@@ -2422,7 +2422,7 @@ PLUGIN_REGISTRY: dict[str, dict] = {
     "browser": {
         "id": "browser",
         "name": "🌐 浏览器上网",
-        "description": "安装 Chromium，让 AI 能通过 browser 命令上网查资料、访问网页、截图。约 100MB。",
+        "description": "Chromium 浏览器，让 AI 能通过 browser 命令上网查资料、访问网页、截图。已预装在 Docker 镜像中（约 100MB，层缓存不重复下载）。",
         "category": "opencli",
         "apt_packages": ["chromium", "chromium-sandbox"],
         "env_vars": {"CHROMIUM_PATH": "/usr/bin/chromium"},
