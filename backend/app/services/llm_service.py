@@ -1178,6 +1178,9 @@ async def build_dm_messages(
     if cross_msgs:
         messages.extend(cross_msgs)
         logger.info(f"  AI {agent.name}: 加入 {len(cross_msgs)} 条跨对话上下文（DM）")
+        # DEBUG: 打印跨对话消息的实际内容
+        for i, cm in enumerate(cross_msgs):
+            logger.info(f"    [{i}] role={cm['role']} content={cm['content'][:120]}...")
 
     # ── 当前私信（最后一个会话标题，位置即语义）──
     messages.append({"role": "system", "content": f"在私信「{partner_name}」(id={partner_user_id})中："})
