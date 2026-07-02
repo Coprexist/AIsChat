@@ -866,10 +866,9 @@ async def _build_cross_conversation_context(
 
             messages.append({"role": "system", "content": f"在群聊「{gname}」(id={gid})中："})
             for m in reversed(recent):
-                role = "user" if m.sender_type == "human" else "assistant"
                 name = name_map.get((m.sender_type, m.sender_id)) or "未知"
                 messages.append({
-                    "role": role,
+                    "role": "system",
                     "content": f"{name}: {(m.content or '')[:200]}",
                 })
     except Exception as e:
@@ -915,10 +914,9 @@ async def _build_cross_conversation_context(
 
                 messages.append({"role": "system", "content": f"在私信「{partner_name}」(id={partner_id})中："})
                 for m in reversed(dm_list):
-                    role = "user" if m.sender_id != agent.user_id else "assistant"
-                    label = partner_name if role == "user" else agent.name
+                    label = partner_name if m.sender_id != agent.user_id else agent.name
                     messages.append({
-                        "role": role,
+                        "role": "system",
                         "content": f"{label}: {(m.content or '')[:200]}",
                     })
     except Exception as e:
