@@ -2412,3 +2412,121 @@ async def apply_provider_preset(
     await db.commit()
 
     return {"message": f"已切换为 {body.provider} 配置", "config": config}
+
+
+# ══════════════════════════════════════════════════════════════
+# 插件管理（按需下载，不预装）
+# ══════════════════════════════════════════════════════════════
+
+PLUGIN_REGISTRY: dict[str, dict] = {
+    "browser": {
+        "id": "browser",
+        "name": "🌐 浏览器上网",
+        "description": "安装 Chromium，让 AI 能通过 browser 命令上网查资料、访问网页、截图。约 100MB。",
+        "category": "opencli",
+        "apt_packages": ["chromium", "chromium-sandbox"],
+        "env_vars": {"CHROMIUM_PATH": "/usr/bin/chromium"},
+        "post_install_hint": "安装后 AI 即可使用 execute_command(command='browser', args=['<session>', 'open', '<url>']) 上网。",
+    },
+}
+
+
+def _check_chromium_installed() -> bool:
+    """检查 Chromium 是否已安装"""
+    import shutil
+    return shutil.which("chromium") is not None
+
+
+def _install_apt_packages(packages: list[str]) -> tuple[bool, str]:
+    """在容器内安装 apt 包。返回 (success, output)"""
+    import subprocess, shutil
+    if shutil.which("apt-get") is None:
+        return False, "当前环境不支持 apt（非 Debian/Ubuntu 系统）"
+    try:
+        result = subprocess.run(
+            ["apt-get", "update"], capture_output=True, text=True, timeout=60,
+        )
+        result = subprocess.run(
+            ["apt-get", "install", "-y", "--no-install-recommends"] + packages,
+            capture_output=True, text=True, timeout=120,
+        )
+        if result.returncode == 0:
+            return True, result.stdout[-500:] if len(result.stdout) > 500 else result.stdout
+        else:
+            return False, result.stderr[-500:] if len(result.stderr) > 500 else result.stderr
+    except subprocess.TimeoutExpired:
+        return False, "安装超时（>120秒），请检查网络或手动安装"
+    except Exception as e:
+        return False, str(e)
+
+
+@router.get("/admin/plugins")
+async def list_plugins(
+    admin: dict = Depends(require_admin),
+):
+    """列出所有可选插件及其安装状态"""
+    plugins = []
+    for pid, pdef in PLUGIN_REGISTRY.items():
+        installed = False
+        if pid == "browser":
+            installed = _check_chromium_installed()
+        plugins.append({
+            "id": pdef["id"],
+            "name": pdef["name"],
+            "description": pdef["description"],
+            "category": pdef["category"],
+            "installed": installed,
+        })
+    return {"plugins": plugins}
+
+
+@router.post("/admin/plugins/{plugin_id}/install")
+async def install_plugin(
+    plugin_id: str,
+    admin: dict = Depends(require_admin),
+):
+    """安装指定插件（下载依赖包）"""
+    pdef = PLUGIN_REGISTRY.get(plugin_id)
+    if not pdef:
+        raise HTTPException(404, f"未知插件: {plugin_id}")
+
+    if plugin_id == "browser":
+        if _check_chromium_installed():
+            return {"message": "Chromium 已安装，无需重复安装", "installed": True}
+        ok, output = _install_apt_packages(pdef["apt_packages"])
+        if ok:
+            return {
+                "message": "Chromium 安装成功！AI 现在可以使用 browser 命令上网。",
+                "installed": True,
+                "hint": pdef["post_install_hint"],
+            }
+        else:
+            raise HTTPException(500, f"安装失败: {output}")
+
+    raise HTTPException(400, f"插件 {plugin_id} 不支持自动安装")
+
+
+@router.post("/admin/plugins/{plugin_id}/uninstall")
+async def uninstall_plugin(
+    plugin_id: str,
+    admin: dict = Depends(require_admin),
+):
+    """卸载指定插件"""
+    pdef = PLUGIN_REGISTRY.get(plugin_id)
+    if not pdef:
+        raise HTTPException(404, f"未知插件: {plugin_id}")
+
+    if plugin_id == "browser":
+        if not _check_chromium_installed():
+            return {"message": "Chromium 未安装", "installed": False}
+        import subprocess
+        try:
+            result = subprocess.run(
+                ["apt-get", "remove", "-y"] + pdef["apt_packages"],
+                capture_output=True, text=True, timeout=60,
+            )
+            return {"message": "Chromium 已卸载", "installed": False}
+        except Exception as e:
+            raise HTTPException(500, f"卸载失败: {e}")
+
+    raise HTTPException(400, f"插件 {plugin_id} 不支持自动卸载")

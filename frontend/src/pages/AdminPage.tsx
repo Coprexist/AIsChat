@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from 'react'
 import { Link, useNavigate, useSearchParams, useOutletContext } from 'react-router-dom'
 import { api } from '../api/client'
-import { Users, Bot, MessageCircle, Ticket, FileText, Activity, Terminal, Database, Globe, BookOpen, ScrollText, ArrowLeft, BarChart3, ChevronRight, Key, Settings, Layers, Wrench, Shield } from 'lucide-react'
+import { Users, Bot, MessageCircle, Ticket, FileText, Activity, Terminal, Database, Globe, BookOpen, ScrollText, ArrowLeft, BarChart3, ChevronRight, Key, Settings, Layers, Wrench, Shield, Plug } from 'lucide-react'
 import { MANUAL_URL, ADMIN_MANUAL_URL } from '../constants'
 import Toggle from '../components/Toggle'
 import { useT } from '../i18n/I18nContext'
@@ -14,8 +14,9 @@ import ApiKeyPoolTab from '../components/ApiKeyPoolTab'
 import SystemPromptTab from '../components/SystemPromptTab'
 import ToolsSkillsTab from '../components/ToolsSkillsTab'
 import AuthSettingsTab from '../components/AuthSettingsTab'
+import PluginManager from '../components/PluginManager'
 
-type Tab = 'overview' | 'users' | 'agents' | 'groups' | 'codes' | 'logs' | 'opencli' | 'backup' | 'federation' | 'convlog' | 'usage' | 'metrics' | 'apipool' | 'system' | 'prompt' | 'tools' | 'auth'
+type Tab = 'overview' | 'users' | 'agents' | 'groups' | 'codes' | 'logs' | 'opencli' | 'backup' | 'federation' | 'convlog' | 'usage' | 'metrics' | 'apipool' | 'system' | 'prompt' | 'tools' | 'auth' | 'plugins'
 type TabCategory = string
 
 const renderContent = (activeTab: Tab) => {
@@ -37,6 +38,7 @@ const renderContent = (activeTab: Tab) => {
     case 'prompt': return <SystemPromptTab />
     case 'tools': return <ToolsSkillsTab />
     case 'auth': return <AuthSettingsTab />
+    case 'plugins': return <PluginManager />
     default: return <OverviewTab />
   }
 }
@@ -62,6 +64,7 @@ export default function AdminPage() {
     { key: 'prompt', label: '系统提示词', icon: Layers, desc: '查看和自定义发给 AI 的系统提示词段', category: t('admin.categorySystem') },
     { key: 'tools', label: t('admin.toolsSkills'), icon: Wrench, desc: t('admin.toolsSkills'), category: t('admin.categorySystem') },
     { key: 'auth', label: t('admin.auth'), icon: Shield, desc: t('admin.authDesc'), category: t('admin.categorySystem') },
+    { key: 'plugins', label: '🧩 插件下载', icon: Plug, desc: '按需安装浏览器上网等扩展功能', category: t('admin.categorySystem') },
   ]
   const initialTab = (searchParams.get('tab') as Tab) || 'overview'
   const [activeTab, setActiveTab] = useState<Tab>(initialTab)
