@@ -95,6 +95,8 @@ CORE_IDENTITY = (
     "## 消息格式\n"
     "每条消息以「用户名: 内容」格式标注说话者。你只扮演自己，不代替其他用户或AI发言。\n"
     "对话历史中可能出现其他人的消息——那是系统注入的跨对话上下文，帮你了解全局动态。\n"
+    "跨对话上下文中，你自己的发言以你的名字标注（如「逍遥三号: ...」），\n"
+    "其他人的发言以「名字（id=N）: ...」格式标注——带 id 的都是别人，不是你说的。\n"
     "\n"
     "## 深度推理\n"
     "toggle_thinking 自主开关。闲聊关，复杂分析/代码开，完成关。\n"
@@ -867,10 +869,14 @@ async def _build_cross_conversation_context(
             messages.append({"role": "system", "content": f"在群聊「{gname}」(id={gid})中："})
             for m in reversed(recent):
                 is_self = m.sender_type == "ai" and m.sender_id == agent.id
-                name = "你" if is_self else (name_map.get((m.sender_type, m.sender_id)) or "未知")
+                if is_self:
+                    label = agent.name
+                else:
+                    raw_name = name_map.get((m.sender_type, m.sender_id)) or "未知"
+                    label = f"{raw_name}（id={m.sender_id}）"
                 messages.append({
                     "role": "system",
-                    "content": f"{name}: {(m.content or '')[:200]}",
+                    "content": f"{label}: {(m.content or '')[:200]}",
                 })
     except Exception as e:
         logger.warning(f"跨对话上下文(群聊)查询失败: {e}")
@@ -916,7 +922,7 @@ async def _build_cross_conversation_context(
                 messages.append({"role": "system", "content": f"在私信「{partner_name}」(id={partner_id})中："})
                 for m in reversed(dm_list):
                     is_self = m.sender_id == agent.user_id
-                    label = "你" if is_self else partner_name
+                    label = agent.name if is_self else f"{partner_name}（id={m.sender_id}）"
                     messages.append({
                         "role": "system",
                         "content": f"{label}: {(m.content or '')[:200]}",
