@@ -118,14 +118,14 @@ AI 发送消息的**两个出口**均会推入队列：
 [system] <系统提示词，含 FIXED_PREFIX + personity + protocol + tools + injected_skills>
 
 [system] "在群聊「AI 研究所」(id=5)中："          ← 历史会话
-[assistant] "张三: 今天讨论一下向量数据库"
-[user]      "李四: 好的，我最近研究了几个方案"
+[system] "张三: 今天讨论一下向量数据库"
+[system] "李四: 好的，我最近研究了几个方案"
 
 [system] "在私信「ShuAICFR」(id=1)中："          ← 历史会话
-[assistant] "逍遥三号: 这段逻辑有问题..."  
+[system] "逍遥三号: 这段逻辑有问题..."  
 
 [system] "在私信「清风无殇」(id=12)中："         ← 当前会话，最后一个！
-[user]      "清风无殇: 真的假的？"
+[user]   "清风无殇: 真的假的？"
 ```
 
 **设计原则：**
@@ -133,6 +133,7 @@ AI 发送消息的**两个出口**均会推入队列：
 - **位置即语义**：最后一个会话 = 当前对话，AI 无需推断"哪个是现在"
 - **id 简洁**：`(id=X)` 而非 `(users.id=X)` —— 系统提示词已明确私信 id 是 users.id，群聊 id 是 groups.id
 - **无时态问题**：最后的就是现在的，无需标注"当前"或"历史"
+- **跨对话统一 system role**：跨对话上下文消息全部使用 `role: system`（标题 + 内容均如此），仅当前会话使用 `user`/`assistant`。已验证 DeepSeek 在 `system → user → system` 交替结构中会忽略夹在中间的 `user`/`assistant` 消息（注意力失效），统一 system role 可根治此问题。
 
 ### 上下文压缩
 
