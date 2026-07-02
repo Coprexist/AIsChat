@@ -794,10 +794,13 @@ async def _build_cross_conversation_context(
     trigger_user_id: int | None = None,
 ) -> list[dict]:
     """
-    为数字生命档/沉浸档/共振 AI 加载其他对话的最近消息。
+    为数字生命档/沉浸档 AI 加载其他对话的最近消息。
 
-    所有跨对话内容合并为一条 system 消息（markdown 标题分隔），
-    与当前对话的 user/assistant 角色清晰分离，避免模型混淆。
+    所有对话的消息都加载到同一上下文中（而非注入一个独立的摘要块），
+    用「在[群名/私信名]中：」标记区分不同对话。AI 切换对话就像人类切换 App 一样自然。
+
+    v0.9.0: 通用/半通用 AI 按 trigger_user_id 过滤，防止跨用户隐私泄露。
+    共鸣 AI 无此限制——所有对话归于同一自我。
 
     返回 [] 表示无跨对话上下文（聊天档 AI 不加载，或该 AI 只有当前这一个对话）。
     """
@@ -805,7 +808,6 @@ async def _build_cross_conversation_context(
     from app.models.group import GroupMember
     from app.models.dm import DMSession, DMMessage
     from app.models.user import User as UserModel
-    from app.models.agent import Agent as AgentModel
 
     profile = getattr(agent, 'config_profile', 'chat') or 'chat'
     ai_type = agent.ai_type or "resonance"
@@ -820,7 +822,7 @@ async def _build_cross_conversation_context(
 
     is_filtered = ai_type in ("general", "semi_general") and trigger_user_id is not None
 
-    sections: list[str] = []
+    messages: list[dict] = []
 
     # ── 1. 收集群聊 ──
     try:
@@ -843,29 +845,15 @@ async def _build_cross_conversation_context(
             recent = await get_recent_messages(db, gid, limit=3)
             if not recent:
                 continue
-
-            # 批量解析发送者名称（本地消息 sender_name 为 NULL）
-            human_ids = {m.sender_id for m in recent if m.sender_type == "human"}
-            ai_ids = {m.sender_id for m in recent if m.sender_type == "ai"}
-            name_map: dict[tuple, str] = {}
-            if human_ids:
-                u_result = await db.execute(
-                    select(UserModel.id, UserModel.username).where(UserModel.id.in_(human_ids))
-                )
-                for row in u_result.all():
-                    name_map[("human", row[0])] = row[1]
-            if ai_ids:
-                a_result = await db.execute(
-                    select(AgentModel.id, AgentModel.name).where(AgentModel.id.in_(ai_ids))
-                )
-                for row in a_result.all():
-                    name_map[("ai", row[0])] = row[1]
-
-            lines = [f"### 在群聊「{gname}」(id={gid})中："]
+            messages.append({"role": "system", "content": f"在群聊「{gname}」(id={gid})中："})
             for m in reversed(recent):
-                name = name_map.get((m.sender_type, m.sender_id)) or "未知"
-                lines.append(f"- {name}: {(m.content or '')[:200]}")
-            sections.append("\n".join(lines))
+                role = "user" if m.sender_type == "human" else "assistant"
+                md = message_to_dict(m)
+                name = md.get("sender_name", "未知")
+                messages.append({
+                    "role": role,
+                    "content": f"{name}: {(m.content or '')[:200]}",
+                })
     except Exception as e:
         logger.warning(f"跨对话上下文(群聊)查询失败: {e}")
 
@@ -907,19 +895,18 @@ async def _build_cross_conversation_context(
                 if not dm_list:
                     continue
 
-                lines = [f"### 在私信「{partner_name}」(id={partner_id})中："]
+                messages.append({"role": "system", "content": f"在私信「{partner_name}」(id={partner_id})中："})
                 for m in reversed(dm_list):
-                    label = partner_name if m.sender_id != agent.user_id else agent.name
-                    lines.append(f"- {label}: {(m.content or '')[:200]}")
-                sections.append("\n".join(lines))
+                    role = "user" if m.sender_id != agent.user_id else "assistant"
+                    label = partner_name if role == "user" else agent.name
+                    messages.append({
+                        "role": role,
+                        "content": f"{label}: {(m.content or '')[:200]}",
+                    })
     except Exception as e:
         logger.warning(f"跨对话上下文(私信)查询失败: {e}")
 
-    if not sections:
-        return []
-
-    content = "## 跨对话上下文（你在其他会话中的最近动态）\n\n" + "\n\n".join(sections)
-    return [{"role": "system", "content": content}]
+    return messages
 
 
 async def build_messages(
@@ -1039,8 +1026,7 @@ async def build_messages(
     )
     if cross_msgs:
         messages.extend(cross_msgs)
-        logger.info(f"  AI {agent.name}: 加入跨对话上下文（{len(cross_msgs[0]['content'])} 字符）")
-        logger.info(f"    {cross_msgs[0]['content'][:300]}...")
+        logger.info(f"  AI {agent.name}: 加入 {len(cross_msgs)} 条跨对话上下文")
 
     # ── 当前群聊（最后一个会话标题，位置即语义）──
     messages.append({"role": "system", "content": f"在群聊「{group_name}」(id={group_id})中："})
@@ -1191,8 +1177,10 @@ async def build_dm_messages(
     )
     if cross_msgs:
         messages.extend(cross_msgs)
-        logger.info(f"  AI {agent.name}: 加入跨对话上下文（DM, {len(cross_msgs[0]['content'])} 字符）")
-        logger.info(f"    {cross_msgs[0]['content'][:300]}...")
+        logger.info(f"  AI {agent.name}: 加入 {len(cross_msgs)} 条跨对话上下文（DM）")
+        # DEBUG: 打印跨对话消息的实际内容
+        for i, cm in enumerate(cross_msgs):
+            logger.info(f"    [{i}] role={cm['role']} content={cm['content'][:120]}...")
 
     # ── 当前私信（最后一个会话标题，位置即语义）──
     messages.append({"role": "system", "content": f"在私信「{partner_name}」(id={partner_user_id})中："})
