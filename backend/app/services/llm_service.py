@@ -845,11 +845,29 @@ async def _build_cross_conversation_context(
             recent = await get_recent_messages(db, gid, limit=3)
             if not recent:
                 continue
+
+            # 批量解析发送者名称（本地消息 sender_name 为 NULL，需查表）
+            from app.models.agent import Agent as AgentModel
+            human_ids = {m.sender_id for m in recent if m.sender_type == "human"}
+            ai_ids = {m.sender_id for m in recent if m.sender_type == "ai"}
+            name_map: dict[tuple, str] = {}
+            if human_ids:
+                u_result = await db.execute(
+                    select(UserModel.id, UserModel.username).where(UserModel.id.in_(human_ids))
+                )
+                for row in u_result.all():
+                    name_map[("human", row[0])] = row[1]
+            if ai_ids:
+                a_result = await db.execute(
+                    select(AgentModel.id, AgentModel.name).where(AgentModel.id.in_(ai_ids))
+                )
+                for row in a_result.all():
+                    name_map[("ai", row[0])] = row[1]
+
             messages.append({"role": "system", "content": f"在群聊「{gname}」(id={gid})中："})
             for m in reversed(recent):
                 role = "user" if m.sender_type == "human" else "assistant"
-                md = message_to_dict(m)
-                name = md.get("sender_name", "未知")
+                name = name_map.get((m.sender_type, m.sender_id)) or "未知"
                 messages.append({
                     "role": role,
                     "content": f"{name}: {(m.content or '')[:200]}",
