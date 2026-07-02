@@ -161,13 +161,11 @@ async def _decide_reply_action(db, agent, context: ActionContext) -> ActionDecis
     except Exception:
         pass
 
-    # Gate 5: 意愿判断
-    if not is_mentioned and w.level == "low":
+    # Gate 5: 意愿判断（使用 AI 的 auto_dnd_threshold，尊重用户设置）
+    threshold = getattr(agent, 'auto_dnd_threshold', None) or 20
+    if not is_mentioned and w.score < threshold:
         return ActionDecision(False, ActionType.NONE, w.score,
-                            f"AI {agent.name} 意愿过低({w.score})")
-    if not is_mentioned and w.level == "medium":
-        return ActionDecision(False, ActionType.NONE, w.score,
-                            f"AI {agent.name} 中意愿({w.score})，仅 @提及 时回复")
+                            f"AI {agent.name} 意愿不足({w.score} < 阈值{threshold})")
 
     return ActionDecision(
         should_act=True,
