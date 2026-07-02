@@ -106,34 +106,38 @@ AI 发送消息的**两个出口**均会推入队列：
 ## 2.4 统一上下文 / Unified Context
 
 > 位置 / Located at: `backend/app/services/llm_service.py:_build_cross_conversation_context()`
-> 设计版本：v1.1.0（统一标题格式 + 上下文压缩）
+> 设计版本：v1.2.0（system role + 自我/他人区分 + A/B 对照验证）
 
 统一上下文让 AI 在响应某个群聊/私信时，能同时看到它在**所有活跃对话**中的最近消息。所有会话使用统一的 `"在XX「名字」(id=X)中："` 标题格式，**当前会话标题放在最后**——位置即语义，AI 自然知道最后的就是现在。
 
 ### 格式设计
 
-所有会话（历史的 + 当前的）采用统一格式，零差异：
+**跨对话上下文全部使用 `role: system`**（标题 + 内容均如此），仅当前会话使用 `user`/`assistant`。
+**AI 自己的发言以纯名字标注**（无 id），**其他人的发言以「名字（id=N）」标注**（带 id 的都是别人）。
 
 ```
-[system] <系统提示词，含 FIXED_PREFIX + personity + protocol + tools + injected_skills>
+[system] <系统提示词>
 
-[system] "在群聊「AI 研究所」(id=5)中："          ← 历史会话
-[system] "张三: 今天讨论一下向量数据库"
-[system] "李四: 好的，我最近研究了几个方案"
+[system] 在群聊「AI 研究所」(id=5)中：               ← 历史会话标题
+[system] 逍遥三号: 今天讨论向量数据库                  ← 自己（无id）
+[system] 张三（id=3）: 好的，我最近研究了几个方案       ← 别人（带id）
+[system] 李四（id=7）: 同意，这个话题很有意思           ← 别人（带id）
 
-[system] "在私信「ShuAICFR」(id=1)中："          ← 历史会话
-[system] "逍遥三号: 这段逻辑有问题..."  
+[system] 在私信「ShuAICFR」(id=1)中：               ← 历史会话标题
+[system] 逍遥三号: 这段逻辑有问题...                  ← 自己（无id）
+[system] ShuAICFR（id=1）: 你说得对，我再看看         ← 别人（带id）
 
-[system] "在私信「清风无殇」(id=12)中："         ← 当前会话，最后一个！
-[user]   "清风无殇: 真的假的？"
+[system] 在私信「清风无殇」(id=12)中：              ← 当前会话，最后一个！
+[user]   清风无殇: 真的假的？                        ← 当前会话用 user/assistant
 ```
 
 **设计原则：**
-- **格式统一**：所有会话全用 `"在XX「名字」(id=X)中："` + `"名字: 内容"`，无例外
-- **位置即语义**：最后一个会话 = 当前对话，AI 无需推断"哪个是现在"
-- **id 简洁**：`(id=X)` 而非 `(users.id=X)` —— 系统提示词已明确私信 id 是 users.id，群聊 id 是 groups.id
-- **无时态问题**：最后的就是现在的，无需标注"当前"或"历史"
-- **跨对话统一 system role**：跨对话上下文消息全部使用 `role: system`（标题 + 内容均如此），仅当前会话使用 `user`/`assistant`。已验证 DeepSeek 在 `system → user → system` 交替结构中会忽略夹在中间的 `user`/`assistant` 消息（注意力失效），统一 system role 可根治此问题。
+- **跨对话统一 system role**：跨对话上下文（标题 + 内容）全部 `role: system`。v1.2.0 A/B 对照验证：DeepSeek 在 `system → user/assistant → system` 交替结构中会忽略夹在中间的 `user`/`assistant` 消息（注意力失效），统一 system role 后 AI 可完整读取所有跨对话内容。
+- **自我/他人显式区分**：自己的发言以 AI 名字标注（如 `逍遥三号: ...`），他人的发言以 `名字（id=N）: ...` 标注。带 id 的都是别人——id 是数据库主键，用户名无法伪造，杜绝「用户名注入冒充 AI 自己」的攻击面。
+- **系统提示词规则**：CORE_IDENTITY 消息格式段写明「带 id 的都是别人，不是你说的」。
+- **位置即语义**：最后一个会话标题 = 当前对话，AI 无需推断"哪个是现在"。
+- **格式统一**：所有会话标题全用 `"在XX「名字」(id=X)中："` 格式，无例外。
+- **无时态问题**：最后的就是现在的，无需标注"当前"或"历史"。
 
 ### 上下文压缩
 

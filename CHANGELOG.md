@@ -24,6 +24,7 @@
 
 ### Fixed
 
+- 🐛 **跨对话上下文 role 混淆（DeepSeek 注意力失效）**：经 A/B 对照验证，DeepSeek 在 `system → user/assistant → system` 交替结构中存在注意力失效——API 收到完整数据，但模型会忽略夹在 system 消息之间的 `user`/`assistant` 消息（能见标题、不见内容）。修复方案：跨对话上下文（标题 + 内容）全部改用 `role: system`，仅当前会话保留 `user`/`assistant`。同时引入自我/他人显式区分——AI 自己的发言保留纯名字（如 `逍遥三号: ...`），他人发言附带 id（如 `清风无殇（id=12）: ...`），系统提示词加规则「带 id 的都是别人」。id 是数据库主键不可伪造，杜绝用户名注入冒充 AI 自己的攻击面。设计文档全量同步（AI对话链机制.md / 三空间模型.md / 记忆架构设计.md / 项目全景报告.md §7.5）。
 - 🐛 **统一上下文修复**：`config_profile=custom` 的共振 AI 此前被 `_build_cross_conversation_context` 排除，修复后仅跳过 `chat` 档和 `general`/`semi_general` 类型，共振 AI 在任何档位下均加载跨对话上下文。
 - 🔧 **set_status 工具注册**：补上 `tools/__init__.py` 中漏掉的 import。
 - 🐛 **纯文件消息修复**：发送纯文件消息（无文字）不再被 `content` 空检查拦截。

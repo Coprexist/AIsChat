@@ -221,20 +221,21 @@ flowchart TB
     Res -->|无过滤| Mem
 ```
 
-### 5.2 统一上下文（v1.1.0）
+### 5.2 统一上下文（v1.2.0）
 
-> v1.1.0 重新设计：所有会话采用统一的 `"在XX「名字」(id=X)中："` 标题格式，当前会话放最后。详见 [`AI对话链机制.md §2.4`](./AI对话链机制.md#24-统一上下文--unified-context)。
+> v1.2.0: 跨对话上下文统一 `role: system` + 自我/他人区分（自己无 id，他人带 id）。v1.1.0 统一标题格式 + 上下文压缩。详见 [`AI对话链机制.md §2.4`](./AI对话链机制.md#24-统一上下文--unified-context)。
 
 ```mermaid
 flowchart LR
-    subgraph UC["AI 统一上下文（所有会话统一格式）"]
+    subgraph UC["AI 统一上下文（跨对话 system role，当前 user/assistant）"]
         Sys["[system] 核心身份 + 人格 + 工具"]
         G1["[system] 在群聊「化学研讨」(id=42)中："]
-        M1["[system] 张三: 上次说的催化剂..."]
+        M1["[system] 逍遥三号: 上次说的催化剂...  ← 自己，无id"]
+        M1b["[system] 张三（id=3）: 我有个想法  ← 别人，带id"]
         G2["[system] 在私信「李四」(id=3)中："]
-        M2["[system] 李四: 你好，我是新来的"]
-        Cur["[system] 在私信「ShuAICFR」(id=1)中： ← 当前，最后一个！"]
-        CurM["[user] ShuAICFR: 你记得..."]
+        M2["[system] 李四（id=3）: 你好，我是新来的"]
+        Cur["[system] 在私信「ShuAICFR」(id=1)中： ← 当前"]
+        CurM["[user] ShuAICFR: 你记得...  ← 当前用 user/assistant"]
     end
     style Sys fill:#7c3aed,stroke:#6d28d9,color:#fff
     style Cur fill:#dc2626,stroke:#b91c1c,color:#fff
