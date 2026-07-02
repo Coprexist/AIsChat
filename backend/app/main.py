@@ -9,6 +9,37 @@ from fastapi.middleware.cors import CORSMiddleware
 from app.config import settings
 from app.database import check_db_connection
 
+logger = logging.getLogger("app.main")
+
+
+async def _start_browser_service():
+    """启动共享 Chromium CDP 服务（稍延迟，等数据库就绪）"""
+    await asyncio.sleep(3)  # 等数据库和网络就绪
+    try:
+        from app.services.browser_service import start, is_running, CDP_PORT
+        if is_running():
+            logger.info(f"🔍 Chromium CDP 已在运行 (port {CDP_PORT})")
+            return
+        ok = await start()
+        if ok:
+            logger.info(f"🔍 Chromium CDP 已启动 (port {CDP_PORT})，所有 AI 共用")
+            # 设置环境变量供 opencli 使用
+            import os
+            os.environ["OPENCLI_CDP_ENDPOINT"] = f"http://127.0.0.1:{CDP_PORT}"
+        else:
+            logger.warning("⚠️  Chromium CDP 启动失败，browser 命令将不可用")
+    except Exception as e:
+        logger.warning(f"⚠️  浏览器服务启动失败（非致命）: {e}")
+
+
+async def _stop_browser_service():
+    """停止共享 Chromium CDP 服务"""
+    try:
+        from app.services.browser_service import stop
+        await stop()
+    except Exception:
+        pass
+
 # 配置日志
 logging.basicConfig(
     level=logging.INFO,
@@ -80,6 +111,9 @@ async def lifespan(app: FastAPI):
     fed_reconnect_task = asyncio.create_task(federation_reconnect())
     fed_profile_sync_task = asyncio.create_task(federation_profile_sync())
 
+    # 启动共享 Chromium 服务（所有 AI 共用的浏览器 CDP）
+    asyncio.create_task(_start_browser_service())
+
     logger.info("✅ 后台 worker 已全部启动（含联邦通信）")
 
     yield
@@ -104,6 +138,9 @@ async def lifespan(app: FastAPI):
             await task
         except asyncio.CancelledError:
             pass
+
+    # 停止共享 Chromium
+    await _stop_browser_service()
     logger.info("后台 worker 已停止")
 
 

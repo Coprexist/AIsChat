@@ -21,6 +21,9 @@ RUN sed -i 's/deb.debian.org/mirrors.tuna.tsinghua.edu.cn/g' /etc/apt/sources.li
 RUN printf '#!/bin/sh\nexec /usr/bin/chromium --no-sandbox --disable-gpu "$@"\n' > /usr/bin/google-chrome \
     && chmod +x /usr/bin/google-chrome
 
+# 共享 CDP 端点（opencli browser 连接此端口）
+ENV OPENCLI_CDP_ENDPOINT=http://127.0.0.1:9222
+
 # 安装 Python 依赖
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt

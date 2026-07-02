@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import { api } from '../api/client'
-import { Download, Trash2, CheckCircle, RefreshCw, Plug } from 'lucide-react'
+import { Play, Square, CheckCircle, RefreshCw, Plug, Circle } from 'lucide-react'
 import { useT } from '../i18n/I18nContext'
 
 interface Plugin {
@@ -9,13 +9,15 @@ interface Plugin {
   description: string
   category: string
   installed: boolean
+  running: boolean
+  port: number | null
 }
 
 export default function PluginManager() {
   const t = useT()
   const [plugins, setPlugins] = useState<Plugin[]>([])
   const [loading, setLoading] = useState(true)
-  const [installing, setInstalling] = useState<string | null>(null)
+  const [toggling, setToggling] = useState<string | null>(null)
   const [message, setMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null)
 
   const fetchPlugins = async () => {
@@ -23,7 +25,7 @@ export default function PluginManager() {
       const res = await api.get('/admin/plugins')
       setPlugins(res.data.plugins)
     } catch (e: any) {
-      setMessage({ type: 'error', text: e?.response?.data?.detail || '加载插件列表失败' })
+      setMessage({ type: 'error', text: e?.response?.data?.detail || '加载失败' })
     } finally {
       setLoading(false)
     }
@@ -31,32 +33,24 @@ export default function PluginManager() {
 
   useEffect(() => { fetchPlugins() }, [])
 
-  const handleInstall = async (pluginId: string) => {
-    setInstalling(pluginId)
-    setMessage(null)
-    try {
-      const res = await api.post(`/admin/plugins/${pluginId}/install`)
-      setMessage({ type: 'success', text: res.data.message || '安装成功' })
-      await fetchPlugins()
-    } catch (e: any) {
-      setMessage({ type: 'error', text: e?.response?.data?.detail || '安装失败' })
-    } finally {
-      setInstalling(null)
-    }
-  }
+  // 每 5 秒刷新状态
+  useEffect(() => {
+    const iv = setInterval(fetchPlugins, 5000)
+    return () => clearInterval(iv)
+  }, [])
 
-  const handleUninstall = async (pluginId: string) => {
-    if (!confirm('确定要卸载此插件吗？AI 将无法使用相关功能。')) return
-    setInstalling(pluginId)
+  const handleToggle = async (plugin: Plugin) => {
+    setToggling(plugin.id)
     setMessage(null)
+    const action = plugin.running ? 'stop' : 'start'
     try {
-      const res = await api.post(`/admin/plugins/${pluginId}/uninstall`)
-      setMessage({ type: 'success', text: res.data.message || '已卸载' })
+      const res = await api.post(`/admin/plugins/${plugin.id}/${action}`)
+      setMessage({ type: 'success', text: res.data.message || (plugin.running ? '已停止' : '已启动') })
       await fetchPlugins()
     } catch (e: any) {
-      setMessage({ type: 'error', text: e?.response?.data?.detail || '卸载失败' })
+      setMessage({ type: 'error', text: e?.response?.data?.detail || '操作失败' })
     } finally {
-      setInstalling(null)
+      setToggling(null)
     }
   }
 
@@ -71,9 +65,9 @@ export default function PluginManager() {
   return (
     <div className="flex-1 overflow-y-auto p-6 space-y-6">
       <div>
-        <h2 className="text-base font-semibold text-textPrimary mb-1">🧩 插件下载</h2>
+        <h2 className="text-base font-semibold text-textPrimary mb-1">🧩 插件管理</h2>
         <p className="text-sm text-textSecondary">
-          按需安装扩展功能。未安装的插件不会占用系统资源，按需选择。
+          管理扩展服务。启动后所有 AI 共享同一实例，无需每个 AI 单独运行。
         </p>
       </div>
 
@@ -99,31 +93,44 @@ export default function PluginManager() {
                   <Plug size={16} className="text-textMuted shrink-0" />
                   <h3 className="font-medium text-textPrimary">{plugin.name}</h3>
                   {plugin.installed && (
-                    <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-medium bg-emerald-100 dark:bg-emerald-900/30 text-emerald-700 dark:text-emerald-400">
-                      <CheckCircle size={11} /> 已安装
+                    plugin.running ? (
+                      <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-medium bg-emerald-100 dark:bg-emerald-900/30 text-emerald-700 dark:text-emerald-400">
+                        <CheckCircle size={11} /> 运行中 :{plugin.port}
+                      </span>
+                    ) : (
+                      <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-medium bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-400">
+                        <Circle size={11} /> 已停止
+                      </span>
+                    )
+                  )}
+                  {!plugin.installed && (
+                    <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-medium bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-400">
+                      未安装
                     </span>
                   )}
                 </div>
                 <p className="text-sm text-textSecondary">{plugin.description}</p>
               </div>
-              <button
-                onClick={() => plugin.installed ? handleUninstall(plugin.id) : handleInstall(plugin.id)}
-                disabled={installing === plugin.id}
-                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium transition-colors shrink-0 ${
-                  plugin.installed
-                    ? 'bg-red-50 dark:bg-red-900/20 text-red-600 dark:text-red-400 hover:bg-red-100 dark:hover:bg-red-900/40 border border-red-200 dark:border-red-800'
-                    : 'bg-primary-500 text-white hover:bg-primary-600'
-                } disabled:opacity-50`}
-              >
-                {installing === plugin.id ? (
-                  <RefreshCw size={14} className="animate-spin" />
-                ) : plugin.installed ? (
-                  <Trash2 size={14} />
-                ) : (
-                  <Download size={14} />
-                )}
-                {installing === plugin.id ? '处理中…' : plugin.installed ? '卸载' : '下载安装'}
-              </button>
+              {plugin.installed && (
+                <button
+                  onClick={() => handleToggle(plugin)}
+                  disabled={toggling === plugin.id}
+                  className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium transition-colors shrink-0 ${
+                    plugin.running
+                      ? 'bg-red-50 dark:bg-red-900/20 text-red-600 dark:text-red-400 hover:bg-red-100 dark:hover:bg-red-900/40 border border-red-200 dark:border-red-800'
+                      : 'bg-emerald-500 text-white hover:bg-emerald-600'
+                  } disabled:opacity-50`}
+                >
+                  {toggling === plugin.id ? (
+                    <RefreshCw size={14} className="animate-spin" />
+                  ) : plugin.running ? (
+                    <Square size={14} />
+                  ) : (
+                    <Play size={14} />
+                  )}
+                  {toggling === plugin.id ? '处理中…' : plugin.running ? '停止' : '启动'}
+                </button>
+              )}
             </div>
           </div>
         ))}
@@ -132,7 +139,7 @@ export default function PluginManager() {
       {plugins.length === 0 && (
         <div className="text-center py-12 text-textMuted">
           <Plug size={32} className="mx-auto mb-3 opacity-50" />
-          <p className="text-sm">暂无可下载的插件</p>
+          <p className="text-sm">暂无可管理的插件</p>
         </div>
       )}
     </div>
