@@ -15,9 +15,10 @@ RUN sed -i 's/deb.debian.org/mirrors.tuna.tsinghua.edu.cn/g' /etc/apt/sources.li
     && apt-get install -y --no-install-recommends nodejs \
     && npm config set registry https://registry.npmmirror.com \
     && npm install -g @jackwener/opencli \
-    && rm -rf /var/lib/apt/lists/* \
-    # Chromium Docker wrapper：拦截所有 chrome 调用，注入 --no-sandbox
-    && printf '#!/bin/sh\nexec /usr/bin/chromium --no-sandbox --disable-gpu "$@"\n' > /usr/bin/google-chrome \
+    && rm -rf /var/lib/apt/lists/*
+
+# Chromium Docker wrapper：拦截所有 chrome 调用，注入 --no-sandbox（独立层，改脚本不触发 apt 重下载）
+RUN printf '#!/bin/sh\nexec /usr/bin/chromium --no-sandbox --disable-gpu "$@"\n' > /usr/bin/google-chrome \
     && chmod +x /usr/bin/google-chrome
 
 # 安装 Python 依赖
