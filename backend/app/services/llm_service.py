@@ -866,12 +866,11 @@ async def _build_cross_conversation_context(
 
             messages.append({"role": "system", "content": f"在群聊「{gname}」(id={gid})中："})
             for m in reversed(recent):
-                name = name_map.get((m.sender_type, m.sender_id)) or "未知"
                 is_self = m.sender_type == "ai" and m.sender_id == agent.id
-                prefix = f"{name}（你）" if is_self else name
+                name = "你" if is_self else (name_map.get((m.sender_type, m.sender_id)) or "未知")
                 messages.append({
                     "role": "system",
-                    "content": f"{prefix}: {(m.content or '')[:200]}",
+                    "content": f"{name}: {(m.content or '')[:200]}",
                 })
     except Exception as e:
         logger.warning(f"跨对话上下文(群聊)查询失败: {e}")
@@ -917,7 +916,7 @@ async def _build_cross_conversation_context(
                 messages.append({"role": "system", "content": f"在私信「{partner_name}」(id={partner_id})中："})
                 for m in reversed(dm_list):
                     is_self = m.sender_id == agent.user_id
-                    label = partner_name if not is_self else f"{agent.name}（你）"
+                    label = "你" if is_self else partner_name
                     messages.append({
                         "role": "system",
                         "content": f"{label}: {(m.content or '')[:200]}",
