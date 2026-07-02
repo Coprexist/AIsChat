@@ -227,12 +227,12 @@ flowchart TB
 
 ```mermaid
 flowchart LR
-    subgraph UC["AI 统一上下文（跨对话 system role，当前 user/assistant）"]
+    subgraph UC["AI 统一上下文（所有会话统一格式）"]
         Sys["[system] 核心身份 + 人格 + 工具"]
         G1["[system] 在群聊「化学研讨」(id=42)中："]
-        M1["[system] 张三: 上次说的催化剂..."]
+        M1["[assistant] 张三: 上次说的催化剂..."]
         G2["[system] 在私信「李四」(id=3)中："]
-        M2["[system] 李四: 你好，我是新来的"]
+        M2["[user] 李四: 你好，我是新来的"]
         Cur["[system] 在私信「ShuAICFR」(id=1)中： ← 当前，最后一个！"]
         CurM["[user] ShuAICFR: 你记得..."]
     end

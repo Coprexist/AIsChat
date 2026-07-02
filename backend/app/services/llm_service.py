@@ -790,10 +790,10 @@ async def _build_cross_conversation_context(
     trigger_user_id: int | None = None,
 ) -> list[dict]:
     """
-    为数字生命档/沉浸档/共振 AI 加载其他对话的最近消息。
+    为数字生命档/沉浸档 AI 加载其他对话的最近消息。
 
-    v1.1.0: 所有跨对话消息统一 role=system（与当前对话的 user/assistant 区分），
-    使用统一的「在XX「名字」(id=X)中：」标题格式。当前会话标题始终在最后。
+    所有对话的消息都加载到同一上下文中（而非注入一个独立的摘要块），
+    用「在[群名/私信名]中：」标记区分不同对话。AI 切换对话就像人类切换 App 一样自然。
 
     v0.9.0: 通用/半通用 AI 按 trigger_user_id 过滤，防止跨用户隐私泄露。
     共鸣 AI 无此限制——所有对话归于同一自我。
@@ -843,10 +843,11 @@ async def _build_cross_conversation_context(
                 continue
             messages.append({"role": "system", "content": f"在群聊「{gname}」(id={gid})中："})
             for m in reversed(recent):
+                role = "user" if m.sender_type == "human" else "assistant"
                 md = message_to_dict(m)
                 name = md.get("sender_name", "未知")
                 messages.append({
-                    "role": "system",
+                    "role": role,
                     "content": f"{name}: {(m.content or '')[:200]}",
                 })
     except Exception as e:
@@ -892,9 +893,10 @@ async def _build_cross_conversation_context(
 
                 messages.append({"role": "system", "content": f"在私信「{partner_name}」(id={partner_id})中："})
                 for m in reversed(dm_list):
-                    label = partner_name if m.sender_id != agent.user_id else agent.name
+                    role = "user" if m.sender_id != agent.user_id else "assistant"
+                    label = partner_name if role == "user" else agent.name
                     messages.append({
-                        "role": "system",
+                        "role": role,
                         "content": f"{label}: {(m.content or '')[:200]}",
                     })
     except Exception as e:
