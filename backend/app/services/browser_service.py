@@ -55,6 +55,7 @@ async def start() -> bool:
             "--disable-gpu",
             "--disable-dev-shm-usage",
             "--disable-software-rasterizer",
+            "--disable-features=AsyncDNS",
             f"--remote-debugging-port={CDP_PORT}",
             "--remote-allow-origins=*",
             stdout=asyncio.subprocess.DEVNULL,

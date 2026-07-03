@@ -20,9 +20,9 @@ RUN sed -i 's/deb.debian.org/mirrors.tuna.tsinghua.edu.cn/g' /etc/apt/sources.li
 # Chromium Docker wrappers：不管 opencli 调 google-chrome/chromium/puppeteer 哪个，
 # 都注入 --no-sandbox --disable-gpu（独立层，改脚本不触发 apt 重下载）
 RUN mv /usr/bin/chromium /usr/bin/chromium.bin \
-    && printf '#!/bin/sh\nexec /usr/bin/chromium.bin --no-sandbox --disable-gpu "$@"\n' > /usr/bin/chromium \
+    && printf '#!/bin/sh\nexec /usr/bin/chromium.bin --no-sandbox --disable-gpu --disable-features=AsyncDNS "$@"\n' > /usr/bin/chromium \
     && chmod +x /usr/bin/chromium \
-    && printf '#!/bin/sh\nexec /usr/bin/chromium.bin --no-sandbox --disable-gpu "$@"\n' > /usr/bin/google-chrome \
+    && printf '#!/bin/sh\nexec /usr/bin/chromium.bin --no-sandbox --disable-gpu --disable-features=AsyncDNS "$@"\n' > /usr/bin/google-chrome \
     && chmod +x /usr/bin/google-chrome
 
 # 共享 CDP 端点（opencli browser 连接此端口）
