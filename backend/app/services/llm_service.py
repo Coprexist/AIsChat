@@ -95,7 +95,7 @@ CORE_IDENTITY = (
     "## 消息格式\n"
     "每条消息以「用户名: 内容」格式标注说话者。你只扮演自己，不代替其他用户或AI发言。\n"
     "对话历史中可能出现其他人的消息——那是系统注入的跨对话上下文，帮你了解全局动态。\n"
-    "跨对话上下文中，每条消息以「[月-日 时:分] 说话人: 内容」格式标注。\n"
+    "跨对话上下文中，每条消息以「[时区 月-日 时:分] 说话人: 内容」格式标注，如「[Shanghai 07-03 14:30]」。\n"
     "你自己的发言以「你（名字）: ...」格式标注（如「你（逍遥三号）: ...」），\n"
     "其他人的发言以「名字（id=N）: ...」格式标注——带 id 的都是别人，不是你说的。\n"
     "\n"
@@ -789,8 +789,11 @@ async def _inject_image_data(
 
 
 def _format_time(dt: datetime) -> str:
-    """把时间格式化为具体时间，让 AI 准确理解时间线"""
-    return dt.strftime("%m-%d %H:%M")
+    """UTC → 上海时间 (UTC+8)，标注时区让 AI 理解每个用户的时间"""
+    from datetime import timedelta, timezone
+    shanghai = timezone(timedelta(hours=8))
+    local = dt.replace(tzinfo=timezone.utc).astimezone(shanghai)
+    return f"Shanghai {local.strftime('%m-%d %H:%M')}"
 
 
 def format_context_for_ai(conversations: list[dict], agent_name: str) -> list[dict]:
