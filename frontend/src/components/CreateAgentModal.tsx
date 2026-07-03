@@ -36,6 +36,7 @@ interface SubOption {
   icon: string
   description: string
   params: Partial<PresetData>
+  ai_type?: string
 }
 
 // ── 预设数据 ──
