@@ -93,11 +93,10 @@ CORE_IDENTITY = (
     "发完不确认（对方已收到）。不把话写 content 里。\n"
     "\n"
     "## 消息格式\n"
-    "每条消息以「[时区 月-日 时:分] 用户名: 内容」格式标注，如「[Shanghai 07-03 14:30] 浮生: 你好」。\n"
-    "跨对话上下文中你自己的发言以「你（名字）: ...」格式标注，别人的以「名字（id=N）: ...」——带 id 的都是别人。\n"
+    "每条消息以「[时区 月-日 时:分] 说话人: 内容」格式标注。\n"
+    "你自己的消息显示为「你（名字）」（如「你（逍遥三号）: 你好」）。\n"
+    "别人的消息显示为「名字（id=N）」（如「浮生（id=12）: 你好」）——带 id 的都是别人。\n"
     "你只扮演自己，不代替其他用户或AI发言。\n"
-    "你自己的发言以「你（名字）: ...」格式标注（如「你（逍遥三号）: ...」），\n"
-    "其他人的发言以「名字（id=N）: ...」格式标注——带 id 的都是别人，不是你说的。\n"
     "\n"
     "## 深度推理\n"
     "toggle_thinking 自主开关。闲聊关，复杂分析/代码开，完成关。\n"
@@ -139,8 +138,8 @@ PROTOCOL_DIGITAL_LIFE = (
     "主动管理自己的在线状态（switch_state / set_dnd）。用闹钟系统（set_alarm / list_alarms）维持生活节奏——\n"
     "定时检查待办、整理记忆、发起社交。对话结束自动设闹钟防止「睡死」。\n"
     "用工作区（manage_workspace）记录 TODO/PLAN/JOURNAL，用 execute_command 操作个人文件空间。\n"
-    "## 跨对话\n"
-    "记忆跨所有对话共享，可用 cross_post 跨群传递信息。注意隐私边界。\n"
+    "## 多个会话\n"
+    "你同时参与多个群聊和私信，记忆共享，可用 cross_post 跨群传递信息。注意隐私边界。\n"
 )
 
 # v0.5.0: DM 行为协议（私信对话精简版）
@@ -798,7 +797,7 @@ def _format_time(dt: datetime) -> str:
 
 def format_message(msg: dict, agent_name: str = "") -> str:
     """
-    纯函数：统一格式化单条消息。跨对话上下文、当前对话、向量检索全部走这里。
+    纯函数：统一格式化单条消息。多会话上下文、当前对话、向量检索全部走这里。
     结构化输入 → 一行文本输出。加字段只改这里。
 
     msg 结构: {time, speaker_name, speaker_id?, is_self?, content, prefix?}
@@ -851,7 +850,7 @@ async def _build_cross_conversation_context(
     trigger_user_id: int | None = None,
 ) -> list[dict]:
     """
-    为数字生命档/沉浸档 AI 收集并格式化跨对话上下文。
+    为数字生命档/沉浸档 AI 收集并格式化多会话上下文。
 
     两层架构：
     1. 数据层（本函数）：查询 DB，产出结构化数据
@@ -930,7 +929,7 @@ async def _build_cross_conversation_context(
                 })
             conversations.append({"type": "group", "name": gname, "id": gid, "messages": msgs})
     except Exception as e:
-        logger.warning(f"跨对话上下文(群聊)查询失败: {e}")
+        logger.warning(f"多会话上下文(群聊)查询失败: {e}")
 
     # ── 2. 收集私信数据 ──
     try:
@@ -983,7 +982,7 @@ async def _build_cross_conversation_context(
                     })
                 conversations.append({"type": "dm", "name": partner_name, "id": partner_id, "messages": msgs})
     except Exception as e:
-        logger.warning(f"跨对话上下文(私信)查询失败: {e}")
+        logger.warning(f"多会话上下文(私信)查询失败: {e}")
 
     return format_context_for_ai(conversations, agent.name)
 
@@ -1099,13 +1098,13 @@ async def build_messages(
 
     messages = [{"role": "system", "content": system_prompt}]
 
-    # ── 统一上下文：数字生命档/沉浸档/共振 → 加载跨对话上下文 ──
+    # ── 统一上下文：数字生命档/沉浸档/共振 → 加载多会话上下文 ──
     cross_msgs = await _build_cross_conversation_context(
         db, agent, current_group_id=group_id, trigger_user_id=trigger_user_id,
     )
     if cross_msgs:
         messages.extend(cross_msgs)
-        logger.info(f"  AI {agent.name}: 加入 {len(cross_msgs)} 条跨对话上下文")
+        logger.info(f"  AI {agent.name}: 加入 {len(cross_msgs)} 条多会话上下文")
 
     # ── 当前群聊（最后一个会话标题，位置即语义）──
     messages.append({"role": "system", "content": f"在群聊「{group_name}」(id={group_id})中："})
@@ -1255,13 +1254,13 @@ async def build_dm_messages(
 
     messages = [{"role": "system", "content": system_prompt}]
 
-    # ── 统一上下文：数字生命档/沉浸档/共振 → 加载跨对话上下文 ──
+    # ── 统一上下文：数字生命档/沉浸档/共振 → 加载多会话上下文 ──
     cross_msgs = await _build_cross_conversation_context(
         db, agent, current_session_id=session_id, trigger_user_id=trigger_user_id,
     )
     if cross_msgs:
         messages.extend(cross_msgs)
-        logger.info(f"  AI {agent.name}: 加入 {len(cross_msgs)} 条跨对话上下文（DM）")
+        logger.info(f"  AI {agent.name}: 加入 {len(cross_msgs)} 条多会话上下文（DM）")
         # DEBUG: 打印跨对话消息的实际内容
         for i, cm in enumerate(cross_msgs):
             logger.info(f"    [{i}] role={cm['role']} content={cm['content'][:120]}...")
