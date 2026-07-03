@@ -59,6 +59,16 @@ MIGRATIONS: list[tuple[str, str]] = [
               AND gm.member_id = g.owner_id
         )""",
     ),
+    # ── v2.0.2: 修复每个群多个 owner 的错误数据 ──
+    (
+        "重复群主清理",
+        """UPDATE group_members gm
+        SET role = 'member'
+        WHERE role = 'owner'
+          AND (gm.member_type, gm.member_id) NOT IN (
+              SELECT g.owner_type, g.owner_id FROM groups g WHERE g.id = gm.group_id
+          )""",
+    ),
 ]
 
 

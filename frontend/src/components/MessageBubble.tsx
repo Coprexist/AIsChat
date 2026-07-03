@@ -88,7 +88,7 @@ const MessageBubble = memo(function MessageBubble({
   }
 
   const bubbleBg = isMine
-    ? 'bg-primary-600 text-white rounded-2xl rounded-tr-md shadow-lg shadow-primary-500/15'
+    ? 'bg-primary-500 dark:bg-primary-600 text-white rounded-2xl rounded-tr-md shadow-lg shadow-primary-500/15'
     : senderType === 'system'
       ? 'bg-rose-50 dark:bg-rose-900/20 text-rose-900 dark:text-rose-300 rounded-2xl rounded-tl-md border border-rose-200 dark:border-rose-800'
       : 'bg-surface text-textPrimary rounded-2xl rounded-tl-md border border-border'

@@ -81,6 +81,7 @@ async def run_migrations():
             await _migrate_group_members_user_id(db)  # v2.0.0 AI 群成员统一用 user_id
             await _migrate_group_invitations(db)  # v2.0.0 群邀请卡片系统
             await _migrate_group_owner_membership(db)  # v2.0.1 修复群主缺失的群成员记录
+            await _migrate_fix_duplicate_owners(db)     # v2.0.2 修复错误的多群主记录
             await _fix_column_types(db)  # 必须是最后一个：修复老部署的列类型不匹配
             await db.commit()
             logger.info("✅ 数据库迁移检查完成")
@@ -2230,6 +2231,30 @@ async def _migrate_group_owner_membership(db):
             logger.info(f"     group={row[0]} {row[1]}={row[2]} role=owner")
     else:
         logger.info("  ⏭ 群主成员记录完整，无需修复")
+
+
+async def _migrate_fix_duplicate_owners(db):
+    """
+    v2.0.2: 修复每个群多个 owner 的数据错误（幂等）。
+
+    将不是 groups 表指定群主的人从 owner 降为 member。
+    """
+    result = await db.execute(text("""
+        UPDATE group_members gm
+        SET role = 'member'
+        WHERE role = 'owner'
+          AND (gm.member_type, gm.member_id) NOT IN (
+              SELECT g.owner_type, g.owner_id FROM groups g WHERE g.id = gm.group_id
+          )
+        RETURNING group_id, member_type, member_id
+    """))
+    rows = result.fetchall()
+    if rows:
+        logger.info(f"  ✅ 已修复 {len(rows)} 条错误的群主记录（降为 member）")
+        for row in rows:
+            logger.info(f"     group={row[0]} {row[1]}={row[2]} owner→member")
+    else:
+        logger.info("  ⏭ 群主角色正确，无需修复")
 
 
 async def _fix_column_types(db):
