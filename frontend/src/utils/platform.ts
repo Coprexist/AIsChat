@@ -29,3 +29,10 @@ export function getWsUrl(): string {
   const host = instanceUrl.replace(/^https?:\/\//, '')
   return `${protocol}://${host}/ws`
 }
+
+/** 解析 WebSocket URL 为协议和主机部分（纯函数） */
+export function parseWsUrl(url: string): { protocol: 'wss' | 'ws'; host: string } | null {
+  const m = url.match(/^(wss?):\/\/([^/]+)/)
+  if (!m) return null
+  return { protocol: m[1] as 'wss' | 'ws', host: m[2] }
+}

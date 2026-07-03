@@ -12,7 +12,7 @@ import { formatFileSize } from '../utils/format'
 import { avatarGradient } from '../utils/avatar'
 import { useLang, useT } from '../i18n/I18nContext'
 import { api } from '../api/client'
-import MermaidBlock from './MermaidBlock'
+import CodeRenderer from './shared/CodeRenderer'
 import FilePreviewModal from './FilePreviewModal'
 import InvitationCard from './InvitationCard'
 
@@ -25,26 +25,7 @@ const BouncingDots = ({ className = '' }: { className?: string }) => (
   </span>
 );
 
-/** 聊天消息中的 code 渲染：只对 block code/mermaid 做溢出控制，inline code 不干预 */
-function ChatCodeRenderer({ className, children, inline, ...props }: any) {
-  const match = /language-(\w+)/.exec(className || '')
-  const code = String(children).replace(/\n$/, '')
-
-  if (!inline && match && match[1] === 'mermaid') {
-    return <MermaidBlock code={code} compact />
-  }
-
-  if (inline) {
-    // 行内代码：允许断词换行（长 token 无空格时也能折行），但不阻止跟随文本自然流排
-    return <code className={`bg-black/5 dark:bg-white/10 rounded px-1 py-0.5 text-[0.85em] break-all ${className || ''}`}>{children}</code>
-  }
-  // 块级代码（```）：横向滚动，不换行
-  return (
-    <code className={`block overflow-x-auto whitespace-pre rounded-xl bg-black/5 dark:bg-white/5 border border-border/50 p-4 text-xs text-textPrimary ${className || ''}`}>
-      {children}
-    </code>
-  )
-}
+// ChatCodeRenderer ——已迁移到 components/shared/CodeRenderer.tsx
 
 interface MessageBubbleProps {
   senderName: string
@@ -190,7 +171,7 @@ const MessageBubble = memo(function MessageBubble({
             <Markdown
               remarkPlugins={[remarkGfm, remarkMath, remarkBreaks]}
               rehypePlugins={[rehypeKatex]}
-              components={{ code: ChatCodeRenderer }}
+              components={{ code: CodeRenderer }}
             >
               {content}
             </Markdown>

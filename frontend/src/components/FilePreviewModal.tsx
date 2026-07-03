@@ -8,25 +8,10 @@ import { Download, X, ArrowLeft, FileIcon, Loader2, AlertTriangle, ZoomIn, ZoomO
 import { useT } from '../i18n/I18nContext'
 import { formatFileSize } from '../utils/format'
 import { isTextPreviewable, getCodeLang, isMarkdownFile, resolveMimeType, EXT_LANG_MAP } from '../utils/mime'
-import MermaidBlock from './MermaidBlock'
+import CodeRenderer from './shared/CodeRenderer'
 import ForwardFileModal from './ForwardFileModal'
 
-/** 代码块渲染器（复用 MessageBubble 的设计） */
-function FileCodeRenderer({ className, children, inline, ...props }: any) {
-  const match = /language-(\w+)/.exec(className || '')
-  const code = String(children).replace(/\n$/, '')
-  if (!inline && match && match[1] === 'mermaid') {
-    return <MermaidBlock code={code} compact />
-  }
-  if (inline) {
-    return <code className={`bg-black/5 dark:bg-white/10 rounded px-1 py-0.5 text-[0.85em] break-all ${className || ''}`}>{children}</code>
-  }
-  return (
-    <code className={`block overflow-x-auto whitespace-pre rounded-xl bg-black/5 dark:bg-white/5 border border-border/50 p-4 text-xs text-textPrimary ${className || ''}`}>
-      {children}
-    </code>
-  )
-}
+// FileCodeRenderer ——已迁移到 components/shared/CodeRenderer.tsx
 
 interface FilePreviewModalProps {
   fileId: number
@@ -255,7 +240,7 @@ export default function FilePreviewModal({ fileId, fileName, fileSize, mimeType,
                     <Markdown
                       remarkPlugins={[remarkGfm, remarkMath, remarkBreaks]}
                       rehypePlugins={[rehypeKatex]}
-                      components={{ code: FileCodeRenderer }}
+                      components={{ code: CodeRenderer }}
                     >
                       {content || ''}
                     </Markdown>
