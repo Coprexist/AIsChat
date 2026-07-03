@@ -18,6 +18,7 @@ CONFIG_PROFILES = {
     "chat": {
         "name": "聊天档",
         "description": "被动响应 · 低成本 — 只回答你问的，不多说一句",
+        "ai_type": "general",
         # 模型参数
         "temperature": 0.7, "top_p": 0.9, "presence_penalty": 0.3, "frequency_penalty": 0.3,
         "thinking_enabled": False,
@@ -39,6 +40,7 @@ CONFIG_PROFILES = {
     "immersive": {
         "name": "深度沉浸档",
         "description": "半自主 · 按需参与 — 能自己进群、深度响应，但不主动制造话题",
+        "ai_type": "resonance",
         # 模型参数
         "temperature": 0.9, "top_p": 0.95, "presence_penalty": 0.5, "frequency_penalty": 0.5,
         "thinking_enabled": True,
@@ -60,6 +62,7 @@ CONFIG_PROFILES = {
     "digital_life": {
         "name": "数字生命档",
         "description": "持续在线 · 主动行为 — 自己思考、整理、交友、冲浪",
+        "ai_type": "resonance",
         # 模型参数
         "temperature": 1.1, "top_p": 0.95, "presence_penalty": 0.6, "frequency_penalty": 0.6,
         "thinking_enabled": True,

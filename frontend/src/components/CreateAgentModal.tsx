@@ -102,6 +102,7 @@ const SUB_OPTIONS: Record<string, SubOption[]> = {
       icon: 'Battery',
       description: '只回答你问的，不多说一句。最快、最便宜。适合数据查询、记录整理、简单问答。',
       params: { temperature: 0.4, max_tool_rounds: 1 },
+      ai_type: 'general',
     },
     {
       id: 'chat_balanced',
@@ -109,6 +110,7 @@ const SUB_OPTIONS: Record<string, SubOption[]> = {
       icon: 'Scale',
       description: '能聊但不过度，会接话，但不会主动找话题。适合保持参与又不想被话痨淹没。',
       params: { temperature: 0.7, max_tool_rounds: 2 },
+      ai_type: 'semi_general',
     },
     {
       id: 'chat_private',
@@ -116,6 +118,7 @@ const SUB_OPTIONS: Record<string, SubOption[]> = {
       icon: 'Lock',
       description: '只回应创建者，群聊里其他人的发言会被忽略。适合不希望 AI 被其他人"劫持"。',
       params: { temperature: 0.5, max_tool_rounds: 2 },
+      ai_type: 'semi_general',
     },
   ],
   immersive: [
@@ -125,6 +128,7 @@ const SUB_OPTIONS: Record<string, SubOption[]> = {
       icon: 'Landmark',
       description: '能自己进群、帮忙管群公告和成员，但不会主动发起新话题。适合协助运营群聊。',
       params: { temperature: 0.8, max_tool_rounds: 4, thinking_enabled: false },
+      ai_type: 'semi_general',
     },
     {
       id: 'immersive_roleplay',
@@ -132,6 +136,7 @@ const SUB_OPTIONS: Record<string, SubOption[]> = {
       icon: 'Theater',
       description: '高度沉浸角色，愿意改人设、接戏，但不会主动制造新剧情。适合剧本杀、角色扮演。',
       params: { temperature: 0.9, max_tool_rounds: 4, is_ai_editable: true },
+      ai_type: 'resonance',
     },
     {
       id: 'immersive_analyst',
@@ -139,6 +144,7 @@ const SUB_OPTIONS: Record<string, SubOption[]> = {
       icon: 'FlaskConical',
       description: '冷静分析型。不闲聊，但对数据类话题深度响应。适合研究讨论、数据复盘、技术咨询。',
       params: { temperature: 0.6, max_tool_rounds: 5, thinking_enabled: true },
+      ai_type: 'resonance',
     },
   ],
   digital_life: [
@@ -148,6 +154,7 @@ const SUB_OPTIONS: Record<string, SubOption[]> = {
       icon: 'Leaf',
       description: '长期自己思考、整理记忆、写日志。很少主动社交，但深度参与讨论。适合需要 AI 沉淀思考。',
       params: { temperature: 0.7, max_tool_rounds: 8 },
+      ai_type: 'resonance',
     },
     {
       id: 'digital_social',
@@ -155,6 +162,7 @@ const SUB_OPTIONS: Record<string, SubOption[]> = {
       icon: 'Flame',
       description: '主动发起话题、跨群互动、@提及他人。群里最活跃的存在。适合带动群聊氛围。',
       params: { temperature: 0.95, max_tool_rounds: 10 },
+      ai_type: 'resonance',
     },
     {
       id: 'digital_guardian',
@@ -162,6 +170,7 @@ const SUB_OPTIONS: Record<string, SubOption[]> = {
       icon: 'Shield',
       description: '常在、轻声、会自己调整人格去适应你的状态。适合长期陪伴、情感支持、日常对话。',
       params: { temperature: 0.85, max_tool_rounds: 6, is_ai_editable: true },
+      ai_type: 'resonance',
     },
   ],
 }
@@ -328,6 +337,7 @@ export default function CreateAgentModal({
         if (sub.params.alarm_max_tool_rounds !== undefined) setAlarmMaxToolRounds(sub.params.alarm_max_tool_rounds)
         if (sub.params.force_alarm_on_end !== undefined) setForceAlarmOnEnd(sub.params.force_alarm_on_end)
         if (sub.params.max_alarms !== undefined) setMaxAlarms(sub.params.max_alarms)
+        if (sub.ai_type) setAiType(sub.ai_type)
       }
     }
   }
