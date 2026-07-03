@@ -182,20 +182,25 @@ const MessageBubble = memo(function MessageBubble({
               {fileAtts.map((att) => {
                 const token = localStorage.getItem('access_token')
                 const dlUrl = `/api/fs/download/${att.file_id}?token=${token || ''}`
+                // 文件附件必有这些字段（来自 API），断言为非可选
+                const fid = att.file_id!
+                const fname = att.name!
+                const fsize = att.size!
+                const fmime = att.mime_type!
 
                 // 图片类型：缩略图，点击弹窗查看
-                if (att.mime_type?.startsWith('image/')) {
+                if (fmime.startsWith('image/')) {
                   return (
                     <button
-                      key={att.file_id}
-                      onClick={() => setPreviewFile({ file_id: att.file_id, name: att.name, size: att.size, mime_type: att.mime_type })}
+                      key={fid}
+                      onClick={() => setPreviewFile({ file_id: fid, name: fname, size: fsize, mime_type: fmime })}
                       className="block max-w-full"
                     >
                       <img
                         src={dlUrl}
-                        alt={att.name}
+                        alt={fname}
                         className="max-w-[280px] max-h-[200px] rounded-lg object-cover cursor-pointer hover:opacity-90 transition-opacity border border-white/10"
-                        title={att.name}
+                        title={fname}
                       />
                     </button>
                   )
@@ -204,18 +209,18 @@ const MessageBubble = memo(function MessageBubble({
                 // 其他文件：点击预览（不可预览时自动下载）
                 return (
                   <button
-                    key={att.file_id}
-                    onClick={() => setPreviewFile({ file_id: att.file_id, name: att.name, size: att.size, mime_type: att.mime_type })}
+                    key={fid}
+                    onClick={() => setPreviewFile({ file_id: fid, name: fname, size: fsize, mime_type: fmime })}
                     className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs transition-colors ${
                       isMine
                         ? 'bg-white/10 hover:bg-white/20 text-white/90'
                         : 'bg-canvas hover:bg-elevated text-textSecondary hover:text-textPrimary border border-border'
                     }`}
-                    title={`${att.name} (${formatFileSize(att.size)})`}
+                    title={`${fname} (${formatFileSize(fsize)})`}
                   >
-                    <FileIcon size={12} className={fileIconColor(att.mime_type)} />
-                    <span className="max-w-[100px] truncate">{att.name}</span>
-                    <span className="text-[10px] opacity-60">{formatFileSize(att.size)}</span>
+                    <FileIcon size={12} className={fileIconColor(fmime)} />
+                    <span className="max-w-[100px] truncate">{fname}</span>
+                    <span className="text-[10px] opacity-60">{formatFileSize(fsize)}</span>
                     <Download size={11} className="opacity-60" />
                   </button>
                 )
