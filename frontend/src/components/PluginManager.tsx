@@ -25,7 +25,8 @@ export default function PluginManager() {
       const res = await api.get('/admin/plugins')
       setPlugins(res.data.plugins)
     } catch (e: any) {
-      setMessage({ type: 'error', text: e?.response?.data?.detail || '加载失败' })
+      const detail = e?.response?.data?.detail || e?.message || '加载失败'
+      setMessage({ type: 'error', text: `加载失败: ${detail}` })
     } finally {
       setLoading(false)
     }

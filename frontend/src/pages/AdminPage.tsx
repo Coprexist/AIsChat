@@ -135,7 +135,7 @@ export default function AdminPage() {
       {/* 桌面端：左侧竖标签 + 右侧内容 */}
       <div className="hidden md:flex flex-1 overflow-hidden">
         {/* 左侧标签栏 */}
-        <div className="w-56 border-r border-border bg-surface flex flex-col shrink-0 overflow-y-auto">
+        <div className="w-56 border-r border-border bg-surface flex flex-col shrink-0 overflow-y-auto min-h-0">
           {([t('admin.categoryCore'), t('admin.categoryOps'), t('admin.categorySystem')]).map(cat => {
             const catTabs = tabs.filter(t => t.category === cat)
             return (
