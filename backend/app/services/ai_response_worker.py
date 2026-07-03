@@ -22,6 +22,20 @@ message_queue: asyncio.Queue = asyncio.Queue(maxsize=500)
 # 速率限制：{agent_id: last_call_timestamp}
 _rate_limit_tracker: dict[int, float] = {}
 
+# AI 并发锁：resonance/custom 类型同一 AI 串行执行 LLM 调用，general/semi_general 不锁
+_agent_locks: dict[int, asyncio.Lock] = {}
+
+async def _run_serialized(agent, coro):
+    """resonance/custom 类型加锁串行，general/semi_general 直接执行"""
+    if agent.ai_type in ("general", "semi_general"):
+        return await coro
+    lock = _agent_locks.get(agent.id)
+    if lock is None:
+        lock = asyncio.Lock()
+        _agent_locks[agent.id] = lock
+    async with lock:
+        return await coro
+
 # 导入连接管理器（在 ws.py 中初始化的全局实例）
 from app.routers.ws import manager
 from app.services.context_compressor import should_compress, compress_messages
@@ -553,7 +567,7 @@ async def _maybe_trigger_ai_reply(
                 },
             },
         )
-        await _tool_call_loop(
+        await _run_serialized(agent, _tool_call_loop(
             db=db,
             agent=agent,
             group_id=group_id,
@@ -571,7 +585,7 @@ async def _maybe_trigger_ai_reply(
             pool_key_id=pool_key_id,
             trigger="user",
             is_federated=False,
-        )
+        ))
     finally:
         await manager.broadcast_to_group(
             group_id,
@@ -1184,7 +1198,7 @@ async def _trigger_dm_ai_reply(
                 },
             },
         )
-        await _tool_call_loop(
+        await _run_serialized(agent, _tool_call_loop(
             db=db,
             agent=agent,
             group_id=None,  # DM 不使用 group_id
@@ -1202,7 +1216,7 @@ async def _trigger_dm_ai_reply(
             credit_source=credit_source,
             pool_key_id=pool_key_id,
             trigger="user",
-        )
+        ))
     finally:
         await manager.broadcast_to_dm(
             session_id,
@@ -1496,7 +1510,7 @@ async def _process_alarm_event(db, event: dict):
         pass
 
     try:
-        await _tool_call_loop(
+        await _run_serialized(agent, _tool_call_loop(
             db=db,
             agent=agent,
             group_id=None,  # 闹钟无群聊上下文
@@ -1514,7 +1528,7 @@ async def _process_alarm_event(db, event: dict):
             credit_source=credit_source,
             pool_key_id=pool_key_id,
             trigger="auto",  # v0.6.0: 闹钟不显示"正在思考/输入中"
-        )
+        ))
     except Exception as e:
         logger.error(f"⏰ 闹钟 #{alarm_id}: AI {agent.name}({agent_id}) 执行失败: {e}", exc_info=True)
 
