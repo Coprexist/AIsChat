@@ -210,7 +210,15 @@ async def add_member(
 
     # AI 成员：member_id 统一指向 users 表（agent.user_id）
     if member_type == "ai":
+        # 尝试按 agent.id 查找（可能是旧代码传入的 agent_id）
         agent = await db.get(AgentModel, member_id)
+        if not agent:
+            # 也可能是已经迁移后的 user_id，尝试反向查找
+            agent_result = await db.execute(
+                select(AgentModel).where(AgentModel.user_id == member_id)
+            )
+            agent = agent_result.scalar_one_or_none()
+
         if agent and agent.user_id:
             resolved_id = agent.user_id
         else:
