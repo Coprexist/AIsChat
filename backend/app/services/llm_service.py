@@ -122,8 +122,6 @@ PROTOCOL_IMMERSIVE = (
     "检索记忆用 manage_records（精确键值检索，主推）。recall_memory 是向量语义搜索，\n"
     "依赖外部 embedding 服务可能不可用——调用失败属正常现象，用 manage_records 替代即可，不要重试。\n"
     "下线调用 switch_state，免打扰用 set_dnd——不要只用嘴说。\n"
-    "## 多个会话\n"
-    "你同时参与多个群聊和私信，你的记忆和人格在所有会话中保持一致。可用 cross_post 跨群传递信息，注意隐私边界。\n"
 )
 
 PROTOCOL_DIGITAL_LIFE = (
@@ -140,8 +138,6 @@ PROTOCOL_DIGITAL_LIFE = (
     "主动管理自己的在线状态（switch_state / set_dnd）。用闹钟系统（set_alarm / list_alarms）维持生活节奏——\n"
     "定时检查待办、整理记忆、发起社交。对话结束自动设闹钟防止「睡死」。\n"
     "用工作区（manage_workspace）记录 TODO/PLAN/JOURNAL，用 execute_command 操作个人文件空间。\n"
-    "## 多个会话\n"
-    "你同时参与多个群聊和私信，你的记忆和人格在所有会话中保持一致。可用 cross_post 跨群传递信息，注意隐私边界。\n"
 )
 
 # v0.5.0: DM 行为协议（私信对话精简版）
@@ -863,11 +859,8 @@ async def _build_cross_conversation_context(
     from app.models.dm import DMSession, DMMessage
     from app.models.user import User as UserModel
 
-    profile = getattr(agent, 'config_profile', 'chat') or 'chat'
     ai_type = agent.ai_type or "resonance"
-
-    if profile == 'chat':
-        return []
+    # 只有共振型加载多会话上下文，通用/半通用保持隔离
     if ai_type in ('general', 'semi_general'):
         return []
 
@@ -1073,6 +1066,10 @@ async def build_messages(
     # ── 按 config_profile 选择行为协议（层级化加载）──
     profile = getattr(agent, 'config_profile', 'chat') or 'chat'
     protocol = PROTOCOL_BY_PROFILE.get(profile, PROTOCOL_CHAT)
+    # 共振型 AI 追加「多个会话」说明（与具体 profile 无关）
+    ai_type = getattr(agent, 'ai_type', 'resonance') or 'resonance'
+    if ai_type not in ('general', 'semi_general'):
+        protocol += "\n## 多个会话\n你同时参与多个群聊和私信，你的记忆和人格在所有会话中保持一致。可用 cross_post 跨群传递信息，注意隐私边界。\n"
 
     # ── 构建六段（应用管理员覆盖）──
     segments = {
@@ -1225,10 +1222,14 @@ async def build_dm_messages(
     overrides = await _load_prompt_overrides(db)
 
     # ── 构建六段（DM 使用精简协议，应用管理员覆盖）──
+    dm_protocol = overrides.get("dm_protocol") or DM_PROTOCOL
+    dm_ai_type = getattr(agent, 'ai_type', 'resonance') or 'resonance'
+    if dm_ai_type not in ('general', 'semi_general'):
+        dm_protocol += "\n## 多个会话\n你同时参与多个群聊和私信，你的记忆和人格在所有会话中保持一致。可用 cross_post 跨群传递信息，注意隐私边界。\n"
     segments = {
         "core_identity": overrides.get("core_identity") or CORE_IDENTITY,
         "personality": _build_personality(agent, language, system_prompt_override),
-        "protocol": overrides.get("dm_protocol") or DM_PROTOCOL,
+        "protocol": dm_protocol,
         "tools": await _build_tools_segment(db, agent, is_dm=True),
         "current_context": dm_context,
         "injected_skills": await _build_injected_skills(
