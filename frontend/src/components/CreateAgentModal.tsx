@@ -514,6 +514,40 @@ export default function CreateAgentModal({
           })}
         </div>
 
+        {/* ── AI 类型（选细档时自动推荐，可手动改）── */}
+        {selectedPreset && (
+          <div className="mb-5">
+            <div className="flex items-center gap-2 mb-2">
+              <label className="text-xs font-medium text-textSecondary">{t('modal.detailSettingsAiType')}</label>
+              {selectedSub && (
+                <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-primary-500/15 text-primary-500">{t('modal.aiTypeRecommended')}</span>
+              )}
+            </div>
+            <div className="grid grid-cols-3 gap-2">
+              {([
+                { value: 'general', label: t('modal.detailSettingsAiTypeGeneral'), icon: 'User', desc: t('modal.detailSettingsAiTypeGeneralDesc') },
+                { value: 'semi_general', label: t('modal.detailSettingsAiTypeSemiGeneral'), icon: 'RefreshCw', desc: t('modal.detailSettingsAiTypeSemiGeneralDesc') },
+                { value: 'resonance', label: t('modal.detailSettingsAiTypeResonance'), icon: 'Globe', desc: t('modal.detailSettingsAiTypeResonanceDesc') },
+              ] as const).map((type) => (
+                <button
+                  key={type.value}
+                  type="button"
+                  onClick={() => setAiType(type.value)}
+                  className={`flex flex-col items-center gap-1 p-2.5 rounded-xl border text-center transition-all ${
+                    aiType === type.value
+                      ? 'border-primary-400 bg-primary-500/10 text-primary-600 dark:text-primary-300'
+                      : 'border-border bg-canvas text-textSecondary hover:bg-elevated'
+                  }`}
+                >
+                  <span className="text-lg"><SubIcon name={type.icon} /></span>
+                  <span className="text-xs font-semibold">{type.label}</span>
+                  <span className="text-[9px] leading-tight text-textMuted">{type.desc}</span>
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
+
         {/* ── 跳过预设 ── */}
         {!selectedPreset && (
           <button
