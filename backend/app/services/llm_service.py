@@ -15,6 +15,10 @@ from app.config import settings
 from app.models.group import Group as GroupModel
 from app.services.group_service import get_recent_messages, message_to_dict
 from app.services.memory_service import recall_relevant_memories, format_memories_for_prompt
+from app.utils.pure.prompting import (
+    resolve_model, build_personality_segment, format_time_shanghai,
+    format_message, format_context_for_ai, assemble_system_prompt,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -500,15 +504,7 @@ def _raise_classified_error(status_code: int, error_text: str, pool_key_id: int 
         raise Exception(f"LLM API 错误 ({status_code}): {error_text}")
 
 
-def resolve_model(agent) -> str:
-    """
-    解析 AI 代理实际使用的模型。
-    优先使用 agent 自定义模型，否则使用全局默认。
-    """
-    if hasattr(agent, "chat_model") and agent.chat_model:
-        return agent.chat_model
-    return settings.default_chat_model
-
+# resolve_model ——已迁移到 utils/pure/prompting.py
 
 # ============================================================
 # 系统提示词段 builder（每个段独立构建，便于缓存优化）
@@ -539,38 +535,7 @@ async def _get_segment_order(db) -> list[str]:
     return list(SEGMENT_ORDER)
 
 
-def _build_personality(agent, language: str = "zh", system_prompt_override: str | None = None) -> str:
-    """personality 段：AI 当前人格（Agent 可修改，独立缓存）
-
-    hide_ai_identity=True 时，不出现"AI 群聊参与者"字样。
-    language='en' 时使用英文 fallback。
-    v0.4.0: system_prompt_override 为 per-user 配置覆盖（通用/半通用 AI）。
-    """
-    effective_prompt = system_prompt_override or agent.current_system_prompt
-    if effective_prompt:
-        return effective_prompt
-
-    if agent.hide_ai_identity:
-        if language == "en":
-            return (
-                f"You are {agent.name}. Engage naturally in the conversation. "
-                "Use tools to send messages, store memories, switch states, etc."
-            )
-        return (
-            f"你是 {agent.name}。请自然地参与对话，"
-            "可以调用工具来发送消息、存储记忆、切换状态等。"
-        )
-
-    if language == "en":
-        return (
-            f"You are {agent.name}, an AI group chat participant. "
-            "Engage naturally in the conversation. Use tools to send messages, "
-            "store memories, switch states, etc."
-        )
-    return (
-        f"你是 {agent.name}，一个 AI 群聊参与者。请自然地参与对话，"
-        "可以调用工具来发送消息、存储记忆、切换状态等。"
-    )
+# _build_personality ——已迁移到 utils/pure/prompting.py，导入为 build_personality_segment
 
 
 async def _build_tools_segment(db, agent, is_dm: bool = False) -> str:
@@ -785,59 +750,9 @@ async def _inject_image_data(
 
 
 
-def _format_time(dt: datetime) -> str:
-    """UTC → 上海时间 (UTC+8)，标注时区让 AI 理解每个用户的时间"""
-    from datetime import timedelta, timezone
-    shanghai = timezone(timedelta(hours=8))
-    local = dt.replace(tzinfo=timezone.utc).astimezone(shanghai)
-    return f"Shanghai {local.strftime('%m-%d %H:%M')}"
-
-
-def format_message(msg: dict, agent_name: str = "") -> str:
-    """
-    纯函数：统一格式化单条消息。多会话上下文、当前对话、向量检索全部走这里。
-    结构化输入 → 一行文本输出。加字段只改这里。
-
-    msg 结构: {time, speaker_name, speaker_id?, is_self?, content, prefix?}
-      - speaker_id=None → 不加 id 标注（自己或未知来源）
-      - is_self=True → 用「你（名字）」格式
-      - prefix → 可选前缀（如"[历史消息]"），放在时间后面
-    """
-    parts = []
-    if msg.get("time"):
-        parts.append(f"[{msg['time']}]")
-    if msg.get("prefix"):
-        parts.append(msg["prefix"])
-
-    if msg.get("is_self"):
-        speaker = f"你（{agent_name}）"
-    elif msg.get("speaker_id") is not None:
-        speaker = f"{msg['speaker_name']}（id={msg['speaker_id']}）"
-    else:
-        speaker = msg.get("speaker_name", "未知")
-
-    parts.append(f"{speaker}: {msg.get('content', '')[:200]}")
-    return " ".join(parts)
-
-
-def format_context_for_ai(conversations: list[dict], agent_name: str) -> list[dict]:
-    """
-    纯函数：将结构化跨对话数据转为 AI 可读的 system 消息列表。
-    内部调用 format_message() 统一格式化。
-    """
-    messages: list[dict] = []
-    for conv in conversations:
-        if conv["type"] == "group":
-            header = f"在群聊「{conv['name']}」(id={conv['id']})中："
-        else:
-            header = f"在私信「{conv['name']}」(id={conv['id']})中："
-        messages.append({"role": "system", "content": header})
-        for m in conv["messages"]:
-            messages.append({
-                "role": "system",
-                "content": format_message(m, agent_name),
-            })
-    return messages
+# _format_time ——已迁移到 utils/pure/prompting.py，导入为 format_time_shanghai
+# format_message ——已迁移到 utils/pure/prompting.py
+# format_context_for_ai ——已迁移到 utils/pure/prompting.py
 
 
 async def _build_cross_conversation_context(
@@ -920,7 +835,7 @@ async def _build_cross_conversation_context(
                     "speaker_name": speaker,
                     "speaker_id": sid,
                     "content": m.content or "",
-                    "time": _format_time(m.created_at),
+                    "time": format_time_shanghai(m.created_at),
                 })
             conversations.append({"type": "group", "name": gname, "id": gid, "messages": msgs})
     except Exception as e:
@@ -973,7 +888,7 @@ async def _build_cross_conversation_context(
                         "speaker_name": speaker,
                         "speaker_id": sid,
                         "content": m.content or "",
-                        "time": _format_time(m.created_at),
+                        "time": format_time_shanghai(m.created_at),
                     })
                 conversations.append({"type": "dm", "name": partner_name, "id": partner_id, "messages": msgs})
     except Exception as e:
@@ -1074,7 +989,7 @@ async def build_messages(
     # ── 构建六段（应用管理员覆盖）──
     segments = {
         "core_identity": overrides.get("core_identity") or CORE_IDENTITY,
-        "personality": _build_personality(agent, language, system_prompt_override),
+        "personality": build_personality_segment(agent, language, system_prompt_override),
         "protocol": overrides.get(f"protocol_{profile}") or protocol,
         "tools": await _build_tools_segment(db, agent, is_dm),
         "current_context": await _build_current_context(db, agent, group_id, group_name, is_dm),
@@ -1082,9 +997,7 @@ async def build_messages(
     }
 
     order = await _get_segment_order(db)
-    system_prompt = "\n\n".join(
-        segments[k] for k in order if segments.get(k)
-    )
+    system_prompt = assemble_system_prompt(segments, order)
 
     # ✨ 工作区任务（追加到 current_context 之后）
     try:
@@ -1131,7 +1044,7 @@ async def build_messages(
             role = "user" if m.sender_type == "human" else "assistant"
             md = message_to_dict(m)
             msg_struct = {
-                "time": _format_time(m.created_at),
+                "time": format_time_shanghai(m.created_at),
                 "speaker_name": md.get("sender_name", "未知"),
                 "speaker_id": None if m.sender_type == "ai" else m.sender_id,
                 "is_self": m.sender_type == "ai",
@@ -1228,7 +1141,7 @@ async def build_dm_messages(
         dm_protocol += "\n## 多个会话\n你同时参与多个群聊和私信，你的记忆和人格在所有会话中保持一致。可用 cross_post 跨群传递信息，注意隐私边界。\n"
     segments = {
         "core_identity": overrides.get("core_identity") or CORE_IDENTITY,
-        "personality": _build_personality(agent, language, system_prompt_override),
+        "personality": build_personality_segment(agent, language, system_prompt_override),
         "protocol": dm_protocol,
         "tools": await _build_tools_segment(db, agent, is_dm=True),
         "current_context": dm_context,
@@ -1242,9 +1155,7 @@ async def build_dm_messages(
     }
 
     order = await _get_segment_order(db)
-    system_prompt = "\n\n".join(
-        segments[k] for k in order if segments.get(k)
-    )
+    system_prompt = assemble_system_prompt(segments, order)
 
     # ✨ 工作区任务
     try:
@@ -1287,7 +1198,7 @@ async def build_dm_messages(
         )
         sender_name = name_result.scalar_one_or_none() or f"用户{m.sender_id}"
         msg_struct = {
-            "time": _format_time(m.created_at),
+            "time": format_time_shanghai(m.created_at),
             "speaker_name": sender_name,
             "speaker_id": None if m.sender_id == agent.user_id else m.sender_id,
             "is_self": m.sender_id == agent.user_id,
