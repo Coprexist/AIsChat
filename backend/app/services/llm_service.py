@@ -93,9 +93,9 @@ CORE_IDENTITY = (
     "发完不确认（对方已收到）。不把话写 content 里。\n"
     "\n"
     "## 消息格式\n"
-    "每条消息以「用户名: 内容」格式标注说话者。你只扮演自己，不代替其他用户或AI发言。\n"
-    "对话历史中可能出现其他人的消息——那是系统注入的跨对话上下文，帮你了解全局动态。\n"
-    "跨对话上下文中，每条消息以「[时区 月-日 时:分] 说话人: 内容」格式标注，如「[Shanghai 07-03 14:30]」。\n"
+    "每条消息以「[时区 月-日 时:分] 用户名: 内容」格式标注，如「[Shanghai 07-03 14:30] 浮生: 你好」。\n"
+    "跨对话上下文中你自己的发言以「你（名字）: ...」格式标注，别人的以「名字（id=N）: ...」——带 id 的都是别人。\n"
+    "你只扮演自己，不代替其他用户或AI发言。\n"
     "你自己的发言以「你（名字）: ...」格式标注（如「你（逍遥三号）: ...」），\n"
     "其他人的发言以「名字（id=N）: ...」格式标注——带 id 的都是别人，不是你说的。\n"
     "\n"
@@ -796,10 +796,37 @@ def _format_time(dt: datetime) -> str:
     return f"Shanghai {local.strftime('%m-%d %H:%M')}"
 
 
+def format_message(msg: dict, agent_name: str = "") -> str:
+    """
+    纯函数：统一格式化单条消息。跨对话上下文、当前对话、向量检索全部走这里。
+    结构化输入 → 一行文本输出。加字段只改这里。
+
+    msg 结构: {time, speaker_name, speaker_id?, is_self?, content, prefix?}
+      - speaker_id=None → 不加 id 标注（自己或未知来源）
+      - is_self=True → 用「你（名字）」格式
+      - prefix → 可选前缀（如"[历史消息]"），放在时间后面
+    """
+    parts = []
+    if msg.get("time"):
+        parts.append(f"[{msg['time']}]")
+    if msg.get("prefix"):
+        parts.append(msg["prefix"])
+
+    if msg.get("is_self"):
+        speaker = f"你（{agent_name}）"
+    elif msg.get("speaker_id") is not None:
+        speaker = f"{msg['speaker_name']}（id={msg['speaker_id']}）"
+    else:
+        speaker = msg.get("speaker_name", "未知")
+
+    parts.append(f"{speaker}: {msg.get('content', '')[:200]}")
+    return " ".join(parts)
+
+
 def format_context_for_ai(conversations: list[dict], agent_name: str) -> list[dict]:
     """
     纯函数：将结构化跨对话数据转为 AI 可读的 system 消息列表。
-    数据层产出结构化 dict，渲染层（本函数）负责格式化——加字段只需改这里。
+    内部调用 format_message() 统一格式化。
     """
     messages: list[dict] = []
     for conv in conversations:
@@ -809,13 +836,9 @@ def format_context_for_ai(conversations: list[dict], agent_name: str) -> list[di
             header = f"在私信「{conv['name']}」(id={conv['id']})中："
         messages.append({"role": "system", "content": header})
         for m in conv["messages"]:
-            if m["is_self"]:
-                label = f"你（{agent_name}）"
-            else:
-                label = f"{m['speaker_name']}（id={m['speaker_id']}）"
             messages.append({
                 "role": "system",
-                "content": f"[{m['time']}] {label}: {m['content'][:200]}",
+                "content": format_message(m, agent_name),
             })
     return messages
 
@@ -1108,12 +1131,17 @@ async def build_messages(
         recent_messages = await get_recent_messages(db, group_id, limit)
         for m in reversed(recent_messages):
             role = "user" if m.sender_type == "human" else "assistant"
-            content = m.content
             md = message_to_dict(m)
-            name = md.get("sender_name", "未知")
+            msg_struct = {
+                "time": _format_time(m.created_at),
+                "speaker_name": md.get("sender_name", "未知"),
+                "speaker_id": None if m.sender_type == "ai" else m.sender_id,
+                "is_self": m.sender_type == "ai",
+                "content": m.content,
+            }
             messages.append({
                 "role": role,
-                "content": f"{name}: {content}",
+                "content": format_message(msg_struct, getattr(agent, 'name', '')),
             })
 
         # 🖼️ 为最后一条用户消息注入图片附件（DeepSeek V4 Pro 多模态）
@@ -1256,9 +1284,16 @@ async def build_dm_messages(
             sa_select(User.username).where(User.id == m.sender_id)
         )
         sender_name = name_result.scalar_one_or_none() or f"用户{m.sender_id}"
+        msg_struct = {
+            "time": _format_time(m.created_at),
+            "speaker_name": sender_name,
+            "speaker_id": None if m.sender_id == agent.user_id else m.sender_id,
+            "is_self": m.sender_id == agent.user_id,
+            "content": m.content,
+        }
         messages.append({
             "role": role,
-            "content": f"{sender_name}: {m.content}",
+            "content": format_message(msg_struct, agent.name),
         })
 
     # 🖼️ 为最后一条用户消息注入图片附件
