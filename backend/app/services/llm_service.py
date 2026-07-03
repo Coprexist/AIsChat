@@ -95,7 +95,8 @@ CORE_IDENTITY = (
     "## 消息格式\n"
     "每条消息以「用户名: 内容」格式标注说话者。你只扮演自己，不代替其他用户或AI发言。\n"
     "对话历史中可能出现其他人的消息——那是系统注入的跨对话上下文，帮你了解全局动态。\n"
-    "跨对话上下文中，你自己的发言以「你（名字）: ...」格式标注（如「你（逍遥三号）: ...」），\n"
+    "跨对话上下文中，每条消息以「[时间] 说话人: 内容」格式标注，时间如「刚刚」「3分钟前」。\n"
+    "你自己的发言以「你（名字）: ...」格式标注（如「你（逍遥三号）: ...」），\n"
     "其他人的发言以「名字（id=N）: ...」格式标注——带 id 的都是别人，不是你说的。\n"
     "\n"
     "## 深度推理\n"
@@ -787,6 +788,21 @@ async def _inject_image_data(
 
 
 
+def _relative_time(dt: datetime) -> str:
+    """把时间转为相对描述，给 AI 理解时间线"""
+    now = datetime.utcnow()
+    delta = now - dt
+    seconds = delta.total_seconds()
+    if seconds < 60:
+        return "刚刚"
+    elif seconds < 3600:
+        return f"{int(seconds / 60)}分钟前"
+    elif seconds < 86400:
+        return f"{int(seconds / 3600)}小时前"
+    else:
+        return f"{int(seconds / 86400)}天前"
+
+
 async def _build_cross_conversation_context(
     db: AsyncSession,
     agent,
@@ -875,7 +891,7 @@ async def _build_cross_conversation_context(
                     label = f"{raw_name}（id={m.sender_id}）"
                 messages.append({
                     "role": "system",
-                    "content": f"{label}: {(m.content or '')[:200]}",
+                    "content": f"[{_relative_time(m.created_at)}] {label}: {(m.content or '')[:200]}",
                 })
     except Exception as e:
         logger.warning(f"跨对话上下文(群聊)查询失败: {e}")
@@ -924,7 +940,7 @@ async def _build_cross_conversation_context(
                     label = f"你（{agent.name}）" if is_self else f"{partner_name}（id={m.sender_id}）"
                     messages.append({
                         "role": "system",
-                        "content": f"{label}: {(m.content or '')[:200]}",
+                        "content": f"[{_relative_time(m.created_at)}] {label}: {(m.content or '')[:200]}",
                     })
     except Exception as e:
         logger.warning(f"跨对话上下文(私信)查询失败: {e}")
