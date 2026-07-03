@@ -2442,7 +2442,7 @@ def _browser_status() -> dict:
         return {"installed": False, "running": False, "port": None}
 
 
-@router.get("/admin/plugins")
+@router.get("/plugins")
 async def list_plugins(
     admin: dict = Depends(require_admin),
 ):
@@ -2462,7 +2462,7 @@ async def list_plugins(
     return {"plugins": plugins}
 
 
-@router.post("/admin/plugins/{plugin_id}/start")
+@router.post("/plugins/{plugin_id}/start")
 async def start_plugin(
     plugin_id: str,
     admin: dict = Depends(require_admin),
@@ -2483,7 +2483,7 @@ async def start_plugin(
         raise HTTPException(500, "浏览器服务启动失败，请检查 Chromium 是否已安装")
 
 
-@router.post("/admin/plugins/{plugin_id}/stop")
+@router.post("/plugins/{plugin_id}/stop")
 async def stop_plugin(
     plugin_id: str,
     admin: dict = Depends(require_admin),
