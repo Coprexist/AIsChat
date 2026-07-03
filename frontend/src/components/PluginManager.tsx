@@ -65,7 +65,7 @@ export default function PluginManager() {
   return (
     <div className="flex-1 overflow-y-auto p-6 space-y-6">
       <div>
-        <h2 className="text-base font-semibold text-textPrimary mb-1">🧩 插件管理</h2>
+        <h2 className="text-base font-semibold text-textPrimary mb-1">插件管理</h2>
         <p className="text-sm text-textSecondary">
           管理扩展服务。启动后所有 AI 共享同一实例，无需每个 AI 单独运行。
         </p>

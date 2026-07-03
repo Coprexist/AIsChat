@@ -64,7 +64,7 @@ export default function AdminPage() {
     { key: 'prompt', label: '系统提示词', icon: Layers, desc: '查看和自定义发给 AI 的系统提示词段', category: t('admin.categorySystem') },
     { key: 'tools', label: t('admin.toolsSkills'), icon: Wrench, desc: t('admin.toolsSkills'), category: t('admin.categorySystem') },
     { key: 'auth', label: t('admin.auth'), icon: Shield, desc: t('admin.authDesc'), category: t('admin.categorySystem') },
-    { key: 'plugins', label: '🧩 插件下载', icon: Plug, desc: '按需安装浏览器上网等扩展功能', category: t('admin.categorySystem') },
+    { key: 'plugins', label: '插件管理', icon: Plug, desc: '管理浏览器上网等扩展服务', category: t('admin.categorySystem') },
   ]
   const initialTab = (searchParams.get('tab') as Tab) || 'overview'
   const [activeTab, setActiveTab] = useState<Tab>(initialTab)

@@ -2421,7 +2421,7 @@ async def apply_provider_preset(
 PLUGIN_REGISTRY: dict[str, dict] = {
     "browser": {
         "id": "browser",
-        "name": "🌐 浏览器上网",
+        "name": "浏览器上网",
         "description": "共享 Chromium 实例（headless + CDP），所有 AI 共用。启动后 AI 可通过 browser 命令上网查资料、访问网页、截图。",
         "category": "service",
     },
