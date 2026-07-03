@@ -51,6 +51,8 @@ class ActionContext:
     sender_type: str = "human"
     sender_id: int | None = None
     is_mentioned: bool = False
+    is_at_all: bool = False        # v2.1.0: @all/@everyone/@全体 穿透 DND
+    is_announcement: bool = False  # v2.1.0: 群公告 穿透 DND
     chain_depth: int = 0
     # 闹钟事件字段
     alarm_id: int | None = None
@@ -130,12 +132,14 @@ async def _decide_reply_action(db, agent, context: ActionContext) -> ActionDecis
         await switch_agent_state(db, agent_id=agent_id, target_state="active", reason="被 @提及唤醒")
         await db.flush()
 
-    # Gate 2: DND + 未被 @ → 暂存消息
+    # Gate 2: DND + 无穿透条件 → 暂存消息
+    # 穿透规则(v2.1.0): @提及 / @all / 群公告 可穿透 DND
     in_dnd = await is_member_in_dnd(db, agent_id, context.group_id)
-    if in_dnd and not is_mentioned:
+    dnd_penetrate = is_mentioned or context.is_at_all or context.is_announcement
+    if in_dnd and not dnd_penetrate:
         return ActionDecision(
             False, ActionType.NONE, 0,
-            f"AI {agent.name} DND 中且未被 @提及",
+            f"AI {agent.name} DND 中且无穿透条件",
             details={"store_pending": True},
         )
 

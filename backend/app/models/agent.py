@@ -5,6 +5,7 @@ from sqlalchemy import (
     Column, Integer, String, Boolean, Float, Text, DateTime,
     ForeignKey, UniqueConstraint, func,
 )
+from sqlalchemy.dialects.postgresql import JSONB
 from app.database import Base
 
 
@@ -127,6 +128,10 @@ class Agent(Base):
 
     # API Token（供外部调用该 AI）
     api_token = Column(String(64))
+
+    # 状态栈 — AI 跨任务上下文追踪（v2.1.0）
+    # JSONB 数组，每个元素 {id, type, context_ref, why, doing, todo, plan, journal, created_at, status}
+    state_stack = Column(JSONB, default=list)
 
     created_at = Column(DateTime, server_default=func.now())
 

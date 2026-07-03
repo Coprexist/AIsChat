@@ -59,6 +59,11 @@ MIGRATIONS: list[tuple[str, str]] = [
               AND gm.member_id = g.owner_id
         )""",
     ),
+    # ── v2.1.0: 状态栈（AI 跨任务上下文追踪）──
+    (
+        "agents.state_stack",
+        "ALTER TABLE agents ADD COLUMN IF NOT EXISTS state_stack JSONB DEFAULT '[]'::jsonb",
+    ),
     # ── v2.0.2: 修复每个群多个 owner 的错误数据 ──
     (
         "重复群主清理",

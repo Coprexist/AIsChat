@@ -774,13 +774,11 @@ async def _build_cross_conversation_context(
     from app.models.dm import DMSession, DMMessage
     from app.models.user import User as UserModel
 
-    ai_type = agent.ai_type or "resonance"
-    # 只有共振型加载多会话上下文，通用/半通用保持隔离
-    if ai_type in ('general', 'semi_general'):
-        return []
-
-    is_filtered = ai_type in ("general", "semi_general") and trigger_user_id is not None
-    conversations: list[dict] = []
+    # v2.1.0: 彻底禁用跨对话消息注入。
+    # 原设计将其他群的消息注入为 system 上下文，导致 LLM 跨群回复（"历史重播"死循环）。
+    # 新的「状态栈系统」已通过状态栈摘要提供跨任务上下文感知，
+    # 不需要再把其他群的消息原文注入当前对话。
+    return []
 
     # ── 1. 收集群聊数据 ──
     try:
@@ -1008,6 +1006,15 @@ async def build_messages(
     except Exception as e:
         logger.warning(f"工作区上下文注入失败（非致命）: {e}")
 
+    # ✨ 状态栈摘要（v2.1.0：尾部注入，缓存友好）
+    try:
+        from app.services.state_stack_service import get_state_stack_summary
+        stack_summary = await get_state_stack_summary(db, agent.id)
+        if stack_summary:
+            system_prompt += stack_summary
+    except Exception as e:
+        logger.warning(f"状态栈摘要注入失败（非致命）: {e}")
+
     messages = [{"role": "system", "content": system_prompt}]
 
     # ── 统一上下文：数字生命档/沉浸档/共振 → 加载多会话上下文 ──
@@ -1165,6 +1172,15 @@ async def build_dm_messages(
             system_prompt += task_text
     except Exception as e:
         logger.warning(f"DM 工作区上下文注入失败（非致命）: {e}")
+
+    # ✨ 状态栈摘要（v2.1.0）
+    try:
+        from app.services.state_stack_service import get_state_stack_summary
+        stack_summary = await get_state_stack_summary(db, agent.id)
+        if stack_summary:
+            system_prompt += stack_summary
+    except Exception as e:
+        logger.warning(f"DM 状态栈摘要注入失败（非致命）: {e}")
 
     messages = [{"role": "system", "content": system_prompt}]
 

@@ -82,6 +82,7 @@ async def run_migrations():
             await _migrate_group_invitations(db)  # v2.0.0 群邀请卡片系统
             await _migrate_group_owner_membership(db)  # v2.0.1 修复群主缺失的群成员记录
             await _migrate_fix_duplicate_owners(db)     # v2.0.2 修复错误的多群主记录
+            await _migrate_agent_state_stack(db)       # v2.1.0 状态栈（AI 跨任务上下文追踪）
             await _fix_column_types(db)  # 必须是最后一个：修复老部署的列类型不匹配
             await db.commit()
             logger.info("✅ 数据库迁移检查完成")
@@ -2255,6 +2256,21 @@ async def _migrate_fix_duplicate_owners(db):
             logger.info(f"     group={row[0]} {row[1]}={row[2]} owner→member")
     else:
         logger.info("  ⏭ 群主角色正确，无需修复")
+
+
+async def _migrate_agent_state_stack(db):
+    """
+    v2.1.0: agents 表新增 state_stack JSONB 列（幂等）。
+
+    存储 AI 的跨任务上下文状态栈，支持 push/pop/close/list 操作。
+    """
+    if await _column_exists(db, "agents", "state_stack"):
+        logger.info("  ⏭ agents.state_stack 已存在，跳过")
+        return
+    logger.info("  添加 agents.state_stack JSONB 列...")
+    await db.execute(text("ALTER TABLE agents ADD COLUMN state_stack JSONB DEFAULT '[]'::jsonb"))
+    await db.flush()
+    logger.info("  ✅ agents.state_stack 添加完成")
 
 
 async def _fix_column_types(db):

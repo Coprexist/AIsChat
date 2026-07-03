@@ -13,9 +13,9 @@ class ManageWorkspace(ToolPlugin):
     name = "manage_workspace"
     description = (
         "管理你的个人工作区文件。你可以读取或写入三个文件：\n"
-        "- todo: 你的待办事项列表（markdown 格式）\n"
+        "- todo: 你的待办事项列表（markdown 格式）。push_state 时会自动追加待办，完成时标记 [x]\n"
         "- plan: 你的中长期规划文档\n"
-        "- journal: 你的操作日志/日记，写入时会自动追加时间戳\n"
+        "- journal: 你的操作日志/日记。push_state/pop_state 时自动追加记录，无需手动写\n"
         "用法示例：读 TODO → action='read' file='todo'；写 PLAN → action='write' file='plan' content='...'"
     )
     segment = "self_management"

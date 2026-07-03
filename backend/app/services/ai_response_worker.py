@@ -450,6 +450,9 @@ async def _maybe_trigger_ai_reply(
     logger.info(f"🔍 AI {agent.name}(id={resolved_agent_id}): is_mentioned={is_mentioned}, content_preview='{content[:80]}'")
 
     # v0.5.0: 使用统一决策（替代原有 Gate 1-5 的手动判断）
+    # v2.1.0: 检测 DND 穿透条件
+    is_at_all = any(tag in content for tag in ("@all", "@everyone", "@全体"))
+    is_announcement = message_type == "announcement"
     ctx = ActionContext(
         event_type="message",
         agent_id=resolved_agent_id,
@@ -458,6 +461,8 @@ async def _maybe_trigger_ai_reply(
         sender_type=sender_type,
         sender_id=sender_id,
         is_mentioned=is_mentioned,
+        is_at_all=is_at_all,
+        is_announcement=is_announcement,
         chain_depth=chain_depth,
     )
     decision = await decide_action(db, agent, ctx)
@@ -782,6 +787,11 @@ async def _tool_call_loop(
                     "toggle_thinking": lambda a: f"切换深度推理: {'开启' if a.get('enabled') else '关闭'}",
                     "manage_workspace": lambda a: f"管理工作区: {a.get('action', '?')} — {a.get('section', '?')}",
                     "set_alarm": lambda a: f"设置闹钟: {a.get('reason', '?')[:40]}",
+                    "push_state": lambda a: f"切换上下文: {a.get('doing', '?')[:40]}",
+                    "pop_state": lambda a: "结束当前任务，恢复上一层",
+                    "close_state": lambda a: "关闭状态帧",
+                    "list_states": lambda a: "查看状态栈",
+                    "enter_group": lambda a: f"进入群聊: {a.get('group_id', '?')}",
                 }
                 task_summary = None
                 if tool_name in _work_tools:
@@ -959,7 +969,12 @@ async def _tool_call_loop(
             if last_task:
                 try:
                     from app.services.workspace_service import save_current_task
+                    from app.services.state_stack_service import persist_last_task_as_state
                     await save_current_task(db, agent.id, last_task)
+                    await persist_last_task_as_state(
+                        db, agent.id, last_task, group_id,
+                        context_ref=f"group:{group_id}" if group_id else "",
+                    )
                 except Exception:
                     pass
             await _save_conversation_log_safe(
@@ -1033,7 +1048,12 @@ async def _tool_call_loop(
             if last_task:
                 try:
                     from app.services.workspace_service import save_current_task
+                    from app.services.state_stack_service import persist_last_task_as_state
                     await save_current_task(db, agent.id, last_task)
+                    await persist_last_task_as_state(
+                        db, agent.id, last_task, group_id,
+                        context_ref=f"group:{group_id}" if group_id else "",
+                    )
                 except Exception:
                     pass
             await _save_conversation_log_safe(
@@ -1077,7 +1097,12 @@ async def _tool_call_loop(
             if last_task:
                 try:
                     from app.services.workspace_service import save_current_task
+                    from app.services.state_stack_service import persist_last_task_as_state
                     await save_current_task(db, agent.id, last_task)
+                    await persist_last_task_as_state(
+                        db, agent.id, last_task, group_id,
+                        context_ref=f"group:{group_id}" if group_id else "",
+                    )
                 except Exception:
                     pass
             await _save_conversation_log_safe(

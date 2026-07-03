@@ -13,6 +13,8 @@
 from app.tools.chat_social.send_message import SendMessage
 from app.tools.chat_social.send_dm import SendDM
 from app.tools.chat_social.set_dnd import SetDND
+from app.tools.chat_social.cancel_dnd import CancelDND
+from app.tools.chat_social.enter_group import EnterGroup
 from app.tools.chat_social.switch_state import SwitchState
 from app.tools.chat_social.view_unread import ViewUnread
 from app.tools.chat_social.list_available_skills import ListAvailableSkills
@@ -38,6 +40,10 @@ from app.tools.self_config.set_status import SetStatus
 
 # ── self_management ──
 from app.tools.self_management.end_turn import EndTurn
+from app.tools.self_management.push_state import PushState
+from app.tools.self_management.pop_state import PopState
+from app.tools.self_management.close_state import CloseState
+from app.tools.self_management.list_states import ListStates
 from app.tools.self_management.set_alarm import SetAlarm
 from app.tools.self_management.cancel_alarm import CancelAlarm
 from app.tools.self_management.update_alarm import UpdateAlarm
