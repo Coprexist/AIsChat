@@ -79,6 +79,7 @@ async def run_migrations():
             await _migrate_default_file_quota(db)   # v0.9.0 用户默认文件配额配置
             await _migrate_structured_records(db)  # v0.10.0 结构记忆表（目录级键值存储）
             await _migrate_group_members_user_id(db)  # v2.0.0 AI 群成员统一用 user_id
+            await _migrate_group_invitations(db)  # v2.0.0 群邀请卡片系统
             await _fix_column_types(db)  # 必须是最后一个：修复老部署的列类型不匹配
             await db.commit()
             logger.info("✅ 数据库迁移检查完成")
@@ -2140,7 +2141,66 @@ async def _migrate_group_members_user_id(db):
         "SELECT COUNT(*) FROM group_members WHERE member_type = 'ai'"
     ))
     logger.info(f"  ✅ 群成员 ID 统一完成，{remaining.scalar()} 个 AI 成员均使用 user_id")
+
+    # Step 6: 修复被错误降级为 human 的 AI 条目（add_member 旧版本 bug）
+    from app.models.agent import Agent as AgentModel
+    corrupted = await db.execute(text("""
+        UPDATE group_members gm
+        SET member_type = 'ai'
+        FROM agents a
+        WHERE gm.member_type = 'human'
+        AND (gm.member_id = a.user_id OR gm.member_id = a.id)
+    """))
     await db.flush()
+    logger.info("    🔧 AI 类型修复完成（human → ai 还原）")
+
+    await db.flush()
+
+
+async def _migrate_group_invitations(db):
+    """v2.0.0: 群邀请卡片系统（group_invitations 表 + dm_messages.message_type 列）
+
+    完全幂等：多次执行安全。
+    """
+    # 1. 创建 group_invitations 表
+    await db.execute(text("""
+        CREATE TABLE IF NOT EXISTS group_invitations (
+            id SERIAL PRIMARY KEY,
+            group_id INT NOT NULL REFERENCES groups(id) ON DELETE CASCADE,
+            inviter_id INT NOT NULL REFERENCES users(id),
+            invitee_id INT NOT NULL REFERENCES users(id),
+            status VARCHAR(20) NOT NULL DEFAULT 'pending',
+            message TEXT,
+            dm_session_id VARCHAR(64),
+            dm_message_id INT,
+            created_at TIMESTAMP DEFAULT NOW(),
+            resolved_at TIMESTAMP,
+            CONSTRAINT ck_group_invitation_status CHECK (status IN ('pending', 'accepted', 'rejected'))
+        )
+    """))
+    logger.info("  ✅ group_invitations 表就绪")
+
+    # 2. 添加 dm_messages.message_type 列（幂等）
+    if not await _column_exists(db, "dm_messages", "message_type"):
+        await db.execute(text(
+            "ALTER TABLE dm_messages ADD COLUMN message_type VARCHAR(30) NOT NULL DEFAULT 'normal'"
+        ))
+        logger.info("  ✅ dm_messages.message_type 列已添加")
+    else:
+        logger.info("  ⏭ dm_messages.message_type 列已存在，跳过")
+
+    # 3. 索引（幂等）
+    await db.execute(text(
+        "CREATE INDEX IF NOT EXISTS idx_group_invitations_invitee "
+        "ON group_invitations(invitee_id, status)"
+    ))
+    await db.execute(text(
+        "CREATE INDEX IF NOT EXISTS idx_group_invitations_group "
+        "ON group_invitations(group_id)"
+    ))
+
+    await db.flush()
+    logger.info("  ✅ 群邀请卡片系统迁移完成")
 
 
 async def _fix_column_types(db):

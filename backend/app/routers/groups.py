@@ -46,14 +46,39 @@ async def create_new_group(
     db: AsyncSession = Depends(get_db),
 ):
     """创建群聊"""
+    # 必须至少选 1 个成员
+    if not req.initial_members or len(req.initial_members) == 0:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="请至少选择一位群成员",
+        )
+
+    # 拆分为 AI（直接入群）和 human（走邀请）
+    ai_members = [m for m in req.initial_members if m.get("type") == "ai"]
+    human_members = [m for m in req.initial_members if m.get("type") == "human"]
+
     try:
+        # 创建群聊（仅 AI 初始成员直接入群，人类后面发邀请）
         group = await create_group(
             db,
             name=req.name,
             owner_type="human",
             owner_id=current_user["user_id"],
-            initial_members=req.initial_members,
+            initial_members=ai_members,
         )
+
+        # 人类成员：发送邀请
+        from app.services.invitation_service import send_group_invitation
+        invitations_sent = 0
+        for hm in human_members:
+            try:
+                await send_group_invitation(
+                    db, group.id, current_user["user_id"], hm["id"],
+                )
+                invitations_sent += 1
+            except ValueError:
+                pass  # 已有待处理邀请，跳过
+
         return {
             "id": group.id,
             "name": group.name,
@@ -61,6 +86,7 @@ async def create_new_group(
             "owner_id": group.owner_id,
             "is_vector_accelerated": group.is_vector_accelerated,
             "created_at": str(group.created_at) if group.created_at else None,
+            "invitations_sent": invitations_sent,
         }
     except ValueError as e:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
@@ -125,15 +151,27 @@ async def invite_member(
     current_user: dict = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
-    """邀请成员加入群聊"""
+    """邀请成员加入群聊。AI 直接入群，人类发邀请卡片 DM。"""
     try:
-        member = await add_member(
-            db,
-            group_id=group_id,
-            member_type=req.member_type,
-            member_id=req.member_id,
-        )
-        return {"message": "邀请成功", "group_id": group_id}
+        if req.member_type == "ai":
+            member = await add_member(
+                db,
+                group_id=group_id,
+                member_type=req.member_type,
+                member_id=req.member_id,
+            )
+            return {"message": "已加入群聊", "group_id": group_id, "method": "direct"}
+        else:
+            from app.services.invitation_service import send_group_invitation
+            result = await send_group_invitation(
+                db, group_id, current_user["user_id"], req.member_id, req.message,
+            )
+            return {
+                "message": "邀请已发送",
+                "group_id": group_id,
+                "method": "invitation",
+                **result,
+            }
     except ValueError as e:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
 
@@ -157,10 +195,17 @@ async def list_members(
             if u:
                 name = u.username
         elif m.member_type == "ai":
+            # v2.0.0: member_id 统一为 user_id，同时兼容旧 agent.id
             a_res = await db.execute(
                 select(AgentModel).where(AgentModel.user_id == m.member_id)
             )
             a = a_res.scalar_one_or_none()
+            if a is None:
+                # 向后兼容：可能是尚未迁移的旧 agent.id
+                a_res = await db.execute(
+                    select(AgentModel).where(AgentModel.id == m.member_id)
+                )
+                a = a_res.scalar_one_or_none()
             if a:
                 name = a.name
                 state = a.state

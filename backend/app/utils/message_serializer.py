@@ -77,6 +77,11 @@ def serialize_message(message, *,
         "created_at": str(message.created_at) if message.created_at else None,
     }
 
+    # message_type（DMMessage 有，Message 没有，默认 'normal'）
+    mt = getattr(message, 'message_type', None)
+    if mt:
+        result["message_type"] = mt
+
     if include_read_at:
         m_read_at = getattr(message, 'read_at', None)
         result["read_at"] = str(m_read_at) if m_read_at else None

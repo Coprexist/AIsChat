@@ -9,8 +9,10 @@ import { getStateDotColor } from '../constants'
 import { FileIcon, Download, Globe, ShieldAlert } from 'lucide-react'
 import { formatMessageTime } from '../utils/time'
 import { useLang, useT } from '../i18n/I18nContext'
+import { api } from '../api/client'
 import MermaidBlock from './MermaidBlock'
 import FilePreviewModal from './FilePreviewModal'
+import InvitationCard from './InvitationCard'
 
 /** 弹跳三点（思考中/输入中共用） */
 const BouncingDots = ({ className = '' }: { className?: string }) => (
@@ -20,6 +22,24 @@ const BouncingDots = ({ className = '' }: { className?: string }) => (
     <span className="w-1 h-1 bg-current rounded-full animate-bounce" style={{ animationDelay: '300ms' }} />
   </span>
 );
+
+/** 头像渐变类名（纯函数）——返回完整 Tailwind 字符串，与原拼接逻辑完全等价 */
+function avatarGradient(senderType: string | undefined, isMine: boolean, hasAvatar: boolean): string {
+  const dir = isMine ? 'bg-gradient-to-br' : 'bg-gradient-to-bl'
+  if (senderType === 'system') {
+    return hasAvatar
+      ? `${dir} from-rose-400 to-rose-600/30`
+      : `${dir} from-rose-400 to-rose-600`
+  }
+  if (isMine) {
+    return hasAvatar
+      ? `${dir} from-primary-500 to-primary-700/30`
+      : `${dir} from-primary-500 to-primary-700`
+  }
+  return hasAvatar
+    ? `${dir} from-teal-400 to-teal-600/30`
+    : `${dir} from-teal-400 to-teal-600`
+}
 
 /** 聊天消息中的 code 渲染：只对 block code/mermaid 做溢出控制，inline code 不干预 */
 function ChatCodeRenderer({ className, children, inline, ...props }: any) {
@@ -54,7 +74,8 @@ interface MessageBubbleProps {
   thinking?: boolean
   isTyping?: boolean
   sourcePublicId?: string | null
-  attachments?: Array<{file_id: number, name: string, size: number, mime_type: string}> | null
+  attachments?: Array<{file_id?: number, name?: string, size?: number, mime_type?: string, type?: string, invitation_id?: number, group_name?: string, inviter_name?: string, status?: string}> | null
+  messageType?: string
   onAvatarClick?: (type: string, id: number, name: string, state?: string) => void
 }
 
@@ -74,15 +95,37 @@ function fileIconColor(mimeType: string): string {
 
 const MessageBubble = memo(function MessageBubble({
   senderName, senderAvatarUrl, content, isMine, createdAt, state,
-  senderType, senderId, thinking, isTyping, sourcePublicId, attachments, onAvatarClick,
+  senderType, senderId, thinking, isTyping, sourcePublicId, attachments, messageType, onAvatarClick,
 }: MessageBubbleProps) {
   const { user } = useAuth()
   const lang = useLang()
   const t = useT()
 
   const [previewFile, setPreviewFile] = useState<{ file_id: number; name: string; size: number; mime_type: string } | null>(null)
+  const [invStatus, setInvStatus] = useState<string | null>(null)
 
   const stateColor = getStateDotColor(state)
+
+  // 检测邀请卡片
+  const invAtt = attachments?.find(a => a.type === 'group_invitation')
+  const isInvitation = messageType === 'group_invitation' && invAtt
+  const currentStatus = invStatus || invAtt?.status || 'pending'
+  // 普通文件附件（排除邀请卡片）
+  const fileAtts = attachments?.filter(a => a.type !== 'group_invitation') || []
+
+  const handleAcceptInvitation = async (invitationId: number) => {
+    try {
+      await api.post(`/group-invitations/${invitationId}/accept`)
+      setInvStatus('accepted')
+    } catch (_) { /* ignore */ }
+  }
+
+  const handleRejectInvitation = async (invitationId: number) => {
+    try {
+      await api.post(`/group-invitations/${invitationId}/reject`)
+      setInvStatus('rejected')
+    } catch (_) { /* ignore */ }
+  }
 
   const bubbleBg = isMine
     ? 'bg-primary-600 text-white rounded-2xl rounded-tr-md shadow-lg shadow-primary-500/15'
@@ -90,11 +133,7 @@ const MessageBubble = memo(function MessageBubble({
       ? 'bg-rose-50 dark:bg-rose-900/20 text-rose-900 dark:text-rose-300 rounded-2xl rounded-tl-md border border-rose-200 dark:border-rose-800'
       : 'bg-surface text-textPrimary rounded-2xl rounded-tl-md border border-border'
 
-  const avatarGradientBase = senderType === 'system'
-    ? 'from-rose-400 to-rose-600'
-    : isMine ? 'from-primary-500 to-primary-700' : 'from-teal-400 to-teal-600'
-  const avatarGradientOpacity = senderAvatarUrl ? '/30' : ''
-  const avatarGradientDir = isMine ? 'bg-gradient-to-br' : 'bg-gradient-to-bl'
+  const avatarGradientCls = avatarGradient(senderType, isMine, !!senderAvatarUrl)
   const avatarGradientShadow = isMine ? 'shadow-primary-500/15' : senderType === 'system' ? 'shadow-rose-400/15' : 'shadow-teal-400/10'
 
   return (<>
@@ -112,7 +151,7 @@ const MessageBubble = memo(function MessageBubble({
               onAvatarClick(senderType, senderId, senderName, state)
             }
           }}
-          className={`relative w-9 h-9 rounded-full flex items-center justify-center text-xs font-bold ${avatarGradientDir} ${senderType !== 'system' ? 'cursor-pointer hover:scale-105 transition-transform' : ''} shadow ${avatarGradientBase}${avatarGradientOpacity} ${avatarGradientShadow}`}
+          className={`relative w-9 h-9 rounded-full flex items-center justify-center text-xs font-bold ${avatarGradientCls} ${senderType !== 'system' ? 'cursor-pointer hover:scale-105 transition-transform' : ''} shadow ${avatarGradientShadow}`}
           title={senderType === 'system' ? '系统通知' : thinking ? t('chat.thinking') : isTyping ? t('chat.typing') : t('chat.viewProfile').replace('{name}', senderName)}
         >
           {senderType === 'system' ? (
@@ -156,7 +195,17 @@ const MessageBubble = memo(function MessageBubble({
           [&_img]:max-w-full [&_img]:rounded-lg
           [&_a]:break-all [&_a]:text-primary-500 dark:[&_a]:text-primary-400 [&_a]:underline
         `}>
-          {isTyping ? (
+          {isInvitation && invAtt ? (
+            <InvitationCard
+              invitationId={invAtt.invitation_id!}
+              groupName={invAtt.group_name || ''}
+              inviterName={invAtt.inviter_name || ''}
+              message={undefined}
+              status={currentStatus as 'pending' | 'accepted' | 'rejected'}
+              onAccept={handleAcceptInvitation}
+              onReject={handleRejectInvitation}
+            />
+          ) : isTyping ? (
             <BouncingDots className="text-primary-400 align-middle" />
           ) : (
             <Markdown
@@ -167,10 +216,10 @@ const MessageBubble = memo(function MessageBubble({
               {content}
             </Markdown>
           )}
-          {/* 附件列表 */}
-          {attachments && attachments.length > 0 && (
+          {/* 附件列表（跳过邀请类型附件） */}
+          {fileAtts.length > 0 && (
             <div className={`mt-2 pt-2 border-t flex flex-wrap gap-1.5 ${isMine ? 'border-white/20' : 'border-border'}`}>
-              {attachments.map((att) => {
+              {fileAtts.map((att) => {
                 const token = localStorage.getItem('access_token')
                 const dlUrl = `/api/fs/download/${att.file_id}?token=${token || ''}`
 

@@ -163,10 +163,30 @@ CREATE TABLE IF NOT EXISTS dm_messages (
     content TEXT NOT NULL,
     reply_to INT,
     attachments TEXT,
+    message_type VARCHAR(30) NOT NULL DEFAULT 'normal',  -- normal | group_invitation
     read_at TIMESTAMP,
     source_public_id VARCHAR(50),  -- 联邦来源：NULL=本地，非空=远程实例 public_id
     created_at TIMESTAMP DEFAULT NOW()
 );
+
+-- ============================================================
+-- 群邀请表
+-- ============================================================
+CREATE TABLE IF NOT EXISTS group_invitations (
+    id SERIAL PRIMARY KEY,
+    group_id INT NOT NULL REFERENCES groups(id) ON DELETE CASCADE,
+    inviter_id INT NOT NULL REFERENCES users(id),
+    invitee_id INT NOT NULL REFERENCES users(id),
+    status VARCHAR(20) NOT NULL DEFAULT 'pending',
+    message TEXT,
+    dm_session_id VARCHAR(64),
+    dm_message_id INT,
+    created_at TIMESTAMP DEFAULT NOW(),
+    resolved_at TIMESTAMP,
+    CONSTRAINT ck_group_invitation_status CHECK (status IN ('pending', 'accepted', 'rejected'))
+);
+CREATE INDEX IF NOT EXISTS idx_group_invitations_invitee ON group_invitations(invitee_id, status);
+CREATE INDEX IF NOT EXISTS idx_group_invitations_group ON group_invitations(group_id);
 
 -- ============================================================
 -- 两层记忆表

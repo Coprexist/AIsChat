@@ -48,3 +48,26 @@ class GroupMember(Base):
             name="ck_group_member_type",
         ),
     )
+
+
+class GroupInvitation(Base):
+    """群邀请记录（仅人类走邀请流程，AI 直接入群）"""
+    __tablename__ = "group_invitations"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    group_id = Column(Integer, ForeignKey("groups.id", ondelete="CASCADE"), nullable=False)
+    inviter_id = Column(Integer, ForeignKey("users.id"), nullable=False)
+    invitee_id = Column(Integer, ForeignKey("users.id"), nullable=False)
+    status = Column(String(20), default="pending", nullable=False)  # pending | accepted | rejected
+    message = Column(Text, nullable=True)  # 附言
+    dm_session_id = Column(String(64), nullable=True)  # 关联的 DM 会话
+    dm_message_id = Column(Integer, nullable=True)     # 关联的卡片消息 ID
+    created_at = Column(DateTime, server_default=func.now())
+    resolved_at = Column(DateTime, nullable=True)
+
+    __table_args__ = (
+        CheckConstraint(
+            "status IN ('pending', 'accepted', 'rejected')",
+            name="ck_group_invitation_status",
+        ),
+    )

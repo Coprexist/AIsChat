@@ -14,6 +14,7 @@ class GroupInviteRequest(BaseModel):
     """邀请成员请求"""
     member_type: str = Field(..., description="human | ai")
     member_id: int
+    message: str | None = Field(None, description="邀请附言（仅 human 有效）")
 
 
 class GroupUpdateRequest(BaseModel):

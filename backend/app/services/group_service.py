@@ -164,7 +164,16 @@ async def list_user_groups(db: AsyncSession, user_id: int) -> list[dict]:
             for am in avatar_members:
                 avatar_url = None
                 if am.member_type == "ai":
-                    a = await db.get(AgentModel, am.member_id)
+                    # v2.0.0: member_id 统一为 user_id，同时兼容旧 agent.id
+                    a_result = await db.execute(
+                        select(AgentModel).where(AgentModel.user_id == am.member_id)
+                    )
+                    a = a_result.scalar_one_or_none()
+                    if a is None:
+                        a_result = await db.execute(
+                            select(AgentModel).where(AgentModel.id == am.member_id)
+                        )
+                        a = a_result.scalar_one_or_none()
                     avatar_url = getattr(a, 'avatar_url', None) if a else None
                 else:
                     u = await db.get(User, am.member_id)
@@ -233,10 +242,12 @@ async def add_member(
     )
     existing = result.scalar_one_or_none()
     if existing:
-        # 如果已存在但类型不匹配，更新类型为新的（AI > human 优先）
+        # AI 类型优先：已存在 AI 记录时不被 human 覆盖
         if existing.member_type != resolved_type:
-            existing.member_type = resolved_type
-            await db.flush()
+            # human → ai 可以升级，ai → human 不允许（保留 AI 标识）
+            if existing.member_type != "ai":
+                existing.member_type = resolved_type
+                await db.flush()
         return existing
 
     member = GroupMember(
@@ -352,12 +363,25 @@ async def set_group_dnd(
     ⚠️ dnd_until 必须用 offset-naive datetime（无 tzinfo），因为 DB 列是 TIMESTAMP WITHOUT TIME ZONE。
     混用 offset-aware datetime 会导致 asyncpg DataError。
     """
+    # v2.0.0: AI 类型用 agent.user_id 查找（group_members 统一为 user_id）
+    lookup_id = agent_id
+    if member_type == "ai":
+        agent = await db.get(Agent, agent_id)
+        if agent is None:
+            # 可能是 user_id 传入，尝试反向查找
+            agent_result = await db.execute(
+                select(Agent).where(Agent.user_id == agent_id)
+            )
+            agent = agent_result.scalar_one_or_none()
+        if agent:
+            lookup_id = agent.user_id
+
     result = await db.execute(
         select(GroupMember).where(
             and_(
                 GroupMember.group_id == group_id,
                 GroupMember.member_type == member_type,
-                GroupMember.member_id == agent_id,
+                GroupMember.member_id == lookup_id,
             )
         )
     )
@@ -384,13 +408,14 @@ async def is_member_in_dnd(db: AsyncSession, agent_id: int, group_id: int) -> bo
     if agent and agent.is_paused:
         return True
 
-    # 2. 再检查按群 DND
+    # 2. 再检查按群 DND（v2.0.0: group_members.member_id 统一为 user_id）
+    lookup_id = agent.user_id if agent else agent_id
     result = await db.execute(
         select(GroupMember).where(
             and_(
                 GroupMember.group_id == group_id,
                 GroupMember.member_type == "ai",
-                GroupMember.member_id == agent_id,
+                GroupMember.member_id == lookup_id,
             )
         )
     )
@@ -413,13 +438,27 @@ async def is_member_of_group(
     member_type: str,
     group_id: int,
 ) -> bool:
-    """检查成员是否在指定群聊中"""
+    """检查成员是否在指定群聊中。
+    v2.0.0: AI 类型兼容 agent.id 和 user_id 两种查找。
+    """
+    lookup_id = member_id
+    if member_type == "ai":
+        # 尝试 agent.id → user_id 转换
+        agent = await db.get(Agent, member_id)
+        if agent is None:
+            agent_result = await db.execute(
+                select(Agent).where(Agent.user_id == member_id)
+            )
+            agent = agent_result.scalar_one_or_none()
+        if agent and agent.user_id:
+            lookup_id = agent.user_id
+
     result = await db.execute(
         select(GroupMember).where(
             and_(
                 GroupMember.group_id == group_id,
                 GroupMember.member_type == member_type,
-                GroupMember.member_id == member_id,
+                GroupMember.member_id == lookup_id,
             )
         )
     )
@@ -439,12 +478,24 @@ async def cancel_group_dnd(
     不可加 tzinfo=timezone.utc，否则 asyncpg 抛 DataError。
     ⚠️ 同样，member_type 默认为 "ai"，前端路由调用时必须传 "human"。
     """
+    # v2.0.0: AI 类型用 agent.user_id 查找（group_members 统一为 user_id）
+    lookup_id = agent_id
+    if member_type == "ai":
+        agent = await db.get(Agent, agent_id)
+        if agent is None:
+            agent_result = await db.execute(
+                select(Agent).where(Agent.user_id == agent_id)
+            )
+            agent = agent_result.scalar_one_or_none()
+        if agent:
+            lookup_id = agent.user_id
+
     result = await db.execute(
         select(GroupMember).where(
             and_(
                 GroupMember.group_id == group_id,
                 GroupMember.member_type == member_type,
-                GroupMember.member_id == agent_id,
+                GroupMember.member_id == lookup_id,
             )
         )
     )
@@ -997,7 +1048,9 @@ async def _get_member(
     member_type: str,
     member_id: int,
 ) -> GroupMember | None:
-    """获取群成员记录（内部辅助函数）"""
+    """获取群成员记录（内部辅助函数）。
+    v2.0.0: AI 类型的 member_id 统一为 user_id，同时向后兼容 agent.id 查找。
+    """
     result = await db.execute(
         select(GroupMember).where(
             GroupMember.group_id == group_id,
@@ -1005,7 +1058,23 @@ async def _get_member(
             GroupMember.member_id == member_id,
         )
     )
-    return result.scalar_one_or_none()
+    member = result.scalar_one_or_none()
+
+    # v2.0.0: AI 类型兼容——DB 存 user_id，调用方可能传 agent.id
+    if member is None and member_type == "ai":
+        from app.models.agent import Agent as AgentModel
+        agent = await db.get(AgentModel, member_id)
+        if agent and agent.user_id and agent.user_id != member_id:
+            result = await db.execute(
+                select(GroupMember).where(
+                    GroupMember.group_id == group_id,
+                    GroupMember.member_type == member_type,
+                    GroupMember.member_id == agent.user_id,
+                )
+            )
+            member = result.scalar_one_or_none()
+
+    return member
 
 
 async def disband_group(db: AsyncSession, group_id: int, operator_id: int) -> Group:

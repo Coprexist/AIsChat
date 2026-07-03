@@ -6,7 +6,7 @@ import ChatSidebar from './ChatSidebar'
 import DMChatView from './DMChatView'
 import GroupSettingsPanel from './GroupSettingsPanel'
 import SearchOverlay from './SearchOverlay'
-import { Bell, BellOff, UserPlus, Settings, ArrowLeft, Bot, User, Globe, X } from 'lucide-react'
+import { Bell, BellOff, UserPlus, Settings, ArrowLeft, Bot, User, Globe, X, Check } from 'lucide-react'
 import { useT } from '../i18n/I18nContext'
 import { useResizableSidebar } from '../hooks/useResizableSidebar'
 
@@ -289,13 +289,48 @@ function CreateGroupModal({
   const [name, setName] = useState('')
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
+  // 成员搜索
+  interface SearchResult { id: number; type: 'human' | 'ai'; name: string; state?: string }
+  const [memberQuery, setMemberQuery] = useState('')
+  const [memberResults, setMemberResults] = useState<SearchResult[]>([])
+  const [memberSearchLoading, setMemberSearchLoading] = useState(false)
+  const [selectedMembers, setSelectedMembers] = useState<Map<string, SearchResult>>(new Map())
+
+  useEffect(() => {
+    if (memberQuery.length < 1) { setMemberResults([]); return }
+    const timer = setTimeout(async () => {
+      setMemberSearchLoading(true)
+      try {
+        const data = await api.get<{ results: SearchResult[] }>(`/search?q=${encodeURIComponent(memberQuery)}`)
+        setMemberResults(data.results)
+      } catch { /* ignore */ }
+      finally { setMemberSearchLoading(false) }
+    }, 300)
+    return () => clearTimeout(timer)
+  }, [memberQuery])
+
+  const toggleMember = (r: SearchResult) => {
+    const key = `${r.type}:${r.id}`
+    setSelectedMembers(prev => {
+      const next = new Map(prev)
+      if (next.has(key)) next.delete(key)
+      else next.set(key, r)
+      return next
+    })
+  }
+  const removeMember = (key: string) => {
+    setSelectedMembers(prev => { const next = new Map(prev); next.delete(key); return next })
+  }
+
+  const canCreate = name.trim() && selectedMembers.size > 0 && !loading
 
   const handleCreate = async () => {
-    if (!name.trim()) return
+    if (!canCreate) return
     setLoading(true)
     setError('')
     try {
-      const newGroup = await api.post('/groups', { name: name.trim() })
+      const initialMembers = Array.from(selectedMembers.values()).map(m => ({ type: m.type, id: m.id }))
+      const newGroup = await api.post('/groups', { name: name.trim(), initial_members: initialMembers })
       onCreated(newGroup)
     } catch (err: any) {
       setError(err.message || t('chat.createFailed'))
@@ -311,7 +346,7 @@ function CreateGroupModal({
         onClick={(e) => e.stopPropagation()}
       >
         <h2 className="text-lg font-semibold mb-4 text-textPrimary">{t('chat.createNewGroup')}</h2>
-        <div>
+        <div className="mb-3">
           <label className="block text-xs font-medium mb-1.5 text-textSecondary">{t('chat.groupName')}</label>
           <input
             type="text"
@@ -323,7 +358,53 @@ function CreateGroupModal({
             autoFocus
           />
         </div>
-        {error && <div className="text-sm text-rose-400 mt-3">{error}</div>}
+
+        {/* 成员搜索 */}
+        <div className="mb-2">
+          <label className="block text-xs font-medium mb-1.5 text-textSecondary">
+            {t('chat.addMembers')} <span className="text-rose-400">*</span>
+          </label>
+          <input
+            type="text" value={memberQuery}
+            onChange={(e) => setMemberQuery(e.target.value)}
+            className="w-full px-3.5 py-2 rounded-xl border border-border bg-canvas text-textPrimary placeholder:text-textMuted text-sm focus:outline-none focus:ring-2 focus:ring-primary-500/50"
+            placeholder={t('chat.searchMembers')}
+          />
+          {memberResults.length > 0 && (
+            <div className="mt-1 border border-border rounded-xl bg-canvas max-h-40 overflow-y-auto">
+              {memberResults.map(r => {
+                const key = `${r.type}:${r.id}`
+                const sel = selectedMembers.has(key)
+                return (
+                  <button key={key} onClick={() => toggleMember(r)}
+                    className={`w-full flex items-center gap-2 px-3 py-2 text-sm text-left hover:bg-hover transition-colors ${sel ? 'bg-primary-500/10' : ''}`}>
+                    <span className={`w-4 h-4 rounded border-2 flex items-center justify-center shrink-0 ${sel ? 'bg-primary-500 border-primary-500' : 'border-border'}`}>
+                      {sel && <Check size={10} className="text-white" />}
+                    </span>
+                    <span className="text-textPrimary truncate flex-1">{r.name}</span>
+                    <span className="text-[10px] text-textMuted shrink-0">{r.type === 'ai' ? 'AI' : t('chat.human')}</span>
+                  </button>
+                )
+              })}
+            </div>
+          )}
+          {memberSearchLoading && <div className="mt-1 text-xs text-textMuted">{t('common.searching')}...</div>}
+        </div>
+
+        {/* 已选成员 */}
+        {selectedMembers.size > 0 && (
+          <div className="flex flex-wrap gap-1.5 mb-3">
+            {Array.from(selectedMembers.entries()).map(([key, r]) => (
+              <span key={key} className="inline-flex items-center gap-1 px-2 py-1 bg-primary-500/10 border border-primary-500/20 rounded-lg text-xs text-textPrimary">
+                {r.type === 'ai' ? <Bot size={10} className="text-mint-400" /> : <User size={10} className="text-primary-400" />}
+                {r.name}
+                <button onClick={() => removeMember(key)} className="ml-0.5 hover:text-rose-400 transition-colors"><X size={12} /></button>
+              </span>
+            ))}
+          </div>
+        )}
+
+        {error && <div className="text-sm text-rose-400 mb-3">{error}</div>}
         <div className="flex gap-2 mt-4">
           <button
             onClick={onClose}
@@ -333,7 +414,7 @@ function CreateGroupModal({
           </button>
           <button
             onClick={handleCreate}
-            disabled={!name.trim() || loading}
+            disabled={!canCreate}
             className="flex-1 py-2.5 text-sm bg-primary-500 text-white rounded-xl hover:bg-primary-400 disabled:opacity-30 font-medium transition-all shadow-lg shadow-primary-500/20"
           >
             {loading ? t('chat.creating') : t('chat.create')}
@@ -423,8 +504,14 @@ function InviteMemberModal({
       const [member_type, idStr] = key.split(':')
       const member_id = parseInt(idStr)
       try {
-        await api.post(`/groups/${groupId}/invite`, { member_type, member_id })
-        ok.push(key)
+        const res = await api.post(`/groups/${groupId}/invite`, { member_type, member_id })
+        const entry = selectedEntries.get(key)
+        const name = entry?.name || `${member_type}:${idStr}`
+        if (res.method === 'invitation') {
+          ok.push(`${name} ${t('chat.invitationSent')}`)
+        } else {
+          ok.push(`${name} ${t('chat.joined')}`)
+        }
       } catch (err: any) {
         const entry = selectedEntries.get(key)
         const name = entry?.name || `${member_type}:${idStr}`

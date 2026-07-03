@@ -23,11 +23,21 @@ class ViewUnread(ToolPlugin):
                       arguments: dict, context: dict) -> dict:
         from app.services.group_service import check_unread
         from app.models.group import GroupMember, Group
+        from app.models.agent import Agent as AgentModel
+
+        # v2.0.0: agent_id 是 agent.id，但 group_members.member_id 统一为 user_id
+        lookup_id = agent_id
+        agent_result = await db.execute(
+            sa_select(AgentModel).where(AgentModel.id == agent_id)
+        )
+        agent = agent_result.scalar_one_or_none()
+        if agent and agent.user_id:
+            lookup_id = agent.user_id
 
         member_result = await db.execute(
             sa_select(GroupMember).where(
                 GroupMember.member_type == "ai",
-                GroupMember.member_id == agent_id,
+                GroupMember.member_id == lookup_id,
             )
         )
         memberships = member_result.scalars().all()

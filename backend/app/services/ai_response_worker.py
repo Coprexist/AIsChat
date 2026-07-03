@@ -260,6 +260,8 @@ async def _process_group_event(db, event: dict):
         logger.info(f"群 {group_id} 收到远程 AI 消息 (source={source_public_id})，跳过本地 AI 回复")
         return
 
+    from app.models.agent import Agent as AgentModel
+
     # 获取群聊信息
     group_result = await db.execute(select(Group).where(Group.id == group_id))
     group = group_result.scalar_one_or_none()
@@ -299,12 +301,22 @@ async def _process_group_event(db, event: dict):
     # 确定需要触发的 AI 列表
     target_ai_ids: set[int] = set()
 
+    # v2.0.0: sender_id 对 AI 类型是 agent.id，需转为 user_id 与 group_members 对齐
+    exclude_user_id: int | None = None
+    if sender_type == "ai" and sender_id:
+        sender_agent_result = await db.execute(
+            select(AgentModel).where(AgentModel.id == sender_id)
+        )
+        sender_agent = sender_agent_result.scalar_one_or_none()
+        if sender_agent and sender_agent.user_id:
+            exclude_user_id = sender_agent.user_id
+
     if sender_type == "human":
         target_ai_ids = {m.member_id for m in ai_members}
     else:
         target_ai_ids = {
             m.member_id for m in ai_members
-            if m.member_id != sender_id
+            if m.member_id != (exclude_user_id if exclude_user_id else sender_id)
         }
 
     if not target_ai_ids:
@@ -415,21 +427,32 @@ async def _maybe_trigger_ai_reply(
     """检查单个 AI 是否应该回复，如果是则调用 LLM 生成回复"""
     from app.services.agent_service import get_agent
     from app.services.action_decider import decide_action, ActionContext, ActionType
+    from app.models.agent import Agent as AgentModel
 
+    # v2.0.0: agent_id 可能是 agent.id 或 user_id（group_members 迁移后 member_id 统一为 user_id）
     agent = await get_agent(db, agent_id)
     if agent is None:
-        logger.warning(f"AI agent_id={agent_id} 不存在，跳过")
+        # 通过 user_id 查找（group_members.member_id 现已统一为 user_id）
+        agent_result = await db.execute(
+            select(AgentModel).where(AgentModel.user_id == agent_id)
+        )
+        agent = agent_result.scalar_one_or_none()
+    if agent is None:
+        logger.warning(f"AI agent_id/user_id={agent_id} 不存在，跳过")
         return
 
-    logger.info(f"🔍 检查 AI {agent.name}({agent_id}), state={agent.state}")
+    # 统一使用 agent.id（数据库主键）作为后续内部标识
+    resolved_agent_id = agent.id
+
+    logger.info(f"🔍 检查 AI {agent.name}(id={resolved_agent_id}, user_id={agent.user_id}), state={agent.state}")
 
     is_mentioned = _check_mention(content, agent.name)
-    logger.info(f"🔍 AI {agent.name}({agent_id}): is_mentioned={is_mentioned}, content_preview='{content[:80]}'")
+    logger.info(f"🔍 AI {agent.name}(id={resolved_agent_id}): is_mentioned={is_mentioned}, content_preview='{content[:80]}'")
 
     # v0.5.0: 使用统一决策（替代原有 Gate 1-5 的手动判断）
     ctx = ActionContext(
         event_type="message",
-        agent_id=agent_id,
+        agent_id=resolved_agent_id,
         group_id=group_id,
         content=content,
         sender_type=sender_type,
@@ -438,14 +461,14 @@ async def _maybe_trigger_ai_reply(
         chain_depth=chain_depth,
     )
     decision = await decide_action(db, agent, ctx)
-    logger.info(f"🔍 AI {agent.name}({agent_id}): decision={decision.action_type.value}, "
+    logger.info(f"🔍 AI {agent.name}(id={resolved_agent_id}): decision={decision.action_type.value}, "
                 f"priority={decision.priority}, reason={decision.reason}")
 
     if not decision.should_act:
         # 处理 DND 暂存消息
         if decision.details.get("store_pending"):
             from app.services.group_service import store_pending_message
-            await store_pending_message(db, agent_id, group_id, trigger_message_id)
+            await store_pending_message(db, resolved_agent_id, group_id, trigger_message_id)
         return
 
     # 记录意愿（如果决策中有）
@@ -455,8 +478,8 @@ async def _maybe_trigger_ai_reply(
         agent.last_willingness_reason = decision.reason
 
     # 4. 速率限制检查
-    if not _check_rate_limit(agent_id):
-        logger.info(f"AI {agent.name}({agent_id}) 速率限制，跳过")
+    if not _check_rate_limit(resolved_agent_id):
+        logger.info(f"AI {agent.name}(id={resolved_agent_id}) 速率限制，跳过")
         return
 
     # 5. 获取 API 配置（v0.5.0: 公共辅助函数；v0.6.0: 四层优先链含池 Key）
@@ -474,7 +497,7 @@ async def _maybe_trigger_ai_reply(
     try:
         from app.services.workspace_service import mark_interrupted
         sender_info = f"群聊 #{group_id} 的新消息"
-        await mark_interrupted(db, agent_id, reason=sender_info)
+        await mark_interrupted(db, resolved_agent_id, reason=sender_info)
     except Exception:
         pass  # 非致命
 
@@ -495,7 +518,7 @@ async def _maybe_trigger_ai_reply(
     delay_skipped = False
     if skill_result.delay_seconds > 0:
         from app.services.group_service import get_pending_messages
-        pending = await get_pending_messages(db, agent_id, group_id)
+        pending = await get_pending_messages(db, resolved_agent_id, group_id)
         pending_count = len(pending) if pending else 0
         if pending_count > 0:
             logger.info(f"🧠 AI {agent.name} 有 {pending_count} 条积压消息，跳过延迟回复")
@@ -604,7 +627,7 @@ async def _maybe_trigger_ai_reply(
 
     # 9. 标记未读消息已处理
     from app.services.group_service import mark_pending_read
-    await mark_pending_read(db, agent_id, group_id)
+    await mark_pending_read(db, resolved_agent_id, group_id)
     await db.commit()
 
 

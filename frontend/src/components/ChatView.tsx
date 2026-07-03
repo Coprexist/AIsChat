@@ -20,8 +20,9 @@ interface Message {
   content: string
   reply_to: number | null
   read_at?: string | null
-  attachments?: Array<{file_id: number, name: string, size: number, mime_type: string}> | null
+  attachments?: Array<{file_id?: number, name?: string, size?: number, mime_type?: string, type?: string, invitation_id?: number, group_name?: string, inviter_name?: string, status?: string}> | null
   source_public_id?: string | null
+  message_type?: string
   created_at: string
 }
 
@@ -805,6 +806,7 @@ export default function ChatView({ conversationType, conversationId }: ChatViewP
                 senderId={msg.sender_id}
                 sourcePublicId={msg.source_public_id}
                 attachments={msg.attachments}
+                messageType={msg.message_type}
                 onAvatarClick={handleAvatarClick}
               />
             </div>

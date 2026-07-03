@@ -62,6 +62,7 @@ async def get_or_create_dm_session(
     db: AsyncSession,
     current_user_id: int,
     target_user_id: int,
+    skip_friendship_check: bool = False,
 ) -> dict:
     """获取或创建私信会话"""
     if current_user_id == target_user_id:
@@ -83,8 +84,9 @@ async def get_or_create_dm_session(
 
     is_new = False
     if session is None:
-        # 新建会话前校验：human→human 必须互为好友
-        await _require_friendship(db, current_user_id, target_user_id)
+        # 新建会话前校验：human→human 必须互为好友（群邀请等场景可跳过）
+        if not skip_friendship_check:
+            await _require_friendship(db, current_user_id, target_user_id)
         is_new = True
         user_ids = sorted([current_user_id, target_user_id])
         session = DMSession(
@@ -269,6 +271,8 @@ async def send_dm_message(
     reply_to: int | None = None,
     created_at: datetime | None = None,
     attachments: list[dict] | None = None,
+    message_type: str = "normal",
+    skip_friendship_check: bool = False,
 ) -> dict:
     """发送私信消息（可指定 created_at 用于注入历史消息）"""
     if not content.strip() and not attachments:
@@ -286,7 +290,8 @@ async def send_dm_message(
 
     # 校验好友关系（human→human 必须互为好友）
     receiver_id = session.user2_id if session.user1_id == sender_id else session.user1_id
-    await _require_friendship(db, sender_id, receiver_id)
+    if not skip_friendship_check:
+        await _require_friendship(db, sender_id, receiver_id)
 
     now = datetime.now(timezone.utc).replace(tzinfo=None)
     msg = DMMessage(
@@ -295,6 +300,7 @@ async def send_dm_message(
         content=content.strip(),
         reply_to=reply_to,
         attachments=json.dumps(attachments) if attachments else None,
+        message_type=message_type,
         created_at=created_at or now,
     )
     db.add(msg)
