@@ -22,10 +22,10 @@ export default function PluginManager() {
 
   const fetchPlugins = async () => {
     try {
-      const res = await api.get('/admin/plugins')
-      setPlugins(res.data.plugins)
+      const data: any = await api.get('/admin/plugins')
+      setPlugins(data.plugins || [])
     } catch (e: any) {
-      const detail = e?.response?.data?.detail || e?.message || '加载失败'
+      const detail = e?.message || e?.detail || '加载失败'
       setMessage({ type: 'error', text: `加载失败: ${detail}` })
     } finally {
       setLoading(false)
@@ -45,8 +45,8 @@ export default function PluginManager() {
     setMessage(null)
     const action = plugin.running ? 'stop' : 'start'
     try {
-      const res = await api.post(`/admin/plugins/${plugin.id}/${action}`)
-      setMessage({ type: 'success', text: res.data.message || (plugin.running ? '已停止' : '已启动') })
+      const res: any = await api.post(`/admin/plugins/${plugin.id}/${action}`)
+      setMessage({ type: 'success', text: res.message || (plugin.running ? '已停止' : '已启动') })
       await fetchPlugins()
     } catch (e: any) {
       setMessage({ type: 'error', text: e?.response?.data?.detail || '操作失败' })
