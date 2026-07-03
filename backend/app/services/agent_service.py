@@ -11,6 +11,9 @@ from app.models.memory import RoughMemory, DetailMemory
 from app.config import settings
 from app.utils.text import extract_mentions
 from app.utils.pure.presets import merge_preset_values
+from app.utils.pure.willingness import (
+    WillingnessResult, calc_alarm_willingness, calc_reply_willingness, calc_proactive_willingness,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -893,16 +896,7 @@ async def generate_agent_personality(
         return json.loads(content)
 
 
-class WillingnessResult:
-    """v0.4.0: 意愿评分结果，含逐因子原因和行为级别"""
-    def __init__(self, score: int, reason: str, level: str, details: dict):
-        self.score = score          # 0-100
-        self.reason = reason        # 人类可读的原因字符串
-        self.level = level          # "high" | "medium" | "low"
-        self.details = details      # 逐因子明细
-
-    def __repr__(self):
-        return f"WillingnessResult(score={self.score}, level={self.level}, reason={self.reason!r})"
+# WillingnessResult ——已迁移到 utils/pure/willingness.py
 
 
 async def calculate_willingness(
@@ -917,18 +911,7 @@ async def calculate_willingness(
     """
     计算 AI 对某条消息/事件的意愿评分（0-100），返回含逐因子原因的结果。
 
-    scenario 参数（v0.5.0）：
-    - "reply": 被动回复（默认，保持向后兼容）
-      基础分 50 + @提及 +40/20 + 消息长度 ±10/5 + 活跃度 ±10 + DND -30
-    - "alarm": 闹钟唤醒
-      固定返回高分 (85)，因为闹钟是 AI 自己的意志
-    - "proactive": 主动发言
-      基础分 30 + 空闲时长奖励 + 群活跃度惩罚
-
-    level:
-    - high (>60): 可主动发言
-    - medium (30-60): 仅在 @提及 时回复
-    - low (<30): 跳过
+    编排器：负责 DB 查询 + 调用纯函数计算。
     """
     from datetime import datetime, timedelta
     from app.models.message import Message
@@ -937,64 +920,25 @@ async def calculate_willingness(
     if agent is None:
         return WillingnessResult(0, "AI 不存在", "low", {})
 
-    # offline/blocked 状态不处理
-    if agent.state in ("offline", "blocked"):
-        return WillingnessResult(
-            0, f"状态为 {agent.state}，不参与对话", "low",
-            {"state": agent.state},
-        )
-
-    # v0.5.0: 闹钟场景 — 固定高分
+    # 闹钟场景 — 纯函数
     if scenario == "alarm":
-        return WillingnessResult(85, "闹钟唤醒（AI 自主意志）", "high", {"scenario": "alarm"})
+        return calc_alarm_willingness()
 
-    # v0.5.0: 主动发言场景
+    # 主动发言场景
     if scenario == "proactive":
         return await _calc_proactive_willingness(db, agent_id, group_id, idle_seconds)
 
-    # ═══ 以下为原有的 reply 场景逻辑 ═══
+    # ═══ reply 场景：DB 查询 → 纯函数计算 ═══
 
-    score = 50  # 基础分
-    reason_parts = []
-    details = {"base": 50}
-
-    # 1. @ 提及检测
-    if is_mentioned:
-        # 只传了 True 但没有具体内容时给 +40
-        score += 40
-        reason_parts.append("@提及 +40")
-        details["mention"] = 40
-    elif message_content:
+    # @提及检测（纯计算——extract_mentions 是纯函数）
+    mention_flag = is_mentioned
+    if not mention_flag and message_content:
         mentioned_names = extract_mentions(message_content)
-        agent_name_mentioned = agent.name in mentioned_names
-        generic_mention = "@ai" in message_content.lower() or "@all" in message_content.lower()
-        if agent_name_mentioned:
-            score += 40
-            reason_parts.append("@提及 +40")
-            details["mention"] = 40
-        elif generic_mention:
-            score += 20
-            reason_parts.append("@ai/@all +20")
-            details["mention"] = 20
-        else:
-            details["mention"] = 0
-    else:
-        details["mention"] = 0
+        if agent.name in mentioned_names:
+            mention_flag = True
+        # @ai/@all 由纯函数内部处理
 
-    # 2. 消息长度
-    msg_len = len(message_content)
-    if msg_len < 5:
-        score -= 5
-        reason_parts.append(f"短消息({msg_len}字) -5")
-        details["length"] = -5
-    elif msg_len > 50:
-        score += 10
-        reason_parts.append(f"实质性内容({msg_len}字) +10")
-        details["length"] = 10
-    else:
-        details["length"] = 0
-
-    # 3. 群聊活跃度（最近 1 小时消息数）
+    # 群活跃度（DB 查询）
     one_hour_ago = datetime.utcnow() - timedelta(hours=1)
     count_result = await db.execute(
         select(func.count(Message.id)).where(
@@ -1004,41 +948,14 @@ async def calculate_willingness(
     )
     recent_count = count_result.scalar() or 0
 
-    if recent_count > 50:
-        score -= 10
-        reason_parts.append(f"群聊高活跃({recent_count}条/h) -10")
-        details["activity"] = -10
-    elif recent_count < 5:
-        score += 10
-        reason_parts.append(f"群聊安静({recent_count}条/h) +10")
-        details["activity"] = 10
-    else:
-        details["activity"] = 0
-        details["recent_count"] = recent_count
-
-    # 4. 当前状态加权
-    if agent.state == "dnd":
-        score -= 30
-        reason_parts.append("DND状态 -30")
-        details["dnd_penalty"] = -30
-
-    # 限制在 0-100
-    score = max(0, min(100, score))
-    details["final"] = score
-
-    # 拼接原因
-    reason = "基础分 50, " + ", ".join(reason_parts) if reason_parts else "基础分 50"
-    reason += f" → {score}"
-
-    # 行为级别
-    if score > 60:
-        level = "high"
-    elif score >= 30:
-        level = "medium"
-    else:
-        level = "low"
-
-    return WillingnessResult(score=score, reason=reason, level=level, details=details)
+    # 纯函数计算
+    return calc_reply_willingness(
+        agent_state=agent.state,
+        agent_name=agent.name,
+        message_content=message_content,
+        is_mentioned=mention_flag,
+        recent_count=recent_count,
+    )
 
 
 async def _calc_proactive_willingness(
@@ -1050,54 +967,26 @@ async def _calc_proactive_willingness(
     """
     v0.5.0: 主动发言意愿计算。
 
-    基础分 30 + 空闲时长奖励（每小时+10，上限+40）+ 群活跃度调整。
+    编排器：DB 查询群活跃度 → 纯函数计算。
     """
     from app.models.message import Message
-    from sqlalchemy import func, select as _sel_pro
+    from sqlalchemy import func as _sql_func
 
-    score = 30
-    reason_parts = ["主动发言基础分 30"]
-    details: dict = {"base": 30, "scenario": "proactive"}
-
-    # 空闲时长奖励：每小时 +10，上限 +40
-    hours_idle = idle_seconds / 3600
-    idle_bonus = min(40, int(hours_idle * 10))
-    if idle_bonus > 0:
-        score += idle_bonus
-        reason_parts.append(f"空闲{hours_idle:.1f}h +{idle_bonus}")
-        details["idle_bonus"] = idle_bonus
-
-    # 群活跃度
+    # DB 查询群活跃度
+    recent_count = None
     if group_id:
         from datetime import datetime, timedelta
         one_hour_ago = datetime.utcnow() - timedelta(hours=1)
         count_result = await db.execute(
-            _sel_pro(func.count(Message.id)).where(
+            select(func.count(Message.id)).where(
                 Message.group_id == group_id,
                 Message.created_at >= one_hour_ago,
             )
         )
         recent_count = count_result.scalar() or 0
 
-        if recent_count > 30:
-            score -= 15
-            reason_parts.append(f"群聊活跃({recent_count}条/h) -15")
-            details["activity"] = -15
-        elif recent_count < 3:
-            score += 15
-            reason_parts.append(f"群聊沉寂({recent_count}条/h) +15")
-            details["activity"] = 15
-        else:
-            details["activity"] = 0
-    else:
-        details["activity"] = 0
-
-    score = max(0, min(100, score))
-    details["final"] = score
-    reason = ", ".join(reason_parts) + f" → {score}"
-
-    level = "high" if score > 60 else "medium" if score >= 30 else "low"
-    return WillingnessResult(score=score, reason=reason, level=level, details=details)
+    # 纯函数计算
+    return calc_proactive_willingness(idle_seconds=idle_seconds, recent_count=recent_count)
 
 
 async def export_agent_soul(
