@@ -793,6 +793,30 @@ def _format_time(dt: datetime) -> str:
     return dt.strftime("%m-%d %H:%M")
 
 
+def format_context_for_ai(conversations: list[dict], agent_name: str) -> list[dict]:
+    """
+    纯函数：将结构化跨对话数据转为 AI 可读的 system 消息列表。
+    数据层产出结构化 dict，渲染层（本函数）负责格式化——加字段只需改这里。
+    """
+    messages: list[dict] = []
+    for conv in conversations:
+        if conv["type"] == "group":
+            header = f"在群聊「{conv['name']}」(id={conv['id']})中："
+        else:
+            header = f"在私信「{conv['name']}」(id={conv['id']})中："
+        messages.append({"role": "system", "content": header})
+        for m in conv["messages"]:
+            if m["is_self"]:
+                label = f"你（{agent_name}）"
+            else:
+                label = f"{m['speaker_name']}（id={m['speaker_id']}）"
+            messages.append({
+                "role": "system",
+                "content": f"[{m['time']}] {label}: {m['content'][:200]}",
+            })
+    return messages
+
+
 async def _build_cross_conversation_context(
     db: AsyncSession,
     agent,
@@ -801,15 +825,11 @@ async def _build_cross_conversation_context(
     trigger_user_id: int | None = None,
 ) -> list[dict]:
     """
-    为数字生命档/沉浸档 AI 加载其他对话的最近消息。
+    为数字生命档/沉浸档 AI 收集并格式化跨对话上下文。
 
-    所有对话的消息都加载到同一上下文中（而非注入一个独立的摘要块），
-    用「在[群名/私信名]中：」标记区分不同对话。AI 切换对话就像人类切换 App 一样自然。
-
-    v0.9.0: 通用/半通用 AI 按 trigger_user_id 过滤，防止跨用户隐私泄露。
-    共鸣 AI 无此限制——所有对话归于同一自我。
-
-    返回 [] 表示无跨对话上下文（聊天档 AI 不加载，或该 AI 只有当前这一个对话）。
+    两层架构：
+    1. 数据层（本函数）：查询 DB，产出结构化数据
+    2. 渲染层（format_context_for_ai）：纯函数，结构化数据 → AI 可读文本
     """
     from app.models.group import Group as GroupModel
     from app.models.group import GroupMember
@@ -819,19 +839,15 @@ async def _build_cross_conversation_context(
     profile = getattr(agent, 'config_profile', 'chat') or 'chat'
     ai_type = agent.ai_type or "resonance"
 
-    # 基础聊天档 → 不加载跨对话上下文（纯聊天机器人）
     if profile == 'chat':
         return []
-    # 通/半通用 AI → 不加载（防止跨用户隐私泄露）
     if ai_type in ('general', 'semi_general'):
         return []
-    # 数字生命档 / 沉浸档 / 共振类型（含 custom 档位的共振 AI）→ 加载统一上下文
 
     is_filtered = ai_type in ("general", "semi_general") and trigger_user_id is not None
+    conversations: list[dict] = []
 
-    messages: list[dict] = []
-
-    # ── 1. 收集群聊 ──
+    # ── 1. 收集群聊数据 ──
     try:
         where = (
             GroupMember.member_type == "ai",
@@ -853,7 +869,6 @@ async def _build_cross_conversation_context(
             if not recent:
                 continue
 
-            # 批量解析发送者名称（本地消息 sender_name 为 NULL，需查表）
             from app.models.agent import Agent as AgentModel
             human_ids = {m.sender_id for m in recent if m.sender_type == "human"}
             ai_ids = {m.sender_id for m in recent if m.sender_type == "ai"}
@@ -871,22 +886,27 @@ async def _build_cross_conversation_context(
                 for row in a_result.all():
                     name_map[("ai", row[0])] = row[1]
 
-            messages.append({"role": "system", "content": f"在群聊「{gname}」(id={gid})中："})
+            msgs = []
             for m in reversed(recent):
                 is_self = m.sender_type == "ai" and m.sender_id == agent.id
                 if is_self:
-                    label = f"你（{agent.name}）"
+                    speaker = agent.name
+                    sid = None
                 else:
-                    raw_name = name_map.get((m.sender_type, m.sender_id)) or "未知"
-                    label = f"{raw_name}（id={m.sender_id}）"
-                messages.append({
-                    "role": "system",
-                    "content": f"[{_format_time(m.created_at)}] {label}: {(m.content or '')[:200]}",
+                    speaker = name_map.get((m.sender_type, m.sender_id), "未知")
+                    sid = m.sender_id
+                msgs.append({
+                    "is_self": is_self,
+                    "speaker_name": speaker,
+                    "speaker_id": sid,
+                    "content": m.content or "",
+                    "time": _format_time(m.created_at),
                 })
+            conversations.append({"type": "group", "name": gname, "id": gid, "messages": msgs})
     except Exception as e:
         logger.warning(f"跨对话上下文(群聊)查询失败: {e}")
 
-    # ── 2. 收集私信 ──
+    # ── 2. 收集私信数据 ──
     try:
         if agent.user_id:
             dm_result = await db.execute(
@@ -903,7 +923,6 @@ async def _build_cross_conversation_context(
                 if current_session_id and ds.session_id == current_session_id:
                     continue
                 partner_id = ds.user2_id if ds.user1_id == agent.user_id else ds.user1_id
-                # 通用/半通用：仅显示与当前用户相关的私信
                 if is_filtered and partner_id != trigger_user_id:
                     continue
                 partner_name = f"用户{partner_id}"
@@ -924,18 +943,23 @@ async def _build_cross_conversation_context(
                 if not dm_list:
                     continue
 
-                messages.append({"role": "system", "content": f"在私信「{partner_name}」(id={partner_id})中："})
+                msgs = []
                 for m in reversed(dm_list):
                     is_self = m.sender_id == agent.user_id
-                    label = f"你（{agent.name}）" if is_self else f"{partner_name}（id={m.sender_id}）"
-                    messages.append({
-                        "role": "system",
-                        "content": f"[{_format_time(m.created_at)}] {label}: {(m.content or '')[:200]}",
+                    speaker = agent.name if is_self else partner_name
+                    sid = None if is_self else m.sender_id
+                    msgs.append({
+                        "is_self": is_self,
+                        "speaker_name": speaker,
+                        "speaker_id": sid,
+                        "content": m.content or "",
+                        "time": _format_time(m.created_at),
                     })
+                conversations.append({"type": "dm", "name": partner_name, "id": partner_id, "messages": msgs})
     except Exception as e:
         logger.warning(f"跨对话上下文(私信)查询失败: {e}")
 
-    return messages
+    return format_context_for_ai(conversations, agent.name)
 
 
 async def build_messages(
