@@ -450,7 +450,7 @@ async def _maybe_trigger_ai_reply(
     logger.info(f"🔍 AI {agent.name}(id={resolved_agent_id}): is_mentioned={is_mentioned}, content_preview='{content[:80]}'")
 
     # v0.5.0: 使用统一决策（替代原有 Gate 1-5 的手动判断）
-    # v2.1.0: 检测 DND 穿透条件
+    # v1.2.0: 检测 DND 穿透条件
     is_at_all = any(tag in content for tag in ("@all", "@everyone", "@全体"))
     is_announcement = message_type == "announcement"
     ctx = ActionContext(

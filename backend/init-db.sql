@@ -58,7 +58,7 @@ CREATE TABLE IF NOT EXISTS agents (
     memory_load_mode VARCHAR(30) DEFAULT 'index_only',
     memory_recent_count INT DEFAULT 0,
     memory_shared_scope VARCHAR(30) DEFAULT 'private_only',
-    -- v2.1.0: 状态栈（AI 跨任务上下文追踪）
+    -- v1.2.0: 状态栈（AI 跨任务上下文追踪）
     state_stack JSONB DEFAULT '[]'::jsonb,
     created_at TIMESTAMP DEFAULT NOW()
 );

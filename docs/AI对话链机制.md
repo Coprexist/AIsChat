@@ -28,10 +28,10 @@ flowchart TD
 
     Loop --> StateCheck{状态检查}
     StateCheck -->|offline/blocked| Skip1[⏭️ 跳过]
-    StateCheck -->|active/dnd| DndCheck{DND + 未被@?}
-    
+    StateCheck -->|active/dnd| DndCheck{DND + 无穿透?}
+
     DndCheck -->|是| Pending[暂存到<br/>pending_messages]
-    DndCheck -->|否| Willingness[意愿分计算<br/>calculate_willingness]
+    DndCheck -->|否（@提及/@all/公告穿透）| Willingness[意愿分计算<br/>calculate_willingness]
 
     Willingness --> WillCheck{≥ 阈值?}
     WillCheck -->|否| Skip2[⏭️ 跳过]
@@ -103,73 +103,50 @@ AI 发送消息的**两个出口**均会推入队列：
 
 ---
 
-## 2.4 统一上下文 / Unified Context
+## 2.4 统一上下文 → 状态栈（v1.2.0 重构）
 
-> 位置 / Located at: `backend/app/services/llm_service.py:_build_cross_conversation_context()`
-> 设计版本：v1.2.0（system role + 自我/他人区分 + A/B 对照验证）
+> ⚠️ **v1.2.0 重大变更**：`_build_cross_conversation_context()` 已被**禁用**（始终返回空列表）。
+> 原有的"把其他群消息注入当前群 LLM 上下文"机制存在致命 bug——LLM 看到其他群的消息后在当前群回复，形成"历史重播"死循环（详见下方）。
 
-统一上下文让 AI 在响应某个群聊/私信时，能同时看到它在**所有活跃对话**中的最近消息。所有会话使用统一的 `"在XX「名字」(id=X)中："` 标题格式，**当前会话标题放在最后**——位置即语义，AI 自然知道最后的就是现在。
+**替代方案：状态栈系统**（`docs/ai-context-state-design.md`）
 
-### 格式设计
+不再把其他群的消息原文注入当前对话。改为：
+- AI 通过 `push_state`/`pop_state`/`list_states` 追踪跨任务状态
+- 状态栈摘要注入 prompt 尾部（缓存友好）——让 AI 知道"之前在群 B 聊过什么"但不直接回复
+- 需要看其他群的消息时调用 `enter_group` → 实际切换到目标群 → `send_message` 永远发到正确的群
 
-**跨对话上下文全部使用 `role: system`**（标题 + 内容均如此），仅当前会话使用 `user`/`assistant`。
-**AI 自己的发言以纯名字标注**（无 id），**其他人的发言以「名字（id=N）」标注**（带 id 的都是别人）。
-
+**死循环原理（已修复）**：
 ```
-[system] <系统提示词>
-
-[system] 在群聊「AI 研究所」(id=5)中：               ← 历史会话标题
-[system] 逍遥三号: 今天讨论向量数据库                  ← 自己（无id）
-[system] 张三（id=3）: 好的，我最近研究了几个方案       ← 别人（带id）
-[system] 李四（id=7）: 同意，这个话题很有意思           ← 别人（带id）
-
-[system] 在私信「ShuAICFR」(id=1)中：               ← 历史会话标题
-[system] 逍遥三号: 这段逻辑有问题...                  ← 自己（无id）
-[system] ShuAICFR（id=1）: 你说得对，我再看看         ← 别人（带id）
-
-[system] 在私信「清风无殇」(id=12)中：              ← 当前会话，最后一个！
-[user]   清风无殇: 真的假的？                        ← 当前会话用 user/assistant
+_build_cross_conversation_context()
+  → 把其他群的历史消息注入 LLM 上下文（role: system）
+    → LLM 看到旧对话，误以为需要回复
+      → send_message 发到当前群（而不是历史消息所属的群）
+        → 新消息触发 REPLY 决策 → 再次调用上下文构建 → 无限循环
 ```
 
-**设计原则：**
-- **跨对话统一 system role**：跨对话上下文（标题 + 内容）全部 `role: system`。v1.2.0 A/B 对照验证：DeepSeek 在 `system → user/assistant → system` 交替结构中会忽略夹在中间的 `user`/`assistant` 消息（注意力失效），统一 system role 后 AI 可完整读取所有跨对话内容。
-- **自我/他人显式区分**：自己的发言以 AI 名字标注（如 `逍遥三号: ...`），他人的发言以 `名字（id=N）: ...` 标注。带 id 的都是别人——id 是数据库主键，用户名无法伪造，杜绝「用户名注入冒充 AI 自己」的攻击面。
-- **系统提示词规则**：CORE_IDENTITY 消息格式段写明「带 id 的都是别人，不是你说的」。
-- **位置即语义**：最后一个会话标题 = 当前对话，AI 无需推断"哪个是现在"。
-- **格式统一**：所有会话标题全用 `"在XX「名字」(id=X)中："` 格式，无例外。
-- **无时态问题**：最后的就是现在的，无需标注"当前"或"历史"。
+### 上下文压缩（保留）
 
-### 上下文压缩
-
-v1.1.0 核心变更：消息列表"滑动窗口"导致 prompt cache 命中率骤降（每次请求第一条消息不同则全 miss），引入**常态上下文压缩**：
+v1.1.0 引入的上下文压缩机制继续有效：
 
 - 保留 `messages[0]`（系统提示词，维持 FIXED_PREFIX cache 命中）
 - 压缩旧消息为稳定摘要，置于系统提示词末尾
 - 仅保留最近 N 条消息（默认 5）不压缩
-- 压缩阈值从 102K tokens 大幅降低（待定），确保常态压缩而非应急压缩
+- 压缩阈值 `COMPRESSION_THRESHOLD`（默认 0.06，~8K tokens）
 
-**效果**：摘要稳定不变 → 缓存前缀始终命中 → cache 命中率从 ~60% 回升至 ~90%+
+**效果**：摘要稳定不变 → 缓存前缀始终命中 → cache 命中率 ~90%+
 
-### 生效条件
+### 状态栈摘要格式（v1.2.0 新增）
 
-| config_profile | ai_type | 统一上下文 | 隐私过滤 |
-|---------------|---------|:--------:|:------:|
-| chat | 任意 | ❌ | - |
-| custom / immersive / digital_life | resonance（共鸣） | ✅ | 无过滤，全共享 |
-| custom / immersive / digital_life | general / semi_general（通/半通用） | ❌ | 防止跨用户隐私泄露 |
-| custom / immersive / digital_life | 其他 | ✅ | 按 trigger_user_id 过滤 |
+状态栈摘要放在系统提示词尾部（在上下文压缩摘要之后），格式：
 
-**关键规则：**
-- **基础聊天档 (`chat`)**：始终不加载——纯聊天机器人，不需要"全局意识"
-- **共振 AI (`resonance`)**：始终加载——同一个自我在不同对话间穿梭，所有对话归于一
-- **通/半通用 (`general`/`semi_general`)**：始终不加载——一个 AI 服务多个用户，必须隔离隐私
+```
+📋 状态栈（底→顶）
+▸  [group_chat] (group:7): 日常聊天流
+▸↑ [dm] (dm:12): 张三请我 review PR#42  TODO: 读diff→写review→发DM
+▸▶ [file_work] (file:review.md): 正在写 review 草稿  TODO: 完成草稿→发回DM
 
-### 与对话链的交互
-
-1. **跨群触发**：AI 在群 A 被触发时，看到群 B 的最近消息 → 可能在群 A 的回复中引用群 B 的讨论
-2. **链深度隔离**：`chain_depth` 仍按单个群聊计算，跨对话上下文不计入深度——防止统一上下文被人为压低链深度
-3. **DM 互见**：AI 在私信中看到群聊消息，反之亦然 → `cross_post` 工具可主动跨对话传信息
-4. **隐私边界**：通/半通用 AI 不加载统一上下文，确保不同用户之间的对话完全隔离
+请继续执行栈顶活跃任务。完成后调用 pop_state 回到上一层，或 close_state 放弃。
+```
 
 ---
 
@@ -238,13 +215,14 @@ r'@([^\s@，。！？、；：""''「」『』【】（）\(\)\[\]{}<>#+*&^%$!~`
 支持中文名、英文名。提取后去掉尾部标点。
 Supports Chinese and English names. Trailing punctuation is stripped.
 
-### 4.2 穿透规则 / Bypass Rules
+### 4.2 穿透规则 / Bypass Rules（v1.2.0 增强）
 
 | 场景 / Scenario | 效果 / Effect |
 |------|------|
 | AI 处于 DND + 被 @点名 | DND 被绕过，强制推送消息 |
-| AI 处于 DND + @all / @ai | 同上 |
-| AI 处于 DND + 未被 @ | 消息暂存到 `pending_messages`，恢复后补读 |
+| AI 处于 DND + @all / @everyone / @全体 | DND 被绕过，强制推送（v1.2.0 新增） |
+| AI 处于 DND + 群公告 | DND 被绕过（v1.2.0 新增） |
+| AI 处于 DND + 普通消息 | 消息暂存到 `pending_messages`，恢复后补读 |
 | AI 意愿过低 + 被 @点名 | 不自动 DND，依然尝试回复 |
 
 ### 4.3 双端 @提及 / Dual-End @Mention
@@ -266,40 +244,18 @@ Supports Chinese and English names. Trailing punctuation is stripped.
 
 ---
 
-## 6. 状态工具白名单 / State-Based Tool Whitelist
+## 6. 状态工具白名单 / State-Based Tool Whitelist（v1.2.0 更新）
 
 > 位置 / Located at: `backend/app/services/tool_registry.py:STATE_TOOL_WHITELIST`
 
-<details>
-<summary>📊 展开图表 / Expand Diagram</summary>
+| AI 状态 | 可用工具数 | 说明 |
+|----------|-----------|------|
+| active | 37 | 全部工具 |
+| dnd | 26 | 排除社交主动工具，仍可管理自我 + 状态栈全套 |
+| offline | 14 | 含状态栈全套工具（push/pop/close/list） |
+| blocked | 0 | 完全封禁 |
 
-```mermaid
-flowchart LR
-    subgraph Active["🟢 active — 14 tools"]
-        A1[send_message]
-        A2[set_dnd]
-        A3[store_memory]
-        A4[recall_memory]
-        A5[switch_state]
-        A6[...]
-    end
-    
-    subgraph DND["🟡 dnd — 5 tools"]
-        D1[switch_state]
-        D2[recall_memory]
-        D3[view_unread]
-    end
-    
-    subgraph Offline["⚫ offline — 2 tools"]
-        O1[switch_state<br/>仅允许→active]
-    end
-    
-    subgraph Blocked["🔴 blocked — 0"]
-        B1[全部禁用]
-    end
-```
-
-</details>
+**v1.2.0 新增工具**：`push_state`、`pop_state`、`close_state`、`list_states`（self_management 段）；`cancel_dnd`、`enter_group`（chat_social 段）。
 
 ---
 

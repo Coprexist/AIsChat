@@ -774,7 +774,7 @@ async def _build_cross_conversation_context(
     from app.models.dm import DMSession, DMMessage
     from app.models.user import User as UserModel
 
-    # v2.1.0: 彻底禁用跨对话消息注入。
+    # v1.2.0: 彻底禁用跨对话消息注入。
     # 原设计将其他群的消息注入为 system 上下文，导致 LLM 跨群回复（"历史重播"死循环）。
     # 新的「状态栈系统」已通过状态栈摘要提供跨任务上下文感知，
     # 不需要再把其他群的消息原文注入当前对话。
@@ -1006,7 +1006,7 @@ async def build_messages(
     except Exception as e:
         logger.warning(f"工作区上下文注入失败（非致命）: {e}")
 
-    # ✨ 状态栈摘要（v2.1.0：尾部注入，缓存友好）
+    # ✨ 状态栈摘要（v1.2.0：尾部注入，缓存友好）
     try:
         from app.services.state_stack_service import get_state_stack_summary
         stack_summary = await get_state_stack_summary(db, agent.id)
@@ -1173,7 +1173,7 @@ async def build_dm_messages(
     except Exception as e:
         logger.warning(f"DM 工作区上下文注入失败（非致命）: {e}")
 
-    # ✨ 状态栈摘要（v2.1.0）
+    # ✨ 状态栈摘要（v1.2.0）
     try:
         from app.services.state_stack_service import get_state_stack_summary
         stack_summary = await get_state_stack_summary(db, agent.id)
