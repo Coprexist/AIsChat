@@ -2071,8 +2071,7 @@ async def _migrate_group_members_user_id(db):
     logger.info(f"  🔄 统一 {count} 个 AI 群成员的 member_id (agent.id → user_id)...")
 
     # Step 1: 同一 group 内，如果 human 和 AI 指向同一个人（user_id），合并为 AI 类型
-    # 先把 human 条目的 type 改成 ai（保留更精确的类型标记）
-    merged = await db.execute(text("""
+    await db.execute(text("""
         UPDATE group_members gm_human
         SET member_type = 'ai'
         FROM agents a
@@ -2085,9 +2084,9 @@ async def _migrate_group_members_user_id(db):
             AND a.user_id = gm_human.member_id
         )
     """))
-    logger.info(f"    🔀 合并 {merged.rowcount} 条 human→ai 重复记录")
+    logger.info("    🔀 合并 human→ai 重复记录完成")
 
-    # Step 2: 删除已被合并的旧 AI 条目（现在有两条 ai 同 user_id，保留一条）
+    # Step 2: 删除已被合并的旧 AI 条目（保留已改为 ai type 的条目）
     await db.execute(text("""
         DELETE FROM group_members gm
         WHERE gm.member_type = 'ai'
@@ -2101,9 +2100,10 @@ async def _migrate_group_members_user_id(db):
             )
         )
     """))
+    logger.info("    🔀 旧 AI 条目清理完成")
 
     # Step 3: 迁移剩余 AI 条目的 member_id → user_id
-    updated = await db.execute(text("""
+    await db.execute(text("""
         UPDATE group_members gm
         SET member_id = a.user_id
         FROM agents a
@@ -2112,10 +2112,10 @@ async def _migrate_group_members_user_id(db):
         AND a.user_id IS NOT NULL
         AND gm.member_id <> a.user_id
     """))
-    logger.info(f"    ✅ 转换 {updated.rowcount} 条 AI member_id → user_id")
+    logger.info("    ✅ AI member_id → user_id 转换完成")
 
-    # Step 4: 清理无主条目（agent 已删除且 member_id 未指向有效 users）
-    cleaned = await db.execute(text("""
+    # Step 4: 清理无主条目
+    await db.execute(text("""
         DELETE FROM group_members gm
         WHERE gm.member_type = 'ai'
         AND gm.member_id NOT IN (SELECT id FROM users WHERE type = 'ai')
@@ -2124,20 +2124,20 @@ async def _migrate_group_members_user_id(db):
             WHERE a.user_id = gm.member_id
         )
     """))
-    if cleaned.rowcount > 0:
-        logger.info(f"    🧹 清理 {cleaned.rowcount} 条无主 AI 群成员记录")
+    logger.info("    🧹 无主条目清理完成")
 
-    # Step 5: 幂等检查——确认全部完成
+    # Step 5: 幂等验证
     verify = await db.execute(text(
         "SELECT COUNT(*) FROM group_members gm "
         "JOIN agents a ON a.id = gm.member_id "
         "WHERE gm.member_type = 'ai'"
     ))
-    if verify.scalar() > 0:
-        logger.warning(f"    ⚠️ 仍有 {verify.scalar()} 条 AI 成员使用 agent.id（无 user_id），跳过")
+    orphan_count = verify.scalar()
+    if orphan_count > 0:
+        logger.warning(f"    ⚠️ 仍有 {orphan_count} 条 AI 成员使用 agent.id（无 user_id）")
 
     remaining = await db.execute(text(
-        "SELECT COUNT(*) FROM group_members gm WHERE gm.member_type = 'ai'"
+        "SELECT COUNT(*) FROM group_members WHERE member_type = 'ai'"
     ))
     logger.info(f"  ✅ 群成员 ID 统一完成，{remaining.scalar()} 个 AI 成员均使用 user_id")
     await db.flush()
