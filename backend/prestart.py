@@ -46,6 +46,19 @@ MIGRATIONS: list[tuple[str, str]] = [
         "idx_group_invitations_group",
         "CREATE INDEX IF NOT EXISTS idx_group_invitations_group ON group_invitations(group_id)",
     ),
+    # ── v2.0.1: 补全缺失的群主成员记录 ──
+    (
+        "群主成员记录补全",
+        """INSERT INTO group_members (group_id, member_type, member_id, role)
+        SELECT g.id, g.owner_type, g.owner_id, 'owner'
+        FROM groups g
+        WHERE NOT EXISTS (
+            SELECT 1 FROM group_members gm
+            WHERE gm.group_id = g.id
+              AND gm.member_type = g.owner_type
+              AND gm.member_id = g.owner_id
+        )""",
+    ),
 ]
 
 
