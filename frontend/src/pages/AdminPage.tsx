@@ -6,6 +6,7 @@ import { MANUAL_URL, ADMIN_MANUAL_URL } from '../constants'
 import Toggle from '../components/Toggle'
 import { useT } from '../i18n/I18nContext'
 import { LANGUAGES } from '../i18n/languages'
+import { useResizableSidebar } from '../hooks/useResizableSidebar'
 import FederationTab from '../components/FederationTab'
 import ConversationLogTab from '../components/ConversationLogTab'
 import UsageDashboardTab from '../components/UsageDashboardTab'
@@ -73,6 +74,8 @@ export default function AdminPage() {
     searchParams.get('tab') ? 'detail' : 'list'
   )
   const navigate = useNavigate()
+  const sidebarRef = useRef<HTMLDivElement>(null)
+  const { sidebarWidth, handleResizeStart } = useResizableSidebar('admin_sidebar_width', sidebarRef)
 
   const switchTab = (tab: Tab) => {
     setActiveTab(tab)
@@ -134,8 +137,8 @@ export default function AdminPage() {
 
       {/* 桌面端：左侧竖标签 + 右侧内容 */}
       <div className="hidden md:flex flex-1 overflow-hidden">
-        {/* 左侧标签栏 */}
-        <div className="w-56 border-r border-border bg-surface flex flex-col shrink-0 overflow-y-auto min-h-0">
+        {/* 左侧标签栏（可拖拽宽度） */}
+        <div ref={sidebarRef} className="shrink-0 relative border-r border-border bg-surface flex flex-col overflow-y-auto min-h-0" style={{ width: sidebarWidth }}>
           {([t('admin.categoryCore'), t('admin.categoryOps'), t('admin.categorySystem')]).map(cat => {
             const catTabs = tabs.filter(t => t.category === cat)
             return (
@@ -162,6 +165,11 @@ export default function AdminPage() {
               </div>
             )
           })}
+          {/* 拖拽手柄 */}
+          <div
+            className="absolute top-0 right-0 w-1.5 h-full cursor-col-resize hover:bg-primary-400/30 active:bg-primary-400/50 transition-colors z-10"
+            onMouseDown={handleResizeStart}
+          />
         </div>
         {/* 右侧内容区 */}
         <div className="flex-1 overflow-y-auto p-6 bg-canvas">
