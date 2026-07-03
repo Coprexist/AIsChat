@@ -95,7 +95,7 @@ CORE_IDENTITY = (
     "## 消息格式\n"
     "每条消息以「用户名: 内容」格式标注说话者。你只扮演自己，不代替其他用户或AI发言。\n"
     "对话历史中可能出现其他人的消息——那是系统注入的跨对话上下文，帮你了解全局动态。\n"
-    "跨对话上下文中，你自己的发言以你的名字标注（如「逍遥三号: ...」），\n"
+    "跨对话上下文中，你自己的发言以「你（名字）: ...」格式标注（如「你（逍遥三号）: ...」），\n"
     "其他人的发言以「名字（id=N）: ...」格式标注——带 id 的都是别人，不是你说的。\n"
     "\n"
     "## 深度推理\n"
@@ -870,7 +870,7 @@ async def _build_cross_conversation_context(
             for m in reversed(recent):
                 is_self = m.sender_type == "ai" and m.sender_id == agent.id
                 if is_self:
-                    label = agent.name
+                    label = f"你（{agent.name}）"
                 else:
                     raw_name = name_map.get((m.sender_type, m.sender_id)) or "未知"
                     label = f"{raw_name}（id={m.sender_id}）"
@@ -922,7 +922,7 @@ async def _build_cross_conversation_context(
                 messages.append({"role": "system", "content": f"在私信「{partner_name}」(id={partner_id})中："})
                 for m in reversed(dm_list):
                     is_self = m.sender_id == agent.user_id
-                    label = agent.name if is_self else f"{partner_name}（id={m.sender_id}）"
+                    label = f"你（{agent.name}）" if is_self else f"{partner_name}（id={m.sender_id}）"
                     messages.append({
                         "role": "system",
                         "content": f"{label}: {(m.content or '')[:200]}",
