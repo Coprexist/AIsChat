@@ -12,3 +12,10 @@ export function fmtTokenNum(n: number, lang?: string): string {
   if (n >= 10_000) return `${(n / 10_000).toFixed(2)}万`
   return (n || 0).toLocaleString()
 }
+
+/** 文件大小格式化（纯函数） */
+export function formatFileSize(bytes: number): string {
+  if (bytes < 1024) return `${bytes}B`
+  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)}KB`
+  return `${(bytes / (1024 * 1024)).toFixed(1)}MB`
+}

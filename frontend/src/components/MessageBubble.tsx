@@ -8,6 +8,8 @@ import { useAuth } from '../context/AuthContext'
 import { getStateDotColor } from '../constants'
 import { FileIcon, Download, Globe, ShieldAlert } from 'lucide-react'
 import { formatMessageTime } from '../utils/time'
+import { formatFileSize } from '../utils/format'
+import { avatarGradient } from '../utils/avatar'
 import { useLang, useT } from '../i18n/I18nContext'
 import { api } from '../api/client'
 import MermaidBlock from './MermaidBlock'
@@ -22,24 +24,6 @@ const BouncingDots = ({ className = '' }: { className?: string }) => (
     <span className="w-1 h-1 bg-current rounded-full animate-bounce" style={{ animationDelay: '300ms' }} />
   </span>
 );
-
-/** 头像渐变类名（纯函数）——返回完整 Tailwind 字符串，与原拼接逻辑完全等价 */
-function avatarGradient(senderType: string | undefined, isMine: boolean, hasAvatar: boolean): string {
-  const dir = isMine ? 'bg-gradient-to-br' : 'bg-gradient-to-bl'
-  if (senderType === 'system') {
-    return hasAvatar
-      ? `${dir} from-rose-400 to-rose-600/30`
-      : `${dir} from-rose-400 to-rose-600`
-  }
-  if (isMine) {
-    return hasAvatar
-      ? `${dir} from-primary-500 to-primary-700/30`
-      : `${dir} from-primary-500 to-primary-700`
-  }
-  return hasAvatar
-    ? `${dir} from-teal-400 to-teal-600/30`
-    : `${dir} from-teal-400 to-teal-600`
-}
 
 /** 聊天消息中的 code 渲染：只对 block code/mermaid 做溢出控制，inline code 不干预 */
 function ChatCodeRenderer({ className, children, inline, ...props }: any) {
@@ -79,11 +63,6 @@ interface MessageBubbleProps {
   onAvatarClick?: (type: string, id: number, name: string, state?: string) => void
 }
 
-function formatFileSize(bytes: number): string {
-  if (bytes < 1024) return `${bytes}B`
-  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)}KB`
-  return `${(bytes / (1024 * 1024)).toFixed(1)}MB`
-}
 
 function fileIconColor(mimeType: string): string {
   if (mimeType.startsWith('image/')) return 'text-mint-400'

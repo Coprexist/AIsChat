@@ -6,55 +6,10 @@ import remarkBreaks from 'remark-breaks'
 import rehypeKatex from 'rehype-katex'
 import { Download, X, ArrowLeft, FileIcon, Loader2, AlertTriangle, ZoomIn, ZoomOut, RotateCcw, Share2 } from 'lucide-react'
 import { useT } from '../i18n/I18nContext'
+import { formatFileSize } from '../utils/format'
+import { isTextPreviewable, getCodeLang, isMarkdownFile, resolveMimeType, EXT_LANG_MAP } from '../utils/mime'
 import MermaidBlock from './MermaidBlock'
 import ForwardFileModal from './ForwardFileModal'
-
-/** 可直接文本预览的 MIME 类型 */
-function isTextPreviewable(mimeType: string): boolean {
-  if (mimeType.startsWith('text/')) return true
-  const textish = [
-    'application/json',
-    'application/xml',
-    'application/javascript',
-    'application/x-yaml',
-    'application/x-sh',
-    'application/x-shellscript',
-  ]
-  return textish.includes(mimeType)
-}
-
-/** 扩展名→语言标签（用于代码块语法高亮） */
-const EXT_LANG_MAP: Record<string, string> = {
-  py: 'python', js: 'javascript', ts: 'typescript', jsx: 'jsx', tsx: 'tsx',
-  c: 'c', cpp: 'cpp', h: 'c', hpp: 'cpp',
-  json: 'json', xml: 'xml', html: 'html', css: 'css', scss: 'scss',
-  yaml: 'yaml', yml: 'yaml', toml: 'toml',
-  sh: 'bash', bash: 'bash', zsh: 'bash',
-  sql: 'sql', rs: 'rust', go: 'go', java: 'java', kt: 'kotlin', swift: 'swift',
-  php: 'php', rb: 'ruby', lua: 'lua', r: 'r', dart: 'dart',
-}
-
-/** 文件名→语言标签 */
-function getCodeLang(fileName: string, mimeType: string): string {
-  const ext = fileName.split('.').pop()?.toLowerCase() || ''
-  if (EXT_LANG_MAP[ext]) return EXT_LANG_MAP[ext]
-  // MIME fallback
-  if (mimeType.startsWith('text/') && mimeType !== 'text/plain' && mimeType !== 'text/markdown') {
-    return mimeType.replace('text/x-', '').replace('text/', '')
-  }
-  return ''
-}
-
-/** 是否 Markdown */
-function isMarkdownFile(fileName: string, mimeType: string): boolean {
-  return mimeType === 'text/markdown' || fileName.endsWith('.md') || fileName.endsWith('.markdown')
-}
-
-function formatFileSize(bytes: number): string {
-  if (bytes < 1024) return `${bytes}B`
-  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)}KB`
-  return `${(bytes / (1024 * 1024)).toFixed(1)}MB`
-}
 
 /** 代码块渲染器（复用 MessageBubble 的设计） */
 function FileCodeRenderer({ className, children, inline, ...props }: any) {
@@ -95,25 +50,7 @@ export default function FilePreviewModal({ fileId, fileName, fileSize, mimeType,
   const dlUrl = `/api/fs/download/${fileId}?token=${token || ''}`
 
   // 优先后端 mimeType，缺失时从文件名扩展名推断
-  const resolvedMime = (() => {
-    if (mimeType && mimeType !== 'application/octet-stream') return mimeType
-    const ext = fileName.split('.').pop()?.toLowerCase() || ''
-    const mimeMap: Record<string, string> = {
-      png: 'image/png', jpg: 'image/jpeg', jpeg: 'image/jpeg', gif: 'image/gif',
-      webp: 'image/webp', svg: 'image/svg+xml', bmp: 'image/bmp',
-      pdf: 'application/pdf',
-      docx: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
-      json: 'application/json', xml: 'application/xml', yaml: 'application/x-yaml', yml: 'application/x-yaml',
-      js: 'application/javascript', ts: 'text/typescript', py: 'text/x-python',
-      c: 'text/x-c', cpp: 'text/x-c++src', h: 'text/x-c', hpp: 'text/x-c++src',
-      sh: 'application/x-shellscript', bash: 'application/x-shellscript',
-      md: 'text/markdown', txt: 'text/plain', html: 'text/html', css: 'text/css',
-      csv: 'text/csv', log: 'text/plain', toml: 'application/toml', ini: 'text/plain',
-      mp4: 'video/mp4', webm: 'video/webm', mp3: 'audio/mpeg', wav: 'audio/wav',
-      zip: 'application/zip', tar: 'application/x-tar', gz: 'application/gzip',
-    }
-    return mimeMap[ext] || 'application/octet-stream'
-  })()
+  const resolvedMime = resolveMimeType(fileName, mimeType)
 
   const isImage = resolvedMime.startsWith('image/')
   const isPDF = resolvedMime === 'application/pdf'

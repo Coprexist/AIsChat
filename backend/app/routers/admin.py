@@ -12,6 +12,8 @@ from sqlalchemy import select, func, update
 from pydantic import BaseModel, Field
 from app.config import settings
 from app.database import get_db
+from app.utils.pure.formatting import mask_api_key
+from app.utils.config_resolver import find_old_config
 from app.models.user import User
 from app.models.agent import Agent
 from app.models.group import Group
@@ -467,7 +469,7 @@ async def list_pool_keys(
             "id": k.id,
             "name": k.name,
             "api_base_url": k.api_base_url or settings.deepseek_base_url,
-            "api_key_preview": _mask_api_key(k.api_key_encrypted),
+            "api_key_preview": mask_api_key(k.api_key_encrypted),
             "is_active": k.is_active,
             "priority": k.priority,
             "concurrent_limit": k.concurrent_limit,
@@ -509,7 +511,7 @@ async def create_pool_key(
         "id": key_entry.id,
         "name": key_entry.name,
         "api_base_url": key_entry.api_base_url or settings.deepseek_base_url,
-        "api_key_preview": _mask_api_key(encrypted),
+        "api_key_preview": mask_api_key(encrypted),
         "is_active": key_entry.is_active,
         "priority": key_entry.priority,
         "concurrent_limit": key_entry.concurrent_limit,
@@ -584,13 +586,6 @@ async def delete_pool_key(
     return {"message": f"池 Key「{key_entry.name}」已删除"}
 
 
-def _mask_api_key(encrypted: str) -> str:
-    """脱敏显示：如 encrypted 为空返回空，否则显示 ****...后4位（实际是密文后4位）"""
-    if not encrypted:
-        return ""
-    if len(encrypted) <= 4:
-        return "****"
-    return "****" + encrypted[-4:]
 
 
 # ---------- API Key 池统计 ----------
@@ -1173,7 +1168,7 @@ async def update_smtp_configs(
                 cfg["password_encrypted"] = encrypt_api_key(item.password)
             else:
                 # 尝试从旧配置中保留密码
-                old = _find_old_config(row.smtp_config, item.host, item.username)
+                old = find_old_config(row.smtp_config, item.host, item.username)
                 if old and old.get("password_encrypted"):
                     cfg["password_encrypted"] = old["password_encrypted"]
 
@@ -1293,20 +1288,6 @@ async def reset_email_templates(
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
 
 
-def _find_old_config(old_raw, host: str, username: str) -> dict | None:
-    """从旧配置中查找匹配 host+username 的配置（用于密码保留）"""
-    if not old_raw:
-        return None
-    if isinstance(old_raw, dict):
-        configs = [old_raw]
-    elif isinstance(old_raw, list):
-        configs = old_raw
-    else:
-        return None
-    for c in configs:
-        if isinstance(c, dict) and c.get("host") == host and c.get("username") == username:
-            return c
-    return None
 
 
 async def _get_or_create_settings(db: AsyncSession):

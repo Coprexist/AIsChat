@@ -10,6 +10,7 @@ from app.models.agent import Agent, AgentConfigHistory, AgentUserConfig, AgentCo
 from app.models.memory import RoughMemory, DetailMemory
 from app.config import settings
 from app.utils.text import extract_mentions
+from app.utils.pure.presets import merge_preset_values
 
 logger = logging.getLogger(__name__)
 
@@ -84,101 +85,9 @@ CONFIG_PROFILES = {
 }
 
 
-# 预设档位顺序（用于判断升降级方向）
-_PRESET_ORDER = {"chat": 0, "immersive": 1, "digital_life": 2}
-
-# 强相关参数：切换预设时按升降级规则合并
-_STRONG_NUMERIC_PARAMS = [
-    "temperature", "top_p", "presence_penalty", "frequency_penalty",
-    "max_tool_rounds", "alarm_max_tool_rounds", "max_alarms",
-    "memory_recent_count",
-]
-_STRONG_BOOL_PARAMS = [
-    "thinking_enabled", "force_alarm_on_end", "is_ai_editable",
-]
-# 字符串枚举参数：切换预设时直接覆盖（不合并）
-_STRONG_STRING_PARAMS = [
-    "memory_load_mode", "memory_shared_scope",
-]
-# 无关参数：切换预设时永远不改
-_INDEPENDENT_PARAMS = [
-    "hide_ai_identity", "delay_reply_enabled",
-    # 以下在 preset dict 中不存在但列出来明确语义
-    # "system_prompt", "chat_model", "work_model", "api_base_url",
-    # "api_key_encrypted", "api_credit_cost", "avatar_url", "name",
-]
-
-
-def _merge_preset_values(
-    old_profile: str,
-    new_profile: str,
-    current_values: dict,
-    preset_values: dict,
-) -> tuple[dict, list[str]]:
-    """
-    按升降级规则合并预设值，返回 (合并后的值, 变更字段列表)。
-
-    升级（chat→immersive→digital_life）：
-      - 数值：max(当前, 预设) — 用户拉高的保留
-      - 布尔：当前 OR 预设 — 任一开即开
-
-    降级（逆向）：
-      - 数值：min(当前, 预设) — 用户拉低的保留
-      - 布尔：当前 AND 预设 — 都开才开
-    """
-    old_order = _PRESET_ORDER.get(old_profile, 0)
-    new_order = _PRESET_ORDER.get(new_profile, 0)
-
-    is_upgrade = new_order > old_order
-
-    merged = {}
-    changed: list[str] = []
-
-    for key in _STRONG_NUMERIC_PARAMS:
-        if key not in preset_values:
-            continue
-        cur = current_values.get(key)
-        pre = preset_values[key]
-        if cur is None:
-            merged[key] = pre
-            changed.append(key)
-        elif is_upgrade:
-            merged[key] = max(cur, pre)
-            if merged[key] != cur:
-                changed.append(key)
-        else:
-            merged[key] = min(cur, pre)
-            if merged[key] != cur:
-                changed.append(key)
-
-    for key in _STRONG_BOOL_PARAMS:
-        if key not in preset_values:
-            continue
-        cur = current_values.get(key)
-        pre = preset_values[key]
-        if cur is None:
-            merged[key] = pre
-            changed.append(key)
-        elif is_upgrade:
-            merged[key] = cur or pre
-            if merged[key] != cur:
-                changed.append(key)
-        else:
-            merged[key] = cur and pre
-            if merged[key] != cur:
-                changed.append(key)
-
-    for key in _STRONG_STRING_PARAMS:
-        if key not in preset_values:
-            continue
-        cur = current_values.get(key)
-        pre = preset_values[key]
-        if cur != pre:
-            merged[key] = pre
-            changed.append(key)
-
-    return merged, changed
-
+# 预设档位顺序（用于判断升降级方向）——已迁移到 utils/pure/presets.py
+# 强相关参数列表 ——已迁移到 utils/pure/presets.py
+# _merge_preset_values ——已迁移到 utils/pure/presets.py，导入为 merge_preset_values
 
 async def apply_config_profile(
     db: AsyncSession,
@@ -223,7 +132,7 @@ async def apply_config_profile(
     }
 
     # 合并
-    merged, changed = _merge_preset_values(old_profile, profile, current_values, preset)
+    merged, changed = merge_preset_values(old_profile, profile, current_values, preset)
 
     # 预览模式
     if dry_run:
