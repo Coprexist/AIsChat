@@ -218,7 +218,7 @@ export default function CreateAgentModal({
   const [hideAiIdentity, setHideAiIdentity] = useState(false)
   const [reminderGrace, setReminderGrace] = useState('every_time')
   const [delayReplyEnabled, setDelayReplyEnabled] = useState<boolean | null>(null)
-  const [configProfile, setConfigProfile] = useState('custom')
+  const [configProfile, setConfigProfile] = useState('chat')
   const [maxToolRounds, setMaxToolRounds] = useState(3)
   const [alarmMaxToolRounds, setAlarmMaxToolRounds] = useState(10)
   const [forceAlarmOnEnd, setForceAlarmOnEnd] = useState(false)
@@ -365,7 +365,7 @@ export default function CreateAgentModal({
         hide_ai_identity: hideAiIdentity,
         delay_reply_enabled: delayReplyEnabled,
         reminder_grace: reminderGrace,
-        config_profile: selectedPreset || 'custom',
+        config_profile: selectedPreset || 'chat',
         max_tool_rounds: maxToolRounds,
         alarm_max_tool_rounds: alarmMaxToolRounds,
         force_alarm_on_end: forceAlarmOnEnd,

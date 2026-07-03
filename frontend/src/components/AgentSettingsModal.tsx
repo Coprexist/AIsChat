@@ -72,7 +72,6 @@ const PRESET_DEFAULTS: Record<string, Record<string, any>> = {
 }
 
 const PROFILE_OPTIONS = [
-  { value: 'custom', label: 'agentDetail.profileCustom', desc: 'agentDetail.profileCustomDesc', color: 'bg-slate-500/10 text-slate-400 border-slate-400/30' },
   { value: 'chat', label: 'agentDetail.profileChat', desc: 'agentDetail.profileChatDesc', color: 'bg-blue-500/10 text-blue-400 border-blue-400/30' },
   { value: 'immersive', label: 'agentDetail.profileImmersive', desc: 'agentDetail.profileImmersiveDesc', color: 'bg-amber-500/10 text-amber-400 border-amber-400/30' },
   { value: 'digital_life', label: 'agentDetail.profileDigitalLife', desc: 'agentDetail.profileDigitalLifeDesc', color: 'bg-violet-500/10 text-violet-400 border-violet-400/30' },
@@ -97,7 +96,7 @@ export default function AgentSettingsModal({
   const [delayReplyEnabled, setDelayReplyEnabled] = useState<boolean | null>(agent.delay_reply_enabled)
   const [allowOthersChat, setAllowOthersChat] = useState(agent.allow_others_chat ?? true)
   const [isPaused, setIsPaused] = useState(agent.is_paused ?? false)
-  const [configProfile, setConfigProfile] = useState(agent.config_profile || 'custom')
+  const [configProfile, setConfigProfile] = useState(agent.config_profile || 'chat')
   const [aiType, setAiType] = useState(agent.ai_type || 'resonance')
 
   // ── 详细设置状态 ──

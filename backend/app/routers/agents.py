@@ -904,7 +904,7 @@ async def list_config_presets():
              }
             for k, v in CONFIG_PROFILES.items()
         ],
-        "current_default": "custom",
+        "current_default": "chat",
     }
 
 

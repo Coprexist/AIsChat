@@ -82,7 +82,7 @@ CONFIG_PROFILES = {
 
 
 # 预设档位顺序（用于判断升降级方向）
-_PRESET_ORDER = {"custom": 0, "chat": 1, "immersive": 2, "digital_life": 3}
+_PRESET_ORDER = {"chat": 0, "immersive": 1, "digital_life": 2}
 
 # 强相关参数：切换预设时按升降级规则合并
 _STRONG_NUMERIC_PARAMS = [
@@ -122,17 +122,11 @@ def _merge_preset_values(
     降级（逆向）：
       - 数值：min(当前, 预设) — 用户拉低的保留
       - 布尔：当前 AND 预设 — 都开才开
-
-    custom→任意预设视为升级；任意预设→custom 不做任何变更。
     """
     old_order = _PRESET_ORDER.get(old_profile, 0)
     new_order = _PRESET_ORDER.get(new_profile, 0)
 
-    # custom → custom 或 预设 → custom：不改任何值
-    if new_profile == "custom":
-        return {}, []
-
-    is_upgrade = new_order > old_order  # custom→预设 也是升级
+    is_upgrade = new_order > old_order
 
     merged = {}
     changed: list[str] = []
@@ -193,8 +187,7 @@ async def apply_config_profile(
     """
     应用（或预览）预设配置档。
 
-    - 首次应用（config_profile='custom'）：直接写入全部强相关值
-    - 切换预设：按升降级规则智能合并，保护用户手动调整
+    按升降级规则智能合并，保护用户手动调整。
 
     设置 dry_run=True 返回预览 dict 而非实际写入。
     """
@@ -206,7 +199,7 @@ async def apply_config_profile(
         raise ValueError("AI 代理不存在")
 
     preset = CONFIG_PROFILES[profile]
-    old_profile = agent.config_profile or "custom"
+    old_profile = agent.config_profile or "chat"
 
     # 收集当前强相关值
     current_values = {
@@ -812,13 +805,9 @@ async def update_agent_config(
     if "user_can_view_logs" in updates:
         agent.user_can_view_logs = updates["user_can_view_logs"]
 
-    # config_profile（手动编辑参数时自动回退到 custom）
+    # config_profile：手动调参不改变预设（预设只是起点，用户可以基于它自由修改）
     if "config_profile" in updates and updates["config_profile"] is not None:
         agent.config_profile = updates["config_profile"]
-    elif any(f in updates and updates[f] is not None for f in allowed_fields):
-        # 用户手动调了参数 → 不再是预设档
-        if agent.config_profile and agent.config_profile != "custom":
-            agent.config_profile = "custom"
 
     await db.flush()
     await db.refresh(agent)
@@ -1410,7 +1399,7 @@ def agent_to_dict(agent: Agent) -> dict:
         "user_can_view_logs": agent.user_can_view_logs,
         "is_ai_editable": agent.is_ai_editable,
         "thinking_enabled": agent.thinking_enabled,
-        "config_profile": agent.config_profile or "custom",
+        "config_profile": agent.config_profile or "chat",
         "delay_reply_enabled": agent.delay_reply_enabled,
         "max_tool_rounds": agent.max_tool_rounds,
         "alarm_max_tool_rounds": agent.alarm_max_tool_rounds,

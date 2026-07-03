@@ -50,8 +50,8 @@ class Agent(Base):
     # 深度推理模式（DeepSeek thinking），AI 可自行切换
     thinking_enabled = Column(Boolean, default=False)
 
-    # 三档 AI 配置：custom / chat / immersive / digital_life
-    config_profile = Column(String(20), default="custom")
+    # 三档 AI 配置：chat / immersive / digital_life（选一个作为起点，之后可自由调参）
+    config_profile = Column(String(20), default="chat")
 
     # AI 在 users 表中的身份（统一 ID 空间，用于私信等场景）
     user_id = Column(Integer, ForeignKey("users.id"))

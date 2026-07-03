@@ -155,7 +155,6 @@ PROTOCOL_BY_PROFILE = {
     "chat": PROTOCOL_CHAT,
     "immersive": PROTOCOL_IMMERSIVE,
     "digital_life": PROTOCOL_DIGITAL_LIFE,
-    "custom": PROTOCOL_CHAT,  # custom 默认走 chat 协议
 }
 
 # 段拼接顺序（固定段在前最大化缓存命中，变动段在后）

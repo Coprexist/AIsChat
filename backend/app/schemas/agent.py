@@ -17,7 +17,7 @@ class AgentCreateRequest(BaseModel):
     work_model: str | None = None
     thinking_enabled: bool = Field(default=False)
     hide_ai_identity: bool = Field(default=False)
-    config_profile: str | None = Field(default=None, description="预设档位: chat|immersive|digital_life，不填=custom")
+    config_profile: str | None = Field(default=None, description="预设档位: chat|immersive|digital_life")
     delay_reply_enabled: bool | None = Field(default=None, description="延迟回复开关，NULL=继承全局默认")
     max_tool_rounds: int = Field(default=3, ge=1, le=20, description="单次回复最大工具调用轮次")
     alarm_max_tool_rounds: int = Field(default=10, ge=1, le=30, description="闹钟/心跳最大工具调用轮次")

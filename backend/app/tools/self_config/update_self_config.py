@@ -11,7 +11,7 @@ logger = logging.getLogger(__name__)
 class UpdateSelfConfig(ToolPlugin):
     name = "update_self_config"
     description = ("修改自己的配置参数。可以调整性格、温度、推理模式、工具调用轮次等。\n"
-                   "注意：config_profile 设为 \"custom\" 表示自定义模式；设为 \"chat\"/\"immersive\"/\"digital_life\" 表示切换到对应预设档位。")
+                   "注意：config_profile 设为 \"chat\"/\"immersive\"/\"digital_life\" 表示切换到对应预设档位，预设只是起点，之后可自由调参。")
     segment = "self_config"
     parameters = {
         "system_prompt": {"type": "string", "nullable": True, "description": "新的系统提示词（性格描述）"},
@@ -22,7 +22,7 @@ class UpdateSelfConfig(ToolPlugin):
         "thinking_enabled": {"type": "boolean", "nullable": True, "description": "是否开启深度推理模式"},
         "config_profile": {
             "type": "string", "nullable": True,
-            "description": "配置档位：custom（自定义）/ chat（聊天档）/ immersive（深度沉浸档）/ digital_life（数字生命档）",
+            "description": "配置档位：chat（聊天档）/ immersive（深度沉浸档）/ digital_life（数字生命档）",
         },
         "hide_ai_identity": {"type": "boolean", "nullable": True, "description": "是否隐藏 AI 身份（隐藏后你的系统提示词不会提及你是 AI）"},
         "max_tool_rounds": {"type": "integer", "nullable": True, "description": "单次回复最大工具调用轮次，范围 1-20。谨慎调高，每轮都会消耗 token"},

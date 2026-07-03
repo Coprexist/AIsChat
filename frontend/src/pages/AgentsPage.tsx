@@ -339,7 +339,7 @@ function EditAgentModal({ agent, onClose, onUpdated }: {
   const [thinkingEnabled, setThinkingEnabled] = useState(agent.thinking_enabled)
   const [hideAiIdentity, setHideAiIdentity] = useState(agent.hide_ai_identity || false)
   const [delayReplyEnabled, setDelayReplyEnabled] = useState<boolean | null>(agent.delay_reply_enabled ?? null)
-  const [configProfile, setConfigProfile] = useState(agent.config_profile || 'custom')
+  const [configProfile, setConfigProfile] = useState(agent.config_profile || 'chat')
   const [maxToolRounds, setMaxToolRounds] = useState(agent.max_tool_rounds ?? 3)
   const [alarmMaxToolRounds, setAlarmMaxToolRounds] = useState(agent.alarm_max_tool_rounds ?? 10)
   const [forceAlarmOnEnd, setForceAlarmOnEnd] = useState(agent.force_alarm_on_end ?? false)
@@ -500,11 +500,9 @@ function EditAgentModal({ agent, onClose, onUpdated }: {
                 {t('agents.currentSettings')}{hasModified ? t('agents.currentSettingsModified') : ''}
               </h3>
               {/* 档位标签 */}
-              {configProfile !== 'custom' && (
-                <span className="text-[10px] px-2 py-0.5 rounded-full bg-primary-500/20 text-primary-400 font-medium">
-                  {configProfile === 'chat' ? t('agents.badgeChat') : configProfile === 'immersive' ? t('agents.badgeImmersive') : t('agents.badgeDigitalLife')}
-                </span>
-              )}
+              <span className="text-[10px] px-2 py-0.5 rounded-full bg-primary-500/20 text-primary-400 font-medium">
+                {configProfile === 'chat' ? t('agents.badgeChat') : configProfile === 'immersive' ? t('agents.badgeImmersive') : t('agents.badgeDigitalLife')}
+              </span>
             </div>
             {/* 三档快捷切换 */}
             <div className="flex gap-1.5 mb-3">
@@ -714,7 +712,7 @@ function EditAgentModal({ agent, onClose, onUpdated }: {
           <div className="mb-4 bg-amber-500/5 border border-amber-500/20 rounded-xl p-4">
             <h4 className="text-sm font-semibold text-textPrimary mb-2">{t('agents.presetConfirmTitle')}</h4>
             <p className="text-xs text-textSecondary mb-3">
-              {t('agents.presetFrom')} <b>{presetPreview.old_profile === 'custom' ? t('agents.presetCustom') : presetPreview.old_profile}</b> {t('agents.presetTo')}{' '}
+              {t('agents.presetFrom')} <b>{presetPreview.old_profile}</b> {t('agents.presetTo')}{' '}
               <b>{presetPreview.new_profile}</b>
               （{presetPreview.direction === 'upgrade' ? `${t('agents.presetUpgrade')}` : `${t('agents.presetDowngrade')}`}），
               {t('agents.presetItemsWillChange').replace(' field(s) will change:', ` ${Object.keys(presetPreview.changed_fields || {}).length} 项将变更：`.replace('/项/', ` ${Object.keys(presetPreview.changed_fields || {}).length} 项`))}

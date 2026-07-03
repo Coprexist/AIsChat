@@ -857,7 +857,7 @@ export default function AgentDetailPage() {
                   <span className="text-textPrimary">
                     {agent.config_profile === 'chat' ? t('agentDetail.profileChat') :
                      agent.config_profile === 'immersive' ? t('agentDetail.profileImmersive') :
-                     agent.config_profile === 'digital_life' ? t('agentDetail.profileDigitalLife') : t('agentDetail.profileCustom')}
+                     t('agentDetail.profileDigitalLife')}
                   </span>
                 </div>
                 <div>
