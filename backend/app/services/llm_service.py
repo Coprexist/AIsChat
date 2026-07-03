@@ -800,7 +800,7 @@ async def _build_cross_conversation_context(
         for gid, gname in ai_groups:
             if gname and gname.startswith("DM:"):
                 continue
-            recent = await get_recent_messages(db, gid, limit=3)
+            recent = await get_recent_messages(db, gid, limit=1)  # 仅最近一条，字段从 3→1 防重播
             if not recent:
                 continue
 

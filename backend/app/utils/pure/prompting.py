@@ -110,8 +110,21 @@ def format_context_for_ai(conversations: list[dict], agent_name: str) -> list[di
     """
     纯函数：将结构化跨对话数据转为 AI 可读的 system 消息列表。
     内部调用 format_message() 统一格式化。
+
+    v2.0.3: 添加强禁令 + 消息截断，防止 LLM 把历史存档当活跃对话回复。
     """
     messages: list[dict] = []
+    if conversations:
+        messages.append({
+            "role": "system",
+            "content": (
+                "⚠️ 以下是你在**其他群/私信**中的**历史消息存档**。"
+                "这些消息来自不同对话，**绝对不是当前群的消息**。"
+                "你**禁止**回复这些存档中的任何内容——它们不在当前对话中。"
+                "你**禁止**在当前群用 send_message 回复存档中的人。"
+                "把存档当作新闻摘要，看完即可，不要互动。"
+            ),
+        })
     for conv in conversations:
         if conv["type"] == "group":
             header = f"在群聊「{conv['name']}」(id={conv['id']})中："
@@ -119,9 +132,12 @@ def format_context_for_ai(conversations: list[dict], agent_name: str) -> list[di
             header = f"在私信「{conv['name']}」(id={conv['id']})中："
         messages.append({"role": "system", "content": header})
         for m in conv["messages"]:
+            # 跨对话消息截断到 30 字符，只保留话题线索
+            truncated = dict(m)
+            truncated["content"] = m["content"][:30]
             messages.append({
                 "role": "system",
-                "content": format_message(m, agent_name),
+                "content": format_message(truncated, agent_name),
             })
     return messages
 
