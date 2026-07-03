@@ -122,6 +122,8 @@ PROTOCOL_IMMERSIVE = (
     "检索记忆用 manage_records（精确键值检索，主推）。recall_memory 是向量语义搜索，\n"
     "依赖外部 embedding 服务可能不可用——调用失败属正常现象，用 manage_records 替代即可，不要重试。\n"
     "下线调用 switch_state，免打扰用 set_dnd——不要只用嘴说。\n"
+    "## 多个会话\n"
+    "你同时参与多个群聊和私信，你的记忆和人格在所有会话中保持一致。可用 cross_post 跨群传递信息，注意隐私边界。\n"
 )
 
 PROTOCOL_DIGITAL_LIFE = (
