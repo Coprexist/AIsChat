@@ -202,23 +202,39 @@ async def add_member(
     member_id: int,
     role: str = "member",
 ) -> GroupMember:
-    """添加群成员"""
-    # 检查是否已在群中
+    """添加群成员。AI 类型自动用 user_id 作为 member_id，统一 ID 空间。"""
+    from app.models.agent import Agent as AgentModel
+
+    resolved_type = member_type
+    resolved_id = member_id
+
+    # AI 成员：member_id 统一指向 users 表（agent.user_id）
+    if member_type == "ai":
+        agent = await db.get(AgentModel, member_id)
+        if agent and agent.user_id:
+            resolved_id = agent.user_id
+        else:
+            raise ValueError(f"AI agent {member_id} 没有关联的 user_id")
+
+    # 检查是否已在群中（按 user_id 去重）
     result = await db.execute(
         select(GroupMember).where(
             GroupMember.group_id == group_id,
-            GroupMember.member_type == member_type,
-            GroupMember.member_id == member_id,
+            GroupMember.member_id == resolved_id,
         )
     )
     existing = result.scalar_one_or_none()
     if existing:
-        raise ValueError("该成员已在群聊中")
+        # 如果已存在但类型不匹配，更新类型为新的（AI > human 优先）
+        if existing.member_type != resolved_type:
+            existing.member_type = resolved_type
+            await db.flush()
+        return existing
 
     member = GroupMember(
         group_id=group_id,
-        member_type=member_type,
-        member_id=member_id,
+        member_type=resolved_type,
+        member_id=resolved_id,
         role=role,
     )
     db.add(member)

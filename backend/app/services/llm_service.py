@@ -871,7 +871,7 @@ async def _build_cross_conversation_context(
     try:
         where = (
             GroupMember.member_type == "ai",
-            GroupMember.member_id == agent.id,
+            GroupMember.member_id == (agent.user_id or 0),  # v2.0.0: member_id 统一为 user_id
             GroupModel.id != current_group_id if current_group_id else True,
         )
         gm_result = await db.execute(

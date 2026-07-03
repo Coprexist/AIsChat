@@ -78,6 +78,7 @@ async def run_migrations():
             await _migrate_oracle_file_references(db) # v0.10.x: 文件引用表幂等唯一约束
             await _migrate_default_file_quota(db)   # v0.9.0 用户默认文件配额配置
             await _migrate_structured_records(db)  # v0.10.0 结构记忆表（目录级键值存储）
+            await _migrate_group_members_user_id(db)  # v2.0.0 AI 群成员统一用 user_id
             await _fix_column_types(db)  # 必须是最后一个：修复老部署的列类型不匹配
             await db.commit()
             logger.info("✅ 数据库迁移检查完成")
@@ -2046,6 +2047,61 @@ async def _migrate_oracle_file_references(db):
     """))
     await db.flush()
     logger.info("  ✅ file_references 幂等约束迁移完成")
+
+
+async def _migrate_group_members_user_id(db):
+    """v2.0.0: AI 群成员的 member_id 从 agent.id 统一为 agent.user_id
+
+    使 AI 和人类用户共用 users 表 ID 空间，消除搜索/列表中的重复。
+    幂等：检查是否还有 member_type='ai' 且 member_id 指向 agents.id 的记录。
+    """
+    from app.models.agent import Agent
+
+    # 检查是否需要迁移
+    result = await db.execute(text(
+        "SELECT COUNT(*) FROM group_members gm "
+        "JOIN agents a ON a.id = gm.member_id "
+        "WHERE gm.member_type = 'ai' AND a.user_id IS NOT NULL AND gm.member_id <> a.user_id"
+    ))
+    count = result.scalar()
+    if count == 0:
+        logger.info("  ⏭ 群成员 ID 已统一，跳过")
+        return
+
+    logger.info(f"  🔄 统一 {count} 个 AI 群成员的 member_id (agent.id → user_id)...")
+
+    # 先处理冲突：如果同一 group 里已有同 user_id 的 human 成员，删掉 AI 条目
+    await db.execute(text("""
+        DELETE FROM group_members gm
+        WHERE gm.member_type = 'ai'
+        AND EXISTS (
+            SELECT 1 FROM agents a
+            WHERE a.id = gm.member_id
+            AND EXISTS (
+                SELECT 1 FROM group_members gm2
+                WHERE gm2.group_id = gm.group_id
+                AND gm2.member_type = 'human'
+                AND gm2.member_id = a.user_id
+            )
+        )
+    """))
+
+    # 迁移 AI member_id → user_id，丢弃孤立的（agent 已被删除）
+    await db.execute(text("""
+        UPDATE group_members gm
+        SET member_id = a.user_id
+        FROM agents a
+        WHERE gm.member_type = 'ai'
+        AND a.id = gm.member_id
+        AND a.user_id IS NOT NULL
+        AND gm.member_id <> a.user_id
+    """))
+
+    remaining = await db.execute(text(
+        "SELECT COUNT(*) FROM group_members gm WHERE gm.member_type = 'ai'"
+    ))
+    logger.info(f"  ✅ 群成员 ID 统一完成，剩余 {remaining.scalar()} 个 AI 成员（均已使用 user_id）")
+    await db.flush()
 
 
 async def _fix_column_types(db):

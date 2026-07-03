@@ -100,7 +100,7 @@ async def get_group_detail(
     if ai_member_ids:
         ai_result = await db.execute(
             select(AgentModel).where(
-                AgentModel.id.in_(ai_member_ids),
+                AgentModel.user_id.in_(ai_member_ids),  # v2.0.0: member_id 统一为 user_id
                 AgentModel.state == "active",
             )
         )
@@ -157,7 +157,10 @@ async def list_members(
             if u:
                 name = u.username
         elif m.member_type == "ai":
-            a = await db.get(AgentModel, m.member_id)
+            a_res = await db.execute(
+                select(AgentModel).where(AgentModel.user_id == m.member_id)
+            )
+            a = a_res.scalar_one_or_none()
             if a:
                 name = a.name
                 state = a.state
