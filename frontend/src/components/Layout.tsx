@@ -14,6 +14,7 @@ export default function Layout() {
   const [softText, setSoftText] = useState('服务器正在调整，功能可能偶尔不稳定')
   const [softColor, setSoftColor] = useState('#f59e0b')
   const [softStyle, setSoftStyle] = useState('banner')
+  const [softOnce, setSoftOnce] = useState(false)
   const location = useLocation()
 
   useEffect(() => {
@@ -38,6 +39,7 @@ export default function Layout() {
         if (d.soft_text) { setSoftText(d.soft_text); localStorage.setItem('maintenance_soft', d.soft_text) }
         if (d.soft_color) { setSoftColor(d.soft_color); localStorage.setItem('maintenance_soft_color', d.soft_color) }
         if (d.soft_style) { setSoftStyle(d.soft_style) }
+        setSoftOnce(!!d.soft_once)
       } catch {
         setSoftText(localStorage.getItem('maintenance_soft') || '服务器正在调整，功能可能偶尔不稳定')
         setSoftColor(localStorage.getItem('maintenance_soft_color') || '#f59e0b')
@@ -94,17 +96,17 @@ export default function Layout() {
       <BalancePromptModal />
 
       {/* 软维护顶栏（API正常，仅提示） */}
-      {softMaintenance && softStyle === 'banner' && (
+      {softMaintenance && !(softOnce && sessionStorage.getItem('maint_soft_done')) && softStyle === 'banner' && (
         <div className="fixed top-0 left-0 right-0 z-[65] text-xs text-center py-1.5 px-4 font-medium" style={{ backgroundColor: softColor, color: '#ffffff' }}>
           {softText}
-          <button onClick={() => setSoftMaintenance(false)} className="ml-2 underline opacity-80 hover:opacity-100">关闭</button>
+          <button onClick={() => { setSoftMaintenance(false); if (softOnce) sessionStorage.setItem('maint_soft_done', '1') }} className="ml-2 underline opacity-80 hover:opacity-100">关闭</button>
         </div>
       )}
-      {softMaintenance && softStyle === 'popup' && (
+      {softMaintenance && !(softOnce && sessionStorage.getItem('maint_soft_done')) && softStyle === 'popup' && (
         <div className="fixed inset-0 z-[65] flex items-center justify-center bg-black/50 p-4">
           <div className="bg-surface rounded-2xl p-6 max-w-sm w-full text-center shadow-2xl border border-border">
             <p className="text-sm text-textSecondary">{softText}</p>
-            <button onClick={() => setSoftMaintenance(false)} className="mt-4 px-4 py-1.5 rounded-lg text-xs font-medium" style={{ backgroundColor: softColor, color: '#ffffff' }}>知道了</button>
+            <button onClick={() => { setSoftMaintenance(false); if (softOnce) sessionStorage.setItem('maint_soft_done', '1') }} className="mt-4 px-4 py-1.5 rounded-lg text-xs font-medium" style={{ backgroundColor: softColor, color: '#ffffff' }}>知道了</button>
           </div>
         </div>
       )}

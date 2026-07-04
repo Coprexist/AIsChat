@@ -5,7 +5,7 @@ import { Plus, X } from 'lucide-react'
 interface MsgData {
   hard_title: string; hard_body: string; hard_color: string; hard_text_color: string
   hard_image: string; hard_style: string
-  soft_text: string; soft_color: string; soft_style: string
+  soft_text: string; soft_color: string; soft_style: string; soft_once: boolean
 }
 
 interface PresetItem extends MsgData { name: string }
@@ -13,7 +13,7 @@ interface PresetItem extends MsgData { name: string }
 const DEFAULT_MSG: MsgData = {
   hard_title: '正在更新', hard_body: '服务器正在更新，稍等一下就好~',
   hard_color: '#f59e0b', hard_text_color: '#ffffff', hard_image: '', hard_style: 'popup',
-  soft_text: '服务器正在调整，功能可能偶尔不稳定', soft_color: '#f59e0b', soft_style: 'banner',
+  soft_text: '服务器正在调整，功能可能偶尔不稳定', soft_color: '#f59e0b', soft_style: 'banner', soft_once: false,
 }
 
 export default function MaintenanceMsgEditor() {
@@ -163,6 +163,10 @@ export default function MaintenanceMsgEditor() {
           <select value={msg.soft_style} onChange={e => setMsg({...msg, soft_style: e.target.value})} className="w-full px-3 py-1.5 rounded-lg border border-border bg-canvas text-xs text-textPrimary focus:outline-none focus:ring-1 focus:ring-primary-500/50">
             <option value="banner">顶栏</option><option value="popup">弹窗</option>
           </select>
+          <label className="flex items-center gap-1.5 mt-1 text-[10px] text-textSecondary cursor-pointer">
+            <input type="checkbox" checked={msg.soft_once} onChange={e => setMsg({...msg, soft_once: e.target.checked})} className="rounded" />
+            仅首次显示（关闭后刷新不再弹）
+          </label>
         </F>
       </div>
 
