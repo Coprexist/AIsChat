@@ -2,7 +2,7 @@
 管理员面板路由
 所有端点都需要 admin 权限
 """
-import json, asyncio, secrets
+import json, secrets
 import logging
 from datetime import datetime, timedelta, timezone
 from fastapi import APIRouter, Depends, HTTPException, status, Query, UploadFile, File
@@ -2512,23 +2512,17 @@ async def test_browser_connection(
 
     # 通过 WebSocket 发送 navigate 命令
     try:
-        import asyncio
         import websockets
 
-        async def _test_navigate():
-            async with websockets.connect(ws_url, max_size=2**20, close_timeout=5) as ws:
-                # 导航到百度
-                await ws.send(json.dumps({
-                    "id": 1,
-                    "method": "Page.navigate",
-                    "params": {"url": "https://www.baidu.com"},
-                }))
-                # 等待结果（最多 15 秒）
-                result = await asyncio.wait_for(ws.recv(), timeout=15)
-                return json.loads(result)
-
-        nav_result = asyncio.get_event_loop().run_until_complete(_test_navigate())
-    except asyncio.TimeoutError:
+        async with websockets.connect(ws_url, max_size=2**20, close_timeout=5) as ws:
+            await ws.send(json.dumps({
+                "id": 1,
+                "method": "Page.navigate",
+                "params": {"url": "https://www.baidu.com"},
+            }))
+            result = await asyncio.wait_for(ws.recv(), timeout=15)
+            nav_result = json.loads(result)
+    except TimeoutError:
         return {"ok": False, "error": "访问百度超时（15秒）——网络不通或 DNS 解析失败", "step": "navigate"}
     except Exception as e:
         return {"ok": False, "error": f"CDP 通信失败: {e}", "step": "navigate"}
