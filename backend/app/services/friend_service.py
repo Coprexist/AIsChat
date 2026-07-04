@@ -279,6 +279,8 @@ async def list_friends(
                 friend_user_id = u.id
         elif f.friend_type == "ai":
             a = agents_map.get(f.friend_id)
+            if not a:
+                a = next((ag for ag in agents_map.values() if ag.user_id == f.friend_id), None)
             if a:
                 friend_user_id = a.user_id
         if friend_user_id:
@@ -314,6 +316,9 @@ async def list_friends(
                 status_color = getattr(u, 'status_color', None)
         elif f.friend_type == "ai":
             a = agents_map.get(f.friend_id)
+            if not a:
+                # 兼容：friend_id 可能是 agent.user_id 而非 agent.id
+                a = next((ag for ag in agents_map.values() if ag.user_id == f.friend_id), None)
             if a:
                 name = a.name
                 state = a.state
