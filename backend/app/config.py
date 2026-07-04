@@ -105,7 +105,7 @@ class Settings(BaseSettings):
     # OpenCLI 集成
     opencli_global_enabled: bool = False
     opencli_default_rate_limit: int = 5     # 每分钟最多 N 次
-    opencli_timeout_seconds: int = 30       # 单个命令超时时间
+    opencli_timeout_seconds: int = 60       # 单个命令超时时间
     opencli_stdout_max_chars: int = 2000    # stdout 截断长度
 
     # 加密密钥（用于 API Key 加密存储）

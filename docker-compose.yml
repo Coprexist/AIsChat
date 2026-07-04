@@ -30,6 +30,10 @@ services:
       DATABASE_URL: postgresql+asyncpg://ai_chat:${DB_PASSWORD}@postgres:5432/ai_group_chat
       DATABASE_URL_SYNC: postgresql://ai_chat:${DB_PASSWORD}@postgres:5432/ai_group_chat
       JWT_SECRET_KEY: ${JWT_SECRET_KEY}
+      OPENCLI_BROWSER_TIMEOUT: "60"
+    dns:
+      - 223.5.5.5
+      - 114.114.114.114
     volumes:
       - ${DATA_DIR:-./data}:/app/data
       - ${DATA_DIR:-./data}/uploads:/app/uploads

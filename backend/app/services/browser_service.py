@@ -57,7 +57,7 @@ async def start() -> bool:
             "--disable-software-rasterizer",
             f"--remote-debugging-port={CDP_PORT}",
             "--remote-allow-origins=*",
-            "--dns-server=8.8.8.8",
+            "--dns-server=223.5.5.5",
             stdout=asyncio.subprocess.DEVNULL,
             stderr=asyncio.subprocess.DEVNULL,
         )
