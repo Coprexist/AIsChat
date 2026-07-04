@@ -2165,30 +2165,43 @@ async def _migrate_fix_human_members_changed_to_ai(db):
     """
     v1.0.2: 修复 _migrate_group_members_user_id 的 bug——Step 1 把人类成员误改为 AI 类型。
 
-    原因：当 human.member_id == agent.user_id 且同群有 AI 记录时，
-    迁移错误地将 human 记录 SET member_type = 'ai'，导致 list_user_groups 查不到。
+    逐条处理，避免 SQL 层面主键冲突。
     """
-    result = await db.execute(text("""
-        SELECT COUNT(*) FROM group_members gm
+    # 查出所有被误改的记录：member_type='ai' 但 member_id 是人类的
+    rows = (await db.execute(text("""
+        SELECT gm.group_id, gm.member_id, gm.role
+        FROM group_members gm
         JOIN users u ON u.id = gm.member_id
         WHERE gm.member_type = 'ai' AND u.type = 'human'
-    """))
-    count = result.scalar()
-    if count == 0:
+    """))).all()
+
+    if not rows:
         logger.info("  ⏭ 没有被误改的人类成员，跳过")
         return
 
-    logger.info(f"  🔧 修复 {count} 条被误改为 AI 的人类成员记录...")
-    await db.execute(text("""
-        UPDATE group_members gm
-        SET member_type = 'human'
-        FROM users u
-        WHERE gm.member_type = 'ai'
-          AND u.id = gm.member_id
-          AND u.type = 'human'
-    """))
+    deleted = 0
+    updated = 0
+    for group_id, member_id, role in rows:
+        # 同群是否已有正确 human 记录
+        dup = (await db.execute(text(
+            "SELECT 1 FROM group_members WHERE group_id=:g AND member_type='human' AND member_id=:m"
+        ), {"g": group_id, "m": member_id})).first()
+
+        if dup:
+            # 删掉误改的 ai 记录
+            await db.execute(text(
+                "DELETE FROM group_members WHERE group_id=:g AND member_type='ai' AND member_id=:m"
+            ), {"g": group_id, "m": member_id})
+            deleted += 1
+        else:
+            # 直接改回 human
+            await db.execute(text(
+                "UPDATE group_members SET member_type='human' WHERE group_id=:g AND member_type='ai' AND member_id=:m"
+            ), {"g": group_id, "m": member_id})
+            updated += 1
+
     await db.flush()
-    logger.info("  ✅ 人类成员类型已还原")
+    logger.info(f"  ✅ 修复完成：删除 {deleted} 条重复 + 还原 {updated} 条人类成员")
 
     await db.flush()
 
