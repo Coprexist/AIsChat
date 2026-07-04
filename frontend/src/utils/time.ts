@@ -11,12 +11,13 @@ function parseServerDate(dateStr: string): Date {
 }
 
 /**
- * 相对时间格式化
+ * 相对时间格式化（侧边栏等列表用，精简版）
  * - 今天 → HH:MM
  * - 昨天 → "昨天" / "Yesterday"
  * - 2-6 天前 → "X天前" / "X days ago"
  * - 1-4 周前 → "X周前" / "X weeks ago"
- * - >4 周前 → "YYYY/M/D"
+ * - 1-11 月前 → "X月前" / "X months ago"
+ * - 1+ 年前 → "X年前" / "X years ago"
  */
 export function formatRelativeTime(
   dateStr: string | null | undefined,
@@ -29,36 +30,34 @@ export function formatRelativeTime(
 
   const now = new Date()
   const diffMs = now.getTime() - date.getTime()
-  // 负数修正：服务器时间略微超前客户端时，新消息 diffDays 可能为 -1
   const diffDays = Math.max(0, Math.floor(diffMs / (1000 * 60 * 60 * 24)))
 
   const meta = getLangMeta(lang)
 
-  // 今天：显示时间 HH:MM
   if (diffDays === 0) {
-    return date.toLocaleTimeString(meta.locale, {
-      hour: '2-digit',
-      minute: '2-digit',
-    })
+    return date.toLocaleTimeString(meta.locale, { hour: '2-digit', minute: '2-digit' })
   }
 
-  // 昨天
-  if (diffDays === 1) {
-    return meta.yesterday
-  }
+  if (diffDays === 1) return meta.yesterday
 
-  // 2-6 天前
-  if (diffDays >= 2 && diffDays <= 6) {
-    return meta.daysAgo(diffDays)
-  }
+  if (diffDays >= 2 && diffDays <= 6) return meta.daysAgo(diffDays)
 
-  // 1-4 周前（7-28 天）
   if (diffDays >= 7 && diffDays <= 28) {
     const weeks = Math.floor(diffDays / 7)
     return meta.weeksAgo(weeks)
   }
 
-  // >4 周前：YYYY/M/D
+  const diffMonths = (now.getFullYear() - date.getFullYear()) * 12 + (now.getMonth() - date.getMonth())
+  if (diffMonths >= 1 && diffMonths <= 11) {
+    return lang === 'zh' ? `${diffMonths}月前` : `${diffMonths} month${diffMonths > 1 ? 's' : ''} ago`
+  }
+
+  const diffYears = now.getFullYear() - date.getFullYear()
+  if (diffYears >= 1) {
+    return lang === 'zh' ? `${diffYears}年前` : `${diffYears} year${diffYears > 1 ? 's' : ''} ago`
+  }
+
+  // 兜底
   const y = date.getFullYear()
   const m = date.getMonth() + 1
   const d = date.getDate()
@@ -66,7 +65,8 @@ export function formatRelativeTime(
 }
 
 /**
- * 格式化消息气泡内的时间（完整时间）
+ * 格式化消息气泡内的时间（完整版，含月/年）。
+ * 用户可点击切换相对 ↔ 绝对时间。
  */
 export function formatMessageTime(
   dateStr: string | null | undefined,
@@ -79,34 +79,54 @@ export function formatMessageTime(
 
   const now = new Date()
   const diffMs = now.getTime() - date.getTime()
-  // 负数修正：服务器时间略微超前客户端时，新消息 diffDays 可能为 -1
   const diffDays = Math.max(0, Math.floor(diffMs / (1000 * 60 * 60 * 24)))
+  const diffMins = Math.max(0, Math.floor(diffMs / (1000 * 60)))
 
   const timeStr = date.toLocaleTimeString(lang === 'zh' ? 'zh-CN' : 'en-US', {
-    hour: '2-digit',
-    minute: '2-digit',
+    hour: '2-digit', minute: '2-digit',
   })
 
-  if (diffDays === 0) {
-    return timeStr
-  }
+  // < 1 分钟
+  if (diffMins < 1) return lang === 'zh' ? '刚刚' : 'Just now'
 
-  if (diffDays === 1) {
-    return lang === 'zh' ? `昨天 ${timeStr}` : `Yesterday ${timeStr}`
-  }
+  // < 1 小时
+  if (diffMins < 60) return lang === 'zh' ? `${diffMins}分钟前` : `${diffMins} min ago`
 
+  // 今天
+  if (diffDays === 0) return timeStr
+
+  // 昨天
+  if (diffDays === 1) return lang === 'zh' ? `昨天 ${timeStr}` : `Yesterday ${timeStr}`
+
+  // 2-6 天
   if (diffDays >= 2 && diffDays <= 6) {
     return lang === 'zh' ? `${diffDays}天前 ${timeStr}` : `${diffDays} days ago ${timeStr}`
   }
 
+  // 1-4 周
   if (diffDays >= 7 && diffDays <= 28) {
     const weeks = Math.floor(diffDays / 7)
-    const weekStr = lang === 'zh' ? `${weeks}周前` : `${weeks} week${weeks > 1 ? 's' : ''} ago`
-    return `${weekStr} ${timeStr}`
+    const w = lang === 'zh' ? `${weeks}周前` : `${weeks} week${weeks > 1 ? 's' : ''} ago`
+    return `${w} ${timeStr}`
   }
 
+  // 1-11 月
+  const diffMonths = (now.getFullYear() - date.getFullYear()) * 12 + (now.getMonth() - date.getMonth())
+  if (diffMonths >= 1 && diffMonths <= 11) {
+    const m = lang === 'zh' ? `${diffMonths}月前` : `${diffMonths} month${diffMonths > 1 ? 's' : ''} ago`
+    return `${m} ${timeStr}`
+  }
+
+  // 1+ 年
+  const diffYears = now.getFullYear() - date.getFullYear()
+  if (diffYears >= 1) {
+    const y = lang === 'zh' ? `${diffYears}年前` : `${diffYears} year${diffYears > 1 ? 's' : ''} ago`
+    return `${y} ${timeStr}`
+  }
+
+  // 兜底
   const y = date.getFullYear()
-  const m = date.getMonth() + 1
+  const mo = date.getMonth() + 1
   const d = date.getDate()
-  return `${y}/${m}/${d} ${timeStr}`
+  return `${y}/${mo}/${d} ${timeStr}`
 }
