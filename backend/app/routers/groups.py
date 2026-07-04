@@ -255,9 +255,10 @@ async def get_messages(
         for a in result.scalars().all():
             # sender_id 可能是 agent.id 或 agent.user_id，两个都要映射
             for key in (a.id, a.user_id):
-                name_map[("ai", key)] = a.name
-                avatar_map[("ai", key)] = a.avatar_url
-                state_map[("ai", key)] = a.state
+                if key is not None:
+                    name_map[("ai", key)] = a.name
+                    avatar_map[("ai", key)] = a.avatar_url
+                    state_map[("ai", key)] = a.state
 
     return [
         message_to_dict(m, sender_name=name_map.get((m.sender_type, m.sender_id)), sender_avatar_url=avatar_map.get((m.sender_type, m.sender_id)), sender_state=state_map.get((m.sender_type, m.sender_id)))
