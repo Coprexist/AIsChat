@@ -132,6 +132,20 @@ export default function PluginManager() {
                   {toggling === plugin.id ? '处理中…' : plugin.running ? '停止' : '启动'}
                 </button>
               )}
+              {plugin.id === 'browser' && plugin.running && (
+                <button
+                  onClick={async () => {
+                    setMessage(null)
+                    try {
+                      const res: any = await api.post('/admin/plugins/browser/test')
+                      setMessage({ type: res.ok ? 'success' : 'error', text: res.ok ? `✅ ${res.message}` : `❌ ${res.error}` })
+                    } catch (e: any) { setMessage({ type: 'error', text: `请求失败: ${e?.message || e}` }) }
+                  }}
+                  className="flex items-center gap-1 px-3 py-1.5 rounded-lg text-sm font-medium bg-blue-50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400 hover:bg-blue-100 border border-blue-200 dark:border-blue-800 transition-colors shrink-0"
+                >
+                  测通百度
+                </button>
+              )}
             </div>
           </div>
         ))}

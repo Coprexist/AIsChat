@@ -2,7 +2,7 @@
 管理员面板路由
 所有端点都需要 admin 权限
 """
-import secrets
+import json, asyncio, secrets
 import logging
 from datetime import datetime, timedelta, timezone
 from fastapi import APIRouter, Depends, HTTPException, status, Query, UploadFile, File
@@ -2453,6 +2453,74 @@ def _browser_status() -> dict:
         }
     except Exception:
         return {"installed": False, "running": False, "port": None}
+
+
+@router.post("/plugins/browser/test")
+async def test_browser_connection(
+    admin: dict = Depends(require_admin),
+):
+    """测试浏览器是否能访问公网——用 CDP 打开百度，返回结果或报错"""
+    import urllib.request
+    import urllib.error
+
+    # 先检查 CDP 是否在运行
+    try:
+        cdp_resp = urllib.request.urlopen("http://127.0.0.1:9222/json/version", timeout=5)
+        cdp_info = json.loads(cdp_resp.read())
+    except Exception as e:
+        return {"ok": False, "error": f"Chromium CDP 未运行: {e}", "step": "cdp-check"}
+
+    # 尝试用 CDP 打开百度
+    try:
+        # 创建新页面
+        req = urllib.request.Request(
+            "http://127.0.0.1:9222/json/new?about:blank",
+            method="PUT",
+        )
+        page_resp = urllib.request.urlopen(req, timeout=5)
+        page_info = json.loads(page_resp.read())
+        ws_url = page_info.get("webSocketDebuggerUrl", "")
+        page_id = page_info.get("id", "")
+    except Exception as e:
+        return {"ok": False, "error": f"创建 CDP 页面失败: {e}", "step": "create-page"}
+
+    if not ws_url:
+        return {"ok": False, "error": "无法获取 CDP WebSocket URL", "step": "ws-url"}
+
+    # 通过 WebSocket 发送 navigate 命令
+    try:
+        import asyncio
+        import websockets
+
+        async def _test_navigate():
+            async with websockets.connect(ws_url, max_size=2**20, close_timeout=5) as ws:
+                # 导航到百度
+                await ws.send(json.dumps({
+                    "id": 1,
+                    "method": "Page.navigate",
+                    "params": {"url": "https://www.baidu.com"},
+                }))
+                # 等待结果（最多 15 秒）
+                result = await asyncio.wait_for(ws.recv(), timeout=15)
+                return json.loads(result)
+
+        nav_result = asyncio.get_event_loop().run_until_complete(_test_navigate())
+    except asyncio.TimeoutError:
+        return {"ok": False, "error": "访问百度超时（15秒）——网络不通或 DNS 解析失败", "step": "navigate"}
+    except Exception as e:
+        return {"ok": False, "error": f"CDP 通信失败: {e}", "step": "navigate"}
+
+    # 检查导航结果
+    error = nav_result.get("result", {}).get("errorText", "")
+    if error:
+        return {"ok": False, "error": f"浏览器导航失败: {error}", "step": "navigate-result"}
+
+    return {
+        "ok": True,
+        "message": "浏览器能正常访问百度",
+        "cdp_version": cdp_info.get("Browser", "unknown"),
+        "page_id": page_id,
+    }
 
 
 @router.get("/plugins")
