@@ -26,6 +26,7 @@ async def run_migrations():
     async with async_session() as db:
         try:
             await _migrate_users_type(db)
+            await _migrate_unify_ai_user_id(db)       # v1.0.2 全局统一AI ID为user_id（最先做）
             await _migrate_conversation_logs(db)   # 必须在查询 Agent 之前添加列
             await _migrate_federation_tables(db)   # 必须在查询 Agent 之前添加列
             await _migrate_api_credit(db)          # 新增列必须在查询 Agent 之前
@@ -2484,6 +2485,49 @@ async def _migrate_multi_provider(db):
         logger.info("  ⏭ api_key_pool.provider_name 已存在，跳过")
 
     await db.flush()
+
+
+async def _migrate_unify_ai_user_id(db):
+    """
+    v1.0.2: 全局统一——将所有表中的 AI ID 从 agent.id 转为 agent.user_id。
+    涉及: messages, dm_messages, group_members, file_metadata。
+    """
+    count = 0
+    # 1. group_members (幂等: 跳过已经是 user_id 的)
+    r = await db.execute(text("""
+        UPDATE group_members gm SET member_id = a.user_id
+        FROM agents a
+        WHERE gm.member_type = 'ai' AND a.id = gm.member_id AND gm.member_id <> a.user_id
+          AND NOT EXISTS (SELECT 1 FROM group_members gm2 WHERE gm2.group_id=gm.group_id AND gm2.member_type='ai' AND gm2.member_id=a.user_id)
+    """))
+    count += 1
+
+    # 2. messages
+    r = await db.execute(text("""
+        UPDATE messages m SET sender_id = a.user_id
+        FROM agents a
+        WHERE m.sender_type = 'ai' AND a.id = m.sender_id AND m.sender_id <> a.user_id
+    """))
+    count += 1
+
+    # 3. dm_messages
+    r = await db.execute(text("""
+        UPDATE dm_messages dm SET sender_id = a.user_id
+        FROM agents a
+        WHERE a.id = dm.sender_id AND dm.sender_id <> a.user_id
+    """))
+    count += 1
+
+    # 4. file_metadata
+    r = await db.execute(text("""
+        UPDATE file_metadata fm SET owner_id = a.user_id
+        FROM agents a
+        WHERE fm.owner_type = 'ai' AND a.id = fm.owner_id AND fm.owner_id <> a.user_id
+    """))
+    count += 1
+
+    await db.flush()
+    logger.info("  ✅ 全局 AI ID 统一为 user_id 完成")
 
 
 async def _migrate_agent_status_color(db):

@@ -95,7 +95,9 @@ async def check_file_access(db: AsyncSession, file_id: int, requester_type: str,
     if metadata.owner_type == "ai" and requester_type == "human":
         from app.models.agent import Agent as AgentModel, AgentCollaborator
         agent_result = await db.execute(
-            select(AgentModel).where(AgentModel.id == metadata.owner_id)
+            select(AgentModel).where(
+                (AgentModel.id == metadata.owner_id) | (AgentModel.user_id == metadata.owner_id)
+            )
         )
         agent = agent_result.scalar_one_or_none()
         if agent is not None:

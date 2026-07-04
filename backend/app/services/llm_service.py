@@ -826,7 +826,7 @@ async def _build_cross_conversation_context(
 
             msgs = []
             for m in reversed(recent):
-                is_self = m.sender_type == "ai" and m.sender_id == agent.id
+                is_self = m.sender_type == "ai" and m.sender_id in (agent.id, agent.user_id)
                 if is_self:
                     speaker = agent.name
                     sid = None
@@ -883,7 +883,7 @@ async def _build_cross_conversation_context(
 
                 msgs = []
                 for m in reversed(dm_list):
-                    is_self = m.sender_id == agent.user_id
+                    is_self = m.sender_id in (agent.id, agent.user_id)
                     speaker = agent.name if is_self else partner_name
                     sid = None if is_self else m.sender_id
                     msgs.append({

@@ -249,11 +249,15 @@ async def get_messages(
             name_map[("human", u.id)] = u.username
             avatar_map[("human", u.id)] = u.avatar_url
     if ai_ids:
-        result = await db.execute(select(Agent).where(Agent.id.in_(ai_ids)))
+        result = await db.execute(select(Agent).where(
+            (Agent.id.in_(ai_ids)) | (Agent.user_id.in_(ai_ids))
+        ))
         for a in result.scalars().all():
-            name_map[("ai", a.id)] = a.name
-            avatar_map[("ai", a.id)] = a.avatar_url
-            state_map[("ai", a.id)] = a.state
+            # sender_id 可能是 agent.id 或 agent.user_id，两个都要映射
+            for key in (a.id, a.user_id):
+                name_map[("ai", key)] = a.name
+                avatar_map[("ai", key)] = a.avatar_url
+                state_map[("ai", key)] = a.state
 
     return [
         message_to_dict(m, sender_name=name_map.get((m.sender_type, m.sender_id)), sender_avatar_url=avatar_map.get((m.sender_type, m.sender_id)), sender_state=state_map.get((m.sender_type, m.sender_id)))
