@@ -99,9 +99,10 @@ async def _require_agent_access(
     db: AsyncSession = Depends(get_db),
 ):
     """依赖注入：获取 Agent 并校验访问权限（owner / 合作者，管理员可绕过）"""
-    agent = await get_agent(db, agent_id)
-    if agent is None:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="AI 代理不存在")
+    agent_result = await get_agent(db, agent_id)
+    if agent_result.is_err():
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=agent_result.error)
+    agent = agent_result.ok
     if agent.owner_id == current_user["user_id"] or current_user["role"] == "admin":
         return agent
     # 检查合作者
@@ -850,9 +851,10 @@ async def execute_opencli_tool(
     """
     from app.utils.error_handler import build_tool_error, log_error
 
-    agent = await get_agent(db, agent_id)
-    if agent is None:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="AI 代理不存在")
+    agent_result = await get_agent(db, agent_id)
+    if agent_result.is_err():
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=agent_result.error)
+    agent = agent_result.ok
 
     try:
         result = await execute_opencli(

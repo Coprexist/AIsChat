@@ -3,6 +3,8 @@
  * 封装 fetch，自动添加 JWT 认证头
  * 桌面端从 localStorage 读取实例地址拼 API 路径，Web 端保持 '/api' 相对路径
  */
+import { type Result, success, failure } from '../utils/result'
+
 function getApiBaseUrl(): string {
   // 桌面端：从 localStorage 读取实例地址
   const stored = localStorage.getItem('instance_url')
@@ -107,6 +109,20 @@ async function uploadFile(path: string, file: File): Promise<any> {
   return data
 }
 
+/** Result 风格的请求封装（不抛异常，返回 Result<T, ApiError>） */
+async function safeRequest<T = any>(
+  path: string,
+  options: RequestInit = {},
+): Promise<Result<T, ApiError>> {
+  try {
+    const data = await request<T>(path, options)
+    return success(data)
+  } catch (e) {
+    if (e instanceof ApiError) return failure(e)
+    return failure(new ApiError(String(e), 0))
+  }
+}
+
 export const api = {
   get: <T = any>(path: string) => request<T>(path),
   post: <T = any>(path: string, body?: any) =>
@@ -118,6 +134,18 @@ export const api = {
   delete: <T = any>(path: string) =>
     request<T>(path, { method: 'DELETE' }),
   upload: uploadFile,
+  // Result 风格 API（不抛异常）
+  safe: {
+    get: <T = any>(path: string) => safeRequest<T>(path),
+    post: <T = any>(path: string, body?: any) =>
+      safeRequest<T>(path, { method: 'POST', body: JSON.stringify(body) }),
+    put: <T = any>(path: string, body?: any) =>
+      safeRequest<T>(path, { method: 'PUT', body: JSON.stringify(body) }),
+    patch: <T = any>(path: string, body?: any) =>
+      safeRequest<T>(path, { method: 'PATCH', body: JSON.stringify(body) }),
+    delete: <T = any>(path: string) =>
+      safeRequest<T>(path, { method: 'DELETE' }),
+  },
 }
 
 export { ApiError }

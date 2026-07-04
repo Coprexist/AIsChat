@@ -8,6 +8,7 @@ from passlib.context import CryptContext
 from jose import JWTError, jwt
 from fastapi import Depends, HTTPException, status, Query
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
+from app.utils.result import Result
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from app.config import settings
@@ -47,15 +48,17 @@ def create_access_token(data: dict, expires_delta: timedelta = None) -> str:
     return jwt.encode(to_encode, settings.jwt_secret_key, algorithm=settings.jwt_algorithm)
 
 
-def decode_access_token(token: str) -> dict | None:
-    """解码 JWT 令牌，失败返回 None"""
+def decode_access_token(token: str) -> Result[dict, str]:
+    """解码 JWT 令牌，返回 Result[dict, str]"""
     try:
         payload = jwt.decode(
             token, settings.jwt_secret_key, algorithms=[settings.jwt_algorithm]
         )
-        return payload
-    except JWTError:
-        return None
+        return Result.success(payload)
+    except jwt.ExpiredSignatureError:
+        return Result.failure("token 已过期")
+    except JWTError as e:
+        return Result.failure(f"token 无效: {e}")
 
 
 async def get_current_user(
@@ -79,12 +82,13 @@ async def get_current_user(
             detail="缺少认证令牌",
         )
 
-    payload = decode_access_token(raw)
-    if payload is None:
+    payload_result = decode_access_token(raw)
+    if payload_result.is_err():
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="令牌无效或已过期",
+            detail=payload_result.error,
         )
+    payload = payload_result.ok
 
     user_id = payload.get("user_id")
     username = payload.get("username")

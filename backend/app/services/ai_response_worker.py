@@ -429,8 +429,8 @@ async def _maybe_trigger_ai_reply(
     from app.services.action_decider import decide_action, ActionContext, ActionType
     from app.models.agent import Agent as AgentModel
 
-    # v2.0.0: agent_id 可能是 agent.id 或 user_id（group_members 迁移后 member_id 统一为 user_id）
-    agent = await get_agent(db, agent_id)
+    # v2.0.0: agent_id 可能是 agent.id 或 user_id
+    agent = (await get_agent(db, agent_id)).ok
     if agent is None:
         # 通过 user_id 查找（group_members.member_id 现已统一为 user_id）
         agent_result = await db.execute(

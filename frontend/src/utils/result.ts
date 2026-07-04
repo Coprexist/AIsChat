@@ -53,3 +53,12 @@ export function unwrap<T, E>(result: Result<T, E>): T {
   if (!result.ok) throw new Error(String(result.error))
   return result.value
 }
+
+/** 安全的 JSON.parse，返回 Result */
+export function safeParse<T = unknown>(text: string): Result<T, string> {
+  try {
+    return success(JSON.parse(text) as T)
+  } catch {
+    return failure('JSON 解析失败')
+  }
+}

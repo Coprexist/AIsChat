@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState, useCallback } from 'react'
 import { getInstanceUrl } from '../utils/platform'
+import { safeParse } from '../utils/result'
 
 export interface WebSocketMessage {
   type: string
@@ -83,8 +84,12 @@ export function useWebSocket(
     }
 
     ws.onmessage = (event) => {
-      try {
-        const msg = JSON.parse(event.data)
+      const result = safeParse<WebSocketMessage>(event.data)
+      if (!result.ok) {
+        console.warn('WebSocket 收到无效 JSON:', (event.data as string).slice(0, 100))
+        return
+      }
+      const msg = result.value
 
         // 错误事件：自动消失的 toast
         if (msg.type === 'error') {
@@ -109,9 +114,6 @@ export function useWebSocket(
         // 无需 flushSync：消费者内部全部使用函数式 setState(prev => ...)，
         // 即使 React 18 批处理合并多次调用，prev 链式叠加也不会丢失消息。
         onMessageRef.current?.(msg)
-      } catch {
-        // ignore invalid JSON
-      }
     }
 
     ws.onclose = (event) => {

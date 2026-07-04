@@ -155,10 +155,11 @@ manager = ConnectionManager()
 async def websocket_endpoint(ws: WebSocket, token: str = Query(...)):
     """WebSocket 端点：/ws?token=JWT"""
 
-    payload = decode_access_token(token)
-    if payload is None:
-        await ws.close(code=4001, reason="令牌无效或已过期")
+    payload_result = decode_access_token(token)
+    if payload_result.is_err():
+        await ws.close(code=4001, reason=payload_result.error)
         return
+    payload = payload_result.ok
 
     user_id = int(payload.get("user_id", 0))
     username = payload.get("username", "unknown")

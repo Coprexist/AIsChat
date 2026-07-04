@@ -109,9 +109,7 @@ async def apply_config_profile(
     if profile not in CONFIG_PROFILES:
         raise ValueError(f"无效的配置档: {profile}，可选: {list(CONFIG_PROFILES.keys())}")
 
-    agent = await get_agent(db, agent_id)
-    if agent is None:
-        raise ValueError("AI 代理不存在")
+    agent = (await get_agent(db, agent_id)).unwrap()
 
     preset = CONFIG_PROFILES[profile]
     old_profile = agent.config_profile or "chat"
@@ -342,13 +340,17 @@ async def create_agent(
     return agent
 
 
-async def get_agent(db: AsyncSession, agent_id: int, owner_id: int | None = None) -> Agent | None:
-    """获取单个 Agent"""
+async def get_agent(db: AsyncSession, agent_id: int, owner_id: int | None = None) -> Result[Agent, str]:
+    """获取单个 Agent，返回 Result[Agent, str]"""
+    from app.utils.result import Result
     query = select(Agent).where(Agent.id == agent_id)
     if owner_id is not None:
         query = query.where(Agent.owner_id == owner_id)
     result = await db.execute(query)
-    return result.scalar_one_or_none()
+    agent = result.scalar_one_or_none()
+    if agent is None:
+        return Result.failure(f"AI 代理 {agent_id} 不存在")
+    return Result.success(agent)
 
 
 async def list_agents(db: AsyncSession, owner_id: int) -> list[Agent]:
@@ -389,11 +391,9 @@ async def get_effective_config(
 
     返回 dict 包含：system_prompt, temperature, top_p, presence_penalty,
     frequency_penalty, thinking_enabled, hide_ai_identity, ai_type 等
+    （内部已用 get_agent() 的 unwrap，agent 不存在时抛 ValueError）
     """
-    agent_result = await db.execute(select(Agent).where(Agent.id == agent_id))
-    agent = agent_result.scalar_one_or_none()
-    if agent is None:
-        raise ValueError("AI 代理不存在")
+    agent = (await get_agent(db, agent_id)).unwrap()
 
     ai_type = agent.ai_type or "resonance"
 
@@ -469,9 +469,7 @@ async def delete_agent(
     删除 AI 代理，返还 api_credit_cost 给创建者。
     同时删除关联的 users 条目（type='ai'）。
     """
-    agent = await get_agent(db, agent_id)
-    if agent is None:
-        raise ValueError("AI 代理不存在")
+    agent = (await get_agent(db, agent_id)).unwrap()
 
     # 权限检查：owner 或 can_delete 合作者
     if not is_admin and agent.owner_id != operator_id:
@@ -528,9 +526,7 @@ async def update_agent_config(
     v0.4.0: 通用/半通用 AI 的可覆盖字段写入 agent_user_configs，
     而非 agent 本体（实现 per-user 配置隔离）。
     """
-    agent = await get_agent(db, agent_id)
-    if agent is None:
-        raise ValueError("AI 代理不存在")
+    agent = (await get_agent(db, agent_id)).unwrap()
 
     ai_type = agent.ai_type or "resonance"
 
@@ -741,9 +737,7 @@ async def rollback_config(
     回滚 AI 配置到历史版本。
     version_id 可以是 agent_config_history.id，或 -1 表示上一版本。
     """
-    agent = await get_agent(db, agent_id)
-    if agent is None:
-        raise ValueError("AI 代理不存在")
+    agent = (await get_agent(db, agent_id)).unwrap()
 
     # 查询历史记录
     query = select(AgentConfigHistory).where(
@@ -798,9 +792,7 @@ async def switch_agent_state(
     if target_state not in valid_states:
         raise ValueError(f"无效状态: {target_state}，可选: {valid_states}")
 
-    agent = await get_agent(db, agent_id)
-    if agent is None:
-        raise ValueError("AI 代理不存在")
+    agent = (await get_agent(db, agent_id)).unwrap()
 
     # blocked 状态特殊处理
     if target_state == "blocked":
@@ -916,9 +908,10 @@ async def calculate_willingness(
     from datetime import datetime, timedelta
     from app.models.message import Message
 
-    agent = await get_agent(db, agent_id)
-    if agent is None:
-        return WillingnessResult(0, "AI 不存在", "low", {})
+    agent_result = await get_agent(db, agent_id)
+    if agent_result.is_err():
+        return WillingnessResult(0, agent_result.error, "low", {})
+    agent = agent_result.ok
 
     # 闹钟场景 — 纯函数
     if scenario == "alarm":
@@ -998,9 +991,7 @@ async def export_agent_soul(
     """
     from datetime import datetime, timezone as tz
 
-    agent = await get_agent(db, agent_id)
-    if agent is None:
-        raise ValueError("AI 代理不存在")
+    agent = (await get_agent(db, agent_id)).unwrap()
 
     # 配置历史（最新 100 条）
     history_result = await db.execute(
