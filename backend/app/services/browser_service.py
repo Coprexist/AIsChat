@@ -67,13 +67,24 @@ async def start() -> bool:
             "--disable-dev-shm-usage",
             "--password-store=basic",
             "--use-mock-keychain",
-            "--single-process",
+            "--disable-features=AsyncDNS",
             f"--remote-debugging-port={CDP_PORT}",
             "--remote-allow-origins=*",
+            "--enable-logging=stderr",
+            "--v=1",
             stdout=asyncio.subprocess.PIPE,
             stderr=asyncio.subprocess.PIPE,
             env={**os.environ, "DBUS_SESSION_BUS_ADDRESS": "/dev/null"},
         )
+        # 后台读取 stderr
+        async def _log_stderr():
+            try:
+                while _chrome_process.returncode is None:
+                    line = await _chrome_process.stderr.readline()
+                    if line: logger.warning(f"[Chrome] {line.decode().rstrip()}")
+            except Exception: pass
+        asyncio.create_task(_log_stderr())
+
         # 等待端口就绪
         for _ in range(50):  # 最多等 5 秒
             await asyncio.sleep(0.1)
