@@ -1476,6 +1476,7 @@ class CommandWhitelistBody(BaseModel):
     pattern: str = Field(..., min_length=1, max_length=200)
     is_regex: bool = False
     description: str | None = Field(default=None, max_length=200)
+    default_enabled: bool = False  # True=全部AI默认可用
 
 
 @router.get("/opencli/config")
@@ -1565,6 +1566,7 @@ async def add_opencli_command(
             pattern=req.pattern,
             is_regex=req.is_regex,
             description=req.description,
+            default_enabled=req.default_enabled,
             created_by=admin["user_id"],
         )
         await _log_admin_action(
@@ -1588,6 +1590,27 @@ async def toggle_opencli_command(
         return await toggle_command_whitelist(db, cmd_id, enabled)
     except ValueError as e:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
+
+
+@router.put("/opencli/commands/{cmd_id}/default")
+async def toggle_opencli_command_default(
+    cmd_id: int,
+    default_enabled: bool = Query(True),
+    admin: dict = Depends(require_admin),
+    db: AsyncSession = Depends(get_db),
+):
+    """开关某条命令的「默认可用」（全部 AI 无需白名单）"""
+    try:
+        entry = await db.get(OpenCLICommandWhitelist, cmd_id) if False else None
+        from sqlalchemy import update, text
+        await db.execute(
+            text("UPDATE opencli_command_whitelist SET default_enabled = :v WHERE id = :id"),
+            {"v": default_enabled, "id": cmd_id},
+        )
+        await db.commit()
+        return {"ok": True, "cmd_id": cmd_id, "default_enabled": default_enabled}
+    except Exception as e:
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=str(e))
 
 
 @router.delete("/opencli/commands/{cmd_id}")

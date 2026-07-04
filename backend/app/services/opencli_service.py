@@ -52,17 +52,39 @@ async def check_permission(
     if not config.global_enabled:
         return False, "OPENCLI_DISABLED: OpenCLI 全局未启用"
 
-    # 2. AI 白名单
-    result = await db.execute(
-        select(OpenCLIAgentWhitelist).where(
-            OpenCLIAgentWhitelist.agent_id == agent_id
+    # 2. 先查命令白名单（用于判断是否 default_enabled）
+    cmd_result = await db.execute(
+        select(OpenCLICommandWhitelist).where(
+            OpenCLICommandWhitelist.enabled == True
         )
     )
-    agent_wl = result.scalar_one_or_none()
-    if agent_wl is None or not agent_wl.enabled:
-        return False, "OPENCLI_AGENT_NOT_ALLOWED: 此 AI 未被授权使用 OpenCLI"
+    whitelist_entries = cmd_result.scalars().all()
 
-    # 3. 默认黑名单检查（无法被白名单覆盖）
+    # 检查命令是否匹配 default_enabled 项
+    is_default_cmd = False
+    for entry in whitelist_entries:
+        if not entry.default_enabled:
+            continue
+        try:
+            matched = re.fullmatch(entry.pattern, command) if entry.is_regex else (entry.pattern == command)
+            if matched:
+                is_default_cmd = True
+                break
+        except re.error:
+            pass
+
+    # 3. AI 白名单（默认命令可跳过）
+    if not is_default_cmd:
+        result = await db.execute(
+            select(OpenCLIAgentWhitelist).where(
+                OpenCLIAgentWhitelist.agent_id == agent_id
+            )
+        )
+        agent_wl = result.scalar_one_or_none()
+        if agent_wl is None or not agent_wl.enabled:
+            return False, "OPENCLI_AGENT_NOT_ALLOWED: 此 AI 未被授权使用 OpenCLI"
+
+    # 4. 默认黑名单检查（无法被白名单覆盖）
     denied_result = await db.execute(select(OpenCLIDeniedCommand))
     denied_patterns = denied_result.scalars().all()
     for dp in denied_patterns:
@@ -73,17 +95,7 @@ async def check_permission(
             if dp.pattern == command:
                 return False, f"OPENCLI_COMMAND_DENIED: 命令 '{command}' 被系统禁止（{dp.reason}）"
 
-    # 4. 命令白名单检查
-    cmd_result = await db.execute(
-        select(OpenCLICommandWhitelist).where(
-            OpenCLICommandWhitelist.enabled == True
-        )
-    )
-    whitelist_entries = cmd_result.scalars().all()
-
-    if not whitelist_entries:
-        return False, "OPENCLI_NO_WHITELIST: 命令白名单为空，请管理员先添加允许的命令"
-
+    # 5. 命令匹配
     for entry in whitelist_entries:
         try:
             if entry.is_regex:
@@ -552,6 +564,7 @@ async def list_command_whitelist(db: AsyncSession) -> list[dict]:
             "is_regex": e.is_regex,
             "description": e.description,
             "enabled": e.enabled,
+            "default_enabled": e.default_enabled if hasattr(e, 'default_enabled') else False,
             "created_at": str(e.created_at) if e.created_at else None,
         }
         for e in entries
@@ -564,6 +577,7 @@ async def add_command_whitelist(
     is_regex: bool,
     description: str | None,
     created_by: int,
+    default_enabled: bool = False,
 ) -> dict:
     """添加命令白名单"""
     # 验证正则
@@ -577,6 +591,7 @@ async def add_command_whitelist(
         pattern=pattern,
         is_regex=is_regex,
         description=description,
+        default_enabled=default_enabled,
         created_by=created_by,
     )
     db.add(entry)

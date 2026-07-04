@@ -38,6 +38,7 @@ class OpenCLICommandWhitelist(Base):
     is_regex = Column(Boolean, default=False)
     description = Column(String(200))
     enabled = Column(Boolean, default=True)
+    default_enabled = Column(Boolean, default=False)  # True=全部AI默认可用，跳过白名单
     created_by = Column(Integer, ForeignKey("users.id"))
     created_at = Column(DateTime, server_default=func.now())
 
