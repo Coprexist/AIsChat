@@ -41,6 +41,7 @@ async def run_migrations():
             await _migrate_friend_controls(db)         # v0.6.0 好友控制字段（必须在 select(Agent) 之前）
             await _migrate_memory_config_columns(db)   # v0.8.0 文件记忆配置字段（必须在 select(Agent) 之前）
             await _migrate_bio_and_status(db)     # v0.9.0 AI 简介 + 用户/AI 自定义状态（必须在 select(Agent) 之前）
+            await _migrate_agent_status_color(db)     # v1.0.2 AI状态颜色（必须在 select(Agent) 之前）
             await _migrate_others_chat_controls(db)  # v0.9.0 对话权限 + 限额控制（必须在 select(Agent) 之前）
             await _migrate_email_verification(db)  # v1.0.0 邮箱认证（必须在 select(Agent) 之前）
             await _migrate_provider_config(db)      # v1.0.0 LLM 厂商预设
@@ -87,7 +88,6 @@ async def run_migrations():
             await _migrate_multi_provider(db)          # v1.0.2 多供应商 + api_key_pool.provider_name
             await _migrate_ai_friend_user_id(db)       # v1.0.2 AI好友friend_id统一为user_id
             await _migrate_opencli_default_enabled(db) # v1.0.2 OpenCLI命令默认可用
-            await _migrate_agent_status_color(db)      # v1.0.2 AI状态颜色
             await _fix_column_types(db)  # 必须是最后一个：修复老部署的列类型不匹配
             await db.commit()
             logger.info("✅ 数据库迁移检查完成")
