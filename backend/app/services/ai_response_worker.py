@@ -277,7 +277,7 @@ async def _process_group_event(db, event: dict):
         if limit_per_min > 0:
             effective_max_depth = max(limit_per_min * 2, 5)
         else:
-            effective_max_depth = 3  # 人类群默认浅层，防链式刷屏
+            effective_max_depth = 50
 
     if chain_depth > effective_max_depth:
         logger.info(
@@ -638,8 +638,16 @@ async def _maybe_trigger_ai_reply(
             },
         )
     logger.info(f"✅ AI {agent.name}: LLM 调用完成")
+    # 9. 回复后自动退出聊天链：设 2 分钟群免打扰（@提及仍可穿透）
+    try:
+        from app.services.group_service import set_group_dnd
+        await set_group_dnd(db, agent_id=resolved_agent_id, group_id=group_id,
+                            duration_minutes=2, member_type="ai")
+        logger.info(f"🔇 AI {agent.name} 群 {group_id} 自动免打扰 2 分钟（退出聊天链）")
+    except Exception as e:
+        logger.warning(f"自动 DND 设置失败（非致命）: {e}")
 
-    # 9. 标记未读消息已处理
+    # 10. 标记未读消息已处理
     from app.services.group_service import mark_pending_read
     await mark_pending_read(db, resolved_agent_id, group_id)
     await db.commit()
