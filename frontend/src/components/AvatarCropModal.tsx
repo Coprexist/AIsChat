@@ -34,8 +34,7 @@ function getCroppedImgRaw(image: HTMLImageElement, crop: Area): Promise<Blob> {
         if (blob) resolve(blob)
         else reject(new Error('Canvas toBlob failed'))
       },
-      'image/jpeg',
-      0.85,
+      'image/png',
     )
   })
 }
