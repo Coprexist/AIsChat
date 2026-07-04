@@ -160,18 +160,29 @@ async def download_file(
     db: AsyncSession = Depends(get_db),
 ):
     """下载文件（含权限检查）"""
-    metadata = await get_file(db, file_id)
+    try:
+        metadata = await get_file(db, file_id)
+    except Exception as e:
+        logger.error(f"下载文件 {file_id} 查询元数据失败: {e}", exc_info=True)
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="查询文件失败")
+
     if metadata is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="文件不存在")
 
     # 权限检查
-    can_access = await check_file_access(db, file_id, "human", current_user["user_id"], "read")
+    try:
+        can_access = await check_file_access(db, file_id, "human", current_user["user_id"], "read")
+    except Exception as e:
+        logger.error(f"下载文件 {file_id} 权限检查异常: {e}", exc_info=True)
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=f"权限检查失败: {e}")
+
     if not can_access:
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="无权访问此文件")
 
     physical_path = _get_physical_path(metadata.path)
     if not os.path.exists(physical_path):
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="物理文件不存在")
+        logger.error(f"下载文件 {file_id}: 物理文件不存在 path={physical_path} metadata.path={metadata.path}")
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=f"物理文件不存在")
 
     # 追踪引用
     await track_file_reference(db, file_id, "human", current_user["user_id"], "read")
