@@ -2518,6 +2518,13 @@ async def test_browser_connection(
         async with websockets.connect(ws_url, max_size=2**20, close_timeout=5) as ws:
             await ws.send(json.dumps({"id": 0, "method": "Page.enable"}))
             await ws.recv()
+            # 先用 JS fetch 测试网络——不靠页面加载
+            await ws.send(json.dumps({"id": 0.5, "method": "Runtime.enable"}))
+            await ws.recv()
+            await ws.send(json.dumps({"id": 0.6, "method": "Runtime.evaluate", "params": {"expression": "fetch('http://example.com').then(r=>r.status).catch(e=>'ERR:'+e.message)"}}))
+            fetch_msg = json.loads(await asyncio.wait_for(ws.recv(), timeout=15))
+            fetch_result = str(fetch_msg.get("result", {}).get("result", {}).get("value", "?"))
+            # 再试正常导航
             await ws.send(json.dumps({"id": 1, "method": "Page.navigate", "params": {"url": "http://example.com"}}))
             nav_result = json.loads(await asyncio.wait_for(ws.recv(), timeout=15))
             page_title = ""
@@ -2544,7 +2551,7 @@ async def test_browser_connection(
 
     return {
         "ok": True,
-        "message": f"浏览器能正常访问百度（页面标题: {page_title or '无'}）{' CDP事件:' + ','.join(msgs_log) if not page_title else ''}",
+        "message": f"fetch={fetch_result} | 页面标题={page_title or '无'}{' CDP:' + ','.join(msgs_log) if not page_title else ''}",
         "page_title": page_title or "",
         "cdp_version": cdp_info.get("Browser", "unknown"),
     }

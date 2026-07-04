@@ -65,8 +65,8 @@ async def start() -> bool:
             "--disable-features=AsyncDNS,TranslateUI,VizDisplayCompositor,NetworkService",
             f"--remote-debugging-port={CDP_PORT}",
             "--remote-allow-origins=*",
-            stdout=asyncio.subprocess.DEVNULL,
-            stderr=asyncio.subprocess.DEVNULL,
+            stdout=asyncio.subprocess.PIPE,
+            stderr=asyncio.subprocess.PIPE,
         )
         # 等待端口就绪
         for _ in range(50):  # 最多等 5 秒
