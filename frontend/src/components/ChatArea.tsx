@@ -53,6 +53,13 @@ export default function ChatArea({ groupId, dmSessionId }: ChatAreaProps) {
     api.get('/groups').then(setGroups).catch(console.error)
   }, [])
 
+  // 监听群设置面板发出的邀请事件
+  useEffect(() => {
+    const handler = () => setShowInvite(true)
+    window.addEventListener('open-invite-modal', handler)
+    return () => window.removeEventListener('open-invite-modal', handler)
+  }, [])
+
   // 群聊选中变化时刷新未读
   useEffect(() => {
     if (groupId) {

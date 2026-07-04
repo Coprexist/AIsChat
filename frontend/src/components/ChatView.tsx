@@ -616,8 +616,13 @@ export default function ChatView({ conversationType, conversationId }: ChatViewP
     const files = e.target.files
     if (!files || files.length === 0) return
 
+    const MAX_FILE_MB = 10
     for (let i = 0; i < files.length; i++) {
       const file = files[i]
+      if (file.size > MAX_FILE_MB * 1024 * 1024) {
+        alert(`文件「${file.name}」超出 ${MAX_FILE_MB}MB 上传限制`)
+        continue
+      }
       const tempId = `att_${Date.now()}_${i}`
       const newAtt: PendingAttachment = {
         id: tempId,

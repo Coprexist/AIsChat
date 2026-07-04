@@ -1,6 +1,7 @@
 """
 群聊与消息路由
 """
+from datetime import datetime, timezone
 from fastapi import APIRouter, Depends, HTTPException, status, Query
 from fastapi.responses import Response
 from sqlalchemy import select
@@ -548,8 +549,18 @@ async def mark_read(
 ):
     """标记当前用户已读该群消息（进入群聊时调用）。"""
     updated = await update_last_read(db, group_id, "human", current_user["user_id"])
+    # 成员记录缺失时尝试补创建（重建容器后 group_members 可能不完整）
+    if not updated:
+        try:
+            db.add(GroupMember(
+                group_id=group_id, member_type="human", member_id=current_user["user_id"],
+                role="member", last_read_at=datetime.now(timezone.utc).replace(tzinfo=None),
+            ))
+            await db.flush()
+            updated = True
+        except Exception:
+            pass
     return {"ok": True, "updated": updated}
-    return {"message": "已标记为已读"}
 
 
 # ---------- 联邦共享控制（v1.0.0: 群主/AI制作者按群控制） ----------

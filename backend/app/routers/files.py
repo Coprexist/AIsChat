@@ -85,6 +85,9 @@ async def upload_file_endpoint(
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="路径不合法")
 
     content = await file.read()
+    max_bytes = settings.upload_max_size_mb * 1024 * 1024
+    if len(content) > max_bytes:
+        raise HTTPException(400, f"文件大小不能超过 {settings.upload_max_size_mb}MB")
     metadata = await upload_file(
         db, path, file.filename or f"unnamed_{uuid.uuid4().hex[:8]}",
         content, file.content_type, "human", current_user["user_id"],
@@ -114,11 +117,11 @@ async def upload_attachment(
     """上传消息附件（存入 attachments/ 子目录）"""
     content = await file.read()
 
-    # 限制附件大小（50MB）
-    max_size = 50 * 1024 * 1024
+    # 限制附件大小
+    max_size = settings.upload_max_size_mb * 1024 * 1024
     if len(content) > max_size:
         raise HTTPException(status_code=status.HTTP_413_REQUEST_ENTITY_TOO_LARGE,
-                          detail="附件大小不能超过 50MB")
+                          detail=f"附件大小不能超过 {settings.upload_max_size_mb}MB")
 
     metadata = await upload_file(
         db, "attachments/", file.filename or f"att_{uuid.uuid4().hex[:8]}",
