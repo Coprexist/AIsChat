@@ -2597,6 +2597,40 @@ async def add_preset(body: MaintenancePresetBody, admin: dict = Depends(require_
     return {"ok": True, "message": f"已添加预设「{body.name}」"}
 
 
+# 维护图片库（独立于预设）
+_IMG_FILE = "/tmp/maintenance_images.json"
+
+def _load_images() -> list[str]:
+    try:
+        if os.path.exists(_IMG_FILE):
+            with open(_IMG_FILE) as f: return json.loads(f.read())
+    except: pass
+    return []
+
+
+@router.get("/maintenance/images")
+async def list_images(admin: dict = Depends(require_admin)):
+    return {"images": _load_images()}
+
+
+@router.post("/maintenance/images")
+async def add_image(admin: dict = Depends(require_admin), url: str = ""):
+    if not url: raise HTTPException(400, "缺少 url")
+    imgs = _load_images()
+    if url not in imgs:
+        imgs.insert(0, url)
+    with open(_IMG_FILE, "w") as f: f.write(json.dumps(imgs, ensure_ascii=False))
+    return {"ok": True, "images": imgs}
+
+
+@router.delete("/maintenance/images")
+async def del_image(admin: dict = Depends(require_admin), url: str = ""):
+    imgs = _load_images()
+    new_list = [i for i in imgs if i != url]
+    with open(_IMG_FILE, "w") as f: f.write(json.dumps(new_list, ensure_ascii=False))
+    return {"ok": True, "images": new_list}
+
+
 @router.post("/plugins/browser/test")
 async def test_browser_connection(
     admin: dict = Depends(require_admin),

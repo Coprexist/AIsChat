@@ -308,14 +308,20 @@ function OverviewTab() {
 function MaintenanceMsgEditor() {
   const [msg, setMsg] = useState({ hard_title: '', hard_body: '', hard_color: '#f59e0b', hard_image: '', hard_style: 'popup', soft_text: '', soft_color: '#f59e0b' })
   const [presets, setPresets] = useState<any[]>([])
+  const [images, setImages] = useState<string[]>([])
   const [loaded, setLoaded] = useState(false)
   const [saved, setSaved] = useState(false)
 
   const load = async () => {
     try {
-      const [m, p] = await Promise.all([api.get('/admin/maintenance/msg'), api.get('/admin/maintenance/presets')])
-      const d: any = m; setMsg({ hard_title: d.hard_title || '', hard_body: d.hard_body || '', hard_color: d.hard_color || '#f59e0b', hard_image: d.hard_image || '', soft_text: d.soft_text || '', soft_color: d.soft_color || '#f59e0b' })
+      const [m, p, img] = await Promise.all([
+        api.get('/admin/maintenance/msg'),
+        api.get('/admin/maintenance/presets'),
+        api.get('/admin/maintenance/images'),
+      ])
+      const d: any = m; setMsg({ hard_title: d.hard_title || '', hard_body: d.hard_body || '', hard_color: d.hard_color || '#f59e0b', hard_image: d.hard_image || '', hard_style: d.hard_style || 'popup', soft_text: d.soft_text || '', soft_color: d.soft_color || '#f59e0b' })
       setPresets((p as any).presets || [])
+      setImages((img as any).images || [])
       setLoaded(true)
     } catch {}
   }
@@ -410,20 +416,34 @@ function MaintenanceMsgEditor() {
                   const r: any = await api.upload('/fs/upload-attachment', f)
                   const url = `/api/fs/public/${r.file_id}`
                   setMsg({...msg, hard_image: url})
+                  try { await api.post(`/admin/maintenance/images?url=${encodeURIComponent(url)}`); setImages(prev => [url, ...prev.filter(x => x !== url)]) } catch {}
                 } catch (err: any) { alert('上传失败: ' + (err?.message || err)) }
               }} />
             </label>
           </div>
-          {/* 预设中的图片快捷选择 */}
-          {presets.filter((p: any) => p.hard_image).length > 0 && (
-            <select onChange={e => { if (e.target.value) setMsg({...msg, hard_image: e.target.value}); e.target.value = '' }}
-              className="w-full mt-1 px-3 py-1.5 rounded-lg border border-border bg-canvas text-xs text-textMuted focus:outline-none focus:ring-1 focus:ring-primary-500/50"
-              defaultValue="">
-              <option value="">从预设中选图…</option>
-              {presets.filter((p: any) => p.hard_image).map((p: any) => (
-                <option key={p.name} value={p.hard_image}>{p.name} 的图</option>
-              ))}
-            </select>
+          {/* 已上传图片快捷选择 */}
+          {images.length > 0 && (
+            <div className="flex gap-1.5 mt-1">
+              <select onChange={e => { if (e.target.value) setMsg({...msg, hard_image: e.target.value}); e.target.value = '' }}
+                className="flex-1 px-3 py-1.5 rounded-lg border border-border bg-canvas text-xs text-textMuted focus:outline-none focus:ring-1 focus:ring-primary-500/50"
+                defaultValue="">
+                <option value="">从图片库选择…</option>
+                {images.map((url: string, i: number) => (
+                  <option key={i} value={url}>{url.slice(url.lastIndexOf('/')+1) || url.slice(-20)}</option>
+                ))}
+                {presets.filter((p: any) => p.hard_image && !images.includes(p.hard_image)).map((p: any) => (
+                  <option key={p.name} value={p.hard_image}>{p.name} 的图</option>
+                ))}
+              </select>
+              <button onClick={() => {
+                const url = prompt('输入外网图片URL：')
+                if (url) { setMsg({...msg, hard_image: url}); api.post(`/admin/maintenance/images?url=${encodeURIComponent(url)}`).then(() => setImages(prev => [url, ...prev.filter(x => x !== url)])).catch(()=>{}) }
+              }} className="shrink-0 px-2 py-1 text-[10px] rounded-lg border border-border text-textMuted hover:text-primary-400 transition-colors">🔗</button>
+              <button onClick={() => {
+                const url = prompt('删除图片URL：', msg.hard_image)
+                if (url) { api.delete(`/admin/maintenance/images?url=${encodeURIComponent(url)}`).then(() => { load(); if (msg.hard_image === url) setMsg({...msg, hard_image: ''}) }).catch(()=>{}) }
+              }} className="shrink-0 px-2 py-1 text-[10px] rounded-lg border border-rose-500/20 text-rose-400 hover:bg-rose-500/10 transition-colors">🗑</button>
+            </div>
           )}
           {msg.hard_image && (
             <div className="mt-1"><img src={msg.hard_image} alt="" className="h-16 object-contain rounded-lg border border-border bg-black/20" /></div>
