@@ -2514,30 +2514,29 @@ async def test_browser_connection(
     try:
         import websockets
 
+        msgs_log = []
         async with websockets.connect(ws_url, max_size=2**20, close_timeout=5) as ws:
-            # 启用 Page 域
             await ws.send(json.dumps({"id": 0, "method": "Page.enable"}))
             await ws.recv()
-            # 导航
-            await ws.send(json.dumps({"id": 1, "method": "Page.navigate", "params": {"url": "https://www.baidu.com"}}))
+            await ws.send(json.dumps({"id": 1, "method": "Page.navigate", "params": {"url": "http://example.com"}}))
             nav_result = json.loads(await asyncio.wait_for(ws.recv(), timeout=15))
-            # 等待 loadEventFired（页面真正加载完成）
             page_title = ""
-            for _ in range(10):
-                msg = json.loads(await asyncio.wait_for(ws.recv(), timeout=3))
+            for _ in range(15):
+                try:
+                    msg = json.loads(await asyncio.wait_for(ws.recv(), timeout=3))
+                except TimeoutError:
+                    break
                 method = msg.get("method", "")
+                msgs_log.append(f"{method or msg.get('id','?')}")
                 if method == "Page.loadEventFired":
-                    # 加载完成——读 title
                     await ws.send(json.dumps({"id": 2, "method": "Runtime.evaluate", "params": {"expression": "document.title"}}))
                     title_msg = json.loads(await asyncio.wait_for(ws.recv(), timeout=5))
                     page_title = title_msg.get("result", {}).get("result", {}).get("value", "")
                     break
-                elif method == "Page.frameStoppedLoading":
-                    pass
     except TimeoutError:
-        return {"ok": False, "error": "访问百度超时——网络不通或 DNS 解析失败", "step": "navigate"}
+        return {"ok": False, "error": "访问超时——网络不通或 DNS 解析失败", "step": "navigate", "cdp_msgs": msgs_log}
     except Exception as e:
-        return {"ok": False, "error": f"CDP 通信失败: {e}", "step": "navigate"}
+        return {"ok": False, "error": f"CDP 通信失败: {e}", "step": "navigate", "cdp_msgs": msgs_log}
 
     error = nav_result.get("result", {}).get("errorText", "")
     if error:
