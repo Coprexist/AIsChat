@@ -253,15 +253,6 @@ async def get_messages(
                 a = (await db.execute(select(Agent.name, Agent.avatar_url, Agent.state).where(Agent.user_id == uid))).first()
                 if a: name_map[uid] = a[0]; avatar_map[uid] = a[1] or uavatar or ''; state_map[uid] = a[2]
 
-        # 补查 agent.id 格式的旧数据（sender_id = agent.id，不在 users 表中）
-        unresolved = all_ids - set(name_map.keys())
-        if unresolved:
-            a_result = await db.execute(select(Agent.id, Agent.name, Agent.avatar_url, Agent.state, Agent.user_id).where(Agent.id.in_(unresolved)))
-            for row in a_result.all():
-                aid, aname, aavatar, astate, auid = row[0], row[1], row[2], row[3], row[4]
-                name_map[aid] = aname; avatar_map[aid] = aavatar or ''; state_map[aid] = astate
-                if auid:
-                    name_map[auid] = aname; avatar_map[auid] = aavatar or ''; state_map[auid] = astate
 
     return [
         message_to_dict(m, sender_name=name_map.get(m.sender_id), sender_avatar_url=avatar_map.get(m.sender_id), sender_state=state_map.get(m.sender_id))

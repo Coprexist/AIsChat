@@ -29,26 +29,23 @@ class SendMessage(ToolPlugin):
         from app.services.group_service import create_message, message_to_dict
         from app.models.agent import Agent as AgentModel
 
+        # 统一用 user_id 作为 sender_id（v2.0.0 迁移后所有消息 sender_id 均为 users.id）
+        a_obj = (await db.execute(select(AgentModel).where(AgentModel.id == agent_id))).scalar_one_or_none()
+        user_id = a_obj.user_id if a_obj and a_obj.user_id else agent_id
+
         target_group = arguments.get("group_id", group_id)
         content = arguments["content"]
         reply_to = arguments.get("reply_to")
 
         message = await create_message(
             db, group_id=target_group, sender_type="ai",
-            sender_id=agent_id, content=content, reply_to=reply_to,
+            sender_id=user_id, content=content, reply_to=reply_to,
         )
         await db.commit()
 
         # WebSocket 广播
         agent_name = context.get("agent_name", f"AI:{agent_id}")
-        sender_avatar = None
-        try:
-            a_result = await db.execute(select(AgentModel).where(AgentModel.id == agent_id))
-            a_obj = a_result.scalar_one_or_none()
-            if a_obj:
-                sender_avatar = a_obj.avatar_url
-        except Exception:
-            pass
+        sender_avatar = getattr(a_obj, 'avatar_url', None) if a_obj else None
         msg_data = message_to_dict(message, sender_name=agent_name, sender_avatar_url=sender_avatar)
         manager = context.get("manager")
         if manager:
@@ -66,7 +63,7 @@ class SendMessage(ToolPlugin):
                 "message_id": message.id,
                 "content": content,
                 "sender_type": "ai",
-                "sender_id": agent_id,
+                "sender_id": user_id,  # v2.0.0: 统一用 user_id
                 "chain_depth": next_depth,
             })
         except asyncio.QueueFull:

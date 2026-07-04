@@ -132,7 +132,7 @@ class SendFile(ToolPlugin):
             try:
                 message = await create_group_message(
                     db, group_id=target_group,
-                    sender_type="ai", sender_id=agent_id,
+                    sender_type="ai", sender_id=agent_user_id,
                     content=caption if caption else "",
                     attachments=[attachment_info],
                 )
@@ -157,7 +157,7 @@ class SendFile(ToolPlugin):
                     "message_id": message.id,
                     "content": caption,
                     "sender_type": "ai",
-                    "sender_id": agent_id,
+                    "sender_id": agent_user_id,
                     "chain_depth": next_depth,
                 })
             except asyncio.QueueFull:

@@ -135,7 +135,7 @@ async def list_user_groups(db: AsyncSession, user_id: int) -> list[dict]:
             preview = make_preview(last_msg.content, last_msg.attachments, max_len=50)
             # 解析发送者名称
             if last_msg.sender_type == "ai":
-                a = await db.get(AgentModel, last_msg.sender_id)
+                a_result = await db.execute(select(AgentModel).where(AgentModel.user_id == last_msg.sender_id)); a = a_result.scalar_one_or_none()
                 sender = a.name if a else "AI"
             elif last_msg.sender_type == "system":
                 sender = "系统"
@@ -997,7 +997,7 @@ async def get_unread_info(
             if u:
                 sender_name = u.username
         else:
-            a = await db.get(AgentModel, last_msg.sender_id)
+            a_result2 = await db.execute(select(AgentModel).where(AgentModel.user_id == last_msg.sender_id)); a = a_result2.scalar_one_or_none()
             if a:
                 sender_name = a.name
 

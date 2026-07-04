@@ -301,15 +301,8 @@ async def _process_group_event(db, event: dict):
     # 确定需要触发的 AI 列表
     target_ai_ids: set[int] = set()
 
-    # v2.0.0: sender_id 对 AI 类型是 agent.id，需转为 user_id 与 group_members 对齐
-    exclude_user_id: int | None = None
-    if sender_type == "ai" and sender_id:
-        sender_agent_result = await db.execute(
-            select(AgentModel).where(AgentModel.id == sender_id)
-        )
-        sender_agent = sender_agent_result.scalar_one_or_none()
-        if sender_agent and sender_agent.user_id:
-            exclude_user_id = sender_agent.user_id
+    # sender_id 统一为 user_id，与 group_members.member_id 直接对齐
+    exclude_user_id = sender_id if sender_type == "ai" else None
 
     if sender_type == "human":
         target_ai_ids = {m.member_id for m in ai_members}

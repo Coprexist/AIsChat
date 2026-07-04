@@ -487,16 +487,6 @@ async def _get_messages(
                     sender_info[row[0]]["name"] = row[1] or sender_info[row[0]]["name"]
                     if row[2]: sender_info[row[0]]["avatar_url"] = row[2]
 
-        # 补查 agent.id 格式的旧数据（sender_id = agent.id，不在 users 表中）
-        unresolved = sender_ids - set(sender_info.keys())
-        if unresolved:
-            a_result = await db.execute(
-                select(Agent.id, Agent.user_id, Agent.name, Agent.avatar_url, Agent.state).where(Agent.id.in_(unresolved))
-            )
-            for row in a_result.all():
-                aid, auid, aname, aavatar, astate = row[0], row[1], row[2], row[3], row[4]
-                sender_info[aid] = {"name": aname or f"AI{aid}", "type": "ai", "avatar_url": aavatar or ""}
-                if auid: sender_info[auid] = {"name": aname or f"AI{auid}", "type": "ai", "avatar_url": aavatar or ""}
 
     # 按时间升序排列（前端从上到下显示）
     sorted_messages = sorted(messages, key=lambda m: m.id) if after_id else list(reversed(messages))

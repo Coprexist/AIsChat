@@ -83,7 +83,7 @@ class CrossPost(ToolPlugin):
                     return {"error": True, "message": f"你不是群 {target_id} 的成员，无法发消息"}
                 message = await create_message(
                     db, group_id=target_id, sender_type="ai",
-                    sender_id=agent_id, content=full_content,
+                    sender_id=agent.user_id, content=full_content,
                 )
                 await db.flush()
                 manager = context.get("manager")
