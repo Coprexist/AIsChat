@@ -119,7 +119,7 @@ const MessageBubble = memo(function MessageBubble({
           ) : (thinking || isTyping) ? (
             <BouncingDots className="text-white/80" />
           ) : senderAvatarUrl ? (
-            <img src={senderAvatarUrl} alt={senderName} className="w-[30px] h-[30px] rounded-full object-cover border border-white/20" />
+            <img src={senderAvatarUrl} alt={senderName} className="w-full h-full rounded-full object-cover" />
           ) : (
             senderName.charAt(0).toUpperCase()
           )}
