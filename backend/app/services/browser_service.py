@@ -75,6 +75,7 @@ async def start() -> bool:
             "--disable-component-update",
             "--disable-breakpad",
             "--disable-client-side-phishing-detection",
+            "--ignore-certificate-errors",
             f"--remote-debugging-port={CDP_PORT}",
             "--remote-allow-origins=*",
             stdout=asyncio.subprocess.DEVNULL,

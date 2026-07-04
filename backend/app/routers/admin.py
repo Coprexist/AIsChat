@@ -2522,30 +2522,34 @@ async def test_browser_connection(
 
         msgs_log = []
         async with websockets.connect(ws_url, max_size=2**20, close_timeout=5) as ws:
-            await ws.send(json.dumps({"id": 0, "method": "Page.enable"}))
-            await ws.recv()
-            # 先用 JS fetch 测试网络——不靠页面加载
-            await ws.send(json.dumps({"id": 0.5, "method": "Runtime.enable"}))
-            await ws.recv()
-            await ws.send(json.dumps({"id": 0.6, "method": "Runtime.evaluate", "params": {"expression": "'online='+navigator.onLine+';'+(function(){try{var x=new XMLHttpRequest();x.open('GET','http://example.com',false);x.send();return'XHR:'+x.status}catch(e){return'ERR:'+e.message}})()"}}))
-            fetch_msg = json.loads(await asyncio.wait_for(ws.recv(), timeout=15))
+            for domain in ("Page", "Runtime", "Network", "Log"):
+                await ws.send(json.dumps({"id": -1, "method": f"{domain}.enable"}))
+                try: await asyncio.wait_for(ws.recv(), timeout=2)
+                except: pass
+            # sync XHR
+            await ws.send(json.dumps({"id": 1, "method": "Runtime.evaluate", "params": {"expression": "'net='+navigator.onLine+';'+(function(){try{var x=new XMLHttpRequest();x.open('GET','http://example.com',false);x.send();return'XHR:'+x.status}catch(e){return'ERR:'+e.message}})()"}}))
+            fetch_msg = json.loads(await asyncio.wait_for(ws.recv(), timeout=20))
             fetch_result = str(fetch_msg.get("result", {}).get("result", {}).get("value", "?"))
-            # 再试正常导航
-            await ws.send(json.dumps({"id": 1, "method": "Page.navigate", "params": {"url": "http://example.com"}}))
+            # navigate
+            await ws.send(json.dumps({"id": 2, "method": "Page.navigate", "params": {"url": "http://example.com"}}))
             nav_result = json.loads(await asyncio.wait_for(ws.recv(), timeout=15))
             page_title = ""
-            for _ in range(15):
+            for _ in range(20):
                 try:
                     msg = json.loads(await asyncio.wait_for(ws.recv(), timeout=3))
                 except TimeoutError:
                     break
-                method = msg.get("method", "")
-                msgs_log.append(f"{method or msg.get('id','?')}")
-                if method == "Page.loadEventFired":
-                    await ws.send(json.dumps({"id": 2, "method": "Runtime.evaluate", "params": {"expression": "document.title"}}))
+                m = msg.get("method", ""); e = msg.get("params", {}).get("errorText", "")
+                tag = f"{m or msg.get('id','?')}"
+                if e: tag += f"({e})"
+                msgs_log.append(tag)
+                if m == "Page.loadEventFired":
+                    await ws.send(json.dumps({"id": 3, "method": "Runtime.evaluate", "params": {"expression": "document.title"}}))
                     title_msg = json.loads(await asyncio.wait_for(ws.recv(), timeout=5))
                     page_title = title_msg.get("result", {}).get("result", {}).get("value", "")
                     break
+                if m in ("Network.requestWillBeSent", "Network.responseReceived", "Network.loadingFailed", "Network.loadingFinished", "Log.entryAdded"):
+                    pass  # keep collecting
     except TimeoutError:
         return {"ok": False, "error": "访问超时——网络不通或 DNS 解析失败", "step": "navigate", "cdp_msgs": msgs_log}
     except Exception as e:
