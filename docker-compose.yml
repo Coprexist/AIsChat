@@ -37,6 +37,12 @@ services:
     depends_on:
       postgres:
         condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost:8000/health || exit 1"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+      start_period: 8s
     command: sh -c "python prestart.py && uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload --reload-delay 3"
 
   frontend:
@@ -49,5 +55,6 @@ services:
       - /app/node_modules
       - ./docs:/app/public/docs
     depends_on:
-      - backend
+      backend:
+        condition: service_healthy
     command: yarn dev -- --host 0.0.0.0
