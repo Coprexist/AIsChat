@@ -253,36 +253,28 @@ async def list_friends(
     if not friendships:
         return []
 
-    # ── 批量查询：分离 human / ai ──
-    human_ids = [f.friend_id for f in friendships if f.friend_type == "human"]
-    ai_ids = [f.friend_id for f in friendships if f.friend_type == "ai"]
-
+    # ── 批量查询：统一用 users 表（v1.0.2 迁移后 AI 的 friend_id = user_id）──
+    all_friend_ids = [f.friend_id for f in friendships]
     users_map: dict[int, User] = {}
-    if human_ids:
-        user_results = await db.execute(select(User).where(User.id.in_(human_ids)))
+    if all_friend_ids:
+        user_results = await db.execute(select(User).where(User.id.in_(all_friend_ids)))
         for u in user_results.scalars().all():
             users_map[u.id] = u
 
-    agents_map: dict[int, Agent] = {}
-    if ai_ids:
-        agent_results = await db.execute(select(Agent).where(Agent.id.in_(ai_ids)))
+    # ── AI 状态查询（需要 agent 表的 state）──
+    agents_by_user_id: dict[int, Agent] = {}
+    ai_friend_ids = [f.friend_id for f in friendships if f.friend_type == "ai"]
+    if ai_friend_ids:
+        agent_results = await db.execute(
+            select(Agent).where(Agent.user_id.in_(ai_friend_ids))
+        )
         for a in agent_results.scalars().all():
-            agents_map[a.id] = a
+            agents_by_user_id[a.user_id] = a
 
     # ── 批量查询：所有 DM session 的 last_message_at ──
     session_ids: list[str] = []
     for f in friendships:
-        friend_user_id = None
-        if f.friend_type == "human":
-            u = users_map.get(f.friend_id)
-            if u:
-                friend_user_id = u.id
-        elif f.friend_type == "ai":
-            a = agents_map.get(f.friend_id)
-            if not a:
-                a = next((ag for ag in agents_map.values() if ag.user_id == f.friend_id), None)
-            if a:
-                friend_user_id = a.user_id
+        friend_user_id = f.friend_id  # 迁移后统一为 user_id
         if friend_user_id:
             session_ids.append(generate_dm_session_id(user_id, friend_user_id))
 
@@ -301,30 +293,24 @@ async def list_friends(
     for f in friendships:
         name = f"未知:{f.friend_id}"
         state = None
-        friend_user_id = None
+        friend_user_id = f.friend_id  # 统一为 user_id
         avatar_url = None
         status_text = None
         status_color = None
 
-        if f.friend_type == "human":
-            u = users_map.get(f.friend_id)
-            if u:
-                name = u.username
-                friend_user_id = u.id
-                avatar_url = u.avatar_url
-                status_text = getattr(u, 'status_text', None)
-                status_color = getattr(u, 'status_color', None)
-        elif f.friend_type == "ai":
-            a = agents_map.get(f.friend_id)
-            if not a:
-                # 兼容：friend_id 可能是 agent.user_id 而非 agent.id
-                a = next((ag for ag in agents_map.values() if ag.user_id == f.friend_id), None)
+        u = users_map.get(f.friend_id)
+        if u:
+            name = u.username
+            avatar_url = u.avatar_url
+            status_text = getattr(u, 'status_text', None)
+            status_color = getattr(u, 'status_color', None)
+
+        if f.friend_type == "ai":
+            a = agents_by_user_id.get(f.friend_id)
             if a:
-                name = a.name
                 state = a.state
-                friend_user_id = a.user_id
-                avatar_url = a.avatar_url
-                status_text = getattr(a, 'status_text', None)
+                avatar_url = a.avatar_url or avatar_url
+                status_text = getattr(a, 'status_text', None) or status_text
 
         last_dm_at = None
         if friend_user_id:

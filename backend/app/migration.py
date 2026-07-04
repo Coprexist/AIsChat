@@ -84,6 +84,7 @@ async def run_migrations():
             await _migrate_fix_duplicate_owners(db)     # v2.0.2 修复错误的多群主记录
             await _migrate_agent_state_stack(db)       # v1.0.1 状态栈（AI 跨任务上下文追踪）
             await _migrate_multi_provider(db)          # v1.0.2 多供应商 + api_key_pool.provider_name
+            await _migrate_ai_friend_user_id(db)       # v1.0.2 AI好友friend_id统一为user_id
             await _fix_column_types(db)  # 必须是最后一个：修复老部署的列类型不匹配
             await db.commit()
             logger.info("✅ 数据库迁移检查完成")
@@ -2437,4 +2438,27 @@ async def _migrate_multi_provider(db):
         logger.info("  ⏭ api_key_pool.provider_name 已存在，跳过")
 
     await db.flush()
+
+
+async def _migrate_ai_friend_user_id(db):
+    """v1.0.2: friendships 表中 AI 好友的 friend_id 统一为 agent.user_id（幂等）"""
+    result = await db.execute(text(
+        "SELECT COUNT(*) FROM friendships f "
+        "JOIN agents a ON a.id = f.friend_id "
+        "WHERE f.friend_type = 'ai' AND f.friend_id <> a.user_id"
+    ))
+    count = result.scalar()
+    if count == 0:
+        logger.info("  ⏭ AI 好友 friend_id 已统一，跳过")
+        return
+
+    logger.info(f"  🔄 统一 {count} 条 AI 好友的 friend_id (agent.id → user_id)...")
+    await db.execute(text(
+        "UPDATE friendships f "
+        "SET friend_id = a.user_id "
+        "FROM agents a "
+        "WHERE f.friend_type = 'ai' AND a.id = f.friend_id AND f.friend_id <> a.user_id"
+    ))
+    await db.flush()
+    logger.info("  ✅ AI 好友 friend_id 统一完成")
 
