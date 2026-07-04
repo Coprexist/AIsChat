@@ -197,7 +197,7 @@ def _get_maintenance_msg() -> dict:
 @app.middleware("http")
 async def maintenance_middleware(request, call_next):
     path = request.url.path
-    bypass = path in ("/health", "/", "/docs", "/openapi.json") or path.startswith("/admin")
+    bypass = path in ("/health", "/", "/docs", "/openapi.json") or path.startswith("/admin") or path.startswith("/auth") or path.startswith("/maintenance-msg")
 
     # 硬维护（自动启动/关闭 或 管理员手动）：503 拦截
     if (_os.path.exists(_MAINTENANCE_AUTO) or _os.path.exists(_MAINTENANCE_ADMIN_HARD)) and not bypass:
