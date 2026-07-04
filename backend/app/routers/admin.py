@@ -2544,7 +2544,7 @@ async def test_browser_connection(
 
     return {
         "ok": True,
-        "message": f"浏览器能正常访问百度（页面标题: {page_title or '无'}）",
+        "message": f"浏览器能正常访问百度（页面标题: {page_title or '无'}）{' CDP事件:' + ','.join(msgs_log) if not page_title else ''}",
         "page_title": page_title or "",
         "cdp_version": cdp_info.get("Browser", "unknown"),
     }
