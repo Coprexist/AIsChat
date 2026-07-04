@@ -347,7 +347,21 @@ async def websocket_endpoint(ws: WebSocket, token: str = Query(...)):
                         except Exception as e:
                             logger.error(f"获取发送者头像失败: {e}", exc_info=True)
 
-                        msg_data = message_to_dict(message, sender_avatar_url=sender_avatar, sender_state=sender_state if sender_type == "ai" else None)
+                        # 解析发送者名称（和 groups.py REST 端点一致）
+                        sender_name = username
+                        if sender_type == "ai":
+                            a_result = await db.execute(select(AgentModel).where(
+                                (AgentModel.id == user_id) | (AgentModel.user_id == user_id)
+                            ))
+                            a_row = a_result.scalar_one_or_none()
+                            if a_row: sender_name = a_row.name
+                        elif sender_type == "human":
+                            from app.models.user import User as UserModel
+                            u_result = await db.execute(select(UserModel).where(UserModel.id == user_id))
+                            u_row = u_result.scalar_one_or_none()
+                            if u_row: sender_name = u_row.username
+
+                        msg_data = message_to_dict(message, sender_name=sender_name, sender_avatar_url=sender_avatar, sender_state=sender_state if sender_type == "ai" else None)
 
                         # 先回显给发送者
                         await ws.send_json({"type": "message", "conversation_type": "group", "data": msg_data})

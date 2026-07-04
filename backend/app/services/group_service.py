@@ -271,26 +271,10 @@ async def create_message(
     attachments: list[dict] | None = None,
 ) -> Message:
     """创建消息（支持附件，非 owner 发送含附件消息时自动创建转发引用）"""
-    # 解析发送者名称
-    sender_name = None
-    try:
-        if sender_type == "human":
-            from app.models.user import User as UModel
-            u = (await db.execute(select(UModel.username).where(UModel.id == sender_id))).scalar_one_or_none()
-            sender_name = u
-        elif sender_type == "ai":
-            from app.models.agent import Agent as AModel
-            a = (await db.execute(select(AModel.name).where(
-                (AModel.id == sender_id) | (AModel.user_id == sender_id)
-            ))).scalar_one_or_none()
-            sender_name = a
-    except Exception: pass
-
     message = Message(
         group_id=group_id,
         sender_type=sender_type,
         sender_id=sender_id,
-        sender_name=sender_name,
         content=content,
         reply_to=reply_to,
         attachments=attachments,
