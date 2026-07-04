@@ -83,6 +83,7 @@ async def run_migrations():
             await _migrate_group_owner_membership(db)  # v2.0.1 修复群主缺失的群成员记录
             await _migrate_fix_duplicate_owners(db)     # v2.0.2 修复错误的多群主记录
             await _migrate_agent_state_stack(db)       # v1.2.0 状态栈（AI 跨任务上下文追踪）
+            await _migrate_multi_provider(db)          # v1.3.0 多供应商 + api_key_pool.provider_name
             await _fix_column_types(db)  # 必须是最后一个：修复老部署的列类型不匹配
             await db.commit()
             logger.info("✅ 数据库迁移检查完成")
@@ -2388,4 +2389,52 @@ async def _migrate_others_chat_controls(db):
     if created_any:
         await db.flush()
         logger.info("  ✅ 对话权限/限额迁移完成")
+
+
+async def _migrate_multi_provider(db):
+    """v1.3.0: provider_config 单对象 → 数组 + api_key_pool 加 provider_name（幂等）"""
+    import json
+
+    # 1. 转换 provider_config：单对象 → 默认数组
+    result = await db.execute(
+        text("SELECT provider_config FROM system_settings WHERE id = 1 AND provider_config IS NOT NULL")
+    )
+    row = result.fetchone()
+    if row is not None:
+        raw = row[0]
+        if isinstance(raw, list):
+            logger.info("  ⏭ provider_config 已是数组，跳过")
+        elif isinstance(raw, dict):
+            # 旧单对象 → 包装为默认数组
+            logger.info("  🔄 provider_config 单对象 → 默认数组")
+            default_config = {
+                "name": raw.get("provider", "default"),
+                "provider": raw.get("provider", "deepseek"),
+                "base_url": raw.get("base_url", ""),
+                "chat_model": raw.get("chat_model", ""),
+                "work_model": raw.get("work_model", ""),
+                "embedding_model": raw.get("embedding_model", ""),
+                "model_options": raw.get("model_options", []),
+                "thinking_supported": raw.get("thinking_supported", False),
+                "is_default": True,
+            }
+            await db.execute(
+                text("UPDATE system_settings SET provider_config = CAST(:val AS jsonb) WHERE id = 1"),
+                {"val": json.dumps([default_config])},
+            )
+            logger.info("  ✅ provider_config 已转为默认数组")
+    else:
+        logger.info("  ⏭ provider_config 为 NULL，跳过")
+
+    # 2. api_key_pool 加 provider_name 列
+    if not await _column_exists(db, "api_key_pool", "provider_name"):
+        logger.info("  🏷️ 添加 api_key_pool.provider_name 列")
+        await db.execute(text(
+            "ALTER TABLE api_key_pool ADD COLUMN provider_name VARCHAR(100)"
+        ))
+        logger.info("  ✅ api_key_pool.provider_name 添加完成")
+    else:
+        logger.info("  ⏭ api_key_pool.provider_name 已存在，跳过")
+
+    await db.flush()
 

@@ -24,13 +24,66 @@ async def _get_or_create(db: AsyncSession) -> SystemSettings:
 
 
 async def get_provider_config(db: AsyncSession) -> dict:
-    """获取 LLM 厂商配置（从 system_settings 或返回空 dict）"""
+    """[兼容旧代码] 获取默认 LLM 厂商配置（provider_config 数组的第一项，或空 dict）"""
+    providers = await get_providers(db)
+    if not providers:
+        return {}
+    # 返回第一个标记为 is_default 的，或第一个
+    default = next((p for p in providers if p.get("is_default")), providers[0])
+    return default
+
+
+async def get_providers(db: AsyncSession) -> list[dict]:
+    """获取所有 LLM 厂商配置数组"""
     from app.models.system_settings import SystemSettings
     result = await db.execute(select(SystemSettings).where(SystemSettings.id == 1))
     row = result.scalar_one_or_none()
     if row is None:
-        return {}
-    return dict(row.provider_config or {})
+        return []
+    raw = row.provider_config
+    if raw is None:
+        return []
+    if isinstance(raw, list):
+        return raw
+    # 兼容旧单对象
+    if isinstance(raw, dict):
+        raw.setdefault("name", raw.get("provider", "default"))
+        raw.setdefault("is_default", True)
+        return [raw]
+    return []
+
+
+async def get_provider_by_name(db: AsyncSession, name: str) -> dict | None:
+    """按名称查找单个供应商配置"""
+    providers = await get_providers(db)
+    for p in providers:
+        if p.get("name") == name:
+            return p
+    return None
+
+
+async def get_provider_for_pool_key(db: AsyncSession, pool_key) -> dict:
+    """根据池 Key 获取对应的供应商配置"""
+    from app.models.api_key_pool import ApiKeyPool
+    # 如果 pool_key 有 provider_name，使用它
+    provider_name = getattr(pool_key, "provider_name", None)
+    if provider_name:
+        provider = await get_provider_by_name(db, provider_name)
+        if provider:
+            return provider
+    # 回退：用池 Key 的 api_base_url 匹配
+    key_base = (getattr(pool_key, "api_base_url", None) or "").rstrip("/")
+    if key_base:
+        providers = await get_providers(db)
+        for p in providers:
+            if (p.get("base_url", "") or "").rstrip("/") == key_base:
+                return p
+    # 最终回退：默认供应商
+    providers = await get_providers(db)
+    if providers:
+        default = next((p for p in providers if p.get("is_default")), providers[0])
+        return default
+    return {}
 
 
 async def get_settings(db: AsyncSession) -> dict:

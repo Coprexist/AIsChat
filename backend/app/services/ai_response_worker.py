@@ -342,7 +342,7 @@ async def _get_api_config(
     exclude_pool_key_id: int | None = None,
     chatter_id: int | None = None,
     force_own_key: bool = False,
-) -> tuple[str | None, str, str, int | None]:
+) -> tuple[str | None, str, str, int | None, dict]:
     """
     获取 API Key 和 Base URL（四层优先链 + 平台赠送额度）。
 
@@ -353,8 +353,9 @@ async def _get_api_config(
 
     v0.9.0: chatter_id 决定账单人（通用 AI 扣聊天者，否则扣主人）。
             force_own_key=True 时跳过 Tier 2/3，直接走账单人自有 Key。
+    v1.3.0: 返回 provider_info 字典，含 thinking_supported / models / base_url。
 
-    返回: (api_key, api_base, credit_source, pool_key_id)
+    返回: (api_key, api_base, credit_source, pool_key_id, provider_info)
     """
     from app.utils.crypto import decrypt_api_key
     from app.models.user import User as UserModel
@@ -363,6 +364,7 @@ async def _get_api_config(
     api_base = settings.deepseek_base_url
     credit_source = "none"
     pool_key_id = None
+    provider_info = {"thinking_supported": settings.is_deepseek_api, "base_url": api_base}
 
     # 确定账单人：通用/半通用 + 有聊天者 → 聊天者付；否则主人付
     if chatter_id and agent.ai_type in ("general", "semi_general"):
@@ -375,14 +377,15 @@ async def _get_api_config(
         api_key = decrypt_api_key(agent.api_key_encrypted)
         api_base = agent.api_base_url or settings.deepseek_base_url
         credit_source = "agent_key"
-        return api_key, api_base, credit_source, pool_key_id
+        provider_info = {"thinking_supported": "deepseek.com" in api_base, "base_url": api_base}
+        return api_key, api_base, credit_source, pool_key_id, provider_info
 
     # 查账单用户
     user_result = await db.execute(select(UserModel).where(UserModel.id == bill_user_id))
     user = user_result.scalar_one_or_none()
 
     if user is None:
-        return api_key, api_base, credit_source, pool_key_id
+        return api_key, api_base, credit_source, pool_key_id, provider_info
 
     # force_own_key: 跳过池 Key，直接走用户自有 Key
     if force_own_key:
@@ -390,7 +393,8 @@ async def _get_api_config(
             api_key = decrypt_api_key(user.api_key_encrypted)
             api_base = user.api_base_url or settings.deepseek_base_url
             credit_source = "user_key"
-        return api_key, api_base, credit_source, pool_key_id
+            provider_info = {"thinking_supported": "deepseek.com" in api_base, "base_url": api_base}
+        return api_key, api_base, credit_source, pool_key_id, provider_info
 
     # 有效可用额度 = 平台赠送（截断>=0） + api_credit
     effective_credit = max(0, (user.platform_gifted_credit or 0)) + (user.api_credit or 0)
@@ -405,7 +409,15 @@ async def _get_api_config(
                 api_base = pool_key.api_base_url or settings.deepseek_base_url
                 credit_source = "pool_key"
                 pool_key_id = pool_key.id
-                return api_key, api_base, credit_source, pool_key_id
+                # v1.3.0: 获取池 Key 的供应商配置
+                from app.services.system_settings_service import get_provider_for_pool_key
+                pool_provider = await get_provider_for_pool_key(db, pool_key)
+                provider_info = {
+                    "thinking_supported": pool_provider.get("thinking_supported", "deepseek.com" in api_base),
+                    "base_url": api_base,
+                    "provider_name": pool_provider.get("name", ""),
+                }
+                return api_key, api_base, credit_source, pool_key_id, provider_info
             except Exception as e:
                 logger.warning(f"  ⚠️ 池 Key {pool_key.id} 解密失败: {e}，回退到用户自有 Key")
 
@@ -414,8 +426,9 @@ async def _get_api_config(
         api_key = decrypt_api_key(user.api_key_encrypted)
         api_base = user.api_base_url or settings.deepseek_base_url
         credit_source = "user_key"
+        provider_info = {"thinking_supported": "deepseek.com" in api_base, "base_url": api_base}
 
-    return api_key, api_base, credit_source, pool_key_id
+    return api_key, api_base, credit_source, pool_key_id, provider_info
 
 
 async def _maybe_trigger_ai_reply(
@@ -488,7 +501,7 @@ async def _maybe_trigger_ai_reply(
         return
 
     # 5. 获取 API 配置（v0.5.0: 公共辅助函数；v0.6.0: 四层优先链含池 Key）
-    api_key, api_base, credit_source, pool_key_id = await _get_api_config(db, agent)
+    api_key, api_base, credit_source, pool_key_id, provider_info = await _get_api_config(db, agent)
     logger.info(f"🔍 AI {agent.name}: api_base={api_base}, has_api_key={api_key is not None}, "
                 f"credit_source={credit_source}")
 
@@ -611,6 +624,7 @@ async def _maybe_trigger_ai_reply(
             effective_cfg=effective_cfg,
             credit_source=credit_source,
             pool_key_id=pool_key_id,
+            provider_supports_thinking=provider_info.get("thinking_supported"),
             trigger="user",
             is_federated=False,
         ))
@@ -653,6 +667,7 @@ async def _tool_call_loop(
     effective_cfg: dict | None = None,
     credit_source: str = "user_key",
     pool_key_id: int | None = None,
+    provider_supports_thinking: bool | None = None,
     trigger: str = "user",
     is_federated: bool = False,
 ):
@@ -716,7 +731,7 @@ async def _tool_call_loop(
             # 切换 Key 时重新获取配置
             if key_attempt > 0 and last_limited_key_id:
                 exclude_id = last_limited_key_id
-                current_api_key, current_api_base, current_credit_source, current_pool_key_id = \
+                current_api_key, current_api_base, current_credit_source, current_pool_key_id, _ = \
                     await _get_api_config(db, agent, exclude_pool_key_id=exclude_id)
 
             # 获取并发槽位
@@ -848,6 +863,7 @@ async def _tool_call_loop(
                             thinking_enabled=effective_cfg["thinking_enabled"],
                             stream=True,
                             pool_key_id=current_pool_key_id,
+                            provider_supports_thinking=provider_supports_thinking,
                             on_tool_call=_dispatch_one_tool,
                         )
                         # 更新池 Key ID（可能已切换）
@@ -1185,7 +1201,7 @@ async def _trigger_dm_ai_reply(
     effective_cfg = await _get_eff_cfg(db, agent.id, sender_id)
 
     # 获取 API 配置（v0.9.0: 按 AI 类型 + force_own_key 决定账单人）
-    api_key, api_base, credit_source, pool_key_id = await _get_api_config(
+    api_key, api_base, credit_source, pool_key_id, provider_info = await _get_api_config(
         db, agent,
         chatter_id=sender_id,
         force_own_key=force_own_key,
@@ -1263,6 +1279,7 @@ async def _trigger_dm_ai_reply(
             effective_cfg=effective_cfg,
             credit_source=credit_source,
             pool_key_id=pool_key_id,
+            provider_supports_thinking=provider_info.get("thinking_supported"),
             trigger="user",
         ))
     finally:
@@ -1476,7 +1493,7 @@ async def _process_alarm_event(db, event: dict):
         await db.flush()
 
     # 获取 API 配置（v0.5.0: 公共辅助函数；v0.6.0: 四层优先链含池 Key）
-    api_key, api_base, credit_source, pool_key_id = await _get_api_config(db, agent)
+    api_key, api_base, credit_source, pool_key_id, provider_info = await _get_api_config(db, agent)
 
     # 构建系统提示词（层级化：内核 + 人格 + 协议）
     profile = getattr(agent, 'config_profile', 'chat') or 'chat'
@@ -1575,6 +1592,7 @@ async def _process_alarm_event(db, event: dict):
             effective_cfg=effective_cfg,
             credit_source=credit_source,
             pool_key_id=pool_key_id,
+            provider_supports_thinking=provider_info.get("thinking_supported"),
             trigger="auto",  # v0.6.0: 闹钟不显示"正在思考/输入中"
         ))
     except Exception as e:

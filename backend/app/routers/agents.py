@@ -62,32 +62,68 @@ async def get_available_models(
     current_user: dict = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
-    """返回可用模型选项列表（供前端下拉框），附带当前 API 提供商的能力"""
+    """返回可用模型选项列表（所有供应商的全部模型，供前端下拉框分组展示）"""
     from app.config import settings
-    from app.services.system_settings_service import get_provider_config
+    from app.services.system_settings_service import get_providers, get_provider_config
 
-    provider = await get_provider_config(db)
+    providers = await get_providers(db)
 
-    # 模型列表优先用 DB 保存的配置，否则用 env 默认
-    models = provider.get("model_options") or settings.get_model_options()
-    chat_model = provider.get("chat_model") or settings.default_chat_model
-    work_model = provider.get("work_model") or settings.default_work_model
-    api_base = provider.get("base_url") or settings.deepseek_base_url
-    thinking_supported = provider.get(
-        "thinking_supported",
-        "deepseek.com" in api_base,
-    )
+    if not providers:
+        # 没有任何已保存的供应商，用 env 默认
+        default_provider = await get_provider_config(db)
+        if not default_provider:
+            return {
+                "models": settings.get_model_options(),
+                "defaults": {"chat_model": settings.default_chat_model, "work_model": settings.default_work_model},
+                "providers": [],
+                "provider": {"key": "unknown", "base_url": settings.deepseek_base_url, "thinking_supported": settings.is_deepseek_api, "is_deepseek": settings.is_deepseek_api},
+            }
+        providers = [default_provider]
+
+    # 收集所有供应商的全部模型
+    all_models = []
+    provider_list = []
+    defaults = {"chat_model": "", "work_model": ""}
+
+    for p in providers:
+        p_models = p.get("model_options") or []
+        p_info = {
+            "name": p.get("name", p.get("provider", "?")),
+            "provider": p.get("provider", "unknown"),
+            "base_url": p.get("base_url", ""),
+            "thinking_supported": p.get("thinking_supported", False),
+            "is_default": p.get("is_default", False),
+            "models": p_models,
+        }
+        provider_list.append(p_info)
+
+        for m in p_models:
+            if isinstance(m, dict):
+                all_models.append({**m, "provider_name": p_info["name"], "provider_key": p_info["provider"]})
+
+        # 默认模型取第一个 is_default 的供应商
+        if p.get("is_default"):
+            defaults["chat_model"] = p.get("chat_model") or settings.default_chat_model
+            defaults["work_model"] = p.get("work_model") or settings.default_work_model
+
+    if not defaults["chat_model"]:
+        # 没有明确默认的，取第一个
+        first = providers[0]
+        defaults["chat_model"] = first.get("chat_model") or settings.default_chat_model
+        defaults["work_model"] = first.get("work_model") or settings.default_work_model
+
+    # 获取默认供应商的 provider info（兼容旧前端）
+    default_provider = await get_provider_config(db)
+    api_base = (default_provider.get("base_url") or settings.deepseek_base_url) if default_provider else settings.deepseek_base_url
 
     return {
-        "models": models,
-        "defaults": {
-            "chat_model": chat_model,
-            "work_model": work_model,
-        },
+        "models": all_models,
+        "defaults": defaults,
+        "providers": provider_list,
         "provider": {
-            "key": provider.get("provider", "unknown"),
+            "key": default_provider.get("provider", "unknown") if default_provider else "unknown",
             "base_url": api_base,
-            "thinking_supported": thinking_supported,
+            "thinking_supported": default_provider.get("thinking_supported", settings.is_deepseek_api) if default_provider else settings.is_deepseek_api,
             "is_deepseek": "deepseek.com" in api_base,
         },
     }

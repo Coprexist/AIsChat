@@ -186,6 +186,7 @@ async def chat_completion(
     user_id: str | None = None,
     stream: bool = False,
     pool_key_id: int | None = None,
+    provider_supports_thinking: bool | None = None,
     on_tool_call: callable = None,
 ) -> dict:
     """
@@ -209,14 +210,14 @@ async def chat_completion(
                 messages, model, api_base_url, api_key, tools,
                 temperature, top_p, presence_penalty, frequency_penalty,
                 max_tokens, response_format, thinking_enabled, user_id,
-                pool_key_id, on_tool_call,
+                pool_key_id, provider_supports_thinking, on_tool_call,
             )
         else:
             result = await _chat_completion_non_streaming(
                 messages, model, api_base_url, api_key, tools,
                 temperature, top_p, presence_penalty, frequency_penalty,
                 max_tokens, response_format, thinking_enabled, user_id,
-                pool_key_id,
+                pool_key_id, provider_supports_thinking,
             )
         elapsed = _time.monotonic() - t0
         await metrics.record_llm_call(elapsed, success=True)
@@ -242,6 +243,7 @@ async def _chat_completion_non_streaming(
     thinking_enabled: bool = False,
     user_id: str | None = None,
     pool_key_id: int | None = None,
+    provider_supports_thinking: bool | None = None,
 ) -> dict:
     """
     非流式聊天补全 — 当前生产路径。
@@ -268,9 +270,10 @@ async def _chat_completion_non_streaming(
         payload["tool_choice"] = "auto"
     if response_format:
         payload["response_format"] = response_format
-    if thinking_enabled and settings.is_deepseek_api:
+    _thinking_ok = provider_supports_thinking if provider_supports_thinking is not None else settings.is_deepseek_api
+    if thinking_enabled and _thinking_ok:
         payload["thinking"] = {"type": "enabled"}
-    if user_id and settings.is_deepseek_api:
+    if user_id and _thinking_ok:
         payload["user_id"] = user_id
 
     async with httpx.AsyncClient(timeout=120.0) as client:
@@ -320,6 +323,7 @@ async def _chat_completion_streaming(
     thinking_enabled: bool = False,
     user_id: str | None = None,
     pool_key_id: int | None = None,
+    provider_supports_thinking: bool | None = None,
     on_tool_call: callable = None,
 ) -> dict:
     """
@@ -355,9 +359,10 @@ async def _chat_completion_streaming(
         payload["tool_choice"] = "auto"
     if response_format:
         payload["response_format"] = response_format
-    if thinking_enabled and settings.is_deepseek_api:
+    _thinking_ok = provider_supports_thinking if provider_supports_thinking is not None else settings.is_deepseek_api
+    if thinking_enabled and _thinking_ok:
         payload["thinking"] = {"type": "enabled"}
-    if user_id and settings.is_deepseek_api:
+    if user_id and _thinking_ok:
         payload["user_id"] = user_id
 
     full_content = ""

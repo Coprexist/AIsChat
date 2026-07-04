@@ -2322,66 +2322,87 @@ async def get_provider_presets(
     admin: dict = Depends(require_admin),
     db: AsyncSession = Depends(get_db),
 ):
-    """获取所有 LLM 厂商预设 + 当前生效配置"""
+    """获取所有 LLM 厂商预设 + 当前已配置的供应商列表"""
     from app.services.provider_presets import get_all_presets
-    from app.services.system_settings_service import get_settings
+    from app.services.system_settings_service import get_providers
 
     presets = get_all_presets()
-    settings = await get_settings(db)
-    current = settings.get("provider_config") or {
-        "provider": "manual",
-        "base_url": "",
-        "chat_model": "",
-        "work_model": "",
-        "embedding_model": "",
-        "model_options": [],
-    }
+    current_providers = await get_providers(db)
 
     return {
         "presets": presets,
-        "current": current,
+        "providers": current_providers,
     }
 
 
-class ApplyPresetBody(BaseModel):
-    provider: str  # preset key, or "manual"
+class SaveProviderBody(BaseModel):
+    name: str
+    provider: str  # preset key 或 "manual"
     base_url: str | None = None
     chat_model: str | None = None
     work_model: str | None = None
     embedding_model: str | None = None
     model_options: list[dict] | None = None
+    thinking_supported: bool | None = None
+    is_default: bool = False
+    index: int | None = None
 
 
-@router.put("/provider-presets/apply")
-async def apply_provider_preset(
-    body: ApplyPresetBody,
+@router.put("/provider-presets/save")
+async def save_provider(
+    body: SaveProviderBody,
     admin: dict = Depends(require_admin),
     db: AsyncSession = Depends(get_db),
 ):
-    """应用 LLM 厂商预设（保存到 system_settings.provider_config）"""
+    """新增或更新一个 LLM 供应商配置（保存到 system_settings.provider_config 数组）"""
+    import json
     from app.services.provider_presets import get_preset
+    from app.services.system_settings_service import get_providers
 
     if body.provider == "manual":
         config = {
+            "name": body.name,
             "provider": "manual",
             "base_url": body.base_url or "",
             "chat_model": body.chat_model or "",
             "work_model": body.work_model or "",
             "embedding_model": body.embedding_model or "",
             "model_options": body.model_options or [],
+            "thinking_supported": body.thinking_supported or False,
+            "is_default": body.is_default,
         }
     else:
         preset = get_preset(body.provider)
         if preset is None:
             raise HTTPException(400, f"未知厂商: {body.provider}")
         config = {
+            "name": body.name,
             "provider": preset["key"],
-            "base_url": preset["base_url"],
+            "base_url": body.base_url or preset["base_url"],
             "chat_model": body.chat_model or preset["chat_model"],
             "work_model": body.work_model or preset["work_model"],
             "embedding_model": body.embedding_model or preset["embedding_model"],
             "model_options": body.model_options or preset["models"],
+            "thinking_supported": body.thinking_supported if body.thinking_supported is not None else preset["thinking_supported"],
+            "is_default": body.is_default,
         }
+
+    providers = await get_providers(db)
+
+    if config["is_default"]:
+        for p in providers:
+            p["is_default"] = False
+
+    if body.index is not None and 0 <= body.index < len(providers):
+        providers[body.index] = config
+    else:
+        existing_idx = next((i for i, p in enumerate(providers) if p.get("name") == body.name), None)
+        if existing_idx is not None:
+            providers[existing_idx] = config
+        else:
+            if not providers:
+                config["is_default"] = True
+            providers.append(config)
 
     from app.models.system_settings import SystemSettings
     result = await db.execute(select(SystemSettings).where(SystemSettings.id == 1))
@@ -2389,10 +2410,41 @@ async def apply_provider_preset(
     if row is None:
         row = SystemSettings(id=1)
         db.add(row)
-    row.provider_config = config
+    row.provider_config = json.dumps(providers, ensure_ascii=False)
     await db.commit()
 
-    return {"message": f"已切换为 {body.provider} 配置", "config": config}
+    return {"message": f"已保存供应商 {body.name}", "providers": providers}
+
+
+@router.delete("/provider-presets/{provider_name}")
+async def delete_provider(
+    provider_name: str,
+    admin: dict = Depends(require_admin),
+    db: AsyncSession = Depends(get_db),
+):
+    """删除一个供应商配置"""
+    import json
+    from app.services.system_settings_service import get_providers
+
+    providers = await get_providers(db)
+    new_list = [p for p in providers if p.get("name") != provider_name]
+    if len(new_list) == len(providers):
+        raise HTTPException(404, f"供应商 {provider_name} 不存在")
+
+    was_default = any(p.get("name") == provider_name and p.get("is_default") for p in providers)
+    if was_default and new_list:
+        new_list[0]["is_default"] = True
+
+    from app.models.system_settings import SystemSettings
+    result = await db.execute(select(SystemSettings).where(SystemSettings.id == 1))
+    row = result.scalar_one_or_none()
+    if row is None:
+        row = SystemSettings(id=1)
+        db.add(row)
+    row.provider_config = json.dumps(new_list, ensure_ascii=False) if new_list else None
+    await db.commit()
+
+    return {"message": f"已删除供应商 {provider_name}", "providers": new_list}
 
 
 # ══════════════════════════════════════════════════════════════
