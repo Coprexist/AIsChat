@@ -231,7 +231,7 @@ export default function MePage() {
   const handleAvatarSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]
     if (!file) return
-    if (file.size > 2 * 1024 * 1024) { alert(t('error.avatarTooLarge')); return }
+    if (file.size > 10 * 1024 * 1024) { alert(t('error.avatarTooLarge')); return }
     setCropFile(file)
     // 重置 input 以便再次选择同一文件
     e.target.value = ''
