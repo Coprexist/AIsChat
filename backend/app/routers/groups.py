@@ -236,24 +236,32 @@ async def get_messages(
 
     messages = await get_recent_messages(db, group_id, limit, before_id=before_id, after_id=after_id)
 
-    # 统一走 users 表查名字（AI 也是 users 的一行）
+    # 统一查所有 sender（可能是 users.id 或 agent.id，迁移后数据混合）
     all_ids = {m.sender_id for m in messages}
     name_map: dict[int, str] = {}
     avatar_map: dict[int, str] = {}
-    state_map: dict[int, str] = {}  # 仅 AI 有
+    state_map: dict[int, str] = {}
+
     if all_ids:
-        u_result = await db.execute(select(User).where(User.id.in_(all_ids)))
-        for u in u_result.scalars().all():
-            name_map[u.id] = u.username
-            if u.type == "ai":
-                a_result = await db.execute(select(Agent).where(Agent.user_id == u.id))
-                a = a_result.scalar_one_or_none()
-                if a:
-                    name_map[u.id] = a.name
-                    avatar_map[u.id] = a.avatar_url or u.avatar_url
-                    state_map[u.id] = a.state
-            else:
-                avatar_map[u.id] = u.avatar_url
+        # 先查 users 表
+        u_result = await db.execute(select(User.id, User.username, User.type, User.avatar_url).where(User.id.in_(all_ids)))
+        for row in u_result.all():
+            uid, uname, utype, uavatar = row[0], row[1], row[2], row[3]
+            name_map[uid] = uname
+            avatar_map[uid] = uavatar or ''
+            if utype == "ai":
+                a = (await db.execute(select(Agent.name, Agent.avatar_url, Agent.state).where(Agent.user_id == uid))).first()
+                if a: name_map[uid] = a[0]; avatar_map[uid] = a[1] or uavatar or ''; state_map[uid] = a[2]
+
+        # 补查 agent.id 格式的旧数据（sender_id = agent.id，不在 users 表中）
+        unresolved = all_ids - set(name_map.keys())
+        if unresolved:
+            a_result = await db.execute(select(Agent.id, Agent.name, Agent.avatar_url, Agent.state, Agent.user_id).where(Agent.id.in_(unresolved)))
+            for row in a_result.all():
+                aid, aname, aavatar, astate, auid = row[0], row[1], row[2], row[3], row[4]
+                name_map[aid] = aname; avatar_map[aid] = aavatar or ''; state_map[aid] = astate
+                if auid:
+                    name_map[auid] = aname; avatar_map[auid] = aavatar or ''; state_map[auid] = astate
 
     return [
         message_to_dict(m, sender_name=name_map.get(m.sender_id), sender_avatar_url=avatar_map.get(m.sender_id), sender_state=state_map.get(m.sender_id))

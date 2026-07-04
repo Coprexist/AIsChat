@@ -476,15 +476,27 @@ async def _get_messages(
         for row in result.all():
             sender_info[row[0]] = {"name": row[1], "type": row[2] or "human", "avatar_url": row[3]}
 
-        # AI 头像存在 agents 表，需要额外查询补充
+        # AI 头像 + 名字存在 agents 表，需要额外查询补充
         ai_sender_ids = [uid for uid, info in sender_info.items() if info["type"] == "ai"]
         if ai_sender_ids:
-            agent_avatar_result = await db.execute(
-                select(Agent.user_id, Agent.avatar_url).where(Agent.user_id.in_(ai_sender_ids))
+            agent_result = await db.execute(
+                select(Agent.user_id, Agent.name, Agent.avatar_url).where(Agent.user_id.in_(ai_sender_ids))
             )
-            for agent_row in agent_avatar_result.all():
-                if agent_row[1]:
-                    sender_info[agent_row[0]]["avatar_url"] = agent_row[1]
+            for row in agent_result.all():
+                if row[0] in sender_info:
+                    sender_info[row[0]]["name"] = row[1] or sender_info[row[0]]["name"]
+                    if row[2]: sender_info[row[0]]["avatar_url"] = row[2]
+
+        # 补查 agent.id 格式的旧数据（sender_id = agent.id，不在 users 表中）
+        unresolved = sender_ids - set(sender_info.keys())
+        if unresolved:
+            a_result = await db.execute(
+                select(Agent.id, Agent.user_id, Agent.name, Agent.avatar_url, Agent.state).where(Agent.id.in_(unresolved))
+            )
+            for row in a_result.all():
+                aid, auid, aname, aavatar, astate = row[0], row[1], row[2], row[3], row[4]
+                sender_info[aid] = {"name": aname or f"AI{aid}", "type": "ai", "avatar_url": aavatar or ""}
+                if auid: sender_info[auid] = {"name": aname or f"AI{auid}", "type": "ai", "avatar_url": aavatar or ""}
 
     # 按时间升序排列（前端从上到下显示）
     sorted_messages = sorted(messages, key=lambda m: m.id) if after_id else list(reversed(messages))
