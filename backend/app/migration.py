@@ -2450,7 +2450,7 @@ async def _migrate_ai_friend_user_id(db):
 
     # 查所有 AI 好友记录
     friendships_result = await db.execute(
-        select(text("id, user_id, friend_id")).where(text("friend_type = 'ai'"))
+        text("SELECT id, user_id, friend_id FROM friendships WHERE friend_type = 'ai'")
     )
     f_rows = friendships_result.all()
 
