@@ -82,6 +82,7 @@ async def run_migrations():
             await _migrate_group_invitations(db)  # v2.0.0 群邀请卡片系统
             await _migrate_group_owner_membership(db)  # v2.0.1 修复群主缺失的群成员记录
             await _migrate_fix_duplicate_owners(db)     # v2.0.2 修复错误的多群主记录
+            await _migrate_fix_human_members_changed_to_ai(db)  # v1.0.2 修被误改为AI的人类成员
             await _migrate_agent_state_stack(db)       # v1.0.1 状态栈（AI 跨任务上下文追踪）
             await _migrate_multi_provider(db)          # v1.0.2 多供应商 + api_key_pool.provider_name
             await _migrate_ai_friend_user_id(db)       # v1.0.2 AI好友friend_id统一为user_id
@@ -2158,6 +2159,36 @@ async def _migrate_group_members_user_id(db):
     """))
     await db.flush()
     logger.info("    🔧 AI 类型修复完成（human → ai 还原）")
+
+
+async def _migrate_fix_human_members_changed_to_ai(db):
+    """
+    v1.0.2: 修复 _migrate_group_members_user_id 的 bug——Step 1 把人类成员误改为 AI 类型。
+
+    原因：当 human.member_id == agent.user_id 且同群有 AI 记录时，
+    迁移错误地将 human 记录 SET member_type = 'ai'，导致 list_user_groups 查不到。
+    """
+    result = await db.execute(text("""
+        SELECT COUNT(*) FROM group_members gm
+        JOIN users u ON u.id = gm.member_id
+        WHERE gm.member_type = 'ai' AND u.type = 'human'
+    """))
+    count = result.scalar()
+    if count == 0:
+        logger.info("  ⏭ 没有被误改的人类成员，跳过")
+        return
+
+    logger.info(f"  🔧 修复 {count} 条被误改为 AI 的人类成员记录...")
+    await db.execute(text("""
+        UPDATE group_members gm
+        SET member_type = 'human'
+        FROM users u
+        WHERE gm.member_type = 'ai'
+          AND u.id = gm.member_id
+          AND u.type = 'human'
+    """))
+    await db.flush()
+    logger.info("  ✅ 人类成员类型已还原")
 
     await db.flush()
 
