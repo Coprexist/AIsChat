@@ -391,9 +391,9 @@ function MaintenanceMsgEditor() {
             <input value={msg.hard_image} onChange={e => setMsg({...msg, hard_image: e.target.value})}
               placeholder="图片URL或点击上传"
               className="flex-1 px-3 py-1.5 rounded-lg border border-border bg-canvas text-textPrimary text-xs focus:outline-none focus:ring-1 focus:ring-primary-500/50" />
-            <label className="shrink-0 px-2 py-1 text-[10px] rounded-lg border border-border bg-canvas text-textSecondary hover:text-primary-400 cursor-pointer transition-colors">
+            <label className="relative shrink-0 px-2 py-1 text-[10px] rounded-lg border border-border bg-canvas text-textSecondary hover:text-primary-400 cursor-pointer transition-colors overflow-hidden">
               上传
-              <input type="file" accept="image/*" className="hidden" onChange={async e => {
+              <input type="file" accept="image/*" className="absolute inset-0 opacity-0 cursor-pointer" onChange={async e => {
                 const f = e.target.files?.[0]; if (!f) return
                 try {
                   const r: any = await api.upload('/fs/upload-attachment', f)
