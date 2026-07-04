@@ -131,8 +131,8 @@ export default function LoginPage() {
           <div className="relative inline-flex items-center justify-center mb-6">
             <div className="absolute w-20 h-20 rounded-full ai-pulse-active" />
             <div className="absolute w-16 h-16 rounded-full bg-primary-500/20 blur-xl" />
-            <div className="relative w-14 h-14 rounded-2xl bg-gradient-to-br from-primary-400 to-primary-600 flex items-center justify-center shadow-lg shadow-primary-500/25">
-              <MessageCircle size={26} className="text-white" strokeWidth={2} />
+            <div className="relative w-14 h-14 rounded-2xl flex items-center justify-center shadow-lg shadow-primary-500/25 overflow-hidden">
+              <img src="/logo.png" alt="AIsChat" className="w-full h-full object-contain" />
             </div>
           </div>
           <h1 className="text-2xl font-bold text-textPrimary tracking-tight">{t('auth.title')}</h1>

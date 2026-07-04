@@ -41,8 +41,8 @@ export default function Sidebar({ mobile, onClose }: { mobile?: boolean; onClose
       <div className="h-14 px-4 border-b border-border flex items-center justify-between shrink-0">
         {!collapsed && (
           <div className="flex items-center gap-2">
-            <div className="w-6 h-6 rounded-md bg-gradient-to-br from-primary-400 to-primary-600 flex items-center justify-center shadow shadow-primary-500/30">
-              <MessageCircle size={12} className="text-white" strokeWidth={2.5} />
+            <div className="w-6 h-6 rounded-md flex items-center justify-center shadow shadow-primary-500/30 overflow-hidden">
+              <img src="/logo.png" alt="AIsChat" className="w-full h-full object-contain" />
             </div>
             <span className="text-base font-bold text-textPrimary tracking-tight">AIsChat</span>
           </div>
