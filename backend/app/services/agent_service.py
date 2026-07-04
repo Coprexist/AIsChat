@@ -9,6 +9,7 @@ from app.models.user import User
 from app.models.agent import Agent, AgentConfigHistory, AgentUserConfig, AgentCollaborator
 from app.models.memory import RoughMemory, DetailMemory
 from app.config import settings
+from app.utils.result import Result
 from app.utils.text import extract_mentions
 from app.utils.pure.presets import merge_preset_values
 from app.utils.pure.willingness import (
