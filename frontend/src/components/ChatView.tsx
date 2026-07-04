@@ -616,7 +616,7 @@ export default function ChatView({ conversationType, conversationId }: ChatViewP
     const files = e.target.files
     if (!files || files.length === 0) return
 
-    const MAX_FILE_MB = 10
+    const MAX_FILE_MB = 32
     for (let i = 0; i < files.length; i++) {
       const file = files[i]
       if (file.size > MAX_FILE_MB * 1024 * 1024) {

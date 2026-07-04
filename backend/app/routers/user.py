@@ -227,8 +227,12 @@ async def upload_user_avatar(
     if len(content) > max_bytes:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=f"头像不能超过 {settings.avatar_max_size_mb}MB")
 
+    # 压缩头像（≤2MB）
+    from app.utils.image_compress import compress_avatar
+    content = compress_avatar(content)
+
     # 保存到统一头像目录
-    ext = file.filename.split(".")[-1] if file.filename and "." in file.filename else "png"
+    ext = "jpg"  # 压缩后统一 JPEG
     filename = f"user_{current_user['user_id']}_{uuid.uuid4().hex[:8]}.{ext}"
     upload_dir = "/app/uploads/avatars"
     os.makedirs(upload_dir, exist_ok=True)

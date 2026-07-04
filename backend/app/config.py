@@ -75,10 +75,10 @@ class Settings(BaseSettings):
         return "/app/data"
 
     # 头像
-    avatar_max_size_mb: int = int(os.getenv("AVATAR_MAX_SIZE_MB", "2"))
+    avatar_max_size_mb: int = int(os.getenv("AVATAR_MAX_SIZE_MB", "10"))
 
     # 单文件上传大小上限
-    upload_max_size_mb: int = int(os.getenv("UPLOAD_MAX_SIZE_MB", "10"))
+    upload_max_size_mb: int = int(os.getenv("UPLOAD_MAX_SIZE_MB", "32"))
 
     # 防滥用
     rate_limit_per_second: int = 2  # 每个 AI 每秒最多发言次数
