@@ -58,7 +58,12 @@ export default function MaintenanceMsgEditor() {
     if (action === 'save') {
       const n = prompt('预设名称：', selPreset || '')
       if (!n) return
-      try { await api.post('/admin/maintenance/presets', { name: n, ...msg }); setSelPreset(n); load() } catch (e: any) { alert(e?.message || '保存失败') }
+      try {
+        // 同名先删再存=更新
+        if (presets.some(p => p.name === n)) await api.delete(`/admin/maintenance/presets/${encodeURIComponent(n)}`)
+        await api.post('/admin/maintenance/presets', { name: n, ...msg })
+        setSelPreset(n); load()
+      } catch (e: any) { alert(e?.message || '保存失败') }
     } else if (action === 'del' && name) {
       if (confirm(`删除「${name}」？`)) { await api.delete(`/admin/maintenance/presets/${encodeURIComponent(name)}`); if (selPreset === name) setSelPreset(''); load() }
     } else if (action === 'rename' && name) {
