@@ -2499,19 +2499,17 @@ async def test_browser_connection(
     chrome_alive = subprocess.run(["pgrep", "-f", "chromium"], capture_output=True, text=True).stdout.strip()
     chrome_pids = chrome_alive.replace("\n", ",")
 
-    # 尝试用 CDP 打开百度
+    # 尝试用 CDP 打开百度——直接用现有页面避免 about:blank 上下文问题
     try:
-        # 创建新页面
-        req = urllib.request.Request(
-            "http://127.0.0.1:9222/json/new?about:blank",
-            method="PUT",
-        )
-        page_resp = urllib.request.urlopen(req, timeout=5)
-        page_info = json.loads(page_resp.read())
-        ws_url = page_info.get("webSocketDebuggerUrl", "")
-        page_id = page_info.get("id", "")
+        pages_resp = urllib.request.urlopen("http://127.0.0.1:9222/json", timeout=5)
+        pages = json.loads(pages_resp.read())
+        # 找第一个普通页面（跳过 devtools 类型）
+        page = next((p for p in pages if p.get("type") == "page"), pages[0] if pages else None)
+        if not page:
+            return {"ok": False, "error": "没有可用页面", "step": "create-page"}
+        ws_url = page.get("webSocketDebuggerUrl", "")
     except Exception as e:
-        return {"ok": False, "error": f"创建 CDP 页面失败: {e}", "step": "create-page"}
+        return {"ok": False, "error": f"获取CDP页面失败: {e}", "step": "create-page"}
 
     if not ws_url:
         return {"ok": False, "error": "无法获取 CDP WebSocket URL", "step": "ws-url"}
@@ -2553,9 +2551,15 @@ async def test_browser_connection(
                     msg = json.loads(await asyncio.wait_for(ws.recv(), timeout=3))
                 except TimeoutError:
                     break
-                m = msg.get("method", ""); e = msg.get("params", {}).get("errorText", "")
-                tag = f"{m or msg.get('id','?')}"
-                if e: tag += f"({e})"
+                m = msg.get("method", ""); e = msg.get("params", {}).get("errorText", ""); p = msg.get("params", {})
+                tag = m or str(msg.get('id','?'))
+                if m == "Network.requestWillBeSent":
+                    tag = f"REQ:{p.get('request',{}).get('url','?')[:60]}"
+                elif m == "Network.responseReceived":
+                    tag = f"RESP:{p.get('response',{}).get('status','?')} {p.get('response',{}).get('url','?')[:40]}"
+                elif m == "Network.loadingFailed":
+                    tag = f"FAIL:{e} {p.get('request',{}).get('url','?')[:40]}"
+                elif e: tag += f"({e})"
                 msgs_log.append(tag)
                 if m == "Page.loadEventFired":
                     await ws.send(json.dumps({"id": 3, "method": "Runtime.evaluate", "params": {"expression": "document.title"}}))
