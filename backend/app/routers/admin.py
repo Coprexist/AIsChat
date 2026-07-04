@@ -2530,8 +2530,22 @@ async def test_browser_connection(
             await ws.send(json.dumps({"id": 1, "method": "Runtime.evaluate", "params": {"expression": "'net='+navigator.onLine+';'+(function(){try{var x=new XMLHttpRequest();x.open('GET','http://example.com',false);x.send();return'XHR:'+x.status}catch(e){return'ERR:'+e.message}})()"}}))
             fetch_msg = json.loads(await asyncio.wait_for(ws.recv(), timeout=20))
             fetch_result = str(fetch_msg.get("result", {}).get("result", {}).get("value", "?"))
-            # navigate
-            await ws.send(json.dumps({"id": 2, "method": "Page.navigate", "params": {"url": "http://example.com"}}))
+            # 先测 data: URL（零网络依赖）验证渲染正常
+            await ws.send(json.dumps({"id": 2, "method": "Page.navigate", "params": {"url": "data:text/html,<h1>CDP_OK</h1>"}}))
+            nav_result = json.loads(await asyncio.wait_for(ws.recv(), timeout=10))
+            data_title = ""
+            for _ in range(10):
+                try:
+                    msg = json.loads(await asyncio.wait_for(ws.recv(), timeout=2))
+                    if msg.get("method") == "Page.loadEventFired":
+                        await ws.send(json.dumps({"id": 3, "method": "Runtime.evaluate", "params": {"expression": "document.title"}}))
+                        title_msg = json.loads(await asyncio.wait_for(ws.recv(), timeout=5))
+                        data_title = title_msg.get("result", {}).get("result", {}).get("value", "")
+                        break
+                    msgs_log.append(msg.get("method", "?"))
+                except TimeoutError: break
+            # 再测真实URL
+            await ws.send(json.dumps({"id": 4, "method": "Page.navigate", "params": {"url": "http://example.com"}}))
             nav_result = json.loads(await asyncio.wait_for(ws.recv(), timeout=15))
             page_title = ""
             for _ in range(20):
@@ -2561,7 +2575,7 @@ async def test_browser_connection(
 
     return {
         "ok": True,
-        "message": f"fetch={fetch_result} | 标题={page_title or '无'} | Chrome进程: {chrome_pids}{' CDP:' + ','.join(msgs_log) if not page_title else ''}",
+        "message": f"dataURL标题={data_title or '?'} | fetch={fetch_result} | 页面标题={page_title or '无'}{' CDP:' + ','.join(msgs_log) if not page_title else ''}",
         "page_title": page_title or "",
         "cdp_version": cdp_info.get("Browser", "unknown"),
     }
