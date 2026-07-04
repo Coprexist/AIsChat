@@ -62,7 +62,6 @@ async def start() -> bool:
         _chrome_process = await asyncio.create_subprocess_exec(
             CHROMIUM_BIN,
             "--headless",
-            env={**__import__('os').environ, "DBUS_SESSION_BUS_ADDRESS": "/dev/null"},
             "--no-sandbox",
             "--disable-gpu",
             "--disable-dev-shm-usage",
@@ -73,6 +72,7 @@ async def start() -> bool:
             "--remote-allow-origins=*",
             stdout=asyncio.subprocess.PIPE,
             stderr=asyncio.subprocess.PIPE,
+            env={**os.environ, "DBUS_SESSION_BUS_ADDRESS": "/dev/null"},
         )
         # 等待端口就绪
         for _ in range(50):  # 最多等 5 秒
