@@ -44,7 +44,7 @@ function AvatarPic({ url, name, size = 'md' }: { url: string | null | undefined;
     <div className={`${sizeClass} rounded-full shrink-0 overflow-hidden relative ${!url ? 'bg-gradient-to-br from-primary-500 to-primary-700 flex items-center justify-center shadow shadow-primary-500/15' : ''}`}>
       {url ? (
         <>
-          <div className="absolute inset-0.5 rounded-full bg-gradient-to-br from-primary-500 to-primary-700" />
+          <div className="absolute inset-0.5 rounded-full bg-gradient-to-br from-primary-500 to-primary-700/30" />
           <img src={url} alt={name} className="relative w-full h-full rounded-full object-cover" />
         </>
       ) : (

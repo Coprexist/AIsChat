@@ -281,7 +281,7 @@ export default function MePage() {
           <div className="shrink-0">
             {user.avatar_url ? (
               <div className="relative w-16 h-16 rounded-full overflow-hidden shadow shadow-primary-500/25">
-                <div className="absolute inset-0.5 rounded-full bg-gradient-to-br from-primary-500 to-primary-700" />
+                <div className="absolute inset-0.5 rounded-full bg-gradient-to-br from-primary-500 to-primary-700/30" />
                 <img src={user.avatar_url} className="relative w-full h-full rounded-full object-cover" />
               </div>
             ) : (
@@ -405,7 +405,7 @@ export default function MePage() {
               >
                 {a.avatar_url ? (
                   <div className="relative w-10 h-10 rounded-full mx-auto mb-1.5 shadow shadow-primary-500/15 overflow-hidden">
-                    <div className="absolute inset-0.5 rounded-full bg-gradient-to-br from-primary-500 to-primary-700" />
+                    <div className="absolute inset-0.5 rounded-full bg-gradient-to-br from-primary-500 to-primary-700/30" />
                     <img src={a.avatar_url} className="relative w-full h-full rounded-full object-cover" />
                   </div>
                 ) : (

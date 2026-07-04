@@ -115,7 +115,7 @@ const MessageBubble = memo(function MessageBubble({
             className={`relative w-9 h-9 rounded-full overflow-hidden ${senderType !== 'system' ? 'cursor-pointer hover:scale-105 transition-transform' : ''} shadow ${avatarGradientShadow}`}
             title={t('chat.viewProfile').replace('{name}', senderName)}
           >
-            <div className={`absolute inset-0.5 rounded-full ${avatarGradient(senderType, isMine, false)}`} />
+            <div className={`absolute inset-0.5 rounded-full ${avatarGradient(senderType, isMine, true)}`} />
             <img src={senderAvatarUrl} alt={senderName} className="relative w-full h-full rounded-full object-cover" />
           </div>
         ) : (
