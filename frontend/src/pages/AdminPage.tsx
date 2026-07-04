@@ -345,11 +345,9 @@ function MaintenanceMsgEditor() {
       {/* 预设选择（下拉） */}
       <div className="flex items-center gap-2 mb-3">
         <select
-          onChange={e => { if (e.target.value) applyPreset(e.target.value) }}
+          onChange={e => { if (e.target.value) applyPreset(e.target.value); e.target.value = '' }}
           className="flex-1 px-3 py-1.5 rounded-lg border border-border bg-canvas text-xs text-textPrimary focus:outline-none focus:ring-1 focus:ring-primary-500/50"
-          value={presets.length > 0 ? (presets.find((p: any) =>
-            p.hard_title === msg.hard_title && p.hard_body === msg.hard_body
-          ) as any)?.name || '' : ''}
+          value=""
         >
           {presets.length === 0 && <option value="">暂无预设</option>}
           {presets.map((p: any) => (
