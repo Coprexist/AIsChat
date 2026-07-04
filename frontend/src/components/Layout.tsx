@@ -100,6 +100,14 @@ export default function Layout() {
           <button onClick={() => setSoftMaintenance(false)} className="ml-2 underline opacity-80 hover:opacity-100">关闭</button>
         </div>
       )}
+      {softMaintenance && softStyle === 'popup' && (
+        <div className="fixed inset-0 z-[65] flex items-center justify-center bg-black/50 p-4">
+          <div className="bg-surface rounded-2xl p-6 max-w-sm w-full text-center shadow-2xl border border-border">
+            <p className="text-sm text-textSecondary">{softText}</p>
+            <button onClick={() => setSoftMaintenance(false)} className="mt-4 px-4 py-1.5 rounded-lg text-xs font-medium" style={{ backgroundColor: softColor, color: '#ffffff' }}>知道了</button>
+          </div>
+        </div>
+      )}
 
       {/* 硬维护（API 503）——弹窗 / 顶栏 */}
       {maintenance && hardText.style === 'banner' && (
