@@ -2549,7 +2549,6 @@ async def test_browser_connection(
                     msgs_log.append(f"TITLE:{page_title}")
                     break
     except TimeoutError:
-    except TimeoutError:
         return {"ok": False, "error": "访问超时——网络不通或 DNS 解析失败", "step": "navigate", "cdp_msgs": msgs_log}
     except Exception as e:
         return {"ok": False, "error": f"CDP 通信失败: {e}", "step": "navigate", "cdp_msgs": msgs_log}
