@@ -2510,10 +2510,12 @@ class MaintenanceMsgBody(BaseModel):
     hard_title: str = "正在更新"
     hard_body: str = "服务器正在更新，稍等一下就好~"
     hard_color: str = "#f59e0b"
+    hard_text_color: str = "#ffffff"
     hard_image: str = ""
-    hard_style: str = "popup"  # popup | banner
+    hard_style: str = "popup"
     soft_text: str = "服务器正在调整，功能可能偶尔不稳定"
     soft_color: str = "#f59e0b"
+    soft_style: str = "banner"
 
 
 @router.get("/maintenance/msg")
@@ -2523,7 +2525,7 @@ async def get_maintenance_msg(admin: dict = Depends(require_admin)):
             with open("/tmp/maintenance_msg.json") as f:
                 return json.loads(f.read())
     except: pass
-    return {"hard_title": "正在更新", "hard_body": "服务器正在更新，稍等一下就好~", "hard_color": "#f59e0b", "hard_image": "", "hard_style": "popup", "soft_text": "服务器正在调整，功能可能偶尔不稳定", "soft_color": "#f59e0b"}
+    return {"hard_title":"正在更新","hard_body":"服务器正在更新，稍等一下就好~","hard_color":"#f59e0b","hard_text_color":"#ffffff","hard_image":"","hard_style":"popup","soft_text":"服务器正在调整，功能可能偶尔不稳定","soft_color":"#f59e0b","soft_style":"banner"}
 
 
 @router.put("/maintenance/msg")
@@ -2566,7 +2568,7 @@ async def apply_preset(admin: dict = Depends(require_admin), name: str = ""):
     p = next((p for p in _load_presets() if p["name"] == name), None)
     if not p: raise HTTPException(404, f"预设 {name} 不存在")
     with open("/tmp/maintenance_msg.json", "w") as f:
-        f.write(json.dumps({"hard_title": p["hard_title"], "hard_body": p["hard_body"], "hard_color": p.get("hard_color","#f59e0b"), "hard_image": p.get("hard_image",""), "hard_style": p.get("hard_style","popup"), "soft_text": p["soft_text"], "soft_color": p.get("soft_color","#f59e0b")}, ensure_ascii=False))
+        f.write(json.dumps({"hard_title":p["hard_title"],"hard_body":p["hard_body"],"hard_color":p.get("hard_color","#f59e0b"),"hard_text_color":p.get("hard_text_color","#ffffff"),"hard_image":p.get("hard_image",""),"hard_style":p.get("hard_style","popup"),"soft_text":p["soft_text"],"soft_color":p.get("soft_color","#f59e0b"),"soft_style":p.get("soft_style","banner")}, ensure_ascii=False))
     return {"ok": True, "message": f"已应用预设「{name}」", "msg": p}
 
 
