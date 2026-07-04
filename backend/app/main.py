@@ -59,8 +59,8 @@ async def lifespan(app: FastAPI):
     logger.info(f"  默认聊天模型: {settings.default_chat_model}")
     logger.info(f"  默认工作模型: {settings.default_work_model}")
 
-    # 启动时进入维护模式
-    open(_MAINTENANCE_FILE, "w").close()
+    # 启动时进入自动维护模式
+    open(_MAINTENANCE_AUTO, "w").close()
 
     # 检查数据库连接
     db_ok = await check_db_connection()
@@ -119,16 +119,16 @@ async def lifespan(app: FastAPI):
 
     logger.info("✅ 后台 worker 已全部启动（含联邦通信）")
 
-    # 启动完成，退出维护模式
-    if _os.path.exists(_MAINTENANCE_FILE):
-        _os.remove(_MAINTENANCE_FILE)
-        logger.info("🟢 维护模式已关闭，服务就绪")
+    # 启动完成，退出自动维护（但手动维护仍生效）
+    if _os.path.exists(_MAINTENANCE_AUTO):
+        _os.remove(_MAINTENANCE_AUTO)
+        logger.info("🟢 自动维护已关闭，服务就绪" if not _os.path.exists(_MAINTENANCE_MANUAL) else "🟡 服务就绪但手动维护模式仍开启")
 
     yield
 
-    # 进入关闭流程，重新开启维护模式
+    # 进入关闭流程，自动维护
     logger.info("👋 系统关闭，正在停止后台 worker...")
-    open(_MAINTENANCE_FILE, "w").close()
+    open(_MAINTENANCE_AUTO, "w").close()
 
     logger.info("👋 系统关闭，正在停止后台 worker...")
     # 优雅关闭：排空记忆缓冲区
@@ -174,11 +174,15 @@ app.add_middleware(
 
 # 维护模式中间件
 import os as _os
-_MAINTENANCE_FILE = "/tmp/maintenance_mode"
+_MAINTENANCE_AUTO = "/tmp/maintenance_startup"
+_MAINTENANCE_MANUAL = "/tmp/maintenance_manual"
+
+def _in_maintenance() -> bool:
+    return _os.path.exists(_MAINTENANCE_AUTO) or _os.path.exists(_MAINTENANCE_MANUAL)
 
 @app.middleware("http")
 async def maintenance_middleware(request, call_next):
-    if _os.path.exists(_MAINTENANCE_FILE):
+    if _in_maintenance():
         path = request.url.path
         # 放行：健康检查 + 管理端点
         if path in ("/health", "/", "/docs", "/openapi.json") or path.startswith("/admin"):
