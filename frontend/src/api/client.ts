@@ -49,6 +49,11 @@ async function request<T = any>(
     throw new ApiError('Unauthorized', 401)
   }
 
+  // 软维护提示（API 正常但带维护头）
+  if (res.headers.get('X-Maintenance') === 'true') {
+    window.dispatchEvent(new CustomEvent('maintenance-soft'))
+  }
+
   if (res.status === 503) {
     try { const body = JSON.parse(await res.clone().text()); if (body.maintenance) { window.dispatchEvent(new CustomEvent('maintenance-mode')); throw new ApiError('服务器维护中', 503) } } catch {}
   }

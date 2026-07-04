@@ -222,16 +222,16 @@ export default function AdminPage() {
 function OverviewTab() {
   const t = useT()
   const [stats, setStats] = useState<any>(null)
-  const [maintenance, setMaintenance] = useState(false)
+  const [mt, setMt] = useState<{ auto: boolean; manual: boolean }>({ auto: false, manual: false })
   useEffect(() => {
     api.get('/admin/overview').then(setStats).catch(console.error)
-    api.get('/admin/maintenance').then((d: any) => setMaintenance(!!d.maintenance)).catch(() => {})
+    api.get('/admin/maintenance').then((d: any) => setMt({ auto: !!d.auto, manual: !!d.manual })).catch(() => {})
   }, [])
 
   const toggleMaintenance = async () => {
     try {
       const d: any = await api.post('/admin/maintenance/toggle')
-      setMaintenance(!!d.maintenance)
+      setMt({ auto: !!d.hard || !!d.auto, manual: !!d.manual })
     } catch {}
   }
 
@@ -245,22 +245,27 @@ function OverviewTab() {
         <StatCard label={t('admin.totalGroups')} value={stats.total_groups} icon={MessageCircle} />
         <StatCard label={t('admin.pendingRequests')} value={stats.pending_vector_requests} icon={Activity} />
       </div>
-      <div className={`p-4 rounded-xl border ${maintenance ? 'border-amber-500/40 bg-amber-500/5' : 'border-border bg-surface'}`}>
+      <div className={`p-4 rounded-xl border ${(mt.auto || mt.manual) ? 'border-amber-500/40 bg-amber-500/5' : 'border-border bg-surface'}`}>
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-3">
-            <div className={`w-10 h-10 rounded-xl flex items-center justify-center ${maintenance ? 'bg-amber-500/10' : 'bg-mint-400/10'}`}>
-              <Wrench size={20} className={maintenance ? 'text-amber-400' : 'text-mint-400'} />
+            <div className={`w-10 h-10 rounded-xl flex items-center justify-center ${(mt.auto || mt.manual) ? 'bg-amber-500/10' : 'bg-mint-400/10'}`}>
+              <Wrench size={20} className={(mt.auto || mt.manual) ? 'text-amber-400' : 'text-mint-400'} />
             </div>
             <div>
               <p className="font-medium text-textPrimary">维护模式</p>
-              <p className="text-xs text-textSecondary">{maintenance ? '已开启——用户访问会看到维护提示' : '已关闭——服务正常运行'}</p>
+              <p className="text-xs text-textSecondary">
+                {mt.auto && '🔒 硬维护（后端503）'}
+                {mt.auto && mt.manual && ' · '}
+                {mt.manual && '⚠️ 软维护（API正常，前端提示）'}
+                {!mt.auto && !mt.manual && '已关闭——服务正常运行'}
+              </p>
             </div>
           </div>
           <button onClick={toggleMaintenance}
             className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
-              maintenance ? 'bg-mint-500 hover:bg-mint-400 text-white' : 'bg-amber-500 hover:bg-amber-400 text-white'
+              mt.manual ? 'bg-mint-500 hover:bg-mint-400 text-white' : 'bg-amber-500 hover:bg-amber-400 text-white'
             }`}>
-            {maintenance ? '关闭维护' : '开启维护'}
+            {mt.manual ? '关闭软维护' : '开启软维护'}
           </button>
         </div>
       </div>

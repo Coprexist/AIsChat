@@ -177,22 +177,25 @@ import os as _os
 _MAINTENANCE_AUTO = "/tmp/maintenance_startup"
 _MAINTENANCE_MANUAL = "/tmp/maintenance_manual"
 
-def _in_maintenance() -> bool:
-    return _os.path.exists(_MAINTENANCE_AUTO) or _os.path.exists(_MAINTENANCE_MANUAL)
-
 @app.middleware("http")
 async def maintenance_middleware(request, call_next):
-    if _in_maintenance():
-        path = request.url.path
-        # 放行：健康检查 + 管理端点
-        if path in ("/health", "/", "/docs", "/openapi.json") or path.startswith("/admin"):
-            return await call_next(request)
+    path = request.url.path
+    # 放行：健康检查 + 管理端点
+    bypass = path in ("/health", "/", "/docs", "/openapi.json") or path.startswith("/admin")
+
+    # 硬维护（自动）：503 拦截
+    if _os.path.exists(_MAINTENANCE_AUTO) and not bypass:
         from fastapi.responses import JSONResponse
         return JSONResponse(
             status_code=503,
-            content={"detail": "服务器正在维护中，请稍后再来", "maintenance": True}
+            content={"detail": "服务器正在维护中，请稍后再来", "maintenance": True, "hard": True}
         )
-    return await call_next(request)
+
+    # 软维护（手动）：API 正常但前端显示提示
+    response = await call_next(request)
+    if _os.path.exists(_MAINTENANCE_MANUAL) and not bypass:
+        response.headers["X-Maintenance"] = "true"
+    return response
 
 
 # 注册路由

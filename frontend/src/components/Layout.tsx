@@ -9,12 +9,18 @@ import { Wrench } from 'lucide-react'
 export default function Layout() {
   const [drawerOpen, setDrawerOpen] = useState(false)
   const [maintenance, setMaintenance] = useState(false)
+  const [softMaintenance, setSoftMaintenance] = useState(false)
   const location = useLocation()
 
   useEffect(() => {
-    const handler = () => setMaintenance(true)
-    window.addEventListener('maintenance-mode', handler)
-    return () => window.removeEventListener('maintenance-mode', handler)
+    const h1 = () => setMaintenance(true)
+    const h2 = () => setSoftMaintenance(true)
+    window.addEventListener('maintenance-mode', h1)
+    window.addEventListener('maintenance-soft', h2)
+    return () => {
+      window.removeEventListener('maintenance-mode', h1)
+      window.removeEventListener('maintenance-soft', h2)
+    }
   }, [])
 
   // 桌面通知：标签页标题未读计数 + 任务栏闪烁（所有页面生效）
@@ -59,7 +65,15 @@ export default function Layout() {
       {/* ── 全局弹窗 ── */}
       <BalancePromptModal />
 
-      {/* 维护模式提示 */}
+      {/* 软维护顶栏（API正常，仅提示） */}
+      {softMaintenance && (
+        <div className="fixed top-0 left-0 right-0 z-[65] bg-amber-500/90 text-white text-xs text-center py-1.5 px-4 font-medium">
+          服务器维护中——部分功能可能不稳定 · 管理员正在调整
+          <button onClick={() => setSoftMaintenance(false)} className="ml-2 underline opacity-80 hover:opacity-100">关闭</button>
+        </div>
+      )}
+
+      {/* 硬维护弹窗（API 503） */}
       {maintenance && (
         <div className="fixed inset-0 z-[70] flex items-center justify-center bg-black/60 p-4">
           <div className="bg-surface rounded-2xl p-6 max-w-sm w-full text-center shadow-2xl border border-border">

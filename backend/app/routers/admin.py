@@ -2481,10 +2481,14 @@ def _browser_status() -> dict:
 
 @router.get("/maintenance")
 async def get_maintenance(admin: dict = Depends(require_admin)):
+    auto = os.path.exists("/tmp/maintenance_startup")
+    manual = os.path.exists("/tmp/maintenance_manual")
     return {
-        "maintenance": os.path.exists("/tmp/maintenance_startup") or os.path.exists("/tmp/maintenance_manual"),
-        "auto": os.path.exists("/tmp/maintenance_startup"),
-        "manual": os.path.exists("/tmp/maintenance_manual"),
+        "maintenance": auto or manual,
+        "auto": auto,
+        "manual": manual,
+        "hard": auto,   # 硬维护：后端503拦截
+        "soft": manual, # 软维护：API正常，仅前端提示
     }
 
 
@@ -2492,9 +2496,9 @@ async def get_maintenance(admin: dict = Depends(require_admin)):
 async def toggle_maintenance(admin: dict = Depends(require_admin)):
     if os.path.exists("/tmp/maintenance_manual"):
         os.remove("/tmp/maintenance_manual")
-        return {"maintenance": os.path.exists("/tmp/maintenance_startup"), "manual": False, "message": "手动维护已关闭"}
+        return {"maintenance": os.path.exists("/tmp/maintenance_startup"), "manual": False, "message": "软维护已关闭"}
     open("/tmp/maintenance_manual", "w").close()
-    return {"maintenance": True, "manual": True, "message": "手动维护已开启"}
+    return {"maintenance": True, "manual": True, "message": "软维护已开启——API正常但用户看到维护提示"}
 
 
 @router.post("/plugins/browser/test")
