@@ -61,9 +61,21 @@ const MessageBubble = memo(function MessageBubble({
   const { user } = useAuth()
   const lang = useLang()
   const t = useT()
-  // 每分钟刷新相对时间（"刚刚"→"1分钟前"→...）
+  // 智能刷新相对时间：越近越频繁，越远越少刷
   const [, setTick] = useState(0)
-  useEffect(() => { const i = setInterval(() => setTick(t => t + 1), 30_000); return () => clearInterval(i) }, [])
+  useEffect(() => {
+    if (!createdAt) return
+    const d = new Date(/Z$/i.test(createdAt) ? createdAt : createdAt + 'Z')
+    if (isNaN(d.getTime())) return
+    const ageMs = Date.now() - d.getTime()
+    let interval: number
+    if (ageMs < 60_000)           interval = 5_000   // < 1分钟：每5秒
+    else if (ageMs < 3_600_000)   interval = 30_000  // < 1小时：每30秒
+    else if (ageMs < 86_400_000)  interval = 300_000 // < 1天：每5分钟
+    else return // 超过1天不刷
+    const i = setInterval(() => setTick(t => t + 1), interval)
+    return () => clearInterval(i)
+  }, [createdAt])
 
   const [previewFile, setPreviewFile] = useState<{ file_id: number; name: string; size: number; mime_type: string } | null>(null)
   const [invStatus, setInvStatus] = useState<string | null>(null)
