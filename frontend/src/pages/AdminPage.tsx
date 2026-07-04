@@ -357,8 +357,12 @@ function MaintenanceMsgEditor() {
           ))}
         </select>
         <button onClick={async () => {
-          const name = prompt('预设名称（如：节日祝福、服务器更新）')
+          const matched = presets.find((p: any) => p.hard_title === msg.hard_title && p.hard_body === msg.hard_body) as any
+          const name = prompt('预设名称（如：节日祝福）', matched?.name || '')
           if (!name) return
+          if (presets.some((p: any) => p.name === name && (matched ? p.name !== matched.name : true))) {
+            alert(`预设「${name}」已存在，请换一个名字`); return
+          }
           try { await api.post('/admin/maintenance/presets', { name, ...msg }); load() } catch {}
         }} className="shrink-0 px-2 py-1 text-[10px] rounded-lg border border-dashed border-border text-textMuted hover:text-primary-400 transition-colors">
           + 存为预设
