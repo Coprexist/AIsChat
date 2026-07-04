@@ -184,6 +184,7 @@ export default function SettingsPage() {
   // ── 滚动监听：高亮当前可见 section ──
   const contentRef = useRef<HTMLDivElement>(null)
   const [activeSection, setActiveSection] = useState('quota')
+  const [mobileView, setMobileView] = useState<'list' | 'detail'>('list')
 
   useEffect(() => {
     const el = contentRef.current
@@ -385,6 +386,7 @@ export default function SettingsPage() {
 
   /** 点击侧边栏 → 滚动到对应 section */
   const scrollToSection = (id: string) => {
+    setActiveSection(id)
     document.getElementById(`settings-${id}`)?.scrollIntoView({ behavior: 'smooth', block: 'start' })
   }
 
@@ -1080,18 +1082,67 @@ export default function SettingsPage() {
     <div className="h-full flex flex-col bg-canvas">
       {/* 头部 */}
       <div className="px-4 h-14 border-b border-border bg-surface flex items-center gap-2 shrink-0">
-        <button
-          onClick={() => navigate('/me')}
-          className="md:hidden p-1.5 -ml-1 rounded-lg hover:bg-elevated text-textSecondary transition-colors"
-          title={t('nav.me')}
-        >
-          <ArrowLeft size={18} />
-        </button>
+        {mobileView === 'detail' ? (
+          <button
+            onClick={() => setMobileView('list')}
+            className="md:hidden p-1.5 -ml-1 rounded-lg hover:bg-elevated text-textSecondary transition-colors"
+          >
+            <ArrowLeft size={18} />
+          </button>
+        ) : (
+          <button
+            onClick={() => navigate('/me')}
+            className="md:hidden p-1.5 -ml-1 rounded-lg hover:bg-elevated text-textSecondary transition-colors"
+            title={t('nav.me')}
+          >
+            <ArrowLeft size={18} />
+          </button>
+        )}
         <h1 className="font-semibold text-textPrimary text-sm">{t('settings.title')}</h1>
       </div>
 
+      {/* ── 移动端：分类导航列表 ── */}
+      {mobileView === 'list' && (
+        <div className="md:hidden flex-1 overflow-y-auto p-4 pb-[var(--safe-bottom)] bg-canvas space-y-4">
+          {user?.role === 'admin' && (
+            <button
+              onClick={() => navigate('/admin')}
+              className="w-full flex items-center justify-center gap-2 px-4 py-3 rounded-xl bg-primary-500/10 border border-primary-500/20 text-primary-400 hover:bg-primary-500/15 text-sm font-medium transition-colors"
+            >
+              <Shield size={16} />
+              {t('settings.adminButton')}
+            </button>
+          )}
+          {[...new Set(NAV_SECTIONS.map(s => s.category))].map(cat => {
+            const items = NAV_SECTIONS.filter(s => s.category === cat)
+            return (
+              <div key={cat}>
+                <div className="text-xs font-semibold text-textMuted uppercase tracking-wider px-1 mb-1.5">{t(cat)}</div>
+                <div className="space-y-1">
+                  {items.map(({ id, icon: Icon, labelKey }) => (
+                    <button
+                      key={id}
+                      onClick={() => { setActiveSection(id); setMobileView('detail'); setTimeout(() => scrollToSection(id), 100) }}
+                      className="w-full flex items-center gap-3 px-4 py-3 rounded-xl hover:bg-elevated active:bg-border/50 transition-colors text-left"
+                    >
+                      <div className="w-9 h-9 rounded-lg bg-primary-500/10 flex items-center justify-center shrink-0">
+                        <Icon size={18} className="text-primary-400" />
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <div className="text-sm font-medium text-textPrimary">{t(labelKey)}</div>
+                      </div>
+                      <ChevronRight size={16} className="text-textMuted shrink-0" />
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )
+          })}
+        </div>
+      )}
+
       {/* ── 主体：桌面端侧边栏 + 内容，移动端纯内容 ── */}
-      <div className="flex-1 flex min-h-0">
+      <div className={`flex-1 flex min-h-0 ${mobileView === 'list' ? 'md:flex hidden' : ''}`}>
         {/* 桌面端侧边栏导航（可拖拽宽度） */}
         <div ref={sidebarRef} className="hidden md:flex shrink-0 relative border-r border-border bg-surface" style={{ width: sidebarWidth }}>
           <div className="overflow-y-auto py-1 w-full">
