@@ -532,12 +532,12 @@ export default function SettingsPage() {
           {providerPresets.length > 0 && (
             <div>
               <label className="block text-xs font-medium mb-1.5 text-textSecondary">{t('settings.presetProvider') || '厂商预设'}</label>
-              <div className="flex flex-wrap gap-2 mb-2">
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2 mb-2">
                 {providerPresets.map(p => (
                   <button
                     key={p.name}
                     onClick={() => setApiBaseUrl(p.base_url)}
-                    className={`px-3 py-1.5 text-xs rounded-lg font-medium transition-colors border ${
+                    className={`px-3 py-1.5 text-xs rounded-lg font-medium transition-colors border truncate ${
                       apiBaseUrl === p.base_url
                         ? 'bg-primary-500/15 border-primary-500/40 text-primary-500'
                         : 'bg-canvas border-border text-textSecondary hover:text-textPrimary hover:border-primary-500/30'
