@@ -50,7 +50,7 @@ async def start() -> bool:
     try:
         _chrome_process = await asyncio.create_subprocess_exec(
             CHROMIUM_BIN,
-            "--headless=new",
+            "--headless",
             "--no-sandbox",
             "--disable-gpu",
             "--disable-dev-shm-usage",
@@ -59,6 +59,8 @@ async def start() -> bool:
             "--disable-background-networking",
             "--disable-sync",
             "--no-first-run",
+            "--disable-web-security",
+            "--enable-features=NetworkServiceInProcess",
             "--disable-features=AsyncDNS,TranslateUI",
             f"--remote-debugging-port={CDP_PORT}",
             "--remote-allow-origins=*",
