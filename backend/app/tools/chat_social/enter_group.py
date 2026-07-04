@@ -28,26 +28,15 @@ class EnterGroup(ToolPlugin):
 
     async def execute(self, db: AsyncSession, agent_id: int, group_id: int | None,
                       arguments: dict, context: dict) -> dict:
-        from app.models.group import Group, GroupMember
-        from app.models.agent import Agent as AgentModel
+        from app.models.group import Group
 
         target_group = arguments["group_id"]
         reason = arguments.get("reason", "主动查看")
 
-        # 获取 agent 的 user_id (v2.0.0 规范)
-        agent_result = await db.execute(sa_select(AgentModel).where(AgentModel.id == agent_id))
-        agent = agent_result.scalar_one_or_none()
-        lookup_id = agent.user_id or agent_id if agent else agent_id
-
-        # 验证成员资格
-        member_result = await db.execute(
-            sa_select(GroupMember).where(
-                GroupMember.member_type == "ai",
-                GroupMember.member_id == lookup_id,
-                GroupMember.group_id == target_group,
-            )
-        )
-        if not member_result.scalar_one_or_none():
+        # 验证成员资格（用 _get_member 兼容 agent.id/user_id 两种格式）
+        from app.services.group_service import _get_member
+        member = await _get_member(db, target_group, "ai", agent_id)
+        if not member:
             return {"error": True, "message": f"你不在群聊 {target_group} 中"}
 
         # 群名
@@ -56,7 +45,6 @@ class EnterGroup(ToolPlugin):
         group_name = group.name if group else f"群聊#{target_group}"
 
         # 未读消息数
-        member = member_result.scalar_one()
         unread_count = 0
         preview = ""
         from app.services.group_service import check_unread
