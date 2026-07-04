@@ -123,11 +123,17 @@ async def upload_attachment(
         raise HTTPException(status_code=status.HTTP_413_REQUEST_ENTITY_TOO_LARGE,
                           detail=f"附件大小不能超过 {settings.upload_max_size_mb}MB")
 
-    metadata = await upload_file(
-        db, "attachments/", file.filename or f"att_{uuid.uuid4().hex[:8]}",
-        content, file.content_type, "human", current_user["user_id"],
-        collaboration_mode="solo",
-    )
+    try:
+        metadata = await upload_file(
+            db, "attachments/", file.filename or f"att_{uuid.uuid4().hex[:8]}",
+            content, file.content_type, "human", current_user["user_id"],
+            collaboration_mode="solo",
+        )
+    except ValueError as e:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
+    except Exception as e:
+        logger.error(f"附件上传失败: {e}", exc_info=True)
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=f"上传失败: {e}")
 
     return {
         "file_id": metadata.id,
