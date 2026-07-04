@@ -61,8 +61,13 @@ async def start() -> bool:
     # 确保 D-Bus 运行（Chrome 渲染引擎依赖）
     try:
         await asyncio.create_subprocess_exec("mkdir", "-p", "/run/dbus", stdout=asyncio.subprocess.DEVNULL, stderr=asyncio.subprocess.DEVNULL)
-        proc = await asyncio.create_subprocess_exec("dbus-daemon", "--system", "--fork", stdout=asyncio.subprocess.DEVNULL, stderr=asyncio.subprocess.DEVNULL)
-        await proc.wait()
+        # system bus
+        sp = await asyncio.create_subprocess_exec("dbus-daemon", "--system", "--fork", stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.PIPE)
+        await sp.wait()
+        # session bus
+        ss = await asyncio.create_subprocess_exec("dbus-daemon", "--session", "--fork", "--address=unix:path=/tmp/dbus_session", stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.PIPE)
+        await ss.wait()
+        os.environ["DBUS_SESSION_BUS_ADDRESS"] = "unix:path=/tmp/dbus_session"
     except Exception: pass
     try:
         _chrome_process = await asyncio.create_subprocess_exec(
@@ -87,7 +92,7 @@ async def start() -> bool:
             "--remote-allow-origins=*",
             stdout=asyncio.subprocess.DEVNULL,
             stderr=asyncio.subprocess.DEVNULL,
-            env={**os.environ, "DBUS_SESSION_BUS_ADDRESS": "/dev/null"},
+            env={**os.environ},
         )
 
         # 等待端口就绪
