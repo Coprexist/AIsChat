@@ -154,11 +154,29 @@ app = FastAPI(
 # CORS 中间件
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  # 开发环境允许所有来源
+    allow_origins=["*"],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+# 维护模式中间件
+import os as _os
+_MAINTENANCE_FILE = "/tmp/maintenance_mode"
+
+@app.middleware("http")
+async def maintenance_middleware(request, call_next):
+    if _os.path.exists(_MAINTENANCE_FILE):
+        path = request.url.path
+        # 放行：健康检查 + 管理端点
+        if path in ("/health", "/", "/docs", "/openapi.json") or path.startswith("/admin"):
+            return await call_next(request)
+        from fastapi.responses import JSONResponse
+        return JSONResponse(
+            status_code=503,
+            content={"detail": "服务器正在维护中，请稍后再来", "maintenance": True}
+        )
+    return await call_next(request)
 
 
 # 注册路由
