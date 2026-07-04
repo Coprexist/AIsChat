@@ -327,6 +327,7 @@ async def _process_group_event(db, event: dict):
             chain_depth=next_depth,
             sender_type=sender_type,
             sender_id=sender_id,
+            message_type=event.get("message_type", "normal"),
         )
 
 
@@ -429,6 +430,7 @@ async def _maybe_trigger_ai_reply(
     chain_depth: int = 0,
     sender_type: str = "human",
     sender_id: int | None = None,
+    message_type: str = "normal",
 ):
     """检查单个 AI 是否应该回复，如果是则调用 LLM 生成回复"""
     from app.services.agent_service import get_agent
