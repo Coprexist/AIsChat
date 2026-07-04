@@ -306,7 +306,7 @@ function OverviewTab() {
 }
 
 function MaintenanceMsgEditor() {
-  const [msg, setMsg] = useState({ hard_title: '', hard_body: '', soft_text: '' })
+  const [msg, setMsg] = useState({ hard_title: '', hard_body: '', hard_color: '#f59e0b', soft_text: '', soft_color: '#f59e0b' })
   const [presets, setPresets] = useState<any[]>([])
   const [loaded, setLoaded] = useState(false)
   const [saved, setSaved] = useState(false)
@@ -314,7 +314,7 @@ function MaintenanceMsgEditor() {
   const load = async () => {
     try {
       const [m, p] = await Promise.all([api.get('/admin/maintenance/msg'), api.get('/admin/maintenance/presets')])
-      const d: any = m; setMsg({ hard_title: d.hard_title || '', hard_body: d.hard_body || '', soft_text: d.soft_text || '' })
+      const d: any = m; setMsg({ hard_title: d.hard_title || '', hard_body: d.hard_body || '', hard_color: d.hard_color || '#f59e0b', soft_text: d.soft_text || '', soft_color: d.soft_color || '#f59e0b' })
       setPresets((p as any).presets || [])
       setLoaded(true)
     } catch {}
@@ -328,7 +328,7 @@ function MaintenanceMsgEditor() {
   const applyPreset = async (name: string) => {
     try {
       const r: any = await api.post(`/admin/maintenance/presets/apply?name=${encodeURIComponent(name)}`)
-      if (r.msg) setMsg({ hard_title: r.msg.hard_title, hard_body: r.msg.hard_body, soft_text: r.msg.soft_text })
+      if (r.msg) setMsg({ hard_title: r.msg.hard_title, hard_body: r.msg.hard_body, hard_color: r.msg.hard_color || '#f59e0b', soft_text: r.msg.soft_text, soft_color: r.msg.soft_color || '#f59e0b' })
     } catch {}
   }
 
@@ -367,8 +367,11 @@ function MaintenanceMsgEditor() {
       <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
         <div>
           <label className="block text-[10px] text-textMuted mb-1">暂停服务——弹窗标题</label>
-          <input value={msg.hard_title} onChange={e => setMsg({...msg, hard_title: e.target.value})}
-            className="w-full px-3 py-1.5 rounded-lg border border-border bg-canvas text-textPrimary text-xs focus:outline-none focus:ring-1 focus:ring-primary-500/50" />
+          <div className="flex gap-1.5">
+            <input type="color" value={msg.hard_color} onChange={e => setMsg({...msg, hard_color: e.target.value})} className="w-8 h-8 rounded cursor-pointer border border-border" />
+            <input value={msg.hard_title} onChange={e => setMsg({...msg, hard_title: e.target.value})}
+              className="flex-1 px-3 py-1.5 rounded-lg border border-border bg-canvas text-textPrimary text-xs focus:outline-none focus:ring-1 focus:ring-primary-500/50" />
+          </div>
         </div>
         <div>
           <label className="block text-[10px] text-textMuted mb-1">暂停服务——弹窗正文</label>
@@ -377,8 +380,11 @@ function MaintenanceMsgEditor() {
         </div>
         <div className="md:col-span-2">
           <label className="block text-[10px] text-textMuted mb-1">维护提示——顶部横幅文字</label>
-          <input value={msg.soft_text} onChange={e => setMsg({...msg, soft_text: e.target.value})}
-            className="w-full px-3 py-1.5 rounded-lg border border-border bg-canvas text-textPrimary text-xs focus:outline-none focus:ring-1 focus:ring-primary-500/50" />
+          <div className="flex gap-1.5">
+            <input type="color" value={msg.soft_color} onChange={e => setMsg({...msg, soft_color: e.target.value})} className="w-8 h-8 rounded cursor-pointer border border-border" />
+            <input value={msg.soft_text} onChange={e => setMsg({...msg, soft_text: e.target.value})}
+              className="flex-1 px-3 py-1.5 rounded-lg border border-border bg-canvas text-textPrimary text-xs focus:outline-none focus:ring-1 focus:ring-primary-500/50" />
+          </div>
         </div>
       </div>
       <div className="flex items-center gap-3 mt-3">

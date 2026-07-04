@@ -9,9 +9,10 @@ import { Wrench } from 'lucide-react'
 export default function Layout() {
   const [drawerOpen, setDrawerOpen] = useState(false)
   const [maintenance, setMaintenance] = useState(false)
-  const [hardText, setHardText] = useState({ title: '正在更新', body: '服务器正在更新，稍等一下就好~' })
+  const [hardText, setHardText] = useState({ title: '正在更新', body: '服务器正在更新，稍等一下就好~', color: '#f59e0b' })
   const [softMaintenance, setSoftMaintenance] = useState(false)
   const [softText, setSoftText] = useState('服务器正在调整，功能可能偶尔不稳定')
+  const [softColor, setSoftColor] = useState('#f59e0b')
   const location = useLocation()
 
   useEffect(() => {
@@ -20,7 +21,7 @@ export default function Layout() {
       try {
         const res = await fetch('/api/maintenance-msg')
         const d = await res.json()
-        if (d.hard_title) setHardText({ title: d.hard_title, body: d.hard_body })
+        if (d.hard_title) setHardText({ title: d.hard_title, body: d.hard_body, color: d.hard_color || '#f59e0b' })
       } catch {}
     }
     const h2 = async () => {
@@ -29,6 +30,7 @@ export default function Layout() {
         const res = await fetch('/api/maintenance-msg')
         const d = await res.json()
         if (d.soft_text) setSoftText(d.soft_text)
+        if (d.soft_color) setSoftColor(d.soft_color)
       } catch {}
     }
     window.addEventListener('maintenance-mode', h1)
@@ -83,7 +85,7 @@ export default function Layout() {
 
       {/* 软维护顶栏（API正常，仅提示） */}
       {softMaintenance && (
-        <div className="fixed top-0 left-0 right-0 z-[65] bg-amber-500/90 text-white text-xs text-center py-1.5 px-4 font-medium">
+        <div className="fixed top-0 left-0 right-0 z-[65] text-white text-xs text-center py-1.5 px-4 font-medium" style={{ backgroundColor: softColor }}>
           {softText}
           <button onClick={() => setSoftMaintenance(false)} className="ml-2 underline opacity-80 hover:opacity-100">关闭</button>
         </div>
@@ -93,10 +95,10 @@ export default function Layout() {
       {maintenance && (
         <div className="fixed inset-0 z-[70] flex items-center justify-center bg-black/60 p-4">
           <div className="bg-surface rounded-2xl p-6 max-w-sm w-full text-center shadow-2xl border border-border">
-            <Wrench size={40} className="text-amber-400 mx-auto mb-3" />
+            <Wrench size={40} className="mx-auto mb-3" style={{ color: hardText.color }} />
             <h2 className="text-lg font-semibold text-textPrimary mb-2">{hardText.title}</h2>
             <p className="text-sm text-textSecondary mb-4">{hardText.body}</p>
-            <button onClick={() => setMaintenance(false)} className="px-4 py-2 text-sm rounded-lg bg-primary-500 text-white hover:bg-primary-400 transition-colors">
+            <button onClick={() => setMaintenance(false)} className="px-4 py-2 text-sm rounded-lg text-white hover:opacity-90 transition-colors" style={{ backgroundColor: hardText.color }}>
               知道了
             </button>
           </div>
