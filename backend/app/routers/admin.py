@@ -2358,51 +2358,34 @@ async def save_provider(
     import json
     from app.services.provider_presets import get_preset
     from app.services.system_settings_service import get_providers
+    from app.utils.pure.provider_config import build_provider_config, upsert_provider
 
     if body.provider == "manual":
-        config = {
-            "name": body.name,
-            "provider": "manual",
-            "base_url": body.base_url or "",
-            "chat_model": body.chat_model or "",
-            "work_model": body.work_model or "",
-            "embedding_model": body.embedding_model or "",
-            "model_options": body.model_options or [],
-            "thinking_supported": body.thinking_supported or False,
-            "is_default": body.is_default,
-        }
+        config = build_provider_config(
+            name=body.name, provider_key="manual",
+            base_url=body.base_url or "", chat_model=body.chat_model or "",
+            work_model=body.work_model or "", embedding_model=body.embedding_model or "",
+            model_options=body.model_options or [],
+            thinking_supported=body.thinking_supported or False,
+            is_default=body.is_default,
+        )
     else:
         preset = get_preset(body.provider)
         if preset is None:
             raise HTTPException(400, f"未知厂商: {body.provider}")
-        config = {
-            "name": body.name,
-            "provider": preset["key"],
-            "base_url": body.base_url or preset["base_url"],
-            "chat_model": body.chat_model or preset["chat_model"],
-            "work_model": body.work_model or preset["work_model"],
-            "embedding_model": body.embedding_model or preset["embedding_model"],
-            "model_options": body.model_options or preset["models"],
-            "thinking_supported": body.thinking_supported if body.thinking_supported is not None else preset["thinking_supported"],
-            "is_default": body.is_default,
-        }
+        config = build_provider_config(
+            name=body.name, provider_key=preset["key"],
+            base_url=body.base_url or preset["base_url"],
+            chat_model=body.chat_model or preset["chat_model"],
+            work_model=body.work_model or preset["work_model"],
+            embedding_model=body.embedding_model or preset["embedding_model"],
+            model_options=body.model_options or preset["models"],
+            thinking_supported=body.thinking_supported if body.thinking_supported is not None else preset["thinking_supported"],
+            is_default=body.is_default,
+        )
 
     providers = await get_providers(db)
-
-    if config["is_default"]:
-        for p in providers:
-            p["is_default"] = False
-
-    if body.index is not None and 0 <= body.index < len(providers):
-        providers[body.index] = config
-    else:
-        existing_idx = next((i for i, p in enumerate(providers) if p.get("name") == body.name), None)
-        if existing_idx is not None:
-            providers[existing_idx] = config
-        else:
-            if not providers:
-                config["is_default"] = True
-            providers.append(config)
+    providers = upsert_provider(providers, config, body.index)
 
     from app.models.system_settings import SystemSettings
     result = await db.execute(select(SystemSettings).where(SystemSettings.id == 1))
@@ -2425,15 +2408,12 @@ async def delete_provider(
     """删除一个供应商配置"""
     import json
     from app.services.system_settings_service import get_providers
+    from app.utils.pure.provider_config import remove_provider
 
     providers = await get_providers(db)
-    new_list = [p for p in providers if p.get("name") != provider_name]
+    new_list = remove_provider(providers, provider_name)
     if len(new_list) == len(providers):
         raise HTTPException(404, f"供应商 {provider_name} 不存在")
-
-    was_default = any(p.get("name") == provider_name and p.get("is_default") for p in providers)
-    if was_default and new_list:
-        new_list[0]["is_default"] = True
 
     from app.models.system_settings import SystemSettings
     result = await db.execute(select(SystemSettings).where(SystemSettings.id == 1))
