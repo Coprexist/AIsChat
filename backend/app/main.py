@@ -59,6 +59,9 @@ async def lifespan(app: FastAPI):
     logger.info(f"  默认聊天模型: {settings.default_chat_model}")
     logger.info(f"  默认工作模型: {settings.default_work_model}")
 
+    # 启动时进入维护模式
+    open(_MAINTENANCE_FILE, "w").close()
+
     # 检查数据库连接
     db_ok = await check_db_connection()
     if db_ok:
@@ -116,7 +119,16 @@ async def lifespan(app: FastAPI):
 
     logger.info("✅ 后台 worker 已全部启动（含联邦通信）")
 
+    # 启动完成，退出维护模式
+    if _os.path.exists(_MAINTENANCE_FILE):
+        _os.remove(_MAINTENANCE_FILE)
+        logger.info("🟢 维护模式已关闭，服务就绪")
+
     yield
+
+    # 进入关闭流程，重新开启维护模式
+    logger.info("👋 系统关闭，正在停止后台 worker...")
+    open(_MAINTENANCE_FILE, "w").close()
 
     logger.info("👋 系统关闭，正在停止后台 worker...")
     # 优雅关闭：排空记忆缓冲区

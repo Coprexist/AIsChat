@@ -2,7 +2,7 @@
 管理员面板路由
 所有端点都需要 admin 权限
 """
-import os, json, asyncio, secrets
+import json, asyncio, secrets
 import logging
 from datetime import datetime, timedelta, timezone
 from fastapi import APIRouter, Depends, HTTPException, status, Query, UploadFile, File
@@ -2477,23 +2477,6 @@ def _browser_status() -> dict:
         }
     except Exception:
         return {"installed": False, "running": False, "port": None}
-
-
-@router.get("/maintenance")
-async def get_maintenance_status(admin: dict = Depends(require_admin)):
-    """查看维护模式状态"""
-    return {"maintenance": os.path.exists("/tmp/maintenance_mode")}
-
-
-@router.post("/maintenance/toggle")
-async def toggle_maintenance(admin: dict = Depends(require_admin)):
-    """开关维护模式"""
-    if os.path.exists("/tmp/maintenance_mode"):
-        os.remove("/tmp/maintenance_mode")
-        return {"maintenance": False, "message": "维护模式已关闭"}
-    else:
-        open("/tmp/maintenance_mode", "w").close()
-        return {"maintenance": True, "message": "维护模式已开启——非管理员请求将返回 503"}
 
 
 @router.post("/plugins/browser/test")
