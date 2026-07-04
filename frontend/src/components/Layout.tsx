@@ -9,7 +9,7 @@ import { Wrench } from 'lucide-react'
 export default function Layout() {
   const [drawerOpen, setDrawerOpen] = useState(false)
   const [maintenance, setMaintenance] = useState(false)
-  const [hardText, setHardText] = useState({ title: '正在更新', body: '服务器正在更新，稍等一下就好~', color: '#f59e0b' })
+  const [hardText, setHardText] = useState({ title: '正在更新', body: '服务器正在更新，稍等一下就好~', color: '#f59e0b', image: '' })
   const [softMaintenance, setSoftMaintenance] = useState(false)
   const [softText, setSoftText] = useState('服务器正在调整，功能可能偶尔不稳定')
   const [softColor, setSoftColor] = useState('#f59e0b')
@@ -21,7 +21,7 @@ export default function Layout() {
       try {
         const res = await fetch('/api/maintenance-msg')
         const d = await res.json()
-        if (d.hard_title) setHardText({ title: d.hard_title, body: d.hard_body, color: d.hard_color || '#f59e0b' })
+        if (d.hard_title) setHardText({ title: d.hard_title, body: d.hard_body, color: d.hard_color || '#f59e0b', image: d.hard_image || '' })
       } catch {}
     }
     const h2 = async () => {
@@ -97,7 +97,10 @@ export default function Layout() {
           <div className="bg-surface rounded-2xl p-6 max-w-sm w-full text-center shadow-2xl border border-border">
             <Wrench size={40} className="mx-auto mb-3" style={{ color: hardText.color }} />
             <h2 className="text-lg font-semibold text-textPrimary mb-2">{hardText.title}</h2>
-            <p className="text-sm text-textSecondary mb-4">{hardText.body}</p>
+            <p className="text-sm text-textSecondary mb-3">{hardText.body}</p>
+            {hardText.image && (
+              <img src={hardText.image} alt="" className="w-24 h-24 object-contain mx-auto mb-3 rounded-lg" />
+            )}
             <button onClick={() => setMaintenance(false)} className="px-4 py-2 text-sm rounded-lg text-white hover:opacity-90 transition-colors" style={{ backgroundColor: hardText.color }}>
               知道了
             </button>

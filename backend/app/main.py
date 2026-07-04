@@ -192,6 +192,7 @@ def _get_maintenance_msg() -> dict:
         "hard_title": "正在更新",
         "hard_body": "服务器正在更新，稍等一下就好~",
         "hard_color": "#f59e0b",
+        "hard_image": "",
         "soft_text": "服务器正在调整，功能可能偶尔不稳定",
         "soft_color": "#f59e0b",
     }

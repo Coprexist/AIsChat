@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from 'react'
 import { Link, useNavigate, useSearchParams, useOutletContext } from 'react-router-dom'
 import { api } from '../api/client'
-import { Users, Bot, MessageCircle, Ticket, FileText, Activity, Terminal, Database, Globe, BookOpen, ScrollText, ArrowLeft, BarChart3, ChevronRight, Key, Settings, Layers, Wrench, Shield, Plug } from 'lucide-react'
+import { Users, Bot, MessageCircle, Ticket, FileText, Activity, Terminal, Database, Globe, BookOpen, ScrollText, ArrowLeft, BarChart3, ChevronRight, Key, Settings, Layers, Wrench, Shield, Plug, X } from 'lucide-react'
 import { MANUAL_URL, ADMIN_MANUAL_URL } from '../constants'
 import Toggle from '../components/Toggle'
 import { useT } from '../i18n/I18nContext'
@@ -306,7 +306,7 @@ function OverviewTab() {
 }
 
 function MaintenanceMsgEditor() {
-  const [msg, setMsg] = useState({ hard_title: '', hard_body: '', hard_color: '#f59e0b', soft_text: '', soft_color: '#f59e0b' })
+  const [msg, setMsg] = useState({ hard_title: '', hard_body: '', hard_color: '#f59e0b', hard_image: '', soft_text: '', soft_color: '#f59e0b' })
   const [presets, setPresets] = useState<any[]>([])
   const [loaded, setLoaded] = useState(false)
   const [saved, setSaved] = useState(false)
@@ -314,7 +314,7 @@ function MaintenanceMsgEditor() {
   const load = async () => {
     try {
       const [m, p] = await Promise.all([api.get('/admin/maintenance/msg'), api.get('/admin/maintenance/presets')])
-      const d: any = m; setMsg({ hard_title: d.hard_title || '', hard_body: d.hard_body || '', hard_color: d.hard_color || '#f59e0b', soft_text: d.soft_text || '', soft_color: d.soft_color || '#f59e0b' })
+      const d: any = m; setMsg({ hard_title: d.hard_title || '', hard_body: d.hard_body || '', hard_color: d.hard_color || '#f59e0b', hard_image: d.hard_image || '', soft_text: d.soft_text || '', soft_color: d.soft_color || '#f59e0b' })
       setPresets((p as any).presets || [])
       setLoaded(true)
     } catch {}
@@ -328,7 +328,7 @@ function MaintenanceMsgEditor() {
   const applyPreset = async (name: string) => {
     try {
       const r: any = await api.post(`/admin/maintenance/presets/apply?name=${encodeURIComponent(name)}`)
-      if (r.msg) setMsg({ hard_title: r.msg.hard_title, hard_body: r.msg.hard_body, hard_color: r.msg.hard_color || '#f59e0b', soft_text: r.msg.soft_text, soft_color: r.msg.soft_color || '#f59e0b' })
+      if (r.msg) setMsg({ hard_title: r.msg.hard_title, hard_body: r.msg.hard_body, hard_color: r.msg.hard_color || '#f59e0b', hard_image: r.msg.hard_image || '', soft_text: r.msg.soft_text, soft_color: r.msg.soft_color || '#f59e0b' })
     } catch {}
   }
 
@@ -376,6 +376,12 @@ function MaintenanceMsgEditor() {
         <div>
           <label className="block text-[10px] text-textMuted mb-1">暂停服务——弹窗正文</label>
           <input value={msg.hard_body} onChange={e => setMsg({...msg, hard_body: e.target.value})}
+            className="w-full px-3 py-1.5 rounded-lg border border-border bg-canvas text-textPrimary text-xs focus:outline-none focus:ring-1 focus:ring-primary-500/50" />
+        </div>
+        <div>
+          <label className="block text-[10px] text-textMuted mb-1">弹窗图片 URL（可选）</label>
+          <input value={msg.hard_image} onChange={e => setMsg({...msg, hard_image: e.target.value})}
+            placeholder="https://example.com/image.png"
             className="w-full px-3 py-1.5 rounded-lg border border-border bg-canvas text-textPrimary text-xs focus:outline-none focus:ring-1 focus:ring-primary-500/50" />
         </div>
         <div className="md:col-span-2">
