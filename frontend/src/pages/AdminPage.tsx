@@ -365,15 +365,21 @@ function MaintenanceMsgEditor() {
         }} className="shrink-0 px-2 py-1 text-[10px] rounded-lg border border-dashed border-border text-textMuted hover:text-primary-400 transition-colors">
           + 存为预设
         </button>
-        {presets.length > 0 && (
+        {presets.length > 0 && (<>
           <button onClick={() => {
-            const selected = presets.find((p: any) => p.hard_title === msg.hard_title && p.hard_body === msg.hard_body) as any
-            const name = selected?.name
-            if (name && confirm(`删除预设「${name}」？`)) { deletePreset(name); load() }
-          }} className="shrink-0 px-2 py-1 text-[10px] rounded-lg border border-border text-textMuted hover:text-rose-400 transition-colors">
-            删选中
-          </button>
-        )}
+            const name = prompt('要删除的预设名：')
+            if (name && confirm(`删除「${name}」？`)) { deletePreset(name); load() }
+          }} className="shrink-0 px-2 py-1 text-[10px] rounded-lg border border-rose-500/20 text-rose-400 hover:bg-rose-500/10 transition-colors">🗑</button>
+          <button onClick={async () => {
+            const old = prompt('要重命名的预设名：')
+            if (!old) return
+            const p = presets.find((x: any) => x.name === old)
+            if (!p) { alert('预设不存在'); return }
+            const nn = prompt('新名称：', old)
+            if (!nn || nn === old) return
+            try { await api.delete(`/admin/maintenance/presets/${encodeURIComponent(old)}`); await api.post('/admin/maintenance/presets', { ...p, name: nn }); load() } catch {}
+          }} className="shrink-0 px-2 py-1 text-[10px] rounded-lg border border-border text-textMuted hover:text-primary-400 transition-colors">✏️</button>
+        </>)}
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
@@ -402,7 +408,9 @@ function MaintenanceMsgEditor() {
                 const f = e.target.files?.[0]; if (!f) return
                 try {
                   const r: any = await api.upload('/fs/upload-attachment', f)
-                  setMsg({...msg, hard_image: `/api/fs/public/${r.file_id}`})
+                  const url = `/api/fs/public/${r.file_id}`
+                  setMsg({...msg, hard_image: url})
+                  try { await api.put('/admin/maintenance/msg', {...msg, hard_image: url}); setSaved(true); setTimeout(() => setSaved(false), 2000) } catch {}
                 } catch (err: any) { alert('上传失败: ' + (err?.message || err)) }
               }} />
             </label>
