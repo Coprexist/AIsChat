@@ -345,17 +345,19 @@ function MaintenanceMsgEditor() {
       {/* 预设选择（下拉） */}
       <div className="flex items-center gap-2 mb-3">
         <select
-          onChange={e => { if (e.target.value) applyPreset(e.target.value); e.target.value = '' }}
+          onChange={e => { if (e.target.value) applyPreset(e.target.value) }}
           className="flex-1 px-3 py-1.5 rounded-lg border border-border bg-canvas text-xs text-textPrimary focus:outline-none focus:ring-1 focus:ring-primary-500/50"
-          defaultValue=""
+          value={presets.length > 0 ? (presets.find((p: any) =>
+            p.hard_title === msg.hard_title && p.hard_body === msg.hard_body
+          ) as any)?.name || '' : ''}
         >
-          <option value="" disabled>选择预设文案…</option>
+          {presets.length === 0 && <option value="">暂无预设</option>}
           {presets.map((p: any) => (
             <option key={p.name} value={p.name}>{p.name}</option>
           ))}
         </select>
         <button onClick={async () => {
-          const name = prompt('预设名称')
+          const name = prompt('预设名称（如：节日祝福、服务器更新）')
           if (!name) return
           try { await api.post('/admin/maintenance/presets', { name, ...msg }); load() } catch {}
         }} className="shrink-0 px-2 py-1 text-[10px] rounded-lg border border-dashed border-border text-textMuted hover:text-primary-400 transition-colors">
@@ -363,7 +365,8 @@ function MaintenanceMsgEditor() {
         </button>
         {presets.length > 0 && (
           <button onClick={() => {
-            const name = (presets[0] as any)?.name
+            const selected = presets.find((p: any) => p.hard_title === msg.hard_title && p.hard_body === msg.hard_body) as any
+            const name = selected?.name
             if (name && confirm(`删除预设「${name}」？`)) { deletePreset(name); load() }
           }} className="shrink-0 px-2 py-1 text-[10px] rounded-lg border border-border text-textMuted hover:text-rose-400 transition-colors">
             删选中
