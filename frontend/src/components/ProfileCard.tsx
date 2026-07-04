@@ -129,17 +129,17 @@ export default function ProfileCard({ entityType, entityId, entityName, state, o
         <div className="flex items-start justify-between mb-4">
           <div className="flex items-center gap-3 flex-1 min-w-0">
             {/* 头像 */}
-            {avatarUrl ? (
-              <img src={avatarUrl} alt={name} className="w-14 h-14 rounded-full object-cover shrink-0 bg-elevated border-2 border-border" />
-            ) : (
-              <div className={`w-14 h-14 rounded-full bg-gradient-to-bl flex items-center justify-center text-xl font-bold shrink-0 ${
-                entityType === 'human'
-                  ? 'from-primary-500 to-primary-700 text-white'
-                  : 'from-teal-400 to-teal-600 text-white'
-              }`}>
-                {name.charAt(0).toUpperCase()}
-              </div>
-            )}
+            <div className={`w-14 h-14 rounded-full bg-gradient-to-bl flex items-center justify-center shrink-0 ${
+              entityType === 'human'
+                ? 'from-primary-500 to-primary-700'
+                : 'from-teal-400 to-teal-600'
+            }`}>
+              {avatarUrl ? (
+                <img src={avatarUrl} alt={name} className="w-[50px] h-[50px] rounded-full object-cover border border-white/20" />
+              ) : (
+                <span className="text-xl font-bold text-white">{name.charAt(0).toUpperCase()}</span>
+              )}
+            </div>
             <div className="min-w-0">
               <h3 className="font-semibold text-textPrimary text-base truncate">{name}</h3>
               <div className="flex items-center gap-1.5 text-sm text-textSecondary">

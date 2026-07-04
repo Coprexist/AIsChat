@@ -279,13 +279,13 @@ export default function MePage() {
         <div className="flex items-center gap-4">
           {/* 头像 */}
           <div className="shrink-0">
-            {user.avatar_url ? (
-              <img src={user.avatar_url} className="w-16 h-16 rounded-full object-cover border-2 border-primary-400/30 relative z-10" />
-            ) : (
-              <div className="w-16 h-16 rounded-full bg-gradient-to-br from-primary-500 to-primary-700 flex items-center justify-center shadow shadow-primary-500/25">
+            <div className="w-16 h-16 rounded-full bg-gradient-to-br from-primary-500 to-primary-700 flex items-center justify-center shadow shadow-primary-500/25">
+              {user.avatar_url ? (
+                <img src={user.avatar_url} className="w-[58px] h-[58px] rounded-full object-cover border-2 border-white/20" />
+              ) : (
                 <User size={28} className="text-white" />
-              </div>
-            )}
+              )}
+            </div>
           </div>
 
           <div className="flex-1 min-w-0">
@@ -400,11 +400,11 @@ export default function MePage() {
                 to={`/agents/${a.id}`}
                 className="shrink-0 w-28 bg-canvas rounded-xl p-3 border border-border hover:border-primary-400/30 transition-colors text-center"
               >
-                <div className="w-10 h-10 rounded-full bg-primary-500/10 flex items-center justify-center mx-auto mb-1.5">
+                <div className="w-10 h-10 rounded-full bg-gradient-to-br from-primary-500 to-primary-700 flex items-center justify-center mx-auto mb-1.5 shadow shadow-primary-500/15">
                   {a.avatar_url ? (
-                    <img src={a.avatar_url} className="w-10 h-10 rounded-full object-cover" />
+                    <img src={a.avatar_url} className="w-[34px] h-[34px] rounded-full object-cover border border-white/20" />
                   ) : (
-                    <Bot size={18} className="text-primary-400" />
+                    <Bot size={18} className="text-white" />
                   )}
                 </div>
                 <div className="text-xs font-medium text-textPrimary truncate">{a.name}</div>

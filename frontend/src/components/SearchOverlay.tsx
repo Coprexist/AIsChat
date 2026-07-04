@@ -159,17 +159,17 @@ export default function SearchOverlay() {
                   onClick={() => openProfile(item)}
                   className="shrink-0"
                 >
-                  {item.avatar_url ? (
-                    <img src={item.avatar_url} alt={item.name} className="w-8 h-8 rounded-full object-cover bg-elevated" />
-                  ) : (
-                    <div className={`w-8 h-8 rounded-full bg-gradient-to-bl flex items-center justify-center text-xs font-bold ${
-                      item.type === 'human'
-                        ? 'from-primary-500 to-primary-700 text-white'
-                        : 'from-teal-400 to-teal-600 text-white'
-                    }`}>
-                      {item.name.charAt(0).toUpperCase()}
-                    </div>
-                  )}
+                  <div className={`w-8 h-8 rounded-full bg-gradient-to-bl flex items-center justify-center shrink-0 ${
+                    item.type === 'human'
+                      ? 'from-primary-500 to-primary-700'
+                      : 'from-teal-400 to-teal-600'
+                  }`}>
+                    {item.avatar_url ? (
+                      <img src={item.avatar_url} alt={item.name} className="w-[26px] h-[26px] rounded-full object-cover border border-white/20" />
+                    ) : (
+                      <span className="text-xs font-bold text-white">{item.name.charAt(0).toUpperCase()}</span>
+                    )}
+                  </div>
                 </button>
 
                 {/* 信息（可点击 → 资料卡） */}

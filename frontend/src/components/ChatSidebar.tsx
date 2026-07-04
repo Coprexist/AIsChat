@@ -292,7 +292,7 @@ export default function ChatSidebar({
                     s.partner.type === 'system' ? 'from-rose-400 to-rose-600' : 'from-teal-400 to-teal-600'
                   }`}>
                     {s.partner.avatar_url ? (
-                      <img src={s.partner.avatar_url} alt="" className="w-full h-full rounded-full object-cover" />
+                      <img src={s.partner.avatar_url} alt="" className="w-[30px] h-[30px] rounded-full object-cover border border-white/20" />
                     ) : s.partner.type === 'system' ? (
                       <ShieldAlert size={16} className="text-white" />
                     ) : (
