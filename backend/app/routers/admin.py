@@ -2526,7 +2526,8 @@ async def test_browser_connection(
             # 先用 JS fetch 测试网络——不靠页面加载
             await ws.send(json.dumps({"id": 0.5, "method": "Runtime.enable"}))
             await ws.recv()
-            await ws.send(json.dumps({"id": 0.6, "method": "Runtime.evaluate", "params": {"expression": "fetch('http://example.com').then(r=>r.status).catch(e=>'ERR:'+e.message)", "awaitPromise": True, "timeout": 10000}}))
+            const expr = "'online='+navigator.onLine+';'+(function(){try{var x=new XMLHttpRequest();x.open('GET','http://example.com',false);x.send();return'XHR:'+x.status}catch(e){return'ERR:'+e.message}})()"
+            await ws.send(json.dumps({"id": 0.6, "method": "Runtime.evaluate", "params": {"expression": expr}}))
             fetch_msg = json.loads(await asyncio.wait_for(ws.recv(), timeout=15))
             fetch_result = str(fetch_msg.get("result", {}).get("result", {}).get("value", "?"))
             # 再试正常导航
