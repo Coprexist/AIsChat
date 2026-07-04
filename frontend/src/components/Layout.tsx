@@ -9,10 +9,11 @@ import { Wrench } from 'lucide-react'
 export default function Layout() {
   const [drawerOpen, setDrawerOpen] = useState(false)
   const [maintenance, setMaintenance] = useState(false)
-  const [hardText, setHardText] = useState({ title: '正在更新', body: '服务器正在更新，稍等一下就好~', color: '#f59e0b', image: '', style: 'popup' })
+  const [hardText, setHardText] = useState({ title: '正在更新', body: '服务器正在更新，稍等一下就好~', color: '#f59e0b', textColor: '#ffffff', image: '', style: 'popup' })
   const [softMaintenance, setSoftMaintenance] = useState(false)
   const [softText, setSoftText] = useState('服务器正在调整，功能可能偶尔不稳定')
   const [softColor, setSoftColor] = useState('#f59e0b')
+  const [softStyle, setSoftStyle] = useState('banner')
   const location = useLocation()
 
   useEffect(() => {
@@ -24,7 +25,7 @@ export default function Layout() {
       else try {
         const res = await fetch('/api/maintenance-msg')
         const d = await res.json()
-        const txt = { title: d.hard_title || '正在更新', body: d.hard_body || '服务器正在更新', color: d.hard_color || '#f59e0b', image: d.hard_image || '', style: d.hard_style || 'popup' }
+        const txt = { title: d.hard_title||'正在更新', body: d.hard_body||'服务器正在更新', color: d.hard_color||'#f59e0b', textColor: d.hard_text_color||'#ffffff', image: d.hard_image||'', style: d.hard_style||'popup' }
         localStorage.setItem('maintenance_msg', JSON.stringify(txt))
         setHardText(txt)
       } catch { if (cached?.title) setHardText(cached) }
@@ -36,6 +37,7 @@ export default function Layout() {
         const d = await res.json()
         if (d.soft_text) { setSoftText(d.soft_text); localStorage.setItem('maintenance_soft', d.soft_text) }
         if (d.soft_color) { setSoftColor(d.soft_color); localStorage.setItem('maintenance_soft_color', d.soft_color) }
+        if (d.soft_style) { setSoftStyle(d.soft_style) }
       } catch {
         setSoftText(localStorage.getItem('maintenance_soft') || '服务器正在调整，功能可能偶尔不稳定')
         setSoftColor(localStorage.getItem('maintenance_soft_color') || '#f59e0b')
@@ -92,8 +94,8 @@ export default function Layout() {
       <BalancePromptModal />
 
       {/* 软维护顶栏（API正常，仅提示） */}
-      {softMaintenance && (
-        <div className="fixed top-0 left-0 right-0 z-[65] text-white text-xs text-center py-1.5 px-4 font-medium" style={{ backgroundColor: softColor }}>
+      {softMaintenance && softStyle === 'banner' && (
+        <div className="fixed top-0 left-0 right-0 z-[65] text-xs text-center py-1.5 px-4 font-medium" style={{ backgroundColor: softColor, color: '#ffffff' }}>
           {softText}
           <button onClick={() => setSoftMaintenance(false)} className="ml-2 underline opacity-80 hover:opacity-100">关闭</button>
         </div>
@@ -101,7 +103,7 @@ export default function Layout() {
 
       {/* 硬维护（API 503）——弹窗 / 顶栏 */}
       {maintenance && hardText.style === 'banner' && (
-        <div className="fixed top-0 left-0 right-0 z-[70] text-white text-xs text-center py-1.5 px-4 font-medium" style={{ backgroundColor: hardText.color }}>
+        <div className="fixed top-0 left-0 right-0 z-[70] text-xs text-center py-1.5 px-4 font-medium" style={{ backgroundColor: hardText.color, color: hardText.textColor }}>
           {hardText.title} · {hardText.body}
           <button onClick={() => setMaintenance(false)} className="ml-2 underline opacity-80 hover:opacity-100">关闭</button>
         </div>
@@ -110,12 +112,12 @@ export default function Layout() {
         <div className="fixed inset-0 z-[70] flex items-center justify-center bg-black/60 p-4">
           <div className="bg-surface rounded-2xl p-6 max-w-sm w-full text-center shadow-2xl border border-border">
             <Wrench size={40} className="mx-auto mb-3" style={{ color: hardText.color }} />
-            <h2 className="text-lg font-semibold text-textPrimary mb-2">{hardText.title}</h2>
+            <h2 className="text-lg font-semibold mb-2" style={{ color: hardText.color }}>{hardText.title}</h2>
             <p className="text-sm text-textSecondary mb-3">{hardText.body}</p>
             {hardText.image && (
               <img src={hardText.image} alt="" className="w-24 h-24 object-contain mx-auto mb-3 rounded-lg" />
             )}
-            <button onClick={() => setMaintenance(false)} className="px-4 py-2 text-sm rounded-lg text-white hover:opacity-90 transition-colors" style={{ backgroundColor: hardText.color }}>
+            <button onClick={() => setMaintenance(false)} className="px-4 py-2 text-sm rounded-lg hover:opacity-90 transition-colors" style={{ backgroundColor: hardText.color, color: hardText.textColor }}>
               知道了
             </button>
           </div>
