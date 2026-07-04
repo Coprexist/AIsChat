@@ -2520,54 +2520,35 @@ async def test_browser_connection(
 
         msgs_log = []
         async with websockets.connect(ws_url, max_size=2**20, close_timeout=5) as ws:
-            for domain in ("Page", "Runtime", "Network", "Log"):
-                await ws.send(json.dumps({"id": -1, "method": f"{domain}.enable"}))
+            for domain in ("Page", "Runtime", "Network"):
+                await ws.send(json.dumps({"id": domain, "method": f"{domain}.enable"}))
                 try: await asyncio.wait_for(ws.recv(), timeout=2)
                 except: pass
-            # sync XHR
-            await ws.send(json.dumps({"id": 1, "method": "Runtime.evaluate", "params": {"expression": "'net='+navigator.onLine+';'+(function(){try{var x=new XMLHttpRequest();x.open('GET','http://example.com',false);x.send();return'XHR:'+x.status}catch(e){return'ERR:'+e.message}})()"}}))
-            fetch_msg = json.loads(await asyncio.wait_for(ws.recv(), timeout=20))
-            fetch_result = str(fetch_msg.get("result", {}).get("result", {}).get("value", "?"))
-            # 先测 data: URL（零网络依赖）验证渲染正常
-            await ws.send(json.dumps({"id": 2, "method": "Page.navigate", "params": {"url": "data:text/html,<h1>CDP_OK</h1>"}}))
-            nav_result = json.loads(await asyncio.wait_for(ws.recv(), timeout=10))
-            data_title = ""
-            for _ in range(10):
-                try:
-                    msg = json.loads(await asyncio.wait_for(ws.recv(), timeout=2))
-                    if msg.get("method") == "Page.loadEventFired":
-                        await ws.send(json.dumps({"id": 3, "method": "Runtime.evaluate", "params": {"expression": "document.title"}}))
-                        title_msg = json.loads(await asyncio.wait_for(ws.recv(), timeout=5))
-                        data_title = title_msg.get("result", {}).get("result", {}).get("value", "")
-                        break
-                    msgs_log.append(msg.get("method", "?"))
-                except TimeoutError: break
-            # 再测真实URL
-            await ws.send(json.dumps({"id": 4, "method": "Page.navigate", "params": {"url": "http://example.com"}}))
+            # 直接导航到 example.com
+            await ws.send(json.dumps({"id": 1, "method": "Page.navigate", "params": {"url": "http://example.com"}}))
             nav_result = json.loads(await asyncio.wait_for(ws.recv(), timeout=15))
             page_title = ""
             for _ in range(20):
                 try:
                     msg = json.loads(await asyncio.wait_for(ws.recv(), timeout=3))
-                except TimeoutError:
-                    break
-                m = msg.get("method", ""); e = msg.get("params", {}).get("errorText", ""); p = msg.get("params", {})
-                tag = m or str(msg.get('id','?'))
+                except TimeoutError: break
+                m = msg.get("method", ""); p = msg.get("params", {})
+                e = p.get("errorText", "")
                 if m == "Network.requestWillBeSent":
-                    tag = f"REQ:{p.get('request',{}).get('url','?')[:60]}"
+                    msgs_log.append(f"REQ:{p.get('request',{}).get('url','?')[:60]}")
                 elif m == "Network.responseReceived":
-                    tag = f"RESP:{p.get('response',{}).get('status','?')} {p.get('response',{}).get('url','?')[:40]}"
+                    msgs_log.append(f"RESP:{p.get('response',{}).get('status','?')}")
                 elif m == "Network.loadingFailed":
-                    tag = f"FAIL:{e} {p.get('request',{}).get('url','?')[:40]}"
-                elif e: tag += f"({e})"
-                msgs_log.append(tag)
-                if m == "Page.loadEventFired":
-                    await ws.send(json.dumps({"id": 3, "method": "Runtime.evaluate", "params": {"expression": "document.title"}}))
+                    msgs_log.append(f"FAIL:{e}")
+                elif m == "Network.loadingFinished":
+                    msgs_log.append(f"DONE")
+                elif m == "Page.loadEventFired":
+                    await ws.send(json.dumps({"id": 2, "method": "Runtime.evaluate", "params": {"expression": "document.title"}}))
                     title_msg = json.loads(await asyncio.wait_for(ws.recv(), timeout=5))
                     page_title = title_msg.get("result", {}).get("result", {}).get("value", "")
+                    msgs_log.append(f"TITLE:{page_title}")
                     break
-                if m in ("Network.requestWillBeSent", "Network.responseReceived", "Network.loadingFailed", "Network.loadingFinished", "Log.entryAdded"):
-                    pass  # keep collecting
+    except TimeoutError:
     except TimeoutError:
         return {"ok": False, "error": "访问超时——网络不通或 DNS 解析失败", "step": "navigate", "cdp_msgs": msgs_log}
     except Exception as e:
