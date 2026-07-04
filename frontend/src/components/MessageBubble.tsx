@@ -1,4 +1,4 @@
-import { memo, useState } from 'react'
+import { memo, useState, useEffect } from 'react'
 import Markdown from 'react-markdown'
 import remarkGfm from 'remark-gfm'
 import remarkMath from 'remark-math'
@@ -61,6 +61,9 @@ const MessageBubble = memo(function MessageBubble({
   const { user } = useAuth()
   const lang = useLang()
   const t = useT()
+  // 每分钟刷新相对时间（"刚刚"→"1分钟前"→...）
+  const [, setTick] = useState(0)
+  useEffect(() => { const i = setInterval(() => setTick(t => t + 1), 30_000); return () => clearInterval(i) }, [])
 
   const [previewFile, setPreviewFile] = useState<{ file_id: number; name: string; size: number; mime_type: string } | null>(null)
   const [invStatus, setInvStatus] = useState<string | null>(null)
