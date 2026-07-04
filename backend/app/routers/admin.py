@@ -2,7 +2,7 @@
 管理员面板路由
 所有端点都需要 admin 权限
 """
-import json, secrets
+import json, asyncio, secrets
 import logging
 from datetime import datetime, timedelta, timezone
 from fastapi import APIRouter, Depends, HTTPException, status, Query, UploadFile, File
