@@ -37,7 +37,7 @@ services:
     depends_on:
       postgres:
         condition: service_healthy
-    command: sh -c "python prestart.py && uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload"
+    command: sh -c "python prestart.py && uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload --reload-delay 3"
 
   frontend:
     build: ./frontend
