@@ -41,9 +41,12 @@ interface FriendRequest {
 function AvatarPic({ url, name, size = 'md' }: { url: string | null | undefined; name: string; size?: 'sm' | 'md' | 'lg' }) {
   const sizeClass = size === 'sm' ? 'w-7 h-7 text-[10px]' : size === 'lg' ? 'w-12 h-12 text-xl' : 'w-10 h-10 text-lg'
   return (
-    <div className={`${sizeClass} rounded-full bg-gradient-to-br from-primary-500 to-primary-700 flex items-center justify-center shrink-0 overflow-hidden shadow shadow-primary-500/15`}>
+    <div className={`${sizeClass} rounded-full shrink-0 overflow-hidden relative ${!url ? 'bg-gradient-to-br from-primary-500 to-primary-700 flex items-center justify-center shadow shadow-primary-500/15' : ''}`}>
       {url ? (
-        <img src={url} alt={name} className="w-full h-full rounded-full object-cover" />
+        <>
+          <div className="absolute inset-0.5 rounded-full bg-gradient-to-br from-primary-500 to-primary-700" />
+          <img src={url} alt={name} className="relative w-full h-full rounded-full object-cover" />
+        </>
       ) : (
         <span className="text-white font-bold">{name.charAt(0)}</span>
       )}

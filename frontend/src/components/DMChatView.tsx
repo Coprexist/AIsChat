@@ -62,12 +62,18 @@ export default function DMChatView({ sessionId, onMobileBack }: DMChatViewProps)
           className="shrink-0"
           title={t('profileCard.viewProfile')}
         >
-          <div className={`w-8 h-8 rounded-full bg-gradient-to-bl flex items-center justify-center text-xs font-bold text-white overflow-hidden ${
-            partner?.type === 'system' ? 'from-rose-400 to-rose-600' : 'from-teal-400 to-teal-600'
-          }`}>
           {partner?.avatar_url ? (
-            <img src={partner.avatar_url} alt={partner.name || ''} className="w-full h-full rounded-full object-cover" />
-          ) : partner?.type === 'system' ? (
+            <div className="relative w-8 h-8 rounded-full overflow-hidden shrink-0">
+              <div className={`absolute inset-0.5 rounded-full bg-gradient-to-bl ${
+                partner?.type === 'system' ? 'from-rose-400 to-rose-600' : 'from-teal-400 to-teal-600'
+              }`} />
+              <img src={partner.avatar_url} alt={partner.name || ''} className="relative w-full h-full rounded-full object-cover" />
+            </div>
+          ) : (
+            <div className={`w-8 h-8 rounded-full bg-gradient-to-bl flex items-center justify-center text-xs font-bold text-white overflow-hidden ${
+              partner?.type === 'system' ? 'from-rose-400 to-rose-600' : 'from-teal-400 to-teal-600'
+            }`}>
+          {partner?.type === 'system' ? (
             <ShieldAlert size={14} className="text-white" />
           ) : (
             partner?.name?.charAt(0)?.toUpperCase() || '?'

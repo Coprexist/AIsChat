@@ -105,25 +105,38 @@ const MessageBubble = memo(function MessageBubble({
           <div className="absolute -inset-0.5 w-10 h-10 rounded-full ai-pulse-active" />
         )}
         {/* 头像 */}
-        <div
-          onClick={() => {
-            if (onAvatarClick && senderType && senderId && senderType !== 'system') {
-              onAvatarClick(senderType, senderId, senderName, state)
-            }
-          }}
-          className={`relative w-9 h-9 rounded-full flex items-center justify-center text-xs font-bold ${avatarGradientCls} ${senderType !== 'system' ? 'cursor-pointer hover:scale-105 transition-transform' : ''} shadow ${avatarGradientShadow} overflow-hidden`}
-          title={senderType === 'system' ? '系统通知' : thinking ? t('chat.thinking') : isTyping ? t('chat.typing') : t('chat.viewProfile').replace('{name}', senderName)}
-        >
-          {senderType === 'system' ? (
-            <ShieldAlert size={16} className="text-white" />
-          ) : (thinking || isTyping) ? (
-            <BouncingDots className="text-white/80" />
-          ) : senderAvatarUrl ? (
-            <img src={senderAvatarUrl} alt={senderName} className="w-full h-full rounded-full object-cover" />
-          ) : (
-            senderName.charAt(0).toUpperCase()
-          )}
-        </div>
+        {senderAvatarUrl ? (
+          <div
+            onClick={() => {
+              if (onAvatarClick && senderType && senderId && senderType !== 'system') {
+                onAvatarClick(senderType, senderId, senderName, state)
+              }
+            }}
+            className={`relative w-9 h-9 rounded-full overflow-hidden ${senderType !== 'system' ? 'cursor-pointer hover:scale-105 transition-transform' : ''} shadow ${avatarGradientShadow}`}
+            title={t('chat.viewProfile').replace('{name}', senderName)}
+          >
+            <div className={`absolute inset-0.5 rounded-full ${avatarGradient(senderType, isMine, false)}`} />
+            <img src={senderAvatarUrl} alt={senderName} className="relative w-full h-full rounded-full object-cover" />
+          </div>
+        ) : (
+          <div
+            onClick={() => {
+              if (onAvatarClick && senderType && senderId && senderType !== 'system') {
+                onAvatarClick(senderType, senderId, senderName, state)
+              }
+            }}
+            className={`relative w-9 h-9 rounded-full flex items-center justify-center text-xs font-bold ${avatarGradient(senderType, isMine, false)} ${senderType !== 'system' ? 'cursor-pointer hover:scale-105 transition-transform' : ''} shadow ${avatarGradientShadow} overflow-hidden`}
+            title={senderType === 'system' ? '系统通知' : thinking ? t('chat.thinking') : isTyping ? t('chat.typing') : t('chat.viewProfile').replace('{name}', senderName)}
+          >
+            {senderType === 'system' ? (
+              <ShieldAlert size={16} className="text-white" />
+            ) : (thinking || isTyping) ? (
+              <BouncingDots className="text-white/80" />
+            ) : (
+              senderName.charAt(0).toUpperCase()
+            )}
+          </div>
+        )}
         {/* 在线状态点 */}
         {!isMine && state && !thinking && !isTyping && (
           <span className={`absolute -bottom-0.5 -right-0.5 w-3 h-3 rounded-full ${stateColor} border-2 border-canvas`} />

@@ -288,15 +288,24 @@ export default function ChatSidebar({
               >
                 <div className="flex items-center gap-2.5">
                   {/* 对方头像 */}
-                  <div className={`w-9 h-9 rounded-full bg-gradient-to-bl flex items-center justify-center shrink-0 relative overflow-hidden ${
-                    s.partner.type === 'system' ? 'from-rose-400 to-rose-600' : 'from-teal-400 to-teal-600'
-                  }`}>
+                  <div className="w-9 h-9 rounded-full relative shrink-0 overflow-hidden">
                     {s.partner.avatar_url ? (
-                      <img src={s.partner.avatar_url} alt="" className="w-full h-full rounded-full object-cover" />
-                    ) : s.partner.type === 'system' ? (
-                      <ShieldAlert size={16} className="text-white" />
+                      <>
+                        <div className={`absolute inset-0.5 rounded-full bg-gradient-to-bl ${
+                          s.partner.type === 'system' ? 'from-rose-400 to-rose-600' : 'from-teal-400 to-teal-600'
+                        }`} />
+                        <img src={s.partner.avatar_url} alt="" className="relative w-full h-full rounded-full object-cover" />
+                      </>
                     ) : (
-                      <span className="text-xs font-bold text-white">{s.partner.name?.charAt(0)?.toUpperCase() || '?'}</span>
+                      <div className={`w-full h-full rounded-full bg-gradient-to-bl flex items-center justify-center ${
+                        s.partner.type === 'system' ? 'from-rose-400 to-rose-600' : 'from-teal-400 to-teal-600'
+                      }`}>
+                        {s.partner.type === 'system' ? (
+                          <ShieldAlert size={16} className="text-white" />
+                        ) : (
+                          <span className="text-xs font-bold text-white">{s.partner.name?.charAt(0)?.toUpperCase() || '?'}</span>
+                        )}
+                      </div>
                     )}
                     {s.partner.type !== 'system' && (
                       <span className={`absolute -bottom-0.5 -right-0.5 w-3 h-3 rounded-full border-2 border-surface ${getStateDotColor(s.partner.state)}`} />

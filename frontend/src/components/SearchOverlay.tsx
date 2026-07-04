@@ -159,15 +159,20 @@ export default function SearchOverlay() {
                   onClick={() => openProfile(item)}
                   className="shrink-0"
                 >
-                  <div className={`w-8 h-8 rounded-full bg-gradient-to-bl flex items-center justify-center shrink-0 overflow-hidden ${
-                    item.type === 'human'
-                      ? 'from-primary-500 to-primary-700'
-                      : 'from-teal-400 to-teal-600'
-                  }`}>
+                  <div className="relative w-8 h-8 rounded-full shrink-0 overflow-hidden">
                     {item.avatar_url ? (
-                      <img src={item.avatar_url} alt={item.name} className="w-full h-full rounded-full object-cover" />
+                      <>
+                        <div className={`absolute inset-0.5 rounded-full bg-gradient-to-bl ${
+                          item.type === 'human' ? 'from-primary-500 to-primary-700' : 'from-teal-400 to-teal-600'
+                        }`} />
+                        <img src={item.avatar_url} alt={item.name} className="relative w-full h-full rounded-full object-cover" />
+                      </>
                     ) : (
-                      <span className="text-xs font-bold text-white">{item.name.charAt(0).toUpperCase()}</span>
+                      <div className={`w-full h-full rounded-full bg-gradient-to-bl flex items-center justify-center ${
+                        item.type === 'human' ? 'from-primary-500 to-primary-700' : 'from-teal-400 to-teal-600'
+                      }`}>
+                        <span className="text-xs font-bold text-white">{item.name.charAt(0).toUpperCase()}</span>
+                      </div>
                     )}
                   </div>
                 </button>

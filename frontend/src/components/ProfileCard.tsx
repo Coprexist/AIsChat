@@ -129,15 +129,24 @@ export default function ProfileCard({ entityType, entityId, entityName, state, o
         <div className="flex items-start justify-between mb-4">
           <div className="flex items-center gap-3 flex-1 min-w-0">
             {/* 头像 */}
-            <div className={`w-14 h-14 rounded-full bg-gradient-to-bl flex items-center justify-center shrink-0 overflow-hidden ${
+            <div className={`relative w-14 h-14 rounded-full flex items-center justify-center shrink-0 overflow-hidden ${
               entityType === 'human'
                 ? 'from-primary-500 to-primary-700'
                 : 'from-teal-400 to-teal-600'
             }`}>
               {avatarUrl ? (
-                <img src={avatarUrl} alt={name} className="w-full h-full rounded-full object-cover" />
+                <>
+                  <div className={`absolute inset-0.5 rounded-full bg-gradient-to-bl ${
+                    entityType === 'human' ? 'from-primary-500 to-primary-700' : 'from-teal-400 to-teal-600'
+                  }`} />
+                  <img src={avatarUrl} alt={name} className="relative w-full h-full rounded-full object-cover" />
+                </>
               ) : (
-                <span className="text-xl font-bold text-white">{name.charAt(0).toUpperCase()}</span>
+                <div className={`w-full h-full rounded-full bg-gradient-to-bl flex items-center justify-center ${
+                  entityType === 'human' ? 'from-primary-500 to-primary-700' : 'from-teal-400 to-teal-600'
+                }`}>
+                  <span className="text-xl font-bold text-white">{name.charAt(0).toUpperCase()}</span>
+                </div>
               )}
             </div>
             <div className="min-w-0">

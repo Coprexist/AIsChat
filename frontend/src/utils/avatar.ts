@@ -31,6 +31,9 @@ export function avatarGradient(
   return 'bg-gradient-to-bl from-teal-400 to-teal-600'
 }
 
+/** 内层渐变缩进尺寸——比外层小 1px，防抗锯齿溢出 */
+export const AVATAR_GRADIENT_INSET = 'inset-0.5'
+
 /** 头像阴影色 */
 export function avatarShadowColor(
   senderType: string | undefined,
