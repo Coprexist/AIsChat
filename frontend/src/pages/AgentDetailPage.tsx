@@ -265,7 +265,8 @@ export default function AgentDetailPage() {
   const [loading, setLoading] = useState(true)
   const [activeTab, setActiveTab] = useState<'info' | 'memories' | 'storage' | 'workspace' | 'logs' | 'collaborators'>('info')
   const [showFullSettings, setShowFullSettings] = useState(false)
-  const [modelOptions, setModelOptions] = useState<{ value: string; label: string }[]>([])
+  const [modelOptions, setModelOptions] = useState<{ value: string; label: string; provider_name?: string; provider_key?: string }[]>([])
+  const [providersList, setProvidersList] = useState<{ name: string; provider: string; base_url: string; thinking_supported: boolean; is_default: boolean; models: { value: string; label: string }[] }[]>([])
   const [defaultModels, setDefaultModels] = useState({ chat_model: '', work_model: '' })
   const [thinkingSupported, setThinkingSupported] = useState(true)
   // 文件删除确认
@@ -466,6 +467,7 @@ export default function AgentDetailPage() {
     api.get<{ models: { value: string; label: string }[]; defaults: { chat_model: string; work_model: string }; thinking_supported: boolean }>('/agents/models')
       .then(data => {
         setModelOptions(data.models || [])
+        setProvidersList((data as any).providers || [])
         setDefaultModels(data.defaults || { chat_model: '', work_model: '' })
         setThinkingSupported(data.thinking_supported !== false)
       })
@@ -1630,6 +1632,7 @@ export default function AgentDetailPage() {
         <AgentSettingsModal
           agent={agent}
           modelOptions={modelOptions}
+          providers={providersList}
           defaults={defaultModels}
           thinkingSupported={thinkingSupported}
           isOpen={showFullSettings}

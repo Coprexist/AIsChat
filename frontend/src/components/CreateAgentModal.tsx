@@ -9,7 +9,17 @@ import Toggle from './Toggle'
 interface ModelOption {
   value: string
   label: string
+  provider_name?: string
+  provider_key?: string
+}
+
+interface ProviderInfo {
+  name: string
   provider: string
+  base_url: string
+  thinking_supported: boolean
+  is_default: boolean
+  models: ModelOption[]
 }
 
 interface PresetData {
@@ -202,6 +212,21 @@ function SubIcon({ name, size }: { name: string; size?: number }) {
   return <Icon size={size ?? 20} />
 }
 
+// ── 模型选项渲染（按供应商分组）──
+function renderModelOptions(models: ModelOption[], providers: ProviderInfo[]) {
+  if (providers.length > 0) {
+    return providers.map(p => (
+      <optgroup key={p.name} label={`${p.name}${p.is_default ? ' ★' : ''}`}>
+        {p.models.map(m => (
+          <option key={m.value} value={m.value}>{m.label}</option>
+        ))}
+      </optgroup>
+    ))
+  }
+  // 无供应商数据时回退到扁平列表
+  return models.map(m => <option key={m.value} value={m.value}>{m.label}</option>)
+}
+
 // ── 组件 ──
 
 export default function CreateAgentModal({
@@ -263,6 +288,7 @@ export default function CreateAgentModal({
 
   // 加载中的模型选项
   const [modelOptions, setModelOptions] = useState<ModelOption[]>([])
+  const [providers, setProviders] = useState<ProviderInfo[]>([])
   const [defaults, setDefaults] = useState<{ chat_model: string; work_model: string }>({ chat_model: '', work_model: '' })
   const [thinkingSupported, setThinkingSupported] = useState(false)
 
@@ -297,9 +323,10 @@ export default function CreateAgentModal({
   }, [selectedSub, selectedPreset])
 
   useEffect(() => {
-    api.get<{ models: ModelOption[]; defaults: { chat_model: string; work_model: string }; provider: { thinking_supported: boolean } }>('/agents/models')
+    api.get<{ models: ModelOption[]; providers: ProviderInfo[]; defaults: { chat_model: string; work_model: string }; provider: { thinking_supported: boolean } }>('/agents/models')
       .then(data => {
         setModelOptions(data.models)
+        setProviders(data.providers || [])
         setDefaults(data.defaults)
         setThinkingSupported(data.provider?.thinking_supported ?? false)
       })
@@ -943,7 +970,7 @@ function DetailSettingsModal({
                 <select value={chatModel} onChange={(e) => setChatModel(e.target.value)}
                   className="w-full px-3 py-2 rounded-lg border border-border bg-canvas text-sm text-textPrimary focus:outline-none focus:ring-2 focus:ring-primary-500/50">
                   <option value="">{t('modal.detailSettingsGlobalDefault')}</option>
-                  {modelOptions.map(m => <option key={m.value} value={m.value}>{m.label}</option>)}
+                  {renderModelOptions(modelOptions, providers)}
                 </select>
               </div>
               <div>
@@ -953,7 +980,7 @@ function DetailSettingsModal({
                 <select value={workModel} onChange={(e) => setWorkModel(e.target.value)}
                   className="w-full px-3 py-2 rounded-lg border border-border bg-canvas text-sm text-textPrimary focus:outline-none focus:ring-2 focus:ring-primary-500/50">
                   <option value="">{t('modal.detailSettingsGlobalDefault')}</option>
-                  {modelOptions.map(m => <option key={m.value} value={m.value}>{m.label}</option>)}
+                  {renderModelOptions(modelOptions, providers)}
                 </select>
               </div>
             </div>

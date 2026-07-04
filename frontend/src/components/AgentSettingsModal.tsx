@@ -52,11 +52,23 @@ interface AgentData {
 interface ModelOption {
   value: string
   label: string
+  provider_name?: string
+  provider_key?: string
+}
+
+interface ProviderItem {
+  name: string
+  provider: string
+  base_url: string
+  thinking_supported: boolean
+  is_default: boolean
+  models: ModelOption[]
 }
 
 interface Props {
   agent: AgentData
   modelOptions: ModelOption[]
+  providers?: ProviderItem[]
   defaults: { chat_model: string; work_model: string }
   thinkingSupported: boolean
   isOpen: boolean
@@ -77,8 +89,22 @@ const PROFILE_OPTIONS = [
   { value: 'digital_life', label: 'agentDetail.profileDigitalLife', desc: 'agentDetail.profileDigitalLifeDesc', color: 'bg-violet-500/10 text-violet-400 border-violet-400/30' },
 ]
 
+/** 模型选项渲染（按供应商分组）*/
+function renderGroupedModels(models: ModelOption[], providers?: ProviderItem[]) {
+  if (providers && providers.length > 0) {
+    return providers.map(p => (
+      <optgroup key={p.name} label={`${p.name}${p.is_default ? ' ★' : ''}`}>
+        {p.models.map(m => (
+          <option key={m.value} value={m.value}>{m.label}</option>
+        ))}
+      </optgroup>
+    ))
+  }
+  return models.map(m => <option key={m.value} value={m.value}>{m.label}</option>)
+}
+
 export default function AgentSettingsModal({
-  agent, modelOptions, defaults, thinkingSupported, isOpen, onClose, onSaved,
+  agent, modelOptions, providers, defaults, thinkingSupported, isOpen, onClose, onSaved,
 }: Props) {
   const t = useT()
 
@@ -374,7 +400,7 @@ export default function AgentSettingsModal({
                     <select value={chatModel} onChange={(e) => setChatModel(e.target.value)}
                       className="w-full px-3 py-2 rounded-lg border border-border bg-canvas text-sm text-textPrimary focus:outline-none focus:ring-2 focus:ring-primary-500/50">
                       <option value="">{t('modal.detailSettingsGlobalDefault')}</option>
-                      {modelOptions.map(m => <option key={m.value} value={m.value}>{m.label}</option>)}
+                      {renderGroupedModels(modelOptions, providers)}
                     </select>
                   </div>
                   <div>
@@ -384,7 +410,7 @@ export default function AgentSettingsModal({
                     <select value={workModel} onChange={(e) => setWorkModel(e.target.value)}
                       className="w-full px-3 py-2 rounded-lg border border-border bg-canvas text-sm text-textPrimary focus:outline-none focus:ring-2 focus:ring-primary-500/50">
                       <option value="">{t('modal.detailSettingsGlobalDefault')}</option>
-                      {modelOptions.map(m => <option key={m.value} value={m.value}>{m.label}</option>)}
+                      {renderGroupedModels(modelOptions, providers)}
                     </select>
                   </div>
                 </div>
