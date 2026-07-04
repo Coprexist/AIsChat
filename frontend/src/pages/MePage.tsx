@@ -280,7 +280,7 @@ export default function MePage() {
           {/* 头像 */}
           <div className="shrink-0">
             {user.avatar_url ? (
-              <div className="w-16 h-16 rounded-full bg-gradient-to-br from-primary-500 to-primary-700 p-px shadow shadow-primary-500/25 overflow-hidden">
+              <div className="w-16 h-16 rounded-full bg-gradient-to-br from-primary-500 to-primary-700 shadow shadow-primary-500/25 overflow-hidden">
                 <img src={user.avatar_url} className="w-full h-full rounded-full object-cover" />
               </div>
             ) : (
@@ -403,7 +403,7 @@ export default function MePage() {
                 className="shrink-0 w-28 bg-canvas rounded-xl p-3 border border-border hover:border-primary-400/30 transition-colors text-center"
               >
                 {a.avatar_url ? (
-                  <div className="w-10 h-10 rounded-full bg-gradient-to-br from-primary-500 to-primary-700 p-px mx-auto mb-1.5 shadow shadow-primary-500/15 overflow-hidden">
+                  <div className="w-10 h-10 rounded-full bg-gradient-to-br from-primary-500 to-primary-700 mx-auto mb-1.5 shadow shadow-primary-500/15 overflow-hidden">
                     <img src={a.avatar_url} className="w-full h-full rounded-full object-cover" />
                   </div>
                 ) : (
