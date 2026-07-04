@@ -672,12 +672,12 @@ async def upload_agent_avatar(
     if len(content) > max_bytes:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=f"头像不能超过 {settings.avatar_max_size_mb}MB")
 
-    # 压缩头像（≤2MB）
+    # 压缩头像（≤2MB，保持透明通道）
     from app.utils.image_compress import compress_avatar
     content = compress_avatar(content)
+    ext = "png" if content[:4] == b'\x89PNG' else "jpg"
 
     # 保存到统一头像目录
-    ext = "jpg"  # 压缩后统一 JPEG
     filename = f"agent_{agent_id}_{uuid.uuid4().hex[:8]}.{ext}"
     upload_dir = "/app/uploads/avatars"
     os.makedirs(upload_dir, exist_ok=True)
