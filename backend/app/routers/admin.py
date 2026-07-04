@@ -1652,7 +1652,8 @@ async def add_opencli_preset_commands(
         {"pattern": "file_info",   "is_regex": False, "description": "ℹ️ 文件信息 — 查看文件大小、修改时间等元信息"},
         {"pattern": "create_dir",  "is_regex": False, "description": "📁 创建目录 — 在自己文件空间里创建新文件夹"},
         # ── 浏览器自动化（操控已登录的 Chrome 浏览器） ──
-        {"pattern": "browser",   "is_regex": False, "description": "🌐 浏览器操作 — AI 能打开网页、截图、点击、填表、抓取内容"},
+        {"pattern": "browser",   "is_regex": False, "description": "🌐 浏览器操作 — AI 能打开网页、截图、点击、填表、抓取内容（依赖 Chrome 环境）"},
+        {"pattern": "curl .*",  "is_regex": True,  "description": "🌐 curl 网页抓取 — 纯命令行 HTTP 请求，不需要 Chrome。用法: curl https://example.com"},
         {"pattern": "list",      "is_regex": False, "description": "📋 列出命令 — AI 查看当前可用的所有 OpenCLI 命令"},
         # ── 外部 CLI 桥接（将已有命令行工具接入 OpenCLI） ──
         {"pattern": "gh .*",     "is_regex": True,  "description": "🐙 GitHub CLI — 浏览仓库、PR、Issue、搜索（需 gh CLI 已登录）"},

@@ -30,8 +30,6 @@ services:
       DATABASE_URL: postgresql+asyncpg://ai_chat:${DB_PASSWORD}@postgres:5432/ai_group_chat
       DATABASE_URL_SYNC: postgresql://ai_chat:${DB_PASSWORD}@postgres:5432/ai_group_chat
       JWT_SECRET_KEY: ${JWT_SECRET_KEY}
-    security_opt:
-      - seccomp:unconfined
     volumes:
       - ${DATA_DIR:-./data}:/app/data
       - ${DATA_DIR:-./data}/uploads:/app/uploads
@@ -60,8 +58,3 @@ services:
       backend:
         condition: service_healthy
     command: yarn dev -- --host 0.0.0.0
-
-networks:
-  default:
-    driver_opts:
-      com.docker.network.driver.mtu: 1400
