@@ -48,14 +48,14 @@ interface NavSection {
 }
 const NAV_SECTIONS: NavSection[] = [
   { id: 'quota',       icon: Zap,     labelKey: 'settings.quotaTitle',      category: 'settings.catAccount' },
+  { id: 'email',       icon: Mail,    labelKey: 'auth.email',                category: 'settings.catAccount' },
   { id: 'api',         icon: Key,     labelKey: 'settings.apiConfigTitle',   category: 'settings.catApi' },
   { id: 'timezone',    icon: Clock,   labelKey: 'settings.timezone',         category: 'settings.catPrefs' },
   { id: 'language',    icon: Globe,   labelKey: 'settings.language',         category: 'settings.catPrefs' },
   { id: 'chatstyle',   icon: Layout,  labelKey: 'settings.chatStyle',        category: 'settings.catPrefs' },
-  { id: 'strategy',    icon: Zap,     labelKey: 'settings.strategy',         category: 'settings.catBehavior' },
-  { id: 'appearance',  icon: Palette, labelKey: 'settings.appearance',       category: 'settings.appearance' },
-  { id: 'notifications', icon: Bell,  labelKey: 'settings.notifications',   category: 'settings.appearance' },
-  { id: 'email',         icon: Mail,  labelKey: 'auth.email',                category: 'settings.catAccount' },
+  { id: 'appearance',  icon: Palette, labelKey: 'settings.appearance',       category: 'settings.catPrefs' },
+  { id: 'notifications', icon: Bell,  labelKey: 'settings.notifications',   category: 'settings.catPrefs' },
+  { id: 'strategy',    icon: Zap,     labelKey: 'settings.strategy',         category: 'settings.catPrefs' },
   ...(isDesktop() ? [
     { id: 'desktop',  icon: Monitor, labelKey: 'settings.desktopSection',     category: 'settings.catDesktop' },
   ] : []),
