@@ -99,36 +99,28 @@ async def list_user_groups(db: AsyncSession, user_id: int) -> list[dict]:
         last_message_preview = None
         last_message_at = None
 
-        if m.last_read_at:
-            # 统计 last_read_at 之后的消息
+        # 兜底：last_read_at 为 NULL 时用 joined_at，避免统计全量历史
+        read_baseline = m.last_read_at or m.joined_at
+        if read_baseline:
             count_result = await db.execute(
                 select(sqlfunc.count(Message.id)).where(
                     Message.group_id == group.id,
-                    Message.created_at > m.last_read_at,
+                    Message.created_at > read_baseline,
                     ~((Message.sender_type == "human") & (Message.sender_id == user_id)),
                 )
             )
             unread_count = count_result.scalar() or 0
 
-            # @提及检测
             if username and unread_count > 0:
                 mention_result = await db.execute(
                     select(Message).where(
                         Message.group_id == group.id,
-                        Message.created_at > m.last_read_at,
+                        Message.created_at > read_baseline,
                         Message.content.contains(f"@{username}"),
                     ).limit(1)
                 )
                 has_mention = mention_result.scalar_one_or_none() is not None
-        else:
-            # 从未读过 → 简单统计
-            count_result = await db.execute(
-                select(sqlfunc.count(Message.id)).where(
-                    Message.group_id == group.id,
-                    ~((Message.sender_type == "human") & (Message.sender_id == user_id)),
-                )
-            )
-            unread_count = count_result.scalar() or 0
+        # read_baseline 为 None（极端情况：无 last_read_at 也无 joined_at）→ unread_count = 0
 
         # 最后一条消息预览（始终查询，无论是否访问过）
         last_msg_result = await db.execute(
@@ -959,13 +951,11 @@ async def get_unread_info(
     member = await _get_member(db, group_id, "human", user_id)
     last_read = member.last_read_at if member else None
 
-    # 统计未读消息数
+    # 统计未读消息数（last_read 为 NULL 时用 joined_at 兜底）
+    read_baseline = last_read or (member.joined_at if member else None)
     base_query = select(Message).where(Message.group_id == group_id)
-    if last_read:
-        base_query = base_query.where(Message.created_at > last_read)
-    else:
-        # 从未读过 → 全部算未读
-        pass
+    if read_baseline:
+        base_query = base_query.where(Message.created_at > read_baseline)
 
     # 排除自己的消息
     base_query = base_query.where(
