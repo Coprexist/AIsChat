@@ -222,17 +222,17 @@ export default function AdminPage() {
 function OverviewTab() {
   const t = useT()
   const [stats, setStats] = useState<any>(null)
-  const [mt, setMt] = useState<{ auto: boolean; manual: boolean }>({ auto: false, manual: false })
+  const [mt, setMt] = useState<{ hard: boolean; soft: boolean; auto: boolean }>({ hard: false, soft: false, auto: false })
   useEffect(() => {
     api.get('/admin/overview').then(setStats).catch(console.error)
-    api.get('/admin/maintenance').then((d: any) => setMt({ auto: !!d.auto, manual: !!d.manual })).catch(() => {})
+    api.get('/admin/maintenance').then((d: any) => setMt({ hard: !!d.hard, soft: !!d.soft, auto: !!d.auto })).catch(() => {})
   }, [])
 
-  const toggleMaintenance = async () => {
-    try {
-      const d: any = await api.post('/admin/maintenance/toggle')
-      setMt({ auto: !!d.hard || !!d.auto, manual: !!d.manual })
-    } catch {}
+  const toggleHard = async () => {
+    try { const d: any = await api.post('/admin/maintenance/hard'); setMt(prev => ({ ...prev, hard: !!d.hard })) } catch {}
+  }
+  const toggleSoft = async () => {
+    try { const d: any = await api.post('/admin/maintenance/soft'); setMt(prev => ({ ...prev, soft: !!d.soft })) } catch {}
   }
 
   if (!stats) return <p className="text-textMuted">{t('common.loading')}</p>
@@ -245,28 +245,34 @@ function OverviewTab() {
         <StatCard label={t('admin.totalGroups')} value={stats.total_groups} icon={MessageCircle} />
         <StatCard label={t('admin.pendingRequests')} value={stats.pending_vector_requests} icon={Activity} />
       </div>
-      <div className={`p-4 rounded-xl border ${(mt.auto || mt.manual) ? 'border-amber-500/40 bg-amber-500/5' : 'border-border bg-surface'}`}>
-        <div className="flex items-center justify-between">
+      <div className={`p-4 rounded-xl border ${(mt.hard || mt.soft) ? 'border-amber-500/40 bg-amber-500/5' : 'border-border bg-surface'}`}>
+        <div className="flex items-center justify-between flex-wrap gap-3">
           <div className="flex items-center gap-3">
-            <div className={`w-10 h-10 rounded-xl flex items-center justify-center ${(mt.auto || mt.manual) ? 'bg-amber-500/10' : 'bg-mint-400/10'}`}>
-              <Wrench size={20} className={(mt.auto || mt.manual) ? 'text-amber-400' : 'text-mint-400'} />
+            <div className={`w-10 h-10 rounded-xl flex items-center justify-center ${(mt.hard || mt.soft) ? 'bg-amber-500/10' : 'bg-mint-400/10'}`}>
+              <Wrench size={20} className={(mt.hard || mt.soft) ? 'text-amber-400' : 'text-mint-400'} />
             </div>
             <div>
               <p className="font-medium text-textPrimary">维护模式</p>
               <p className="text-xs text-textSecondary">
-                {mt.auto && '🔒 硬维护（后端503）'}
-                {mt.auto && mt.manual && ' · '}
-                {mt.manual && '⚠️ 软维护（API正常，前端提示）'}
-                {!mt.auto && !mt.manual && '已关闭——服务正常运行'}
+                {mt.hard ? '🔒 暂停服务' : ''}{mt.hard && mt.soft ? ' · ' : ''}{mt.soft ? '⚠️ 维护提示' : ''}
+                {!mt.hard && !mt.soft && '正常'}
               </p>
             </div>
           </div>
-          <button onClick={toggleMaintenance}
-            className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
-              mt.manual ? 'bg-mint-500 hover:bg-mint-400 text-white' : 'bg-amber-500 hover:bg-amber-400 text-white'
-            }`}>
-            {mt.manual ? '关闭软维护' : '开启软维护'}
-          </button>
+          <div className="flex gap-2">
+            <button onClick={toggleHard}
+              className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-colors ${
+                mt.hard ? 'bg-mint-500 hover:bg-mint-400 text-white' : 'bg-rose-500/10 hover:bg-rose-500/20 text-rose-400 border border-rose-500/30'
+              }`}>
+              {mt.hard ? '恢复服务' : '暂停服务'}
+            </button>
+            <button onClick={toggleSoft}
+              className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-colors ${
+                mt.soft ? 'bg-mint-500 hover:bg-mint-400 text-white' : 'bg-amber-500/10 hover:bg-amber-500/20 text-amber-400 border border-amber-500/30'
+              }`}>
+              {mt.soft ? '取消提示' : '维护提示'}
+            </button>
+          </div>
         </div>
       </div>
     </div>

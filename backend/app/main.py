@@ -2,6 +2,7 @@
 AI群聊社交网络 - FastAPI 主应用入口
 """
 import asyncio
+import json
 import logging
 from contextlib import asynccontextmanager
 from fastapi import FastAPI
@@ -122,7 +123,7 @@ async def lifespan(app: FastAPI):
     # 启动完成，退出自动维护（但手动维护仍生效）
     if _os.path.exists(_MAINTENANCE_AUTO):
         _os.remove(_MAINTENANCE_AUTO)
-        logger.info("🟢 自动维护已关闭，服务就绪" if not _os.path.exists(_MAINTENANCE_MANUAL) else "🟡 服务就绪但手动维护模式仍开启")
+        logger.info("🟢 自动维护已关闭，服务就绪" if not _os.path.exists(_MAINTENANCE_SOFT) else "🟡 服务就绪但软维护仍开启")
 
     yield
 
@@ -175,25 +176,41 @@ app.add_middleware(
 # 维护模式中间件
 import os as _os
 _MAINTENANCE_AUTO = "/tmp/maintenance_startup"
-_MAINTENANCE_MANUAL = "/tmp/maintenance_manual"
+_MAINTENANCE_SOFT = "/tmp/maintenance_soft"
+_MAINTENANCE_ADMIN_HARD = "/tmp/maintenance_admin_hard"
+_MAINTENANCE_MSG_FILE = "/tmp/maintenance_msg.json"
+
+def _get_maintenance_msg() -> dict:
+    """读取自定义维护文本，不存在则返回默认"""
+    try:
+        if _os.path.exists(_MAINTENANCE_MSG_FILE):
+            with open(_MAINTENANCE_MSG_FILE) as f:
+                return json.loads(f.read())
+    except Exception:
+        pass
+    return {
+        "hard_title": "正在更新",
+        "hard_body": "服务器正在更新，稍等一下就好~",
+        "soft_text": "服务器正在调整，功能可能偶尔不稳定",
+    }
 
 @app.middleware("http")
 async def maintenance_middleware(request, call_next):
     path = request.url.path
-    # 放行：健康检查 + 管理端点
     bypass = path in ("/health", "/", "/docs", "/openapi.json") or path.startswith("/admin")
 
-    # 硬维护（自动）：503 拦截
-    if _os.path.exists(_MAINTENANCE_AUTO) and not bypass:
+    # 硬维护（自动启动/关闭 或 管理员手动）：503 拦截
+    if (_os.path.exists(_MAINTENANCE_AUTO) or _os.path.exists(_MAINTENANCE_ADMIN_HARD)) and not bypass:
+        msg = _get_maintenance_msg()
         from fastapi.responses import JSONResponse
         return JSONResponse(
             status_code=503,
-            content={"detail": "服务器正在维护中，请稍后再来", "maintenance": True, "hard": True}
+            content={"detail": msg["hard_body"], "maintenance": True, "hard": True}
         )
 
     # 软维护（手动）：API 正常但前端显示提示
     response = await call_next(request)
-    if _os.path.exists(_MAINTENANCE_MANUAL) and not bypass:
+    if _os.path.exists(_MAINTENANCE_SOFT) and not bypass:
         response.headers["X-Maintenance"] = "true"
     return response
 
@@ -226,6 +243,11 @@ async def root():
         "version": "0.1.0",
         "status": "running",
     }
+
+
+@app.get("/maintenance-msg")
+async def public_maintenance_msg():
+    return _get_maintenance_msg()
 
 
 @app.get("/health")

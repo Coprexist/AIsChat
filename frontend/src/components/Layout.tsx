@@ -9,12 +9,28 @@ import { Wrench } from 'lucide-react'
 export default function Layout() {
   const [drawerOpen, setDrawerOpen] = useState(false)
   const [maintenance, setMaintenance] = useState(false)
+  const [hardText, setHardText] = useState({ title: '正在更新', body: '服务器正在更新，稍等一下就好~' })
   const [softMaintenance, setSoftMaintenance] = useState(false)
+  const [softText, setSoftText] = useState('服务器正在调整，功能可能偶尔不稳定')
   const location = useLocation()
 
   useEffect(() => {
-    const h1 = () => setMaintenance(true)
-    const h2 = () => setSoftMaintenance(true)
+    const h1 = async () => {
+      setMaintenance(true)
+      try {
+        const res = await fetch('/api/maintenance-msg')
+        const d = await res.json()
+        if (d.hard_title) setHardText({ title: d.hard_title, body: d.hard_body })
+      } catch {}
+    }
+    const h2 = async () => {
+      setSoftMaintenance(true)
+      try {
+        const res = await fetch('/api/maintenance-msg')
+        const d = await res.json()
+        if (d.soft_text) setSoftText(d.soft_text)
+      } catch {}
+    }
     window.addEventListener('maintenance-mode', h1)
     window.addEventListener('maintenance-soft', h2)
     return () => {
@@ -68,7 +84,7 @@ export default function Layout() {
       {/* 软维护顶栏（API正常，仅提示） */}
       {softMaintenance && (
         <div className="fixed top-0 left-0 right-0 z-[65] bg-amber-500/90 text-white text-xs text-center py-1.5 px-4 font-medium">
-          服务器维护中——部分功能可能不稳定 · 管理员正在调整
+          {softText}
           <button onClick={() => setSoftMaintenance(false)} className="ml-2 underline opacity-80 hover:opacity-100">关闭</button>
         </div>
       )}
@@ -78,8 +94,8 @@ export default function Layout() {
         <div className="fixed inset-0 z-[70] flex items-center justify-center bg-black/60 p-4">
           <div className="bg-surface rounded-2xl p-6 max-w-sm w-full text-center shadow-2xl border border-border">
             <Wrench size={40} className="text-amber-400 mx-auto mb-3" />
-            <h2 className="text-lg font-semibold text-textPrimary mb-2">服务器维护中</h2>
-            <p className="text-sm text-textSecondary mb-4">管理员正在对服务器进行维护，请稍后再来。</p>
+            <h2 className="text-lg font-semibold text-textPrimary mb-2">{hardText.title}</h2>
+            <p className="text-sm text-textSecondary mb-4">{hardText.body}</p>
             <button onClick={() => setMaintenance(false)} className="px-4 py-2 text-sm rounded-lg bg-primary-500 text-white hover:bg-primary-400 transition-colors">
               知道了
             </button>

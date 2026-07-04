@@ -2481,24 +2481,52 @@ def _browser_status() -> dict:
 
 @router.get("/maintenance")
 async def get_maintenance(admin: dict = Depends(require_admin)):
-    auto = os.path.exists("/tmp/maintenance_startup")
-    manual = os.path.exists("/tmp/maintenance_manual")
     return {
-        "maintenance": auto or manual,
-        "auto": auto,
-        "manual": manual,
-        "hard": auto,   # 硬维护：后端503拦截
-        "soft": manual, # 软维护：API正常，仅前端提示
+        "auto": os.path.exists("/tmp/maintenance_startup"),
+        "hard": os.path.exists("/tmp/maintenance_admin_hard") or os.path.exists("/tmp/maintenance_startup"),
+        "soft": os.path.exists("/tmp/maintenance_soft"),
     }
 
 
-@router.post("/maintenance/toggle")
-async def toggle_maintenance(admin: dict = Depends(require_admin)):
-    if os.path.exists("/tmp/maintenance_manual"):
-        os.remove("/tmp/maintenance_manual")
-        return {"maintenance": os.path.exists("/tmp/maintenance_startup"), "manual": False, "message": "软维护已关闭"}
-    open("/tmp/maintenance_manual", "w").close()
-    return {"maintenance": True, "manual": True, "message": "软维护已开启——API正常但用户看到维护提示"}
+@router.post("/maintenance/hard")
+async def toggle_hard(admin: dict = Depends(require_admin)):
+    if os.path.exists("/tmp/maintenance_admin_hard"):
+        os.remove("/tmp/maintenance_admin_hard")
+        return {"hard": False, "message": "硬维护已关闭"}
+    open("/tmp/maintenance_admin_hard", "w").close()
+    return {"hard": True, "message": "硬维护已开启——API 返回 503"}
+
+
+@router.post("/maintenance/soft")
+async def toggle_soft(admin: dict = Depends(require_admin)):
+    if os.path.exists("/tmp/maintenance_soft"):
+        os.remove("/tmp/maintenance_soft")
+        return {"soft": False, "message": "软维护已关闭"}
+    open("/tmp/maintenance_soft", "w").close()
+    return {"soft": True, "message": "软维护已开启——API 正常，前端展示提示"}
+
+
+class MaintenanceMsgBody(BaseModel):
+    hard_title: str = "正在更新"
+    hard_body: str = "服务器正在更新，稍等一下就好~"
+    soft_text: str = "服务器正在调整，功能可能偶尔不稳定"
+
+
+@router.get("/maintenance/msg")
+async def get_maintenance_msg(admin: dict = Depends(require_admin)):
+    try:
+        if os.path.exists("/tmp/maintenance_msg.json"):
+            with open("/tmp/maintenance_msg.json") as f:
+                return json.loads(f.read())
+    except: pass
+    return {"hard_title": "正在更新", "hard_body": "服务器正在更新，稍等一下就好~", "soft_text": "服务器正在调整，功能可能偶尔不稳定"}
+
+
+@router.put("/maintenance/msg")
+async def save_maintenance_msg(body: MaintenanceMsgBody, admin: dict = Depends(require_admin)):
+    with open("/tmp/maintenance_msg.json", "w") as f:
+        f.write(json.dumps(body.model_dump(), ensure_ascii=False))
+    return {"ok": True, "message": "维护文本已保存"}
 
 
 @router.post("/plugins/browser/test")
