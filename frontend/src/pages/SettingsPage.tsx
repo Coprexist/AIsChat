@@ -364,7 +364,9 @@ export default function SettingsPage() {
 
   const startEditAgentApi = (agent: any) => {
     setEditingAgentId(agent.id)
-    setAgentApiBaseUrl(agent.api_base_url || '')
+    // 优先用已保存的，否则匹配默认预设
+    const saved = agent.api_base_url || ''
+    setAgentApiBaseUrl(saved || (providerPresets.find(p => p.is_default)?.base_url || ''))
     setAgentApiKey('')
   }
 
@@ -648,7 +650,8 @@ export default function SettingsPage() {
                           </div>
                           {providerPresets.length > 0 && (
                             <>
-                              <div className="flex flex-wrap gap-1.5">
+                              <label className="block text-xs text-textSecondary mb-1">厂商预设</label>
+                              <div className="flex flex-wrap gap-1.5 mb-1">
                                 {providerPresets.map(p => (
                                   <button
                                     key={p.name}
