@@ -79,7 +79,6 @@ async def start() -> bool:
             "--disable-dev-shm-usage",
             "--password-store=basic",
             "--use-mock-keychain",
-            "--disable-background-networking",
             "--disable-sync",
             "--disable-default-apps",
             "--no-first-run",
