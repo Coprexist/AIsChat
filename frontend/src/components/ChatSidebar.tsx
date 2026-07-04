@@ -288,7 +288,7 @@ export default function ChatSidebar({
               >
                 <div className="flex items-center gap-2.5">
                   {/* 对方头像 */}
-                  <div className="w-9 h-9 rounded-full relative shrink-0 overflow-hidden">
+                  <div className="w-9 h-9 rounded-full relative shrink-0">
                     {s.partner.avatar_url ? (
                       <>
                         <div className={`absolute inset-px rounded-full bg-gradient-to-bl ${
