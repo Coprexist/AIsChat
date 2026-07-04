@@ -997,21 +997,19 @@ async def build_messages(
             "   - 你确知双方认识（如他们曾在同一群聊、对话中提到过彼此）\n"
             "   - 当前对话者主动问起且语气自然（如「XX最近怎么样」而不是试探性提问）\n"
             "   以下情况绝不能说：陌生人、不熟的人、没有证据表明双方认识的人\n"
-            "## 聊天链规则
+            "## 聊天链规则（仅供参考，非强制）
 "
             "群聊消息间隔 < 2 分钟 = 同一聊天链；≥ 2 分钟无消息 = 链结束。
 "
-            "你每次回复后应自行判断是继续参与还是退出，不是必须跟每条消息。
+            "如果群里有多个 AI 同时回复，容易刷屏——此时你可以选择退让：
 "
-            "退出策略（三选一，你自行决定）：
+            "① 安静旁观：不回这条。@/公告会叫你。
 "
-            "① 退出聊天链：本链结束前不回应普通消息（链断后自动恢复），@/公告仍可穿透。
+            "② set_dnd：设免打扰 N 分钟，@/公告可穿透。
 "
-            "② 设群免打扰（set_dnd）：指定时长内不回应普通消息，@/公告可穿透。到期自动恢复。
+            "③ mute_group：设屏蔽（≤30 分钟），连 @/公告都不收。
 "
-            "③ 设群屏蔽（mute_group）：连 @/公告都不收。时间短（≤30 分钟），用于极度不想被打扰时。
-"
-            "一旦回复了某条消息，你就已参与当前链——后续同链消息可继续参与也可退出。
+            "以上都是可选项。话题有意思就接着聊，完全没毛病。
 "
         )
 
@@ -1067,7 +1065,6 @@ async def build_messages(
             query_text_v = " ".join([m.content[:100] for m in recent])
             relevant = await hybrid_search(db, group_id, query_text_v, top_k=limit)
             for r in reversed(relevant):
-                role = "user" if r.get("sender_type") == "human" else "assistant"
                 messages.append({
                     "role": role,
                     "content": f"[历史消息] {r.get('sender_name', '未知')}: {r.get('content', '')}",
@@ -1079,7 +1076,6 @@ async def build_messages(
     if not vector_accelerated:
         recent_messages = await get_recent_messages(db, group_id, limit)
         for m in reversed(recent_messages):
-            role = "user" if m.sender_type == "human" else "assistant"
             md = message_to_dict(m)
             msg_struct = {
                 "time": format_time_shanghai(m.created_at),
@@ -1110,14 +1106,12 @@ async def build_dm_messages(
     system_prompt_override: str | None = None,
 ) -> list[dict]:
     """构建 DM 私信的消息列表（6 段系统提示词 + DM 历史消息）
-    v0.4.0: system_prompt_override 用于通用/半通用 AI 的 per-user 人格覆盖。"""
     from app.models.dm import DMMessage, DMSession
     from app.models.user import User
     from sqlalchemy import select as sa_select
 
     # ── 获取对方信息 ──
     partner_user_id = None
-    partner_name = "对方"
     try:
         dm_sess_result = await db.execute(
             sa_select(DMSession).where(DMSession.session_id == session_id)
@@ -1128,7 +1122,6 @@ async def build_dm_messages(
             name_result = await db.execute(
                 sa_select(User.username).where(User.id == partner_user_id)
             )
-            partner_name = name_result.scalar_one_or_none() or f"用户{partner_user_id}"
     except Exception:
         pass
 
@@ -1138,9 +1131,6 @@ async def build_dm_messages(
 
     # ── DM 上下文段（精简：标题格式已承载会话信息，不再重复说教）──
     dm_context = (
-        f"## 当前时间\n"
-        f"{now_str}\n"
-        f"\n"
         f"## 私信规则\n"
         f"- 回复对方用 send_dm(target_user_id={partner_user_id})，不要用 send_message（那是群聊工具）\n"
         f"- 不要在这里测试工具或自言自语——这里只有对方能看到\n"
@@ -1175,22 +1165,6 @@ async def build_dm_messages(
     # ── 构建六段（DM 使用精简协议，应用管理员覆盖）──
     dm_protocol = overrides.get("dm_protocol") or DM_PROTOCOL
     dm_ai_type = getattr(agent, 'ai_type', 'resonance') or 'resonance'
-            "## 聊天链规则
-"
-            "群聊消息间隔 < 2 分钟 = 同一聊天链；≥ 2 分钟无消息 = 链结束。
-"
-            "你每次回复后应自行判断是继续参与还是退出，不是必须跟每条消息。
-"
-            "退出策略（三选一，你自行决定）：
-"
-            "① 退出聊天链：本链结束前不回应普通消息（链断后自动恢复），@/公告仍可穿透。
-"
-            "② 设群免打扰（set_dnd）：指定时长内不回应普通消息，@/公告可穿透。到期自动恢复。
-"
-            "③ 设群屏蔽（mute_group）：连 @/公告都不收。时间短（≤30 分钟），用于极度不想被打扰时。
-"
-            "一旦回复了某条消息，你就已参与当前链——后续同链消息可继续参与也可退出。
-"
     if dm_ai_type not in ('general', 'semi_general'):
         dm_protocol += (
             "\n## 多个会话\n"
@@ -1202,6 +1176,20 @@ async def build_dm_messages(
             "   - 你确知双方认识（如他们曾在同一群聊、对话中提到过彼此）\n"
             "   - 当前对话者主动问起且语气自然（如「XX最近怎么样」而不是试探性提问）\n"
             "   以下情况绝不能说：陌生人、不熟的人、没有证据表明双方认识的人\n"
+            "## 聊天链规则（仅供参考，非强制）
+"
+            "群聊消息间隔 < 2 分钟 = 同一聊天链；≥ 2 分钟无消息 = 链结束。
+"
+            "如果群里有多个 AI 同时回复，容易刷屏——此时你可以选择退让：
+"
+            "① 安静旁观：不回这条。@/公告会叫你。
+"
+            "② set_dnd：设免打扰 N 分钟，@/公告可穿透。
+"
+            "③ mute_group：设屏蔽（≤30 分钟），连 @/公告都不收。
+"
+            "以上都是可选项。话题有意思就接着聊，完全没毛病。
+"
         )
     segments = {
         "core_identity": overrides.get("core_identity") or CORE_IDENTITY,
