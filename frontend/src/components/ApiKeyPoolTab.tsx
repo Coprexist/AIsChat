@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react'
 import { api } from '../api/client'
 import { useT } from '../i18n/I18nContext'
+import { getApiKeyUrl } from '../utils/providers'
 import { Key, Plus, Trash2, ToggleLeft, ToggleRight, Loader2, BarChart3, X } from 'lucide-react'
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell, Legend } from 'recharts'
 
@@ -244,7 +245,19 @@ function AddPoolKeyModal({ onClose, onSaved }: { onClose: () => void; onSaved: (
             />
           </div>
           <div>
-            <label className="block text-xs font-medium mb-1 text-textSecondary">{t('admin.keyApiKey')}</label>
+            <label className="block text-xs font-medium mb-1 text-textSecondary flex items-center gap-2">
+              {t('admin.keyApiKey')}
+              {apiBaseUrl && getApiKeyUrl(apiBaseUrl) && (
+                <a
+                  href={getApiKeyUrl(apiBaseUrl)}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="text-[10px] text-primary-400 hover:text-primary-300 underline underline-offset-2 font-normal"
+                >
+                  获取 API Key →
+                </a>
+              )}
+            </label>
             <input
               type="password" value={apiKey} onChange={(e) => setApiKey(e.target.value)}
               placeholder="sk-..."

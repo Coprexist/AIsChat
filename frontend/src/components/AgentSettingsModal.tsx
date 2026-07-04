@@ -60,6 +60,7 @@ interface ProviderItem {
   name: string
   provider: string
   base_url: string
+  api_key_url?: string
   thinking_supported: boolean
   is_default: boolean
   models: ModelOption[]
@@ -88,6 +89,22 @@ const PROFILE_OPTIONS = [
   { value: 'immersive', label: 'agentDetail.profileImmersive', desc: 'agentDetail.profileImmersiveDesc', color: 'bg-amber-500/10 text-amber-400 border-amber-400/30' },
   { value: 'digital_life', label: 'agentDetail.profileDigitalLife', desc: 'agentDetail.profileDigitalLifeDesc', color: 'bg-violet-500/10 text-violet-400 border-violet-400/30' },
 ]
+
+/** API Key 获取链接 */
+function ApiKeyGetLink({ providers }: { providers?: ProviderItem[] }) {
+  const defaultProvider = providers?.find(p => p.is_default) || providers?.[0]
+  if (!defaultProvider?.api_key_url) return null
+  return (
+    <a
+      href={defaultProvider.api_key_url}
+      target="_blank"
+      rel="noopener noreferrer"
+      className="text-[10px] text-primary-400 hover:text-primary-300 underline underline-offset-2 font-normal"
+    >
+      获取 API Key →
+    </a>
+  )
+}
 
 /** 模型选项渲染（按供应商分组）*/
 function renderGroupedModels(models: ModelOption[], providers?: ProviderItem[]) {
@@ -617,7 +634,10 @@ export default function AgentSettingsModal({
                     placeholder={t('modal.detailSettingsApiBaseUrlPlaceholder')} />
                 </div>
                 <div>
-                  <label className="block text-xs font-medium mb-1 text-textSecondary">API Key</label>
+                  <label className="block text-xs font-medium mb-1 text-textSecondary flex items-center gap-2">
+                    API Key
+                    <ApiKeyGetLink providers={providers} />
+                  </label>
                   <input type="password" value={apiKey} onChange={(e) => setApiKey(e.target.value)}
                     className="w-full px-3 py-2 rounded-lg border border-border bg-canvas text-sm text-textPrimary placeholder:text-textMuted focus:outline-none focus:ring-2 focus:ring-primary-500/50"
                     placeholder={agent.has_api_key ? '•••••••• (unchanged if empty)' : t('modal.detailSettingsApiKeyPlaceholder')} />

@@ -8,6 +8,7 @@ import { useResizableSidebar } from '../hooks/useResizableSidebar'
 import VerificationCodeInput from '../components/VerificationCodeInput'
 import { LANGUAGES } from '../i18n/languages'
 import { isDesktop } from '../utils/platform'
+import { getApiKeyUrl } from '../utils/providers'
 import { Key, Zap, Save, Clock, Palette, Bell, Eye, EyeOff, CheckCircle, XCircle, Loader2, Globe, Layout, Bot, Pencil, X, Ticket, Plus, ChevronDown, ChevronRight, Shield, AlertTriangle, ArrowLeft, Mail, Monitor, HardDrive, Trash2, Cpu, Wrench, Box, ExternalLink } from 'lucide-react'
 import { useNavigate, useBlocker, useLocation } from 'react-router-dom'
 
@@ -530,7 +531,19 @@ export default function SettingsPage() {
             <p className="text-[10px] text-textMuted mt-1">{t('settings.baseUrlDesc')}</p>
           </div>
           <div>
-            <label className="block text-xs font-medium mb-1.5 text-textSecondary">{t('settings.apiKey')}</label>
+            <label className="block text-xs font-medium mb-1.5 text-textSecondary flex items-center gap-2">
+              {t('settings.apiKey')}
+              {apiBaseUrl && (
+                <a
+                  href={getApiKeyUrl(apiBaseUrl)}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="text-[10px] text-primary-400 hover:text-primary-300 underline underline-offset-2 font-normal"
+                >
+                  获取 API Key →
+                </a>
+              )}
+            </label>
             <div className="relative">
               <input
                 type={showApiKey ? 'text' : 'password'}

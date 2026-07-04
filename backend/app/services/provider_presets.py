@@ -10,6 +10,7 @@ class ProviderPreset(TypedDict):
     key: str
     label: str
     base_url: str
+    api_key_url: str  # 获取 API Key 的官网链接
     chat_model: str
     work_model: str
     embedding_model: str
@@ -23,6 +24,7 @@ PRESETS: dict[str, ProviderPreset] = {
         "key": "deepseek",
         "label": "DeepSeek",
         "base_url": "https://api.deepseek.com",
+        "api_key_url": "https://platform.deepseek.com/api_keys",
         "chat_model": "deepseek-v4-flash",
         "work_model": "deepseek-v4-pro",
         "embedding_model": "deepseek-embed",
@@ -38,6 +40,7 @@ PRESETS: dict[str, ProviderPreset] = {
         "key": "openai",
         "label": "OpenAI / ChatGPT",
         "base_url": "https://api.openai.com",
+        "api_key_url": "https://platform.openai.com/api-keys",
         "chat_model": "gpt-4o",
         "work_model": "gpt-4o",
         "embedding_model": "text-embedding-3-small",
@@ -55,6 +58,7 @@ PRESETS: dict[str, ProviderPreset] = {
         "key": "ollama",
         "label": "Ollama（本地）",
         "base_url": "http://localhost:11434",
+        "api_key_url": "",
         "chat_model": "qwen3",
         "work_model": "qwen3:14b",
         "embedding_model": "nomic-embed-text",
@@ -73,6 +77,7 @@ PRESETS: dict[str, ProviderPreset] = {
         "key": "qwen",
         "label": "通义千问（阿里云 DashScope）",
         "base_url": "https://dashscope.aliyuncs.com/compatible-mode/v1",
+        "api_key_url": "https://dashscope.console.aliyun.com/apiKey",
         "chat_model": "qwen-plus",
         "work_model": "qwen-max",
         "embedding_model": "text-embedding-v3",
@@ -90,6 +95,7 @@ PRESETS: dict[str, ProviderPreset] = {
         "key": "kimi",
         "label": "Kimi（月之暗面 Moonshot）",
         "base_url": "https://api.moonshot.cn",
+        "api_key_url": "https://platform.moonshot.cn/console/api-keys",
         "chat_model": "moonshot-v1-8k",
         "work_model": "moonshot-v1-32k",
         "embedding_model": "",
@@ -107,6 +113,7 @@ PRESETS: dict[str, ProviderPreset] = {
         "key": "zhipu",
         "label": "智谱 AI（GLM）",
         "base_url": "https://open.bigmodel.cn/api/paas/v4",
+        "api_key_url": "https://open.bigmodel.cn/usercenter/apikeys",
         "chat_model": "glm-4-flash",
         "work_model": "glm-4",
         "embedding_model": "embedding-2",
@@ -123,6 +130,7 @@ PRESETS: dict[str, ProviderPreset] = {
         "key": "siliconflow",
         "label": "硅基流动 SiliconFlow",
         "base_url": "https://api.siliconflow.cn",
+        "api_key_url": "https://cloud.siliconflow.cn/account/ak",
         "chat_model": "Qwen/Qwen3-8B",
         "work_model": "deepseek-ai/DeepSeek-V3",
         "embedding_model": "BAAI/bge-large-zh-v1.5",
@@ -149,6 +157,7 @@ def get_all_presets() -> list[ProviderPreset]:
             "key": p["key"],
             "label": p["label"],
             "base_url": p["base_url"],
+            "api_key_url": p["api_key_url"],
             "chat_model": p["chat_model"],
             "work_model": p["work_model"],
             "embedding_model": p["embedding_model"],

@@ -74,13 +74,24 @@ def collect_all_models(providers: list[dict]) -> list[dict]:
 
 
 def build_provider_summaries(providers: list[dict]) -> list[dict]:
-    """构建前端可用的供应商摘要列表（不包含 model_options 详情？保留——前端需要）"""
+    """构建前端可用的供应商摘要列表"""
+    from app.services.provider_presets import get_preset
+
     result: list[dict] = []
     for p in providers:
+        provider_key = p.get("provider", "unknown")
+        # 从预设中获取 api_key_url（优先用配置中手动指定的，否则用预设的）
+        api_key_url = p.get("api_key_url", "")
+        if not api_key_url:
+            preset = get_preset(provider_key)
+            if preset:
+                api_key_url = preset.get("api_key_url", "")
+
         result.append({
             "name": p.get("name", p.get("provider", "?")),
-            "provider": p.get("provider", "unknown"),
+            "provider": provider_key,
             "base_url": p.get("base_url", ""),
+            "api_key_url": api_key_url,
             "thinking_supported": p.get("thinking_supported", False),
             "is_default": p.get("is_default", False),
             "models": p.get("model_options", []),

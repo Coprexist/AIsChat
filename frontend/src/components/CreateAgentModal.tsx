@@ -17,6 +17,7 @@ interface ProviderInfo {
   name: string
   provider: string
   base_url: string
+  api_key_url?: string
   thinking_supported: boolean
   is_default: boolean
   models: ModelOption[]
@@ -210,6 +211,22 @@ function SubIcon({ name, size }: { name: string; size?: number }) {
   const Icon = ICON_MAP[name]
   if (!Icon) return null
   return <Icon size={size ?? 20} />
+}
+
+/** API Key 获取链接——从默认供应商取 api_key_url */
+function ApiKeyGetLink({ providers }: { providers: ProviderInfo[] }) {
+  const defaultProvider = providers.find(p => p.is_default) || providers[0]
+  if (!defaultProvider?.api_key_url) return null
+  return (
+    <a
+      href={defaultProvider.api_key_url}
+      target="_blank"
+      rel="noopener noreferrer"
+      className="text-[10px] text-primary-400 hover:text-primary-300 underline underline-offset-2 font-normal"
+    >
+      获取 API Key →
+    </a>
+  )
 }
 
 // ── 模型选项渲染（按供应商分组）──
@@ -1192,7 +1209,10 @@ function DetailSettingsModal({
               />
             </div>
             <div>
-              <label className="block text-xs font-medium mb-1 text-textSecondary">API Key</label>
+              <label className="block text-xs font-medium mb-1 text-textSecondary flex items-center gap-2">
+                API Key
+                <ApiKeyGetLink providers={providers} />
+              </label>
               <input
                 type="password"
                 value={apiKey}
