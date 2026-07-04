@@ -2515,28 +2515,29 @@ async def test_browser_connection(
         import websockets
 
         async with websockets.connect(ws_url, max_size=2**20, close_timeout=5) as ws:
-            await ws.send(json.dumps({
-                "id": 1,
-                "method": "Page.navigate",
-                "params": {"url": "https://www.baidu.com"},
-            }))
-            result = await asyncio.wait_for(ws.recv(), timeout=15)
-            nav_result = json.loads(result)
+            await ws.send(json.dumps({"id": 1, "method": "Page.navigate", "params": {"url": "https://www.baidu.com"}}))
+            nav_result = json.loads(await asyncio.wait_for(ws.recv(), timeout=15))
+            # 等页面真的加载——获取 title 验证
+            await ws.send(json.dumps({"id": 2, "method": "Runtime.evaluate", "params": {"expression": "document.title"}}))
+            title_msg = {}
+            for _ in range(5):
+                msg = json.loads(await asyncio.wait_for(ws.recv(), timeout=8))
+                if msg.get("id") == 2: title_msg = msg; break
+            page_title = title_msg.get("result", {}).get("result", {}).get("value", "")
     except TimeoutError:
-        return {"ok": False, "error": "访问百度超时（15秒）——网络不通或 DNS 解析失败", "step": "navigate"}
+        return {"ok": False, "error": "访问百度超时——网络不通或 DNS 解析失败", "step": "navigate"}
     except Exception as e:
         return {"ok": False, "error": f"CDP 通信失败: {e}", "step": "navigate"}
 
-    # 检查导航结果
     error = nav_result.get("result", {}).get("errorText", "")
     if error:
         return {"ok": False, "error": f"浏览器导航失败: {error}", "step": "navigate-result"}
 
     return {
         "ok": True,
-        "message": "浏览器能正常访问百度",
+        "message": f"浏览器能正常访问百度（页面标题: {page_title or '无'}）",
+        "page_title": page_title or "",
         "cdp_version": cdp_info.get("Browser", "unknown"),
-        "page_id": page_id,
     }
 
 

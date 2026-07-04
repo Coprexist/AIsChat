@@ -1260,6 +1260,7 @@ function OpenCLICommandsSection() {
                 <th className="text-left py-2 px-3 font-medium text-textSecondary">{t('admin.cmdColPattern')}</th>
                 <th className="text-left py-2 px-3 font-medium text-textSecondary">{t('admin.cmdColType')}</th>
                 <th className="text-left py-2 px-3 font-medium text-textSecondary">{t('admin.cmdColDesc')}</th>
+                <th className="text-left py-2 px-3 font-medium text-textSecondary">默认</th>
                 <th className="text-left py-2 px-3 font-medium text-textSecondary">{t('admin.cmdColStatus')}</th>
                 <th className="text-left py-2 px-3 font-medium text-textSecondary">{t('admin.cmdColAction')}</th>
               </tr>
@@ -1270,6 +1271,14 @@ function OpenCLICommandsSection() {
                   <td className="py-2 px-3 font-mono text-xs text-textPrimary">{c.pattern}</td>
                   <td className="py-2 px-3 text-xs text-textSecondary">{c.is_regex ? t('admin.regex') : t('admin.exact')}</td>
                   <td className="py-2 px-3 text-xs text-textSecondary">{c.description || '-'}</td>
+                  <td className="py-2 px-3">
+                    <button onClick={async () => {
+                      await api.put(`/admin/opencli/commands/${c.id}/default?default_enabled=${!c.default_enabled}`)
+                      load()
+                    }} className={`text-xs px-2 py-0.5 rounded-full font-medium ${c.default_enabled ? 'bg-mint-400/10 text-mint-400' : 'bg-gray-100 text-gray-400'}`}>
+                      {c.default_enabled ? '全部AI' : '白名单'}
+                    </button>
+                  </td>
                   <td className="py-2 px-3">
                     <span className={c.enabled ? 'text-mint-400 text-xs' : 'text-textMuted text-xs'}>
                       {c.enabled ? t('common.enabled') : t('common.disabled')}
