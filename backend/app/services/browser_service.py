@@ -61,8 +61,9 @@ async def start() -> bool:
     try:
         _chrome_process = await asyncio.create_subprocess_exec(
             CHROMIUM_BIN,
-            "--headless",
+            "--headless=old",
             "--no-sandbox",
+            "--window-size=1920,1080",
             "--disable-gpu",
             "--disable-dev-shm-usage",
             "--password-store=basic",
