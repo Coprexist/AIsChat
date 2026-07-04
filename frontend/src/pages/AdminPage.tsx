@@ -275,6 +275,29 @@ function OverviewTab() {
           </div>
         </div>
       </div>
+
+      {/* 状态流程 */}
+      <div className="bg-surface rounded-xl border border-border p-5">
+        <p className="text-xs font-semibold text-textSecondary uppercase tracking-wider mb-3">服务器状态</p>
+        <div className="flex items-center gap-0.5 text-xs flex-wrap">
+          {[
+            { label: '启动中',       active: mt.auto, dot: mt.auto ? 'bg-amber-400 animate-pulse' : 'bg-gray-300' },
+            { label: '· 运行中 ·',   active: !mt.auto && !mt.hard, dot: (!mt.auto && !mt.hard) ? 'bg-mint-400' : 'bg-gray-300' },
+            { label: '暂停服务',     active: mt.hard, dot: mt.hard ? 'bg-rose-400' : 'bg-gray-300' },
+            { label: '· 维护提示 ·', active: mt.soft, dot: mt.soft ? 'bg-amber-400' : 'bg-gray-300' },
+          ].map(s => (
+            <div key={s.label} className="flex items-center gap-1">
+              <div className="flex items-center gap-1 px-2 py-1 rounded-lg border" style={{ borderColor: s.active ? undefined : 'transparent', borderColor: s.active ? undefined : undefined }}>
+                <div className={`w-2 h-2 rounded-full ${s.dot}`} />
+                <span className="text-[10px] whitespace-nowrap" style={{ color: s.active ? '#fff' : undefined }}>{s.label}</span>
+              </div>
+            </div>
+          ))}
+        </div>
+        <p className="text-[10px] text-textMuted mt-3">
+          {mt.auto ? '⚡ 后端启动/关闭中——自动暂停服务' : mt.hard ? '🔴 管理员暂停了服务' : mt.soft ? '🟡 管理员开启了维护提示' : '🟢 服务完全正常'}
+        </p>
+      </div>
     </div>
   )
 }
