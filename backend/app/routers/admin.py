@@ -2515,15 +2515,25 @@ async def test_browser_connection(
         import websockets
 
         async with websockets.connect(ws_url, max_size=2**20, close_timeout=5) as ws:
+            # 启用 Page 域
+            await ws.send(json.dumps({"id": 0, "method": "Page.enable"}))
+            await ws.recv()
+            # 导航
             await ws.send(json.dumps({"id": 1, "method": "Page.navigate", "params": {"url": "https://www.baidu.com"}}))
             nav_result = json.loads(await asyncio.wait_for(ws.recv(), timeout=15))
-            # 等页面真的加载——获取 title 验证
-            await ws.send(json.dumps({"id": 2, "method": "Runtime.evaluate", "params": {"expression": "document.title"}}))
-            title_msg = {}
-            for _ in range(5):
-                msg = json.loads(await asyncio.wait_for(ws.recv(), timeout=8))
-                if msg.get("id") == 2: title_msg = msg; break
-            page_title = title_msg.get("result", {}).get("result", {}).get("value", "")
+            # 等待 loadEventFired（页面真正加载完成）
+            page_title = ""
+            for _ in range(10):
+                msg = json.loads(await asyncio.wait_for(ws.recv(), timeout=3))
+                method = msg.get("method", "")
+                if method == "Page.loadEventFired":
+                    # 加载完成——读 title
+                    await ws.send(json.dumps({"id": 2, "method": "Runtime.evaluate", "params": {"expression": "document.title"}}))
+                    title_msg = json.loads(await asyncio.wait_for(ws.recv(), timeout=5))
+                    page_title = title_msg.get("result", {}).get("result", {}).get("value", "")
+                    break
+                elif method == "Page.frameStoppedLoading":
+                    pass
     except TimeoutError:
         return {"ok": False, "error": "访问百度超时——网络不通或 DNS 解析失败", "step": "navigate"}
     except Exception as e:
