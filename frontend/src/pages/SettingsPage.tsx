@@ -92,6 +92,10 @@ export default function SettingsPage() {
   const [redeemMsg, setRedeemMsg] = useState('')
   const [showAgentApi, setShowAgentApi] = useState(false)
 
+  // ── 预设供应商列表 ──
+  interface ProviderPreset { name: string; provider: string; base_url: string; api_key_url: string; is_default: boolean }
+  const [providerPresets, setProviderPresets] = useState<ProviderPreset[]>([])
+
   // ── 桌面端设置 ──
   const [autoStart, setAutoStart] = useState(false)
   const [buildFactoryExpanded, setBuildFactoryExpanded] = useState(false)
@@ -270,6 +274,10 @@ export default function SettingsPage() {
       }).catch(console.error)
       api.get<any[]>('/agents').then(list => {
         setAgents(list || [])
+      }).catch(() => {})
+      // 拉取供应商预设
+      api.get<{providers: ProviderPreset[]}>('/agents/models').then(d => {
+        setProviderPresets(d.providers || [])
       }).catch(() => {})
     }
   }, [user])
@@ -519,6 +527,24 @@ export default function SettingsPage() {
         </div>
 
         <div className="space-y-4">
+          {providerPresets.length > 0 && (
+            <div>
+              <label className="block text-xs font-medium mb-1.5 text-textSecondary">{t('settings.presetProvider') || '厂商预设'}</label>
+              <select
+                onChange={(e) => {
+                  const p = providerPresets.find(pr => pr.name === e.target.value)
+                  if (p) setApiBaseUrl(p.base_url)
+                }}
+                className="w-full px-3.5 py-2.5 rounded-xl border border-border bg-canvas text-sm text-textPrimary focus:outline-none focus:ring-2 focus:ring-primary-500/50"
+                defaultValue=""
+              >
+                <option value="" disabled>{t('settings.selectPreset') || '选择预设自动填充...'}</option>
+                {providerPresets.map(p => (
+                  <option key={p.name} value={p.name}>{p.name}{p.is_default ? ' ★' : ''}</option>
+                ))}
+              </select>
+            </div>
+          )}
           <div>
             <label className="block text-xs font-medium mb-1.5 text-textSecondary">{t('settings.baseUrl')}</label>
             <input
@@ -612,6 +638,21 @@ export default function SettingsPage() {
                               <X size={14} />
                             </button>
                           </div>
+                          {providerPresets.length > 0 && (
+                            <select
+                              onChange={(e) => {
+                                const p = providerPresets.find(pr => pr.name === e.target.value)
+                                if (p) setAgentApiBaseUrl(p.base_url)
+                              }}
+                              className="w-full px-3 py-1.5 rounded-lg border border-border bg-surface text-xs text-textSecondary focus:outline-none focus:ring-1 focus:ring-primary-500/50"
+                              defaultValue=""
+                            >
+                              <option value="" disabled>厂商预设...</option>
+                              {providerPresets.map(p => (
+                                <option key={p.name} value={p.name}>{p.name}{p.is_default ? ' ★' : ''}</option>
+                              ))}
+                            </select>
+                          )}
                           <input
                             type="text"
                             value={agentApiBaseUrl}
