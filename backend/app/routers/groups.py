@@ -236,32 +236,27 @@ async def get_messages(
 
     messages = await get_recent_messages(db, group_id, limit, before_id=before_id, after_id=after_id)
 
-    # 批量解析发送者名称 + 头像
-    human_ids = {m.sender_id for m in messages if m.sender_type == "human"}
-    ai_ids = {m.sender_id for m in messages if m.sender_type == "ai"}
-
-    name_map: dict[tuple, str] = {}
-    avatar_map: dict[tuple, str | None] = {}
-    state_map: dict[tuple, str | None] = {}
-    if human_ids:
-        result = await db.execute(select(User).where(User.id.in_(human_ids)))
-        for u in result.scalars().all():
-            name_map[("human", u.id)] = u.username
-            avatar_map[("human", u.id)] = u.avatar_url
-    if ai_ids:
-        result = await db.execute(select(Agent).where(
-            (Agent.id.in_(ai_ids)) | (Agent.user_id.in_(ai_ids))
-        ))
-        for a in result.scalars().all():
-            # sender_id 可能是 agent.id 或 agent.user_id，两个都要映射
-            for key in (a.id, a.user_id):
-                if key is not None:
-                    name_map[("ai", key)] = a.name
-                    avatar_map[("ai", key)] = a.avatar_url
-                    state_map[("ai", key)] = a.state
+    # 统一走 users 表查名字（AI 也是 users 的一行）
+    all_ids = {m.sender_id for m in messages}
+    name_map: dict[int, str] = {}
+    avatar_map: dict[int, str] = {}
+    state_map: dict[int, str] = {}  # 仅 AI 有
+    if all_ids:
+        u_result = await db.execute(select(User).where(User.id.in_(all_ids)))
+        for u in u_result.scalars().all():
+            name_map[u.id] = u.username
+            if u.type == "ai":
+                a_result = await db.execute(select(Agent).where(Agent.user_id == u.id))
+                a = a_result.scalar_one_or_none()
+                if a:
+                    name_map[u.id] = a.name
+                    avatar_map[u.id] = a.avatar_url or u.avatar_url
+                    state_map[u.id] = a.state
+            else:
+                avatar_map[u.id] = u.avatar_url
 
     return [
-        message_to_dict(m, sender_name=name_map.get((m.sender_type, m.sender_id)), sender_avatar_url=avatar_map.get((m.sender_type, m.sender_id)), sender_state=state_map.get((m.sender_type, m.sender_id)))
+        message_to_dict(m, sender_name=name_map.get(m.sender_id), sender_avatar_url=avatar_map.get(m.sender_id), sender_state=state_map.get(m.sender_id))
         for m in messages
     ]
 
