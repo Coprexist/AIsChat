@@ -55,7 +55,10 @@ async function request<T = any>(
   }
 
   if (res.status === 503) {
-    try { const body = JSON.parse(await res.clone().text()); if (body.maintenance) { window.dispatchEvent(new CustomEvent('maintenance-mode')); throw new ApiError('服务器维护中', 503) } } catch {}
+    try { const body = JSON.parse(await res.clone().text()); if (body.maintenance) {
+      window.dispatchEvent(new CustomEvent('maintenance-mode', { detail: body }))
+      throw new ApiError(body.detail || '服务器维护中', 503)
+    } } catch {}
   }
 
   // 安全解析 JSON：处理空 body / 非 JSON 响应

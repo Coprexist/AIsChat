@@ -342,26 +342,33 @@ function MaintenanceMsgEditor() {
     <div className="bg-surface rounded-xl border border-border p-5">
       <p className="text-xs font-semibold text-textSecondary uppercase tracking-wider mb-3">维护文案</p>
 
-      {/* 预设选择 */}
-      <div className="flex flex-wrap items-center gap-1.5 mb-3">
-        {presets.map((p: any) => (
-          <span key={p.name} className="inline-flex items-center gap-1">
-            <button onClick={() => applyPreset(p.name)}
-              className="px-2 py-1 text-[10px] rounded-lg border border-border bg-canvas text-textSecondary hover:text-primary-400 hover:border-primary-500/30 transition-colors">
-              {p.name}
-            </button>
-            <button onClick={() => deletePreset(p.name)}
-              className="text-textMuted hover:text-rose-400 p-0.5"><X size={10} /></button>
-          </span>
-        ))}
+      {/* 预设选择（下拉） */}
+      <div className="flex items-center gap-2 mb-3">
+        <select
+          onChange={e => { if (e.target.value) applyPreset(e.target.value); e.target.value = '' }}
+          className="flex-1 px-3 py-1.5 rounded-lg border border-border bg-canvas text-xs text-textPrimary focus:outline-none focus:ring-1 focus:ring-primary-500/50"
+          defaultValue=""
+        >
+          <option value="" disabled>选择预设文案…</option>
+          {presets.map((p: any) => (
+            <option key={p.name} value={p.name}>{p.name}</option>
+          ))}
+        </select>
         <button onClick={async () => {
-          const name = prompt('预设名称（如：节日祝福）')
+          const name = prompt('预设名称')
           if (!name) return
           try { await api.post('/admin/maintenance/presets', { name, ...msg }); load() } catch {}
-        }}
-          className="px-2 py-1 text-[10px] rounded-lg border border-dashed border-border text-textMuted hover:text-primary-400 hover:border-primary-500/30 transition-colors">
+        }} className="shrink-0 px-2 py-1 text-[10px] rounded-lg border border-dashed border-border text-textMuted hover:text-primary-400 transition-colors">
           + 存为预设
         </button>
+        {presets.length > 0 && (
+          <button onClick={() => {
+            const name = (presets[0] as any)?.name
+            if (name && confirm(`删除预设「${name}」？`)) { deletePreset(name); load() }
+          }} className="shrink-0 px-2 py-1 text-[10px] rounded-lg border border-border text-textMuted hover:text-rose-400 transition-colors">
+            删选中
+          </button>
+        )}
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-3">

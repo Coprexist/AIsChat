@@ -16,22 +16,30 @@ export default function Layout() {
   const location = useLocation()
 
   useEffect(() => {
-    const h1 = async () => {
+    const h1 = async (e?: CustomEvent) => {
       setMaintenance(true)
-      try {
+      const cached = (() => { try { return JSON.parse(localStorage.getItem('maintenance_msg') || '') } catch { return null } })()
+      // 优先用事件带的，其次读 API，最后读缓存
+      if (e?.detail?.detail) setHardText({ title: '服务器维护中', body: e.detail.detail, color: '#f59e0b', image: '' })
+      else try {
         const res = await fetch('/api/maintenance-msg')
         const d = await res.json()
-        if (d.hard_title) setHardText({ title: d.hard_title, body: d.hard_body, color: d.hard_color || '#f59e0b', image: d.hard_image || '' })
-      } catch {}
+        const txt = { title: d.hard_title || '正在更新', body: d.hard_body || '服务器正在更新', color: d.hard_color || '#f59e0b', image: d.hard_image || '' }
+        localStorage.setItem('maintenance_msg', JSON.stringify(txt))
+        setHardText(txt)
+      } catch { if (cached?.title) setHardText(cached) }
     }
     const h2 = async () => {
       setSoftMaintenance(true)
       try {
         const res = await fetch('/api/maintenance-msg')
         const d = await res.json()
-        if (d.soft_text) setSoftText(d.soft_text)
-        if (d.soft_color) setSoftColor(d.soft_color)
-      } catch {}
+        if (d.soft_text) { setSoftText(d.soft_text); localStorage.setItem('maintenance_soft', d.soft_text) }
+        if (d.soft_color) { setSoftColor(d.soft_color); localStorage.setItem('maintenance_soft_color', d.soft_color) }
+      } catch {
+        setSoftText(localStorage.getItem('maintenance_soft') || '服务器正在调整，功能可能偶尔不稳定')
+        setSoftColor(localStorage.getItem('maintenance_soft_color') || '#f59e0b')
+      }
     }
     window.addEventListener('maintenance-mode', h1)
     window.addEventListener('maintenance-soft', h2)
