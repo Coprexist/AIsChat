@@ -2499,15 +2499,14 @@ async def test_browser_connection(
     chrome_alive = subprocess.run(["pgrep", "-f", "chromium"], capture_output=True, text=True).stdout.strip()
     chrome_pids = chrome_alive.replace("\n", ",")
 
-    # 尝试用 CDP 打开百度——直接用现有页面避免 about:blank 上下文问题
+    # 用 /json/new?url 创建新页面
     try:
-        pages_resp = urllib.request.urlopen("http://127.0.0.1:9222/json", timeout=5)
-        pages = json.loads(pages_resp.read())
-        # 找第一个普通页面（跳过 devtools 类型）
-        page = next((p for p in pages if p.get("type") == "page"), pages[0] if pages else None)
-        if not page:
-            return {"ok": False, "error": "没有可用页面", "step": "create-page"}
-        ws_url = page.get("webSocketDebuggerUrl", "")
+        import urllib.parse
+        new_url = f"http://127.0.0.1:9222/json/new?{urllib.parse.urlencode({'url': 'http://example.com'})}"
+        req = urllib.request.Request(new_url, method="PUT")
+        page_resp = urllib.request.urlopen(req, timeout=10)
+        page_info = json.loads(page_resp.read())
+        ws_url = page_info.get("webSocketDebuggerUrl", "")
     except Exception as e:
         return {"ok": False, "error": f"获取CDP页面失败: {e}", "step": "create-page"}
 
