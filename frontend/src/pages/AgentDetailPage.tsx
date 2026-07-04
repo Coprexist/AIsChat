@@ -641,8 +641,25 @@ export default function AgentDetailPage() {
   const handleAvatarSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]
     if (!file) return
+    // GIF 动图跳过裁剪，直接上传
+    if (file.type === 'image/gif') {
+      uploadAgentAvatarDirectly(file)
+      return
+    }
     setCropFile(file)
     e.target.value = ''
+  }
+
+  const uploadAgentAvatarDirectly = async (file: File) => {
+    setUploadingAvatar(true)
+    try {
+      const formData = new FormData()
+      formData.append('file', file, `avatar.gif`)
+      const token = localStorage.getItem('access_token')
+      await fetch(`/api/agents/${agentId}/avatar`, { method: 'POST', headers: { Authorization: `Bearer ${token}` }, body: formData })
+      loadAgent()
+    } catch { /* ignore */ }
+    finally { setUploadingAvatar(false) }
   }
 
   const handleCropConfirm = async (blob: Blob) => {
@@ -650,7 +667,8 @@ export default function AgentDetailPage() {
     setUploadingAvatar(true)
     try {
       const formData = new FormData()
-      formData.append('file', blob, 'avatar.jpg')
+      const ext = blob.type === 'image/gif' ? 'gif' : blob.type === 'image/png' ? 'png' : 'jpg'
+      formData.append('file', blob, `avatar.${ext}`)
       const token = localStorage.getItem('access_token')
       const res = await fetch(`/api/agents/${agentId}/avatar`, {
         method: 'POST',

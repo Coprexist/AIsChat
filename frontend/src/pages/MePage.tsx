@@ -232,16 +232,31 @@ export default function MePage() {
     const file = e.target.files?.[0]
     if (!file) return
     if (file.size > 10 * 1024 * 1024) { alert(t('error.avatarTooLarge')); return }
+    // GIF 动图无法裁剪，直接上传
+    if (file.type === 'image/gif') {
+      uploadAvatarDirectly(file)
+      return
+    }
     setCropFile(file)
-    // 重置 input 以便再次选择同一文件
     e.target.value = ''
+  }
+
+  const uploadAvatarDirectly = async (file: File) => {
+    setAvatarUploading(true)
+    try {
+      const res = await api.upload('/user/avatar', file)
+      setEditAvatarUrl(res.avatar_url)
+      refreshUser?.()
+    } catch (err: any) { alert(err.message || t('error.unknown')) }
+    finally { setAvatarUploading(false) }
   }
 
   const handleCropConfirm = async (blob: Blob) => {
     setCropFile(null)
     setAvatarUploading(true)
     try {
-      const res = await api.upload('/user/avatar', new File([blob], 'avatar.jpg', { type: 'image/jpeg' }))
+      const ext = blob.type === 'image/gif' ? 'gif' : blob.type === 'image/png' ? 'png' : 'jpg'
+      const res = await api.upload('/user/avatar', new File([blob], `avatar.${ext}`, { type: blob.type || 'image/jpeg' }))
       setEditAvatarUrl(res.avatar_url)
     } catch (err: any) {
       alert(err.message || t('error.uploadFailed'))

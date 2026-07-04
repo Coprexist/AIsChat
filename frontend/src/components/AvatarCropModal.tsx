@@ -60,6 +60,11 @@ export default function AvatarCropModal({ file, onConfirm, onCancel }: AvatarCro
   }, [])
 
   const handleConfirm = useCallback(async () => {
+    // GIF 动图跳过裁剪，直接传原文件保留动画
+    if (file.type === 'image/gif') {
+      onConfirm(file)
+      return
+    }
     const crop = croppedRef.current
     if (!imageSrc || !crop) {
       onConfirm(file)
