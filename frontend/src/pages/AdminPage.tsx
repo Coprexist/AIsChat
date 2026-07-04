@@ -306,7 +306,8 @@ function OverviewTab() {
 }
 
 function MaintenanceMsgEditor() {
-  const [msg, setMsg] = useState({ hard_title: '', hard_body: '', hard_color: '#f59e0b', hard_image: '', hard_style: 'popup', soft_text: '', soft_color: '#f59e0b' })
+  const [msg, setMsg] = useState({ hard_title: '', hard_body: '', hard_color: '#f59e0b', hard_text_color: '#ffffff', hard_image: '', hard_style: 'popup', soft_text: '', soft_color: '#f59e0b', soft_style: 'banner' })
+  const [selectedPreset, setSelectedPreset] = useState('')
   const [presets, setPresets] = useState<any[]>([])
   const [images, setImages] = useState<string[]>([])
   const [loaded, setLoaded] = useState(false)
