@@ -287,9 +287,9 @@ function OverviewTab() {
             { label: '· 维护提示 ·', active: mt.soft, dot: mt.soft ? 'bg-amber-400' : 'bg-gray-300' },
           ].map(s => (
             <div key={s.label} className="flex items-center gap-1">
-              <div className="flex items-center gap-1 px-2 py-1 rounded-lg border" style={{ borderColor: s.active ? undefined : 'transparent', borderColor: s.active ? undefined : undefined }}>
+              <div className={`flex items-center gap-1 px-2 py-1 rounded-lg border ${s.active ? 'border-border' : 'border-transparent'}`}>
                 <div className={`w-2 h-2 rounded-full ${s.dot}`} />
-                <span className="text-[10px] whitespace-nowrap" style={{ color: s.active ? '#fff' : undefined }}>{s.label}</span>
+                <span className={`text-[10px] whitespace-nowrap ${s.active ? 'font-medium text-textPrimary' : 'text-textMuted'}`}>{s.label}</span>
               </div>
             </div>
           ))}
