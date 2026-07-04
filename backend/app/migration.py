@@ -26,8 +26,7 @@ async def run_migrations():
     async with async_session() as db:
         try:
             await _migrate_users_type(db)
-            await _migrate_unify_ai_user_id(db)       # v1.0.2 全局统一AI ID为user_id（最先做）
-            await _migrate_fix_dm_sender_ids(db)      # v1.0.2 修复误改的DM sender_id
+            await _migrate_unify_ai_user_id(db)       # v1.0.2 全局统一AI ID为user_id
             await _migrate_conversation_logs(db)   # 必须在查询 Agent 之前添加列
             await _migrate_federation_tables(db)   # 必须在查询 Agent 之前添加列
             await _migrate_api_credit(db)          # 新增列必须在查询 Agent 之前
@@ -2491,66 +2490,44 @@ async def _migrate_multi_provider(db):
 async def _migrate_unify_ai_user_id(db):
     """
     v1.0.2: 全局统一——将所有表中的 AI ID 从 agent.id 转为 agent.user_id。
-    涉及: messages, dm_messages, group_members, file_metadata。
+    涉及: messages, group_members, file_metadata（dm_messages 不转换——天然用 user_id）。
     """
-    count = 0
-    # 1. group_members (幂等: 跳过已经是 user_id 的)
-    r = await db.execute(text("""
+    # 1. messages（安全：有 sender_type='ai' 过滤）
+    await db.execute(text("""
+        UPDATE messages SET sender_id = a.user_id
+        FROM agents a
+        WHERE sender_type = 'ai' AND a.id = messages.sender_id AND messages.sender_id <> a.user_id
+    """))
+
+    # 2. group_members（安全：有 member_type='ai' 过滤 + 去重）
+    await db.execute(text("""
         UPDATE group_members gm SET member_id = a.user_id
         FROM agents a
         WHERE gm.member_type = 'ai' AND a.id = gm.member_id AND gm.member_id <> a.user_id
           AND NOT EXISTS (SELECT 1 FROM group_members gm2 WHERE gm2.group_id=gm.group_id AND gm2.member_type='ai' AND gm2.member_id=a.user_id)
     """))
-    count += 1
 
-    # 2. messages
-    r = await db.execute(text("""
-        UPDATE messages m SET sender_id = a.user_id
+    # 3. file_metadata（安全：有 owner_type='ai' 过滤）
+    await db.execute(text("""
+        UPDATE file_metadata SET owner_id = a.user_id
         FROM agents a
-        WHERE m.sender_type = 'ai' AND a.id = m.sender_id AND m.sender_id <> a.user_id
+        WHERE owner_type = 'ai' AND a.id = file_metadata.owner_id AND file_metadata.owner_id <> a.user_id
     """))
-    count += 1
 
-    # 3. dm_messages（危险：dm_messages 无 sender_type 列，必须关联 dm_sessions 判断方向）
-    # 跳过——DM 的 sender_id 始终是 users.id，无需迁移
-    count += 1
-
-    # 4. file_metadata
-    r = await db.execute(text("""
-        UPDATE file_metadata fm SET owner_id = a.user_id
-        FROM agents a
-        WHERE fm.owner_type = 'ai' AND a.id = fm.owner_id AND fm.owner_id <> a.user_id
+    # 4. dm_messages 修复：sender_id 不属于会话参与者的消息，用另一参与者恢复
+    await db.execute(text("""
+        UPDATE dm_messages dm SET sender_id = ds.user1_id
+        FROM dm_sessions ds
+        WHERE dm.session_id = ds.session_id AND dm.sender_id NOT IN (ds.user1_id, ds.user2_id)
     """))
-    count += 1
+    await db.execute(text("""
+        UPDATE dm_messages dm SET sender_id = ds.user2_id
+        FROM dm_sessions ds
+        WHERE dm.session_id = ds.session_id AND dm.sender_id NOT IN (ds.user1_id, ds.user2_id)
+    """))
 
     await db.flush()
     logger.info("  ✅ 全局 AI ID 统一为 user_id 完成")
-
-
-async def _migrate_fix_dm_sender_ids(db):
-    """修复 _migrate_unify_ai_user_id 误改的 DM sender_id
-
-    dm_messages 没有 sender_type 列，原先的迁移 WHERE a.id = dm.sender_id
-    会错误匹配人类用户的 ID（因为 agent.id 可能等于人类 user.id）。
-    修复：用 dm_sessions 的 user1_id/user2_id 恢复正确的 sender_id。
-    """
-    from app.models.dm import DMSession
-    sessions = (await db.execute(select(DMSession.session_id, DMSession.user1_id, DMSession.user2_id))).all()
-    fixed = 0
-    for sid, u1, u2 in sessions:
-        # 找 sender_id 不是会话参与者的消息
-        bad = await db.execute(text(
-            "SELECT id, sender_id FROM dm_messages WHERE session_id = :s AND sender_id NOT IN (:u1, :u2)"
-        ), {"s": sid, "u1": u1, "u2": u2})
-        for msg_id, bad_sid in bad.all():
-            # 确定正确发送者：如果是 AI 的 agent.id 被改了，取 agent.user_id
-            from app.models.agent import Agent as AModel
-            a = (await db.execute(select(AModel.user_id).where(AModel.id == bad_sid))).scalar_one_or_none()
-            correct = a if a else (u1 if bad_sid in (u2,) else u2)
-            await db.execute(text("UPDATE dm_messages SET sender_id = :c WHERE id = :i"), {"c": correct, "i": msg_id})
-            fixed += 1
-    if fixed:
-        logger.info(f"  🩹 修复 {fixed} 条 DM 消息的 sender_id")
 
 
 async def _migrate_agent_status_color(db):
