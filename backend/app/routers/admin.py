@@ -2529,6 +2529,66 @@ async def save_maintenance_msg(body: MaintenanceMsgBody, admin: dict = Depends(r
     return {"ok": True, "message": "维护文本已保存"}
 
 
+_PRESETS_FILE = "/tmp/maintenance_presets.json"
+_DEFAULT_PRESETS = [
+    {"name": "服务器更新", "hard_title": "正在更新", "hard_body": "服务器正在更新，稍等一下就好~", "soft_text": "服务器正在更新，功能可能偶尔不稳定"},
+    {"name": "紧急维护", "hard_title": "紧急维护", "hard_body": "服务器突发故障，正在紧急抢修中，请稍后再来", "soft_text": "服务器正在紧急维护，可能会出现短暂不可用"},
+    {"name": "功能升级", "hard_title": "功能升级中", "hard_body": "正在升级新功能，马上就好~", "soft_text": "新功能部署中，部分功能可能暂时不可用"},
+    {"name": "网络波动", "hard_title": "网络波动", "hard_body": "网络不稳定，正在排查中", "soft_text": "网络有些不稳定，正在处理"},
+    {"name": "数据库维护", "hard_title": "数据库维护", "hard_body": "数据库正在优化，稍等片刻", "soft_text": "数据库正在维护，涉及存储的功能可能受影响"},
+    {"name": "性能优化", "hard_title": "性能优化中", "hard_body": "正在优化服务器性能，请稍等", "soft_text": "服务器性能调优中，体验可能略有影响"},
+]
+
+def _load_presets():
+    try:
+        if os.path.exists(_PRESETS_FILE):
+            with open(_PRESETS_FILE) as f:
+                return json.loads(f.read())
+    except: pass
+    with open(_PRESETS_FILE, "w") as f:
+        f.write(json.dumps(_DEFAULT_PRESETS, ensure_ascii=False))
+    return list(_DEFAULT_PRESETS)
+
+
+@router.get("/maintenance/presets")
+async def list_presets(admin: dict = Depends(require_admin)):
+    return {"presets": _load_presets()}
+
+
+@router.post("/maintenance/presets/apply")
+async def apply_preset(admin: dict = Depends(require_admin), name: str = ""):
+    p = next((p for p in _load_presets() if p["name"] == name), None)
+    if not p: raise HTTPException(404, f"预设 {name} 不存在")
+    with open("/tmp/maintenance_msg.json", "w") as f:
+        f.write(json.dumps({"hard_title": p["hard_title"], "hard_body": p["hard_body"], "soft_text": p["soft_text"]}, ensure_ascii=False))
+    return {"ok": True, "message": f"已应用预设「{name}」", "msg": p}
+
+
+@router.delete("/maintenance/presets/{name}")
+async def delete_preset(name: str, admin: dict = Depends(require_admin)):
+    presets = _load_presets()
+    new_list = [p for p in presets if p["name"] != name]
+    if len(new_list) == len(presets): raise HTTPException(404, f"预设 {name} 不存在")
+    with open(_PRESETS_FILE, "w") as f: f.write(json.dumps(new_list, ensure_ascii=False))
+    return {"ok": True, "message": f"已删除预设「{name}」"}
+
+
+class MaintenancePresetBody(BaseModel):
+    name: str
+    hard_title: str = "正在更新"
+    hard_body: str = "服务器正在更新，稍等一下就好~"
+    soft_text: str = "服务器正在调整，功能可能偶尔不稳定"
+
+
+@router.post("/maintenance/presets")
+async def add_preset(body: MaintenancePresetBody, admin: dict = Depends(require_admin)):
+    presets = _load_presets()
+    if any(p["name"] == body.name for p in presets): raise HTTPException(400, f"预设 {body.name} 已存在")
+    presets.append(body.model_dump())
+    with open(_PRESETS_FILE, "w") as f: f.write(json.dumps(presets, ensure_ascii=False))
+    return {"ok": True, "message": f"已添加预设「{body.name}」"}
+
+
 @router.post("/plugins/browser/test")
 async def test_browser_connection(
     admin: dict = Depends(require_admin),

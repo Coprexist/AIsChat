@@ -307,21 +307,33 @@ function OverviewTab() {
 
 function MaintenanceMsgEditor() {
   const [msg, setMsg] = useState({ hard_title: '', hard_body: '', soft_text: '' })
+  const [presets, setPresets] = useState<any[]>([])
   const [loaded, setLoaded] = useState(false)
   const [saved, setSaved] = useState(false)
 
-  useEffect(() => {
-    api.get('/admin/maintenance/msg').then((d: any) => {
-      setMsg({ hard_title: d.hard_title || '', hard_body: d.hard_body || '', soft_text: d.soft_text || '' })
+  const load = async () => {
+    try {
+      const [m, p] = await Promise.all([api.get('/admin/maintenance/msg'), api.get('/admin/maintenance/presets')])
+      const d: any = m; setMsg({ hard_title: d.hard_title || '', hard_body: d.hard_body || '', soft_text: d.soft_text || '' })
+      setPresets((p as any).presets || [])
       setLoaded(true)
-    }).catch(() => {})
-  }, [])
+    } catch {}
+  }
+  useEffect(() => { load() }, [])
 
   const save = async () => {
+    try { await api.put('/admin/maintenance/msg', msg); setSaved(true); setTimeout(() => setSaved(false), 2000) } catch {}
+  }
+
+  const applyPreset = async (name: string) => {
     try {
-      await api.put('/admin/maintenance/msg', msg)
-      setSaved(true); setTimeout(() => setSaved(false), 2000)
+      const r: any = await api.post(`/admin/maintenance/presets/apply?name=${encodeURIComponent(name)}`)
+      if (r.msg) setMsg({ hard_title: r.msg.hard_title, hard_body: r.msg.hard_body, soft_text: r.msg.soft_text })
     } catch {}
+  }
+
+  const deletePreset = async (name: string) => {
+    try { await api.delete(`/admin/maintenance/presets/${encodeURIComponent(name)}`); load() } catch {}
   }
 
   if (!loaded) return null
@@ -329,27 +341,42 @@ function MaintenanceMsgEditor() {
   return (
     <div className="bg-surface rounded-xl border border-border p-5">
       <p className="text-xs font-semibold text-textSecondary uppercase tracking-wider mb-3">维护文案</p>
+
+      {/* 预设选择 */}
+      {presets.length > 0 && (
+        <div className="flex flex-wrap gap-1.5 mb-3">
+          {presets.map((p: any) => (
+            <span key={p.name} className="inline-flex items-center gap-1">
+              <button onClick={() => applyPreset(p.name)}
+                className="px-2 py-1 text-[10px] rounded-lg border border-border bg-canvas text-textSecondary hover:text-primary-400 hover:border-primary-500/30 transition-colors">
+                {p.name}
+              </button>
+              <button onClick={() => deletePreset(p.name)}
+                className="text-textMuted hover:text-rose-400 p-0.5"><X size={10} /></button>
+            </span>
+          ))}
+        </div>
+      )}
+
       <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
         <div>
           <label className="block text-[10px] text-textMuted mb-1">暂停服务——弹窗标题</label>
           <input value={msg.hard_title} onChange={e => setMsg({...msg, hard_title: e.target.value})}
-            className="w-full px-3 py-1.5 rounded-lg border border-border bg-canvas text-sm text-textPrimary text-xs focus:outline-none focus:ring-1 focus:ring-primary-500/50" />
+            className="w-full px-3 py-1.5 rounded-lg border border-border bg-canvas text-textPrimary text-xs focus:outline-none focus:ring-1 focus:ring-primary-500/50" />
         </div>
         <div>
           <label className="block text-[10px] text-textMuted mb-1">暂停服务——弹窗正文</label>
           <input value={msg.hard_body} onChange={e => setMsg({...msg, hard_body: e.target.value})}
-            className="w-full px-3 py-1.5 rounded-lg border border-border bg-canvas text-sm text-textPrimary text-xs focus:outline-none focus:ring-1 focus:ring-primary-500/50" />
+            className="w-full px-3 py-1.5 rounded-lg border border-border bg-canvas text-textPrimary text-xs focus:outline-none focus:ring-1 focus:ring-primary-500/50" />
         </div>
         <div className="md:col-span-2">
           <label className="block text-[10px] text-textMuted mb-1">维护提示——顶部横幅文字</label>
           <input value={msg.soft_text} onChange={e => setMsg({...msg, soft_text: e.target.value})}
-            className="w-full px-3 py-1.5 rounded-lg border border-border bg-canvas text-sm text-textPrimary text-xs focus:outline-none focus:ring-1 focus:ring-primary-500/50" />
+            className="w-full px-3 py-1.5 rounded-lg border border-border bg-canvas text-textPrimary text-xs focus:outline-none focus:ring-1 focus:ring-primary-500/50" />
         </div>
       </div>
       <div className="flex items-center gap-3 mt-3">
-        <button onClick={save} className="px-4 py-1.5 rounded-lg bg-primary-500 text-white text-xs font-medium hover:bg-primary-400 transition-colors">
-          保存文案
-        </button>
+        <button onClick={save} className="px-4 py-1.5 rounded-lg bg-primary-500 text-white text-xs font-medium hover:bg-primary-400 transition-colors">保存文案</button>
         {saved && <span className="text-xs text-mint-400">已保存</span>}
       </div>
     </div>
