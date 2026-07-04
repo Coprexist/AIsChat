@@ -78,11 +78,19 @@ def compress_image(content: bytes, mime_type: str = "", max_px: int = IMAGE_MAX_
     return result
 
 
+def _is_gif(content: bytes) -> bool:
+    """检测是否为 GIF 动图（GIF87a / GIF89a）"""
+    return content[:6] in (b'GIF87a', b'GIF89a')
+
+
 def compress_avatar(content: bytes) -> bytes:
     """
     压缩头像：最大 256px + 最大 2MB。
+    GIF 动图直接返回原图保留动画。
     有透明通道 → PNG；无透明 → JPEG 逐级降质量。
     """
+    if _is_gif(content):
+        return content  # 保留动画
     try:
         from PIL import Image
     except ImportError:
