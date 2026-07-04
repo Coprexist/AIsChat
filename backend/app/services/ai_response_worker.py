@@ -353,7 +353,7 @@ async def _get_api_config(
 
     v0.9.0: chatter_id 决定账单人（通用 AI 扣聊天者，否则扣主人）。
             force_own_key=True 时跳过 Tier 2/3，直接走账单人自有 Key。
-    v1.3.0: 返回 provider_info 字典，含 thinking_supported / models / base_url。
+    v1.0.2: 返回 provider_info 字典，含 thinking_supported / models / base_url。
 
     返回: (api_key, api_base, credit_source, pool_key_id, provider_info)
     """
@@ -409,7 +409,7 @@ async def _get_api_config(
                 api_base = pool_key.api_base_url or settings.deepseek_base_url
                 credit_source = "pool_key"
                 pool_key_id = pool_key.id
-                # v1.3.0: 获取池 Key 的供应商配置
+                # v1.0.2: 获取池 Key 的供应商配置
                 from app.services.system_settings_service import get_provider_for_pool_key
                 pool_provider = await get_provider_for_pool_key(db, pool_key)
                 provider_info = {
@@ -463,7 +463,7 @@ async def _maybe_trigger_ai_reply(
     logger.info(f"🔍 AI {agent.name}(id={resolved_agent_id}): is_mentioned={is_mentioned}, content_preview='{content[:80]}'")
 
     # v0.5.0: 使用统一决策（替代原有 Gate 1-5 的手动判断）
-    # v1.2.0: 检测 DND 穿透条件
+    # v1.0.1: 检测 DND 穿透条件
     is_at_all = any(tag in content for tag in ("@all", "@everyone", "@全体"))
     is_announcement = message_type == "announcement"
     ctx = ActionContext(

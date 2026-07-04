@@ -21,7 +21,7 @@ logger = logging.getLogger(__name__)
 
 # 默认上下文窗口（DeepSeek V4 为 128K）
 DEFAULT_CONTEXT_WINDOW = 128_000
-# 压缩阈值：v1.1.0 大幅降低——常态压缩以稳定 prompt cache 前缀
+# 压缩阈值：v1.0.1 大幅降低——常态压缩以稳定 prompt cache 前缀
 # 旧值 0.8（~102K tokens）基本不触发；新值 ~8K tokens 即触发
 COMPRESSION_THRESHOLD = 0.06
 # 压缩后至少保留的最近消息数

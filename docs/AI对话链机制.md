@@ -103,9 +103,9 @@ AI 发送消息的**两个出口**均会推入队列：
 
 ---
 
-## 2.4 统一上下文 → 状态栈（v1.2.0 重构）
+## 2.4 统一上下文 → 状态栈（v1.0.1 重构）
 
-> ⚠️ **v1.2.0 重大变更**：`_build_cross_conversation_context()` 已被**禁用**（始终返回空列表）。
+> ⚠️ **v1.0.1 重大变更**：`_build_cross_conversation_context()` 已被**禁用**（始终返回空列表）。
 > 原有的"把其他群消息注入当前群 LLM 上下文"机制存在致命 bug——LLM 看到其他群的消息后在当前群回复，形成"历史重播"死循环（详见下方）。
 
 **替代方案：状态栈系统**（`docs/ai-context-state-design.md`）
@@ -126,7 +126,7 @@ _build_cross_conversation_context()
 
 ### 上下文压缩（保留）
 
-v1.1.0 引入的上下文压缩机制继续有效：
+v1.0.1 引入的上下文压缩机制继续有效：
 
 - 保留 `messages[0]`（系统提示词，维持 FIXED_PREFIX cache 命中）
 - 压缩旧消息为稳定摘要，置于系统提示词末尾
@@ -135,7 +135,7 @@ v1.1.0 引入的上下文压缩机制继续有效：
 
 **效果**：摘要稳定不变 → 缓存前缀始终命中 → cache 命中率 ~90%+
 
-### 状态栈摘要格式（v1.2.0 新增）
+### 状态栈摘要格式（v1.0.1 新增）
 
 状态栈摘要放在系统提示词尾部（在上下文压缩摘要之后），格式：
 
@@ -215,13 +215,13 @@ r'@([^\s@，。！？、；：""''「」『』【】（）\(\)\[\]{}<>#+*&^%$!~`
 支持中文名、英文名。提取后去掉尾部标点。
 Supports Chinese and English names. Trailing punctuation is stripped.
 
-### 4.2 穿透规则 / Bypass Rules（v1.2.0 增强）
+### 4.2 穿透规则 / Bypass Rules（v1.0.1 增强）
 
 | 场景 / Scenario | 效果 / Effect |
 |------|------|
 | AI 处于 DND + 被 @点名 | DND 被绕过，强制推送消息 |
-| AI 处于 DND + @all / @everyone / @全体 | DND 被绕过，强制推送（v1.2.0 新增） |
-| AI 处于 DND + 群公告 | DND 被绕过（v1.2.0 新增） |
+| AI 处于 DND + @all / @everyone / @全体 | DND 被绕过，强制推送（v1.0.1 新增） |
+| AI 处于 DND + 群公告 | DND 被绕过（v1.0.1 新增） |
 | AI 处于 DND + 普通消息 | 消息暂存到 `pending_messages`，恢复后补读 |
 | AI 意愿过低 + 被 @点名 | 不自动 DND，依然尝试回复 |
 
@@ -244,7 +244,7 @@ Supports Chinese and English names. Trailing punctuation is stripped.
 
 ---
 
-## 6. 状态工具白名单 / State-Based Tool Whitelist（v1.2.0 更新）
+## 6. 状态工具白名单 / State-Based Tool Whitelist（v1.0.1 更新）
 
 > 位置 / Located at: `backend/app/services/tool_registry.py:STATE_TOOL_WHITELIST`
 
@@ -255,7 +255,7 @@ Supports Chinese and English names. Trailing punctuation is stripped.
 | offline | 14 | 含状态栈全套工具（push/pop/close/list） |
 | blocked | 0 | 完全封禁 |
 
-**v1.2.0 新增工具**：`push_state`、`pop_state`、`close_state`、`list_states`（self_management 段）；`cancel_dnd`、`enter_group`（chat_social 段）。
+**v1.0.1 新增工具**：`push_state`、`pop_state`、`close_state`、`list_states`（self_management 段）；`cancel_dnd`、`enter_group`（chat_social 段）。
 
 ---
 

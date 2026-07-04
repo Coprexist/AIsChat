@@ -82,8 +82,8 @@ async def run_migrations():
             await _migrate_group_invitations(db)  # v2.0.0 群邀请卡片系统
             await _migrate_group_owner_membership(db)  # v2.0.1 修复群主缺失的群成员记录
             await _migrate_fix_duplicate_owners(db)     # v2.0.2 修复错误的多群主记录
-            await _migrate_agent_state_stack(db)       # v1.2.0 状态栈（AI 跨任务上下文追踪）
-            await _migrate_multi_provider(db)          # v1.3.0 多供应商 + api_key_pool.provider_name
+            await _migrate_agent_state_stack(db)       # v1.0.1 状态栈（AI 跨任务上下文追踪）
+            await _migrate_multi_provider(db)          # v1.0.2 多供应商 + api_key_pool.provider_name
             await _fix_column_types(db)  # 必须是最后一个：修复老部署的列类型不匹配
             await db.commit()
             logger.info("✅ 数据库迁移检查完成")
@@ -2261,7 +2261,7 @@ async def _migrate_fix_duplicate_owners(db):
 
 async def _migrate_agent_state_stack(db):
     """
-    v1.2.0: agents 表新增 state_stack JSONB 列（幂等）。
+    v1.0.1: agents 表新增 state_stack JSONB 列（幂等）。
 
     存储 AI 的跨任务上下文状态栈，支持 push/pop/close/list 操作。
     """
@@ -2392,7 +2392,7 @@ async def _migrate_others_chat_controls(db):
 
 
 async def _migrate_multi_provider(db):
-    """v1.3.0: provider_config 单对象 → 数组 + api_key_pool 加 provider_name（幂等）"""
+    """v1.0.2: provider_config 单对象 → 数组 + api_key_pool 加 provider_name（幂等）"""
     import json
 
     # 1. 转换 provider_config：单对象 → 默认数组

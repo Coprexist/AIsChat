@@ -3,7 +3,7 @@
 本 CHANGELOG 遵循 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.0.0/) 规范，
 版本号遵守 [语义化版本](https://semver.org/lang/zh-CN/)。
 
-> **当前阶段**：v0.x 预发布 — 每次功能批次递增次版本号（第二位）。
+> **当前阶段**：v1.0 正式版 — 补丁版本号（第三位）递增。
 
 ---
 
@@ -37,6 +37,53 @@
 - ♻️ **SMTP 配置数据迁移**：`system_settings.smtp_config` 从单 JSONB 对象改为 JSONB 数组（`_migrate_smtp_configs_array` 自动包装旧格式）。`get_auth_settings` 返回新增 `smtp_configs` 字段，旧 `smtp_config` 字段保留兼容。
 - 📝 **对话链机制文档**：新增统一上下文章节（§2.4——生效条件表、上下文格式、与链交互规则）。
 - 📝 **认知架构文档**：统一上下文规则表覆盖 `custom + resonance` 组合。
+
+---
+
+## [v1.0.2] - 2026-07-01
+
+### Added
+
+- 🏭 **API 多供应商架构**：`provider_config` 从单对象→数组，支持同时配置多个 LLM 厂商（DeepSeek/OpenAI/Ollama/通义千问/Kimi/智谱/硅基流动），每个供应商独立设置 base_url/模型列表/深度推理支持。管理面板新增供应商增删改、设为默认。
+- 🔗 **池 Key 关联供应商**：`api_key_pool` 新增 `provider_name` 列，池 Key 可关联供应商自动获得模型列表和 thinking 支持。未关联时按 api_base_url 自动匹配。
+- 🎛️ **模型下拉框按供应商分组**：创建/编辑 AI 时聊天模型和工作模型用 `<optgroup>` 分组，★ 标记默认供应商。
+- 🧠 **thinking 判定从全局改为按供应商**：`chat_completion` 新增 `provider_supports_thinking` 参数，非 DeepSeek 供应商也能正确发送 thinking。
+- ♻️ **供应商配置纯函数化**：`utils/pure/provider_config.py`——查找/匹配/收集/增删全部零 IO。
+
+### Changed
+
+- 🔧 旧 `provider_config` 单对象自动迁移为数组：`_migrate_multi_provider` 包装为 `[{is_default:true,name,provider,...}]`，幂等。
+- 🔧 `/agents/models` 端点新增 `providers` 字段，返回全部供应商配置和能力标记。
+- 🔧 `_get_api_config` 返回值追加 `provider_info` 字典。
+- 🔧 管理面板 `ProviderPresetSelector` 从单对象编辑重写为多供应商卡片式管理。
+
+### Fixed
+
+- 🐛 `agent_service.py` 遗漏 `from app.utils.result import Result` 导致容器启动 `NameError`。
+- 🐛 后端容器无 `curl` 导致 healthcheck 失败——改用 Python `urllib.request`。
+- 🐛 Docker 卷挂载触发 uvicorn `--reload` 误重启 + 前端启动早于后端就绪——加 `--reload-delay 3` + 后端 healthcheck + 前端 `condition: service_healthy`。
+
+---
+
+## [v1.0.1] - 2026-06-30
+
+### Added
+
+- 📚 **AI 状态栈**：`agents.state_stack` JSONB 列，4 个工具 push/pop/close/list 追踪跨任务上下文。end_turn 自动兜底 push。
+- 🔕 **群 DND 增强**：@mention/@all/@everyone/@全体/群公告穿透免打扰。新增 `cancel_dnd` 工具。
+- 🚪 **`enter_group` 工具**：验证成员资格→获取未读数→push 状态帧→返回预览。
+- 📋 **TODO/PLAN/JOURNAL 自动联动**：push_state/pop_state 自动写入 workspace。
+- ♻️ **Result Monad 集成**：`get_agent()`/`decode_access_token()`/`get_effective_config()` 返回 `Result[T,E]`。TypeScript 端 `safeParse<T>()`、`api.safe.*`。
+
+### Fixed
+
+- 🐛 **跨对话上下文死循环**：`_build_cross_conversation_context` 永久禁用（返回 `[]`），状态栈替代。
+- 🐛 **多群主错误数据**：迁移将非 owner 的 `role='owner'` 记录降为 member。
+
+### Changed
+
+- 🔧 状态栈摘要注入到系统提示词尾部（最大化 prompt cache 命中）。
+- 🔧 闹钟/群聊/DM 三个路径 end_turn 时调用 `persist_last_task_as_state()`。
 
 ---
 

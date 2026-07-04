@@ -221,9 +221,9 @@ flowchart TB
     Res -->|无过滤| Mem
 ```
 
-### 5.2 统一上下文（v1.2.0）
+### 5.2 统一上下文（v1.0.1）
 
-> v1.2.0: 跨对话上下文统一 `role: system` + 自我/他人区分（自己无 id，他人带 id）。v1.1.0 统一标题格式 + 上下文压缩。详见 [`AI对话链机制.md §2.4`](./AI对话链机制.md#24-统一上下文--unified-context)。
+> v1.0.1: 跨对话上下文统一 `role: system` + 自我/他人区分（自己无 id，他人带 id）。v1.0.1 统一标题格式 + 上下文压缩。详见 [`AI对话链机制.md §2.4`](./AI对话链机制.md#24-统一上下文--unified-context)。
 
 ```mermaid
 flowchart LR
@@ -252,7 +252,7 @@ flowchart LR
 
 ## 6. 系统提示词段布局
 
-七段结构（v1.1.0），固定段在前最大化 cache 命中：
+七段结构（v1.0.1），固定段在前最大化 cache 命中：
 
 ```mermaid
 flowchart TB
@@ -264,7 +264,7 @@ flowchart TB
     end
     subgraph Dynamic["动态段"]
         S5["5. current_context"]
-        S6["6. cross_context 🆕 v1.1.0<br/>统一上下文（统一标题格式）"]
+        S6["6. cross_context 🆕 v1.0.1<br/>统一上下文（统一标题格式）"]
         S7["7. injected_skills<br/>向量记忆 + Skill 引擎<br/>+ 结构记忆索引"]
     end
     S1 --> S2 --> S3 --> S4 --> S5 --> S6 --> S7
@@ -275,7 +275,7 @@ flowchart TB
     style S7 fill:#0891b2,stroke:#0e7490,color:#fff
 ```
 
-> v1.1.0: 跨对话上下文从独立消息注入改为统一标题格式，配合上下文压缩保缓存命中。详见 [`AI对话链机制.md §2.4`](./AI对话链机制.md#24-统一上下文--unified-context)。
+> v1.0.1: 跨对话上下文从独立消息注入改为统一标题格式，配合上下文压缩保缓存命中。详见 [`AI对话链机制.md §2.4`](./AI对话链机制.md#24-统一上下文--unified-context)。
 
 ---
 
@@ -307,7 +307,7 @@ flowchart TB
 | `Toggle.tsx` | 加 `border-2 border-border` 描边 |
 | `AdminPage.tsx` | 分页按钮加 `text-textSecondary` 日夜适配 |
 | `llm_service.py` | 空目录不注入索引 → 始终注入 |
-| `llm_service.py` | 新增 `_build_cross_conversation_context` 统一上下文（v1.1.0 统一标题格式） |
+| `llm_service.py` | 新增 `_build_cross_conversation_context` 统一上下文（v1.0.1 统一标题格式） |
 | `api/client.ts` | API_BASE 可配置（桌面端 localStorage） |
 | `hooks/useWebSocket.ts` | WS URL 从配置读取 |
 
