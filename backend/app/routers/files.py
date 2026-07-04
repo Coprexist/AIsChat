@@ -200,6 +200,18 @@ async def download_file(
     )
 
 
+@router.get("/public/{file_id}")
+async def download_public_file(file_id: int, db: AsyncSession = Depends(get_db)):
+    """公开下载（无需登录，供维护弹窗等场景）"""
+    metadata = await get_file(db, file_id)
+    if metadata is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="文件不存在")
+    physical_path = _get_physical_path(metadata.path)
+    if not os.path.exists(physical_path):
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="物理文件不存在")
+    return FileResponse(physical_path, media_type=metadata.mime_type or "application/octet-stream")
+
+
 # ============================================================
 # 文件删除
 # ============================================================

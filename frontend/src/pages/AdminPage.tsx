@@ -404,7 +404,7 @@ function MaintenanceMsgEditor() {
                 const f = e.target.files?.[0]; if (!f) return
                 try {
                   const r: any = await api.upload('/fs/upload-attachment', f)
-                  setMsg({...msg, hard_image: `/api/fs/download/${r.file_id}`})
+                  setMsg({...msg, hard_image: `/api/fs/public/${r.file_id}`})
                 } catch (err: any) { alert('上传失败: ' + (err?.message || err)) }
               }} />
             </label>
