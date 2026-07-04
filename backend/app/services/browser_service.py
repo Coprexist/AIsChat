@@ -83,6 +83,7 @@ async def start() -> bool:
             "--disable-default-apps",
             "--disable-features=ImprovedCookieControls,SafeBrowsing,SubresourceFilter",
             f"--remote-debugging-port={CDP_PORT}",
+            "--remote-debugging-address=127.0.0.1",
             "--remote-allow-origins=*",
             stdout=asyncio.subprocess.DEVNULL,
             stderr=asyncio.subprocess.DEVNULL,
