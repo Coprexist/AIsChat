@@ -386,10 +386,30 @@ function MaintenanceMsgEditor() {
             className="w-full px-3 py-1.5 rounded-lg border border-border bg-canvas text-textPrimary text-xs focus:outline-none focus:ring-1 focus:ring-primary-500/50" />
         </div>
         <div>
-          <label className="block text-[10px] text-textMuted mb-1">弹窗图片 URL（可选）</label>
-          <input value={msg.hard_image} onChange={e => setMsg({...msg, hard_image: e.target.value})}
-            placeholder="https://example.com/image.png"
-            className="w-full px-3 py-1.5 rounded-lg border border-border bg-canvas text-textPrimary text-xs focus:outline-none focus:ring-1 focus:ring-primary-500/50" />
+          <label className="block text-[10px] text-textMuted mb-1">弹窗图片（可上传/URL/预选）</label>
+          <div className="flex gap-1.5">
+            <input value={msg.hard_image} onChange={e => setMsg({...msg, hard_image: e.target.value})}
+              placeholder="图片URL或点击上传"
+              className="flex-1 px-3 py-1.5 rounded-lg border border-border bg-canvas text-textPrimary text-xs focus:outline-none focus:ring-1 focus:ring-primary-500/50" />
+            <label className="shrink-0 px-2 py-1 text-[10px] rounded-lg border border-border bg-canvas text-textSecondary hover:text-primary-400 cursor-pointer transition-colors">
+              上传
+              <input type="file" accept="image/*" className="hidden" onChange={async e => {
+                const f = e.target.files?.[0]; if (!f) return
+                try { const r: any = await api.upload('/fs/upload-attachment', f); setMsg({...msg, hard_image: `/api/fs/download/${r.file_id}`}) } catch {}
+              }} />
+            </label>
+          </div>
+          {/* 预设中的图片快捷选择 */}
+          {presets.filter((p: any) => p.hard_image).length > 0 && (
+            <select onChange={e => { if (e.target.value) setMsg({...msg, hard_image: e.target.value}); e.target.value = '' }}
+              className="w-full mt-1 px-3 py-1.5 rounded-lg border border-border bg-canvas text-xs text-textMuted focus:outline-none focus:ring-1 focus:ring-primary-500/50"
+              defaultValue="">
+              <option value="">从预设中选图…</option>
+              {presets.filter((p: any) => p.hard_image).map((p: any) => (
+                <option key={p.name} value={p.hard_image}>{p.name} 的图</option>
+              ))}
+            </select>
+          )}
         </div>
         <div className="md:col-span-2">
           <label className="block text-[10px] text-textMuted mb-1">维护提示——顶部横幅文字</label>
