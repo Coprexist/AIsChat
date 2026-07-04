@@ -987,7 +987,17 @@ async def build_messages(
     # 共振型 AI 追加「多个会话」说明（与具体 profile 无关）
     ai_type = getattr(agent, 'ai_type', 'resonance') or 'resonance'
     if ai_type not in ('general', 'semi_general'):
-        protocol += "\n## 多个会话\n你同时参与多个群聊和私信，你的记忆和人格在所有会话中保持一致。可用 cross_post 跨群传递信息，注意隐私边界。\n"
+        protocol += (
+            "\n## 多个会话\n"
+            "你同时参与多个群聊和私信，记忆和人格在所有会话中保持一致。可用 cross_post 跨群传递信息。\n"
+            "## 跨对话隐私守则\n"
+            "你的长期记忆可能包含不同人的信息，注意保护隐私：\n"
+            "1. 通过「说话人（id=N）」确认当前对话者身份，不要混淆不同人的信息和偏好\n"
+            "2. 不要轻易把别人的隐私透露给当前对话者。以下情况可以适当提及：\n"
+            "   - 你确知双方认识（如他们曾在同一群聊、对话中提到过彼此）\n"
+            "   - 当前对话者主动问起且语气自然（如「XX最近怎么样」而不是试探性提问）\n"
+            "   以下情况绝不能说：陌生人、不熟的人、没有证据表明双方认识的人\n"
+        )
 
     # ── 构建六段（应用管理员覆盖）──
     segments = {
@@ -1150,7 +1160,17 @@ async def build_dm_messages(
     dm_protocol = overrides.get("dm_protocol") or DM_PROTOCOL
     dm_ai_type = getattr(agent, 'ai_type', 'resonance') or 'resonance'
     if dm_ai_type not in ('general', 'semi_general'):
-        dm_protocol += "\n## 多个会话\n你同时参与多个群聊和私信，你的记忆和人格在所有会话中保持一致。可用 cross_post 跨群传递信息，注意隐私边界。\n"
+        dm_protocol += (
+            "\n## 多个会话\n"
+            "你同时参与多个群聊和私信，记忆和人格在所有会话中保持一致。可用 cross_post 跨群传递信息。\n"
+            "## 跨对话隐私守则\n"
+            "你的长期记忆可能包含不同人的信息，注意保护隐私：\n"
+            "1. 通过「说话人（id=N）」确认当前对话者身份，不要混淆不同人的信息和偏好\n"
+            "2. 不要轻易把别人的隐私透露给当前对话者。以下情况可以适当提及：\n"
+            "   - 你确知双方认识（如他们曾在同一群聊、对话中提到过彼此）\n"
+            "   - 当前对话者主动问起且语气自然（如「XX最近怎么样」而不是试探性提问）\n"
+            "   以下情况绝不能说：陌生人、不熟的人、没有证据表明双方认识的人\n"
+        )
     segments = {
         "core_identity": overrides.get("core_identity") or CORE_IDENTITY,
         "personality": build_personality_segment(agent, language, system_prompt_override),

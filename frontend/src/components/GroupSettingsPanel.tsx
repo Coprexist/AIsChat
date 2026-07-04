@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react'
 import { api } from '../api/client'
 import { useT } from '../i18n/I18nContext'
 import { getStateDotColor } from '../constants'
-import { X, Bell, BellOff, LogOut, UserX, Shield, ShieldOff, UserPlus, Volume2, VolumeX, Download, Clock, Globe, Loader2, ArrowLeft } from 'lucide-react'
+import { X, Bell, BellOff, LogOut, UserX, Shield, ShieldOff, UserPlus, Volume2, VolumeX, Download, Clock, Globe, Loader2, ArrowLeft, Crown } from 'lucide-react'
 import Toggle from './Toggle'
 
 // ── 联邦共享状态（v1.0.0: 群主/AI制作者按群控制联邦共享） ──
@@ -612,6 +612,9 @@ export default function GroupSettingsPanel({ group, onClose, onUpdate, onLeave }
                       <div className="min-w-0">
                         <div className="text-sm text-textPrimary truncate flex items-center gap-1.5">
                           {m.name}
+                          {m.role === 'owner' && (
+                            <span className="text-[10px] text-amber-400 font-medium flex items-center gap-0.5"><Crown size={10} />{t('groupSettings.roleOwner')}</span>
+                          )}
                           {m.type === 'ai' && (
                             <span className="text-[10px] text-primary-400 font-medium">{t('chatlist.ai')}</span>
                           )}
