@@ -144,8 +144,8 @@ async def _decide_reply_action(db, agent, context: ActionContext) -> ActionDecis
         )
 
     # Gate 3: 快速过滤器（config_profile）
-    if not is_mentioned and profile == 'chat' and context.sender_type != 'human':
-        return ActionDecision(False, ActionType.NONE, 0, f"AI {agent.name} 聊天档未@且非人类消息")
+    if not is_mentioned and profile == 'chat':
+        return ActionDecision(False, ActionType.NONE, 0, f"AI {agent.name} 聊天档未被 @，跳过")
 
     # Gate 4: 意愿计算
     w = await calculate_willingness(

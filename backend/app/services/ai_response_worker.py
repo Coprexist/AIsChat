@@ -277,7 +277,7 @@ async def _process_group_event(db, event: dict):
         if limit_per_min > 0:
             effective_max_depth = max(limit_per_min * 2, 5)
         else:
-            effective_max_depth = 50
+            effective_max_depth = 3  # 人类群默认浅层，防链式刷屏
 
     if chain_depth > effective_max_depth:
         logger.info(
