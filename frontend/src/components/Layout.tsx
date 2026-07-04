@@ -1,13 +1,21 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { Outlet, useLocation } from 'react-router-dom'
 import Sidebar from './Sidebar'
 import MobileNav from './MobileNav'
 import BalancePromptModal from './BalancePromptModal'
 import { useDesktopNotification } from '../hooks/useDesktopNotification'
+import { Wrench } from 'lucide-react'
 
 export default function Layout() {
   const [drawerOpen, setDrawerOpen] = useState(false)
+  const [maintenance, setMaintenance] = useState(false)
   const location = useLocation()
+
+  useEffect(() => {
+    const handler = () => setMaintenance(true)
+    window.addEventListener('maintenance-mode', handler)
+    return () => window.removeEventListener('maintenance-mode', handler)
+  }, [])
 
   // 桌面通知：标签页标题未读计数 + 任务栏闪烁（所有页面生效）
   useDesktopNotification()
@@ -50,6 +58,20 @@ export default function Layout() {
 
       {/* ── 全局弹窗 ── */}
       <BalancePromptModal />
+
+      {/* 维护模式提示 */}
+      {maintenance && (
+        <div className="fixed inset-0 z-[70] flex items-center justify-center bg-black/60 p-4">
+          <div className="bg-surface rounded-2xl p-6 max-w-sm w-full text-center shadow-2xl border border-border">
+            <Wrench size={40} className="text-amber-400 mx-auto mb-3" />
+            <h2 className="text-lg font-semibold text-textPrimary mb-2">服务器维护中</h2>
+            <p className="text-sm text-textSecondary mb-4">管理员正在对服务器进行维护，请稍后再来。</p>
+            <button onClick={() => setMaintenance(false)} className="px-4 py-2 text-sm rounded-lg bg-primary-500 text-white hover:bg-primary-400 transition-colors">
+              知道了
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   )
 }

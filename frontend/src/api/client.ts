@@ -49,6 +49,10 @@ async function request<T = any>(
     throw new ApiError('Unauthorized', 401)
   }
 
+  if (res.status === 503) {
+    try { const body = JSON.parse(await res.clone().text()); if (body.maintenance) { window.dispatchEvent(new CustomEvent('maintenance-mode')); throw new ApiError('服务器维护中', 503) } } catch {}
+  }
+
   // 安全解析 JSON：处理空 body / 非 JSON 响应
   let data: any
   try {
