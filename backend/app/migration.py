@@ -2514,7 +2514,16 @@ async def _migrate_unify_ai_user_id(db):
         WHERE owner_type = 'ai' AND a.id = file_metadata.owner_id AND file_metadata.owner_id <> a.user_id
     """))
 
-    # 4. dm_messages 修复：sender_id 不属于会话参与者的消息，用另一参与者恢复
+    # 4. dm_messages 修复：sender_id 不属于会话参与者的消息
+    # 策略：sender_id 落在 agent.id 范围的 → 改为 agent.user_id；
+    #        仍然不对的 → 删掉（让对话自然重建）
+    await db.execute(text("""
+        UPDATE dm_messages dm SET sender_id = a.user_id
+        FROM agents a
+        WHERE a.id = dm.sender_id AND a.user_id IS NOT NULL
+          AND EXISTS (SELECT 1 FROM dm_sessions ds WHERE ds.session_id = dm.session_id AND a.user_id IN (ds.user1_id, ds.user2_id))
+    """))
+    # 剩下修不好的恢复为 user1（再不行就 user2）
     await db.execute(text("""
         UPDATE dm_messages dm SET sender_id = ds.user1_id
         FROM dm_sessions ds
