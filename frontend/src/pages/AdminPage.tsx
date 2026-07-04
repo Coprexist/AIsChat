@@ -306,7 +306,7 @@ function OverviewTab() {
 }
 
 function MaintenanceMsgEditor() {
-  const [msg, setMsg] = useState({ hard_title: '', hard_body: '', hard_color: '#f59e0b', hard_image: '', soft_text: '', soft_color: '#f59e0b' })
+  const [msg, setMsg] = useState({ hard_title: '', hard_body: '', hard_color: '#f59e0b', hard_image: '', hard_style: 'popup', soft_text: '', soft_color: '#f59e0b' })
   const [presets, setPresets] = useState<any[]>([])
   const [loaded, setLoaded] = useState(false)
   const [saved, setSaved] = useState(false)
@@ -410,7 +410,6 @@ function MaintenanceMsgEditor() {
                   const r: any = await api.upload('/fs/upload-attachment', f)
                   const url = `/api/fs/public/${r.file_id}`
                   setMsg({...msg, hard_image: url})
-                  try { await api.put('/admin/maintenance/msg', {...msg, hard_image: url}); setSaved(true); setTimeout(() => setSaved(false), 2000) } catch {}
                 } catch (err: any) { alert('上传失败: ' + (err?.message || err)) }
               }} />
             </label>
@@ -426,6 +425,17 @@ function MaintenanceMsgEditor() {
               ))}
             </select>
           )}
+          {msg.hard_image && (
+            <div className="mt-1"><img src={msg.hard_image} alt="" className="h-16 object-contain rounded-lg border border-border bg-black/20" /></div>
+          )}
+        </div>
+        <div>
+          <label className="block text-[10px] text-textMuted mb-1">提示样式</label>
+          <select value={msg.hard_style} onChange={e => setMsg({...msg, hard_style: e.target.value})}
+            className="w-full px-3 py-1.5 rounded-lg border border-border bg-canvas text-xs text-textPrimary focus:outline-none focus:ring-1 focus:ring-primary-500/50">
+            <option value="popup">弹窗</option>
+            <option value="banner">顶栏</option>
+          </select>
         </div>
         <div className="md:col-span-2">
           <label className="block text-[10px] text-textMuted mb-1">维护提示——顶部横幅文字</label>

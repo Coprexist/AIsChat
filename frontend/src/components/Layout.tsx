@@ -9,7 +9,7 @@ import { Wrench } from 'lucide-react'
 export default function Layout() {
   const [drawerOpen, setDrawerOpen] = useState(false)
   const [maintenance, setMaintenance] = useState(false)
-  const [hardText, setHardText] = useState({ title: '正在更新', body: '服务器正在更新，稍等一下就好~', color: '#f59e0b', image: '' })
+  const [hardText, setHardText] = useState({ title: '正在更新', body: '服务器正在更新，稍等一下就好~', color: '#f59e0b', image: '', style: 'popup' })
   const [softMaintenance, setSoftMaintenance] = useState(false)
   const [softText, setSoftText] = useState('服务器正在调整，功能可能偶尔不稳定')
   const [softColor, setSoftColor] = useState('#f59e0b')
@@ -24,7 +24,7 @@ export default function Layout() {
       else try {
         const res = await fetch('/api/maintenance-msg')
         const d = await res.json()
-        const txt = { title: d.hard_title || '正在更新', body: d.hard_body || '服务器正在更新', color: d.hard_color || '#f59e0b', image: d.hard_image || '' }
+        const txt = { title: d.hard_title || '正在更新', body: d.hard_body || '服务器正在更新', color: d.hard_color || '#f59e0b', image: d.hard_image || '', style: d.hard_style || 'popup' }
         localStorage.setItem('maintenance_msg', JSON.stringify(txt))
         setHardText(txt)
       } catch { if (cached?.title) setHardText(cached) }
@@ -99,8 +99,14 @@ export default function Layout() {
         </div>
       )}
 
-      {/* 硬维护弹窗（API 503） */}
-      {maintenance && (
+      {/* 硬维护（API 503）——弹窗 / 顶栏 */}
+      {maintenance && hardText.style === 'banner' && (
+        <div className="fixed top-0 left-0 right-0 z-[70] text-white text-xs text-center py-1.5 px-4 font-medium" style={{ backgroundColor: hardText.color }}>
+          {hardText.title} · {hardText.body}
+          <button onClick={() => setMaintenance(false)} className="ml-2 underline opacity-80 hover:opacity-100">关闭</button>
+        </div>
+      )}
+      {maintenance && hardText.style !== 'banner' && (
         <div className="fixed inset-0 z-[70] flex items-center justify-center bg-black/60 p-4">
           <div className="bg-surface rounded-2xl p-6 max-w-sm w-full text-center shadow-2xl border border-border">
             <Wrench size={40} className="mx-auto mb-3" style={{ color: hardText.color }} />
