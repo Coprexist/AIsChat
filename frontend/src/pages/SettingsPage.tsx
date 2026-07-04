@@ -548,6 +548,9 @@ export default function SettingsPage() {
                   </button>
                 ))}
               </div>
+              {(() => { const cur = providerPresets.find(p => p.base_url === apiBaseUrl); return cur ? (
+                <p className="text-[10px] text-mint-400">当前预设：{cur.name} · {cur.base_url}</p>
+              ) : null })()}
             </div>
           )}
           <div>
@@ -564,7 +567,7 @@ export default function SettingsPage() {
           <div>
             <label className="block text-xs font-medium mb-1.5 text-textSecondary flex items-center gap-2">
               {t('settings.apiKey')}
-              {apiBaseUrl && (
+              {apiBaseUrl && getApiKeyUrl(apiBaseUrl) && (
                 <a
                   href={getApiKeyUrl(apiBaseUrl)}
                   target="_blank"
@@ -644,21 +647,26 @@ export default function SettingsPage() {
                             </button>
                           </div>
                           {providerPresets.length > 0 && (
-                            <div className="flex flex-wrap gap-1.5 mb-1">
-                              {providerPresets.map(p => (
-                                <button
-                                  key={p.name}
-                                  onClick={() => setAgentApiBaseUrl(p.base_url)}
-                                  className={`px-2 py-1 text-[11px] rounded-lg font-medium transition-colors border ${
-                                    agentApiBaseUrl === p.base_url
-                                      ? 'bg-primary-500/15 border-primary-500/40 text-primary-500'
-                                      : 'bg-surface border-border text-textMuted hover:text-textSecondary hover:border-primary-500/30'
-                                  }`}
-                                >
-                                  {p.name}
-                                </button>
-                              ))}
-                            </div>
+                            <>
+                              <div className="flex flex-wrap gap-1.5">
+                                {providerPresets.map(p => (
+                                  <button
+                                    key={p.name}
+                                    onClick={() => setAgentApiBaseUrl(p.base_url)}
+                                    className={`px-2 py-1 text-[11px] rounded-lg font-medium transition-colors border ${
+                                      agentApiBaseUrl === p.base_url
+                                        ? 'bg-primary-500/15 border-primary-500/40 text-primary-500'
+                                        : 'bg-surface border-border text-textMuted hover:text-textSecondary hover:border-primary-500/30'
+                                    }`}
+                                  >
+                                    {p.name}
+                                  </button>
+                                ))}
+                              </div>
+                              {(() => { const cur = providerPresets.find(p => p.base_url === agentApiBaseUrl); return cur ? (
+                                <p className="text-[10px] text-mint-400">当前预设：{cur.name}</p>
+                              ) : null })()}
+                            </>
                           )}
                           <input
                             type="text"
