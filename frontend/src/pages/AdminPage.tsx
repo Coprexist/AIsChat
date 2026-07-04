@@ -351,7 +351,7 @@ function MaintenanceMsgEditor() {
       {/* 预设选择（下拉） */}
       <div className="flex items-center gap-2 mb-3">
         <select
-          onChange={e => {
+          onChange={async e => {
             const v = e.target.value
             if (v === '__del__') { const n = prompt('输入要删除的预设名：'); if (n && confirm(`删除「${n}」？`)) { deletePreset(n); load() } }
             else if (v === '__rename__') {
