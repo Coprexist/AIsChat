@@ -58,6 +58,11 @@ async def start() -> bool:
         return False
 
     logger.info(f"启动 Chromium headless CDP (port {CDP_PORT})...")
+    # 确保 D-Bus 运行（Chrome 渲染引擎依赖）
+    try:
+        proc = await asyncio.create_subprocess_exec("dbus-daemon", "--system", "--fork", stdout=asyncio.subprocess.DEVNULL, stderr=asyncio.subprocess.DEVNULL)
+        await proc.wait()
+    except Exception: pass
     try:
         _chrome_process = await asyncio.create_subprocess_exec(
             CHROMIUM_BIN,
