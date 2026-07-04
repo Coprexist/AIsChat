@@ -19,6 +19,7 @@ PID_FILE = "/tmp/chromium_cdp.pid"
 CHROMIUM_BIN = "/usr/bin/chromium"
 
 _chrome_process: asyncio.subprocess.Process | None = None
+_start_lock = asyncio.Lock()
 
 
 def is_running() -> bool:
@@ -35,12 +36,22 @@ def is_running() -> bool:
 
 
 async def start() -> bool:
-    """启动 Chromium headless + CDP。已运行则跳过。"""
+    """启动 Chromium headless + CDP。已运行则跳过，带锁防重入。"""
     global _chrome_process
 
-    if is_running():
-        logger.info(f"Chromium CDP 已在运行 (port {CDP_PORT})")
-        return True
+    async with _start_lock:
+        if is_running():
+            logger.info(f"Chromium CDP 已在运行 (port {CDP_PORT})")
+            return True
+
+        # 杀掉旧进程（如果有残留）
+        if _chrome_process is not None and _chrome_process.returncode is None:
+            try:
+                _chrome_process.kill()
+                await _chrome_process.wait()
+            except Exception:
+                pass
+            _chrome_process = None
 
     if not os.path.exists(CHROMIUM_BIN):
         logger.error(f"Chromium 未安装: {CHROMIUM_BIN}")
