@@ -180,7 +180,9 @@ cd frontend && npm install && npm run dev
 
 ## 路线图
 
-已实现和规划中的功能详见 **[ROADMAP.md](ROADMAP.md)**。方向是清晰的，优先级按社区反馈调整。
+已实现和规划中的功能详见 **[ROADMAP.md](ROADMAP.md)**。
+
+想了解完整的架构设计、技术决策和模块成熟度评估？看 **[项目全景报告](docs/项目全景报告.md)**——含各模块状态、技术亮点、已知限制和未来规划。
 
 <br>
 
