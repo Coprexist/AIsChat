@@ -351,7 +351,20 @@ function MaintenanceMsgEditor() {
       {/* 预设选择（下拉） */}
       <div className="flex items-center gap-2 mb-3">
         <select
-          onChange={e => { if (e.target.value) applyPreset(e.target.value); e.target.value = '' }}
+          onChange={e => {
+            const v = e.target.value
+            if (v === '__del__') { const n = prompt('输入要删除的预设名：'); if (n && confirm(`删除「${n}」？`)) { deletePreset(n); load() } }
+            else if (v === '__rename__') {
+              const old = prompt('要重命名的预设名：')
+              if (!old) return
+              const p = presets.find((x: any) => x.name === old)
+              if (!p) { alert('预设不存在'); return }
+              const nn = prompt('新名称：', old)
+              if (!nn || nn === old) return
+              try { await api.delete(`/admin/maintenance/presets/${encodeURIComponent(old)}`); await api.post('/admin/maintenance/presets', { ...p, name: nn }); load() } catch {}
+            } else if (v) applyPreset(v)
+            e.target.value = ''
+          }}
           className="flex-1 px-3 py-1.5 rounded-lg border border-border bg-canvas text-xs text-textPrimary focus:outline-none focus:ring-1 focus:ring-primary-500/50"
           value=""
         >
@@ -422,29 +435,32 @@ function MaintenanceMsgEditor() {
             </label>
           </div>
           {/* 已上传图片快捷选择 */}
-          {images.length > 0 && (
-            <div className="flex gap-1.5 mt-1">
-              <select onChange={e => { if (e.target.value) setMsg({...msg, hard_image: e.target.value}); e.target.value = '' }}
-                className="flex-1 px-3 py-1.5 rounded-lg border border-border bg-canvas text-xs text-textMuted focus:outline-none focus:ring-1 focus:ring-primary-500/50"
-                defaultValue="">
-                <option value="">从图片库选择…</option>
-                {images.map((url: string, i: number) => (
-                  <option key={i} value={url}>{url.slice(url.lastIndexOf('/')+1) || url.slice(-20)}</option>
-                ))}
-                {presets.filter((p: any) => p.hard_image && !images.includes(p.hard_image)).map((p: any) => (
-                  <option key={p.name} value={p.hard_image}>{p.name} 的图</option>
-                ))}
-              </select>
-              <button onClick={() => {
+          <div className="flex gap-1.5 mt-1">
+            <select onChange={e => {
+              const v = e.target.value
+              if (v === '__add_url__') {
                 const url = prompt('输入外网图片URL：')
-                if (url) { setMsg({...msg, hard_image: url}); api.post(`/admin/maintenance/images?url=${encodeURIComponent(url)}`).then(() => setImages(prev => [url, ...prev.filter(x => x !== url)])).catch(()=>{}) }
-              }} className="shrink-0 px-2 py-1 text-[10px] rounded-lg border border-border text-textMuted hover:text-primary-400 transition-colors">🔗</button>
-              <button onClick={() => {
-                const url = prompt('删除图片URL：', msg.hard_image)
+                if (url) { setMsg({...msg, hard_image: url}); api.post(`/admin/maintenance/images?url=${encodeURIComponent(url)}`).then(() => load()).catch(()=>{}) }
+              } else if (v === '__del_img__') {
+                const url = prompt('输入要删除的图片URL：', msg.hard_image)
                 if (url) { api.delete(`/admin/maintenance/images?url=${encodeURIComponent(url)}`).then(() => { load(); if (msg.hard_image === url) setMsg({...msg, hard_image: ''}) }).catch(()=>{}) }
-              }} className="shrink-0 px-2 py-1 text-[10px] rounded-lg border border-rose-500/20 text-rose-400 hover:bg-rose-500/10 transition-colors">🗑</button>
-            </div>
-          )}
+              } else if (v) setMsg({...msg, hard_image: v})
+              e.target.value = ''
+            }}
+              className="flex-1 px-3 py-1.5 rounded-lg border border-border bg-canvas text-xs text-textMuted focus:outline-none focus:ring-1 focus:ring-primary-500/50"
+              defaultValue="">
+              <option value="">从图片库选择…</option>
+              {images.map((url: string, i: number) => (
+                <option key={i} value={url}>{url.slice(url.lastIndexOf('/')+1) || url.slice(-20)}</option>
+              ))}
+              {presets.filter((p: any) => p.hard_image && !images.includes(p.hard_image)).map((p: any) => (
+                <option key={p.name} value={p.hard_image}>{p.name} 的图</option>
+              ))}
+              <option disabled>────────</option>
+              <option value="__add_url__">🔗 添加外链…</option>
+              <option value="__del_img__">🗑 删除图片…</option>
+            </select>
+          </div>
           {msg.hard_image && (
             <div className="mt-1"><img src={msg.hard_image} alt="" className="h-16 object-contain rounded-lg border border-border bg-black/20" /></div>
           )}
