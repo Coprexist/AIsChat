@@ -2493,6 +2493,11 @@ async def test_browser_connection(
     except Exception as e:
         return {"ok": False, "error": f"Chromium CDP 未运行: {e}", "step": "cdp-check"}
 
+    # 检查进程是否存活
+    import subprocess, os
+    chrome_alive = subprocess.run(["pgrep", "-f", "chromium"], capture_output=True, text=True).stdout.strip()
+    chrome_pids = chrome_alive.replace("\n", ",")
+
     # 尝试用 CDP 打开百度
     try:
         # 创建新页面
@@ -2551,7 +2556,7 @@ async def test_browser_connection(
 
     return {
         "ok": True,
-        "message": f"fetch={fetch_result} | 页面标题={page_title or '无'}{' CDP:' + ','.join(msgs_log) if not page_title else ''}",
+        "message": f"fetch={fetch_result} | 标题={page_title or '无'} | Chrome进程: {chrome_pids}{' CDP:' + ','.join(msgs_log) if not page_title else ''}",
         "page_title": page_title or "",
         "cdp_version": cdp_info.get("Browser", "unknown"),
     }
