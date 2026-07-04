@@ -7,40 +7,7 @@
 
 ---
 
-## [v1.0.0] - 2026-06-28
-
-### Added
-
-- 🔧 **AI 设置界面二级重构**：设置面板拆分为「主设置」（12 个核心参数：名称/档位/AI类型/模型/温度/思考/工具轮次/延迟/他人对话/暂停）和「详细设置」（全部高级参数）。一键切换四个配置档位即时预览预设，所有参数可在此基础上微调。
-- 🆕 **4 个新配置参数**：`auto_dnd_threshold`、`auto_dnd_duration`、`conversation_logs_limit`、`user_can_view_logs`。前后端全链路支持，创建和编辑均可设置。
-- 🛠️ **tool_help 工具**：AI 可查询工具/CLI 详细用法（含 browser session 协议、17 子命令、典型流程）。`execute_command` 描述指向 `tool_help`。
-- 🎨 **滑块日夜模式修复**：`input[type="range"]` 自定义轨道/拇指 CSS，深色模式轨道清晰可见。`ToggleField` 统一使用标准 `Toggle` 组件。
-- 📧 **邮箱系统增强**：多 SMTP 配置容灾——支持配置多个发件服务器按优先级自动故障转移，一个不可用自动尝试下一个。管理员可增删改排序，独立测试每个配置的连通性。
-- ✉️ **自定义邮件模板**：管理员可编辑验证码邮件的 HTML 模板（分中文/英文/日语，分注册/登录/换绑三种用途），支持 `{code}` `{from_name}` `{username}` 等变量占位符。一键重置为默认模板。
-- 🔢 **OTP 验证码输入组件**：全新 `VerificationCodeInput` 组件——6 个独立数字框，自动聚焦跳转、Backspace 回退、粘贴分发。LoginPage / MePage / SettingsPage 三处统一替换，体验一致。
-- 🇯🇵 **日语界面支持**：完整日语翻译（1415+ key），前端语言选择器全线支持。设置向导、设置页、管理员面板均可切换日语。时间格式化（相对时间 + 消息时间）日语本地化。
-- 📄 **FilePreviewModal 富文本渲染**：`.md` 渲染为格式化 Markdown（react-markdown + GFM/数学公式/Mermaid），`.py/.c/.cpp/.json` 等代码文件语法高亮展示。
-- 🧠 **AI 详情页结构化记忆展示**：新增子 Tab（结构化/向量），3 级可折叠目录树，向量记忆卡片支持展开、scope 彩色标签。
-
-### Fixed
-
-- 🐛 **跨对话上下文 role 混淆（DeepSeek 注意力失效）**：经 A/B 对照验证，DeepSeek 在 `system → user/assistant → system` 交替结构中存在注意力失效——API 收到完整数据，但模型会忽略夹在 system 消息之间的 `user`/`assistant` 消息（能见标题、不见内容）。修复方案：跨对话上下文（标题 + 内容）全部改用 `role: system`，仅当前会话保留 `user`/`assistant`。同时引入自我/他人显式区分——AI 自己的发言保留纯名字（如 `逍遥三号: ...`），他人发言附带 id（如 `清风无殇（id=12）: ...`），系统提示词加规则「带 id 的都是别人」。id 是数据库主键不可伪造，杜绝用户名注入冒充 AI 自己的攻击面。设计文档全量同步（AI对话链机制.md / 三空间模型.md / 记忆架构设计.md / 项目全景报告.md §7.5）。
-- 🐛 **统一上下文修复**：`config_profile=custom` 的共振 AI 此前被 `_build_cross_conversation_context` 排除，修复后仅跳过 `chat` 档和 `general`/`semi_general` 类型，共振 AI 在任何档位下均加载跨对话上下文。
-- 🔧 **set_status 工具注册**：补上 `tools/__init__.py` 中漏掉的 import。
-- 🐛 **纯文件消息修复**：发送纯文件消息（无文字）不再被 `content` 空检查拦截。
-- 🔒 **文件引用幂等**：`file_references` 表加 UNIQUE 约束 + CI 迁移清理重复记录，彻底解决 `MultipleResultsFound` 500 错误。
-- 🧬 **Embedding 模型修正**：`deepseek-embed` 实际不存在，改为 `text-embedding-3-small` + 环境变量 `EMBEDDING_MODEL` 可配。AI 提示词更新，告知 `recall_memory` 可能不可用。
-
-### Changed
-
-- 🔧 **语言配置统一化**：新建 `frontend/src/i18n/languages.ts` 作为语言元数据的单一数据源（`Lang` 类型、`LANGUAGES` 数组、`isValidLang()` 校验、`getLangMeta()` 查询）。`I18nContext`、`SetupPage`、`SettingsPage`、`AdminPage`、`AuthContext`、`time.ts` 全部改为引用此中心文件。新增语言只需在此文件加一条记录。
-- ♻️ **SMTP 配置数据迁移**：`system_settings.smtp_config` 从单 JSONB 对象改为 JSONB 数组（`_migrate_smtp_configs_array` 自动包装旧格式）。`get_auth_settings` 返回新增 `smtp_configs` 字段，旧 `smtp_config` 字段保留兼容。
-- 📝 **对话链机制文档**：新增统一上下文章节（§2.4——生效条件表、上下文格式、与链交互规则）。
-- 📝 **认知架构文档**：统一上下文规则表覆盖 `custom + resonance` 组合。
-
----
-
-## [v1.0.2] - 2026-07-01
+## [v1.0.2] - 2026-07-04
 
 ### Added
 
@@ -74,16 +41,54 @@
 - 🚪 **`enter_group` 工具**：验证成员资格→获取未读数→push 状态帧→返回预览。
 - 📋 **TODO/PLAN/JOURNAL 自动联动**：push_state/pop_state 自动写入 workspace。
 - ♻️ **Result Monad 集成**：`get_agent()`/`decode_access_token()`/`get_effective_config()` 返回 `Result[T,E]`。TypeScript 端 `safeParse<T>()`、`api.safe.*`。
+- 🧩 **统一上下文**：所有会话统一标题格式（「在私信/群聊「名字」(id=X)中」），当前会话标题始终在最后。跨对话消息全部 `role: system`，边界清晰。
+- ⚡ **上下文压缩**：旧消息稳定摘要化保 prompt cache 命中率。`context_compressor.py` 控制阈值（~8K tokens 触发）。
+- 🏗️ **纯函数架构建立**：`utils/pure/` 目录——意愿评分、提示词构建、消息格式化、预设合并、状态栈全部零 IO 抽取。项目遵循「函数式核心 + 命令式外壳」模式。
 
 ### Fixed
 
-- 🐛 **跨对话上下文死循环**：`_build_cross_conversation_context` 永久禁用（返回 `[]`），状态栈替代。
+- 🐛 **跨对话上下文死循环（历史重播）**：`_build_cross_conversation_context` 永久禁用（返回 `[]`），状态栈替代——经 A/B 对照验证，DeepSeek 在 `system→user/assistant→system` 交替结构中存在注意力失效。
 - 🐛 **多群主错误数据**：迁移将非 owner 的 `role='owner'` 记录降为 member。
+- 🐛 **纯文件消息被拦截**：发送纯文件（无文字）不再被 `content` 空检查拦截。
 
 ### Changed
 
 - 🔧 状态栈摘要注入到系统提示词尾部（最大化 prompt cache 命中）。
 - 🔧 闹钟/群聊/DM 三个路径 end_turn 时调用 `persist_last_task_as_state()`。
+- 🔧 跨对话上下文生效条件：chat 档 + general/semi_general 不加载，resonance 及 custom 档共振 AI 加载。
+
+---
+
+## [v1.0.0] - 2026-06-28
+
+### Added
+
+- 🔧 **AI 设置界面二级重构**：设置面板拆分为「主设置」（12 个核心参数：名称/档位/AI类型/模型/温度/思考/工具轮次/延迟/他人对话/暂停）和「详细设置」（全部高级参数）。一键切换四个配置档位即时预览预设，所有参数可在此基础上微调。
+- 🆕 **4 个新配置参数**：`auto_dnd_threshold`、`auto_dnd_duration`、`conversation_logs_limit`、`user_can_view_logs`。前后端全链路支持，创建和编辑均可设置。
+- 🛠️ **tool_help 工具**：AI 可查询工具/CLI 详细用法（含 browser session 协议、17 子命令、典型流程）。`execute_command` 描述指向 `tool_help`。
+- 🎨 **滑块日夜模式修复**：`input[type="range"]` 自定义轨道/拇指 CSS，深色模式轨道清晰可见。`ToggleField` 统一使用标准 `Toggle` 组件。
+- 📧 **邮箱系统增强**：多 SMTP 配置容灾——支持配置多个发件服务器按优先级自动故障转移，一个不可用自动尝试下一个。管理员可增删改排序，独立测试每个配置的连通性。
+- ✉️ **自定义邮件模板**：管理员可编辑验证码邮件的 HTML 模板（分中文/英文/日语，分注册/登录/换绑三种用途），支持 `{code}` `{from_name}` `{username}` 等变量占位符。一键重置为默认模板。
+- 🔢 **OTP 验证码输入组件**：全新 `VerificationCodeInput` 组件——6 个独立数字框，自动聚焦跳转、Backspace 回退、粘贴分发。LoginPage / MePage / SettingsPage 三处统一替换，体验一致。
+- 🇯🇵 **日语界面支持**：完整日语翻译（1415+ key），前端语言选择器全线支持。设置向导、设置页、管理员面板均可切换日语。时间格式化（相对时间 + 消息时间）日语本地化。
+- 📄 **FilePreviewModal 富文本渲染**：`.md` 渲染为格式化 Markdown（react-markdown + GFM/数学公式/Mermaid），`.py/.c/.cpp/.json` 等代码文件语法高亮展示。
+- 🧠 **AI 详情页结构化记忆展示**：新增子 Tab（结构化/向量），3 级可折叠目录树，向量记忆卡片支持展开、scope 彩色标签。
+
+### Fixed
+
+- 🐛 **跨对话上下文 role 混淆（DeepSeek 注意力失效）**：经 A/B 对照验证，DeepSeek 在 `system → user/assistant → system` 交替结构中存在注意力失效——API 收到完整数据，但模型会忽略夹在 system 消息之间的 `user`/`assistant` 消息（能见标题、不见内容）。修复方案：跨对话上下文（标题 + 内容）全部改用 `role: system`，仅当前会话保留 `user`/`assistant`。同时引入自我/他人显式区分——AI 自己的发言保留纯名字（如 `逍遥三号: ...`），他人发言附带 id（如 `清风无殇（id=12）: ...`），系统提示词加规则「带 id 的都是别人」。id 是数据库主键不可伪造，杜绝用户名注入冒充 AI 自己的攻击面。设计文档全量同步（AI对话链机制.md / 三空间模型.md / 记忆架构设计.md / 项目全景报告.md §7.5）。
+- 🐛 **统一上下文修复**：`config_profile=custom` 的共振 AI 此前被 `_build_cross_conversation_context` 排除，修复后仅跳过 `chat` 档和 `general`/`semi_general` 类型，共振 AI 在任何档位下均加载跨对话上下文。
+- 🔧 **set_status 工具注册**：补上 `tools/__init__.py` 中漏掉的 import。
+- 🐛 **纯文件消息修复**：发送纯文件消息（无文字）不再被 `content` 空检查拦截。
+- 🔒 **文件引用幂等**：`file_references` 表加 UNIQUE 约束 + CI 迁移清理重复记录，彻底解决 `MultipleResultsFound` 500 错误。
+- 🧬 **Embedding 模型修正**：`deepseek-embed` 实际不存在，改为 `text-embedding-3-small` + 环境变量 `EMBEDDING_MODEL` 可配。AI 提示词更新，告知 `recall_memory` 可能不可用。
+
+### Changed
+
+- 🔧 **语言配置统一化**：新建 `frontend/src/i18n/languages.ts` 作为语言元数据的单一数据源（`Lang` 类型、`LANGUAGES` 数组、`isValidLang()` 校验、`getLangMeta()` 查询）。`I18nContext`、`SetupPage`、`SettingsPage`、`AdminPage`、`AuthContext`、`time.ts` 全部改为引用此中心文件。新增语言只需在此文件加一条记录。
+- ♻️ **SMTP 配置数据迁移**：`system_settings.smtp_config` 从单 JSONB 对象改为 JSONB 数组（`_migrate_smtp_configs_array` 自动包装旧格式）。`get_auth_settings` 返回新增 `smtp_configs` 字段，旧 `smtp_config` 字段保留兼容。
+- 📝 **对话链机制文档**：新增统一上下文章节（§2.4——生效条件表、上下文格式、与链交互规则）。
+- 📝 **认知架构文档**：统一上下文规则表覆盖 `custom + resonance` 组合。
 
 ---
 
