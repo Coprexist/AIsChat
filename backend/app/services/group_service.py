@@ -424,6 +424,27 @@ async def is_member_in_dnd(db: AsyncSession, agent_id: int, group_id: int) -> bo
     now = datetime.utcnow()
     return member.dnd_until > now
 
+async def is_member_muted(db: AsyncSession, agent_id: int, group_id: int) -> bool:
+    """检查 AI 在指定群聊是否处于屏蔽状态（比 DND 更强，@/公告也不穿透）"""
+    from app.models.agent import Agent as AgentModel
+    agent_result = await db.execute(select(AgentModel).where(AgentModel.id == agent_id))
+    agent = agent_result.scalar_one_or_none()
+    lookup_id = agent.user_id if agent else agent_id
+    result = await db.execute(
+        select(GroupMember).where(
+            and_(
+                GroupMember.group_id == group_id,
+                GroupMember.member_type == "ai",
+                GroupMember.member_id == lookup_id,
+            )
+        )
+    )
+    member = result.scalar_one_or_none()
+    if member is None or member.muted_until is None:
+        return False
+    now = datetime.utcnow()
+    return member.muted_until > now
+
 
 async def is_member_of_group(
     db: AsyncSession,

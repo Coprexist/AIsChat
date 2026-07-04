@@ -568,6 +568,14 @@ async def _maybe_trigger_ai_reply(
     )
     logger.info(f"🔍 AI {agent.name}: 构建了 {len(messages)} 条消息")
 
+    # DND 被 @ 穿透时，提醒 AI 重新评估免打扰/聊天链状态
+    if decision.details.get("dnd_penetrated"):
+        messages.append({"role": "system", "content": (
+            "⚠️ 你之前设了群免打扰，但被 @（或 @all/群公告）穿透了。"
+            "请评估：① 是否需要重新设置免打扰？② 是否要退出当前聊天链（间隔 < 2 分钟 = 同链）？"
+            "如果只是来答一个问题，答完后用 set_dnd 设短时免打扰安静回去。"
+        )})
+
     # 延迟被跳过时，注入提醒：加快回复速度 + 记入记忆
     if delay_skipped:
         delay_hint = (

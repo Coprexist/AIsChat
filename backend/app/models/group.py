@@ -38,6 +38,7 @@ class GroupMember(Base):
     member_id = Column(Integer, nullable=False)
     role = Column(String(20), default="member")  # owner|admin|member
     dnd_until = Column(DateTime, nullable=True)  # NULL=永久免打扰; 有值=临时截止时间
+    muted_until = Column(DateTime, nullable=True)  # 屏蔽截止时间，期间 @/公告也不穿透
     last_read_at = Column(DateTime, nullable=True)  # 用户上次查看群聊的时间
     joined_at = Column(DateTime, server_default=func.now())
 

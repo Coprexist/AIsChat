@@ -13,6 +13,7 @@
 from app.tools.chat_social.send_message import SendMessage
 from app.tools.chat_social.send_dm import SendDM
 from app.tools.chat_social.set_dnd import SetDND
+from app.tools.chat_social.mute_group import MuteGroup
 from app.tools.chat_social.cancel_dnd import CancelDND
 from app.tools.chat_social.enter_group import EnterGroup
 from app.tools.chat_social.switch_state import SwitchState
