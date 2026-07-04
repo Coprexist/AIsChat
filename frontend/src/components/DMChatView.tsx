@@ -79,6 +79,7 @@ export default function DMChatView({ sessionId, onMobileBack }: DMChatViewProps)
             partner?.name?.charAt(0)?.toUpperCase() || '?'
           )}
         </div>
+          )}
         </button>
 
         {/* 对方信息 */}
