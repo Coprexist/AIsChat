@@ -10,9 +10,11 @@ interface AvatarCropModalProps {
 }
 
 function getCroppedImgRaw(image: HTMLImageElement, crop: Area): Promise<Blob> {
+  const MAX = 1024 // iOS Safari canvas 大图容易崩
+  const scale = Math.min(1, MAX / Math.max(crop.width, crop.height))
   const canvas = document.createElement('canvas')
-  canvas.width = crop.width
-  canvas.height = crop.height
+  canvas.width = Math.round(crop.width * scale)
+  canvas.height = Math.round(crop.height * scale)
   const ctx = canvas.getContext('2d')
   if (!ctx) throw new Error('No 2d context')
 

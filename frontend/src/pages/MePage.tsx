@@ -247,7 +247,7 @@ export default function MePage() {
       const res = await api.upload('/user/avatar', file)
       setEditAvatarUrl(res.avatar_url)
       refreshUser?.()
-    } catch (err: any) { alert(err.message || t('error.unknown')) }
+    } catch (err: any) { alert(err?.message || err?.detail || t('error.unknown')) }
     finally { setAvatarUploading(false) }
   }
 
@@ -259,7 +259,7 @@ export default function MePage() {
       const res = await api.upload('/user/avatar', new File([blob], `avatar.${ext}`, { type: blob.type || 'image/jpeg' }))
       setEditAvatarUrl(res.avatar_url)
     } catch (err: any) {
-      alert(err.message || t('error.uploadFailed'))
+      alert(err?.message || err?.detail || (typeof err === 'string' ? err : '上传失败，请检查网络或文件大小'))
     } finally { setAvatarUploading(false) }
   }
   const handleSaveProfile = async () => {
