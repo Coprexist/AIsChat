@@ -698,6 +698,8 @@ async def update_agent_config(
         agent.bio = updates["bio"]
     if "status_text" in updates:
         agent.status_text = updates["status_text"]
+    if "status_color" in updates:
+        agent.status_color = updates["status_color"]
 
     # 好友申请开关
     if "allow_friend_requests" in updates:

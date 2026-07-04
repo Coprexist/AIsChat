@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { api } from '../api/client'
 import { useT } from '../i18n/I18nContext'
 import { ArrowLeft, X, Loader2, RotateCw, Ticket, ChevronRight } from 'lucide-react'
+import { STATUS_COLORS } from '../utils/statusColor'
 import SkillBackpack from './SkillBackpack'
 import Toggle from './Toggle'
 
@@ -171,6 +172,7 @@ export default function AgentSettingsModal({
   const [apiKey, setApiKey] = useState('')
   const [bio, setBio] = useState(agent.bio || '')
   const [statusText, setStatusText] = useState(agent.status_text || '')
+  const [statusColor, setStatusColor] = useState((agent as any).status_color || '')
 
   // ── UI 状态 ──
   const [saving, setSaving] = useState(false)
@@ -285,6 +287,7 @@ export default function AgentSettingsModal({
         user_can_view_logs: userCanViewLogs,
         bio: bio || null,
         status_text: statusText || null,
+        status_color: statusColor || null,
       }
       if (apiKey.trim()) {
         payload.api_key = apiKey.trim()
@@ -482,6 +485,27 @@ export default function AgentSettingsModal({
                   <label className="block text-xs font-medium mb-1 text-textSecondary">{t('agentDetail.statusTextLabel') || '个性状态'}</label>
                   <input type="text" value={statusText} onChange={(e) => setStatusText(e.target.value)} maxLength={100}
                     className="w-full px-3 py-2 rounded-lg border border-border bg-canvas text-sm text-textPrimary placeholder:text-textMuted focus:outline-none focus:ring-2 focus:ring-primary-500/50" />
+                </div>
+                <div>
+                  <label className="block text-xs font-medium mb-1 text-textSecondary">{t('me.statusColorLabel') || '状态颜色'}</label>
+                  <div className="flex items-center gap-1.5 flex-wrap">
+                    {STATUS_COLORS.map(c => (
+                      <button key={c.value} type="button" onClick={() => setStatusColor(c.value)}
+                        className={`w-5 h-5 rounded-full border-2 transition-all ${
+                          statusColor === c.value ? 'border-primary-400 scale-110 shadow-md'
+                          : c.value === '' ? 'border-border bg-canvas hover:border-textMuted'
+                          : 'border-transparent hover:scale-105'
+                        }`}
+                        style={c.value ? { backgroundColor: c.value } : undefined}
+                        title={c.label}
+                      >
+                        {c.value === '' && <X size={8} className="text-textMuted m-auto" />}
+                      </button>
+                    ))}
+                    <input type="color" value={statusColor || '#000000'} onChange={e => setStatusColor(e.target.value)}
+                      className="w-5 h-5 rounded-full cursor-pointer border-2 border-border hover:border-primary-400 transition-colors"
+                      title="自定义" />
+                  </div>
                 </div>
               </Section>
 

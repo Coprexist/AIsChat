@@ -87,6 +87,7 @@ async def run_migrations():
             await _migrate_multi_provider(db)          # v1.0.2 多供应商 + api_key_pool.provider_name
             await _migrate_ai_friend_user_id(db)       # v1.0.2 AI好友friend_id统一为user_id
             await _migrate_opencli_default_enabled(db) # v1.0.2 OpenCLI命令默认可用
+            await _migrate_agent_status_color(db)      # v1.0.2 AI状态颜色
             await _fix_column_types(db)  # 必须是最后一个：修复老部署的列类型不匹配
             await db.commit()
             logger.info("✅ 数据库迁移检查完成")
@@ -2483,6 +2484,17 @@ async def _migrate_multi_provider(db):
         logger.info("  ⏭ api_key_pool.provider_name 已存在，跳过")
 
     await db.flush()
+
+
+async def _migrate_agent_status_color(db):
+    """v1.0.2: agents 表加 status_color 列（幂等）"""
+    if await _column_exists(db, "agents", "status_color"):
+        logger.info("  ⏭ agents.status_color 已存在，跳过")
+        return
+    logger.info("  🎨 添加 agents.status_color 列")
+    await db.execute(text("ALTER TABLE agents ADD COLUMN status_color VARCHAR(20)"))
+    await db.flush()
+    logger.info("  ✅ agents.status_color 添加完成")
 
 
 async def _migrate_opencli_default_enabled(db):

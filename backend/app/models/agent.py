@@ -125,6 +125,7 @@ class Agent(Base):
 
     # 自定义状态文本（AI 可通过工具自行设置，展示在资料卡和消息旁）
     status_text = Column(String(100), nullable=True, comment="自定义状态文本")
+    status_color = Column(String(20), nullable=True, comment="状态文字颜色(hex)")
 
     # API Token（供外部调用该 AI）
     api_token = Column(String(64))
