@@ -343,20 +343,26 @@ function MaintenanceMsgEditor() {
       <p className="text-xs font-semibold text-textSecondary uppercase tracking-wider mb-3">维护文案</p>
 
       {/* 预设选择 */}
-      {presets.length > 0 && (
-        <div className="flex flex-wrap gap-1.5 mb-3">
-          {presets.map((p: any) => (
-            <span key={p.name} className="inline-flex items-center gap-1">
-              <button onClick={() => applyPreset(p.name)}
-                className="px-2 py-1 text-[10px] rounded-lg border border-border bg-canvas text-textSecondary hover:text-primary-400 hover:border-primary-500/30 transition-colors">
-                {p.name}
-              </button>
-              <button onClick={() => deletePreset(p.name)}
-                className="text-textMuted hover:text-rose-400 p-0.5"><X size={10} /></button>
-            </span>
-          ))}
-        </div>
-      )}
+      <div className="flex flex-wrap items-center gap-1.5 mb-3">
+        {presets.map((p: any) => (
+          <span key={p.name} className="inline-flex items-center gap-1">
+            <button onClick={() => applyPreset(p.name)}
+              className="px-2 py-1 text-[10px] rounded-lg border border-border bg-canvas text-textSecondary hover:text-primary-400 hover:border-primary-500/30 transition-colors">
+              {p.name}
+            </button>
+            <button onClick={() => deletePreset(p.name)}
+              className="text-textMuted hover:text-rose-400 p-0.5"><X size={10} /></button>
+          </span>
+        ))}
+        <button onClick={async () => {
+          const name = prompt('预设名称（如：节日祝福）')
+          if (!name) return
+          try { await api.post('/admin/maintenance/presets', { name, ...msg }); load() } catch {}
+        }}
+          className="px-2 py-1 text-[10px] rounded-lg border border-dashed border-border text-textMuted hover:text-primary-400 hover:border-primary-500/30 transition-colors">
+          + 存为预设
+        </button>
+      </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
         <div>
