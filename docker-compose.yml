@@ -39,11 +39,11 @@ services:
         condition: service_healthy
     healthcheck:
       test: ["CMD-SHELL", "python -c \"import urllib.request; urllib.request.urlopen('http://localhost:8000/health')\""]
-      interval: 5s
+      interval: 2s
       timeout: 3s
-      retries: 10
-      start_period: 8s
-    command: sh -c "python prestart.py && uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload --reload-delay 3"
+      retries: 5
+      start_period: 3s
+    command: sh -c "python prestart.py && uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload"
 
   frontend:
     build: ./frontend
