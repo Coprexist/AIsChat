@@ -45,7 +45,7 @@ export default function ActivityBar({ users }: ActivityBarProps) {
             {u.avatarUrl ? (
               <img src={u.avatarUrl} alt={u.name} className="w-full h-full object-cover" />
             ) : (
-              <span className="w-full h-full flex items-center justify-center text-[10px] font-bold bg-primary-500/20 text-primary-500">
+              <span className="w-full h-full flex items-center justify-center text-[10px] font-bold bg-gradient-to-br from-primary-500 to-primary-700 text-white">
                 {u.name.charAt(0).toUpperCase()}
               </span>
             )}

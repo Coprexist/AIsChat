@@ -280,10 +280,10 @@ export default function MePage() {
           {/* 头像 */}
           <div className="shrink-0">
             {user.avatar_url ? (
-              <img src={user.avatar_url} className="w-16 h-16 rounded-full object-cover border-2 border-primary-400/30" />
+              <img src={user.avatar_url} className="w-16 h-16 rounded-full object-cover border-2 border-primary-400/30 relative z-10" />
             ) : (
-              <div className="w-16 h-16 rounded-full bg-primary-500/15 flex items-center justify-center">
-                <User size={28} className="text-primary-400" />
+              <div className="w-16 h-16 rounded-full bg-gradient-to-br from-primary-500 to-primary-700 flex items-center justify-center shadow shadow-primary-500/25">
+                <User size={28} className="text-white" />
               </div>
             )}
           </div>
