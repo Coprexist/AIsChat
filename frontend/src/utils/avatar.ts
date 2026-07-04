@@ -32,7 +32,7 @@ export function avatarGradient(
 }
 
 /** 内层渐变缩进尺寸——比外层小 1px，防抗锯齿溢出 */
-export const AVATAR_GRADIENT_INSET = 'inset-0.5'
+export const AVATAR_GRADIENT_INSET = 'inset-px'
 
 /** 头像阴影色 */
 export function avatarShadowColor(

@@ -64,7 +64,7 @@ export default function DMChatView({ sessionId, onMobileBack }: DMChatViewProps)
         >
           {partner?.avatar_url ? (
             <div className="relative w-8 h-8 rounded-full overflow-hidden shrink-0">
-              <div className={`absolute inset-0.5 rounded-full bg-gradient-to-bl ${
+              <div className={`absolute inset-px rounded-full bg-gradient-to-bl ${
                 partner?.type === 'system' ? 'from-rose-400 to-rose-600' : 'from-teal-400 to-teal-600'
               }`} />
               <img src={partner.avatar_url} alt={partner.name || ''} className="relative w-full h-full rounded-full object-cover" />

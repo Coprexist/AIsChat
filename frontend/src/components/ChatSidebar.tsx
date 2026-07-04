@@ -291,7 +291,7 @@ export default function ChatSidebar({
                   <div className="w-9 h-9 rounded-full relative shrink-0 overflow-hidden">
                     {s.partner.avatar_url ? (
                       <>
-                        <div className={`absolute inset-0.5 rounded-full bg-gradient-to-bl ${
+                        <div className={`absolute inset-px rounded-full bg-gradient-to-bl ${
                           s.partner.type === 'system' ? 'from-rose-400 to-rose-600' : 'from-teal-400 to-teal-600'
                         }`} />
                         <img src={s.partner.avatar_url} alt="" className="relative w-full h-full rounded-full object-cover" />

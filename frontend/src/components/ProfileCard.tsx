@@ -136,7 +136,7 @@ export default function ProfileCard({ entityType, entityId, entityName, state, o
             }`}>
               {avatarUrl ? (
                 <>
-                  <div className={`absolute inset-0.5 rounded-full bg-gradient-to-bl ${
+                  <div className={`absolute inset-px rounded-full bg-gradient-to-bl ${
                     entityType === 'human' ? 'from-primary-500 to-primary-700' : 'from-teal-400 to-teal-600'
                   }`} />
                   <img src={avatarUrl} alt={name} className="relative w-full h-full rounded-full object-cover" />

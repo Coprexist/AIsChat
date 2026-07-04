@@ -102,7 +102,7 @@ const MessageBubble = memo(function MessageBubble({
       <div className="relative shrink-0">
         {/* 仅在 AI 思考中/输入中显示脉动 */}
         {!isMine && (thinking || isTyping) && (
-          <div className="absolute -inset-0.5 w-10 h-10 rounded-full ai-pulse-active" />
+          <div className="absolute -inset-px w-10 h-10 rounded-full ai-pulse-active" />
         )}
         {/* 头像 */}
         {senderAvatarUrl ? (
@@ -115,7 +115,7 @@ const MessageBubble = memo(function MessageBubble({
             className={`relative w-9 h-9 rounded-full overflow-hidden ${senderType !== 'system' ? 'cursor-pointer hover:scale-105 transition-transform' : ''} shadow ${avatarGradientShadow}`}
             title={t('chat.viewProfile').replace('{name}', senderName)}
           >
-            <div className={`absolute inset-0.5 rounded-full ${avatarGradient(senderType, isMine, true)}`} />
+            <div className={`absolute inset-px rounded-full ${avatarGradient(senderType, isMine, true)}`} />
             <img src={senderAvatarUrl} alt={senderName} className="relative w-full h-full rounded-full object-cover" />
           </div>
         ) : (
