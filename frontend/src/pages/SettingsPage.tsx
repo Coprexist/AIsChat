@@ -532,19 +532,21 @@ export default function SettingsPage() {
           {providerPresets.length > 0 && (
             <div>
               <label className="block text-xs font-medium mb-1.5 text-textSecondary">{t('settings.presetProvider') || '厂商预设'}</label>
-              <select
-                onChange={(e) => {
-                  const p = providerPresets.find(pr => pr.name === e.target.value)
-                  if (p) setApiBaseUrl(p.base_url)
-                }}
-                className="w-full px-3.5 py-2.5 rounded-xl border border-border bg-canvas text-sm text-textPrimary focus:outline-none focus:ring-2 focus:ring-primary-500/50"
-                defaultValue=""
-              >
-                <option value="" disabled>{t('settings.selectPreset') || '选择预设自动填充...'}</option>
+              <div className="flex flex-wrap gap-2 mb-2">
                 {providerPresets.map(p => (
-                  <option key={p.name} value={p.name}>{p.name}{p.is_default ? ' ★' : ''}</option>
+                  <button
+                    key={p.name}
+                    onClick={() => setApiBaseUrl(p.base_url)}
+                    className={`px-3 py-1.5 text-xs rounded-lg font-medium transition-colors border ${
+                      apiBaseUrl === p.base_url
+                        ? 'bg-primary-500/15 border-primary-500/40 text-primary-500'
+                        : 'bg-canvas border-border text-textSecondary hover:text-textPrimary hover:border-primary-500/30'
+                    }`}
+                  >
+                    {p.name}{p.is_default ? ' ★' : ''}
+                  </button>
                 ))}
-              </select>
+              </div>
             </div>
           )}
           <div>
@@ -641,19 +643,21 @@ export default function SettingsPage() {
                             </button>
                           </div>
                           {providerPresets.length > 0 && (
-                            <select
-                              onChange={(e) => {
-                                const p = providerPresets.find(pr => pr.name === e.target.value)
-                                if (p) setAgentApiBaseUrl(p.base_url)
-                              }}
-                              className="w-full px-3 py-1.5 rounded-lg border border-border bg-surface text-xs text-textSecondary focus:outline-none focus:ring-1 focus:ring-primary-500/50"
-                              defaultValue=""
-                            >
-                              <option value="" disabled>厂商预设...</option>
+                            <div className="flex flex-wrap gap-1.5 mb-1">
                               {providerPresets.map(p => (
-                                <option key={p.name} value={p.name}>{p.name}{p.is_default ? ' ★' : ''}</option>
+                                <button
+                                  key={p.name}
+                                  onClick={() => setAgentApiBaseUrl(p.base_url)}
+                                  className={`px-2 py-1 text-[11px] rounded-lg font-medium transition-colors border ${
+                                    agentApiBaseUrl === p.base_url
+                                      ? 'bg-primary-500/15 border-primary-500/40 text-primary-500'
+                                      : 'bg-surface border-border text-textMuted hover:text-textSecondary hover:border-primary-500/30'
+                                  }`}
+                                >
+                                  {p.name}
+                                </button>
                               ))}
-                            </select>
+                            </div>
                           )}
                           <input
                             type="text"
