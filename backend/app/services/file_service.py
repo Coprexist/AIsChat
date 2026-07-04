@@ -226,9 +226,9 @@ async def upload_file(
             FileMetadata.path == relative_path,
             FileMetadata.owner_type == owner_type,
             FileMetadata.owner_id == owner_id,
-        )
+        ).limit(1)
     )
-    existing = result.scalar_one_or_none()
+    existing = result.scalars().first()
 
     if existing and existing.size == len(content):
         # 大小相同 → 计算内容哈希进一步比对
