@@ -111,7 +111,7 @@ const MessageBubble = memo(function MessageBubble({
               onAvatarClick(senderType, senderId, senderName, state)
             }
           }}
-          className={`relative w-9 h-9 rounded-full flex items-center justify-center text-xs font-bold ${avatarGradientCls} ${senderType !== 'system' ? 'cursor-pointer hover:scale-105 transition-transform' : ''} shadow ${avatarGradientShadow}`}
+          className={`relative w-9 h-9 rounded-full flex items-center justify-center text-xs font-bold ${avatarGradientCls} ${senderType !== 'system' ? 'cursor-pointer hover:scale-105 transition-transform' : ''} shadow ${avatarGradientShadow} overflow-hidden`}
           title={senderType === 'system' ? '系统通知' : thinking ? t('chat.thinking') : isTyping ? t('chat.typing') : t('chat.viewProfile').replace('{name}', senderName)}
         >
           {senderType === 'system' ? (

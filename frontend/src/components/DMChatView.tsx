@@ -66,7 +66,7 @@ export default function DMChatView({ sessionId, onMobileBack }: DMChatViewProps)
             partner?.type === 'system' ? 'from-rose-400 to-rose-600' : 'from-teal-400 to-teal-600'
           }`}>
           {partner?.avatar_url ? (
-            <img src={partner.avatar_url} alt={partner.name || ''} className="w-[26px] h-[26px] rounded-full object-cover border border-white/20" />
+            <img src={partner.avatar_url} alt={partner.name || ''} className="w-full h-full rounded-full object-cover" />
           ) : partner?.type === 'system' ? (
             <ShieldAlert size={14} className="text-white" />
           ) : (

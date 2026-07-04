@@ -288,11 +288,11 @@ export default function ChatSidebar({
               >
                 <div className="flex items-center gap-2.5">
                   {/* 对方头像 */}
-                  <div className={`w-9 h-9 rounded-full bg-gradient-to-bl flex items-center justify-center shrink-0 relative ${
+                  <div className={`w-9 h-9 rounded-full bg-gradient-to-bl flex items-center justify-center shrink-0 relative overflow-hidden ${
                     s.partner.type === 'system' ? 'from-rose-400 to-rose-600' : 'from-teal-400 to-teal-600'
                   }`}>
                     {s.partner.avatar_url ? (
-                      <img src={s.partner.avatar_url} alt="" className="w-[30px] h-[30px] rounded-full object-cover border border-white/20" />
+                      <img src={s.partner.avatar_url} alt="" className="w-full h-full rounded-full object-cover" />
                     ) : s.partner.type === 'system' ? (
                       <ShieldAlert size={16} className="text-white" />
                     ) : (

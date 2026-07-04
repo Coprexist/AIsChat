@@ -40,11 +40,10 @@ interface FriendRequest {
 // 头像组件：优先显示真实头像，否则显示首字母
 function AvatarPic({ url, name, size = 'md' }: { url: string | null | undefined; name: string; size?: 'sm' | 'md' | 'lg' }) {
   const sizeClass = size === 'sm' ? 'w-7 h-7 text-[10px]' : size === 'lg' ? 'w-12 h-12 text-xl' : 'w-10 h-10 text-lg'
-  const imgSize = size === 'sm' ? 'w-[22px] h-[22px]' : size === 'lg' ? 'w-[42px] h-[42px]' : 'w-[34px] h-[34px]'
   return (
-    <div className={`${sizeClass} rounded-full bg-gradient-to-br from-primary-500 to-primary-700 flex items-center justify-center shrink-0 shadow shadow-primary-500/15`}>
+    <div className={`${sizeClass} rounded-full bg-gradient-to-br from-primary-500 to-primary-700 flex items-center justify-center shrink-0 overflow-hidden shadow shadow-primary-500/15`}>
       {url ? (
-        <img src={url} alt={name} className={`${imgSize} rounded-full object-cover border border-white/20`} />
+        <img src={url} alt={name} className="w-full h-full rounded-full object-cover" />
       ) : (
         <span className="text-white font-bold">{name.charAt(0)}</span>
       )}
