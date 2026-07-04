@@ -242,6 +242,7 @@ async def get_messages(
 
     name_map: dict[tuple, str] = {}
     avatar_map: dict[tuple, str | None] = {}
+    state_map: dict[tuple, str | None] = {}
     if human_ids:
         result = await db.execute(select(User).where(User.id.in_(human_ids)))
         for u in result.scalars().all():
@@ -252,10 +253,10 @@ async def get_messages(
         for a in result.scalars().all():
             name_map[("ai", a.id)] = a.name
             avatar_map[("ai", a.id)] = a.avatar_url
+            state_map[("ai", a.id)] = a.state
 
-    # messages 已由 service 层按时间升序排列
     return [
-        message_to_dict(m, sender_name=name_map.get((m.sender_type, m.sender_id)), sender_avatar_url=avatar_map.get((m.sender_type, m.sender_id)))
+        message_to_dict(m, sender_name=name_map.get((m.sender_type, m.sender_id)), sender_avatar_url=avatar_map.get((m.sender_type, m.sender_id)), sender_state=state_map.get((m.sender_type, m.sender_id)))
         for m in messages
     ]
 

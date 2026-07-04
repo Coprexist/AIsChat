@@ -27,6 +27,7 @@ def serialize_message(message, *,
                       sender_name=None,
                       sender_type=None,
                       sender_avatar_url=None,
+                      sender_state=None,
                       conversation_key='group_id',
                       include_read_at=False) -> dict:
     """将消息 ORM 对象序列化为字典。
@@ -73,6 +74,7 @@ def serialize_message(message, *,
         "content": message.content,
         "reply_to": getattr(message, 'reply_to', None),
         "source_public_id": getattr(message, 'source_public_id', None),
+        "sender_state": sender_state,
         "attachments": attachments,
         "created_at": str(message.created_at) if message.created_at else None,
     }

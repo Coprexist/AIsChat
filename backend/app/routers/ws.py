@@ -343,11 +343,11 @@ async def websocket_endpoint(ws: WebSocket, token: str = Query(...)):
                                 a = a_result.scalar_one_or_none()
                                 if a:
                                     sender_avatar = a.avatar_url
+                                    sender_state = a.state
                         except Exception as e:
                             logger.error(f"获取发送者头像失败: {e}", exc_info=True)
-                            # 头像获取失败不阻断发送
 
-                        msg_data = message_to_dict(message, sender_name=username, sender_avatar_url=sender_avatar)
+                        msg_data = message_to_dict(message, sender_name=username, sender_avatar_url=sender_avatar, sender_state=sender_state if sender_type == "ai" else None)
 
                         # 先回显给发送者
                         await ws.send_json({"type": "message", "conversation_type": "group", "data": msg_data})

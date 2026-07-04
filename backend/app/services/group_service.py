@@ -322,13 +322,14 @@ async def get_recent_messages(
     return messages
 
 
-def message_to_dict(message: Message, sender_name: str | None = None, sender_avatar_url: str | None = None) -> dict:
+def message_to_dict(message: Message, sender_name: str | None = None, sender_avatar_url: str | None = None, sender_state: str | None = None) -> dict:
     """将 Message ORM 对象转为字典"""
     from app.utils.message_serializer import serialize_message
     return serialize_message(
         message,
         sender_name=sender_name,
         sender_avatar_url=sender_avatar_url,
+        sender_state=sender_state,
         conversation_key='group_id',
         include_read_at=False,
     )
