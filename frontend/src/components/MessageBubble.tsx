@@ -69,9 +69,9 @@ const MessageBubble = memo(function MessageBubble({
     if (isNaN(d.getTime())) return
     const ageMs = Date.now() - d.getTime()
     let interval: number
-    if (ageMs < 60_000)           interval = 5_000   // < 1分钟：每5秒
-    else if (ageMs < 3_600_000)   interval = 30_000  // < 1小时：每30秒
-    else if (ageMs < 86_400_000)  interval = 300_000 // < 1天：每5分钟
+    if (ageMs < 60_000)           interval = 15_000   // < 1分钟：每15秒
+    else if (ageMs < 3_600_000)   interval = 300_000  // < 1小时：每5分钟
+    else if (ageMs < 86_400_000)  interval = 3_600_000 // < 1天：每小时
     else return // 超过1天不刷
     const i = setInterval(() => setTick(t => t + 1), interval)
     return () => clearInterval(i)
