@@ -10,6 +10,7 @@ import { FileIcon, Download, Globe, ShieldAlert } from 'lucide-react'
 import { formatMessageTime } from '../utils/time'
 import { formatFileSize } from '../utils/format'
 import { avatarGradient } from '../utils/avatar'
+import { getChatStyle, chatStyleClasses } from '../utils/providers'
 import { useLang, useT } from '../i18n/I18nContext'
 import { api } from '../api/client'
 import CodeRenderer from './shared/CodeRenderer'
@@ -96,8 +97,10 @@ const MessageBubble = memo(function MessageBubble({
   const avatarGradientCls = avatarGradient(senderType, isMine, !!senderAvatarUrl)
   const avatarGradientShadow = isMine ? 'shadow-primary-500/15' : senderType === 'system' ? 'shadow-rose-400/15' : 'shadow-teal-400/10'
 
+  const { gap, mb, avatar: avatarSize, textSize: avatarTextSize } = chatStyleClasses(getChatStyle())
+
   return (<>
-    <div className={`flex gap-3 mb-5 msg-enter ${isMine ? 'flex-row-reverse' : ''}`}>
+    <div className={`flex ${gap} ${mb} msg-enter ${isMine ? 'flex-row-reverse' : ''}`}>
       {/* 头像 — 思考/输入中时带脉动光环 */}
       <div className="relative shrink-0">
         {/* 仅在 AI 思考中/输入中显示脉动 */}
@@ -112,7 +115,7 @@ const MessageBubble = memo(function MessageBubble({
                 onAvatarClick(senderType, senderId, senderName, state)
               }
             }}
-            className={`relative w-9 h-9 rounded-full overflow-hidden ${senderType !== 'system' ? 'cursor-pointer hover:scale-105 transition-transform' : ''} shadow ${avatarGradientShadow}`}
+            className={`relative ${avatarSize} rounded-full overflow-hidden ${senderType !== 'system' ? 'cursor-pointer hover:scale-105 transition-transform' : ''} shadow ${avatarGradientShadow}`}
             title={t('chat.viewProfile').replace('{name}', senderName)}
           >
             <div className={`absolute inset-px rounded-full ${avatarGradient(senderType, isMine, true)}`} />
@@ -125,7 +128,7 @@ const MessageBubble = memo(function MessageBubble({
                 onAvatarClick(senderType, senderId, senderName, state)
               }
             }}
-            className={`relative w-9 h-9 rounded-full flex items-center justify-center text-xs font-bold ${avatarGradient(senderType, isMine, false)} ${senderType !== 'system' ? 'cursor-pointer hover:scale-105 transition-transform' : ''} shadow ${avatarGradientShadow} overflow-hidden`}
+            className={`relative ${avatarSize} rounded-full flex items-center justify-center ${avatarTextSize} font-bold ${avatarGradient(senderType, isMine, false)} ${senderType !== 'system' ? 'cursor-pointer hover:scale-105 transition-transform' : ''} shadow ${avatarGradientShadow} overflow-hidden`}
             title={senderType === 'system' ? '系统通知' : thinking ? t('chat.thinking') : isTyping ? t('chat.typing') : t('chat.viewProfile').replace('{name}', senderName)}
           >
             {senderType === 'system' ? (

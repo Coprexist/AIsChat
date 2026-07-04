@@ -263,7 +263,7 @@ export default function SettingsPage() {
         setAutoDefault(ad)
         if (data.timezone) setTimezone(tz)
         if (data.language) setLanguage(lang)
-        if (data.ui_prefs?.chat_style) setChatStyle(style)
+        if (data.ui_prefs?.chat_style) { setChatStyle(style); try { localStorage.setItem('chat_style', style) } catch {} }
         setSavedValues({
           apiBaseUrl: apiUrl,
           autoTimeout: to,
@@ -325,6 +325,7 @@ export default function SettingsPage() {
         language,
         ui_prefs: { chat_style: chatStyle },
       })
+      try { localStorage.setItem('chat_style', chatStyle) } catch {}
       setApiKey('')
       setMessage(t('settings.saveSuccess'))
       setSavedValues({
