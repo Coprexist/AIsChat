@@ -2442,23 +2442,43 @@ async def _migrate_multi_provider(db):
 
 async def _migrate_ai_friend_user_id(db):
     """v1.0.2: friendships 表中 AI 好友的 friend_id 统一为 agent.user_id（幂等）"""
-    result = await db.execute(text(
-        "SELECT COUNT(*) FROM friendships f "
-        "JOIN agents a ON a.id = f.friend_id "
-        "WHERE f.friend_type = 'ai' AND f.friend_id <> a.user_id"
-    ))
-    count = result.scalar()
-    if count == 0:
-        logger.info("  ⏭ AI 好友 friend_id 已统一，跳过")
-        return
+    from app.models.agent import Agent
 
-    logger.info(f"  🔄 统一 {count} 条 AI 好友的 friend_id (agent.id → user_id)...")
-    await db.execute(text(
-        "UPDATE friendships f "
-        "SET friend_id = a.user_id "
-        "FROM agents a "
-        "WHERE f.friend_type = 'ai' AND a.id = f.friend_id AND f.friend_id <> a.user_id"
-    ))
-    await db.flush()
-    logger.info("  ✅ AI 好友 friend_id 统一完成")
+    # 查所有 AI，构建 id→user_id 映射
+    agent_result = await db.execute(select(Agent.id, Agent.user_id))
+    id_to_uid = {row[0]: row[1] for row in agent_result.all() if row[1]}
+
+    # 查所有 AI 好友记录
+    friendships_result = await db.execute(
+        select(text("id, user_id, friend_id")).where(text("friend_type = 'ai'"))
+    )
+    f_rows = friendships_result.all()
+
+    # 收集需要处理的
+    current_set = {(r[1], r[2]) for r in f_rows}  # (user_id, friend_id)
+    to_delete = []
+    to_update = []
+
+    for f_id, f_user_id, f_friend_id in f_rows:
+        new_id = id_to_uid.get(f_friend_id)
+        if new_id is None or new_id == f_friend_id:
+            continue  # 找不到 agent 或已经正确
+        if (f_user_id, new_id) in current_set:
+            to_delete.append(f_id)  # 目标已存在，删旧的
+        else:
+            to_update.append((f_id, new_id))
+
+    if to_delete:
+        await db.execute(text(f"DELETE FROM friendships WHERE id IN ({','.join(map(str, to_delete))})"))
+        logger.info(f"  🧹 删除 {len(to_delete)} 条重复 AI 好友记录")
+
+    for f_id, new_id in to_update:
+        await db.execute(text(
+            "UPDATE friendships SET friend_id = :uid WHERE id = :fid"
+        ), {"uid": new_id, "fid": f_id})
+    if to_update:
+        logger.info(f"  🔄 更新 {len(to_update)} 条 AI 好友 friend_id → user_id")
+
+    if not to_delete and not to_update:
+        logger.info("  ⏭ AI 好友 friend_id 已统一，跳过")
 
