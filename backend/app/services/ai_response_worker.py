@@ -332,8 +332,6 @@ async def _process_group_event(db, event: dict):
         logger.info(f"群 {group_id} 所有 AI 仍在聊天链中（尺时间未过），静默")
         return
 
-    # 提前标记：防止第一个 AI 秒回后触发其他已在列表中的 AI
-    chat_chain_manager.mark_all_replied(group_id, wake_candidates)
 
     logger.info(
         f"群聊 {group_id} 收到消息 (sender={sender_type}:{sender_id}, depth={chain_depth})，"
