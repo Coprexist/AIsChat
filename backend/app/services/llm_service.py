@@ -1003,6 +1003,7 @@ async def build_dm_messages(
     from app.models.user import User
     from sqlalchemy import select as sa_select
 
+    partner_name = "对方"
     # ── 获取对方信息 ──
     partner_user_id = None
     try:
