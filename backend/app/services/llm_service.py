@@ -998,7 +998,7 @@ async def build_dm_messages(
     trigger_user_id: int | None = None,
     system_prompt_override: str | None = None,
 ) -> list[dict]:
-    """构建 DM 私信的消息列表（6 段系统提示词 + DM 历史消息）
+    """构建 DM 私信的消息列表（6 段系统提示词 + DM 历史消息）"""
     from app.models.dm import DMMessage, DMSession
     from app.models.user import User
     from sqlalchemy import select as sa_select
