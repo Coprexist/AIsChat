@@ -150,6 +150,17 @@ async def _decide_reply_action(db, agent, context: ActionContext) -> ActionDecis
         )
 
     # Gate 3: 快速过滤器（config_profile）
+
+    # Gate 3.5: 聊天链尺时间判定（非重要消息时检查是否还在同一条链里）
+    # 重要消息（@/公告）绕过；未注册的 AI 首次触发也绕过
+    if not dnd_penetrate:
+        from app.services.chat_chain_service import chat_chain_manager
+        if not chat_chain_manager.should_wake(agent_id, context.group_id):
+            return ActionDecision(
+                False, ActionType.NONE, 0,
+                f"AI {agent.name} 仍在当前聊天链中（尺时间未过），静默",
+                details={"chain_silent": True},
+            )
     if not is_mentioned and profile == 'chat' and context.sender_type != 'human':
         return ActionDecision(False, ActionType.NONE, 0, f"AI {agent.name} 聊天档未@且非人类消息")
 

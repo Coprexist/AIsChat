@@ -321,6 +321,10 @@ async def _process_group_event(db, event: dict):
     )
 
     next_depth = chain_depth + 1
+    # 自动注册 AI 到聊天链管理器（未注册的首次触发默认唤醒）
+    from app.services.chat_chain_service import chat_chain_manager
+    for ai_id in target_ai_ids:
+        chat_chain_manager.register_ai(ai_id, group_id)
     for ai_id in target_ai_ids:
         await _maybe_trigger_ai_reply(
             db, ai_id, group_id, group, content, message_id,
@@ -646,14 +650,12 @@ async def _maybe_trigger_ai_reply(
             },
         )
     logger.info(f"✅ AI {agent.name}: LLM 调用完成")
-    # 9. 回复后自动退出聊天链：设 2 分钟群免打扰（@提及仍可穿透）
+    # 回复后标记退出当前聊天链（尺时间计时开始）
     try:
-        from app.services.group_service import set_group_dnd
-        await set_group_dnd(db, agent_id=resolved_agent_id, group_id=group_id,
-                            duration_minutes=2, member_type="ai")
-        logger.info(f"🔇 AI {agent.name} 群 {group_id} 自动免打扰 2 分钟（退出聊天链）")
-    except Exception as e:
-        logger.warning(f"自动 DND 设置失败（非致命）: {e}")
+        from app.services.chat_chain_service import chat_chain_manager
+        chat_chain_manager.mark_replied(resolved_agent_id, group_id)
+    except Exception:
+        pass
 
     # 10. 标记未读消息已处理
     from app.services.group_service import mark_pending_read
