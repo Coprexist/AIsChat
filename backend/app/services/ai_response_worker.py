@@ -315,24 +315,53 @@ async def _process_group_event(db, event: dict):
     if not target_ai_ids:
         return
 
-    logger.info(
-        f"群聊 {group_id} 收到消息 (sender={sender_type}:{sender_id}, depth={chain_depth})，"
-        f"触发 {len(target_ai_ids)} 个 AI: {target_ai_ids}"
-    )
-
-    next_depth = chain_depth + 1
-    # 自动注册 AI 到聊天链管理器（未注册的首次触发默认唤醒）
+    # 自动注册所有 AI（未注册的首次触发默认唤醒）
     from app.services.chat_chain_service import chat_chain_manager
     for ai_id in target_ai_ids:
         chat_chain_manager.register_ai(ai_id, group_id)
-    for ai_id in target_ai_ids:
-        await _maybe_trigger_ai_reply(
-            db, ai_id, group_id, group, content, message_id,
-            chain_depth=next_depth,
-            sender_type=sender_type,
-            sender_id=sender_id,
-            message_type=event.get("message_type", "normal"),
-        )
+
+    # 批量判定：一次查出所有尺时间已过的 AI（按尺时间升序）
+    # 发送者是 AI 时排除自己；人类消息触发全部
+    wake_candidates = chat_chain_manager.get_wake_candidates(group_id)
+    if sender_type == "ai" and exclude_user_id:
+        wake_candidates = [a for a in wake_candidates if a != exclude_user_id]
+    else:
+        wake_candidates = [a for a in wake_candidates if a in target_ai_ids]
+
+    if not wake_candidates:
+        logger.info(f"群 {group_id} 所有 AI 仍在聊天链中（尺时间未过），静默")
+        return
+
+    # 提前标记：防止第一个 AI 秒回后触发其他已在列表中的 AI
+    chat_chain_manager.mark_all_replied(group_id, wake_candidates)
+
+    logger.info(
+        f"群聊 {group_id} 收到消息 (sender={sender_type}:{sender_id}, depth={chain_depth})，"
+        f"唤醒 {len(wake_candidates)}/{len(target_ai_ids)} 个 AI: {wake_candidates}"
+    )
+
+    # 逐个触发（并发上限由信号量控制）
+    next_depth = chain_depth + 1
+    sem = chat_chain_manager.get_semaphore(group_id)
+    for ai_id in wake_candidates:
+        if not chat_chain_manager.try_claim(ai_id, group_id):
+            continue  # 去重：已在处理队列中
+
+        async def _trigger_one(aid):
+            async with sem:
+                try:
+                    async with async_session() as inner_db:
+                        await _maybe_trigger_ai_reply(
+                            inner_db, aid, group_id, group, content, message_id,
+                            chain_depth=next_depth,
+                            sender_type=sender_type,
+                            sender_id=sender_id,
+                            message_type=event.get("message_type", "normal"),
+                        )
+                finally:
+                    chat_chain_manager.release_claim(aid, group_id)
+
+        asyncio.create_task(_trigger_one(ai_id))
 
 
 async def _get_api_config(
