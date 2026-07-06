@@ -2620,9 +2620,8 @@ async def _migrate_ai_friend_user_id(db):
         logger.info("  ⏭ AI 好友 friend_id 已统一，跳过")
 
 
+
 async def _migrate_group_concurrent_limit(db):
-            await _migrate_group_msg_display_len(db)   # v2.0.5 群聊消息折叠长度
-            await _migrate_group_is_paused(db)        # v2.0.5 群聊暂停对话
     """v2.0.4: groups 添加 concurrent_ai_limit 列（群主/管理可调的同群AI并发数）"""
     if await _column_exists(db, "groups", "concurrent_ai_limit"):
         logger.info("  ⏭ groups.concurrent_ai_limit 已存在，跳过")
@@ -2632,8 +2631,8 @@ async def _migrate_group_concurrent_limit(db):
     await db.flush()
     logger.info("  ✅ groups.concurrent_ai_limit 添加完成")
 
+
 async def _migrate_group_msg_display_len(db):
-            await _migrate_group_is_paused(db)        # v2.0.5 群聊暂停对话
     """v2.0.5: groups 添加 max_msg_display_len 列（群聊消息截断，默认256字，0=不截断）"""
     if await _column_exists(db, "groups", "max_msg_display_len"):
         logger.info("  ⏭ groups.max_msg_display_len 已存在，跳过")
@@ -2642,6 +2641,7 @@ async def _migrate_group_msg_display_len(db):
     await db.execute(text("ALTER TABLE groups ADD COLUMN max_msg_display_len INTEGER DEFAULT 256"))
     await db.flush()
     logger.info("  ✅ groups.max_msg_display_len 添加完成")
+
 
 async def _migrate_group_is_paused(db):
     """v2.0.5: groups 添加 is_paused 列（群管理暂停 AI 触发）"""
