@@ -82,7 +82,7 @@ def format_time_shanghai(dt: datetime) -> str:
 # 消息格式化
 # ═══════════════════════════════════════════════════════════════
 
-def format_message(msg: dict, agent_name: str = "") -> str:
+def format_message(msg: dict, agent_name: str = "", max_content_len: int = 200) -> str:
     """
     纯函数：统一格式化单条消息。多会话上下文、当前对话、向量检索全部走这里。
     结构化输入 → 一行文本输出。
@@ -102,7 +102,10 @@ def format_message(msg: dict, agent_name: str = "") -> str:
     else:
         speaker = msg.get("speaker_name", "未知")
 
-    parts.append(f"{speaker}: {msg.get('content', '')[:200]}")
+    content = msg.get('content', '')
+    if max_content_len > 0:
+        content = content[:max_content_len]
+    parts.append(f"{speaker}: {content}")
     return " ".join(parts)
 
 

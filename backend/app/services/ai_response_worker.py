@@ -1226,6 +1226,12 @@ async def _trigger_dm_ai_reply(
     from app.services.agent_service import get_agent
     from app.models.user import User as UserModel
 
+
+    # 立即发送输入中状态（不等后续耗时操作）
+    await manager.broadcast_to_dm(session_id, {
+        "type": "ai_typing",
+        "data": {"agent_id": agent.id, "agent_name": agent.name, "agent_avatar_url": agent.avatar_url, "is_typing": True},
+    })
     # 状态检查
     if agent.state == "blocked":
         logger.info(f"AI {agent.name}({agent.id}) 状态为 blocked，跳过 DM 回复")

@@ -1139,7 +1139,7 @@ async def build_dm_messages(
         }
         messages.append({
             "role": role,
-            "content": format_message(msg_struct, agent.name),
+            "content": format_message(msg_struct, agent.name, max_content_len=0),
         })
 
     # 🖼️ 为最后一条用户消息注入图片附件
