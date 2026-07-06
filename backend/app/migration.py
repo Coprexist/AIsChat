@@ -43,6 +43,7 @@ async def run_migrations():
             await _migrate_memory_config_columns(db)   # v0.8.0 文件记忆配置字段（必须在 select(Agent) 之前）
             await _migrate_bio_and_status(db)     # v0.9.0 AI 简介 + 用户/AI 自定义状态（必须在 select(Agent) 之前）
             await _migrate_agent_status_color(db)     # v1.0.2 AI状态颜色（必须在 select(Agent) 之前）
+            await _migrate_agent_pending_prompt(db)   # v2.0.5 AI自修改暂存（必须在 select(Agent) 之前）
             await _migrate_others_chat_controls(db)  # v0.9.0 对话权限 + 限额控制（必须在 select(Agent) 之前）
             await _migrate_email_verification(db)  # v1.0.0 邮箱认证（必须在 select(Agent) 之前）
             await _migrate_provider_config(db)      # v1.0.0 LLM 厂商预设
@@ -93,7 +94,6 @@ async def run_migrations():
             await _migrate_group_concurrent_limit(db) # v2.0.4 群聊AI并发上限
             await _migrate_group_msg_display_len(db)   # v2.0.5 群聊消息折叠长度
             await _migrate_group_is_paused(db)        # v2.0.5 群聊暂停对话
-            await _migrate_agent_pending_prompt(db)   # v2.0.5 AI自修改暂存
             await _fix_column_types(db)  # 必须是最后一个：修复老部署的列类型不匹配
             await db.commit()
             logger.info("✅ 数据库迁移检查完成")
