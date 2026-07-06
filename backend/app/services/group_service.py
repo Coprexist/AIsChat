@@ -307,12 +307,12 @@ async def get_recent_messages(
 
     if after_time:
         query = query.where(Message.created_at > after_time)
-        query = query.order_by(Message.created_at.asc())
+        query = query.order_by(desc(Message.created_at))
     elif before_id:
         query = query.where(Message.id < before_id)
     elif after_id:
         query = query.where(Message.id > after_id)
-        query = query.order_by(Message.created_at.asc())
+        query = query.order_by(desc(Message.created_at))
     else:
         query = query.order_by(desc(Message.created_at))
 
@@ -320,8 +320,8 @@ async def get_recent_messages(
     result = await db.execute(query)
     messages = list(result.scalars().all())
 
-    # after_time/after_id 模式结果已是升序，其余按 created_at 降序需反转
-    if not after_id and not after_time:
+    # 降序取最近 N 条未读后反转成升序给 AI
+    if not after_id:
         messages = list(reversed(messages))
     return messages
 
@@ -566,7 +566,7 @@ async def get_pending_messages(
     if group_id is not None:
         query = query.where(PendingMessage.group_id == group_id)
 
-    query = query.order_by(Message.created_at.asc())
+    query = query.order_by(desc(Message.created_at))
 
     result = await db.execute(query)
     rows = result.all()

@@ -179,8 +179,10 @@ export default function GroupSettingsPanel({ group, onClose, onUpdate, onLeave }
   // 表单状态
   const [name, setName] = useState(group?.name || '')
   const [announcement, setAnnouncement] = useState(group?.announcement || '')
-  const [speakLimit, setSpeakLimit] = useState(group?.speak_limit_per_minute || 0)
+  const [speakLimit, setSpeakLimit] = useState(group?.speak_limit_per_minute === -1 ? -1 : (group?.speak_limit_per_minute || 0))
   const [speakWindow, setSpeakWindow] = useState(group?.speak_limit_window_seconds || 120)
+  const [speakEnabled, setSpeakEnabled] = useState((group?.speak_limit_per_minute ?? 0) >= 0)
+  const [concurrentAiLimit, setConcurrentAiLimit] = useState(group?.concurrent_ai_limit ?? 3)
   const [vectorAccel, setVectorAccel] = useState(group?.is_vector_accelerated || false)
   const [dndUntil, setDndUntil] = useState<string | null>(null)
   const [customDndMinutes, setCustomDndMinutes] = useState('')
@@ -679,14 +681,14 @@ export default function GroupSettingsPanel({ group, onClose, onUpdate, onLeave }
                     <input
                       type="range"
                       min={0}
-                      max={30}
+                      max={60}
                       value={speakLimit}
                       onChange={e => setSpeakLimit(Number(e.target.value))}
                       className="w-full accent-primary-500"
                     />
                     <div className="flex justify-between text-[10px] text-textMuted">
                       <span>{t('groupSettings.unlimitedLabel')}</span>
-                      <span>30</span>
+                      <span>60</span>
                     </div>
                   </div>
 
@@ -731,6 +733,7 @@ export default function GroupSettingsPanel({ group, onClose, onUpdate, onLeave }
                   <button
                     onClick={() => saveSettings({
                       speak_limit_per_minute: speakLimit,
+                      concurrent_ai_limit: concurrentAiLimit,
                       speak_limit_window_seconds: speakWindow,
                     })}
                     disabled={saving}
