@@ -23,7 +23,7 @@ logger = logging.getLogger(__name__)
 DEFAULT_CONTEXT_WINDOW = 128_000
 # 压缩阈值：v1.0.1 大幅降低——常态压缩以稳定 prompt cache 前缀
 # 旧值 0.8（~102K tokens）基本不触发；新值 ~8K tokens 即触发
-COMPRESSION_THRESHOLD = 0.06
+COMPRESSION_THRESHOLD = 0.60
 # 压缩后至少保留的最近消息数
 DEFAULT_KEEP_LAST_N = 5
 # 压缩用摘要的最大 token 数
