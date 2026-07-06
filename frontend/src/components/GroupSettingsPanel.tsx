@@ -732,7 +732,7 @@ export default function GroupSettingsPanel({ group, onClose, onUpdate, onLeave }
 
                   <button
                     onClick={() => saveSettings({
-                      speak_limit_per_minute: speakLimit,
+                      speak_limit_per_minute: speakEnabled ? speakLimit : -1,
                       concurrent_ai_limit: concurrentAiLimit,
                       speak_limit_window_seconds: speakWindow,
                     })}
