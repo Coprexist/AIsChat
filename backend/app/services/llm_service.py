@@ -995,19 +995,21 @@ async def build_messages(
                     existing_ids.add(m.id)
                 if len(recent_messages) >= 3:
                     break
+        # 群消息折叠长度（默认256，0=不截断）
+        max_len = getattr(group_obj, 'max_msg_display_len', 256) if group_obj else 256
+
         for m in reversed(recent_messages):
             md = message_to_dict(m)
+            content = m.content or ""
+            if max_len > 0 and len(content) > max_len:
+                content = content[:max_len] + '...[展开 id=' + str(m.id) + ']'
             msg_struct = {
                 "time": format_time_shanghai(m.created_at),
                 "speaker_name": md.get("sender_name", "未知"),
                 "speaker_id": None if m.sender_type == "ai" else m.sender_id,
                 "is_self": m.sender_type == "ai",
-                "content": m.content,
+                "content": content,
             }
-            messages.append({
-                "role": role,
-                "content": format_message(msg_struct, getattr(agent, 'name', '')),
-            })
 
         # 🖼️ 为最后一条用户消息注入图片附件（DeepSeek V4 Pro 多模态）
         await _inject_image_data(messages, recent_messages, settings.data_dir)
