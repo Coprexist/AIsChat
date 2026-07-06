@@ -950,11 +950,28 @@ async def build_messages(
     # ── 当前群聊（最后一个会话标题，位置即语义）──
     messages.append({"role": "system", "content": f"在群聊「{group_name}」(id={group_id})中："})
 
-    # ── 历史消息（保持原有逻辑不变） ──
+    # ── 获取 AI 的 last_read_at（取未读消息用）──
+    last_read_at = None
+    try:
+        from app.models.group import GroupMember
+        gm_result = await db.execute(
+            select(GroupMember).where(
+                GroupMember.group_id == group_id,
+                GroupMember.member_type == "ai",
+                GroupMember.member_id == (agent.user_id or 0),
+            )
+        )
+        gm = gm_result.scalar_one_or_none()
+        if gm:
+            last_read_at = gm.last_read_at
+    except Exception:
+        pass
+
+    # ── 历史消息 ──
     if vector_accelerated:
         try:
             from app.services.vector_pipeline import hybrid_search
-            recent = await get_recent_messages(db, group_id, limit=5)
+            recent = await get_recent_messages(db, group_id, limit=5, after_time=last_read_at)
             query_text_v = " ".join([m.content[:100] for m in recent])
             relevant = await hybrid_search(db, group_id, query_text_v, top_k=limit)
             for r in reversed(relevant):
@@ -967,7 +984,17 @@ async def build_messages(
             vector_accelerated = False
 
     if not vector_accelerated:
-        recent_messages = await get_recent_messages(db, group_id, limit)
+        # 先取未读消息（最多 20 条），不足 3 条补到至少 3 条
+        recent_messages = await get_recent_messages(db, group_id, limit=20, after_time=last_read_at)
+        if len(recent_messages) < 3:
+            extra = await get_recent_messages(db, group_id, limit=3)
+            existing_ids = {m.id for m in recent_messages}
+            for m in reversed(extra):
+                if m.id not in existing_ids:
+                    recent_messages.insert(0, m)
+                    existing_ids.add(m.id)
+                if len(recent_messages) >= 3:
+                    break
         for m in reversed(recent_messages):
             md = message_to_dict(m)
             msg_struct = {
@@ -985,6 +1012,10 @@ async def build_messages(
         # 🖼️ 为最后一条用户消息注入图片附件（DeepSeek V4 Pro 多模态）
         await _inject_image_data(messages, recent_messages, settings.data_dir)
 
+    # 更新 AI 的最后阅读时间
+    if last_read_at is not None:
+        from app.services.group_service import update_last_read
+        await update_last_read(db, group_id, "ai", agent.user_id or 0)
     return messages
 
 

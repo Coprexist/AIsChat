@@ -300,15 +300,19 @@ async def get_recent_messages(
     limit: int = 20,
     before_id: int | None = None,
     after_id: int | None = None,
+    after_time: datetime | None = None,
 ) -> list[Message]:
-    """获取群聊消息（支持游标分页）"""
+    """获取群聊消息（支持游标分页 + 按时间过滤未读）"""
     query = select(Message).where(Message.group_id == group_id)
 
-    if before_id:
+    if after_time:
+        query = query.where(Message.created_at > after_time)
+        query = query.order_by(Message.created_at.asc())
+    elif before_id:
         query = query.where(Message.id < before_id)
     elif after_id:
         query = query.where(Message.id > after_id)
-        query = query.order_by(Message.created_at.asc())  # after 时升序取 next N
+        query = query.order_by(Message.created_at.asc())
     else:
         query = query.order_by(desc(Message.created_at))
 
@@ -316,9 +320,9 @@ async def get_recent_messages(
     result = await db.execute(query)
     messages = list(result.scalars().all())
 
-    # after 模式结果已是升序，before/默认模式结果按 created_at 降序
-    if not after_id:
-        messages = list(reversed(messages))  # 统一转为时间升序
+    # after_time/after_id 模式结果已是升序，其余按 created_at 降序需反转
+    if not after_id and not after_time:
+        messages = list(reversed(messages))
     return messages
 
 
