@@ -729,6 +729,15 @@ export default function GroupSettingsPanel({ group, onClose, onUpdate, onLeave }
                       <div>{t('groupSettings.speakPreviewUnlimitedDesc')}</div>
                     )}
                   </div>
+                  <div>
+                    <div className="flex items-center justify-between mb-1">
+                      <label className="text-xs font-medium text-textSecondary">AI 并发数</label>
+                      <span className="text-xs text-primary-400 font-medium">{concurrentAiLimit}</span>
+                    </div>
+                    <input type="range" min={1} max={10} value={concurrentAiLimit} onChange={e => setConcurrentAiLimit(Number(e.target.value))} className="w-full accent-primary-500" />
+                    <div className="flex justify-between text-[10px] text-textMuted"><span>1</span><span>10</span></div>
+                  </div>
+
 
                   <button
                     onClick={() => saveSettings({
