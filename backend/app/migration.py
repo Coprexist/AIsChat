@@ -2645,7 +2645,6 @@ async def _migrate_group_msg_display_len(db):
 
 
 async def _migrate_group_is_paused(db):
-            await _migrate_agent_pending_prompt(db)   # v2.0.5 AI自修改暂存
     """v2.0.5: groups 添加 is_paused 列（群管理暂停 AI 触发）"""
     if await _column_exists(db, "groups", "is_paused"):
         logger.info("  ⏭ groups.is_paused 已存在，跳过")
