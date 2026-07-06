@@ -25,6 +25,7 @@ class Agent(Base):
 
     # 当前配置（AI 可自修改）
     current_system_prompt = Column(Text)
+    pending_system_prompt = Column(Text, nullable=True)  # AI自修改暂存，压缩时切到current
     current_temperature = Column(Float)
     current_top_p = Column(Float)
     current_presence_penalty = Column(Float)

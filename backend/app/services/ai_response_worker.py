@@ -38,7 +38,7 @@ async def _run_serialized(agent, coro):
 
 # 导入连接管理器（在 ws.py 中初始化的全局实例）
 from app.routers.ws import manager
-from app.services.context_compressor import should_compress, compress_messages
+from app.services.context_compressor import should_compress, inline_compress
 
 
 async def ai_response_worker():
@@ -872,23 +872,21 @@ async def _tool_call_loop(
             if not _auto_compressed:
                 if should_compress(messages):
                     logger.info(
-                        f"AI {agent.name}({agent.id}) 上下文超过阈值，自动压缩中..."
+                        f"AI {agent.name}({agent.id}) 上下文超过阈值，内联压缩中..."
                     )
-                    compress_model = effective_cfg.get("work_model") or model
-                    messages, compress_stats = await compress_messages(
-                        messages=messages,
-                        api_base_url=current_api_base,
-                        api_key=current_api_key,
-                        model=compress_model,
-                        user_id=str(agent.id),
-                    )
+                    messages, compress_stats = inline_compress(messages)
                     if compress_stats.get("compressed"):
                         logger.info(
-                            f"AI {agent.name}({agent.id}) 自动压缩完成："
+                            f"AI {agent.name}({agent.id}) 内联压缩完成："
                             f"{compress_stats['before_tokens']} → {compress_stats['after_tokens']} tokens"
                         )
+                        # 压缩时应用 lazy tag 的 pending 更改
+                        try:
+                            from app.services.agent_service import apply_pending_config
+                            await apply_pending_config(db, agent)
+                        except Exception:
+                            pass
                     _auto_compressed = True
-
             try:
                 # 内层：同 Key 重试（500/503）
                 for server_retry in range(MAX_SERVER_RETRIES + 1):

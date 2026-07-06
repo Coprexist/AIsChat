@@ -1117,7 +1117,7 @@ async def import_agent_soul(
         cur_fp is not None and cur_fp != agent.current_frequency_penalty,
         cur_sp is not None and cur_sp != agent.current_system_prompt,
     ]):
-        agent.current_system_prompt = cur_sp
+        agent.pending_system_prompt = cur_sp  # lazy: 压缩时切到 current
         agent.current_temperature = cur_temp if cur_temp is not None else agent.current_temperature
         agent.current_top_p = cur_top_p if cur_top_p is not None else agent.current_top_p
         agent.current_presence_penalty = cur_pp if cur_pp is not None else agent.current_presence_penalty
@@ -1315,3 +1315,12 @@ def collaborator_to_dict(c: AgentCollaborator) -> dict:
         "can_manage_collaborators": c.can_manage_collaborators,
         "created_at": str(c.created_at) if c.created_at else None,
     }
+
+async def apply_pending_config(db, agent):
+    """压缩时调用：将 pending_system_prompt 切到 current，清空 pending。"""
+    if not agent.pending_system_prompt:
+        return
+    old = agent.current_system_prompt
+    agent.current_system_prompt = agent.pending_system_prompt
+    agent.pending_system_prompt = None
+    logger.info(f"AI {agent.name}: lazy tag 生效，system_prompt 已更新 ({len(old or '')} → {len(agent.current_system_prompt)} 字符)")

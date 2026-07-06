@@ -93,6 +93,7 @@ async def run_migrations():
             await _migrate_group_concurrent_limit(db) # v2.0.4 群聊AI并发上限
             await _migrate_group_msg_display_len(db)   # v2.0.5 群聊消息折叠长度
             await _migrate_group_is_paused(db)        # v2.0.5 群聊暂停对话
+            await _migrate_agent_pending_prompt(db)   # v2.0.5 AI自修改暂存
             await _fix_column_types(db)  # 必须是最后一个：修复老部署的列类型不匹配
             await db.commit()
             logger.info("✅ 数据库迁移检查完成")
@@ -2644,6 +2645,7 @@ async def _migrate_group_msg_display_len(db):
 
 
 async def _migrate_group_is_paused(db):
+            await _migrate_agent_pending_prompt(db)   # v2.0.5 AI自修改暂存
     """v2.0.5: groups 添加 is_paused 列（群管理暂停 AI 触发）"""
     if await _column_exists(db, "groups", "is_paused"):
         logger.info("  ⏭ groups.is_paused 已存在，跳过")
@@ -2652,3 +2654,13 @@ async def _migrate_group_is_paused(db):
     await db.execute(text("ALTER TABLE groups ADD COLUMN is_paused BOOLEAN DEFAULT FALSE"))
     await db.flush()
     logger.info("  ✅ groups.is_paused 添加完成")
+
+async def _migrate_agent_pending_prompt(db):
+    """v2.0.5: agents 添加 pending_system_prompt 列（AI自修改暂存，压缩时生效）"""
+    if await _column_exists(db, "agents", "pending_system_prompt"):
+        logger.info("  ⏭ agents.pending_system_prompt 已存在，跳过")
+        return
+    logger.info("  📝 添加 agents.pending_system_prompt 列")
+    await db.execute(text("ALTER TABLE agents ADD COLUMN pending_system_prompt TEXT"))
+    await db.flush()
+    logger.info("  ✅ agents.pending_system_prompt 添加完成")

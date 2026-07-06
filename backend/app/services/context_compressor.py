@@ -229,3 +229,61 @@ async def compress_messages(
     )
 
     return new_messages, stats
+
+
+def inline_compress(
+    messages: list[dict],
+    keep_system: bool = True,
+    keep_last_n: int = DEFAULT_KEEP_LAST_N,
+) -> tuple[list[dict], dict]:
+    """
+    内联压缩——不调 API，直接截断中间消息，复用前缀保持 cache 命中。
+
+    策略：
+    - 保留 system prompt + 已有摘要
+    - 保留最近 N 条消息
+    - 中间消息用一条 system note 替代
+    """
+    original_count = len(messages)
+    original_tokens = estimate_tokens(messages)
+
+    if original_count <= keep_last_n + 2:
+        return messages, {"compressed": False, "reason": "消息太少无需压缩"}
+
+    # 保留：system prompt + 摘要类消息（role=system 且非第一条）
+    head = []
+    tail_start = max(1, original_count - keep_last_n)
+
+    if keep_system and messages and messages[0].get("role") == "system":
+        head.append(messages[0])
+
+    # 保留中间的 system 消息（已有的摘要）
+    for m in messages[1:tail_start]:
+        if m.get("role") == "system" and "摘要" in m.get("content", ""):
+            head.append(m)
+
+    # 截断提示
+    compressed_count = tail_start - len(head)
+    if compressed_count > 0:
+        head.append({
+            "role": "system",
+            "content": f"[上下文压缩] 中间 {compressed_count} 条消息已折叠。用 expand_context 工具可展开。",
+        })
+
+    # 拼接
+    new_messages = head + messages[tail_start:]
+    new_tokens = estimate_tokens(new_messages)
+
+    logger.info(
+        f"内联压缩：{original_count} → {len(new_messages)} 条，"
+        f"token {original_tokens} → {new_tokens}"
+    )
+
+    return new_messages, {
+        "compressed": True,
+        "inline": True,
+        "before_count": original_count,
+        "after_count": len(new_messages),
+        "before_tokens": original_tokens,
+        "after_tokens": new_tokens,
+    }
