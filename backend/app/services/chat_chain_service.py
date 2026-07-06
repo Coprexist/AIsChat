@@ -101,10 +101,11 @@ class ChatChainManager:
 
     # ── 并发控制 ──
 
-    def get_semaphore(self, group_id: int) -> asyncio.Semaphore:
-        """获取群聊并发信号量（最多 MAX_CONCURRENT_PER_GROUP 个 AI 同时 LLM 调用）。"""
+    def get_semaphore(self, group_id: int, limit: int = 0) -> asyncio.Semaphore:
+        """获取群聊并发信号量。limit 为群设置值，0 用默认 3。"""
+        cap = limit if limit and limit > 0 else MAX_CONCURRENT_PER_GROUP
         if group_id not in self._semaphores:
-            self._semaphores[group_id] = asyncio.Semaphore(MAX_CONCURRENT_PER_GROUP)
+            self._semaphores[group_id] = asyncio.Semaphore(cap)
         return self._semaphores[group_id]
 
     # ── 单 AI 接口（保留向后兼容） ──

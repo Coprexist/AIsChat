@@ -20,6 +20,7 @@ class Group(Base):
     announcement_updated_at = Column(DateTime, nullable=True)
     speak_limit_per_minute = Column(Integer, default=0)  # 0 = 不限制
     speak_limit_window_seconds = Column(Integer, default=120)  # 时间窗口（秒）
+    concurrent_ai_limit = Column(Integer, default=3)  # 同群同时 LLM 调用上限，NULL/0=默认3
     created_at = Column(DateTime, server_default=func.now())
 
     __table_args__ = (

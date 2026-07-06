@@ -8,10 +8,8 @@
 压缩策略：
 - 保留 messages[0]（system prompt）—— 不变动以最大化 prompt cache 命中
 - 保留 messages[-K:]（最近 K 条消息，默认 5）
-- 中间部分 → 调用 LLM 生成摘要（使用工作模型，max_tokens=800）
+- 中间部分 → 调用 LLM 生成摘要
 - 摘要以 system 角色注入到 system prompt 之后
-
-同时提供 compress_context 工具让 AI 主动触发压缩。
 """
 
 import logging
@@ -21,9 +19,12 @@ logger = logging.getLogger(__name__)
 
 # 默认上下文窗口（DeepSeek V4 为 128K）
 DEFAULT_CONTEXT_WINDOW = 128_000
-# 压缩阈值：v1.0.1 大幅降低——常态压缩以稳定 prompt cache 前缀
-# 旧值 0.8（~102K tokens）基本不触发；新值 ~8K tokens 即触发
+# 压缩阈值：达到窗口的 N% 时触发压缩（管理员可覆盖）
 COMPRESSION_THRESHOLD = 0.60
+# 压缩目标范围（管理员可覆盖）
+# 建议压缩到 触发值 × COMPRESSION_TARGET_MIN ~ COMPRESSION_TARGET_MAX
+COMPRESSION_TARGET_MIN = 0.05   # 建议不低于触发值的 5%
+COMPRESSION_TARGET_MAX = 0.20   # 建议不超过触发值的 20%
 # 压缩后至少保留的最近消息数
 DEFAULT_KEEP_LAST_N = 5
 # 压缩用摘要的最大 token 数
@@ -63,17 +64,24 @@ def should_compress(
     return estimated >= int(context_window * threshold)
 
 
-def build_compression_prompt(messages_to_compress: list[dict]) -> str:
+def build_compression_prompt(
+    messages_to_compress: list[dict],
+    trigger_tokens: int = 0,
+) -> str:
     """
     构建压缩提示词。要求 LLM 将中间消息总结为简洁的对话摘要。
+
+    trigger_tokens: 触发压缩时的 token 估算值，用于计算建议范围。
     """
+    min_target = int(trigger_tokens * COMPRESSION_TARGET_MIN) if trigger_tokens > 0 else 0
+    max_target = int(trigger_tokens * COMPRESSION_TARGET_MAX) if trigger_tokens > 0 else 0
+
     # 将待压缩消息格式化为可读文本
     conversation_text_parts = []
     for m in messages_to_compress:
         role = m.get("role", "unknown")
         content = m.get("content", "")
         if isinstance(content, str) and content.strip():
-            # 截断过长内容
             truncated = content[:2000] + "…" if len(content) > 2000 else content
             label = {"user": "用户", "assistant": "AI", "tool": "工具结果", "system": "系统"}.get(role, role)
             conversation_text_parts.append(f"[{label}] {truncated}")
@@ -83,13 +91,20 @@ def build_compression_prompt(messages_to_compress: list[dict]) -> str:
 
     conversation_text = "\n".join(conversation_text_parts)
 
+    suggestion = ""
+    if min_target > 0 and max_target > 0:
+        suggestion = (
+            f"建议压缩到 {min_target}-{max_target} tokens 之间，"
+            f"最多不超过 {max_target} tokens。\n"
+        )
+
     return (
         "请将以下对话历史压缩为一份简洁的摘要。摘要应包含：\n"
         "1. 讨论了哪些话题\n"
         "2. AI 执行了哪些关键操作（工具调用及其结果）\n"
         "3. 做出了哪些决定\n"
         "4. 当前未完成的事项（如有）\n\n"
-        "要求：使用中文，简洁但信息完整，不超过 500 字。\n\n"
+        f"{suggestion}"
         "=== 对话历史 ===\n"
         f"{conversation_text}\n"
         "=== 结束 ===\n\n"
@@ -149,8 +164,8 @@ async def compress_messages(
         f"估算 token: {original_tokens}"
     )
 
-    # 构建压缩请求
-    compression_prompt = build_compression_prompt(messages_to_compress)
+    # 构建压缩请求（传入触发 token 数以计算建议范围）
+    compression_prompt = build_compression_prompt(messages_to_compress, trigger_tokens=original_tokens)
     compression_messages = [
         {"role": "user", "content": compression_prompt},
     ]
@@ -171,7 +186,6 @@ async def compress_messages(
             raise ValueError("LLM 返回空摘要")
     except Exception as e:
         logger.error(f"上下文压缩失败（LLM 摘要调用出错）: {e}")
-        # 压缩失败不阻塞主流程，返回原消息列表
         return messages, {
             "compressed": False,
             "reason": f"摘要生成失败: {e}",

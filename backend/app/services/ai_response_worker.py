@@ -340,7 +340,7 @@ async def _process_group_event(db, event: dict):
 
     # 逐个触发（并发上限由信号量控制）
     next_depth = chain_depth + 1
-    sem = chat_chain_manager.get_semaphore(group_id)
+    sem = chat_chain_manager.get_semaphore(group_id, limit=getattr(group, "concurrent_ai_limit", 0))
     for ai_id in wake_candidates:
         if not chat_chain_manager.try_claim(ai_id, group_id):
             continue  # 去重：已在处理队列中
