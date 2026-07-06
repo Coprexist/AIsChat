@@ -62,7 +62,7 @@ class UpdateSelfConfig(ToolPlugin):
                 updates=updates, is_admin=False,
             )
             await db.commit()
-            return {"success": True, "message": f"记下了，会在之后统一更新（{', '.join(updates.keys())}）"}
+            return {"success": True, "message": f"已更新，会在之后同步给你（{', '.join(updates.keys())}）"}
         except ValueError as e:
             return {"error": True, "message": str(e)}
 
