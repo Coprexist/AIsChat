@@ -74,6 +74,15 @@ MIGRATIONS: list[tuple[str, str]] = [
               SELECT g.owner_type, g.owner_id FROM groups g WHERE g.id = gm.group_id
           )""",
     ),
+    # ── v2.0.5: users.type 支持 'system' 类型（系统通知用户）──
+    (
+        "users.type CHECK 约束支持 system",
+        "ALTER TABLE users DROP CONSTRAINT IF EXISTS users_type_check",
+    ),
+    (
+        "users.type CHECK 约束重建",
+        "ALTER TABLE users ADD CONSTRAINT users_type_check CHECK (type IN ('human', 'ai', 'system'))",
+    ),
 ]
 
 

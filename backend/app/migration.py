@@ -50,6 +50,13 @@ async def run_migrations():
             await _migrate_smtp_configs_array(db)      # v1.0.0 多 SMTP 容灾：单对象 → 数组
             await _migrate_email_templates(db)          # v1.0.0 自定义邮件模板列
             await _migrate_auto_dnd_fields(db)         # v1.0.0+ 自动免打扰配置字段
+            await _migrate_agent_is_paused(db)        # v2.0.5 agents 暂停状态（必须在 select(Agent) 之前）
+            await _migrate_agent_pending_prompt(db)   # v2.0.5 AI自修改暂存（必须在 select(Agent) 之前）
+            # groups 列新增必须在 select(Group) ORM 查询之前
+            await _migrate_group_muted_until(db)     # v2.0.3 群聊屏蔽
+            await _migrate_group_concurrent_limit(db) # v2.0.4 群聊AI并发上限
+            await _migrate_group_msg_display_len(db)   # v2.0.5 群聊消息折叠长度
+            await _migrate_group_is_paused(db)        # v2.0.5 群聊暂停对话
             await _migrate_agent_users(db)            # 此处会 select(Agent) — 需上面列已存在
             await _migrate_create_dm_tables(db)
             await _migrate_dm_messages(db)
@@ -1757,6 +1764,8 @@ async def _migrate_forward_ref_type(db):
         return
     logger.info(f"  🔧 更新 {conname}：添加 'forward' 类型")
     await db.execute(text(f"ALTER TABLE file_references DROP CONSTRAINT {conname}"))
+    # 幂等：先删除已存在的 ck_ref_type（防止因 init-db.sql 提前创建导致冲突）
+    await db.execute(text("ALTER TABLE file_references DROP CONSTRAINT IF EXISTS ck_ref_type"))
     await db.execute(text(
         "ALTER TABLE file_references ADD CONSTRAINT ck_ref_type "
         "CHECK (ref_type IN ('read', 'write', 'import', 'share', 'forward'))"
@@ -2406,7 +2415,7 @@ async def _migrate_system_user(db):
         logger.info("  ✅ 系统用户 id=0 已创建")
 
     # 重置序列（确保后续 ID 不受影响）
-    await db.execute(text("SELECT setval('users_id_seq', greatest(0, (SELECT COALESCE(MAX(id), 0) FROM users)))"))
+    await db.execute(text("SELECT setval('users_id_seq', greatest(1, (SELECT COALESCE(MAX(id), 0) FROM users)))"))
     await db.flush()
 
 
@@ -2642,6 +2651,17 @@ async def _migrate_group_msg_display_len(db):
     await db.execute(text("ALTER TABLE groups ADD COLUMN max_msg_display_len INTEGER DEFAULT 256"))
     await db.flush()
     logger.info("  ✅ groups.max_msg_display_len 添加完成")
+
+
+async def _migrate_agent_is_paused(db):
+    """v2.0.5: agents 添加 is_paused 列（AI 暂停状态）"""
+    if await _column_exists(db, "agents", "is_paused"):
+        logger.info("  ⏭ agents.is_paused 已存在，跳过")
+        return
+    logger.info("  ⏸ 添加 agents.is_paused 列")
+    await db.execute(text("ALTER TABLE agents ADD COLUMN is_paused BOOLEAN DEFAULT FALSE"))
+    await db.flush()
+    logger.info("  ✅ agents.is_paused 添加完成")
 
 
 async def _migrate_group_is_paused(db):
