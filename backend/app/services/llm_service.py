@@ -77,8 +77,8 @@ PROTOCOL_BY_PROFILE = {
 # 段拼接顺序（固定段在前最大化缓存命中，变动段在后）
 SEGMENT_ORDER = [
     "core_identity",
-    "personality",
     "protocol",
+    "personality",
     "tools",
     "current_context",
     "injected_skills",
