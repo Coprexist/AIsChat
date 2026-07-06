@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react'
 import { api } from '../api/client'
 import { useT } from '../i18n/I18nContext'
 import { getStateDotColor } from '../constants'
-import { X, Bell, BellOff, LogOut, UserX, Shield, ShieldOff, UserPlus, Volume2, VolumeX, Download, Clock, Globe, Loader2, ArrowLeft, Crown } from 'lucide-react'
+import { X, Bell, Pause, BellOff, LogOut, UserX, Shield, ShieldOff, UserPlus, Volume2, VolumeX, Download, Clock, Globe, Loader2, ArrowLeft, Crown } from 'lucide-react'
 import Toggle from './Toggle'
 
 // ── 联邦共享状态（v1.0.0: 群主/AI制作者按群控制联邦共享） ──
@@ -154,9 +154,11 @@ interface GroupSettings {
   owner_type: string
   owner_id: number
   is_vector_accelerated: boolean
+  is_paused: boolean
   announcement: string | null
   speak_limit_per_minute: number
   speak_limit_window_seconds: number
+  concurrent_ai_limit: number
   my_role: string
 }
 
@@ -556,6 +558,22 @@ export default function GroupSettingsPanel({ group, onClose, onUpdate, onLeave }
 
               {/* 联邦共享（仅管理员可见） */}
               {isAdmin && <FederationShareSection groupId={group!.id} />}
+
+              {/* 暂停对话（仅管理员） */}
+              {isAdmin && (
+                <button
+                  onClick={async () => {
+                    try {
+                      const r = await api.post(`/groups/${group.id}/toggle-pause`)
+                      setGroup({ ...group, is_paused: (r as any).is_paused })
+                    } catch (e: any) { setError(e?.detail || "操作失败") }
+                  }}
+                  className={`w-full flex items-center justify-center gap-2 px-4 py-2.5 rounded-lg text-sm font-medium transition-colors ${group?.is_paused ? "bg-mint-400/10 text-mint-400 hover:bg-mint-400/20" : "bg-amber-400/10 text-amber-400 hover:bg-amber-400/20"}`}
+                >
+                  <Pause size={16} />
+                  {group?.is_paused ? "恢复对话" : "暂停对话"}
+                </button>
+              )}
 
               <hr className="border-border" />
 

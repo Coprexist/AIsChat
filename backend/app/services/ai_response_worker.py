@@ -268,6 +268,9 @@ async def _process_group_event(db, event: dict):
     if group is None:
         return
 
+    # 群管理暂停了 AI 触发
+    if getattr(group, "is_paused", False):
+        return
     # 对话链深度限制：根据群设置动态计算
     if group.owner_type == "ai":
         effective_max_depth = 50
