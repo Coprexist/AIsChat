@@ -1,0 +1,30 @@
+# ── 环境与密钥 ──
+.env
+.env.local
+
+# ── Python 字节码 ──
+__pycache__/
+*.py[cod]
+*.pyo
+
+# ── 虚拟环境 ──
+venv/
+.venv/
+*.egg-info/
+dist/
+build/
+
+# ── 本地数据与上传 ──
+data/
+uploads/
+
+# ── 日志 ──
+*.log
+
+# ── IDE / 操作系统 ──
+.idea/
+.vscode/
+.DS_Store
+*.swp
+*.swo
+*~

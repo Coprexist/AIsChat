@@ -1,0 +1,42 @@
+# ── 环境与密钥 ──
+.env
+.env.local
+.env.*.local
+
+# ── Docker 数据卷（数据库、上传文件） ──
+data/
+
+# ── Python ──
+__pycache__/
+*.py[cod]
+*.pyo
+*.egg-info/
+dist/
+build/
+*.egg
+.venv/
+venv/
+
+# ── Node ──
+node_modules/
+.pnp/
+.pnp.js
+
+# ── IDE / 编辑器 ──
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+
+# ── 操作系统 ──
+.DS_Store
+Thumbs.db
+Desktop.ini
+
+# ── 日志 ──
+*.log
+
+# ── 其他 ──
+*.tmp
+*.bak

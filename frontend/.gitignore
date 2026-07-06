@@ -1,0 +1,24 @@
+# ── 环境与密钥 ──
+.env
+.env.local
+.env.*.local
+
+# ── 依赖 ──
+node_modules/
+.pnp/
+.pnp.js
+
+# ── 构建产物 ──
+dist/
+build/
+
+# ── 日志 ──
+*.log
+
+# ── IDE / 操作系统 ──
+.idea/
+.vscode/
+.DS_Store
+*.swp
+*.swo
+*~
