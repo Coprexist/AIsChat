@@ -318,33 +318,24 @@ async def _process_group_event(db, event: dict):
     if not target_ai_ids:
         return
 
-    # 自动注册所有 AI（未注册的首次触发默认唤醒）
-    from app.services.chat_chain_service import chat_chain_manager
-    for ai_id in target_ai_ids:
-        chat_chain_manager.register_ai(ai_id, group_id)
+    # AI 自主决定——所有成员都触发，意愿分+提示词引导行为
+    # 仅排除发送者自己（AI 消息时不触发自己）
+    candidates = list(target_ai_ids)
+    if sender_type == "ai" and exclude_user_id and exclude_user_id in candidates:
+        candidates.remove(exclude_user_id)
 
-    # 批量判定：一次查出所有尺时间已过的 AI（按尺时间升序）
-    # 发送者是 AI 时排除自己；人类消息触发全部
-    wake_candidates = chat_chain_manager.get_wake_candidates(group_id)
-    if sender_type == "ai" and exclude_user_id:
-        wake_candidates = [a for a in wake_candidates if a != exclude_user_id]
-    else:
-        wake_candidates = [a for a in wake_candidates if a in target_ai_ids]
-
-    if not wake_candidates:
-        logger.info(f"群 {group_id} 所有 AI 仍在聊天链中（尺时间未过），静默")
+    if not candidates:
         return
-
 
     logger.info(
         f"群聊 {group_id} 收到消息 (sender={sender_type}:{sender_id}, depth={chain_depth})，"
-        f"唤醒 {len(wake_candidates)}/{len(target_ai_ids)} 个 AI: {wake_candidates}"
+        f"触发 {len(candidates)} 个 AI: {candidates}"
     )
 
-    # 逐个触发（并发上限由信号量控制）
     next_depth = chain_depth + 1
+    from app.services.chat_chain_service import chat_chain_manager
     sem = chat_chain_manager.get_semaphore(group_id, limit=getattr(group, "concurrent_ai_limit", 0))
-    for ai_id in wake_candidates:
+    for ai_id in candidates:
         if not chat_chain_manager.try_claim(ai_id, group_id):
             continue  # 去重：已在处理队列中
 
