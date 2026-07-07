@@ -205,3 +205,48 @@
     box-shadow: 0 1px 3px rgba(0, 0, 0, 0.2);
   }
 }
+
+/* ════════════ Markdown 表格 ════════════ */
+
+/* 包装器：窄屏横向滚动 */
+.markdown-table-wrapper {
+  @apply overflow-x-auto my-3 rounded-lg border border-border;
+}
+
+.markdown-table-wrapper table {
+  @apply w-full border-collapse text-sm;
+}
+
+.markdown-table-wrapper thead {
+  @apply bg-elevated;
+}
+
+.markdown-table-wrapper thead th {
+  @apply px-3 py-2 text-left font-semibold text-textSecondary border-b border-border whitespace-nowrap;
+}
+
+.markdown-table-wrapper tbody tr {
+  @apply border-b border-border last:border-b-0;
+}
+
+.markdown-table-wrapper tbody tr:nth-child(even) {
+  @apply bg-canvas;
+}
+
+.markdown-table-wrapper tbody tr:hover {
+  @apply bg-elevated;
+}
+
+.markdown-table-wrapper tbody td {
+  @apply px-3 py-2 text-textPrimary;
+}
+
+.markdown-table-wrapper th[align="center"],
+.markdown-table-wrapper td[align="center"] {
+  text-align: center;
+}
+
+.markdown-table-wrapper th[align="right"],
+.markdown-table-wrapper td[align="right"] {
+  text-align: right;
+}
