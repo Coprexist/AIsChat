@@ -264,6 +264,7 @@ class ChatChainManager:
         self._processing: dict[int, set[int]] = {}
         self._semaphores: dict[int, asyncio.Semaphore] = {}
         self._priority_sem: dict[int, asyncio.Semaphore] = {}
+        self._concurrency_overrides: dict[int, dict[int, int]] = {}  # {group_id: {ai_id: limit}}
 
     def get_wake_candidates(self, group_id: int, msg_time: float | None = None) -> list[int]:
         if msg_time is None:
@@ -395,6 +396,12 @@ class ChatChainManager:
             proc.discard(agent_id)
 
     def get_semaphore(self, group_id: int, limit: int = 0) -> asyncio.Semaphore:
+        """获取并发信号量，AI自修改覆盖优先。"""
+        overrides = self._concurrency_overrides.get(group_id, {})
+        if overrides:
+            ai_min = min(overrides.values())
+            if ai_min < (limit or MAX_CONCURRENT_PER_GROUP):
+                limit = ai_min
         cap = limit if limit and limit > 0 else MAX_CONCURRENT_PER_GROUP
         if group_id not in self._semaphores:
             self._semaphores[group_id] = asyncio.Semaphore(cap)
