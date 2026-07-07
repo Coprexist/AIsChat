@@ -189,6 +189,7 @@ export default function GroupSettingsPanel({ group, onClose, onUpdate, onLeave }
   const [dndUntil, setDndUntil] = useState<string | null>(null)
   const [customDndMinutes, setCustomDndMinutes] = useState('')
   const [saving, setSaving] = useState(false)
+  const [pausing, setPausing] = useState(false)
 
   // 导出状态
   const [exportFormat, setExportFormat] = useState('json')
@@ -563,14 +564,15 @@ export default function GroupSettingsPanel({ group, onClose, onUpdate, onLeave }
               {isAdmin && (
                 <button
                   onClick={async () => {
+                    setPausing(true)
                     try {
                       const r = await api.post(`/groups/${group.id}/toggle-pause`)
-                      setGroup({ ...group, is_paused: (r as any).is_paused })
-                    } catch (e: any) { setError(e?.detail || "操作失败") }
+                      onUpdate({ is_paused: (r as any).is_paused } as Partial<GroupSettings>)
+                    } catch (e: any) { setError(e?.detail || "操作失败") } finally { setPausing(false) }
                   }}
-                  className={`w-full flex items-center justify-center gap-2 px-4 py-2.5 rounded-lg text-sm font-medium transition-colors ${group?.is_paused ? "bg-mint-400/10 text-mint-400 hover:bg-mint-400/20" : "bg-amber-400/10 text-amber-400 hover:bg-amber-400/20"}`}
+                  className={`w-full flex items-center justify-center gap-2 px-4 py-2.5 rounded-lg text-sm font-medium transition-colors disabled:opacity-50 ${group?.is_paused ? "bg-mint-400/10 text-mint-400 hover:bg-mint-400/20" : "bg-amber-400/10 text-amber-400 hover:bg-amber-400/20"}`}
                 >
-                  <Pause size={16} />
+                  {pausing ? <Loader2 size={16} className="animate-spin" /> : <Pause size={16} />}
                   {group?.is_paused ? "恢复对话" : "暂停对话"}
                 </button>
               )}
