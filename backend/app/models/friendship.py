@@ -3,7 +3,7 @@
 支持用户与用户、用户与 AI 之间的好友关系
 """
 from sqlalchemy import (
-    Column, Integer, String, Text, DateTime, CheckConstraint, UniqueConstraint,
+    Column, Integer, String, Text, DateTime, Boolean, CheckConstraint, UniqueConstraint,
 )
 from sqlalchemy.sql import func
 from app.database import Base
