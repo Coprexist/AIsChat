@@ -13,6 +13,7 @@
 from app.tools.chat_social.send_message import SendMessage
 from app.tools.chat_social.expand_message import ExpandMessage
 from app.tools.chat_social.set_concurrency import SetConcurrency
+from app.tools.chat_social.set_friend_priority import SetFriendPriority
 from app.tools.chat_social.send_dm import SendDM
 from app.tools.chat_social.set_dnd import SetDND
 from app.tools.chat_social.mute_group import MuteGroup

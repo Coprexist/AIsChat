@@ -18,6 +18,7 @@ class Friendship(Base):
     friend_type = Column(String(10), nullable=False)       # 'human' 或 'ai'
     friend_id = Column(Integer, nullable=False)             # 好友的 ID
     created_at = Column(DateTime, server_default=func.now())
+    is_priority = Column(Boolean, default=False)  # 特别关心，消息可穿透 DND
 
     __table_args__ = (
         CheckConstraint(
@@ -39,6 +40,7 @@ class FriendshipRequest(Base):
     status = Column(String(20), default="pending")              # pending / accepted / rejected
     message = Column(Text, nullable=True)                        # 申请附言
     created_at = Column(DateTime, server_default=func.now())
+    is_priority = Column(Boolean, default=False)  # 特别关心，消息可穿透 DND
     resolved_at = Column(DateTime, nullable=True)
 
     __table_args__ = (

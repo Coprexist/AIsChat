@@ -499,6 +499,22 @@ async def _maybe_trigger_ai_reply(
     # v1.0.1: 检测 DND 穿透条件
     is_at_all = any(tag in content for tag in ("@all", "@everyone", "@全体"))
     is_announcement = message_type == "announcement"
+    # v2.0.6: 检查发送者是否为特别关心好友
+    is_priority_friend = False
+    if sender_type == "human" and sender_id:
+        try:
+            from app.models.friendship import Friendship
+            f_result = await db.execute(
+                select(Friendship).where(
+                    Friendship.user_id == agent.owner_id,
+                    Friendship.friend_type == "human",
+                    Friendship.friend_id == sender_id,
+                    Friendship.is_priority == True,
+                )
+            )
+            is_priority_friend = f_result.scalar_one_or_none() is not None
+        except Exception:
+            pass
     ctx = ActionContext(
         event_type="message",
         agent_id=resolved_agent_id,
@@ -509,6 +525,7 @@ async def _maybe_trigger_ai_reply(
         is_mentioned=is_mentioned,
         is_at_all=is_at_all,
         is_announcement=is_announcement,
+            is_priority_friend=is_priority_friend,
         chain_depth=chain_depth,
     )
     decision = await decide_action(db, agent, ctx)
