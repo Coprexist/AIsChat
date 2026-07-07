@@ -53,6 +53,7 @@ class ActionContext:
     is_mentioned: bool = False
     is_at_all: bool = False        # v1.0.1: @all/@everyone/@全体 穿透 DND
     is_announcement: bool = False  # v1.0.1: 群公告 穿透 DND
+        is_priority_friend: bool = False  # v2.0.6: 特别关心好友消息穿透 DND
     chain_depth: int = 0
     # 闹钟事件字段
     alarm_id: int | None = None
@@ -140,7 +141,7 @@ async def _decide_reply_action(db, agent, context: ActionContext) -> ActionDecis
 
     # Gate 2b: DND（@/公告可穿透）(v1.0.1): @提及 / @all / 群公告 可穿透 DND
     in_dnd = await is_member_in_dnd(db, agent_id, context.group_id)
-    dnd_penetrate = is_mentioned or context.is_at_all or context.is_announcement
+    dnd_penetrate = is_mentioned or context.is_at_all or context.is_announcement or context.is_priority_friend
     dnd_was_penetrated = in_dnd and dnd_penetrate  # DND 被穿透时后续提醒 AI
     if in_dnd and not dnd_penetrate:
         return ActionDecision(
