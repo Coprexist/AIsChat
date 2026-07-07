@@ -53,7 +53,6 @@ async def run_migrations():
             await _migrate_auto_dnd_fields(db)         # v1.0.0+ 自动免打扰配置字段
             await _migrate_agent_is_paused(db)        # v2.0.5 agents 暂停状态（必须在 select(Agent) 之前）
             await _migrate_agent_pending_prompt(db)   # v2.0.5 AI自修改暂存（必须在 select(Agent) 之前）
-            await _migrate_friendship_priority(db)    # v2.0.6 特别关心
             # groups 列新增必须在 select(Group) ORM 查询之前
             await _migrate_group_muted_until(db)     # v2.0.3 群聊屏蔽
             await _migrate_group_concurrent_limit(db) # v2.0.4 群聊AI并发上限
@@ -2677,7 +2676,6 @@ async def _migrate_group_is_paused(db):
     logger.info("  ✅ groups.is_paused 添加完成")
 
 async def _migrate_agent_pending_prompt(db):
-            await _migrate_friendship_priority(db)    # v2.0.6 特别关心
     """v2.0.5: agents 添加 pending_system_prompt 列（AI自修改暂存，压缩时生效）"""
     if await _column_exists(db, "agents", "pending_system_prompt"):
         logger.info("  ⏭ agents.pending_system_prompt 已存在，跳过")
