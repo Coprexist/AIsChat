@@ -80,7 +80,6 @@ SEGMENT_ORDER = [
     "protocol",
     "personality",
     "tools",
-    "current_context",
     "injected_skills",
 ]
 
@@ -912,7 +911,6 @@ async def build_messages(
         "personality": build_personality_segment(agent, language, system_prompt_override),
         "protocol": overrides.get(f"protocol_{profile}") or protocol,
         "tools": await _build_tools_segment(db, agent, is_dm),
-        "current_context": await _build_current_context(db, agent, group_id, group_name, is_dm),
         "injected_skills": await _build_injected_skills(db, agent, group_id, query_text, api_base_url, api_key, trigger_user_id),
     }
 
@@ -1018,6 +1016,9 @@ async def build_messages(
     if last_read_at is not None:
         from app.services.group_service import update_last_read
         await update_last_read(db, group_id, "ai", agent.user_id or 0)
+    # 当前时间放在最后（每次变化，放末尾不影响前缀cache）
+    current_ctx = await _build_current_context(db, agent, group_id, group_name, is_dm)
+    messages.append({"role": "system", "content": current_ctx})
     return messages
 
 
@@ -1101,7 +1102,6 @@ async def build_dm_messages(
         "personality": build_personality_segment(agent, language, system_prompt_override),
         "protocol": dm_protocol,
         "tools": await _build_tools_segment(db, agent, is_dm=True),
-        "current_context": dm_context,
         "injected_skills": await _build_injected_skills(
             db, agent, group_id=0,  # group_id=0 表示非群聊上下文
             query_text=query_text,
@@ -1178,4 +1178,7 @@ async def build_dm_messages(
     # 🖼️ 为最后一条用户消息注入图片附件
     await _inject_image_data(messages, dm_messages, settings.data_dir)
 
+    # 当前时间放在最后（每次变化，放末尾不影响前缀cache）
+    dm_ctx = await _build_current_context(db, agent, 0, partner_name or "私信", is_dm=True)
+    messages.append({"role": "system", "content": dm_ctx})
     return messages
