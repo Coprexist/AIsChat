@@ -40,3 +40,10 @@ Desktop.ini
 # ── 其他 ──
 *.tmp
 *.bak
+
+# ── Claude 内部文件（绝不公开） ──
+CLAUDE.md
+.claude/
+
+# ── 冻结本文件（后续本地修改不提交） ──
+.gitignore
