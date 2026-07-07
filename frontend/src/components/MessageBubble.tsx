@@ -203,7 +203,9 @@ const MessageBubble = memo(function MessageBubble({
             <Markdown
               remarkPlugins={[remarkGfm, remarkMath, remarkBreaks]}
               rehypePlugins={[rehypeKatex]}
-              components={{ code: CodeRenderer }}
+              components={{ code: CodeRenderer, table: ({ node, ...props }) => (
+                  <div className="markdown-table-wrapper"><table {...props} /></div>
+                ), th: ({ node, ...props }) => (<th {...props} />), td: ({ node, ...props }) => (<td {...props} />), }}
             >
               {content}
             </Markdown>
