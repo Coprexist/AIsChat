@@ -210,11 +210,11 @@
 
 /* 包装器：窄屏横向滚动 */
 .markdown-table-wrapper {
-  @apply overflow-x-auto my-3 rounded-lg border border-border;
+  @apply w-full overflow-x-auto my-3 rounded-lg border border-border;
 }
 
 .markdown-table-wrapper table {
-  @apply w-full border-collapse text-sm;
+  @apply w-full min-w-full border-collapse text-sm;
 }
 
 .markdown-table-wrapper thead {
@@ -222,7 +222,7 @@
 }
 
 .markdown-table-wrapper thead th {
-  @apply px-3 py-2 text-left font-semibold text-textSecondary border-b border-border whitespace-nowrap;
+  @apply px-3 py-2 text-left font-semibold text-textSecondary border-b border-border;
 }
 
 .markdown-table-wrapper tbody tr {
