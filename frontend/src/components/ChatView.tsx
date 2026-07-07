@@ -584,7 +584,9 @@ export default function ChatView({ conversationType, conversationId }: ChatViewP
     const beforeCursor = value.slice(0, cursorPos)
     const atIdx = beforeCursor.lastIndexOf('@')
     if (atIdx === -1) { setMentionActive(false); return }
-    if (atIdx > 0 && beforeCursor[atIdx - 1] !== ' ') { setMentionActive(false); return }
+    const prev = atIdx > 0 ? beforeCursor[atIdx - 1] : ''
+    const allowed = prev === '' || prev === ' ' || /[，。！？、；：""【】（）]/.test(prev)
+    if (!allowed) { setMentionActive(false); return }
     const query = beforeCursor.slice(atIdx + 1, cursorPos)
     if (query.includes(' ')) { setMentionActive(false); return }
     setMentionQuery(query)
