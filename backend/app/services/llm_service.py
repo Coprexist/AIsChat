@@ -1001,6 +1001,8 @@ async def build_messages(
             }
 
         # 🖼️ 为最后一条用户消息注入图片附件（DeepSeek V4 Pro 多模态）
+            role = "assistant" if m.sender_type == "ai" else "user"
+            messages.append({"role": role, "content": format_message(msg_struct, getattr(agent, 'name', '')),})
         await _inject_image_data(messages, recent_messages, settings.data_dir)
 
     # 更新 AI 的最后阅读时间
