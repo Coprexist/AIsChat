@@ -334,13 +334,26 @@ async def _process_group_event(db, event: dict):
 
     next_depth = chain_depth + 1
     from app.services.chat_chain_service import chat_chain_manager
-    sem = chat_chain_manager.get_semaphore(group_id, limit=getattr(group, "concurrent_ai_limit", 0))
-    for ai_id in candidates:
-        if not chat_chain_manager.try_claim(ai_id, group_id):
-            continue  # 去重：已在处理队列中
 
-        async def _trigger_one(aid):
-            async with sem:
+    # 判断消息优先级：@消息/公告 → 优先通道（上限1），普通消息 → 普通通道
+    has_at = sender_type == "human" and "@" in (content or "")
+    is_at_all = any(tag in (content or "") for tag in ("@all", "@everyone", "@全体"))
+    is_priority_msg = has_at or is_at_all
+    normal_sem = chat_chain_manager.get_semaphore(group_id, limit=getattr(group, "concurrent_ai_limit", 0))
+    priority_sem = chat_chain_manager.get_priority_semaphore(group_id)
+
+    for ai_id in candidates:
+        if is_priority_msg:
+            if not chat_chain_manager.try_claim_priority(ai_id, group_id):
+                continue
+            sem = priority_sem
+        else:
+            if not chat_chain_manager.try_claim(ai_id, group_id):
+                continue
+            sem = normal_sem
+
+        async def _trigger_one(aid, chan_sem):
+            async with chan_sem:
                 try:
                     async with async_session() as inner_db:
                         await _maybe_trigger_ai_reply(
@@ -353,7 +366,7 @@ async def _process_group_event(db, event: dict):
                 finally:
                     chat_chain_manager.release_claim(aid, group_id)
 
-        asyncio.create_task(_trigger_one(ai_id))
+        asyncio.create_task(_trigger_one(ai_id, sem))
 
 
 async def _get_api_config(

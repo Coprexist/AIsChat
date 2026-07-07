@@ -263,6 +263,7 @@ class ChatChainManager:
         self._last_reply: dict[int, dict[int, dict]] = {}
         self._processing: dict[int, set[int]] = {}
         self._semaphores: dict[int, asyncio.Semaphore] = {}
+        self._priority_sem: dict[int, asyncio.Semaphore] = {}
 
     def get_wake_candidates(self, group_id: int, msg_time: float | None = None) -> list[int]:
         if msg_time is None:
@@ -400,4 +401,17 @@ class ChatChainManager:
         return self._semaphores[group_id]
 
 
+
+    def try_claim_priority(self, agent_id: int, group_id: int) -> bool:
+        """尝试进 @优先通道。已在普通通道则不重复触发（LLM跑完自然看到@的消息）。"""
+        proc = self._processing.setdefault(group_id, set())
+        if agent_id not in proc:
+            proc.add(agent_id)
+            return True
+        return False
+
+    def get_priority_semaphore(self, group_id: int) -> asyncio.Semaphore:
+        if group_id not in self._priority_sem:
+            self._priority_sem[group_id] = asyncio.Semaphore(1)
+        return self._priority_sem[group_id]
 chat_chain_manager = ChatChainManager()
