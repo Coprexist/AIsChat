@@ -983,16 +983,7 @@ async def build_messages(
 
     if not vector_accelerated:
         # 先取未读消息（最多 20 条），不足 3 条补到至少 3 条
-        recent_messages = await get_recent_messages(db, group_id, limit=20, after_time=last_read_at)
-        if len(recent_messages) < 3:
-            extra = await get_recent_messages(db, group_id, limit=3)
-            existing_ids = {m.id for m in recent_messages}
-            for m in reversed(extra):
-                if m.id not in existing_ids:
-                    recent_messages.insert(0, m)
-                    existing_ids.add(m.id)
-                if len(recent_messages) >= 3:
-                    break
+        recent_messages = await get_recent_messages(db, group_id, limit=20)
         # 群消息折叠长度（默认256，0=不截断）
         max_len = getattr(group_obj, 'max_msg_display_len', 256) if group_obj else 256
 

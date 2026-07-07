@@ -323,20 +323,17 @@ async def _process_group_event(db, event: dict):
     for ai_id in target_ai_ids:
         chat_chain_manager.register_ai(ai_id, group_id)
 
-    # 批量判定：人类消息触发全部 AI（不经过链过滤）
-    # AI 消息才走尺时间链判定，排除发送者自己
-    if sender_type == "human":
-        wake_candidates = list(target_ai_ids)
+    # 批量判定：一次查出所有尺时间已过的 AI（按尺时间升序）
+    # 发送者是 AI 时排除自己；人类消息触发全部
+    wake_candidates = chat_chain_manager.get_wake_candidates(group_id)
+    if sender_type == "ai" and exclude_user_id:
+        wake_candidates = [a for a in wake_candidates if a != exclude_user_id]
     else:
-        wake_candidates = chat_chain_manager.get_wake_candidates(group_id)
-        if exclude_user_id:
-            wake_candidates = [a for a in wake_candidates if a != exclude_user_id]
-        else:
-            wake_candidates = [a for a in wake_candidates if a in target_ai_ids]
+        wake_candidates = [a for a in wake_candidates if a in target_ai_ids]
 
-        if not wake_candidates:
-            logger.info(f"群 {group_id} 所有 AI 仍在聊天链中（尺时间未过），静默")
-            return
+    if not wake_candidates:
+        logger.info(f"群 {group_id} 所有 AI 仍在聊天链中（尺时间未过），静默")
+        return
 
 
     logger.info(
