@@ -319,6 +319,7 @@ async def get_recent_messages(
     query = query.limit(limit)
     result = await db.execute(query)
     messages = list(result.scalars().all())
+    logger.warning(f"🔍 get_recent_messages group={group_id} limit={limit} after_time={after_time} after_id={after_id}: got {len(messages)} results")
 
     # 降序取最近 N 条未读后反转成升序给 AI
     if not after_id:
