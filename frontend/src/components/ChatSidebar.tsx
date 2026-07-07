@@ -65,6 +65,7 @@ export default function ChatSidebar({
   useEffect(() => {
     loadGroups()
     loadDMSessions()
+    window.addEventListener('groupListRefresh', loadGroups)
   }, [])
 
   // 活跃对话变化时刷新（延迟等 mark-as-read 完成）
@@ -72,6 +73,7 @@ export default function ChatSidebar({
     const timer = setTimeout(() => {
       loadGroups()
       loadDMSessions()
+    window.addEventListener('groupListRefresh', loadGroups)
     }, 300)
     return () => clearTimeout(timer)
   }, [activeGroupId, activeSessionId])
@@ -89,6 +91,7 @@ export default function ChatSidebar({
     debounceRef.current = setTimeout(() => {
       loadGroups()
       loadDMSessions()
+    window.addEventListener('groupListRefresh', loadGroups)
     }, 500)
   }
 

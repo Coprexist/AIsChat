@@ -93,6 +93,7 @@ const MessageBubble = memo(function MessageBubble({
     try {
       await api.post(`/group-invitations/${invitationId}/accept`)
       setInvStatus('accepted')
+      window.dispatchEvent(new CustomEvent('groupListRefresh'))
     } catch (_) { /* ignore */ }
   }
 
