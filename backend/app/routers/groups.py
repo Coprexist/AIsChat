@@ -194,6 +194,11 @@ async def list_members(
             u = await db.get(User, m.member_id)
             if u:
                 name = u.username
+            # 人类在线状态：WebSocket 连接 OR 1分钟内有 API 活动
+            from app.services.online_tracker import is_online as _is_human_online
+            from app.routers.ws import manager as _ws_mgr
+            if _ws_mgr.is_user_online(m.member_id) or _is_human_online(m.member_id):
+                state = "online"
         elif m.member_type == "ai":
             # v2.0.0: member_id 统一为 user_id，同时兼容旧 agent.id
             a_res = await db.execute(
