@@ -1250,20 +1250,26 @@ async def _trigger_dm_ai_reply(
     from app.services.agent_service import get_agent
     from app.models.user import User as UserModel
 
+    # 提前捕获 agent 属性（防止 session 过期后 DetachedInstanceError）
+    agent_id = agent.id
+    agent_name = agent.name
+    agent_state = agent.state
+    agent_avatar = agent.avatar_url
+    agent_ai_type = agent.ai_type
 
     # 状态检查
-    if agent.state == "blocked":
-        logger.info(f"AI {agent.name}({agent.id}) 状态为 blocked，跳过 DM 回复")
+    if agent_state == "blocked":
+        logger.info(f"AI {agent_name}({agent_id}) 状态为 blocked，跳过 DM 回复")
         return
 
     # 速率限制
-    if not _check_rate_limit(agent.id):
-        logger.info(f"AI {agent.name}({agent.id}) 速率限制，跳过 DM 回复")
+    if not _check_rate_limit(agent_id):
+        logger.info(f"AI {agent_name}({agent_id}) 速率限制，跳过 DM 回复")
         return
 
     # 获取有效配置（v0.4.0: per-user 覆盖 — DM 场景 trigger_user_id=sender_id）
     from app.services.agent_service import get_effective_config as _get_eff_cfg
-    effective_cfg = await _get_eff_cfg(db, agent.id, sender_id)
+    effective_cfg = await _get_eff_cfg(db, agent_id, sender_id)
 
     # 获取 API 配置（v0.9.0: 按 AI 类型 + force_own_key 决定账单人）
     api_key, api_base, credit_source, pool_key_id, provider_info = await _get_api_config(
@@ -1274,14 +1280,14 @@ async def _trigger_dm_ai_reply(
 
     # 无 API Key → 发送 DM 系统通知后跳过
     if api_key is None:
-        logger.warning(f"AI {agent.name}({agent.id}) 无 API Key，发送 DM 系统通知")
+        logger.warning(f"AI {agent_name}({agent_id}) 无 API Key，发送 DM 系统通知")
         await _send_system_error(db, agent, "no_api_key", "", "dm", None, session_id)
         return
 
     # 中断标记：如果 AI 之前在忙，记录中断
     try:
         from app.services.workspace_service import mark_interrupted
-        await mark_interrupted(db, agent.id, reason=f"私信 {session_id} 的新消息")
+        await mark_interrupted(db, agent_id, reason=f"私信 {session_id} 的新消息")
     except Exception:
         pass  # 非致命
 
@@ -1302,10 +1308,10 @@ async def _trigger_dm_ai_reply(
     # 获取工具
     from app.services.tool_registry import get_allowed_tools
     delay_allowed = await _is_delay_reply_allowed(db, agent)
-    tools = get_allowed_tools(agent.state, thinking_enabled=effective_cfg["thinking_enabled"], delay_reply_allowed=delay_allowed)
+    tools = get_allowed_tools(agent_state, thinking_enabled=effective_cfg["thinking_enabled"], delay_reply_allowed=delay_allowed)
     model = resolve_model(agent)
 
-    logger.info(f"🚀 AI {agent.name}: 开始 DM 回复 (session={session_id})")
+    logger.info(f"🚀 AI {agent_name}: 开始 DM 回复 (session={session_id})")
 
     try:
         await manager.broadcast_to_dm(
@@ -1314,9 +1320,9 @@ async def _trigger_dm_ai_reply(
                 "type": "ai_thinking",
                 "conversation_type": "dm",
                 "data": {
-                    "agent_id": agent.id,
-                    "agent_name": agent.name,
-                    "agent_avatar_url": agent.avatar_url,
+                    "agent_id": agent_id,
+                    "agent_name": agent_name,
+                    "agent_avatar_url": agent_avatar,
                     "session_id": session_id,
                     "trigger": "user",
                 },
@@ -1343,7 +1349,7 @@ async def _trigger_dm_ai_reply(
             trigger="user",
         ))
     except Exception as e:
-        logger.error(f"❌ AI {agent.name} DM 回复异常 (session={session_id}): {e}", exc_info=True)
+        logger.error(f"❌ AI {agent_name} DM 回复异常 (session={session_id}): {e}", exc_info=True)
     finally:
         await manager.broadcast_to_dm(
             session_id,
@@ -1351,15 +1357,15 @@ async def _trigger_dm_ai_reply(
                 "type": "ai_thinking_end",
                 "conversation_type": "dm",
                 "data": {
-                    "agent_id": agent.id,
-                    "agent_name": agent.name,
-                    "agent_avatar_url": agent.avatar_url,
+                    "agent_id": agent_id,
+                    "agent_name": agent_name,
+                    "agent_avatar_url": agent_avatar,
                     "session_id": session_id,
                     "trigger": "user",
                 },
             },
         )
-    logger.info(f"✅ AI {agent.name}: DM 回复完成")
+    logger.info(f"✅ AI {agent_name}: DM 回复完成")
 
     # 提交工作区变更（中断标记、任务保存等）
     await db.commit()
