@@ -5,7 +5,7 @@ AI 对话日志服务
 import logging
 from datetime import datetime, timezone
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select, delete, func, text, Integer, cast as sa_cast
+from sqlalchemy import select, delete, func, text
 
 from app.models.conversation_log import ConversationLogConfig, ConversationLog
 
@@ -592,14 +592,16 @@ async def get_session_token_usage(
     user_id: int,
 ) -> dict:
     """获取指定 DM 会话的 token 消耗汇总（用于前端自费聊天显示）"""
-    from app.models.conversation_log import AiConversationLog
+    from app.models.conversation_log import ConversationLog
     result = await db.execute(
-        select(
-            func.coalesce(func.sum(sa_cast(AiConversationLog.token_usage["total_tokens"].as_string, Integer)), 0).label("total_tokens"),
-            func.coalesce(func.sum(sa_cast(AiConversationLog.token_usage["api_calls"].as_string, Integer)), 0).label("api_calls"),
-        ).where(
-            AiConversationLog.session_id == session_id,
-        )
+        text("""
+            SELECT
+                COALESCE(SUM((token_usage->>'total_tokens')::int), 0) AS total_tokens,
+                COALESCE(SUM((token_usage->>'api_calls')::int), 0) AS api_calls
+            FROM ai_conversation_logs
+            WHERE session_id = :sid
+        """),
+        {"sid": session_id},
     )
     row = result.one()
     return {

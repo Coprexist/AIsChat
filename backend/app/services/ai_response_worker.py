@@ -686,6 +686,8 @@ async def _maybe_trigger_ai_reply(
             trigger="user",
             is_federated=False,
         ))
+    except Exception as e:
+        logger.error(f"❌ AI {agent.name} 群聊回复异常 (group={group_id}): {e}", exc_info=True)
     finally:
         await manager.broadcast_to_group(
             group_id,
@@ -1340,6 +1342,8 @@ async def _trigger_dm_ai_reply(
             provider_supports_thinking=provider_info.get("thinking_supported"),
             trigger="user",
         ))
+    except Exception as e:
+        logger.error(f"❌ AI {agent.name} DM 回复异常 (session={session_id}): {e}", exc_info=True)
     finally:
         await manager.broadcast_to_dm(
             session_id,
