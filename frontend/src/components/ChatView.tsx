@@ -278,6 +278,18 @@ export default function ChatView({ conversationType, conversationId }: ChatViewP
     conversationType, conversationId, { onMessage: handleMessage },
   )
 
+  // 获取上传大小限制（缓存 5 分钟）
+  useEffect(() => {
+    const cached = sessionStorage.getItem('upload_limits')
+    if (cached) {
+      const parsed = JSON.parse(cached)
+      if (Date.now() - parsed.ts < 300000) return // 缓存有效
+    }
+    api.get('/user/config/upload-limits').then((limits: any) => {
+      sessionStorage.setItem('upload_limits', JSON.stringify({ ...limits, ts: Date.now() }))
+    }).catch(() => {})
+  }, [])
+
   // 切换对话 / 卸载时：清除输入中状态，避免对方看到残留的 typing 指示
   useEffect(() => {
     return () => {
@@ -618,7 +630,18 @@ export default function ChatView({ conversationType, conversationId }: ChatViewP
     const files = e.target.files
     if (!files || files.length === 0) return
 
-    const MAX_FILE_MB = 32
+    // 从后端获取上传大小限制（缓存 5 分钟）
+    let MAX_FILE_MB = 32
+    try {
+      const cached = sessionStorage.getItem('upload_limits')
+      if (cached) {
+        const parsed = JSON.parse(cached)
+        if (Date.now() - parsed.ts < 300000) {
+          MAX_FILE_MB = parsed.upload_max_size_mb || 32
+        }
+      }
+    } catch {}
+
     for (let i = 0; i < files.length; i++) {
       const file = files[i]
       if (file.size > MAX_FILE_MB * 1024 * 1024) {

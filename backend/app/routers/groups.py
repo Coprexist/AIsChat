@@ -460,39 +460,41 @@ async def remove_announcement(
         return {"message": "公告已删除"}
     except ValueError as e:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
-    @router.post("/groups/{group_id}/toggle-pause")
-    async def toggle_pause(
-        group_id: int,
-        current_user: dict = Depends(get_current_user),
-        db: AsyncSession = Depends(get_db),
-    ):
-        """暂停/恢复群聊 AI 触发。仅群主/管理员可操作。"""
-        try:
-            from app.models.group import Group
-            result = await db.execute(select(Group).where(Group.id == group_id))
-            group = result.scalar_one_or_none()
-            if group is None:
-                raise HTTPException(status_code=404, detail="群聊不存在")
-            is_owner = (group.owner_type == "human" and group.owner_id == current_user["user_id"])
-            from app.models.group import GroupMember
-            gm_result = await db.execute(
-                select(GroupMember).where(
-                    GroupMember.group_id == group_id,
-                    GroupMember.member_type == "human",
-                    GroupMember.member_id == current_user["user_id"],
-                )
+
+
+@router.post("/groups/{group_id}/toggle-pause")
+async def toggle_pause(
+    group_id: int,
+    current_user: dict = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """暂停/恢复群聊 AI 触发。仅群主/管理员可操作。"""
+    try:
+        from app.models.group import Group
+        result = await db.execute(select(Group).where(Group.id == group_id))
+        group = result.scalar_one_or_none()
+        if group is None:
+            raise HTTPException(status_code=404, detail="群聊不存在")
+        is_owner = (group.owner_type == "human" and group.owner_id == current_user["user_id"])
+        from app.models.group import GroupMember
+        gm_result = await db.execute(
+            select(GroupMember).where(
+                GroupMember.group_id == group_id,
+                GroupMember.member_type == "human",
+                GroupMember.member_id == current_user["user_id"],
             )
-            gm = gm_result.scalar_one_or_none()
-            is_admin = gm and gm.role in ("owner", "admin")
-            if not is_owner and not is_admin:
-                raise HTTPException(status_code=403, detail="仅群主/管理员可操作")
-            group.is_paused = not group.is_paused
-            await db.flush()
-            return {"is_paused": group.is_paused, "message": "已暂停" if group.is_paused else "已恢复"}
-        except HTTPException:
-            raise
-        except Exception as e:
-            raise HTTPException(status_code=500, detail=str(e))
+        )
+        gm = gm_result.scalar_one_or_none()
+        is_admin = gm and gm.role in ("owner", "admin")
+        if not is_owner and not is_admin:
+            raise HTTPException(status_code=403, detail="仅群主/管理员可操作")
+        group.is_paused = not group.is_paused
+        await db.commit()
+        return {"is_paused": group.is_paused, "message": "已暂停" if group.is_paused else "已恢复"}
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
 
 
 @router.patch("/groups/{group_id}/members/{member_type}/{member_id}/role")

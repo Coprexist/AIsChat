@@ -363,6 +363,8 @@ async def _process_group_event(db, event: dict):
                             sender_id=sender_id,
                             message_type=event.get("message_type", "normal"),
                         )
+                except Exception as e:
+                    logger.error(f"AI {aid} 触发异常 (group={group_id}): {e}", exc_info=True)
                 finally:
                     chat_chain_manager.release_claim(aid, group_id)
 
@@ -525,7 +527,7 @@ async def _maybe_trigger_ai_reply(
         is_mentioned=is_mentioned,
         is_at_all=is_at_all,
         is_announcement=is_announcement,
-            is_priority_friend=is_priority_friend,
+        is_priority_friend=is_priority_friend,
         chain_depth=chain_depth,
     )
     decision = await decide_action(db, agent, ctx)
@@ -576,13 +578,8 @@ async def _maybe_trigger_ai_reply(
         "sender_type": sender_type,
         "sender_id": sender_id,
     })
-    # 打字指示器广播
-    if skill_result.show_typing:
-        await manager.broadcast_to_group(group_id, {
-            "type": "ai_typing",
-            "data": {"agent_id": agent.id, "agent_name": agent.name, "agent_avatar_url": agent.avatar_url, "is_typing": True},
-        })
     # 延迟回复（若已有积压消息则跳过，避免级联延迟）
+    # 注：打字状态不在此处发送，改为在 AI 实际调用 send_message 工具时才发送
     delay_skipped = False
     if skill_result.delay_seconds > 0:
         from app.services.group_service import get_pending_messages
@@ -1249,11 +1246,6 @@ async def _trigger_dm_ai_reply(
     from app.models.user import User as UserModel
 
 
-    # 立即发送输入中状态（不等后续耗时操作）
-    await manager.broadcast_to_dm(session_id, {
-        "type": "ai_typing",
-        "data": {"agent_id": agent.id, "agent_name": agent.name, "agent_avatar_url": agent.avatar_url, "is_typing": True},
-    })
     # 状态检查
     if agent.state == "blocked":
         logger.info(f"AI {agent.name}({agent.id}) 状态为 blocked，跳过 DM 回复")
@@ -1294,11 +1286,6 @@ async def _trigger_dm_ai_reply(
         "content": content,
         "sender_type": "human",  # DM 中对方是人类
     })
-    if skill_result.show_typing:
-        await manager.broadcast_to_dm(session_id, {
-            "type": "ai_typing",
-            "data": {"agent_id": agent.id, "agent_name": agent.name, "agent_avatar_url": agent.avatar_url, "is_typing": True},
-        })
     if skill_result.delay_seconds > 0:
         await asyncio.sleep(skill_result.delay_seconds)
 

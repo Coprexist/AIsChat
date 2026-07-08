@@ -916,6 +916,52 @@ async def update_system_settings(
 
 
 # ============================================================
+# 上传大小限制（运行时覆盖，重启后恢复 env 默认值）
+# ============================================================
+
+from pydantic import BaseModel as PydanticBaseModel
+
+class UploadLimitsRequest(PydanticBaseModel):
+    upload_max_size_mb: int | None = None
+    avatar_max_size_mb: int | None = None
+
+
+@router.get("/upload-limits")
+async def get_upload_limits(
+    admin: dict = Depends(require_admin),
+):
+    """获取当前文件/头像上传大小限制"""
+    from app.config import get_effective_upload_max_size_mb, get_effective_avatar_max_size_mb, settings
+    return {
+        "upload_max_size_mb": get_effective_upload_max_size_mb(),
+        "avatar_max_size_mb": get_effective_avatar_max_size_mb(),
+        "upload_max_size_mb_default": settings.upload_max_size_mb,
+        "avatar_max_size_mb_default": settings.avatar_max_size_mb,
+    }
+
+
+@router.put("/upload-limits")
+async def update_upload_limits(
+    req: UploadLimitsRequest,
+    admin: dict = Depends(require_admin),
+):
+    """更新文件/头像上传大小限制（运行时，重启后恢复默认值）"""
+    from app.config import set_runtime_setting, get_effective_upload_max_size_mb, get_effective_avatar_max_size_mb
+    if req.upload_max_size_mb is not None:
+        if req.upload_max_size_mb < 1 or req.upload_max_size_mb > 1024:
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="上传大小限制需在 1-1024 MB 之间")
+        set_runtime_setting("upload_max_size_mb", req.upload_max_size_mb)
+    if req.avatar_max_size_mb is not None:
+        if req.avatar_max_size_mb < 1 or req.avatar_max_size_mb > 100:
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="头像大小限制需在 1-100 MB 之间")
+        set_runtime_setting("avatar_max_size_mb", req.avatar_max_size_mb)
+    return {
+        "upload_max_size_mb": get_effective_upload_max_size_mb(),
+        "avatar_max_size_mb": get_effective_avatar_max_size_mb(),
+    }
+
+
+# ============================================================
 # v1.0.0 邮箱认证：SMTP 配置 + 认证设置
 # ============================================================
 

@@ -139,3 +139,6 @@ def set_runtime_setting(key: str, value):
 
 def get_effective_avatar_max_size_mb() -> int:
     return int(get_runtime_setting("avatar_max_size_mb", settings.avatar_max_size_mb))
+
+def get_effective_upload_max_size_mb() -> int:
+    return int(get_runtime_setting("upload_max_size_mb", settings.upload_max_size_mb))

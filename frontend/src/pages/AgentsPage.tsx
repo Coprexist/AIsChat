@@ -225,7 +225,7 @@ export default function AgentsPage() {
 
                   <div className="flex items-center gap-2 mt-3 pt-3 border-t border-border flex-wrap">
                     <button
-                      onClick={(e) => { e.stopPropagation(); setEditAgent(agent) }}
+                      onClick={(e) => { e.stopPropagation(); navigate(`/agents/${agent.id}`) }}
                       className="flex items-center gap-1 px-2 py-1 text-xs text-textSecondary hover:text-primary-400 rounded-lg hover:bg-elevated transition-colors"
                     >
                       <Edit3 size={12} /> {t('agents.edit')}
