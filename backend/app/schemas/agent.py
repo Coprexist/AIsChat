@@ -70,6 +70,7 @@ class AgentGenerateResponse(BaseModel):
 
 class AgentUpdateConfigRequest(BaseModel):
     """AI 自修改配置请求"""
+    name: str | None = Field(default=None, min_length=1, max_length=50, description="AI 名称")
     system_prompt: str | None = None
     temperature: float | None = Field(default=None, ge=0, le=2.0)
     top_p: float | None = Field(default=None, ge=0, le=1.0)

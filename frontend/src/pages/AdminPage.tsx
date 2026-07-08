@@ -1451,6 +1451,8 @@ function SystemSettingsTab() {
   const [lang, setLang] = useState('en')
   const [platformCredit, setPlatformCredit] = useState(0)
   const [fileQuota, setFileQuota] = useState(100)
+  const [uploadMaxSizeMb, setUploadMaxSizeMb] = useState(32)
+  const [avatarMaxSizeMb, setAvatarMaxSizeMb] = useState(10)
   const [hasActiveKeys, setHasActiveKeys] = useState(false)
   const [saving, setSaving] = useState(false)
   const [msg, setMsg] = useState('')
@@ -1459,11 +1461,14 @@ function SystemSettingsTab() {
     Promise.all([
       api.get('/admin/system-settings'),
       api.get('/admin/api-key-pool'),
-    ]).then(([settings, keys]) => {
+      api.get('/admin/upload-limits'),
+    ]).then(([settings, keys, limits]) => {
       setConfig(settings)
       setLang(settings.default_language || 'en')
       setPlatformCredit(settings.default_platform_credit || 0)
       setFileQuota(settings.default_file_quota_mb ?? 100)
+      setUploadMaxSizeMb(limits.upload_max_size_mb ?? 32)
+      setAvatarMaxSizeMb(limits.avatar_max_size_mb ?? 10)
       setHasActiveKeys(keys.some((k: any) => k.is_active))
     }).catch(console.error)
   }, [])
@@ -1591,6 +1596,54 @@ function SystemSettingsTab() {
           >
             {t('settings.save')}
           </button>
+        </div>
+      </div>
+
+      {/* 单文件上传大小限制（运行时，重启后恢复 env 默认值） */}
+      <div>
+        <label className="block text-sm font-medium mb-1 text-textSecondary">单文件上传大小上限</label>
+        <p className="text-xs text-textMuted mb-2">控制用户上传单个文件的最大尺寸（不含头像）</p>
+        <div className="flex items-center gap-2">
+          <input type="number" value={uploadMaxSizeMb}
+            onChange={(e) => setUploadMaxSizeMb(parseInt(e.target.value) || 1)} min={1} max={1024}
+            className="w-32 px-3 py-2 rounded-xl border border-border bg-canvas text-sm text-textPrimary focus:outline-none focus:ring-2 focus:ring-primary-500/50" />
+          <span className="text-xs text-textMuted">MB</span>
+          <button
+            onClick={async () => {
+              setSaving(true)
+              try {
+                await api.put('/admin/upload-limits', { upload_max_size_mb: uploadMaxSizeMb })
+                setMsg('上传大小限制已更新')
+              } catch (e: any) { setMsg(e?.detail || '更新失败') }
+              finally { setSaving(false) }
+            }}
+            disabled={saving}
+            className="px-3 py-2 bg-primary-500 text-white rounded-xl hover:bg-primary-400 text-sm disabled:opacity-40 transition-colors"
+          >{t('settings.save')}</button>
+        </div>
+      </div>
+
+      {/* 头像上传大小限制（运行时，重启后恢复 env 默认值） */}
+      <div>
+        <label className="block text-sm font-medium mb-1 text-textSecondary">头像上传大小上限</label>
+        <p className="text-xs text-textMuted mb-2">控制用户/AI 上传头像的最大尺寸</p>
+        <div className="flex items-center gap-2">
+          <input type="number" value={avatarMaxSizeMb}
+            onChange={(e) => setAvatarMaxSizeMb(parseInt(e.target.value) || 1)} min={1} max={100}
+            className="w-32 px-3 py-2 rounded-xl border border-border bg-canvas text-sm text-textPrimary focus:outline-none focus:ring-2 focus:ring-primary-500/50" />
+          <span className="text-xs text-textMuted">MB</span>
+          <button
+            onClick={async () => {
+              setSaving(true)
+              try {
+                await api.put('/admin/upload-limits', { avatar_max_size_mb: avatarMaxSizeMb })
+                setMsg('头像大小限制已更新')
+              } catch (e: any) { setMsg(e?.detail || '更新失败') }
+              finally { setSaving(false) }
+            }}
+            disabled={saving}
+            className="px-3 py-2 bg-primary-500 text-white rounded-xl hover:bg-primary-400 text-sm disabled:opacity-40 transition-colors"
+          >{t('settings.save')}</button>
         </div>
       </div>
 

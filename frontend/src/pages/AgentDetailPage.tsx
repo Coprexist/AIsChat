@@ -641,6 +641,18 @@ export default function AgentDetailPage() {
   const handleAvatarSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]
     if (!file) return
+    // 前端头像大小校验
+    let maxAvatarMB = 10
+    try {
+      const cached = sessionStorage.getItem('upload_limits')
+      if (cached) {
+        const parsed = JSON.parse(cached)
+        if (Date.now() - parsed.ts < 300000) {
+          maxAvatarMB = parsed.avatar_max_size_mb || 10
+        }
+      }
+    } catch {}
+    if (file.size > maxAvatarMB * 1024 * 1024) { alert(`头像不能超过 ${maxAvatarMB}MB`); return }
     // GIF 动图跳过裁剪，直接上传
     if (file.type === 'image/gif') {
       uploadAgentAvatarDirectly(file)

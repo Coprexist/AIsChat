@@ -693,6 +693,10 @@ async def update_agent_config(
     if "memory_shared_scope" in updates and updates["memory_shared_scope"] is not None:
         agent.memory_shared_scope = updates["memory_shared_scope"]
 
+    # 名称
+    if "name" in updates and updates["name"] is not None:
+        agent.name = updates["name"]
+
     # 简介 & 状态文本
     if "bio" in updates:
         agent.bio = updates["bio"]

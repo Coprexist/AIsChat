@@ -405,6 +405,16 @@ async def search_users(
     }
 
 
+@router.get("/config/upload-limits")
+async def get_upload_limits():
+    """获取当前文件/头像上传大小限制（供前端使用）"""
+    from app.config import get_effective_upload_max_size_mb, get_effective_avatar_max_size_mb
+    return {
+        "upload_max_size_mb": get_effective_upload_max_size_mb(),
+        "avatar_max_size_mb": get_effective_avatar_max_size_mb(),
+    }
+
+
 @router.get("/profile/{entity_type}/{entity_id}")
 async def get_profile(
     entity_type: str,

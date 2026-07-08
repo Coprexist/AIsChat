@@ -85,9 +85,11 @@ async def upload_file_endpoint(
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="路径不合法")
 
     content = await file.read()
-    max_bytes = settings.upload_max_size_mb * 1024 * 1024
+    from app.config import get_effective_upload_max_size_mb
+    max_mb = get_effective_upload_max_size_mb()
+    max_bytes = max_mb * 1024 * 1024
     if len(content) > max_bytes:
-        raise HTTPException(400, f"文件大小不能超过 {settings.upload_max_size_mb}MB")
+        raise HTTPException(400, f"文件大小不能超过 {max_mb}MB")
     metadata = await upload_file(
         db, path, file.filename or f"unnamed_{uuid.uuid4().hex[:8]}",
         content, file.content_type, "human", current_user["user_id"],
@@ -118,10 +120,12 @@ async def upload_attachment(
     content = await file.read()
 
     # 限制附件大小
-    max_size = settings.upload_max_size_mb * 1024 * 1024
+    from app.config import get_effective_upload_max_size_mb
+    max_mb = get_effective_upload_max_size_mb()
+    max_size = max_mb * 1024 * 1024
     if len(content) > max_size:
         raise HTTPException(status_code=status.HTTP_413_REQUEST_ENTITY_TOO_LARGE,
-                          detail=f"附件大小不能超过 {settings.upload_max_size_mb}MB")
+                          detail=f"附件大小不能超过 {max_mb}MB")
 
     try:
         metadata = await upload_file(

@@ -388,6 +388,42 @@ export default function AgentSettingsModal({
                 </div>
               </Section>
 
+              {/* 个人资料 */}
+              <Section title={t('modal.detailSettingsProfileInfo') || '个人资料'} desc={t('modal.detailSettingsProfileInfoDesc') || 'AI 的对外展示信息'}>
+                <div>
+                  <label className="block text-xs font-medium mb-1 text-textSecondary">{t('agentDetail.bioLabel') || '简介'}</label>
+                  <textarea value={bio} onChange={(e) => setBio(e.target.value)} rows={3} maxLength={500}
+                    className="w-full px-3 py-2 rounded-lg border border-border bg-canvas text-sm text-textPrimary placeholder:text-textMuted focus:outline-none focus:ring-2 focus:ring-primary-500/50 resize-none" />
+                  <p className="text-[10px] text-textMuted mt-0.5">{bio.length}/500</p>
+                </div>
+                <div>
+                  <label className="block text-xs font-medium mb-1 text-textSecondary">{t('agentDetail.statusTextLabel') || '个性状态'}</label>
+                  <input type="text" value={statusText} onChange={(e) => setStatusText(e.target.value)} maxLength={100}
+                    className="w-full px-3 py-2 rounded-lg border border-border bg-canvas text-sm text-textPrimary placeholder:text-textMuted focus:outline-none focus:ring-2 focus:ring-primary-500/50" />
+                </div>
+                <div>
+                  <label className="block text-xs font-medium mb-1 text-textSecondary">{t('me.statusColorLabel') || '状态颜色'}</label>
+                  <div className="flex items-center gap-1.5 flex-wrap">
+                    {STATUS_COLORS.map(c => (
+                      <button key={c.value} type="button" onClick={() => setStatusColor(c.value)}
+                        className={`w-5 h-5 rounded-full border-2 transition-all ${
+                          statusColor === c.value ? 'border-primary-400 scale-110 shadow-md'
+                          : c.value === '' ? 'border-border bg-canvas hover:border-textMuted'
+                          : 'border-transparent hover:scale-105'
+                        }`}
+                        style={c.value ? { backgroundColor: c.value } : undefined}
+                        title={c.label}
+                      >
+                        {c.value === '' && <X size={8} className="text-textMuted m-auto" />}
+                      </button>
+                    ))}
+                    <input type="color" value={statusColor || '#000000'} onChange={e => setStatusColor(e.target.value)}
+                      className="w-5 h-5 rounded-full cursor-pointer border-2 border-border hover:border-primary-400 transition-colors"
+                      title="自定义" />
+                  </div>
+                </div>
+              </Section>
+
               {/* AI 类型 */}
               <Section title={t('modal.detailSettingsAiType')} desc={t('modal.detailSettingsAiTypeDesc')}>
                 <div className="grid grid-cols-3 gap-2">
@@ -471,42 +507,6 @@ export default function AgentSettingsModal({
                 <SliderField label="Top P" value={topP} setValue={setTopP} min={0} max={1} step={0.05} desc={t('modal.detailSettingsTopPDesc')} />
                 <SliderField label="Presence Penalty" value={presencePenalty} setValue={setPresencePenalty} min={-2} max={2} step={0.1} desc={t('modal.detailSettingsPresencePenaltyDesc')} />
                 <SliderField label="Frequency Penalty" value={frequencyPenalty} setValue={setFrequencyPenalty} min={-2} max={2} step={0.1} desc={t('modal.detailSettingsFrequencyPenaltyDesc')} />
-              </Section>
-
-              {/* 个人资料 */}
-              <Section title={t('modal.detailSettingsProfileInfo') || '个人资料'} desc={t('modal.detailSettingsProfileInfoDesc') || 'AI 的对外展示信息'}>
-                <div>
-                  <label className="block text-xs font-medium mb-1 text-textSecondary">{t('agentDetail.bioLabel') || '简介'}</label>
-                  <textarea value={bio} onChange={(e) => setBio(e.target.value)} rows={3} maxLength={500}
-                    className="w-full px-3 py-2 rounded-lg border border-border bg-canvas text-sm text-textPrimary placeholder:text-textMuted focus:outline-none focus:ring-2 focus:ring-primary-500/50 resize-none" />
-                  <p className="text-[10px] text-textMuted mt-0.5">{bio.length}/500</p>
-                </div>
-                <div>
-                  <label className="block text-xs font-medium mb-1 text-textSecondary">{t('agentDetail.statusTextLabel') || '个性状态'}</label>
-                  <input type="text" value={statusText} onChange={(e) => setStatusText(e.target.value)} maxLength={100}
-                    className="w-full px-3 py-2 rounded-lg border border-border bg-canvas text-sm text-textPrimary placeholder:text-textMuted focus:outline-none focus:ring-2 focus:ring-primary-500/50" />
-                </div>
-                <div>
-                  <label className="block text-xs font-medium mb-1 text-textSecondary">{t('me.statusColorLabel') || '状态颜色'}</label>
-                  <div className="flex items-center gap-1.5 flex-wrap">
-                    {STATUS_COLORS.map(c => (
-                      <button key={c.value} type="button" onClick={() => setStatusColor(c.value)}
-                        className={`w-5 h-5 rounded-full border-2 transition-all ${
-                          statusColor === c.value ? 'border-primary-400 scale-110 shadow-md'
-                          : c.value === '' ? 'border-border bg-canvas hover:border-textMuted'
-                          : 'border-transparent hover:scale-105'
-                        }`}
-                        style={c.value ? { backgroundColor: c.value } : undefined}
-                        title={c.label}
-                      >
-                        {c.value === '' && <X size={8} className="text-textMuted m-auto" />}
-                      </button>
-                    ))}
-                    <input type="color" value={statusColor || '#000000'} onChange={e => setStatusColor(e.target.value)}
-                      className="w-5 h-5 rounded-full cursor-pointer border-2 border-border hover:border-primary-400 transition-colors"
-                      title="自定义" />
-                  </div>
-                </div>
               </Section>
 
               {/* 工具调用 */}

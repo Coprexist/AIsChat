@@ -88,6 +88,14 @@ class ConnectionManager:
             return list(self.group_connections[group_id].keys())
         return []
 
+    def is_user_online(self, user_id: int) -> bool:
+        """检查用户是否在线（有活跃 WebSocket 连接）"""
+        return user_id in self.user_connections
+
+    def get_online_user_ids(self) -> set[int]:
+        """获取所有在线用户的 ID 集合"""
+        return set(self.user_connections.keys())
+
     # ── DM 连接管理 ──
 
     async def connect_dm(self, ws: WebSocket, session_id: str, user_id: int):

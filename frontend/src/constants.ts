@@ -10,6 +10,7 @@ export const ADMIN_MANUAL_URL = '/manual/admin'
 /** 状态指示圆点颜色（小圆点，纯背景色） */
 export const STATE_DOT_COLORS: Record<string, string> = {
   active: 'bg-mint-400',
+  online: 'bg-mint-400',   // 人类用户在线
   dnd: 'bg-rose-400',
   offline: 'bg-border',
 }
