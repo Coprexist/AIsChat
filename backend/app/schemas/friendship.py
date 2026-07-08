@@ -38,6 +38,7 @@ class FriendResponse(BaseModel):
     friend_name: str
     avatar_url: str | None = None
     state: str | None = None  # AI 在线状态
+    is_priority: bool = False  # 是否特别关心
     created_at: str | None = None
     last_dm_at: str | None = None  # 最近一次私信时间
 

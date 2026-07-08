@@ -1347,6 +1347,8 @@ const zh: TranslationDict = {
   'profileCard.friendMessagePlaceholder': '附言（选填，最多200字）',
   'profileCard.creator': '制作者',
   'profileCard.registeredOn': '注册时间',
+  'profileCard.priorityOn': '已特别关心',
+  'profileCard.priorityOff': '设为特别关心',
 
   // ======================== 头像裁剪 / AvatarCrop ========================
   'avatarCrop.adjustAvatar': '调整头像',
@@ -2987,6 +2989,8 @@ const en: TranslationDict = {
   'profileCard.friendMessagePlaceholder': 'Message (optional, max 200 chars)',
   'profileCard.creator': 'Creator',
   'profileCard.registeredOn': 'Registered',
+  'profileCard.priorityOn': 'Priority',
+  'profileCard.priorityOff': 'Set Priority',
 
   // ======================== AvatarCrop ========================
   'avatarCrop.adjustAvatar': 'Adjust Avatar',

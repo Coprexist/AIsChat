@@ -3,12 +3,13 @@ import { useNavigate, useOutletContext } from 'react-router-dom'
 import { api } from '../api/client'
 import { useAuth } from '../context/AuthContext'
 import { useT } from '../i18n/I18nContext'
-import { Users, MessageSquare, UserPlus, Check, X, Search, ArrowUpDown, ArrowLeft, Bot, User, Menu } from 'lucide-react'
+import { Users, MessageSquare, UserPlus, Check, X, Search, ArrowUpDown, ArrowLeft, Bot, User, Menu, Star } from 'lucide-react'
 import { getStateDotColor } from '../constants'
 import { getStatusTextStyle, BG_CANVAS_LIGHT, BG_CANVAS_DARK } from '../utils/statusColor'
 import { useTheme } from '../context/ThemeContext'
 
 interface Friend {
+  id: number
   friend_type: string
   friend_id: number
   friend_name: string
@@ -16,6 +17,7 @@ interface Friend {
   avatar_url: string | null
   status_text: string | null
   status_color: string | null
+  is_priority: boolean
   created_at: string | null
   last_dm_at: string | null
   friend_user_id?: number | null
@@ -348,6 +350,7 @@ export default function FriendsPage() {
                           · {f.status_text}
                         </span>
                       )}
+                      {f.is_priority && <Star size={10} className="text-amber-400 fill-amber-400 shrink-0" />}
                       {stateIcon(f.state)}
                     </div>
                     <span className="text-xs text-textMuted">
