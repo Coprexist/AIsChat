@@ -163,6 +163,9 @@ manager = ConnectionManager()
 async def websocket_endpoint(ws: WebSocket, token: str = Query(...)):
     """WebSocket 端点：/ws?token=JWT"""
 
+    # 必须先 accept，再验证 token——否则浏览器报 "closed before established"
+    await ws.accept()
+
     payload_result = decode_access_token(token)
     if payload_result.is_err():
         await ws.close(code=4001, reason=payload_result.error)
@@ -175,8 +178,6 @@ async def websocket_endpoint(ws: WebSocket, token: str = Query(...)):
     if user_id == 0:
         await ws.close(code=4001, reason="令牌数据不完整")
         return
-
-    await ws.accept()
     current_group_id: int | None = None
     current_session_id: str | None = None  # DM 会话 ID 追踪
 

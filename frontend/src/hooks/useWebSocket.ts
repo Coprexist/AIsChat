@@ -117,8 +117,8 @@ export function useWebSocket(
     }
 
     ws.onclose = (event) => {
-      // 1000=正常关闭, 1001=离开页面 → 不重连
-      const cleanClose = event.code === 1000 || event.code === 1001
+      // 1000=正常关闭, 1001=离开页面, 4001=认证失败 → 不重连
+      const cleanClose = event.code === 1000 || event.code === 1001 || event.code === 4001
       if (!mountedRef.current || cleanClose) {
         setConnected(false)
         setReconnecting(false)
