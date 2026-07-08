@@ -60,6 +60,21 @@ export default function ChatArea({ groupId, dmSessionId }: ChatAreaProps) {
     return () => window.removeEventListener('open-invite-modal', handler)
   }, [])
 
+  // 监听在线状态变化 → 更新群列表中的 online_count
+  useEffect(() => {
+    const handler = (e: Event) => {
+      const msg = (e as CustomEvent).detail
+      if (!msg?.data?.group_id) return
+      setGroups((prev) => prev.map((g) => {
+        if (g.id !== msg.data.group_id) return g
+        const delta = msg.type === 'user_online' ? 1 : -1
+        return { ...g, online_count: Math.max(0, (g.online_count || 0) + delta) }
+      }))
+    }
+    window.addEventListener('online-count-change', handler)
+    return () => window.removeEventListener('online-count-change', handler)
+  }, [])
+
   // 群聊选中变化时刷新未读
   useEffect(() => {
     if (groupId) {

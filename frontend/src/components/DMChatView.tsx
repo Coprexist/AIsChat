@@ -19,6 +19,7 @@ export default function DMChatView({ sessionId, onMobileBack }: DMChatViewProps)
   const [myDndUntil, setMyDndUntil] = useState<string | null>(null)
   const [showSettings, setShowSettings] = useState(false)
   const [showProfile, setShowProfile] = useState(false)
+  const [tokenUsage, setTokenUsage] = useState<{ total_tokens: number; api_calls: number } | null>(null)
   const navigate = useNavigate()
 
   useEffect(() => {
@@ -27,7 +28,14 @@ export default function DMChatView({ sessionId, onMobileBack }: DMChatViewProps)
       setPartner(data.partner)
       setMyDndUntil(data.my_dnd_until || null)
     }).catch(console.error)
+    // 加载 token 用量
+    api.get(`/dm/${sessionId}/my-token-usage`).then(setTokenUsage).catch(() => {})
   }, [sessionId])
+
+  // 监听到新消息时刷新 token 用量
+  const refreshTokenUsage = () => {
+    api.get(`/dm/${sessionId}/my-token-usage`).then(setTokenUsage).catch(() => {})
+  }
 
   const handleToggleDnd = async () => {
     try {
@@ -96,6 +104,11 @@ export default function DMChatView({ sessionId, onMobileBack }: DMChatViewProps)
             {partner?.type !== 'system' && partner?.state === 'active' && ` · ${t('dm.online')}`}
             {partner?.type !== 'system' && partner?.state === 'dnd' && ` · ${t('dm.dnd')}`}
             {partner?.type !== 'system' && (!partner?.state || partner?.state === 'offline') && ` · ${t('dm.offline')}`}
+            {tokenUsage && tokenUsage.total_tokens > 0 && (
+              <span className="ml-2 text-textMuted">
+                · {tokenUsage.total_tokens >= 1000 ? `${(tokenUsage.total_tokens / 1000).toFixed(1)}k` : tokenUsage.total_tokens} tokens
+              </span>
+            )}
           </span>
         </div>
 

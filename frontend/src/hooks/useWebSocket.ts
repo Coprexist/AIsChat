@@ -68,7 +68,7 @@ export function useWebSocket(
 
     ws.onopen = () => {
       if (!mountedRef.current) {
-        ws.close()
+        // 组件已卸载，不在此处 close（交由 useEffect cleanup 处理），避免浏览器报 "closed before established"
         return
       }
       setConnected(true)
@@ -78,7 +78,7 @@ export function useWebSocket(
       // 订阅当前对话
       if (conversationType === 'group') {
         ws.send(JSON.stringify({ type: 'subscribe', group_id: conversationId }))
-      } else {
+      } else if (conversationId) {
         ws.send(JSON.stringify({ type: 'subscribe', session_id: conversationId }))
       }
     }
