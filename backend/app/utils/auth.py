@@ -100,6 +100,10 @@ async def get_current_user(
             detail="令牌数据不完整",
         )
 
+    # 记录活动时间戳（用于在线状态判断）
+    from app.services.online_tracker import record_activity
+    record_activity(int(user_id))
+
     return {"user_id": int(user_id), "username": username, "role": role}
 
 

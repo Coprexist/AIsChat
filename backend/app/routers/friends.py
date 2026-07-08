@@ -61,19 +61,17 @@ async def list_my_friends(
 ):
     """获取我的好友列表"""
     friends = await list_friends(db, current_user["user_id"], limit=limit, offset=offset)
-    # 注入在线状态：人类好友通过 WebSocket 连接判断，AI 好友保留 agent.state
+    # 注入在线状态：WebSocket 连接 OR 1分钟内有 API 活动
     from app.routers.ws import manager
-    online_ids = manager.get_online_user_ids()
+    from app.services.online_tracker import get_online_user_ids as get_active_user_ids
+    ws_online = manager.get_online_user_ids()
+    activity_online = get_active_user_ids()
+    all_online = ws_online | activity_online
     for f in friends:
         friend_uid = f.get("friend_user_id")
-        if friend_uid and friend_uid in online_ids:
-            # 在线：人类好友显示 online，AI 好友保留原有 state（active/dnd/offline）
+        if friend_uid and friend_uid in all_online:
             if f["friend_type"] == "human":
                 f["state"] = "online"
-            # AI 好友的 state 已经在 list_friends 中从 agent 表获取，保持不变
-            # 但如果 AI 不在线（无 WebSocket 连接），且 agent.state 为 active，改为 offline
-            elif f["friend_type"] == "ai" and f["state"] == "active" and friend_uid not in online_ids:
-                pass  # AI 的 state 是其主动设置的状态，不根据连接状态覆盖
     return friends
 
 

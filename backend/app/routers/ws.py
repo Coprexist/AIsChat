@@ -181,6 +181,10 @@ async def websocket_endpoint(ws: WebSocket, token: str = Query(...)):
     current_group_id: int | None = None
     current_session_id: str | None = None  # DM 会话 ID 追踪
 
+    # 记录 WebSocket 连接活动（在线追踪兜底）
+    from app.services.online_tracker import record_ws_activity
+    record_ws_activity(user_id)
+
     try:
         while True:
             raw = await ws.receive_text()
