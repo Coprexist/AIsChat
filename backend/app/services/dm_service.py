@@ -18,7 +18,8 @@ logger = logging.getLogger(__name__)
 
 
 def _dm_message_to_dict(m: DMMessage, sender_name: str, sender_type: str,
-                        sender_avatar_url: str | None = None) -> dict:
+                        sender_avatar_url: str | None = None,
+                        sender_state: str | None = None) -> dict:
     """将 DMMessage ORM 对象转为字典（send_dm_message 和 _get_messages 共用）"""
     from app.utils.message_serializer import serialize_message
     return serialize_message(
@@ -26,6 +27,7 @@ def _dm_message_to_dict(m: DMMessage, sender_name: str, sender_type: str,
         sender_name=sender_name,
         sender_type=sender_type,
         sender_avatar_url=sender_avatar_url,
+        sender_state=sender_state,
         conversation_key='session_id',
         include_read_at=True,
     )
@@ -340,7 +342,20 @@ async def send_dm_message(
         if agent_avatar:
             sender_avatar_url = agent_avatar
 
-    return _dm_message_to_dict(msg, sender_name, sender_type, sender_avatar_url)
+    # 发送者在线状态
+    sender_state = None
+    if sender_type == "ai":
+        agent_state_result = await db.execute(
+            select(AgentModel.state).where(AgentModel.user_id == sender_id)
+        )
+        sender_state = agent_state_result.scalar()
+    else:
+        from app.services.online_tracker import is_online as _is_online
+        from app.routers.ws import manager as _ws_mgr
+        if _is_online(sender_id) or _ws_mgr.is_user_online(sender_id):
+            sender_state = "online"
+
+    return _dm_message_to_dict(msg, sender_name, sender_type, sender_avatar_url, sender_state)
 
 
 async def set_dm_dnd(
