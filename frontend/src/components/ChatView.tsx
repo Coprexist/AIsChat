@@ -189,6 +189,8 @@ export default function ChatView({ conversationType, conversationId }: ChatViewP
   const handleMessage = useCallback((msg: WebSocketMessage) => {
     if (msg.type === 'message') {
       const m = msg.data
+      // 过滤：仅处理当前对话的消息（防止 DM 邀请卡闪现到群聊）
+      if (!isMessageForThisConversation(m, conversationType, conversationId)) return
       setMessages((prev) => {
         // 去重：防止 WebSocket 与 HTTP fetch 竞态导致同 ID 消息重复
         if (prev.some((existing) => existing.id === m.id)) return prev
@@ -269,6 +271,9 @@ export default function ChatView({ conversationType, conversationId }: ChatViewP
           ),
         )
       }
+    } else if (msg.type === 'user_online' || msg.type === 'user_offline') {
+      // 在线状态变化 → 通知 ChatArea 更新在线人数
+      window.dispatchEvent(new CustomEvent('online-count-change', { detail: msg }))
     } else if (msg.type === 'dm_notification' || msg.type === 'unread_update') {
       window.dispatchEvent(new CustomEvent(CHAT_REFRESH_EVENT, { detail: msg }))
     }

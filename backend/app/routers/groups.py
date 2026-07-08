@@ -115,24 +115,27 @@ async def get_group_detail(
     if group is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="群聊不存在")
 
-    # 统计成员数量 & 在线人数（AI 成员中 state=active 的）
+    # 统计成员数量 & 在线人数
+    # 在线 = AI state=active + 人类 WebSocket 连接
     from app.models.group import GroupMember
     from app.models.agent import Agent as AgentModel
+    from app.routers.ws import manager as ws_manager
     member_result = await db.execute(
         select(GroupMember).where(GroupMember.group_id == group_id)
     )
     members = member_result.scalars().all()
     member_count = len(members)
     online_count = 0
-    ai_member_ids = [m.member_id for m in members if m.member_type == "ai"]
-    if ai_member_ids:
-        ai_result = await db.execute(
-            select(AgentModel).where(
-                AgentModel.user_id.in_(ai_member_ids),  # v2.0.0: member_id 统一为 user_id
-                AgentModel.state == "active",
-            )
-        )
-        online_count = len(ai_result.scalars().all())
+    online_user_ids = ws_manager.get_online_user_ids()
+    for m in members:
+        if m.member_type == "ai":
+            # AI: 检查 agent.state == active 且在 WebSocket 在线
+            if m.member_id in online_user_ids:
+                online_count += 1
+        else:
+            # 人类: WebSocket 在线即算
+            if m.member_id in online_user_ids:
+                online_count += 1
 
     return {
         "id": group.id,

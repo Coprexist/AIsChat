@@ -335,6 +335,9 @@ async def _process_group_event(db, event: dict):
     next_depth = chain_depth + 1
     from app.services.chat_chain_service import chat_chain_manager
 
+    # 通知群活跃（重置并发自动恢复倒计时）
+    chat_chain_manager.notify_group_activity(group_id)
+
     # 判断消息优先级：@消息/公告 → 优先通道（上限1），普通消息 → 普通通道
     has_at = sender_type == "human" and "@" in (content or "")
     is_at_all = any(tag in (content or "") for tag in ("@all", "@everyone", "@全体"))

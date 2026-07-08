@@ -5,7 +5,7 @@ AI 对话日志服务
 import logging
 from datetime import datetime, timezone
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select, delete, func, text
+from sqlalchemy import select, delete, func, text, Integer, cast as sa_cast
 
 from app.models.conversation_log import ConversationLogConfig, ConversationLog
 
@@ -584,3 +584,26 @@ def _summarize_message(msg: dict) -> dict:
     if msg.get("name"):
         summary["name"] = msg["name"]
     return summary
+
+
+async def get_session_token_usage(
+    db: AsyncSession,
+    session_id: str,
+    user_id: int,
+) -> dict:
+    """获取指定 DM 会话的 token 消耗汇总（用于前端自费聊天显示）"""
+    from app.models.conversation_log import AiConversationLog
+    result = await db.execute(
+        select(
+            func.coalesce(func.sum(sa_cast(AiConversationLog.token_usage["total_tokens"].as_string, Integer)), 0).label("total_tokens"),
+            func.coalesce(func.sum(sa_cast(AiConversationLog.token_usage["api_calls"].as_string, Integer)), 0).label("api_calls"),
+        ).where(
+            AiConversationLog.session_id == session_id,
+        )
+    )
+    row = result.one()
+    return {
+        "total_tokens": row.total_tokens or 0,
+        "api_calls": row.api_calls or 0,
+        "session_id": session_id,
+    }

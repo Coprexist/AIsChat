@@ -104,6 +104,18 @@ async def send_dm(
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
 
 
+@router.get("/dm/{session_id}/my-token-usage")
+async def get_my_token_usage(
+    session_id: str,
+    current_user: dict = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """获取当前用户在此 DM 中的 token 消耗（自费聊天时显示）"""
+    from app.services.conversation_log_service import get_session_token_usage
+    usage = await get_session_token_usage(db, session_id, current_user["user_id"])
+    return usage
+
+
 @router.post("/dm/{session_id}/dnd")
 async def set_dm_dnd_endpoint(
     session_id: str,

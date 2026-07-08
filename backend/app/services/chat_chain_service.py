@@ -10,6 +10,7 @@ v2: 红黑树 + 有序链表实现。
 """
 import asyncio
 import logging
+import time
 from time import time as now
 
 logger = logging.getLogger(__name__)
@@ -421,4 +422,63 @@ class ChatChainManager:
         if group_id not in self._priority_sem:
             self._priority_sem[group_id] = asyncio.Semaphore(1)
         return self._priority_sem[group_id]
+
+    # ── 并发自修改 + 自动恢复 ──
+
+    def set_concurrency(self, group_id: int, limit: int, ai_id: int) -> int:
+        """AI 自修改群并发上限。多个 AI 同时设 → 取最小值。返回实际生效的并发数。"""
+        if group_id not in self._concurrency_overrides:
+            self._concurrency_overrides[group_id] = {}
+        self._concurrency_overrides[group_id][ai_id] = max(1, min(limit, 10))
+        effective = min(self._concurrency_overrides[group_id].values())
+        # 更新信号量
+        old_sem = self._semaphores.get(group_id)
+        if old_sem:
+            self._semaphores[group_id] = asyncio.Semaphore(effective)
+        else:
+            self._semaphores[group_id] = asyncio.Semaphore(effective)
+        # 启动自动恢复定时器
+        self._schedule_restore(group_id)
+        return effective
+
+    def reset_concurrency(self, group_id: int) -> None:
+        """清除所有 AI 自修改并发覆盖，恢复群默认值"""
+        self._concurrency_overrides.pop(group_id, None)
+        self._semaphores.pop(group_id, None)  # 下次 get_semaphore 会重建
+        # 取消恢复任务
+        task = self._restore_tasks.pop(group_id, None)
+        if task:
+            task.cancel()
+
+    def notify_group_activity(self, group_id: int) -> None:
+        """通知群有活动（发消息/AI打字），重置自动恢复倒计时"""
+        self._last_activity[group_id] = time.monotonic()
+        # 重新安排恢复
+        if group_id in self._concurrency_overrides:
+            self._schedule_restore(group_id)
+
+    # ── 内部：自动恢复定时器 ──
+    _last_activity: dict[int, float] = {}
+    _restore_tasks: dict[int, asyncio.Task] = {}
+
+    def _schedule_restore(self, group_id: int) -> None:
+        """安排/重置自动恢复定时器：60s 无活动后恢复默认并发"""
+        # 取消旧任务
+        old = self._restore_tasks.pop(group_id, None)
+        if old:
+            old.cancel()
+
+        async def _restore_after_delay(gid: int):
+            try:
+                await asyncio.sleep(60)
+                # 检查活动时间：如果 60s 内有新活动，不恢复（应该已被重新安排）
+                last = self._last_activity.get(gid, 0)
+                if time.monotonic() - last >= 60:
+                    logger.info(f"🔄 群 {gid} 60s 无活动，自动恢复默认并发数")
+                    self.reset_concurrency(gid)
+            except asyncio.CancelledError:
+                pass
+
+        self._restore_tasks[group_id] = asyncio.create_task(_restore_after_delay(group_id))
+
 chat_chain_manager = ChatChainManager()
