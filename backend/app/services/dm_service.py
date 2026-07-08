@@ -425,6 +425,12 @@ async def _get_partner_info(db: AsyncSession, user_id: int) -> dict:
         if agent_row:
             state = agent_row[0]
             avatar_url = agent_row[1] or avatar_url  # Agent 头像优先
+    else:
+        # 人类在线状态：WebSocket 连接 OR 1分钟内有 API 活动
+        from app.services.online_tracker import is_online as _is_online
+        from app.routers.ws import manager as _ws_mgr
+        if _ws_mgr.is_user_online(user_id) or _is_online(user_id):
+            state = "online"
 
     return {
         "id": user.id,
