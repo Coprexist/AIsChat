@@ -740,7 +740,8 @@ async def _build_cross_conversation_context(
 
             msgs = []
             for m in reversed(recent):
-                is_self = m.sender_type == "ai" and m.sender_id in (agent.id, agent.user_id)
+                # v2.0.0 后 sender_id 统一为 user_id，只用 agent.user_id 判断自己
+                is_self = m.sender_type == "ai" and m.sender_id == agent.user_id
                 if is_self:
                     speaker = agent.name
                     sid = None
@@ -797,7 +798,8 @@ async def _build_cross_conversation_context(
 
                 msgs = []
                 for m in reversed(dm_list):
-                    is_self = m.sender_id in (agent.id, agent.user_id)
+                    # v2.0.0 后 sender_id 统一为 user_id
+                    is_self = m.sender_id == agent.user_id
                     speaker = agent.name if is_self else partner_name
                     sid = None if is_self else m.sender_id
                     msgs.append({
@@ -995,8 +997,8 @@ async def build_messages(
             msg_struct = {
                 "time": format_time_shanghai(m.created_at),
                 "speaker_name": md.get("sender_name", "未知"),
-                "speaker_id": None if m.sender_type == "ai" else m.sender_id,
-                "is_self": m.sender_type == "ai",
+                "speaker_id": None if m.sender_type == "ai" and m.sender_id == agent.user_id else m.sender_id,
+                "is_self": m.sender_type == "ai" and m.sender_id == agent.user_id,
                 "content": content,
             }
 
