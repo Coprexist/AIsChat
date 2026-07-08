@@ -453,7 +453,6 @@ async def get_profile(
         })
 
         # 好友检查
-        is_friend = False
         friend_check = await db.execute(
             select(Friendship).where(
                 Friendship.user_id == current_user["user_id"],
@@ -461,8 +460,10 @@ async def get_profile(
                 Friendship.friend_id == entity_id,
             )
         )
-        is_friend = friend_check.scalar_one_or_none() is not None
-        profile["is_friend"] = is_friend
+        friendship = friend_check.scalar_one_or_none()
+        profile["is_friend"] = friendship is not None
+        profile["friendship_id"] = friendship.id if friendship else None
+        profile["is_priority"] = bool(friendship.is_priority) if friendship else False
         return profile
     else:
         # entity_id 是 User.id（对外统一），映射到 Agent 表
@@ -489,7 +490,6 @@ async def get_profile(
         })
 
         # 好友检查（entity_id 统一为 User.id）
-        is_friend = False
         friend_check = await db.execute(
             select(Friendship).where(
                 Friendship.user_id == current_user["user_id"],
@@ -497,6 +497,8 @@ async def get_profile(
                 Friendship.friend_id == entity_id,
             )
         )
-        is_friend = friend_check.scalar_one_or_none() is not None
-        profile["is_friend"] = is_friend
+        friendship = friend_check.scalar_one_or_none()
+        profile["is_friend"] = friendship is not None
+        profile["friendship_id"] = friendship.id if friendship else None
+        profile["is_priority"] = bool(friendship.is_priority) if friendship else False
         return profile

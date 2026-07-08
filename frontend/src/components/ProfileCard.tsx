@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { X, MessageSquare, UserPlus, Bot, User } from 'lucide-react'
+import { X, MessageSquare, UserPlus, Bot, User, Star } from 'lucide-react'
 import { api } from '../api/client'
 import { getStateDotColor } from '../constants'
 import { useT } from '../i18n/I18nContext'
@@ -27,6 +27,8 @@ interface ProfileData {
   created_at: string | null
   owner_name: string | null
   is_friend: boolean
+  friendship_id: number | null
+  is_priority: boolean
 }
 
 export default function ProfileCard({ entityType, entityId, entityName, state, onClose }: ProfileCardProps) {
@@ -40,14 +42,27 @@ export default function ProfileCard({ entityType, entityId, entityName, state, o
   const [showAddFriend, setShowAddFriend] = useState(false)
   const [friendMessage, setFriendMessage] = useState('')
   const [addingFriend, setAddingFriend] = useState(false)
+  const [isPriority, setIsPriority] = useState(false)
+  const [togglingPriority, setTogglingPriority] = useState(false)
 
   useEffect(() => {
     setLoading(true)
     api.get<ProfileData>(`/user/profile/${entityType}/${entityId}`)
-      .then(setProfile)
+      .then((data) => { setProfile(data); setIsPriority(data.is_priority || false) })
       .catch(() => setProfile(null))
       .finally(() => setLoading(false))
   }, [entityType, entityId])
+
+  const handleTogglePriority = async () => {
+    const fid = profile?.friendship_id
+    if (!fid) return
+    setTogglingPriority(true)
+    try {
+      const r = await api.post<{ is_priority: boolean }>(`/friends/${fid}/toggle-priority`)
+      setIsPriority(r.is_priority)
+    } catch { /* ignore */ }
+    finally { setTogglingPriority(false) }
+  }
 
   const handleSendDM = async () => {
     setSending(true)
@@ -200,6 +215,22 @@ export default function ProfileCard({ entityType, entityId, entityName, state, o
 
         {/* 操作按钮 */}
         <div className="space-y-2">
+          {/* 特别关心（仅好友可见） */}
+          {isFriend && profile?.friendship_id && (
+            <button
+              onClick={handleTogglePriority}
+              disabled={togglingPriority}
+              className={`w-full flex items-center justify-center gap-2 py-2 rounded-xl border text-sm font-medium transition-colors ${
+                isPriority
+                  ? 'bg-amber-400/10 border-amber-400/30 text-amber-400 hover:bg-amber-400/20'
+                  : 'bg-canvas border-border text-textSecondary hover:bg-elevated'
+              }`}
+            >
+              <Star size={16} fill={isPriority ? 'currentColor' : 'none'} />
+              {isPriority ? t('profileCard.priorityOn') || '已特别关心' : t('profileCard.priorityOff') || '设为特别关心'}
+            </button>
+          )}
+
           {/* 加好友区域 */}
           {!isFriend && (
             showAddFriend ? (

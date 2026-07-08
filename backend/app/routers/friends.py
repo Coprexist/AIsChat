@@ -77,6 +77,28 @@ async def list_my_friends(
     return friends
 
 
+@router.post("/friends/{friendship_id}/toggle-priority")
+async def toggle_friend_priority(
+    friendship_id: int,
+    current_user: dict = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """切换特别关心状态"""
+    from app.models.friendship import Friendship
+    result = await db.execute(
+        select(Friendship).where(
+            Friendship.id == friendship_id,
+            Friendship.user_id == current_user["user_id"],
+        )
+    )
+    friendship = result.scalar_one_or_none()
+    if friendship is None:
+        raise HTTPException(status_code=404, detail="好友关系不存在")
+    friendship.is_priority = not friendship.is_priority
+    await db.commit()
+    return {"is_priority": friendship.is_priority}
+
+
 @router.post("/friends/requests", status_code=status.HTTP_201_CREATED)
 async def create_friend_request(
     req: FriendRequestCreate,

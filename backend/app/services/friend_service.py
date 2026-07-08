@@ -327,6 +327,7 @@ async def list_friends(
             "avatar_url": avatar_url,
             "status_text": status_text,
             "status_color": status_color,
+            "is_priority": bool(f.is_priority),
             "created_at": str(f.created_at) if f.created_at else None,
             "last_dm_at": last_dm_at,
         })
