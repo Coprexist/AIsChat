@@ -52,7 +52,7 @@ async def search(
     return {"results": results, "query": q}
 
 
-@router.get("/friends", response_model=list[FriendResponse])
+@router.get("/friends")
 async def list_my_friends(
     limit: int = Query(50, ge=1, le=200),
     offset: int = Query(0, ge=0),
@@ -150,7 +150,7 @@ async def create_friend_request(
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
 
 
-@router.get("/friends/requests", response_model=list[FriendRequestResponse])
+@router.get("/friends/requests")
 async def list_requests(
     status_filter: str = Query("pending", description="pending | accepted | rejected"),
     current_user: dict = Depends(get_current_user),
