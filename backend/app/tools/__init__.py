@@ -10,7 +10,7 @@
 """
 
 # ── chat_social ──
-from app.tools.chat_social.send_message import SendMessage
+from app.tools.chat_social.send_message import SendGm
 from app.tools.chat_social.expand_message import ExpandMessage
 from app.tools.chat_social.set_concurrency import SetConcurrency
 from app.tools.chat_social.set_friend_priority import SetFriendPriority

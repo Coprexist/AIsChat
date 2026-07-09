@@ -511,7 +511,7 @@ async def _build_current_context(
     now_str = now.strftime(f"%Y-%m-%d %H:%M {tz.key}")
     context = f"## 当前时间\n{now_str}\n"
     context += (
-        f"- **重要**：回复时请使用 send_message(group_id={group_id}, content=\"...\")，"
+        f"- **重要**：回复时请使用 send_gm(group_id={group_id}, content=\"...\")，"
         f"不要用其他 group_id\n"
     )
     # Federation context
@@ -1055,7 +1055,7 @@ async def build_dm_messages(
     # ── DM 上下文段（精简：标题格式已承载会话信息，不再重复说教）──
     dm_context = (
         f"## 私信规则\n"
-        f"- 回复对方用 send_dm(target_user_id={partner_user_id})，不要用 send_message（那是群聊工具）\n"
+        f"- 回复对方用 send_dm(target_user_id={partner_user_id})，不要用 send_gm（那是群聊工具）\n"
         f"- 不要在这里测试工具或自言自语——这里只有对方能看到\n"
     )
 

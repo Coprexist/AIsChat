@@ -582,7 +582,7 @@ async def _maybe_trigger_ai_reply(
         "sender_id": sender_id,
     })
     # 延迟回复（若已有积压消息则跳过，避免级联延迟）
-    # 注：打字状态不在此处发送，改为在 AI 实际调用 send_message 工具时才发送
+    # 注：打字状态不在此处发送，改为在 AI 实际调用 send_gm 工具时才发送
     delay_skipped = False
     if skill_result.delay_seconds > 0:
         from app.services.group_service import get_pending_messages
@@ -740,7 +740,7 @@ async def _tool_call_loop(
     """
     工具调用循环：LLM 必须通过工具调用来执行所有操作（包括发消息）。
 
-    铁律：文字不能自动发出去。想说话必须调 send_message。
+    铁律：文字不能自动发出去。想说话必须调 send_gm（群聊）或 send_dm（私信）。
 
     v0.4.0: trigger_user_id 传入工具上下文供 store_memory 做 per-user 隔离。
     effective_cfg 为 get_effective_config 的返回值，提供 per-user 定制的 LLM 参数。
@@ -841,7 +841,7 @@ async def _tool_call_loop(
                     return
                 logger.info(f"AI {agent.name} 调用工具: {tool_name}({arguments})")
                 # 消息类工具推送"正在输入中…"状态
-                if tool_name in ("send_message", "send_dm") and trigger == "user":
+                if tool_name in ("send_gm", "send_dm") and trigger == "user":
                     _typing_data: dict = {"agent_id": agent.id, "agent_name": agent.name, "agent_avatar_url": agent.avatar_url, "trigger": trigger}
                     if conversation_type == "dm" and session_id:
                         _typing_data["session_id"] = session_id
@@ -862,7 +862,7 @@ async def _tool_call_loop(
                     "file_write": lambda a: f"写文件: {a.get('file_path', '?')}",
                     "file_read": lambda a: f"读文件: {a.get('file_path', '?')}",
                     "file_delete": lambda a: f"删除文件: {a.get('file_path', '?')}",
-                    "send_message": lambda a: f"在群聊中发言: {str(a.get('content', ''))[:40]}",
+                    "send_gm": lambda a: f"在群聊中发言: {str(a.get('content', ''))[:40]}",
                     "send_dm": lambda a: f"发私信: {str(a.get('content', ''))[:40]}",
                     "send_friend_request": lambda a: f"发送好友申请: {a.get('message', '?')[:40]}",
                     "toggle_thinking": lambda a: f"切换深度推理: {'开启' if a.get('enabled') else '关闭'}",
@@ -1107,10 +1107,10 @@ async def _tool_call_loop(
                     "reminder": True,
                     "message": (
                         "你刚才返回了文字但没有调用任何工具。"
-                        "文字不能自动发送——如果你想说话，请调用 send_message 工具。"
-                        "括号表情可以写在 send_message 的 content 里发出去，"
+                        "文字不能自动发送——如果你想在群聊发言，请调用 send_gm 工具；私信请用 send_dm。"
+                        "括号表情可以写在 send_gm/send_dm 的 content 里发出去，"
                         "但不能只返回括号文字而不调工具。"
-                        "请现在就调用 send_message 或你需要的其他工具。"
+                        "请现在就调用 send_gm/send_dm 或你需要的其他工具。"
                         "如果你决定不再继续回复，请调用 end_turn 工具来结束本轮。"
                     ),
                 }, ensure_ascii=False),
@@ -1309,6 +1309,7 @@ async def _trigger_dm_ai_reply(
     from app.services.tool_registry import get_allowed_tools
     delay_allowed = await _is_delay_reply_allowed(db, agent)
     tools = get_allowed_tools(agent_state, thinking_enabled=effective_cfg["thinking_enabled"], delay_reply_allowed=delay_allowed)
+    model = resolve_model(agent)
     model = resolve_model(agent)
 
     logger.info(f"🚀 AI {agent_name}: 开始 DM 回复 (session={session_id})")

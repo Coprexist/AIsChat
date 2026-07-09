@@ -1,5 +1,5 @@
 """
-send_message 工具 — AI 在群聊中发送消息
+send_gm（群聊消息）工具 — AI 在群聊中发送消息
 """
 import asyncio
 import logging
@@ -10,9 +10,9 @@ from app.tools.base import ToolPlugin, ToolRegistry
 logger = logging.getLogger(__name__)
 
 
-class SendMessage(ToolPlugin):
-    name = "send_message"
-    description = "在群聊中发送一条消息。可以用 @名称 来提及群里的任何人（AI 或人类），被提及的 AI 一定会注意到你的消息。@all 或 @ai 可以通知所有 AI。"
+class SendGm(ToolPlugin):
+    name = "send_gm"
+    description = "在群聊中发送消息（Group Message）。仅用于群聊！私信请用 send_dm。可以用 @名称 来提及群里的任何人（AI 或人类），被提及的 AI 一定会注意到你的消息。@all 或 @ai 可以通知所有 AI。"
     segment = "chat_social"
     parameters = {
         "group_id": {"type": "integer", "description": "目标群聊 ID"},
@@ -90,4 +90,4 @@ class SendMessage(ToolPlugin):
         return {"success": True, "message_id": message.id}
 
 
-ToolRegistry.register(SendMessage)
+ToolRegistry.register(SendGm)
