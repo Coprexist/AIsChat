@@ -347,7 +347,7 @@ async def websocket_endpoint(ws: WebSocket, token: str = Query(...)):
                         sender_state = None
                         try:
                             from app.models.user import User as UserModel
-                            from app.services.online_tracker import is_online as _is_online
+                            from app.services.online_tracker import get_user_online_status
                             u = (await db.execute(select(UserModel).where(UserModel.id == user_id))).scalar_one_or_none()
                             if u:
                                 sender_avatar = u.avatar_url
@@ -356,10 +356,8 @@ async def websocket_endpoint(ws: WebSocket, token: str = Query(...)):
                                     if a:
                                         sender_avatar = a.avatar_url or sender_avatar
                                         sender_state = a.state
-                                else:
-                                    # 人类发消息时检查在线状态
-                                    if _is_online(user_id) or manager.is_user_online(user_id):
-                                        sender_state = "online"
+                                elif get_user_online_status(user_id):
+                                    sender_state = "online"
                         except Exception as e:
                             logger.error(f"获取头像失败: {e}", exc_info=True)
 
