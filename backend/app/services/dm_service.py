@@ -18,8 +18,7 @@ logger = logging.getLogger(__name__)
 
 
 def _dm_message_to_dict(m: DMMessage, sender_name: str, sender_type: str,
-                        sender_avatar_url: str | None = None,
-                        sender_state: str | None = None) -> dict:
+                        sender_avatar_url: str | None = None) -> dict:
     """将 DMMessage ORM 对象转为字典（send_dm_message 和 _get_messages 共用）"""
     from app.utils.message_serializer import serialize_message
     return serialize_message(
@@ -27,7 +26,6 @@ def _dm_message_to_dict(m: DMMessage, sender_name: str, sender_type: str,
         sender_name=sender_name,
         sender_type=sender_type,
         sender_avatar_url=sender_avatar_url,
-        sender_state=sender_state,
         conversation_key='session_id',
         include_read_at=True,
     )
