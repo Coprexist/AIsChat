@@ -156,8 +156,8 @@ const MessageBubble = memo(function MessageBubble({
             )}
           </div>
         )}
-        {/* 在线状态点 */}
-        {!isMine && state && !thinking && !isTyping && (
+        {/* 在线状态点（仅群聊 AI 消息显示） */}
+        {!isMine && senderType === 'ai' && state && !thinking && !isTyping && (
           <span className={`absolute -bottom-0.5 -right-0.5 w-3 h-3 rounded-full ${stateColor} border-2 border-canvas`} />
         )}
       </div>
