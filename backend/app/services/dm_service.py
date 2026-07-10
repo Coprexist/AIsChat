@@ -342,19 +342,7 @@ async def send_dm_message(
         if agent_avatar:
             sender_avatar_url = agent_avatar
 
-    # 发送者在线状态
-    sender_state = None
-    if sender_type == "ai":
-        agent_state_result = await db.execute(
-            select(AgentModel.state).where(AgentModel.user_id == sender_id)
-        )
-        sender_state = agent_state_result.scalar()
-    elif sender_type == "human":
-        from app.services.online_tracker import get_user_online_status
-        if get_user_online_status(sender_id):
-            sender_state = "online"
-
-    return _dm_message_to_dict(msg, sender_name, sender_type, sender_avatar_url, sender_state)
+    return _dm_message_to_dict(msg, sender_name, sender_type, sender_avatar_url)
 
 
 async def set_dm_dnd(
