@@ -10,6 +10,7 @@ class SystemSettingsResponse(BaseModel):
     default_language: str
     default_platform_credit: int = 0
     default_file_quota_mb: int = 100
+    default_concurrent_ai_limit: int = 3
     updated_by: int | None = None
     updated_at: str | None = None
     login_providers: list[str] = ["direct"]
@@ -21,6 +22,7 @@ class UpdateSystemSettingsRequest(BaseModel):
     default_language: str | None = Field(None, description="全局默认语言: zh 或 en")
     default_platform_credit: int | None = Field(None, ge=0, description="全局默认平台赠送额度")
     default_file_quota_mb: int | None = Field(None, ge=1, description="新用户默认文件配额（MB），修改后所有用户同步调整")
+    default_concurrent_ai_limit: int | None = Field(None, ge=1, le=20, description="新建群聊默认 AI 并发数")
 
 
 class SetupCompleteRequest(BaseModel):

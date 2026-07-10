@@ -1453,6 +1453,9 @@ function SystemSettingsTab() {
   const [fileQuota, setFileQuota] = useState(100)
   const [uploadMaxSizeMb, setUploadMaxSizeMb] = useState(32)
   const [avatarMaxSizeMb, setAvatarMaxSizeMb] = useState(10)
+  const [defaultConcurrentAiLimit, setDefaultConcurrentAiLimit] = useState(3)
+  const [bulkConcurrency, setBulkConcurrency] = useState(3)
+  const [bulking, setBulking] = useState(false)
   const [hasActiveKeys, setHasActiveKeys] = useState(false)
   const [saving, setSaving] = useState(false)
   const [msg, setMsg] = useState('')
@@ -1469,6 +1472,7 @@ function SystemSettingsTab() {
       setFileQuota(settings.default_file_quota_mb ?? 100)
       setUploadMaxSizeMb(limits.upload_max_size_mb ?? 32)
       setAvatarMaxSizeMb(limits.avatar_max_size_mb ?? 10)
+      setDefaultConcurrentAiLimit(settings.default_concurrent_ai_limit ?? 3)
       setHasActiveKeys(keys.some((k: any) => k.is_active))
     }).catch(console.error)
   }, [])
@@ -1481,6 +1485,7 @@ function SystemSettingsTab() {
       if (field === 'language') payload.default_language = value
       else if (field === 'platform_credit') payload.default_platform_credit = value
       else if (field === 'file_quota') payload.default_file_quota_mb = value
+      else if (field === 'concurrent_ai_limit') payload.default_concurrent_ai_limit = value
       const updated = await api.put('/admin/system-settings', payload)
       setConfig(updated)
       setMsg(t('admin.saveSuccess'))
@@ -1644,6 +1649,46 @@ function SystemSettingsTab() {
             disabled={saving}
             className="px-3 py-2 bg-primary-500 text-white rounded-xl hover:bg-primary-400 text-sm disabled:opacity-40 transition-colors"
           >{t('settings.save')}</button>
+        </div>
+      </div>
+
+      {/* 新建群聊默认 AI 并发数 */}
+      <div>
+        <label className="block text-sm font-medium mb-1 text-textSecondary">新建群聊默认 AI 并发数</label>
+        <p className="text-xs text-textMuted mb-2">新建群聊时自动使用的 AI 并发上限（1-20）</p>
+        <div className="flex items-center gap-2">
+          <input type="number" value={defaultConcurrentAiLimit}
+            onChange={(e) => setDefaultConcurrentAiLimit(parseInt(e.target.value) || 3)} min={1} max={20}
+            className="w-32 px-3 py-2 rounded-xl border border-border bg-canvas text-sm text-textPrimary focus:outline-none focus:ring-2 focus:ring-primary-500/50" />
+          <button
+            onClick={() => handleSave('concurrent_ai_limit', defaultConcurrentAiLimit)}
+            disabled={saving || defaultConcurrentAiLimit === (config?.default_concurrent_ai_limit ?? 3)}
+            className="px-3 py-2 bg-primary-500 text-white rounded-xl hover:bg-primary-400 text-sm disabled:opacity-40 transition-colors"
+          >{t('settings.save')}</button>
+        </div>
+      </div>
+
+      {/* 批量修改所有群并发数 */}
+      <div>
+        <label className="block text-sm font-medium mb-1 text-textSecondary">批量修改所有群并发数</label>
+        <p className="text-xs text-textMuted mb-2">将已有全部群聊的 AI 并发上限设为同一值（覆盖已有设置）</p>
+        <div className="flex items-center gap-2">
+          <input type="number" value={bulkConcurrency}
+            onChange={(e) => setBulkConcurrency(parseInt(e.target.value) || 3)} min={1} max={20}
+            className="w-32 px-3 py-2 rounded-xl border border-border bg-canvas text-sm text-textPrimary focus:outline-none focus:ring-2 focus:ring-primary-500/50" />
+          <button
+            onClick={async () => {
+              if (!confirm(`确定将所有群的 AI 并发数设为 ${bulkConcurrency}？此操作不可撤销。`)) return
+              setBulking(true)
+              try {
+                await api.put('/admin/groups/concurrency', { concurrent_ai_limit: bulkConcurrency })
+                setMsg(`已将所有群并发数设为 ${bulkConcurrency}`)
+              } catch (e: any) { setMsg(e?.detail || '批量修改失败') }
+              finally { setBulking(false) }
+            }}
+            disabled={bulking}
+            className="px-3 py-2 bg-amber-500 text-white rounded-xl hover:bg-amber-400 text-sm disabled:opacity-40 transition-colors"
+          >{bulking ? '执行中...' : '批量应用'}</button>
         </div>
       </div>
 

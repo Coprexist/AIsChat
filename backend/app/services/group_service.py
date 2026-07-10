@@ -21,10 +21,17 @@ async def create_group(
     initial_members: list[dict] | None = None,
 ) -> Group:
     """创建群聊"""
+    # 从系统设置获取默认并发数
+    from app.models.system_settings import SystemSettings
+    ss_result = await db.execute(select(SystemSettings).where(SystemSettings.id == 1))
+    ss = ss_result.scalar_one_or_none()
+    default_limit = ss.default_concurrent_ai_limit if ss and ss.default_concurrent_ai_limit else 3
+
     group = Group(
         name=name,
         owner_type=owner_type,
         owner_id=owner_id,
+        concurrent_ai_limit=default_limit,
     )
     db.add(group)
     await db.flush()

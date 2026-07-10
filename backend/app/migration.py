@@ -45,6 +45,7 @@ async def run_migrations():
             await _migrate_agent_status_color(db)     # v1.0.2 AI状态颜色（必须在 select(Agent) 之前）
             await _migrate_agent_pending_prompt(db)   # v2.0.5 AI自修改暂存（必须在 select(Agent) 之前）
             await _migrate_friendship_priority(db)    # v2.0.6 特别关心
+            await _migrate_concurrent_ai_limit_default(db)  # v2.0.7 全局默认AI并发数
             await _migrate_others_chat_controls(db)  # v0.9.0 对话权限 + 限额控制（必须在 select(Agent) 之前）
             await _migrate_email_verification(db)  # v1.0.0 邮箱认证（必须在 select(Agent) 之前）
             await _migrate_provider_config(db)      # v1.0.0 LLM 厂商预设
@@ -2703,3 +2704,14 @@ async def _migrate_friendship_priority(db):
         await db.execute(text("ALTER TABLE friendship_requests ADD COLUMN is_priority BOOLEAN DEFAULT FALSE"))
         await db.flush()
         logger.info("  ✅ friendship_requests.is_priority 添加完成")
+
+
+async def _migrate_concurrent_ai_limit_default(db):
+    """v2.0.7: system_settings 添加默认 AI 并发数列"""
+    if await _column_exists(db, "system_settings", "default_concurrent_ai_limit"):
+        logger.info("  ⏭ system_settings.default_concurrent_ai_limit 已存在，跳过")
+    else:
+        logger.info("  ⚙️ 添加 system_settings.default_concurrent_ai_limit 列")
+        await db.execute(text("ALTER TABLE system_settings ADD COLUMN default_concurrent_ai_limit INTEGER NOT NULL DEFAULT 3"))
+        await db.flush()
+        logger.info("  ✅ system_settings.default_concurrent_ai_limit 添加完成（默认 3）")
