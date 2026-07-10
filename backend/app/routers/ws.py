@@ -185,6 +185,18 @@ async def websocket_endpoint(ws: WebSocket, token: str = Query(...)):
     from app.services.online_tracker import record_ws_activity
     record_ws_activity(user_id)
 
+    # 缓存用户信息（打字状态/在线需要头像）
+    _user_avatar = None
+    try:
+        from app.database import async_session as _init_db
+        async with _init_db() as _init_session:
+            from app.models.user import User as UserModel
+            _u = (await _init_session.execute(select(UserModel.avatar_url).where(UserModel.id == user_id))).scalar()
+            if _u:
+                _user_avatar = _u
+    except Exception:
+        pass
+
     try:
         while True:
             raw = await ws.receive_text()
@@ -502,6 +514,9 @@ async def websocket_endpoint(ws: WebSocket, token: str = Query(...)):
                 group_id = data.get("group_id", current_group_id)
                 is_typing = data.get("is_typing", False)
 
+                # 使用连接时缓存的头像
+                sender_avatar_url = _user_avatar
+
                 if session_id:
                     # DM 输入状态
                     await manager.broadcast_to_dm(
@@ -513,6 +528,7 @@ async def websocket_endpoint(ws: WebSocket, token: str = Query(...)):
                                 "session_id": session_id,
                                 "sender_id": user_id,
                                 "username": username,
+                                "avatar_url": sender_avatar_url,
                                 "is_typing": is_typing,
                             },
                         },
@@ -528,6 +544,7 @@ async def websocket_endpoint(ws: WebSocket, token: str = Query(...)):
                                 "group_id": group_id,
                                 "sender_id": user_id,
                                 "username": username,
+                                "avatar_url": sender_avatar_url,
                                 "is_typing": is_typing,
                             },
                         },
