@@ -68,6 +68,7 @@ async def get_settings(db: AsyncSession) -> dict:
         "system_prompt_order": row.system_prompt_order,
         "federation_sync_interval_minutes": row.federation_sync_interval_minutes,
         "default_file_quota_mb": row.default_file_quota_mb,
+        "default_concurrent_ai_limit": row.default_concurrent_ai_limit or 3,
         "updated_by": row.updated_by,
         "updated_at": str(row.updated_at) if row.updated_at else None,
         # v1.0.0 邮箱认证（公开字段）
@@ -84,6 +85,7 @@ async def update_settings(
     default_language: str | None = None,
     default_platform_credit: int | None = None,
     default_file_quota_mb: int | None = None,
+    default_concurrent_ai_limit: int | None = None,
     updated_by: int | None = None,
 ) -> dict:
     """
@@ -149,6 +151,10 @@ async def update_settings(
                 f"  文件配额基数变更: {old_value}MB → {default_file_quota_mb}MB "
                 f"(delta={delta:+d})，已批量更新所有人类用户"
             )
+
+    if default_concurrent_ai_limit is not None:
+        row.default_concurrent_ai_limit = default_concurrent_ai_limit
+        logger.info(f"  默认 AI 并发数设为: {default_concurrent_ai_limit}")
 
     if updated_by is not None:
         row.updated_by = updated_by

@@ -904,6 +904,7 @@ async def update_system_settings(
             default_language=req.default_language,
             default_platform_credit=req.default_platform_credit,
             default_file_quota_mb=req.default_file_quota_mb,
+            default_concurrent_ai_limit=req.default_concurrent_ai_limit,
             updated_by=admin["user_id"],
         )
         await _log_admin_action(
@@ -959,6 +960,32 @@ async def update_upload_limits(
         "upload_max_size_mb": get_effective_upload_max_size_mb(),
         "avatar_max_size_mb": get_effective_avatar_max_size_mb(),
     }
+
+
+# ============================================================
+# AI 并发数全局管理
+# ============================================================
+
+class BulkConcurrencyRequest(PydanticBaseModel):
+    concurrent_ai_limit: int = 3
+
+
+@router.put("/groups/concurrency")
+async def bulk_set_concurrency(
+    req: BulkConcurrencyRequest,
+    admin: dict = Depends(require_admin),
+    db: AsyncSession = Depends(get_db),
+):
+    """批量修改所有群聊的 AI 并发数（含已有群）"""
+    limit = max(1, min(20, req.concurrent_ai_limit))
+    from sqlalchemy import text
+    await db.execute(text("UPDATE groups SET concurrent_ai_limit = :limit"), {"limit": limit})
+    await db.commit()
+    await _log_admin_action(
+        db, admin["user_id"], "bulk_set_concurrency", "system", 1,
+        {"concurrent_ai_limit": limit},
+    )
+    return {"concurrent_ai_limit": limit, "message": f"所有群聊 AI 并发数已设为 {limit}"}
 
 
 # ============================================================
