@@ -47,4 +47,3 @@ CLAUDE.md
 
 # ── 冻结本文件（后续本地修改不提交） ──
 .gitignore
-.claude/
