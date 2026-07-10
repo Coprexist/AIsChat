@@ -22,6 +22,7 @@ class FriendRequestResponse(BaseModel):
     target_name: str | None = None  # 目标名称（发出的申请用）
     target_avatar_url: str | None = None
     auto_respond_friend_request: bool | None = None
+    is_priority: bool = False  # 是否特别关心
     status: str
     message: str | None = None
     direction: str | None = None  # received 或 sent

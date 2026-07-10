@@ -52,7 +52,7 @@ async def search(
     return {"results": results, "query": q}
 
 
-@router.get("/friends")
+@router.get("/friends", response_model=list[FriendResponse])
 async def list_my_friends(
     limit: int = Query(50, ge=1, le=200),
     offset: int = Query(0, ge=0),
@@ -60,25 +60,19 @@ async def list_my_friends(
     db: AsyncSession = Depends(get_db),
 ):
     """获取我的好友列表"""
-    import logging
-    logger = logging.getLogger(__name__)
-    try:
-        friends = await list_friends(db, current_user["user_id"], limit=limit, offset=offset)
-        # 注入在线状态：WebSocket 连接 OR 1分钟内有 API 活动
-        from app.routers.ws import manager
-        from app.services.online_tracker import get_online_user_ids as get_active_user_ids
-        ws_online = manager.get_online_user_ids()
-        activity_online = get_active_user_ids()
-        all_online = ws_online | activity_online
-        for f in friends:
-            friend_uid = f.get("friend_user_id")
-            if friend_uid and friend_uid in all_online:
-                if f["friend_type"] == "human":
-                    f["state"] = "online"
-        return friends
-    except Exception:
-        logger.error(f"❌ /friends 异常 user_id={current_user.get('user_id')}", exc_info=True)
-        raise
+    friends = await list_friends(db, current_user["user_id"], limit=limit, offset=offset)
+    # 注入在线状态：WebSocket 连接 OR 1分钟内有 API 活动
+    from app.routers.ws import manager
+    from app.services.online_tracker import get_online_user_ids as get_active_user_ids
+    ws_online = manager.get_online_user_ids()
+    activity_online = get_active_user_ids()
+    all_online = ws_online | activity_online
+    for f in friends:
+        friend_uid = f.get("friend_user_id")
+        if friend_uid and friend_uid in all_online:
+            if f["friend_type"] == "human":
+                f["state"] = "online"
+    return friends
 
 
 @router.post("/friends/{friendship_id}/toggle-priority")
@@ -150,21 +144,14 @@ async def create_friend_request(
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
 
 
-@router.get("/friends/requests")
+@router.get("/friends/requests", response_model=list[FriendRequestResponse])
 async def list_requests(
     status_filter: str = Query("pending", description="pending | accepted | rejected"),
     current_user: dict = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
     """获取我的好友申请（收到 + 发出的）"""
-    import logging
-    logger = logging.getLogger(__name__)
-    try:
-        result = await list_friend_requests(db, current_user["user_id"], status=status_filter)
-        return result
-    except Exception:
-        logger.error(f"❌ /friends/requests 异常 user_id={current_user.get('user_id')}", exc_info=True)
-        raise
+    return await list_friend_requests(db, current_user["user_id"], status=status_filter)
 
 
 @router.post("/friends/requests/{request_id}/accept")

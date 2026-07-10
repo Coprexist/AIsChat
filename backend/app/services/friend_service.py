@@ -425,6 +425,7 @@ async def list_friend_requests(
             "target_id": req.target_id,
             "target_name": target_name,
             "target_avatar_url": target_avatar,
+            "is_priority": bool(req.is_priority),
             "status": req.status,
             "message": req.message,
             "direction": "received" if req.target_id == user_id else "sent",
