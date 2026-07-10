@@ -2689,8 +2689,17 @@ async def _migrate_friendship_priority(db):
     """v2.0.6: friendships 添加 is_priority 列（特别关心）"""
     if await _column_exists(db, "friendships", "is_priority"):
         logger.info("  ⏭ friendships.is_priority 已存在，跳过")
-        return
-    logger.info("  ⭐ 添加 friendships.is_priority 列")
-    await db.execute(text("ALTER TABLE friendships ADD COLUMN is_priority BOOLEAN DEFAULT FALSE"))
-    await db.flush()
-    logger.info("  ✅ friendships.is_priority 添加完成")
+    else:
+        logger.info("  ⭐ 添加 friendships.is_priority 列")
+        await db.execute(text("ALTER TABLE friendships ADD COLUMN is_priority BOOLEAN DEFAULT FALSE"))
+        await db.flush()
+        logger.info("  ✅ friendships.is_priority 添加完成")
+
+    # friendship_requests 也加（ORM 模型有该列但迁移遗漏了）
+    if await _column_exists(db, "friendship_requests", "is_priority"):
+        logger.info("  ⏭ friendship_requests.is_priority 已存在，跳过")
+    else:
+        logger.info("  ⭐ 添加 friendship_requests.is_priority 列")
+        await db.execute(text("ALTER TABLE friendship_requests ADD COLUMN is_priority BOOLEAN DEFAULT FALSE"))
+        await db.flush()
+        logger.info("  ✅ friendship_requests.is_priority 添加完成")
