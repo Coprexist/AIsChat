@@ -349,10 +349,9 @@ async def send_dm_message(
             select(AgentModel.state).where(AgentModel.user_id == sender_id)
         )
         sender_state = agent_state_result.scalar()
-    else:
-        from app.services.online_tracker import is_online as _is_online
-        from app.routers.ws import manager as _ws_mgr
-        if _is_online(sender_id) or _ws_mgr.is_user_online(sender_id):
+    elif sender_type == "human":
+        from app.services.online_tracker import get_user_online_status
+        if get_user_online_status(sender_id):
             sender_state = "online"
 
     return _dm_message_to_dict(msg, sender_name, sender_type, sender_avatar_url, sender_state)
@@ -441,10 +440,8 @@ async def _get_partner_info(db: AsyncSession, user_id: int) -> dict:
             state = agent_row[0]
             avatar_url = agent_row[1] or avatar_url  # Agent 头像优先
     else:
-        # 人类在线状态：WebSocket 连接 OR 1分钟内有 API 活动
-        from app.services.online_tracker import is_online as _is_online
-        from app.routers.ws import manager as _ws_mgr
-        if _ws_mgr.is_user_online(user_id) or _is_online(user_id):
+        from app.services.online_tracker import get_user_online_status
+        if get_user_online_status(user_id):
             state = "online"
 
     return {

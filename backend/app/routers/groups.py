@@ -116,20 +116,14 @@ async def get_group_detail(
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="群聊不存在")
 
     # 统计成员数量 & 在线人数
-    # 在线 = WebSocket 连接 OR 1分钟内有 API 活动（兜底）
     from app.models.group import GroupMember
-    from app.routers.ws import manager as ws_manager
-    from app.services.online_tracker import get_online_user_ids as get_active_user_ids
+    from app.services.online_tracker import get_user_online_status
     member_result = await db.execute(
         select(GroupMember).where(GroupMember.group_id == group_id)
     )
     members = member_result.scalars().all()
     member_count = len(members)
-    ws_online = ws_manager.get_online_user_ids()
-    activity_online = get_active_user_ids()
-    # 合并：WebSocket + 活动追踪，取并集
-    all_online = ws_online | activity_online
-    online_count = sum(1 for m in members if m.member_id in all_online)
+    online_count = sum(1 for m in members if get_user_online_status(m.member_id))
 
     return {
         "id": group.id,
@@ -194,10 +188,8 @@ async def list_members(
             u = await db.get(User, m.member_id)
             if u:
                 name = u.username
-            # 人类在线状态：WebSocket 连接 OR 1分钟内有 API 活动
-            from app.services.online_tracker import is_online as _is_human_online
-            from app.routers.ws import manager as _ws_mgr
-            if _ws_mgr.is_user_online(m.member_id) or _is_human_online(m.member_id):
+            from app.services.online_tracker import get_user_online_status
+            if get_user_online_status(m.member_id):
                 state = "online"
         elif m.member_type == "ai":
             # v2.0.0: member_id 统一为 user_id，同时兼容旧 agent.id

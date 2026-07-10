@@ -61,17 +61,12 @@ async def list_my_friends(
 ):
     """获取我的好友列表"""
     friends = await list_friends(db, current_user["user_id"], limit=limit, offset=offset)
-    # 注入在线状态：WebSocket 连接 OR 1分钟内有 API 活动
-    from app.routers.ws import manager
-    from app.services.online_tracker import get_online_user_ids as get_active_user_ids
-    ws_online = manager.get_online_user_ids()
-    activity_online = get_active_user_ids()
-    all_online = ws_online | activity_online
+    # 注入在线状态（统一函数）
+    from app.services.online_tracker import get_user_online_status
     for f in friends:
         friend_uid = f.get("friend_user_id")
-        if friend_uid and friend_uid in all_online:
-            if f["friend_type"] == "human":
-                f["state"] = "online"
+        if friend_uid and f["friend_type"] == "human" and get_user_online_status(friend_uid):
+            f["state"] = "online"
     return friends
 
 
