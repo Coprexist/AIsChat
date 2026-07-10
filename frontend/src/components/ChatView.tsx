@@ -76,6 +76,8 @@ export default function ChatView({ conversationType, conversationId }: ChatViewP
   const [messages, setMessages] = useState<Message[]>([])
   const [input, setInput] = useState('')
   const [loadingState, setLoadingState] = useState<'initial' | 'older' | 'newer' | null>(null)
+  const [inputHeight, setInputHeight] = useState<number | null>(null)  // 输入框高度（null=自动）
+  const inputResizeRef = useRef<boolean>(false)
   const [hasMoreBefore, setHasMoreBefore] = useState(false)
   const [hasMoreAfter, setHasMoreAfter] = useState(false)
   const [isAtBottom, setIsAtBottom] = useState(true)
@@ -876,6 +878,28 @@ export default function ChatView({ conversationType, conversationId }: ChatViewP
         </div>
       )}
 
+      {/* 输入框拖拽调整手柄 */}
+      <div
+        className="relative h-1.5 cursor-row-resize hover:bg-primary-400/30 active:bg-primary-400/50 transition-colors shrink-0"
+        onMouseDown={(e) => {
+          inputResizeRef.current = true
+          const startY = e.clientY
+          const startH = inputHeight || textareaRef.current?.offsetHeight || 100
+          const onMove = (ev: MouseEvent) => {
+            if (!inputResizeRef.current) return
+            const newH = Math.max(60, startH + (startY - ev.clientY))
+            setInputHeight(newH)
+          }
+          const onUp = () => {
+            inputResizeRef.current = false
+            window.removeEventListener('mousemove', onMove)
+            window.removeEventListener('mouseup', onUp)
+          }
+          window.addEventListener('mousemove', onMove)
+          window.addEventListener('mouseup', onUp)
+        }}
+      />
+
       {/* 输入框 */}
       <div className="p-3 bg-surface border-t border-border relative">
         {/* 附件预览列表 */}
@@ -998,6 +1022,7 @@ export default function ChatView({ conversationType, conversationId }: ChatViewP
             }}
             placeholder={conversationType === 'dm' ? t('chat.dmInputPlaceholder') : t('chat.groupInputPlaceholder')}
             rows={1}
+            style={inputHeight ? { height: inputHeight } : undefined}
             className="flex-1 min-w-0 resize-none rounded-xl border border-border bg-canvas px-4 py-2.5 text-sm text-textPrimary placeholder:text-textMuted focus:outline-none focus:ring-2 focus:ring-primary-500/50 focus:border-primary-500/30 transition-shadow"
           />
           <button
