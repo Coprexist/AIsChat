@@ -5,7 +5,6 @@ import remarkMath from 'remark-math'
 import remarkBreaks from 'remark-breaks'
 import rehypeKatex from 'rehype-katex'
 import { useAuth } from '../context/AuthContext'
-import { getStateDotColor } from '../constants'
 import { FileIcon, Download, Globe, ShieldAlert } from 'lucide-react'
 import { formatMessageTime } from '../utils/time'
 import { formatFileSize } from '../utils/format'
@@ -80,8 +79,6 @@ const MessageBubble = memo(function MessageBubble({
   const [previewFile, setPreviewFile] = useState<{ file_id: number; name: string; size: number; mime_type: string } | null>(null)
   const [invStatus, setInvStatus] = useState<string | null>(null)
 
-  const stateColor = getStateDotColor(state)
-
   // 检测邀请卡片
   const invAtt = attachments?.find(a => a.type === 'group_invitation')
   const isInvitation = messageType === 'group_invitation' && invAtt
@@ -155,10 +152,6 @@ const MessageBubble = memo(function MessageBubble({
               senderName.charAt(0).toUpperCase()
             )}
           </div>
-        )}
-        {/* 在线状态点（仅群聊 AI 消息显示） */}
-        {!isMine && senderType === 'ai' && state && !thinking && !isTyping && (
-          <span className={`absolute -bottom-0.5 -right-0.5 w-3 h-3 rounded-full ${stateColor} border-2 border-canvas`} />
         )}
       </div>
 
