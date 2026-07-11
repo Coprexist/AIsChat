@@ -44,7 +44,7 @@ export default function MaintenanceMsgEditor() {
 
   const applyPreset = (name: string) => {
     const p = presets.find(x => x.name === name)
-    if (p) { setMsg({ hard_title: p.hard_title, hard_body: p.hard_body, hard_color: p.hard_color, hard_text_color: p.hard_text_color, hard_image: p.hard_image, hard_style: p.hard_style, soft_text: p.soft_text, soft_color: p.soft_color, soft_style: p.soft_style }); setSelPreset(name) }
+    if (p) { setMsg({ hard_title: p.hard_title, hard_body: p.hard_body, hard_color: p.hard_color, hard_text_color: p.hard_text_color, hard_image: p.hard_image, hard_style: p.hard_style, soft_text: p.soft_text, soft_color: p.soft_color, soft_style: p.soft_style, soft_once: (p as any).soft_once ?? false }); setSelPreset(name) }
   }
 
   const handleUpload = async (file: File) => {

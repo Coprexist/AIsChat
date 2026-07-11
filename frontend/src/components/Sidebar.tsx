@@ -1,24 +1,11 @@
 import { useState } from 'react'
 import { NavLink, useNavigate } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
-import { MessageCircle, Bot, User, Shield, LogOut, Menu, X, ChevronLeft, BookOpen, Users, Settings } from 'lucide-react'
+import { Shield, LogOut, Menu, X, ChevronLeft, BookOpen, Settings } from 'lucide-react'
 import { MANUAL_URL } from '../constants'
 import SearchOverlay from './SearchOverlay'
 import { useT } from '../i18n/I18nContext'
-
-const navKeys = [
-  { to: '/chat', i18nKey: 'nav.chat', icon: MessageCircle },
-  { to: '/friends', i18nKey: 'nav.friends', icon: Users },
-  { to: '/agents', i18nKey: 'nav.ai', icon: Bot },
-  { to: '/me', i18nKey: 'nav.me', icon: User },
-]
-
-const navLinkClass = ({ isActive }: { isActive: boolean }) =>
-  `flex items-center gap-3 px-3 py-2.5 mx-2 rounded-xl text-sm font-medium transition-all duration-200 ${
-    isActive
-      ? 'bg-primary-500/15 text-primary-600 dark:text-primary-300'
-      : 'text-textSecondary hover:text-textPrimary hover:bg-elevated'
-  }`
+import { mainNavItems, navLinkClass, navIconClass } from '../utils/navRegistry'
 
 export default function Sidebar({ mobile, onClose }: { mobile?: boolean; onClose?: () => void }) {
   const { user, logout } = useAuth()
@@ -88,16 +75,16 @@ export default function Sidebar({ mobile, onClose }: { mobile?: boolean; onClose
         </div>
       )}
 
-      {/* 主导航 */}
+      {/* 主导航 — 展开模式 */}
       {!collapsed && (
         <nav className="flex-1 py-3 space-y-0.5">
-          {navKeys.map((item) => (
+          {mainNavItems.filter(item => !item.hidden).map((item) => (
             <NavLink
-              key={item.to}
-              to={item.to}
+              key={item.path}
+              to={item.path}
+              end={!item.matchSubPaths}
               onClick={() => { if (mobile) onClose?.() }}
               className={navLinkClass}
-              title={collapsed ? t(item.i18nKey) : undefined}
             >
               <item.icon size={18} />
               <span>{t(item.i18nKey)}</span>
@@ -120,7 +107,6 @@ export default function Sidebar({ mobile, onClose }: { mobile?: boolean; onClose
             to={MANUAL_URL}
             onClick={() => { if (mobile) onClose?.() }}
             className={navLinkClass}
-            title={collapsed ? t('nav.manual') : undefined}
           >
             <BookOpen size={18} />
             <span>{t('nav.manual')}</span>
@@ -128,26 +114,16 @@ export default function Sidebar({ mobile, onClose }: { mobile?: boolean; onClose
         </nav>
       )}
 
-      {/* 折叠时的最小导航 */}
+      {/* 主导航 — 折叠模式 */}
       {collapsed && (
         <nav className="flex-1 py-3 space-y-0.5 flex flex-col items-center">
-          {[
-            { to: '/chat', i18nKey: 'nav.chat', icon: MessageCircle },
-            { to: '/friends', i18nKey: 'nav.friends', icon: Users },
-            { to: '/agents', i18nKey: 'nav.ai', icon: Bot },
-            { to: '/me', i18nKey: 'nav.me', icon: User },
-          ].map((item) => (
+          {mainNavItems.filter(item => !item.hidden).map((item) => (
             <NavLink
-              key={item.to}
-              to={item.to}
+              key={item.path}
+              to={item.path}
+              end={!item.matchSubPaths}
               onClick={() => { if (mobile) onClose?.() }}
-              className={({ isActive }) =>
-                `flex items-center justify-center w-10 h-10 rounded-xl transition-all duration-200 ${
-                  isActive
-                    ? 'bg-primary-500/15 text-primary-600 dark:text-primary-300'
-                    : 'text-textSecondary hover:text-textPrimary hover:bg-elevated'
-                }`
-              }
+              className={navIconClass}
               title={t(item.i18nKey)}
             >
               <item.icon size={18} />
@@ -157,13 +133,7 @@ export default function Sidebar({ mobile, onClose }: { mobile?: boolean; onClose
             <NavLink
               to="/admin"
               onClick={() => { if (mobile) onClose?.() }}
-              className={({ isActive }) =>
-                `flex items-center justify-center w-10 h-10 rounded-xl transition-all duration-200 ${
-                  isActive
-                    ? 'bg-primary-500/15 text-primary-600 dark:text-primary-300'
-                    : 'text-textSecondary hover:text-textPrimary hover:bg-elevated'
-                }`
-              }
+              className={navIconClass}
               title={t('sidebar.adminPanel')}
             >
               <Shield size={18} />
@@ -172,13 +142,7 @@ export default function Sidebar({ mobile, onClose }: { mobile?: boolean; onClose
           <NavLink
             to={MANUAL_URL}
             onClick={() => { if (mobile) onClose?.() }}
-            className={({ isActive }) =>
-              `flex items-center justify-center w-10 h-10 rounded-xl transition-all duration-200 ${
-                isActive
-                  ? 'bg-primary-500/15 text-primary-600 dark:text-primary-300'
-                  : 'text-textSecondary hover:text-textPrimary hover:bg-elevated'
-              }`
-            }
+            className={navIconClass}
             title={t('sidebar.usageManual')}
           >
             <BookOpen size={18} />

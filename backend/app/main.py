@@ -256,24 +256,10 @@ async def maintenance_middleware(request, call_next):
     return response
 
 
-# 注册路由
-from app.routers import auth, agents, groups, ws, user, memories, files, admin, search, dm, federation_ws, conversation_log, friends, system, invitations
-
-app.include_router(auth.router)
-app.include_router(agents.router)
-app.include_router(groups.router)
-app.include_router(ws.router)
-app.include_router(user.router)
-app.include_router(memories.router)
-app.include_router(files.router)
-app.include_router(admin.router)
-app.include_router(search.router)
-app.include_router(dm.router)
-app.include_router(federation_ws.router)
-app.include_router(conversation_log.router)
-app.include_router(friends.router)
-app.include_router(system.router)
-app.include_router(invitations.router)
+# 注册路由 — 自动发现 routers/ 下所有模块
+from app.routers import get_all_routers
+for _router in get_all_routers():
+    app.include_router(_router)
 
 
 @app.get("/")
