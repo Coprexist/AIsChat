@@ -1,4 +1,4 @@
-"""
+""""
 思维 Skill 引擎
 在 AI 回复 pipeline 中评估触发条件，收集延迟/打字/注入信号。
 """
@@ -124,6 +124,12 @@ async def evaluate_action_skills(
 
         config = skill.config or {}
 
+        # 用 SkillRegistry 判断是否为 action 类技能
+        from app.utils.pure.skill_registry import SkillRegistry
+        type_info = SkillRegistry.get_info(skill.skill_type)
+        if not type_info or type_info.category != "action":
+            continue
+
         if skill.skill_type == "delay_reply" and skill.is_enabled:
             if not delay_allowed:
                 logger.info(f"⏱️ AI agent_id={agent.id} 延迟回复已关闭，跳过 skill #{skill.id}")
@@ -183,6 +189,12 @@ async def evaluate_inject_skills(
             continue
 
         config = skill.config or {}
+
+        # 用 SkillRegistry 判断是否为 inject 类技能
+        from app.utils.pure.skill_registry import SkillRegistry
+        type_info = SkillRegistry.get_info(skill.skill_type)
+        if not type_info or type_info.category != "inject":
+            continue
 
         if skill.skill_type == "inject_prompt" and skill.is_enabled:
             insert_text = config.get("insert_text", "")

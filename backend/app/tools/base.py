@@ -83,6 +83,13 @@ SKILL_SEGMENT_META: dict[str, dict] = {
 class ToolPlugin:
     """工具插件基类 — 每个工具一个子类，定义元数据 + execute 方法"""
 
+    @classmethod
+    def __init_subclass__(cls, **kwargs):
+        """子类被定义时自动注册（name 非空时触发）"""
+        super().__init_subclass__(**kwargs)
+        if cls.name:
+            ToolRegistry.register(cls)
+
     # ── 子类必须定义 ──
     name: str = ""              # 工具名，全局唯一
     description: str = ""       # 给 LLM 看的自然语言描述
@@ -154,10 +161,13 @@ class ToolRegistry:
 
     @classmethod
     def register(cls, plugin_cls: type[ToolPlugin]) -> None:
-        """注册一个工具插件（幂等：同名重复注册会覆盖）"""
+        """注册一个工具插件（幂等：同名同类静默跳过）"""
         instance = plugin_cls()
         if instance.name in cls._plugins:
-            logger.warning(f"工具 {instance.name} 重复注册，已覆盖")
+            existing = cls._plugins[instance.name]
+            if isinstance(existing, plugin_cls):
+                return  # 同类已注册，静默跳过
+            logger.warning(f"工具 {instance.name} 重复注册（不同类），已覆盖")
         cls._plugins[instance.name] = instance
         cls._invalidate_cache()
         logger.debug(f"工具已注册: {instance.name} (segment={instance.segment})")
