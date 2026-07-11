@@ -66,3 +66,4 @@ from app.tools.file_operations.file_list import FileList
 from app.tools.file_operations.file_delete import FileDelete
 from app.tools.file_operations.file_share import FileShare
 from app.tools.file_operations.web_fetch import WebFetch
+from app.tools.file_operations.web_search import WebSearch
