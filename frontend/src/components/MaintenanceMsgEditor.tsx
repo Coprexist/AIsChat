@@ -95,7 +95,7 @@ export default function MaintenanceMsgEditor() {
 
   return (
     <div className="bg-surface rounded-xl border border-border p-5 space-y-4">
-      <p className="text-xs font-semibold text-textSecondary uppercase tracking-wider">维护文案</p>
+      <p className="text-xs font-semibold text-textSecondary uppercase tracking-wider">全平台播报</p>
 
       {/* ── 预设 ── */}
       <div className="flex items-center gap-2">
@@ -116,17 +116,17 @@ export default function MaintenanceMsgEditor() {
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
         {/* ── 硬维护 ── */}
-        <F label="暂停服务——弹窗标题">
+        <F label="弹窗标题（硬播报）">
           <div className="flex gap-1.5"><input type="color" value={msg.hard_color} onChange={e => setMsg({...msg, hard_color: e.target.value})} className="w-8 h-8 rounded cursor-pointer border border-border" />
           <input value={msg.hard_title} onChange={e => setMsg({...msg, hard_title: e.target.value})} className="flex-1 px-3 py-1.5 rounded-lg border border-border bg-canvas text-xs text-textPrimary focus:outline-none focus:ring-1 focus:ring-primary-500/50" /></div>
         </F>
-        <F label="暂停服务——文字颜色">
+        <F label="文字颜色">
           <input type="color" value={msg.hard_text_color} onChange={e => setMsg({...msg, hard_text_color: e.target.value})} className="w-8 h-8 rounded cursor-pointer border border-border" />
         </F>
-        <F label="暂停服务——弹窗正文">
+        <F label="弹窗正文">
           <input value={msg.hard_body} onChange={e => setMsg({...msg, hard_body: e.target.value})} className="w-full px-3 py-1.5 rounded-lg border border-border bg-canvas text-xs text-textPrimary focus:outline-none focus:ring-1 focus:ring-primary-500/50" />
         </F>
-        <F label="提示样式">
+        <F label="硬播报样式">
           <select value={msg.hard_style} onChange={e => setMsg({...msg, hard_style: e.target.value})} className="w-full px-3 py-1.5 rounded-lg border border-border bg-canvas text-xs text-textPrimary focus:outline-none focus:ring-1 focus:ring-primary-500/50">
             <option value="popup">弹窗</option><option value="banner">顶栏</option>
           </select>
@@ -155,11 +155,11 @@ export default function MaintenanceMsgEditor() {
         </F>
 
         {/* ── 软维护 ── */}
-        <F label="维护提示——顶部文字">
+        <F label="顶栏播报文字（软播报）">
           <div className="flex gap-1.5"><input type="color" value={msg.soft_color} onChange={e => setMsg({...msg, soft_color: e.target.value})} className="w-8 h-8 rounded cursor-pointer border border-border" />
           <input value={msg.soft_text} onChange={e => setMsg({...msg, soft_text: e.target.value})} className="flex-1 px-3 py-1.5 rounded-lg border border-border bg-canvas text-xs text-textPrimary focus:outline-none focus:ring-1 focus:ring-primary-500/50" /></div>
         </F>
-        <F label="维护提示样式">
+        <F label="软播报样式">
           <select value={msg.soft_style} onChange={e => setMsg({...msg, soft_style: e.target.value})} className="w-full px-3 py-1.5 rounded-lg border border-border bg-canvas text-xs text-textPrimary focus:outline-none focus:ring-1 focus:ring-primary-500/50">
             <option value="banner">顶栏</option><option value="popup">弹窗</option>
           </select>
