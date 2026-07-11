@@ -106,6 +106,13 @@ class Agent(Base):
     others_chat_used = Column(Integer, default=0, comment="当前已使用次数（可重置）")
     disallow_mode = Column(String(20), default="strict", comment="禁止时的模式: strict | own_key")
 
+    # ── 自动重置配额 (v1.1.0) ──
+    auto_reset_quota = Column(Boolean, default=False, comment="每次用户 DM 时自动重置配额计数")
+    # ── 配额白名单 (v1.1.0): JSONB 数组 [{type:"group"|"user", id:int}, ...] ──
+    quota_whitelist = Column(JSONB, default=list, comment="不消耗配额的白名单实体列表")
+    # ── 群主支付 (v1.1.0): 群聊 AI 消息默认由群主付费 ──
+    group_owner_pays = Column(Boolean, default=True, comment="群聊中 AI 消息是否由群主付费")
+
     # ── 文件系统记忆配置 (v0.7.0) ──
     # 记忆加载模式: index_only(仅索引) | index_plus_recent(索引+最近N篇内容) | index_plus_semantic(索引+语义检索)
     memory_load_mode = Column(String(30), default="index_only")

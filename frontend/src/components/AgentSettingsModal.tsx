@@ -49,6 +49,8 @@ interface AgentData {
   bio?: string | null
   status_text?: string | null
   status_color?: string | null
+  auto_reset_quota?: boolean
+  group_owner_pays?: boolean
 }
 
 interface ModelOption {
@@ -174,6 +176,8 @@ export default function AgentSettingsModal({
   const [bio, setBio] = useState(agent.bio || '')
   const [statusText, setStatusText] = useState(agent.status_text || '')
   const [statusColor, setStatusColor] = useState(agent.status_color || '')
+  const [autoResetQuota, setAutoResetQuota] = useState(agent.auto_reset_quota ?? false)
+  const [groupOwnerPays, setGroupOwnerPays] = useState(agent.group_owner_pays ?? true)
 
   // ── UI 状态 ──
   const [saving, setSaving] = useState(false)
@@ -286,6 +290,8 @@ export default function AgentSettingsModal({
         auto_dnd_duration: autoDndDuration,
         conversation_logs_limit: conversationLogsLimit,
         user_can_view_logs: userCanViewLogs,
+        auto_reset_quota: autoResetQuota,
+        group_owner_pays: groupOwnerPays,
         bio: bio || null,
         status_text: statusText || null,
         status_color: statusColor || null,
@@ -495,6 +501,11 @@ export default function AgentSettingsModal({
               {/* 权限 */}
               <Section title={t('modal.mainSettingsPermissions') || '权限'} desc={t('modal.mainSettingsPermissionsDesc') || ''}>
                 <ToggleField label={t('agents.allowOthersChat')} value={allowOthersChat} setValue={setAllowOthersChat} desc={t('agents.allowOthersChatDesc')} />
+                <ToggleField label={t('agents.discoverable')} value={discoverable} setValue={setDiscoverable} desc={t('agents.discoverableDesc')} />
+                <ToggleField label={t('modal.detailSettingsAllowFriendRequests')} value={allowFriendRequests} setValue={setAllowFriendRequests} desc={t('modal.detailSettingsAllowFriendRequestsDesc')} />
+                {allowFriendRequests && (
+                  <ToggleField label={t('modal.detailSettingsAutoRespondFriendRequest')} value={autoRespondFriendRequest} setValue={setAutoRespondFriendRequest} desc={t('modal.detailSettingsAutoRespondFriendRequestDesc')} />
+                )}
                 <ToggleField label={t('modal.mainSettingsIsPaused') || '暂停 AI'} value={isPaused} setValue={setIsPaused} desc={t('modal.mainSettingsIsPausedDesc') || '暂停后 AI 不再响应任何消息'} />
               </Section>
             </>
@@ -596,55 +607,67 @@ export default function AgentSettingsModal({
                 </div>
               </Section>
 
-              {/* 好友与社交 */}
-              <Section title={t('modal.detailSettingsFriendsSocial')} desc={t('modal.detailSettingsFriendsSocialDesc')}>
+              {/* ── 合并：对话与社交权限 ── */}
+              <Section title={t('modal.detailSettingsChatPermissionsDetail') || '对话与社交权限'} desc={t('modal.detailSettingsChatPermissionsDetailDesc') || '控制谁可以与此 AI 对话、加好友、消耗配额'}>
+                {/* 社交发现 */}
                 <ToggleField label={t('agents.discoverable')} value={discoverable} setValue={setDiscoverable} desc={t('agents.discoverableDesc')} />
                 <ToggleField label={t('modal.detailSettingsAllowFriendRequests')} value={allowFriendRequests} setValue={setAllowFriendRequests} desc={t('modal.detailSettingsAllowFriendRequestsDesc')} />
                 {allowFriendRequests && (
                   <ToggleField label={t('modal.detailSettingsAutoRespondFriendRequest')} value={autoRespondFriendRequest} setValue={setAutoRespondFriendRequest} desc={t('modal.detailSettingsAutoRespondFriendRequestDesc')} />
                 )}
-              </Section>
 
-              {/* 对话权限详情 */}
-              <Section title={t('modal.detailSettingsChatPermissionsDetail') || '对话权限详情'} desc={t('modal.detailSettingsChatPermissionsDetailDesc') || ''}>
-                <div className={`ml-4 pl-3 border-l-2 transition-opacity ${allowOthersChat ? 'border-primary-400/30' : 'border-border/30 opacity-60'}`}>
-                  <label className="text-[11px] font-medium text-textMuted mb-2 block">{t('agents.othersChatQuotaLabel')} · {allowOthersChat ? 'ON' : 'OFF'}</label>
-                  <div className="flex items-center gap-3 mb-2">
-                    <label className="flex items-center gap-1.5 cursor-pointer">
-                      <input type="radio" name="othersChatMode" value="unlimited" checked={othersChatMode === 'unlimited'} onChange={() => setOthersChatMode('unlimited')} className="text-primary-500" />
-                      <span className="text-xs text-textSecondary">{t('agents.othersChatUnlimited')}</span>
-                    </label>
-                    <label className="flex items-center gap-1.5 cursor-pointer">
-                      <input type="radio" name="othersChatMode" value="quota" checked={othersChatMode === 'quota'} onChange={() => setOthersChatMode('quota')} className="text-primary-500" />
-                      <span className="text-xs text-textSecondary">{t('agents.othersChatQuota')}</span>
-                    </label>
-                  </div>
-                  {othersChatMode === 'quota' && (
-                    <div className="flex items-center gap-3 mb-2">
-                      <NumberField label={t('agents.othersChatQuotaLabel')} value={othersChatQuota} setValue={setOthersChatQuota} min={1} max={9999} />
-                      <div className="flex items-center gap-2 pt-5">
-                        <span className="text-[11px] text-textMuted">{t('agents.othersChatUsed')}: {othersChatUsed}</span>
-                        <button type="button"
-                          onClick={async () => { try { await api.post(`/agents/${agent.id}/reset-others-chat-used`); setOthersChatUsed(0) } catch { /* ignore */ } }}
-                          className="text-[10px] px-2 py-0.5 rounded border border-border text-textMuted hover:text-textSecondary transition-colors"
-                        >{t('agents.othersChatUsedReset')}</button>
-                      </div>
+                {/* 对话权限 - 允许时 */}
+                <div className="mt-3 pt-3 border-t border-border/40">
+                  <ToggleField label={t('agents.allowOthersChat')} value={allowOthersChat} setValue={setAllowOthersChat} desc={t('agents.allowOthersChatDesc')} />
+                </div>
+                {allowOthersChat ? (
+                  <div className="ml-4 pl-3 border-l-2 border-primary-400/30 space-y-2 mt-1">
+                    <div className="flex items-center gap-3">
+                      <label className="flex items-center gap-1.5 cursor-pointer">
+                        <input type="radio" name="othersChatMode" value="unlimited" checked={othersChatMode === 'unlimited'} onChange={() => setOthersChatMode('unlimited')} className="text-primary-500" />
+                        <span className="text-xs text-textSecondary">{t('agents.othersChatUnlimited')}</span>
+                      </label>
+                      <label className="flex items-center gap-1.5 cursor-pointer">
+                        <input type="radio" name="othersChatMode" value="quota" checked={othersChatMode === 'quota'} onChange={() => setOthersChatMode('quota')} className="text-primary-500" />
+                        <span className="text-xs text-textSecondary">{t('agents.othersChatQuota')}</span>
+                      </label>
                     </div>
-                  )}
-                </div>
-                <div className={`ml-4 pl-3 border-l-2 transition-opacity ${!allowOthersChat ? 'border-rose-400/30' : 'border-border/30 opacity-60'}`}>
-                  <label className="text-[11px] font-medium text-textMuted mb-2 block">{t('agents.disallowModeLabel')} · {!allowOthersChat ? 'ON' : 'OFF'}</label>
-                  <div className="flex items-center gap-3">
-                    <label className="flex items-center gap-1.5 cursor-pointer">
-                      <input type="radio" name="disallowMode" value="strict" checked={disallowMode === 'strict'} onChange={() => setDisallowMode('strict')} className="text-primary-500" />
-                      <span className="text-xs text-textSecondary">{t('agents.disallowStrict')}</span>
-                    </label>
-                    <label className="flex items-center gap-1.5 cursor-pointer">
-                      <input type="radio" name="disallowMode" value="own_key" checked={disallowMode === 'own_key'} onChange={() => setDisallowMode('own_key')} className="text-primary-500" />
-                      <span className="text-xs text-textSecondary">{t('agents.disallowOwnKey')}</span>
-                    </label>
+                    {othersChatMode === 'quota' && (
+                      <>
+                        <div className="flex items-center gap-3">
+                          <NumberField label={t('agents.othersChatQuotaLabel')} value={othersChatQuota} setValue={setOthersChatQuota} min={1} max={9999} />
+                          <div className="flex items-center gap-2 pt-5">
+                            <span className="text-[11px] text-textMuted">{t('agents.othersChatUsed')}: {othersChatUsed}</span>
+                            <button type="button"
+                              onClick={async () => { try { await api.post(`/agents/${agent.id}/reset-others-chat-used`); setOthersChatUsed(0) } catch { /* ignore */ } }}
+                              className="text-[10px] px-2 py-0.5 rounded border border-border text-textMuted hover:text-textSecondary transition-colors"
+                            >{t('agents.othersChatUsedReset')}</button>
+                          </div>
+                        </div>
+                        <ToggleField label={t('agents.autoResetQuota') || '自动重置配额'} value={autoResetQuota} setValue={setAutoResetQuota} desc={t('agents.autoResetQuotaDesc') || '用户每次 DM 后自动重置配额计数至上限'} />
+                      </>
+                    )}
+                    {/* 群聊付费 */}
+                    <ToggleField label={t('agents.groupOwnerPays') || '群聊由群主付费'} value={groupOwnerPays} setValue={setGroupOwnerPays} desc={t('agents.groupOwnerPaysDesc') || '群聊中 AI 消息由群主付费，关闭后用户需使用自有 API Key'} />
                   </div>
-                </div>
+                ) : (
+                  <div className="ml-4 pl-3 border-l-2 border-rose-400/30 space-y-2 mt-1">
+                    <label className="text-[11px] font-medium text-textMuted mb-2 block">{t('agents.disallowModeLabel')}</label>
+                    <div className="flex items-center gap-3">
+                      <label className="flex items-center gap-1.5 cursor-pointer">
+                        <input type="radio" name="disallowMode" value="strict" checked={disallowMode === 'strict'} onChange={() => setDisallowMode('strict')} className="text-primary-500" />
+                        <span className="text-xs text-textSecondary">{t('agents.disallowStrict')}</span>
+                      </label>
+                      <label className="flex items-center gap-1.5 cursor-pointer">
+                        <input type="radio" name="disallowMode" value="own_key" checked={disallowMode === 'own_key'} onChange={() => setDisallowMode('own_key')} className="text-primary-500" />
+                        <span className="text-xs text-textSecondary">{t('agents.disallowOwnKey')}</span>
+                      </label>
+                    </div>
+                    {disallowMode === 'own_key' && (
+                      <p className="text-[10px] text-textMuted leading-relaxed">{t('agents.disallowOwnKeyDesc')}</p>
+                    )}
+                  </div>
+                )}
               </Section>
 
               {/* 额度 */}

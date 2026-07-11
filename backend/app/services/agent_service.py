@@ -1228,6 +1228,8 @@ def agent_to_dict(agent: Agent) -> dict:
         "bio": getattr(agent, 'bio', None),
         "status_text": getattr(agent, 'status_text', None),
         "status_color": getattr(agent, 'status_color', None),
+        "auto_reset_quota": getattr(agent, 'auto_reset_quota', False),
+        "group_owner_pays": getattr(agent, 'group_owner_pays', True),
     }
 
 

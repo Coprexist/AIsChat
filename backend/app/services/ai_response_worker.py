@@ -379,6 +379,7 @@ async def _get_api_config(
     exclude_pool_key_id: int | None = None,
     chatter_id: int | None = None,
     force_own_key: bool = False,
+    conversation_type: str | None = None,
 ) -> tuple[str | None, str, str, int | None, dict]:
     """
     获取 API Key 和 Base URL（四层优先链 + 平台赠送额度）。
@@ -391,6 +392,7 @@ async def _get_api_config(
     v0.9.0: chatter_id 决定账单人（通用 AI 扣聊天者，否则扣主人）。
             force_own_key=True 时跳过 Tier 2/3，直接走账单人自有 Key。
     v1.0.2: 返回 provider_info 字典，含 thinking_supported / models / base_url。
+    v1.1.0: conversation_type + group_owner_pays 控制群聊账单人。
 
     返回: (api_key, api_base, credit_source, pool_key_id, provider_info)
     """
@@ -403,11 +405,14 @@ async def _get_api_config(
     pool_key_id = None
     provider_info = {"thinking_supported": settings.is_deepseek_api, "base_url": api_base}
 
-    # 确定账单人：通用/半通用 + 有聊天者 → 聊天者付；否则主人付
-    if chatter_id and agent.ai_type in ("general", "semi_general"):
-        bill_user_id = chatter_id
-    else:
+    # 确定账单人
+    # v1.1.0: 群聊 + group_owner_pays → 主人付（即使 AI 是通用/半通用）
+    if conversation_type and conversation_type != "dm" and getattr(agent, 'group_owner_pays', True):
         bill_user_id = agent.owner_id
+    elif chatter_id and agent.ai_type in ("general", "semi_general"):
+        bill_user_id = chatter_id  # DM + 通用/半通用 → 聊天者付
+    else:
+        bill_user_id = agent.owner_id  # 其余 → 主人付
 
     # Tier 1: Agent 自有 Key
     if agent.api_key_encrypted:

@@ -357,6 +357,11 @@ async def _maybe_trigger_dm_ai_reply(
                     )
                     return
 
+    # ── v1.1.0: 自动重置配额 ──
+    if getattr(agent, 'auto_reset_quota', False) and not is_owner:
+        agent.others_chat_used = 0
+        await db.flush()
+
     # ── 推入 AI 回复队列 ──
     from app.services.ai_response_worker import message_queue
     import asyncio

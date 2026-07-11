@@ -46,6 +46,8 @@ class AgentCreateRequest(BaseModel):
     auto_dnd_duration: int = Field(default=5, ge=1, le=1440, description="自动免打扰持续时长（分钟）")
     conversation_logs_limit: int | None = Field(default=None, description="对话日志保留上限（null=继承全局）")
     user_can_view_logs: bool | None = Field(default=None, description="用户可否查看此 AI 对话日志（null=继承全局）")
+    auto_reset_quota: bool = Field(default=False, description="每次对话后自动重置配额计数")
+    group_owner_pays: bool = Field(default=True, description="群聊中 AI 消息是否由群主付费")
 
     @field_validator("status_text")
     @classmethod
@@ -107,6 +109,8 @@ class AgentUpdateConfigRequest(BaseModel):
     auto_dnd_duration: int | None = Field(default=None, ge=1, le=1440, description="自动免打扰持续时长（分钟）")
     conversation_logs_limit: int | None = Field(default=None, description="对话日志保留上限（null=继承全局）")
     user_can_view_logs: bool | None = Field(default=None, description="用户可否查看此 AI 对话日志（null=继承全局）")
+    auto_reset_quota: bool | None = Field(default=None, description="每次用户与 AI 对话后自动重置配额计数")
+    group_owner_pays: bool | None = Field(default=None, description="群聊中 AI 消息是否由群主付费")
 
     @field_validator("status_text")
     @classmethod
@@ -164,6 +168,8 @@ class AgentResponse(BaseModel):
     bio: str | None = None
     status_text: str | None = None
     status_color: str | None = None
+    auto_reset_quota: bool = False
+    group_owner_pays: bool = True
     reminder_grace: str = "every_time"
     auto_dnd_threshold: int = 20
     auto_dnd_duration: int = 5
