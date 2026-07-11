@@ -254,7 +254,6 @@ export default function SetupPage() {
   const canAutoSkip = currentStep.key === 'language' || currentStep.key === 'instanceDefaults' || currentStep.key === 'complete'
   const isModified = stepModified[currentStep.key] ?? false
   const showSkipLabel = !canAutoSkip && !isModified
-  const showNextLabel = canAutoSkip || isModified
 
   // ── 步骤指示条 ──
   const renderStepBar = () => (
@@ -784,7 +783,7 @@ export default function SetupPage() {
                     </span>
                   ) : (
                     <>
-                      {showNextLabel ? t('setup.next') : t('setup.skip')}
+                      {t('setup.next')}
                       <ChevronRight size={16} />
                     </>
                   )}
