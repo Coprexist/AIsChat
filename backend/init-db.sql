@@ -745,6 +745,12 @@ DO $$ BEGIN
     ) THEN
         ALTER TABLE system_settings ADD COLUMN login_providers JSONB NOT NULL DEFAULT '["direct"]';
     END IF;
+    IF NOT EXISTS (
+        SELECT 1 FROM information_schema.columns
+        WHERE table_name = 'system_settings' AND column_name = 'email_templates'
+    ) THEN
+        ALTER TABLE system_settings ADD COLUMN email_templates JSONB;
+    END IF;
 END $$;
 
 -- users.email 部分唯一索引

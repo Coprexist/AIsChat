@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback } from 'react'
 import { api } from '../api/client'
 import { useT } from '../i18n/I18nContext'
-import { Mail, Shield, CheckCircle, XCircle, Loader2, Plus, Trash2, ChevronUp, ChevronDown } from 'lucide-react'
+import { Mail, Shield, CheckCircle, XCircle, Loader2, Plus, Trash2, ChevronUp, ChevronDown, X } from 'lucide-react'
 import ProviderPresetSelector from './ProviderPresetSelector'
 
 interface SmtpConfigItem {
@@ -219,6 +219,23 @@ export default function AuthSettingsTab() {
   }
 
   // ── 邮件模板操作 ──
+
+  const [showPreview, setShowPreview] = useState(false)
+
+  const applyPreviewVars = (html: string) => {
+    return html
+      .replace(/\{code\}/g, '483921')
+      .replace(/\{from_name\}/g, 'AIsChat')
+      .replace(/\{purpose_label\}/g, '邮箱验证')
+      .replace(/\{username\}/g, 'demo_user')
+      .replace(/\{instance_name\}/g, 'AIsChat')
+      .replace(/\{expire_minutes\}/g, '5')
+  }
+
+  const getCurrentTemplates = () => {
+    if (!templates) return null
+    return templates
+  }
 
   const handleSaveTemplates = async () => {
     if (!templates) return
@@ -557,7 +574,7 @@ export default function AuthSettingsTab() {
                   {t('admin.emailPresetHint') || '点击「自定义版」按钮可编辑完整的邮件 HTML'}
                 </p>
                 <button
-                  onClick={() => window.open('#preview', '_blank')}
+                  onClick={() => setShowPreview(true)}
                   className="text-xs text-primary-400 hover:text-primary-300 underline underline-offset-2"
                 >
                   {t('admin.emailTemplateViewPreview') || '查看预览'}
@@ -569,6 +586,62 @@ export default function AuthSettingsTab() {
           <p className="text-xs text-textMuted py-4 text-center">{t('common.loading')}</p>
         )}
       </section>
+
+      {/* ── 邮件模板预览弹窗 ── */}
+      {showPreview && templates && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm" onClick={() => setShowPreview(false)}>
+          <div className="relative w-full max-w-3xl max-h-[90vh] bg-surface rounded-2xl border border-border shadow-2xl overflow-hidden flex flex-col" onClick={e => e.stopPropagation()}>
+            {/* 头部 */}
+            <div className="flex items-center justify-between px-5 py-3 border-b border-border shrink-0">
+              <h3 className="text-sm font-semibold text-textPrimary">
+                {t('admin.emailTemplateViewPreview') || '邮件模板预览'}
+              </h3>
+              <button onClick={() => setShowPreview(false)} className="p-1 rounded-lg text-textMuted hover:text-textPrimary hover:bg-elevated transition-colors">
+                <X size={16} />
+              </button>
+            </div>
+            {/* 用途 Tab */}
+            <div className="flex gap-2 px-5 pt-4 pb-2 shrink-0">
+              {PURPOSES.map(p => (
+                <button
+                  key={p.key}
+                  onClick={() => setTemplatePurpose(p.key)}
+                  className={`px-3 py-1 text-xs rounded-lg font-medium transition-colors ${
+                    templatePurpose === p.key
+                      ? 'bg-primary-500 text-white'
+                      : 'bg-canvas border border-border text-textMuted hover:text-textSecondary'
+                  }`}
+                >
+                  {t(p.labelKey)}
+                </button>
+              ))}
+            </div>
+            {/* 预览内容 */}
+            <div className="flex-1 overflow-auto p-5 bg-white">
+              {(() => {
+                const tpl = templates[templateLang]?.[templatePurpose]
+                if (!tpl) return <p className="text-xs text-textMuted text-center py-8">暂无模板</p>
+                const rendered = applyPreviewVars(tpl.body_html)
+                return (
+                  <div className="space-y-3">
+                    <div className="text-xs text-gray-500 mb-1">
+                      <span className="font-medium">主题：</span>
+                      {applyPreviewVars(tpl.subject)}
+                    </div>
+                    <iframe
+                      srcDoc={rendered}
+                      title="email-preview"
+                      className="w-full border-0 rounded-lg"
+                      style={{ minHeight: 400, height: rendered.includes('min-height') ? 'auto' : 400 }}
+                      sandbox="allow-same-origin"
+                    />
+                  </div>
+                )
+              })()}
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* ── LLM 厂商预设 ── */}
       <ProviderPresetSelector />
