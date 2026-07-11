@@ -95,6 +95,19 @@ export default function SetupPage() {
   const [apiBaseUrl, setApiBaseUrl] = useState('https://api.deepseek.com')
   const [apiKey, setApiKey] = useState('')
   const [showApiKey, setShowApiKey] = useState(false)
+  const [providerPresets, setProviderPresets] = useState<{name:string;provider:string;base_url:string;is_default:boolean}[]>([])
+
+  // 拉取供应商预设
+  useEffect(() => {
+    if (providerPresets.length > 0) return
+    api.get('/agents/models').then((r: any) => {
+      const presets = r.providers || []
+      setProviderPresets(presets)
+      // 自动选中默认供应商的 base_url
+      const def = presets.find((p: any) => p.is_default)
+      if (def) setApiBaseUrl(def.base_url)
+    }).catch(() => {})
+  }, [])
 
   // ── Step 5: 创建 AI ──
   const [aiName, setAiName] = useState('')
@@ -520,6 +533,27 @@ export default function SetupPage() {
           </div>
           <p className="text-sm text-textMuted mb-6">{t('setup.step4Desc')}</p>
           <div className="space-y-4">
+            {/* 供应商预设 */}
+            {providerPresets.length > 0 && (
+              <div>
+                <label className="block text-sm font-medium text-textSecondary mb-1.5">供应商</label>
+                <div className="flex flex-wrap gap-1.5">
+                  {providerPresets.map(p => (
+                    <button
+                      key={p.name}
+                      onClick={() => setApiBaseUrl(p.base_url)}
+                      className={`px-3 py-1.5 text-xs rounded-lg font-medium transition-colors border ${
+                        apiBaseUrl === p.base_url
+                          ? 'bg-primary-500/15 border-primary-500/40 text-primary-500'
+                          : 'bg-canvas border-border text-textSecondary hover:text-textPrimary hover:border-primary-500/30'
+                      }`}
+                    >
+                      {p.name}{p.is_default ? ' ★' : ''}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
             <div>
               <label className="block text-sm font-medium text-textSecondary mb-1.5">{t('setup.apiBaseUrl')}</label>
               <input
