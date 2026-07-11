@@ -574,9 +574,11 @@ export default function SetupPage() {
                   style={{ backgroundColor: statusColor || '#6366f1' }}
                   title={t('me.statusColorCustom') || '自定义'}
                 >
-                  {/* 左上角小笔图标表示可自定义 */}
+                  {/* 居中笔图标表示可自定义 */}
                   {(!statusColor || statusColor === '#6366f1') && (
-                    <Pen size={8} className="absolute top-0 left-0 text-white/80 drop-shadow" />
+                    <span className="absolute inset-0 flex items-center justify-center pointer-events-none">
+                      <Pen size={10} className="text-white/70 drop-shadow" />
+                    </span>
                   )}
                   <input
                     type="color"
