@@ -251,7 +251,7 @@ export default function CreateAgentModal({
   onCreated,
 }: {
   onClose: () => void
-  onCreated: () => void
+  onCreated: (agentName?: string) => void
 }) {
   const t = useT()
   // 预设选择
@@ -455,7 +455,7 @@ export default function CreateAgentModal({
           })
         } catch { /* 静默失败，不影响创建流程 */ }
       }
-      onCreated()
+      onCreated(agent.name)
     } catch (err: any) {
       setError(err.message || t('modal.createAgentFailed'))
     } finally {
