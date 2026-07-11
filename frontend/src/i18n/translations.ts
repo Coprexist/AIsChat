@@ -681,7 +681,12 @@ const zh: TranslationDict = {
   'agents.othersChatUsedReset': '重置',
   'agents.disallowStrict': '严格禁止',
   'agents.disallowOwnKey': '允许使用自有 API Key',
+  'agents.disallowOwnKeyDesc': '关闭后其他人可用自己的 API Key 自费与你 AI 对话，不消耗你的额度',
   'agents.disallowModeLabel': '禁止时的处理方式',
+  'agents.autoResetQuota': '自动重置配额',
+  'agents.autoResetQuotaDesc': '每次 DM 对话后自动将已用次数清零，让用户总能满额对话',
+  'agents.groupOwnerPays': '群聊 AI 由群主付费',
+  'agents.groupOwnerPaysDesc': '群聊中 AI 消息由群主承担，关闭后用户需使用自有 API Key',
   'agents.quotaExhaustedNotice': '你的 AI「{name}」已被其他人触发 {used} 次对话，已达到配额上限（{quota} 条），已自动关闭「允许他人对话」。',
 
   // v0.9.0 余额弹窗
@@ -2386,7 +2391,12 @@ const en: TranslationDict = {
   'agents.othersChatUsedReset': 'Reset',
   'agents.disallowStrict': 'Strictly disallow',
   'agents.disallowOwnKey': 'Allow with own API Key',
+  'agents.disallowOwnKeyDesc': 'Others can chat with your AI at their own cost using their own API key, no quota deducted from you',
   'agents.disallowModeLabel': 'When disallowed',
+  'agents.autoResetQuota': 'Auto-reset quota',
+  'agents.autoResetQuotaDesc': 'Reset used count to 0 after each DM conversation, so users always have full quota',
+  'agents.groupOwnerPays': 'Group chats paid by group owner',
+  'agents.groupOwnerPaysDesc': 'Group AI messages are billed to the group owner; if disabled, users must use their own API key',
   'agents.quotaExhaustedNotice': 'Your AI "{name}" has been triggered {used} times by others, reaching the quota ({quota}). "Allow others to chat" has been auto-disabled.',
 
   // v0.9.0 Balance prompt
@@ -4050,7 +4060,12 @@ const ja: TranslationDict = {
   'agents.othersChatUsedReset': 'リセット',
   'agents.disallowStrict': '厳格に禁止',
   'agents.disallowOwnKey': '独自のAPI Key使用を許可',
+  'agents.disallowOwnKeyDesc': '他のユーザーが自分のAPI Keyを使ってAIと会話でき、あなたのクォータを消費しません',
   'agents.disallowModeLabel': '禁止時の処理',
+  'agents.autoResetQuota': 'クォータ自動リセット',
+  'agents.autoResetQuotaDesc': 'DM会話ごとに使用回数を0にリセットし、ユーザーが常に最大クォータで会話できるようにします',
+  'agents.groupOwnerPays': 'グループチャットはグループ所有者が負担',
+  'agents.groupOwnerPaysDesc': 'グループ内のAIメッセージはグループ所有者が支払います。無効にするとユーザーは独自のAPI Keyを使用する必要があります',
   'agents.quotaExhaustedNotice': 'あなたのAI「{name}」が他のユーザーによって{used}回トリガーされ、クォータ上限（{quota}）に達しました。「他のユーザーとの会話を許可」が自動的にオフになりました。',
 
   // v0.9.0 残高不足ダイアログ
