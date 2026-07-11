@@ -223,19 +223,16 @@ export default function FilePreviewModal({ fileId, fileName, fileSize, mimeType,
               </div>
             ) : isPDF ? (
               <iframe src={dlUrl} className="w-full h-full border-0" title={fileName} />
+            ) : isHtml && content ? (
+              <div className="w-full h-full flex flex-col">
+                <iframe srcDoc={content} className="w-full flex-1 border-0 bg-white rounded-lg" title={fileName} sandbox="allow-scripts" />
+              </div>
             ) : (
               <div className="w-full p-4 md:p-5">
                 {isDocx ? (
                   <div
                     className="prose prose-sm dark:prose-invert max-w-none text-textPrimary"
                     dangerouslySetInnerHTML={{ __html: content || '' }}
-                  />
-                ) : isHtml && content ? (
-                  <iframe
-                    srcDoc={content}
-                    className="w-full h-full border-0 bg-white rounded-lg"
-                    title={fileName}
-                    sandbox="allow-scripts"
                   />
                 ) : isMd || codeLang ? (
                   <div className="prose prose-sm dark:prose-invert max-w-none text-textPrimary
