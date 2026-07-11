@@ -11,6 +11,8 @@ import {
   Palette, Server,
 } from 'lucide-react'
 
+import AvatarCropModal from '../components/AvatarCropModal'
+
 // ─── 预设颜色 ──────────────────────────────────────────────
 const PRESET_COLORS = [
   '#6366f1', '#8b5cf6', '#ec4899', '#f43f5e',
@@ -72,7 +74,8 @@ export default function SetupPage() {
   const [bio, setBio] = useState('')
   const [statusText, setStatusText] = useState('')
   const [statusColor, setStatusColor] = useState('#6366f1')
-  const [avatarFile, setAvatarFile] = useState<File | null>(null)
+  const [cropFile, setCropFile] = useState<File | null>(null)
+  const [avatarBlob, setAvatarBlob] = useState<Blob | null>(null)
   const [avatarPreview, setAvatarPreview] = useState<string | null>(null)
   const [avatarUploading, setAvatarUploading] = useState(false)
   const fileInputRef = useRef<HTMLInputElement>(null)
@@ -124,7 +127,7 @@ export default function SetupPage() {
   const stepModified: Record<string, boolean> = {
     language:         true, // canAutoSkip
     instanceDefaults: true, // canAutoSkip
-    profile:          !!bio || !!statusText || !!avatarFile,
+    profile:          !!bio || !!statusText || !!avatarBlob,
     apiConfig:        !!apiKey,
     createAI:         !!aiName.trim(),
     smtp:             !!smtpHost,
@@ -150,11 +153,12 @@ export default function SetupPage() {
     }
 
     if (step === 'profile') {
-      // 先上传头像（如果有新文件），上传端点会自动更新 user.avatar_url
-      if (avatarFile) {
+      // 先上传头像（如果有裁剪后的 blob），上传端点会自动更新 user.avatar_url
+      if (avatarBlob) {
         setAvatarUploading(true)
         try {
-          await api.upload('/user/avatar', avatarFile)
+          const file = new File([avatarBlob], 'avatar.png', { type: 'image/png' })
+          await api.upload('/user/avatar', file)
         } finally {
           setAvatarUploading(false)
         }
@@ -237,7 +241,7 @@ export default function SetupPage() {
     overrideLangForSetup(lang)
   }
 
-  // ── 头像选择 ──
+  // ── 头像选择：打开裁剪弹窗 ──
   const handleAvatarSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]
     if (!file) return
@@ -245,9 +249,19 @@ export default function SetupPage() {
       setError(t('me.avatarTypeError') || '仅支持 JPEG/PNG/GIF/WebP')
       return
     }
-    setAvatarFile(file)
-    const url = URL.createObjectURL(file)
+    setCropFile(file)
+  }
+
+  // ── 裁剪完成 ──
+  const handleCropConfirm = (blob: Blob) => {
+    setAvatarBlob(blob)
+    const url = URL.createObjectURL(blob)
     setAvatarPreview(url)
+    setCropFile(null)
+  }
+
+  const handleCropCancel = () => {
+    setCropFile(null)
   }
 
   // ── 每个步骤的按钮逻辑 ──
@@ -728,7 +742,16 @@ export default function SetupPage() {
 
   // ── 渲染 ──
   return (
-    <div className="h-full flex items-center justify-center bg-canvas overflow-y-auto">
+    <>
+      {/* 头像裁剪弹窗 */}
+      {cropFile && (
+        <AvatarCropModal
+          file={cropFile}
+          onConfirm={handleCropConfirm}
+          onCancel={handleCropCancel}
+        />
+      )}
+      <div className="h-full flex items-center justify-center bg-canvas overflow-y-auto">
       <div className="max-w-lg w-full px-4 py-8">
         {/* 标题 */}
         <h1 className="text-xl font-bold text-textPrimary text-center mb-6">{t('setup.title')}</h1>
@@ -812,5 +835,6 @@ export default function SetupPage() {
         </div>
       </div>
     </div>
+    </>
   )
 }
