@@ -8,11 +8,13 @@ import { api } from '../api/client'
 import {
   Globe, Check, User, Key, Bot, Mail, Shield, Sparkles,
   Upload, Loader2, Eye, EyeOff, ChevronLeft, ChevronRight,
-  Server, X, Pen,
+  Server, X, Pen, ExternalLink,
 } from 'lucide-react'
 
 import AvatarCropModal from '../components/AvatarCropModal'
+import CreateAgentModal from '../components/CreateAgentModal'
 import { STATUS_COLORS } from '../utils/statusColor'
+import { getApiKeyUrl } from '../utils/providers'
 
 // ─── 步骤配置 ──────────────────────────────────────────────
 interface StepDef {
@@ -169,6 +171,8 @@ export default function SetupPage() {
   const [aiName, setAiName] = useState('')
   const [systemPrompt, setSystemPrompt] = useState('')
   const [configProfile, setConfigProfile] = useState('chat')
+  const [showCreateModal, setShowCreateModal] = useState(false)
+  const [aiCreated, setAiCreated] = useState(false)
 
   // ── Step 6 (admin): SMTP ──
   const [smtpHost, setSmtpHost] = useState('')
@@ -202,7 +206,7 @@ export default function SetupPage() {
     instanceDefaults: true, // canAutoSkip
     profile:          !!bio || !!statusText || !!avatarBlob,
     apiConfig:        !!apiKey,
-    createAI:         !!aiName.trim(),
+    createAI:         aiCreated,
     smtp:             !!smtpHost,
     keyPool:          !!poolKey,
   }
@@ -251,12 +255,8 @@ export default function SetupPage() {
       })
     }
 
-    if (step === 'createAI' && aiName.trim()) {
-      await api.post('/agents', {
-        name: aiName.trim(),
-        system_prompt: systemPrompt || null,
-        config_profile: configProfile,
-      })
+    if (step === 'createAI' && aiCreated) {
+      // AI 已由 CreateAgentModal 创建完成，无需重复 POST
     }
 
     if (step === 'smtp' && isAdmin && smtpHost) {
@@ -645,6 +645,17 @@ export default function SetupPage() {
                   {showApiKey ? <EyeOff size={16} /> : <Eye size={16} />}
                 </button>
               </div>
+              {apiBaseUrl && getApiKeyUrl(apiBaseUrl) && (
+                <a
+                  href={getApiKeyUrl(apiBaseUrl)}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="inline-flex items-center gap-1 text-[11px] text-primary-400 hover:text-primary-300 underline underline-offset-2 mt-1.5"
+                >
+                  {t('setup.getApiKey') || '获取 API Key'}
+                  <ExternalLink size={11} />
+                </a>
+              )}
             </div>
             {!apiKey && (
               <p className="text-xs text-textMuted italic">{t('setup.apiSkip')}</p>
@@ -663,49 +674,48 @@ export default function SetupPage() {
             <h2 className="text-lg font-semibold text-textPrimary">{t('setup.step5Title')}</h2>
           </div>
           <p className="text-sm text-textMuted mb-6">{t('setup.step5Desc')}</p>
-          <div className="space-y-4">
-            <div>
-              <label className="block text-sm font-medium text-textSecondary mb-1.5">{t('setup.aiName')}</label>
-              <input
-                value={aiName}
-                onChange={e => setAiName(e.target.value)}
-                placeholder={t('setup.aiNamePlaceholder')}
-                maxLength={50}
-                className="w-full px-3.5 py-2.5 rounded-xl bg-canvas border border-border text-textPrimary text-sm focus:border-primary-400 focus:outline-none"
-              />
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-textSecondary mb-1.5">{t('setup.systemPrompt')}</label>
-              <textarea
-                value={systemPrompt}
-                onChange={e => setSystemPrompt(e.target.value)}
-                placeholder={t('setup.systemPromptPlaceholder')}
-                rows={4}
-                className="w-full px-3.5 py-2.5 rounded-xl bg-canvas border border-border text-textPrimary text-sm focus:border-primary-400 focus:outline-none resize-none"
-              />
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-textSecondary mb-1.5">{t('setup.configProfile')}</label>
-              <div className="flex gap-2">
-                {(['chat', 'immersive', 'digital_life'] as const).map(profile => (
-                  <button
-                    key={profile}
-                    onClick={() => setConfigProfile(profile)}
-                    className={`flex-1 py-2.5 rounded-xl border-2 text-sm font-medium transition-all ${
-                      configProfile === profile
-                        ? 'border-primary-400 bg-primary-500/10 text-textPrimary'
-                        : 'border-border bg-canvas text-textSecondary hover:border-borderHover'
-                    }`}
-                  >
-                    {t(`setup.configProfile${profile === 'chat' ? 'Chat' : profile === 'immersive' ? 'Immersive' : 'DigitalLife'}`)}
-                  </button>
-                ))}
+
+          {aiCreated ? (
+            /* 已创建成功 → 展示摘要 */
+            <div className="bg-mint-400/10 border border-mint-400/20 rounded-xl p-5 text-center">
+              <div className="w-12 h-12 rounded-full bg-mint-400/20 flex items-center justify-center mx-auto mb-3">
+                <Check size={24} className="text-mint-400" />
               </div>
+              <p className="text-sm font-medium text-textPrimary mb-1">{t('setup.aiCreated') || 'AI 已创建'}</p>
+              <p className="text-xs text-textMuted">{t('setup.aiCreatedDesc') || `「${aiName}」已准备就绪，后续可在 AI 管理页调整详细配置`}</p>
             </div>
-            {!aiName.trim() && (
-              <p className="text-xs text-textMuted italic">{t('setup.skipAI')}</p>
-            )}
-          </div>
+          ) : (
+            /* 未创建 → 引导按钮 */
+            <div className="bg-canvas border-2 border-dashed border-border rounded-xl p-8 text-center">
+              <div className="w-16 h-16 rounded-full bg-primary-500/10 flex items-center justify-center mx-auto mb-4">
+                <Bot size={28} className="text-primary-400" />
+              </div>
+              <p className="text-sm text-textSecondary mb-1">{t('setup.aiCreateHint') || '创建一个 AI 小伙伴陪你聊天'}</p>
+              <p className="text-xs text-textMuted mb-5">{t('setup.aiCreateHintDesc') || '使用完整创建体验，预设档位、详细参数一应俱全'}</p>
+              <button
+                onClick={() => setShowCreateModal(true)}
+                className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-primary-500 hover:bg-primary-400 text-white text-sm font-semibold transition-all shadow-lg shadow-primary-500/20"
+              >
+                <Sparkles size={16} />
+                {t('setup.aiCreateButton') || '创建 AI'}
+              </button>
+              {!aiName.trim() && (
+                <p className="text-xs text-textMuted italic mt-4">{t('setup.skipAI')}</p>
+              )}
+            </div>
+          )}
+
+          {/* CreateAgentModal 弹窗 */}
+          {showCreateModal && (
+            <CreateAgentModal
+              onClose={() => setShowCreateModal(false)}
+              onCreated={(agentName) => {
+                setShowCreateModal(false)
+                setAiCreated(true)
+                setAiName(agentName || 'AI')
+              }}
+            />
+          )}
         </div>
       )
     }
