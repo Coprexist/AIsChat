@@ -34,6 +34,11 @@ async def add_skill(
 ) -> dict:
     """添加一个技能"""
     from app.models.agent_skill import AgentSkill
+    from app.utils.pure.skill_registry import SkillRegistry
+
+    if not SkillRegistry.is_valid_type(skill_type):
+        valid = "、".join(SkillRegistry.get_type_names())
+        return {"error": True, "message": f"未知技能类型「{skill_type}」，可用类型：{valid}"}
 
     skill = AgentSkill(
         agent_id=agent_id,

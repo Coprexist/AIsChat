@@ -17,16 +17,18 @@ async def _start_browser_service():
     """启动共享 Chromium CDP 服务（稍延迟，等数据库就绪）"""
     await asyncio.sleep(3)  # 等数据库和网络就绪
     try:
-        from app.services.browser_service import start, is_running, CDP_PORT
-        if is_running():
-            logger.info(f"🔍 Chromium CDP 已在运行 (port {CDP_PORT})")
+        from app.services.plugin_registry import PluginRegistry
+        plugin = PluginRegistry.get("browser")
+        if plugin is None:
+            logger.warning("⚠️  Browser 插件未注册，browser 命令将不可用")
             return
-        ok = await start()
+        status = await plugin.get_status()
+        if status.get("running"):
+            logger.info(f"🔍 Chromium CDP 已在运行 (port {status.get('port')})")
+            return
+        ok = await plugin.start()
         if ok:
-            logger.info(f"🔍 Chromium CDP 已启动 (port {CDP_PORT})，所有 AI 共用")
-            # 设置环境变量供 opencli 使用
-            import os
-            os.environ["OPENCLI_CDP_ENDPOINT"] = f"http://127.0.0.1:{CDP_PORT}"
+            logger.info("🔍 Chromium CDP 已启动，所有 AI 共用")
         else:
             logger.warning("⚠️  Chromium CDP 启动失败，browser 命令将不可用")
     except Exception as e:
@@ -36,8 +38,10 @@ async def _start_browser_service():
 async def _stop_browser_service():
     """停止共享 Chromium CDP 服务"""
     try:
-        from app.services.browser_service import stop
-        await stop()
+        from app.services.plugin_registry import PluginRegistry
+        plugin = PluginRegistry.get("browser")
+        if plugin is not None:
+            await plugin.stop()
     except Exception:
         pass
 
@@ -120,6 +124,10 @@ async def lifespan(app: FastAPI):
 
     logger.info("✅ 后台 worker 已全部启动（含联邦通信）")
 
+    # 发出系统启动完成事件
+    from app.services.event_bus import event_bus, EventType
+    asyncio.create_task(event_bus.emit(EventType.SYSTEM_STARTUP))
+
     # 启动完成，退出自动维护（但手动维护仍生效）
     if _os.path.exists(_MAINTENANCE_AUTO):
         _os.remove(_MAINTENANCE_AUTO)
@@ -132,6 +140,13 @@ async def lifespan(app: FastAPI):
     open(_MAINTENANCE_AUTO, "w").close()
 
     logger.info("👋 系统关闭，正在停止后台 worker...")
+    # 发出系统关闭事件
+    try:
+        from app.services.event_bus import event_bus, EventType
+        await event_bus.emit(EventType.SYSTEM_SHUTDOWN)
+    except Exception:
+        pass
+
     # 优雅关闭：排空记忆缓冲区
     try:
         from app.services.memory_buffer import drain_buffer_on_shutdown

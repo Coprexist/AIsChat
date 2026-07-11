@@ -46,6 +46,7 @@ async def run_migrations():
             await _migrate_agent_pending_prompt(db)   # v2.0.5 AI自修改暂存（必须在 select(Agent) 之前）
             await _migrate_friendship_priority(db)    # v2.0.6 特别关心
             await _migrate_concurrent_ai_limit_default(db)  # v2.0.7 全局默认AI并发数
+            await _migrate_drop_skill_type_constraint(db)  # v2.1.0 Skill 类型约束 → 注册表
             await _migrate_others_chat_controls(db)  # v0.9.0 对话权限 + 限额控制（必须在 select(Agent) 之前）
             await _migrate_email_verification(db)  # v1.0.0 邮箱认证（必须在 select(Agent) 之前）
             await _migrate_provider_config(db)      # v1.0.0 LLM 厂商预设
@@ -2754,3 +2755,14 @@ async def _migrate_concurrent_ai_limit_default(db):
         await db.execute(text("ALTER TABLE system_settings ADD COLUMN default_concurrent_ai_limit INTEGER NOT NULL DEFAULT 3"))
         await db.flush()
         logger.info("  ✅ system_settings.default_concurrent_ai_limit 添加完成（默认 3）")
+
+
+async def _migrate_drop_skill_type_constraint(db):
+    """v2.1.0: 删除 agent_skills 表 skill_type 的 CheckConstraint（类型改为注册表管理）"""
+    # PostgreSQL 约束名固定为 ck_agent_skills_type
+    try:
+        await db.execute(text("ALTER TABLE agent_skills DROP CONSTRAINT IF EXISTS ck_agent_skills_type"))
+        await db.flush()
+        logger.info("  ✅ 已删除 ck_agent_skills_type 约束（Skill 类型现由注册表管理）")
+    except Exception as e:
+        logger.warning(f"  ⚠️ 删除约束 ck_agent_skills_type 时出错（可能不存在）: {e}")

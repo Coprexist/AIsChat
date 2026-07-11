@@ -2525,37 +2525,21 @@ async def delete_provider(
 
 
 # ══════════════════════════════════════════════════════════════
-# 插件管理（Chrome 服务启动/停止，所有 AI 共享）
+# 插件管理（服务插件启停，所有 AI 共享）
 # ══════════════════════════════════════════════════════════════
 
-PLUGIN_REGISTRY: dict[str, dict] = {
-    "browser": {
-        "id": "browser",
-        "name": "浏览器上网",
-        "description": "共享 Chromium 实例（headless + CDP），所有 AI 共用。启动后 AI 可通过 browser 命令上网查资料、访问网页、截图。",
-        "category": "service",
-    },
-}
-
-
-def _browser_status() -> dict:
-    """获取浏览器服务状态"""
-    try:
-        from app.services.browser_service import is_running, CDP_PORT
-        running = is_running()
-        return {
-            "installed": True,  # Dockerfile 预装
-            "running": running,
-            "port": CDP_PORT if running else None,
-        }
-    except Exception:
-        return {"installed": False, "running": False, "port": None}
+# 导入 browser_plugin 触发自动注册（必须保留，否则插件列表为空）
+from app.services.browser_plugin import BrowserPlugin  # noqa: F401
+from app.services.plugin_registry import PluginRegistry
 
 
 @router.get("/browser-status")
 async def get_browser_status(admin: dict = Depends(require_admin)):
     """获取浏览器服务（Chromium CDP）运行状态"""
-    return _browser_status()
+    plugin = PluginRegistry.get("browser")
+    if plugin is None:
+        return {"installed": False, "running": False, "port": None}
+    return await plugin.get_status()
 
 
 @router.get("/maintenance")
@@ -2802,18 +2786,7 @@ async def list_plugins(
     admin: dict = Depends(require_admin),
 ):
     """列出所有可选插件及运行状态"""
-    plugins = []
-    for pid, pdef in PLUGIN_REGISTRY.items():
-        status = _browser_status() if pid == "browser" else {}
-        plugins.append({
-            "id": pdef["id"],
-            "name": pdef["name"],
-            "description": pdef["description"],
-            "category": pdef["category"],
-            "installed": status.get("installed", False),
-            "running": status.get("running", False),
-            "port": status.get("port"),
-        })
+    plugins = await PluginRegistry.get_status_all()
     return {"plugins": plugins}
 
 
@@ -2823,19 +2796,18 @@ async def start_plugin(
     admin: dict = Depends(require_admin),
 ):
     """启动插件服务"""
-    if plugin_id != "browser":
+    plugin = PluginRegistry.get(plugin_id)
+    if plugin is None:
         raise HTTPException(404, f"未知插件: {plugin_id}")
 
-    from app.services.browser_service import start, is_running
-    if is_running():
-        return {"message": "浏览器服务已在运行", "running": True}
-    ok = await start()
+    status = await plugin.get_status()
+    if status.get("running", False):
+        return {"message": f"{plugin.name} 已在运行", "running": True}
+    ok = await plugin.start()
     if ok:
-        import os
-        os.environ["OPENCLI_CDP_ENDPOINT"] = "http://127.0.0.1:9222"
-        return {"message": "浏览器服务已启动，所有 AI 现在可以上网", "running": True}
+        return {"message": f"{plugin.name} 已启动", "running": True}
     else:
-        raise HTTPException(500, "浏览器服务启动失败，请检查 Chromium 是否已安装")
+        raise HTTPException(500, f"{plugin.name} 启动失败")
 
 
 @router.post("/plugins/{plugin_id}/stop")
@@ -2844,11 +2816,12 @@ async def stop_plugin(
     admin: dict = Depends(require_admin),
 ):
     """停止插件服务"""
-    if plugin_id != "browser":
+    plugin = PluginRegistry.get(plugin_id)
+    if plugin is None:
         raise HTTPException(404, f"未知插件: {plugin_id}")
 
-    from app.services.browser_service import stop, is_running
-    if not is_running():
-        return {"message": "浏览器服务未运行", "running": False}
-    await stop()
-    return {"message": "浏览器服务已停止", "running": False}
+    status = await plugin.get_status()
+    if not status.get("running", False):
+        return {"message": f"{plugin.name} 未运行", "running": False}
+    await plugin.stop()
+    return {"message": f"{plugin.name} 已停止", "running": False}

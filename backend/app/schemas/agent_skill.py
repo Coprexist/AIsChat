@@ -15,7 +15,7 @@ class SkillConfig(BaseModel):
 class SkillCreate(BaseModel):
     """创建技能"""
     name: str = Field(..., min_length=1, max_length=100, description="技能名称")
-    skill_type: str = Field(..., description="delay_reply | typing_indicator | scene_trigger | inject_prompt")
+    skill_type: str = Field(..., description="技能类型，如 delay_reply / inject_prompt（由 SkillRegistry 管理）")
     config: dict = Field(default_factory=dict, description="技能配置JSON")
     is_enabled: bool = Field(default=True, description="是否启用")
     priority: int = Field(default=0, description="优先级")

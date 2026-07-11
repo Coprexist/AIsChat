@@ -5,8 +5,12 @@ import logging
 from sqlalchemy import select as _select
 from sqlalchemy.ext.asyncio import AsyncSession
 from app.tools.base import ToolPlugin, ToolRegistry
+from app.utils.pure.skill_registry import SkillRegistry
 
 logger = logging.getLogger(__name__)
+
+# 从注册表动态获取技能类型列表
+_SKILL_TYPES = SkillRegistry.get_type_names()
 
 
 class ManageSkills(ToolPlugin):
@@ -28,7 +32,7 @@ class ManageSkills(ToolPlugin):
         "skill_id": {"type": "integer", "description": "技能ID（update/delete/toggle 时提供）", "nullable": True},
         "name": {"type": "string", "description": "技能名称（add 时提供），如「温柔模式」「延迟回复」", "nullable": True},
         "skill_type": {
-            "type": "string", "enum": ["delay_reply", "typing_indicator", "scene_trigger", "inject_prompt"],
+            "type": "string", "enum": _SKILL_TYPES,
             "description": "技能类型（add 时提供）", "nullable": True,
         },
         "config": {"type": "object", "description": "技能配置（add/update 时提供）。各类型示例见上方 description", "nullable": True},
@@ -76,15 +80,14 @@ class ManageSkills(ToolPlugin):
         if action == "list":
             skills = await list_skills(db, agent_id)
             type_hints = {
-                "delay_reply": "延迟回复 — 收到消息后等 N 秒再回",
-                "typing_indicator": "打字指示器 — 回复前显示「正在输入…」",
-                "scene_trigger": "场景匹配 — 检测关键词/正则时触发行为",
-                "inject_prompt": "注入提示词 — 临时追加指导到思维中",
+                info.type_name: info.description
+                for info in SkillRegistry.get_all_types().values()
             }
             if not delay_allowed:
                 skills = [s for s in skills if s.get("skill_type") not in bundled_skills]
             for s in skills:
-                s["type_hint"] = type_hints.get(s.get("skill_type", ""), "")
+                info = SkillRegistry.get_info(s.get("skill_type", ""))
+                s["type_hint"] = info.description if info else ""
             return {"success": True, "skills": skills, "count": len(skills)}
 
         elif action == "add":
@@ -92,9 +95,9 @@ class ManageSkills(ToolPlugin):
             skill_type = arguments.get("skill_type")
             if not name or not skill_type:
                 return {"error": True, "message": "add 操作需要 name 和 skill_type"}
-            valid_types = ("delay_reply", "typing_indicator", "scene_trigger", "inject_prompt")
-            if skill_type not in valid_types:
-                return {"error": True, "message": f"skill_type 必须为 {', '.join(valid_types)} 之一"}
+            if not SkillRegistry.is_valid_type(skill_type):
+                available = "、".join(_SKILL_TYPES)
+                return {"error": True, "message": f"未知 skill_type，可用类型：{available}"}
             return await add_skill(
                 db, agent_id, name=name, skill_type=skill_type,
                 config=arguments.get("config", {}),

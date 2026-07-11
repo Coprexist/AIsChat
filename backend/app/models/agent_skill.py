@@ -4,7 +4,7 @@ AI 思维 Skill 模型
 """
 from sqlalchemy import (
     Column, Integer, String, Boolean, DateTime,
-    ForeignKey, func, CheckConstraint,
+    ForeignKey, func,
 )
 from sqlalchemy.dialects.postgresql import JSONB
 from app.database import Base
@@ -22,10 +22,3 @@ class AgentSkill(Base):
     priority = Column(Integer, default=0, comment="优先级：数字越大越靠后")
     created_at = Column(DateTime, server_default=func.now())
     updated_at = Column(DateTime, server_default=func.now())
-
-    __table_args__ = (
-        CheckConstraint(
-            "skill_type IN ('delay_reply', 'typing_indicator', 'scene_trigger', 'inject_prompt')",
-            name="ck_agent_skills_type",
-        ),
-    )
