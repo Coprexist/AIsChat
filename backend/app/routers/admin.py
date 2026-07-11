@@ -995,7 +995,7 @@ async def bulk_set_concurrency(
 from app.schemas.system_settings import (
     SmtpConfigRequest, AuthSettingsRequest, AuthSettingsResponse,
     SmtpConfigItem, SmtpConfigsRequest, SmtpTestRequest,
-    EmailTemplatesData, EmailTemplatesRequest,
+    EmailTemplatesData, EmailTemplatesRequest, EmailPresetRequest,
 )
 from app.utils.crypto import encrypt_api_key, decrypt_api_key
 
@@ -1310,17 +1310,18 @@ async def test_smtp_by_index(
     return {"success": ok, "message": msg, "index": index}
 
 
-# ── v1.0.0 自定义邮件模板管理 ──
+# ── v1.0.0 自定义邮件模板管理（v1.1.0: 预设选择）──
 
 @router.get("/email-templates")
 async def get_email_templates_endpoint(
     admin: dict = Depends(require_admin),
     db: AsyncSession = Depends(get_db),
 ):
-    """获取当前邮件模板（DB 优先，fallback 默认值）"""
-    from app.services.email_service import get_email_templates
+    """获取当前邮件模板 + 预设名"""
+    from app.services.email_service import get_email_templates, get_email_template_preset
     templates = await get_email_templates(db)
-    return {"templates": templates}
+    preset = await get_email_template_preset(db)
+    return {"templates": templates, "preset": preset}
 
 
 @router.put("/email-templates")
@@ -1329,14 +1330,51 @@ async def update_email_templates(
     admin: dict = Depends(require_admin),
     db: AsyncSession = Depends(get_db),
 ):
-    """保存自定义邮件模板到 DB"""
+    """保存自定义邮件模板到 DB（支持同时切换 preset）"""
     try:
-        row = await _get_or_create_settings(db)
-        row.email_templates = req.templates.model_dump()
-        await db.flush()
+        from app.services.email_service import set_email_template_preset
+        if req.preset:
+            custom = req.templates.model_dump() if req.preset == "custom" else None
+            await set_email_template_preset(db, req.preset, custom_templates=custom)
+            await _log_admin_action(
+                db, admin["user_id"], "set_email_preset", "system", 1,
+                {"preset": req.preset},
+            )
+        else:
+            row = await _get_or_create_settings(db)
+            raw = getattr(row, "email_templates", None) or {}
+            if isinstance(raw, str):
+                import json
+                raw = json.loads(raw)
+            if isinstance(raw, dict):
+                raw.update(req.templates.model_dump())
+            else:
+                raw = req.templates.model_dump()
+            row.email_templates = raw  # type: ignore
+            await db.flush()
+            await _log_admin_action(
+                db, admin["user_id"], "update_email_templates", "system", 1,
+                {"preset": raw.get("preset", "custom")},
+            )
+        return await get_email_templates_endpoint(admin=admin, db=db)
+    except ValueError as e:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
+
+
+@router.put("/email-templates/preset")
+async def set_email_template_preset_endpoint(
+    req: EmailPresetRequest,
+    admin: dict = Depends(require_admin),
+    db: AsyncSession = Depends(get_db),
+):
+    """切换邮件模板预设（gradient / simple / custom）"""
+    try:
+        from app.services.email_service import set_email_template_preset as _set_preset
+        custom = req.templates.model_dump() if req.templates else None if req.preset == "custom" else None
+        await _set_preset(db, req.preset, custom_templates=custom)
         await _log_admin_action(
-            db, admin["user_id"], "update_email_templates", "system", 1,
-            {"languages": list(req.templates.model_dump().keys())},
+            db, admin["user_id"], "set_email_preset", "system", 1,
+            {"preset": req.preset},
         )
         return await get_email_templates_endpoint(admin=admin, db=db)
     except ValueError as e:
@@ -1348,11 +1386,10 @@ async def reset_email_templates(
     admin: dict = Depends(require_admin),
     db: AsyncSession = Depends(get_db),
 ):
-    """重置邮件模板为默认值（设为 NULL，让 fallback 生效）"""
+    """重置邮件模板为默认值（恢复到 gradient 预设）"""
     try:
-        row = await _get_or_create_settings(db)
-        row.email_templates = None
-        await db.flush()
+        from app.services.email_service import set_email_template_preset as _set_preset
+        await _set_preset(db, "gradient")
         await _log_admin_action(
             db, admin["user_id"], "reset_email_templates", "system", 1, {},
         )

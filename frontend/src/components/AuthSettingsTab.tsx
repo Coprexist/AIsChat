@@ -85,6 +85,7 @@ export default function AuthSettingsTab() {
 
   // 邮件模板
   const [templates, setTemplates] = useState<EmailTemplatesData | null>(null)
+  const [templatePreset, setTemplatePreset] = useState('gradient')
   const [templateLang, setTemplateLang] = useState('zh')
   const [templatePurpose, setTemplatePurpose] = useState('register')
   const [editSubject, setEditSubject] = useState('')
@@ -109,8 +110,9 @@ export default function AuthSettingsTab() {
   const loadTemplates = useCallback(async () => {
     setTplLoading(true)
     try {
-      const data = await api.get<{ templates: EmailTemplatesData }>('/admin/email-templates')
+      const data = await api.get<{ templates: EmailTemplatesData; preset: string }>('/admin/email-templates')
       setTemplates(data.templates)
+      setTemplatePreset(data.preset || 'gradient')
     } catch { /* */ } finally { setTplLoading(false) }
   }, [])
 
@@ -421,7 +423,7 @@ export default function AuthSettingsTab() {
         </div>
       </section>
 
-      {/* ── 邮件模板编辑 ── */}
+      {/* ── 邮件模板编辑（v1.1.0: 预设选择）── */}
       <section className="bg-surface border border-border rounded-xl p-5">
         <h3 className="text-sm font-semibold text-textPrimary flex items-center gap-2 mb-4">
           <Mail size={16} className="text-amber-400" />
@@ -434,83 +436,134 @@ export default function AuthSettingsTab() {
           </div>
         ) : templates ? (
           <>
-            {/* 语言 Tab */}
-            <div className="flex gap-1 mb-3">
-              {LANGS.map(l => (
+            {/* 预设选择 */}
+            <div className="flex gap-2 mb-4">
+              {(['gradient', 'simple', 'custom'] as const).map(p => (
                 <button
-                  key={l.key}
-                  onClick={() => setTemplateLang(l.key)}
-                  className={`px-3 py-1 text-xs rounded-lg font-medium transition-colors ${
-                    templateLang === l.key
-                      ? 'bg-primary-500 text-white'
-                      : 'bg-canvas border border-border text-textMuted hover:text-textSecondary'
+                  key={p}
+                  onClick={async () => {
+                    if (p === templatePreset) return
+                    try {
+                      await api.put('/admin/email-templates/preset', { preset: p })
+                      await loadTemplates()
+                    } catch { /* */ }
+                  }}
+                  className={`flex-1 py-2 text-xs rounded-lg font-medium border-2 transition-all ${
+                    templatePreset === p
+                      ? 'border-primary-400 bg-primary-500/10 text-primary-500 shadow-sm'
+                      : 'border-border bg-canvas text-textMuted hover:text-textSecondary hover:border-borderHover'
                   }`}
                 >
-                  {l.label}
+                  {p === 'gradient' ? t('admin.emailPresetGradient') || '渐变版' :
+                   p === 'simple' ? t('admin.emailPresetSimple') || '简版' :
+                   t('admin.emailPresetCustom') || '自定义版'}
                 </button>
               ))}
             </div>
 
-            {/* 用途 Tab */}
-            <div className="flex gap-1 mb-4">
-              {PURPOSES.map(p => (
+            {/* 自定义版才显示编辑区 */}
+            {templatePreset === 'custom' ? (
+              <>
+                {/* 语言 Tab */}
+                <div className="flex gap-1 mb-3">
+                  {LANGS.map(l => (
+                    <button
+                      key={l.key}
+                      onClick={() => setTemplateLang(l.key)}
+                      className={`px-3 py-1 text-xs rounded-lg font-medium transition-colors ${
+                        templateLang === l.key
+                          ? 'bg-primary-500 text-white'
+                          : 'bg-canvas border border-border text-textMuted hover:text-textSecondary'
+                      }`}
+                    >
+                      {l.label}
+                    </button>
+                  ))}
+                </div>
+
+                {/* 用途 Tab */}
+                <div className="flex gap-1 mb-4">
+                  {PURPOSES.map(p => (
+                    <button
+                      key={p.key}
+                      onClick={() => setTemplatePurpose(p.key)}
+                      className={`px-3 py-1 text-xs rounded-lg font-medium transition-colors ${
+                        templatePurpose === p.key
+                          ? 'bg-primary-500/10 border border-primary-500/30 text-primary-500'
+                          : 'bg-canvas border border-border text-textMuted hover:text-textSecondary'
+                      }`}
+                    >
+                      {t(p.labelKey)}
+                    </button>
+                  ))}
+                </div>
+
+                {/* 主题 */}
+                <div className="mb-3">
+                  <label className="block text-xs text-textSecondary mb-1">{t('admin.emailTemplateSubject')}</label>
+                  <input
+                    type="text"
+                    value={editSubject}
+                    onChange={e => setEditSubject(e.target.value)}
+                    className="w-full px-3 py-2 text-sm rounded-lg border border-border bg-canvas text-textPrimary focus:outline-none focus:ring-2 focus:ring-primary-500/50"
+                  />
+                </div>
+
+                {/* HTML 正文 */}
+                <div className="mb-3">
+                  <label className="block text-xs text-textSecondary mb-1">{t('admin.emailTemplateBody')}</label>
+                  <textarea
+                    value={editBody}
+                    onChange={e => setEditBody(e.target.value)}
+                    rows={10}
+                    className="w-full px-3 py-2 text-xs font-mono rounded-lg border border-border bg-canvas text-textPrimary focus:outline-none focus:ring-2 focus:ring-primary-500/50 resize-y"
+                  />
+                </div>
+
+                {/* 变量提示 */}
+                <p className="text-[10px] text-textMuted mb-4 bg-canvas rounded-lg px-3 py-2 border border-border/50">
+                  💡 {t('admin.emailTemplateVarHint')}
+                </p>
+
+                {/* 按钮 */}
+                <div className="flex gap-2">
+                  <button
+                    onClick={handleResetTemplates}
+                    className="px-3 py-1.5 text-xs rounded-lg border border-border text-textSecondary hover:text-rose-400 transition-colors"
+                  >
+                    {t('admin.emailTemplateResetAll')}
+                  </button>
+                  <button
+                    onClick={handleSaveTemplates}
+                    disabled={tplSaving}
+                    className="px-4 py-1.5 text-xs rounded-lg bg-primary-500 hover:bg-primary-400 disabled:opacity-30 text-white font-medium transition-colors"
+                  >
+                    {tplSaving ? t('common.saving') : t('admin.emailTemplatesSave')}
+                  </button>
+                </div>
+              </>
+            ) : (
+              /* 预设版：显示提示信息 + 预览 */
+              <div className="bg-mint-400/5 border border-mint-400/20 rounded-xl p-5 text-center">
+                <div className="w-10 h-10 rounded-full bg-mint-400/20 flex items-center justify-center mx-auto mb-3">
+                  <CheckCircle size={20} className="text-mint-400" />
+                </div>
+                <p className="text-sm font-medium text-textPrimary mb-1">
+                  {templatePreset === 'gradient'
+                    ? (t('admin.emailPresetGradientActive') || '渐变版模板使用中')
+                    : (t('admin.emailPresetSimpleActive') || '简版模板使用中')}
+                </p>
+                <p className="text-xs text-textMuted mb-3">
+                  {t('admin.emailPresetHint') || '点击「自定义版」按钮可编辑完整的邮件 HTML'}
+                </p>
                 <button
-                  key={p.key}
-                  onClick={() => setTemplatePurpose(p.key)}
-                  className={`px-3 py-1 text-xs rounded-lg font-medium transition-colors ${
-                    templatePurpose === p.key
-                      ? 'bg-primary-500/10 border border-primary-500/30 text-primary-500'
-                      : 'bg-canvas border border-border text-textMuted hover:text-textSecondary'
-                  }`}
+                  onClick={() => window.open('#preview', '_blank')}
+                  className="text-xs text-primary-400 hover:text-primary-300 underline underline-offset-2"
                 >
-                  {t(p.labelKey)}
+                  {t('admin.emailTemplateViewPreview') || '查看预览'}
                 </button>
-              ))}
-            </div>
-
-            {/* 主题 */}
-            <div className="mb-3">
-              <label className="block text-xs text-textSecondary mb-1">{t('admin.emailTemplateSubject')}</label>
-              <input
-                type="text"
-                value={editSubject}
-                onChange={e => setEditSubject(e.target.value)}
-                className="w-full px-3 py-2 text-sm rounded-lg border border-border bg-canvas text-textPrimary focus:outline-none focus:ring-2 focus:ring-primary-500/50"
-              />
-            </div>
-
-            {/* HTML 正文 */}
-            <div className="mb-3">
-              <label className="block text-xs text-textSecondary mb-1">{t('admin.emailTemplateBody')}</label>
-              <textarea
-                value={editBody}
-                onChange={e => setEditBody(e.target.value)}
-                rows={10}
-                className="w-full px-3 py-2 text-xs font-mono rounded-lg border border-border bg-canvas text-textPrimary focus:outline-none focus:ring-2 focus:ring-primary-500/50 resize-y"
-              />
-            </div>
-
-            {/* 变量提示 */}
-            <p className="text-[10px] text-textMuted mb-4 bg-canvas rounded-lg px-3 py-2 border border-border/50">
-              💡 {t('admin.emailTemplateVarHint')}
-            </p>
-
-            {/* 按钮 */}
-            <div className="flex gap-2">
-              <button
-                onClick={handleResetTemplates}
-                className="px-3 py-1.5 text-xs rounded-lg border border-border text-textSecondary hover:text-rose-400 transition-colors"
-              >
-                {t('admin.emailTemplateResetAll')}
-              </button>
-              <button
-                onClick={handleSaveTemplates}
-                disabled={tplSaving}
-                className="px-4 py-1.5 text-xs rounded-lg bg-primary-500 hover:bg-primary-400 disabled:opacity-30 text-white font-medium transition-colors"
-              >
-                {tplSaving ? t('common.saving') : t('admin.emailTemplatesSave')}
-              </button>
-            </div>
+              </div>
+            )}
           </>
         ) : (
           <p className="text-xs text-textMuted py-4 text-center">{t('common.loading')}</p>

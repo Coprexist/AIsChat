@@ -112,3 +112,10 @@ class EmailTemplatesData(BaseModel):
 class EmailTemplatesRequest(BaseModel):
     """邮件模板保存请求"""
     templates: EmailTemplatesData
+    preset: str | None = None  # gradient / simple / custom，不传则不改变
+
+
+class EmailPresetRequest(BaseModel):
+    """邮件模板预设切换请求"""
+    preset: str = Field(..., description="gradient | simple | custom")
+    templates: EmailTemplatesData | None = None
