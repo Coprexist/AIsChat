@@ -8,7 +8,7 @@ import { api } from '../api/client'
 import {
   Globe, Check, User, Key, Bot, Mail, Shield, Sparkles,
   Upload, Loader2, Eye, EyeOff, ChevronLeft, ChevronRight,
-  Image, Palette, Server, Lock, Cpu,
+  Palette, Server,
 } from 'lucide-react'
 
 // ─── 预设颜色 ──────────────────────────────────────────────
@@ -75,7 +75,6 @@ export default function SetupPage() {
   const [avatarFile, setAvatarFile] = useState<File | null>(null)
   const [avatarPreview, setAvatarPreview] = useState<string | null>(null)
   const [avatarUploading, setAvatarUploading] = useState(false)
-  const [avatarUrl, setAvatarUrl] = useState<string | null>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
 
   // 清理 preview URL
@@ -112,7 +111,7 @@ export default function SetupPage() {
   // ── 加载实例默认设置 ──
   useEffect(() => {
     if (!isAdmin || instanceDefaultsLoaded) return
-    api.get('/admin/settings').then((r: any) => {
+    api.get('/admin/system-settings').then((r: any) => {
       setInstanceLang(r.default_language || 'zh')
       setInstanceCredit(r.default_platform_credit ?? 0)
       setInstanceFileQuota(r.default_file_quota_mb ?? 100)
@@ -151,23 +150,20 @@ export default function SetupPage() {
     }
 
     if (step === 'profile') {
-      // 先上传头像（如果有新文件）
-      let finalAvatarUrl = avatarUrl
+      // 先上传头像（如果有新文件），上传端点会自动更新 user.avatar_url
       if (avatarFile) {
         setAvatarUploading(true)
         try {
-          const uploadResult = await api.upload('/user/avatar', avatarFile)
-          finalAvatarUrl = uploadResult.avatar_url
-          setAvatarUrl(finalAvatarUrl)
+          await api.upload('/user/avatar', avatarFile)
         } finally {
           setAvatarUploading(false)
         }
       }
+      // 保存 bio / status（头像已在上传时保存，不重复传）
       await api.put('/user/settings', {
         bio: bio || null,
         status_text: statusText || null,
         status_color: statusColor,
-        avatar_url: finalAvatarUrl,
       })
     }
 
@@ -183,7 +179,7 @@ export default function SetupPage() {
         name: aiName.trim(),
         system_prompt: systemPrompt || null,
         config_profile: configProfile,
-      }, { timeout: 30000 })
+      })
     }
 
     if (step === 'smtp' && isAdmin && smtpHost) {
