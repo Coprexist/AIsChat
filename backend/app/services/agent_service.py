@@ -1227,6 +1227,7 @@ def agent_to_dict(agent: Agent) -> dict:
         "memory_shared_scope": agent.memory_shared_scope or "private_only",
         "bio": getattr(agent, 'bio', None),
         "status_text": getattr(agent, 'status_text', None),
+        "status_color": getattr(agent, 'status_color', None),
     }
 
 

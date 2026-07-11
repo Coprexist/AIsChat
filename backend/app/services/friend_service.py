@@ -311,6 +311,7 @@ async def list_friends(
                 state = a.state
                 avatar_url = a.avatar_url or avatar_url
                 status_text = getattr(a, 'status_text', None) or status_text
+                status_color = getattr(a, 'status_color', None) or status_color
 
         last_dm_at = None
         if friend_user_id:

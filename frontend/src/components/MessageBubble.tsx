@@ -220,9 +220,7 @@ const MessageBubble = memo(function MessageBubble({
               components={{ code: CodeRenderer, table: ({ node, ...props }) => (
                   <div className="markdown-table-wrapper"><table {...props} /></div>
                 ), th: ({ node, ...props }) => (<th {...props} />), td: ({ node, ...props }) => (<td {...props} />), }}
-            >
-              {content}
-            </Markdown>
+            />
           )}
           {/* 附件列表（跳过邀请类型附件） */}
           {fileAtts.length > 0 && (

@@ -416,15 +416,21 @@ async def _get_partner_info(db: AsyncSession, user_id: int) -> dict:
 
     state = None
     avatar_url = getattr(user, 'avatar_url', None)
+    status_text = getattr(user, 'status_text', None)
+    status_color = getattr(user, 'status_color', None)
     if user.type == "ai":
-        # 查 agent 表获取在线状态和头像（AI 头像存在 agents 表，不在 users 表）
+        # 查 agent 表获取在线状态、头像、个性状态和状态颜色（AI 的这些字段存在 agents 表）
         agent_result = await db.execute(
-            select(Agent.state, Agent.avatar_url).where(Agent.user_id == user_id)
+            select(Agent.state, Agent.avatar_url, Agent.status_text, Agent.status_color).where(Agent.user_id == user_id)
         )
         agent_row = agent_result.one_or_none()
         if agent_row:
             state = agent_row[0]
             avatar_url = agent_row[1] or avatar_url  # Agent 头像优先
+            if agent_row[2]:  # agent.status_text
+                status_text = agent_row[2]
+            if agent_row[3]:  # agent.status_color
+                status_color = agent_row[3]
     else:
         from app.services.online_tracker import get_user_online_status
         if get_user_online_status(user_id):
@@ -436,8 +442,8 @@ async def _get_partner_info(db: AsyncSession, user_id: int) -> dict:
         "type": user.type,
         "state": state,
         "avatar_url": avatar_url,
-        "status_text": getattr(user, 'status_text', None),
-        "status_color": getattr(user, 'status_color', None),
+        "status_text": status_text,
+        "status_color": status_color,
     }
 
 

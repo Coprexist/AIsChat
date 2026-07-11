@@ -5,6 +5,7 @@ import { useAuth } from '../context/AuthContext'
 import { STATE_BADGE_COLORS } from '../constants'
 import Toggle from '../components/Toggle'
 import { useT } from '../i18n/I18nContext'
+import { getStatusTextStyle, STATUS_COLORS } from '../utils/statusColor'
 import {
   ArrowLeft, Trash2, Download, Upload, Key, Edit3,
   Image, HardDrive, Brain, Copy, Check, X, RefreshCw, Bot, Settings, User,
@@ -70,6 +71,7 @@ interface Agent {
   avatar_url: string | null
   bio: string | null
   status_text: string | null
+  status_color: string | null
   api_token: string | null
   is_ai_editable: boolean
   reminder_grace: string
@@ -291,6 +293,9 @@ export default function AgentDetailPage() {
   const [generatingToken, setGeneratingToken] = useState(false)
   const [showToken, setShowToken] = useState(false)
 
+  // Profile 颜色选择器 — 用本地状态避免频繁 API 调用
+  const [profileStatusColor, setProfileStatusColor] = useState('')
+
   // Export / Import
   const [copied, setCopied] = useState(false)
   const [importing, setImporting] = useState(false)
@@ -459,6 +464,11 @@ export default function AgentDetailPage() {
       setMemPage(data.page)
     } catch { /* ignore */ }
   }, [agentId])
+
+  // 同步本地颜色状态
+  useEffect(() => {
+    setProfileStatusColor(agent?.status_color || '')
+  }, [agent?.status_color])
 
   useEffect(() => {
     loadAgent()
@@ -734,6 +744,13 @@ export default function AgentDetailPage() {
                 <span className={`text-xs px-2 py-0.5 rounded-full border ${STATE_BADGE_COLORS[agent.state] || ''}`}>
                   {agent.state}
                 </span>
+                {agent.status_text && (
+                  <span className="text-xs font-medium" style={agent.status_color
+                    ? getStatusTextStyle(agent.status_color, '#151223')
+                    : undefined}>
+                    · {agent.status_text}
+                  </span>
+                )}
                 {agent.ai_type && agent.ai_type !== 'resonance' && (
                   <span className="text-xs px-2 py-0.5 rounded-full border border-accent-400/40 bg-accent-400/10 text-accent-400">
                     {agent.ai_type === 'general' ? t('agentDetail.aiTypeGeneral') : t('agentDetail.aiTypeSemiGeneral')}
@@ -852,6 +869,38 @@ export default function AgentDetailPage() {
                     placeholder={t('agentDetail.statusTextPlaceholder')}
                   />
                   <p className="text-[10px] text-textMuted mt-1">{t('agentDetail.statusTextHint')}</p>
+                </div>
+                <div>
+                  <label className="text-xs text-textMuted">{t('me.statusColorLabel')}</label>
+                  <div className="flex items-center gap-2 flex-wrap mt-1">
+                    {STATUS_COLORS.map(c => (
+                      <button key={c.value} type="button"
+                        onClick={() => { setProfileStatusColor(c.value); handleUpdateAgentField('status_color', c.value || null) }}
+                        className={`w-6 h-6 rounded-full border-2 transition-all ${
+                          (profileStatusColor || '') === c.value
+                            ? 'border-primary-400 scale-110 shadow-md'
+                            : c.value === ''
+                              ? 'border-border bg-canvas hover:border-textMuted'
+                              : 'border-transparent hover:scale-105'
+                        }`}
+                        style={c.value ? { backgroundColor: c.value } : undefined}
+                        title={c.label}
+                      >
+                        {c.value === '' && <X size={10} className="text-textMuted m-auto" />}
+                      </button>
+                    ))}
+                    <div className="relative">
+                      <input type="color" value={profileStatusColor || '#000000'}
+                        onChange={e => setProfileStatusColor(e.target.value)}
+                        onBlur={e => {
+                          if (e.target.value !== (agent?.status_color || '')) {
+                            handleUpdateAgentField('status_color', e.target.value || null)
+                          }
+                        }}
+                        className="w-6 h-6 rounded-full cursor-pointer border-2 border-border hover:border-primary-400 transition-colors"
+                        title={t('me.statusColorCustom') || '自定义'} />
+                    </div>
+                  </div>
                 </div>
               </div>
             </div>
