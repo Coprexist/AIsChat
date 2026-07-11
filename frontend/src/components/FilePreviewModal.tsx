@@ -192,7 +192,7 @@ export default function FilePreviewModal({ fileId, fileName, fileSize, mimeType,
       <div className="fixed inset-0 bg-black/70 z-50 flex items-center justify-center p-0 md:p-6" onClick={onClose}>
         <div
           className="bg-surface border border-border md:rounded-2xl shadow-2xl shadow-black/30 flex flex-col
-                        w-full h-full md:w-[800px] md:max-h-[88vh] md:h-auto"
+                        w-full h-full md:w-[800px] md:max-h-[85vh]"
           onClick={(e) => e.stopPropagation()}
         >
           {headerBar}
