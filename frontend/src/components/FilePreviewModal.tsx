@@ -198,13 +198,13 @@ export default function FilePreviewModal({ fileId, fileName, fileSize, mimeType,
           {headerBar}
 
           {/* 内容区 */}
-          <div className="flex-1 overflow-auto bg-canvas min-h-0 flex items-stretch">
+          <div className="flex-1 overflow-auto bg-canvas min-h-0 flex flex-col">
             {loading ? (
-              <div className="flex items-center justify-center py-20 w-full self-center">
+              <div className="flex items-center justify-center py-20 w-full h-full">
                 <Loader2 size={24} className="animate-spin text-textMuted" />
               </div>
             ) : error ? (
-              <div className="flex flex-col items-center justify-center py-20 gap-3 text-textMuted w-full self-center">
+              <div className="flex flex-col items-center justify-center py-20 gap-3 text-textMuted w-full h-full">
                 <AlertTriangle size={24} className="text-rose-400" />
                 <p className="text-sm">{error}</p>
                 <button onClick={handleDownload} className="px-4 py-2 rounded-xl bg-primary-500 text-white text-sm">
@@ -212,7 +212,7 @@ export default function FilePreviewModal({ fileId, fileName, fileSize, mimeType,
                 </button>
               </div>
             ) : isImage ? (
-              <div ref={imgContainerRef} className="w-full flex items-center justify-center overflow-auto">
+              <div ref={imgContainerRef} className="w-full h-full flex items-center justify-center overflow-auto">
                 <img
                   src={dlUrl}
                   alt={fileName}
@@ -221,10 +221,14 @@ export default function FilePreviewModal({ fileId, fileName, fileSize, mimeType,
                   draggable={false}
                 />
               </div>
-            ) : isPDF ? (
-              <iframe src={dlUrl} className="w-full h-full border-0" title={fileName} />
-            ) : isHtml && content ? (
-              <iframe srcDoc={content} className="w-full h-full border-0 bg-white" title={fileName} sandbox="allow-scripts" />
+            ) : isPDF || (isHtml && content) ? (
+              <iframe
+                src={isPDF ? dlUrl : undefined}
+                srcDoc={isHtml ? content : undefined}
+                className="w-full flex-1 border-0 bg-white"
+                title={fileName}
+                sandbox={isHtml ? 'allow-scripts' : undefined}
+              />
             ) : (
               <div className="w-full p-4 md:p-5 self-start">
                 {isDocx ? (
