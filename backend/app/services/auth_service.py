@@ -30,8 +30,8 @@ async def register_user(
     if result.scalar_one_or_none() is not None:
         raise ValueError("用户名已存在")
 
-    # 判断是否为首个用户
-    count_result = await db.execute(select(func.count(User.id)))
+    # 判断是否为首个用户（排除系统用户 id=0）
+    count_result = await db.execute(select(func.count(User.id)).where(User.type != 'system'))
     user_count = count_result.scalar()
     is_first = user_count == 0
 
