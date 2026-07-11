@@ -42,9 +42,10 @@ export default function FilePreviewModal({ fileId, fileName, fileSize, mimeType,
   const isDocx = resolvedMime === 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'
     || fileName.endsWith('.docx')
   const isText = isTextPreviewable(resolvedMime)
-  const previewable = isImage || isPDF || isDocx || isText
+  const isHtml = resolvedMime === 'text/html' || fileName.endsWith('.html') || fileName.endsWith('.htm')
+  const previewable = isImage || isPDF || isDocx || isText || isHtml
   const isMd = isMarkdownFile(fileName, resolvedMime)
-  const codeLang = getCodeLang(fileName, resolvedMime)
+  const codeLang = isHtml ? '' : getCodeLang(fileName, resolvedMime)  // HTML 用 iframe 渲染
 
   useEffect(() => {
     if (!previewable) {
@@ -228,6 +229,13 @@ export default function FilePreviewModal({ fileId, fileName, fileSize, mimeType,
                   <div
                     className="prose prose-sm dark:prose-invert max-w-none text-textPrimary"
                     dangerouslySetInnerHTML={{ __html: content || '' }}
+                  />
+                ) : isHtml && content ? (
+                  <iframe
+                    srcDoc={content}
+                    className="w-full h-full border-0 bg-white rounded-lg"
+                    title={fileName}
+                    sandbox="allow-scripts"
                   />
                 ) : isMd || codeLang ? (
                   <div className="prose prose-sm dark:prose-invert max-w-none text-textPrimary
