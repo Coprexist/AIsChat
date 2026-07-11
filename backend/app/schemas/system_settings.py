@@ -26,8 +26,14 @@ class UpdateSystemSettingsRequest(BaseModel):
 
 
 class SetupCompleteRequest(BaseModel):
-    """完成初始化设置"""
-    language: str = Field("zh", description="用户选择的语言: zh 或 en")
+    """完成初始化设置（最终步骤调用，标记向导完成）"""
+    language: str | None = Field(None, description="用户选择的语言，留空保留当前设置")
+    completed: bool = Field(True, description="标记向导完成")
+
+
+class LanguageUpdateRequest(BaseModel):
+    """更新用户语言（向导步骤1保存，不标记完成）"""
+    language: str = Field(..., description="用户选择的语言: zh 或 en")
 
 
 # ── v1.0.0 邮箱认证 ──
