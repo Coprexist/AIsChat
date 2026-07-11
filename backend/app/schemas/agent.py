@@ -163,6 +163,7 @@ class AgentResponse(BaseModel):
     avatar_url: str | None = None
     bio: str | None = None
     status_text: str | None = None
+    status_color: str | None = None
     reminder_grace: str = "every_time"
     auto_dnd_threshold: int = 20
     auto_dnd_duration: int = 5

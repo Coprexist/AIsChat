@@ -48,6 +48,7 @@ interface AgentData {
   user_can_view_logs?: boolean | null
   bio?: string | null
   status_text?: string | null
+  status_color?: string | null
 }
 
 interface ModelOption {
@@ -172,7 +173,7 @@ export default function AgentSettingsModal({
   const [apiKey, setApiKey] = useState('')
   const [bio, setBio] = useState(agent.bio || '')
   const [statusText, setStatusText] = useState(agent.status_text || '')
-  const [statusColor, setStatusColor] = useState((agent as any).status_color || '')
+  const [statusColor, setStatusColor] = useState(agent.status_color || '')
 
   // ── UI 状态 ──
   const [saving, setSaving] = useState(false)
@@ -403,10 +404,10 @@ export default function AgentSettingsModal({
                 </div>
                 <div>
                   <label className="block text-xs font-medium mb-1 text-textSecondary">{t('me.statusColorLabel') || '状态颜色'}</label>
-                  <div className="flex items-center gap-1.5 flex-wrap">
+                  <div className="flex items-center gap-2 flex-wrap">
                     {STATUS_COLORS.map(c => (
                       <button key={c.value} type="button" onClick={() => setStatusColor(c.value)}
-                        className={`w-5 h-5 rounded-full border-2 transition-all ${
+                        className={`w-6 h-6 rounded-full border-2 transition-all ${
                           statusColor === c.value ? 'border-primary-400 scale-110 shadow-md'
                           : c.value === '' ? 'border-border bg-canvas hover:border-textMuted'
                           : 'border-transparent hover:scale-105'
@@ -414,12 +415,14 @@ export default function AgentSettingsModal({
                         style={c.value ? { backgroundColor: c.value } : undefined}
                         title={c.label}
                       >
-                        {c.value === '' && <X size={8} className="text-textMuted m-auto" />}
+                        {c.value === '' && <X size={10} className="text-textMuted m-auto" />}
                       </button>
                     ))}
-                    <input type="color" value={statusColor || '#000000'} onChange={e => setStatusColor(e.target.value)}
-                      className="w-5 h-5 rounded-full cursor-pointer border-2 border-border hover:border-primary-400 transition-colors"
-                      title="自定义" />
+                    <div className="relative">
+                      <input type="color" value={statusColor || '#000000'} onChange={e => setStatusColor(e.target.value)}
+                        className="w-6 h-6 rounded-full cursor-pointer border-2 border-border hover:border-primary-400 transition-colors"
+                        title={t('me.statusColorCustom') || '自定义'} />
+                    </div>
                   </div>
                 </div>
               </Section>
