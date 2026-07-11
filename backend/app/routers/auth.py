@@ -12,7 +12,7 @@ from app.schemas.auth import (
     EmailVerificationRequest, VerifyEmailRequest, RebindEmailRequest,
     LoginProvidersResponse,
 )
-from app.schemas.system_settings import SetupCompleteRequest
+from app.schemas.system_settings import SetupCompleteRequest, LanguageUpdateRequest
 from app.services.auth_service import (
     register_user, login_user, get_user_info,
     update_user_settings, rebind_email, unbind_email,
@@ -81,17 +81,39 @@ async def complete_setup(
     current_user: dict = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
-    """完成初始化设置向导"""
-    if req.language not in ("zh", "en"):
+    """完成初始化设置向导（最终步骤调用，标记向导完成）"""
+    result = await db.execute(select(User).where(User.id == current_user["user_id"]))
+    user = result.scalar_one_or_none()
+    if user is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="用户不存在")
+    # 保存语言（如果提供了）
+    if req.language:
+        if req.language not in ("zh", "en", "ja"):
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="不支持的语言")
+        user.language = req.language
+    # 标记向导完成
+    if req.completed:
+        user.setup_completed = True
+    await db.flush()
+    return {"status": "ok", "setup_completed": True}
+
+
+@router.patch("/language")
+async def update_language(
+    req: LanguageUpdateRequest,
+    current_user: dict = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """更新用户语言（向导步骤1调用，不标记完成）"""
+    if req.language not in ("zh", "en", "ja"):
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="不支持的语言")
     result = await db.execute(select(User).where(User.id == current_user["user_id"]))
     user = result.scalar_one_or_none()
     if user is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="用户不存在")
     user.language = req.language
-    user.setup_completed = True
     await db.flush()
-    return {"status": "ok", "setup_completed": True}
+    return {"status": "ok", "language": req.language}
 
 
 # ── v1.0.0 邮箱认证 ──
