@@ -2552,6 +2552,12 @@ def _browser_status() -> dict:
         return {"installed": False, "running": False, "port": None}
 
 
+@router.get("/browser-status")
+async def get_browser_status(admin: dict = Depends(require_admin)):
+    """获取浏览器服务（Chromium CDP）运行状态"""
+    return _browser_status()
+
+
 @router.get("/maintenance")
 async def get_maintenance(admin: dict = Depends(require_admin)):
     return {

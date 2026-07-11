@@ -58,11 +58,16 @@ function ToolRegistryTab() {
   const [loading, setLoading] = useState(true)
   const [filterSegment, setFilterSegment] = useState('all')
   const [filterState, setFilterState] = useState('all')
+  const [browserStatus, setBrowserStatus] = useState<'loading' | 'running' | 'stopped'>('loading')
 
   useEffect(() => {
     api.get<ToolsResponse>('/admin/tools')
       .then(r => { setData(r); setLoading(false) })
       .catch(() => setLoading(false))
+    // 检查浏览器服务状态
+    api.get<{running: boolean}>('/admin/browser-status')
+      .then(r => setBrowserStatus(r.running ? 'running' : 'stopped'))
+      .catch(() => setBrowserStatus('stopped'))
   }, [])
 
   const filtered = useMemo(() => {
@@ -89,6 +94,26 @@ function ToolRegistryTab() {
             <div className="text-lg font-semibold text-textPrimary mt-0.5">{seg.tool_count}</div>
           </div>
         ))}
+      </div>
+
+      {/* 浏览器服务状态提示 */}
+      <div className={`rounded-lg border px-3.5 py-2.5 text-xs flex items-center gap-2 ${
+        browserStatus === 'running'
+          ? 'bg-emerald-500/10 border-emerald-500/20 text-emerald-600 dark:text-emerald-400'
+          : browserStatus === 'loading'
+            ? 'bg-amber-500/10 border-amber-500/20 text-amber-600 dark:text-amber-400'
+            : 'bg-rose-500/10 border-rose-500/20 text-rose-600 dark:text-rose-400'
+      }`}>
+        <span className={`w-2 h-2 rounded-full shrink-0 ${
+          browserStatus === 'running' ? 'bg-emerald-500' : browserStatus === 'loading' ? 'bg-amber-500 animate-pulse' : 'bg-rose-500'
+        }`} />
+        <span>
+          {browserStatus === 'running'
+            ? 'Chromium 浏览器服务运行中，browser 命令可用'
+            : browserStatus === 'loading'
+              ? '正在检查浏览器服务状态...'
+              : 'Chromium 浏览器服务未运行，browser 命令不可用。请改用 web_search（搜索）和 web_fetch（获取网页）工具'}
+        </span>
       </div>
 
       {/* 筛选 */}

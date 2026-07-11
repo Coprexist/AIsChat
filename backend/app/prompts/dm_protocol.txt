@@ -6,3 +6,4 @@
 重要信息用 manage_records 记录（结构化存储，推荐）或 store_memory(scope='private')（向量存储）。
 检索优先用 manage_records，recall_memory 可能不可用。
 切换状态用 switch_state/set_dnd，不要只用嘴说。
+查资料用 web_search（搜索）和 web_fetch（看网页）——browser 命令可能不可用。

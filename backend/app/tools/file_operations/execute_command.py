@@ -13,6 +13,8 @@ class ExecuteCommand(ToolPlugin):
     description = ("通过 OpenCLI 执行命令。\n"
                    "**文件操作（始终可用，安全沙箱隔离）：** file_read（读取文本文件）、file_write（创建/覆盖文件）、file_list（列出目录）、file_delete（删除文件）、file_info（查看文件信息）、create_dir（创建目录）——所有文件操作自动限制在你的个人工作空间内，不会影响系统。\n"
                    "**高级命令（需管理员开启白名单）：** browser（上网查资料）、gh（GitHub CLI）、docker、obsidian 等。\n"
+                   "⚠️ browser 命令依赖 Chromium 浏览器服务，部分环境可能不可用（如 NAS Docker 部署）。\n"
+                   "如果 browser 报错，请改用 web_search（搜索关键词）和 web_fetch（获取指定 URL）工具，它们不依赖浏览器，更稳定。\n"
                    "不在白名单中的命令会被拒绝。browser 等命令的详细用法请用 tool_help 查询。")
     segment = "file_operations"
     parameters = {
