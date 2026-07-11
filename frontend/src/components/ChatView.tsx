@@ -189,6 +189,19 @@ export default function ChatView({ conversationType, conversationId }: ChatViewP
     return () => clearTimeout(timer)
   }, [input, conversationType, conversationId])
 
+  // 页面刷新/关闭时同步保存草稿（beforeunload 是同步事件，cleanup 不保证执行）
+  useEffect(() => {
+    if (!conversationId) return
+    const draftKey = `draft_${conversationType}_${conversationId}`
+    const handleBeforeUnload = () => {
+      if (inputRef.current?.trim()) {
+        localStorage.setItem(draftKey, inputRef.current)
+      }
+    }
+    window.addEventListener('beforeunload', handleBeforeUnload)
+    return () => window.removeEventListener('beforeunload', handleBeforeUnload)
+  }, [conversationType, conversationId])
+
   const handleMessage = useCallback((msg: WebSocketMessage) => {
     if (msg.type === 'message') {
       const m = msg.data
