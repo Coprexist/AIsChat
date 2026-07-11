@@ -345,7 +345,7 @@ export default function SetupPage() {
 
   // ── 步骤指示条 ──
   const renderStepBar = () => (
-    <div className="flex items-center justify-center gap-0 mb-8 overflow-x-auto px-2">
+    <div className="flex items-center justify-center gap-0 mb-8 overflow-x-auto px-2 py-1">
       {visibleSteps.map((s, idx) => {
         const isCurrent = idx === currentIdx
         const isCompleted = completedSteps.has(s.key) || idx < currentIdx
