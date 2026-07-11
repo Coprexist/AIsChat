@@ -32,7 +32,7 @@ class WebFetch(ToolPlugin):
         },
         "selector": {
             "type": "string",
-            "description": "可选：CSS 选择器，只返回匹配元素的内容（如 'article'、'#content'、'.main'）",
+            "description": "可选：只提取指定标签的内容（如 'article'、'div'、'p'）。注意：只支持 HTML 标签名，不支持 CSS 类/ID 选择器",
             "nullable": True,
         },
     }
