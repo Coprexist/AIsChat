@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect, useRef, useCallback } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
 import { useT } from '../i18n/I18nContext'
@@ -93,23 +93,32 @@ export default function SetupPage() {
 
   // ── 自动保存：profile 步骤的数据修改后 1.5s 自动存后端 ──
   const profileSaveTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const profileDirty = useRef(false)
+  const saveProfile = useCallback(async () => {
+    if (!profileDirty.current) return
+    profileDirty.current = false
+    try {
+      await api.put('/user/settings', {
+        bio: bio || null,
+        status_text: statusText || null,
+        status_color: statusColor,
+      })
+    } catch (_) { /* 静默失败，等用户点下一步时重试 */ }
+  }, [bio, statusText, statusColor])
   useEffect(() => {
     if (currentStep.key !== 'profile') return
-    if (!bio && !statusText) return // 空的不用保存
+    profileDirty.current = true
     if (profileSaveTimer.current) clearTimeout(profileSaveTimer.current)
-    profileSaveTimer.current = setTimeout(async () => {
-      try {
-        await api.put('/user/settings', {
-          bio: bio || null,
-          status_text: statusText || null,
-          status_color: statusColor,
-        })
-      } catch (_) { /* 静默失败，等用户点下一步时重试 */ }
-    }, 1500)
+    profileSaveTimer.current = setTimeout(saveProfile, 1500)
     return () => {
-      if (profileSaveTimer.current) clearTimeout(profileSaveTimer.current)
+      if (profileSaveTimer.current) {
+        clearTimeout(profileSaveTimer.current)
+        profileSaveTimer.current = null
+        // 组件卸载/切步骤时落盘未保存的修改
+        saveProfile()
+      }
     }
-  }, [bio, statusText, statusColor, currentStep.key])
+  }, [bio, statusText, statusColor, currentStep.key, saveProfile])
 
   // ── Step 4: API 配置 ──
   const [apiBaseUrl, setApiBaseUrl] = useState('https://api.deepseek.com')
@@ -131,22 +140,30 @@ export default function SetupPage() {
 
   // ── 自动保存：API 配置修改后 1.5s 自动存后端 ──
   const apiSaveTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const apiDirty = useRef(false)
+  const saveApi = useCallback(async () => {
+    if (!apiDirty.current) return
+    apiDirty.current = false
+    try {
+      await api.put('/user/settings', {
+        api_base_url: apiBaseUrl || 'https://api.deepseek.com',
+        api_key: apiKey || null,
+      })
+    } catch (_) { /* 静默失败 */ }
+  }, [apiBaseUrl, apiKey])
   useEffect(() => {
     if (currentStep.key !== 'apiConfig') return
-    if (!apiKey && apiBaseUrl === 'https://api.deepseek.com') return
+    apiDirty.current = true
     if (apiSaveTimer.current) clearTimeout(apiSaveTimer.current)
-    apiSaveTimer.current = setTimeout(async () => {
-      try {
-        await api.put('/user/settings', {
-          api_base_url: apiBaseUrl || 'https://api.deepseek.com',
-          api_key: apiKey || null,
-        })
-      } catch (_) { /* 静默失败 */ }
-    }, 1500)
+    apiSaveTimer.current = setTimeout(saveApi, 1500)
     return () => {
-      if (apiSaveTimer.current) clearTimeout(apiSaveTimer.current)
+      if (apiSaveTimer.current) {
+        clearTimeout(apiSaveTimer.current)
+        apiSaveTimer.current = null
+        saveApi()
+      }
     }
-  }, [apiBaseUrl, apiKey, currentStep.key])
+  }, [apiBaseUrl, apiKey, currentStep.key, saveApi])
 
   // ── Step 5: 创建 AI ──
   const [aiName, setAiName] = useState('')
@@ -550,8 +567,15 @@ export default function SetupPage() {
               <div className="relative">
                 <button
                   type="button"
-                  onClick={() => document.getElementById('setup-color-picker')?.click()}
-                  className="w-6 h-6 rounded-full border-2 border-border hover:border-primary-400 transition-colors cursor-pointer"
+                  onClick={() => {
+                    const el = document.getElementById('setup-color-picker') as HTMLInputElement | null
+                    if (el) el.showPicker?.() ?? el.click()
+                  }}
+                  className={`w-6 h-6 rounded-full border-2 transition-all ${
+                    statusColor === '#6366f1' || !statusColor
+                      ? 'border-primary-400 scale-110 shadow-md'
+                      : 'border-border hover:scale-105'
+                  }`}
                   style={{ backgroundColor: statusColor || '#6366f1' }}
                   title={t('me.statusColorCustom') || '自定义'}
                 />
