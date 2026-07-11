@@ -299,7 +299,7 @@ async def set_email_template_preset(db: AsyncSession, preset: str, custom_templa
     if preset not in ("gradient", "simple", "custom"):
         raise ValueError(f"无效预设: {preset}")
     settings = await get_settings(db)
-    raw = settings.get("email_templates") or {}
+    raw = (settings.get("email_templates") or {}).copy()
     if isinstance(raw, str):
         import json
         raw = json.loads(raw)
@@ -315,8 +315,7 @@ async def set_email_template_preset(db: AsyncSession, preset: str, custom_templa
     result = await db.execute(select(SystemSettings).where(SystemSettings.id == 1))
     row = result.scalar_one_or_none()
     if row:
-        row.email_templates = raw  # type: ignore
-        await db.flush()
+        row.email_templates = raw
 
 
 def format_email_template(tpl: dict, vars: dict) -> dict:
