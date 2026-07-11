@@ -4,6 +4,8 @@ import remarkGfm from 'remark-gfm'
 import remarkMath from 'remark-math'
 import remarkBreaks from 'remark-breaks'
 import rehypeKatex from 'rehype-katex'
+import rehypeRaw from 'rehype-raw'
+import rehypeSanitize from 'rehype-sanitize'
 import { useAuth } from '../context/AuthContext'
 import { FileIcon, Download, Globe, ShieldAlert } from 'lucide-react'
 import { formatMessageTime } from '../utils/time'
@@ -195,7 +197,7 @@ const MessageBubble = memo(function MessageBubble({
           ) : (
             <Markdown
               remarkPlugins={[remarkGfm, remarkMath, remarkBreaks]}
-              rehypePlugins={[rehypeKatex]}
+              rehypePlugins={[rehypeRaw, rehypeSanitize, rehypeKatex]}
               components={{ code: CodeRenderer, table: ({ node, ...props }) => (
                   <div className="markdown-table-wrapper"><table {...props} /></div>
                 ), th: ({ node, ...props }) => (<th {...props} />), td: ({ node, ...props }) => (<td {...props} />), }}
