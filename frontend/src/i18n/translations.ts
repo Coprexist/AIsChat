@@ -1036,6 +1036,7 @@ const zh: TranslationDict = {
   'admin.defaultChatModel': '默认聊天模型',
   'admin.defaultWorkModel': '默认工作模型',
   'admin.modelOptionsJson': '模型选项列表 (JSON)',
+  'admin.defaultProvider': '默认厂商',
   // common
   'common.apply': '应用',
   'common.saved': '已保存',
@@ -2773,6 +2774,7 @@ const en: TranslationDict = {
   'admin.defaultChatModel': 'Default Chat Model',
   'admin.defaultWorkModel': 'Default Work Model',
   'admin.modelOptionsJson': 'Model Options (JSON)',
+  'admin.defaultProvider': 'Default Provider',
   // common
   'common.apply': 'Apply',
   'common.saved': 'Saved',
@@ -4451,6 +4453,7 @@ const ja: TranslationDict = {
   'admin.defaultChatModel': 'デフォルトチャットモデル',
   'admin.defaultWorkModel': 'デフォルト作業モデル',
   'admin.modelOptionsJson': 'モデルオプション一覧 (JSON)',
+  'admin.defaultProvider': 'デフォルトプロバイダー',
   // 共通
   'admin.defaultLanguage': 'グローバルデフォルト言語',
   'admin.defaultLanguageDesc': '未選択の新規ユーザーはこのデフォルト言語を使用します。言語を設定済みのユーザーには影響しません。',
