@@ -8,7 +8,7 @@ import { api } from '../api/client'
 import {
   Globe, Check, User, Key, Bot, Mail, Shield, Sparkles,
   Upload, Loader2, Eye, EyeOff, ChevronLeft, ChevronRight,
-  Server, X,
+  Server, X, Pen,
 } from 'lucide-react'
 
 import AvatarCropModal from '../components/AvatarCropModal'
@@ -565,27 +565,26 @@ export default function SetupPage() {
                 </button>
               ))}
               <div className="relative">
-                <button
-                  type="button"
-                  onClick={() => {
-                    const el = document.getElementById('setup-color-picker') as HTMLInputElement | null
-                    if (el) el.showPicker?.() ?? el.click()
-                  }}
-                  className={`w-6 h-6 rounded-full border-2 transition-all ${
+                <div
+                  className={`w-6 h-6 rounded-full border-2 transition-all relative overflow-hidden ${
                     statusColor === '#6366f1' || !statusColor
                       ? 'border-primary-400 scale-110 shadow-md'
                       : 'border-border hover:scale-105'
                   }`}
                   style={{ backgroundColor: statusColor || '#6366f1' }}
                   title={t('me.statusColorCustom') || '自定义'}
-                />
-                <input
-                  id="setup-color-picker"
-                  type="color"
-                  value={statusColor || '#6366f1'}
-                  onChange={e => setStatusColor(e.target.value)}
-                  className="hidden"
-                />
+                >
+                  {/* 左上角小笔图标表示可自定义 */}
+                  {(!statusColor || statusColor === '#6366f1') && (
+                    <Pen size={8} className="absolute top-0 left-0 text-white/80 drop-shadow" />
+                  )}
+                  <input
+                    type="color"
+                    value={statusColor || '#6366f1'}
+                    onChange={e => setStatusColor(e.target.value)}
+                    className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
+                  />
+                </div>
               </div>
             </div>
           </div>
