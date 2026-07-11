@@ -566,20 +566,14 @@ export default function SetupPage() {
               ))}
               <div className="relative">
                 <div
-                  className={`w-6 h-6 rounded-full border-2 transition-all relative overflow-hidden ${
-                    statusColor === '#6366f1' || !statusColor
-                      ? 'border-primary-400 scale-110 shadow-md'
-                      : 'border-border hover:scale-105'
-                  }`}
+                  className="w-6 h-6 rounded-full border-2 border-primary-400 scale-110 shadow-md transition-all relative overflow-hidden"
                   style={{ backgroundColor: statusColor || '#6366f1' }}
                   title={t('me.statusColorCustom') || '自定义'}
                 >
                   {/* 居中笔图标表示可自定义 */}
-                  {(!statusColor || statusColor === '#6366f1') && (
-                    <span className="absolute inset-0 flex items-center justify-center pointer-events-none">
-                      <Pen size={10} className="text-white/70 drop-shadow" />
-                    </span>
-                  )}
+                  <span className="absolute inset-0 flex items-center justify-center pointer-events-none">
+                    <Pen size={10} className="text-white/70 drop-shadow" />
+                  </span>
                   <input
                     type="color"
                     value={statusColor || '#6366f1'}
