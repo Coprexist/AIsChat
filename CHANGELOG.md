@@ -7,6 +7,42 @@
 
 ---
 
+## [v1.0.4] - 2026-07-11
+
+### Added
+
+- 🧩 **工具自动发现**：`ToolPlugin.__init_subclass__` 自动注册 + `_discover_tools()` 扫描 `tools/` 目录。新增工具只需在对应子目录创建 `.py` 文件，零修改现有代码。
+- 🏷️ **技能类型注册表**：`SkillRegistry` 替代数据库 CHECK 约束，新增技能类型无需改数据库。
+- 🔌 **服务插件注册中心**：`PluginRegistry` + `ServicePlugin` 替代 `admin.py` 中硬编码的 `PLUGIN_REGISTRY` dict 和 `if id != "browser"` 检查。
+- 📡 **事件总线**：`EventBus` 单例发布/订阅架构，支持 `on/off/emit` 接口，错误隔离。预定义 `system.startup/shutdown`、`message.before/after_send`、`ai.before/after_response`、`ai.state_change`、`tool.after_execute` 事件类型。
+- 📦 **Alembic 数据库迁移框架**：`alembic revision --autogenerate` 替代手动写 `ALTER TABLE`。启动自动执行 `alembic upgrade head`，迁移文件版本化管理可回滚。
+- 🎲 **roll_dice 示例工具**：演示工具自动发现机制。
+- 🌐 **Swagger UI 自定义**：语言下拉（中/英） + 快捷登录表单（用户名/密码 → 自动注入 token）。
+
+### Changed
+
+- ♻️ **技能引擎注册式分发**：`skill_engine.py` 的 `if/elif` 硬编码改为 `_ACTION_HANDLERS` / `_INJECT_HANDLERS` 字典调度。新增技能类型只需注册处理器函数。
+- ♻️ **后端 Router 自动发现**：`routers/__init__.py` 自动扫描目录，`main.py` 从 16 行手动注册改为 `get_all_routers()` 循环。新增路由模块零修改。
+- ♻️ **前端导航统一注册**：`navRegistry.ts` 作为导航项单一数据源，`Sidebar.tsx` 展开/折叠和 `MobileNav.tsx` 共用。新增导航项只需改一个文件。
+- ♻️ **前端路由集中注册**：`pageRegistry.tsx` 统一管理所有页面路由定义，`App.tsx` 仅调用 `getPublicRoutes()` + `getProtectedRoutes()`。新增页面只需在 `pageRegistry.tsx` 加一行。
+
+### Fixed
+
+- 🐛 **DM 回复 BUG**：`_build_current_context` 忽略了 `is_dm` 参数，DM 中始终指示 AI 使用 `send_gm`。修复：DM 路径指示用 `send_dm`。
+- 🐛 **ChatArea.tsx Group 接口缺字段**：`Group` 缺少 `is_paused` / `concurrent_ai_limit`。
+- 🐛 **ChatView.tsx sender_state null 传入**：`state` prop 收到 `string | null` 导致类型错误。
+- 🐛 **FilePreviewModal.tsx srcDoc null 传入**：`content` 为 null 时传给 `srcDoc`（需 `string | undefined`）。
+- 🐛 **CreateAgentModal.tsx providers prop 缺失**：`DetailSettingsModal` 未接收 `providers` 参数。
+- 🐛 **Layout.tsx 自定义事件类型**：`maintenance-mode` 自定义事件监听器类型不匹配。
+- 🐛 **MaintenanceMsgEditor.tsx setMsg 缺字段**：预设应用时 `soft_once` 字段缺失。
+
+### Removed
+
+- 🧹 前端 3 处硬编码导航列表合并为 `navRegistry.ts` 单一数据源
+- 🧹 `main.py` 16 行手动 router 注册改为自动发现
+
+---
+
 ## [v1.0.3] - 2026-07-08
 
 ### Added
