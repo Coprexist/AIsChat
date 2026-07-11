@@ -1,8 +1,33 @@
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect, useRef, type ReactNode } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { api } from '../api/client'
 import { Plus, BellOff, Menu, UserPlus, Users, Bot, Globe, ShieldAlert } from 'lucide-react'
 import { getStateDotColor, CHAT_REFRESH_EVENT } from '../constants'
+
+/** URL 正则（匹配 http/https 链接） */
+const URL_RE = /(https?:\/\/[^\s<]+[^\s<.,;:!?)}\]'"])/g
+
+/** 预览文本组件：自动识别 URL 并赋予链接颜色 */
+function PreviewText({ text, placeholder }: { text: string | null; placeholder: string }) {
+  if (!text) return <span className="truncate block">{placeholder}</span>
+  const parts: ReactNode[] = []
+  let lastIndex = 0
+  let match: RegExpExecArray | null
+  URL_RE.lastIndex = 0
+  while ((match = URL_RE.exec(text)) !== null) {
+    if (match.index > lastIndex) {
+      parts.push(text.slice(lastIndex, match.index))
+    }
+    parts.push(
+      <span key={match.index} className="text-primary-500 dark:text-primary-400">{match[0]}</span>
+    )
+    lastIndex = match.index + match[0].length
+  }
+  if (lastIndex < text.length) {
+    parts.push(text.slice(lastIndex))
+  }
+  return <span className="truncate block">{parts}</span>
+}
 import { formatRelativeTime } from '../utils/time'
 import { getStatusTextStyle, BG_SURFACE_LIGHT, BG_SURFACE_DARK } from '../utils/statusColor'
 import { useTheme } from '../context/ThemeContext'
@@ -255,7 +280,7 @@ export default function ChatSidebar({
                       <span className="text-rose-400 font-medium shrink-0">{t('chatlist.atYou')}</span>
                     )}
                     <span className="min-w-0 flex-1" style={{ display: 'block' }}>
-                      <span className="truncate block">{g.last_message_preview || t('chatlist.noMessages')}</span>
+                      <PreviewText text={g.last_message_preview} placeholder={t('chatlist.noMessages')} />
                     </span>
                     {g.last_message_at && (
                       <span className="shrink-0">{formatRelativeTime(g.last_message_at, lang)}</span>
@@ -337,7 +362,7 @@ export default function ChatSidebar({
                     </div>
                     <div className="text-[11px] text-textMuted mt-0.5 flex items-center gap-1 min-w-0">
                       <span className="min-w-0 flex-1" style={{ display: 'block' }}>
-                        <span className="truncate block">{s.last_message_preview || t('chatlist.noMessages')}</span>
+                        <PreviewText text={s.last_message_preview} placeholder={t('chatlist.noMessages')} />
                       </span>
                       {s.last_message_at && (
                         <span className="shrink-0">{formatRelativeTime(s.last_message_at, lang)}</span>
