@@ -2416,8 +2416,8 @@ async def _migrate_system_user(db):
         ), {"pw": pw})
         logger.info("  ✅ 系统用户 id=0 已创建")
 
-    # 重置序列（确保后续 ID 不受影响）
-    await db.execute(text("SELECT setval('users_id_seq', greatest(1, (SELECT COALESCE(MAX(id), 0) FROM users)))"))
+    # 重置序列（确保后续 ID 不受影响；排除 system 类型，让首个真实用户获得 id=1）
+    await db.execute(text("SELECT setval('users_id_seq', COALESCE((SELECT MAX(id) FROM users WHERE type != 'system'), 0))"))
     await db.flush()
 
 

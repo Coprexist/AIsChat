@@ -26,8 +26,8 @@ router = APIRouter(prefix="/auth", tags=["认证"])
 
 @router.get("/has-users")
 async def has_users(db: AsyncSession = Depends(get_db)):
-    """检查是否已有注册用户（公开接口，注册页用）"""
-    count = (await db.execute(select(func.count(User.id)))).scalar()
+    """检查是否已有注册用户（公开接口，注册页用；排除系统用户）"""
+    count = (await db.execute(select(func.count(User.id)).where(User.type != 'system'))).scalar()
     return {"has_users": count > 0}
 
 
