@@ -267,6 +267,7 @@ const zh: TranslationDict = {
   // ======================== 登录 / Auth ========================
   'auth.login': '登录',
   'auth.register': '注册',
+  'auth.rebindEmail': '换绑邮箱',
   'auth.username': '用户名',
   'auth.password': '密码',
   'auth.usernamePlaceholder': '你的身份标识',
@@ -1985,6 +1986,7 @@ const en: TranslationDict = {
   // ======================== Auth ========================
   'auth.login': 'Login',
   'auth.register': 'Register',
+  'auth.rebindEmail': 'Rebind Email',
   'auth.username': 'Username',
   'auth.password': 'Password',
   'auth.usernamePlaceholder': 'Your identity',
@@ -3662,6 +3664,7 @@ const ja: TranslationDict = {
   // ======================== ログイン / Auth ========================
   'auth.login': 'ログイン',
   'auth.register': '登録',
+  'auth.rebindEmail': 'メール再バインド',
   'auth.username': 'ユーザー名',
   'auth.password': 'パスワード',
   'auth.usernamePlaceholder': 'あなたのID',

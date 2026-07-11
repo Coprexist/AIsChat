@@ -221,6 +221,8 @@ export default function AuthSettingsTab() {
   // ── 邮件模板操作 ──
 
   const [showPreview, setShowPreview] = useState(false)
+  const [previewLang, setPreviewLang] = useState('zh')
+  const [previewPurpose, setPreviewPurpose] = useState('register')
 
   const applyPreviewVars = (html: string) => {
     return html
@@ -230,11 +232,6 @@ export default function AuthSettingsTab() {
       .replace(/\{username\}/g, 'demo_user')
       .replace(/\{instance_name\}/g, 'AIsChat')
       .replace(/\{expire_minutes\}/g, '5')
-  }
-
-  const getCurrentTemplates = () => {
-    if (!templates) return null
-    return templates
   }
 
   const handleSaveTemplates = async () => {
@@ -600,14 +597,30 @@ export default function AuthSettingsTab() {
                 <X size={16} />
               </button>
             </div>
-            {/* 用途 Tab */}
+            {/* 语言 Tab */}
             <div className="flex gap-2 px-5 pt-4 pb-2 shrink-0">
+              {LANGS.map(l => (
+                <button
+                  key={l.key}
+                  onClick={() => setPreviewLang(l.key)}
+                  className={`px-3 py-1 text-xs rounded-lg font-medium transition-colors ${
+                    previewLang === l.key
+                      ? 'bg-primary-500 text-white'
+                      : 'bg-canvas border border-border text-textMuted hover:text-textSecondary'
+                  }`}
+                >
+                  {l.label}
+                </button>
+              ))}
+            </div>
+            {/* 用途 Tab */}
+            <div className="flex gap-2 px-5 pb-2 shrink-0">
               {PURPOSES.map(p => (
                 <button
                   key={p.key}
-                  onClick={() => setTemplatePurpose(p.key)}
+                  onClick={() => setPreviewPurpose(p.key)}
                   className={`px-3 py-1 text-xs rounded-lg font-medium transition-colors ${
-                    templatePurpose === p.key
+                    previewPurpose === p.key
                       ? 'bg-primary-500 text-white'
                       : 'bg-canvas border border-border text-textMuted hover:text-textSecondary'
                   }`}
@@ -619,7 +632,7 @@ export default function AuthSettingsTab() {
             {/* 预览内容 */}
             <div className="flex-1 overflow-auto p-5 bg-white">
               {(() => {
-                const tpl = templates[templateLang]?.[templatePurpose]
+                const tpl = templates[previewLang]?.[previewPurpose]
                 if (!tpl) return <p className="text-xs text-textMuted text-center py-8">暂无模板</p>
                 const rendered = applyPreviewVars(tpl.body_html)
                 return (
