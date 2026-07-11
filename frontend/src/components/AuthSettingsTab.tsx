@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useMemo } from 'react'
 import { api } from '../api/client'
 import { useT } from '../i18n/I18nContext'
 import { Mail, Shield, CheckCircle, XCircle, Loader2, Plus, Trash2, ChevronUp, ChevronDown, X } from 'lucide-react'
@@ -224,7 +224,7 @@ export default function AuthSettingsTab() {
   const [previewLang, setPreviewLang] = useState('zh')
   const [previewPurpose, setPreviewPurpose] = useState('register')
 
-  const applyPreviewVars = (html: string) => {
+  const applyPreviewVars = useCallback((html: string) => {
     return html
       .replace(/\{code\}/g, '483921')
       .replace(/\{from_name\}/g, 'AIsChat')
@@ -232,7 +232,28 @@ export default function AuthSettingsTab() {
       .replace(/\{username\}/g, 'demo_user')
       .replace(/\{instance_name\}/g, 'AIsChat')
       .replace(/\{expire_minutes\}/g, '5')
-  }
+  }, [])
+
+  const previewContent = useMemo(() => {
+    if (!templates) return null
+    const tpl = templates[previewLang]?.[previewPurpose]
+    if (!tpl) return null
+    return (
+      <div className="space-y-3">
+        <div className="text-xs text-gray-500 mb-1">
+          <span className="font-medium">主题：</span>
+          {applyPreviewVars(tpl.subject)}
+        </div>
+        <iframe
+          srcDoc={applyPreviewVars(tpl.body_html)}
+          title="email-preview"
+          className="w-full border-0 rounded-lg"
+          style={{ minHeight: 400 }}
+          sandbox="allow-same-origin"
+        />
+      </div>
+    )
+  }, [templates, previewLang, previewPurpose, applyPreviewVars])
 
   const handleSaveTemplates = async () => {
     if (!templates) return
@@ -586,7 +607,7 @@ export default function AuthSettingsTab() {
 
       {/* ── 邮件模板预览弹窗 ── */}
       {showPreview && templates && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm" onClick={() => setShowPreview(false)}>
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60" onClick={() => setShowPreview(false)}>
           <div className="relative w-full max-w-3xl max-h-[90vh] bg-surface rounded-2xl border border-border shadow-2xl overflow-hidden flex flex-col" onClick={e => e.stopPropagation()}>
             {/* 头部 */}
             <div className="flex items-center justify-between px-5 py-3 border-b border-border shrink-0">
@@ -631,26 +652,7 @@ export default function AuthSettingsTab() {
             </div>
             {/* 预览内容 */}
             <div className="flex-1 overflow-auto p-5 bg-white">
-              {(() => {
-                const tpl = templates[previewLang]?.[previewPurpose]
-                if (!tpl) return <p className="text-xs text-textMuted text-center py-8">暂无模板</p>
-                const rendered = applyPreviewVars(tpl.body_html)
-                return (
-                  <div className="space-y-3">
-                    <div className="text-xs text-gray-500 mb-1">
-                      <span className="font-medium">主题：</span>
-                      {applyPreviewVars(tpl.subject)}
-                    </div>
-                    <iframe
-                      srcDoc={rendered}
-                      title="email-preview"
-                      className="w-full border-0 rounded-lg"
-                      style={{ minHeight: 400, height: rendered.includes('min-height') ? 'auto' : 400 }}
-                      sandbox="allow-same-origin"
-                    />
-                  </div>
-                )
-              })()}
+              {previewContent || <p className="text-xs text-textMuted text-center py-8">暂无模板</p>}
             </div>
           </div>
         </div>
