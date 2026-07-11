@@ -551,7 +551,7 @@ export default function SettingsPage() {
                 ))}
               </div>
               {(() => { const cur = providerPresets.find(p => p.base_url === apiBaseUrl); return cur ? (
-                <p className="text-[10px] text-mint-400">当前预设：{cur.name} · {cur.base_url}</p>
+                <p className="text-[10px] text-mint-400">{t('settings.currentPreset')}：{cur.name} · {cur.base_url}</p>
               ) : null })()}
             </div>
           )}
@@ -667,7 +667,7 @@ export default function SettingsPage() {
                                 ))}
                               </div>
                               {(() => { const cur = providerPresets.find(p => p.base_url === agentApiBaseUrl); return cur ? (
-                                <p className="text-[10px] text-mint-400">当前预设：{cur.name}</p>
+                                <p className="text-[10px] text-mint-400">{t('settings.currentPreset')}：{cur.name}</p>
                               ) : null })()}
                             </>
                           )}
