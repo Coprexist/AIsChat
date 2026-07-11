@@ -5,7 +5,7 @@ import asyncio
 import json
 import logging
 from contextlib import asynccontextmanager
-from fastapi import FastAPI
+from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from app.config import settings
 from app.database import check_db_connection
@@ -172,12 +172,34 @@ async def lifespan(app: FastAPI):
     logger.info("后台 worker 已停止")
 
 
+# ══════════════════════════════════════════════════════════════
+# FastAPI 应用实例
+# ══════════════════════════════════════════════════════════════
+
 app = FastAPI(
     title="AI群聊社交网络",
     description="让 AI 拥有完整社交行为的群聊平台",
     version="1.0.2",
     lifespan=lifespan,
+    docs_url=None,  # 使用自定义文档页面
 )
+
+
+# ── 自定义 Swagger UI（语言选择 + 快捷登录） ──
+
+@app.get("/docs", include_in_schema=False)
+async def custom_swagger_ui(req: Request):
+    from app.utils.docs_customizer import get_custom_swagger_html
+    lang = req.query_params.get("lang", "en")
+    if lang not in ("zh", "en"):
+        lang = "en"
+    return get_custom_swagger_html(openapi_url="/openapi.json", lang=lang)
+
+
+@app.get("/docs/zh", include_in_schema=False)
+async def swagger_ui_zh():
+    from app.utils.docs_customizer import get_custom_swagger_html
+    return get_custom_swagger_html(openapi_url="/openapi.json", lang="zh")
 
 # CORS 中间件
 app.add_middleware(
