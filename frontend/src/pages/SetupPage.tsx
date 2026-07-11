@@ -54,8 +54,18 @@ export default function SetupPage() {
   const currentStep = visibleSteps[currentIdx]
   const isLastStep = currentIdx === visibleSteps.length - 1
 
-  // ── Step 1: 语言 ──
-  const [selectedLang, setSelectedLang] = useState<Lang>(DEFAULT_LANG)
+  // ── Step 1: 语言（优先从已保存的用户设置读取）──
+  const [selectedLang, setSelectedLang] = useState<Lang>(() => {
+    const saved = user?.language as Lang | undefined
+    return saved || DEFAULT_LANG
+  })
+
+  // 如果有已保存的语言，立即生效
+  useEffect(() => {
+    if (user?.language) {
+      overrideLangForSetup(user.language as Lang)
+    }
+  }, [])
 
   // ── Step 2 (admin): 实例默认设置 ──
   const [instanceLang, setInstanceLang] = useState('zh')
@@ -210,6 +220,7 @@ export default function SetupPage() {
 
       if (isLastStep) {
         await api.post('/auth/setup', { language: selectedLang })
+        overrideLangForSetup(null) // 清除临时语言覆盖
         await refreshUser()
         navigate('/chat', { replace: true })
       } else {
