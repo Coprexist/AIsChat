@@ -15,21 +15,46 @@ const METHOD_LABELS: Record<string, string> = {
   qq: 'auth.methodQQ',
 }
 
+const SESSION_KEY = 'login_state'
+
+/** 从 sessionStorage 恢复登录流程状态（切换页面不丢失验证码流程） */
+function loadSessionState() {
+  try {
+    const raw = sessionStorage.getItem(SESSION_KEY)
+    if (!raw) return {}
+    return JSON.parse(raw)
+  } catch { return {} }
+}
+
+/** 保存登录流程状态到 sessionStorage */
+function saveSessionState(state: Record<string, any>) {
+  try {
+    const prev = loadSessionState()
+    sessionStorage.setItem(SESSION_KEY, JSON.stringify({ ...prev, ...state }))
+  } catch { /* 静默失败 */ }
+}
+
+/** 清除登录流程状态 */
+function clearSessionState() {
+  try { sessionStorage.removeItem(SESSION_KEY) } catch { /* 静默失败 */ }
+}
+
 export default function LoginPage() {
-  const [mode, setMode] = useState<'login' | 'register'>('login')
+  const saved = loadSessionState()
+  const [mode, setMode] = useState<'login' | 'register'>(saved.mode || 'login')
   const [username, setUsername] = useState('')
   const [password, setPassword] = useState('')
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
   const [hasExistingUsers, setHasExistingUsers] = useState<boolean | null>(null)
 
-  // v1.0.0 邮箱认证
+  // v1.0.0 邮箱认证（状态从 sessionStorage 恢复，切换页面不丢）
   const [providers, setProviders] = useState<string[]>(['direct'])
   const [requireEmailVerification, setRequireEmailVerification] = useState(false)
-  const [loginMethod, setLoginMethod] = useState<string>('direct')
-  const [email, setEmail] = useState('')
-  const [code, setCode] = useState('')
-  const [codeSent, setCodeSent] = useState(false)
+  const [loginMethod, setLoginMethod] = useState<string>(saved.loginMethod || 'direct')
+  const [email, setEmail] = useState(saved.email || '')
+  const [code, setCode] = useState(saved.code || '')
+  const [codeSent, setCodeSent] = useState(saved.codeSent || false)
   const [sendCooldown, setSendCooldown] = useState(0)
 
   const { login, register } = useAuth()
@@ -56,6 +81,11 @@ export default function LoginPage() {
       })
       .catch(() => {})
   }, [])
+
+  // 登录流程状态持久化（切换页面/刷新不丢失）
+  useEffect(() => {
+    saveSessionState({ mode, email, codeSent, code, loginMethod })
+  }, [mode, email, codeSent, code, loginMethod])
 
   // 验证码发送冷却倒计时
   useEffect(() => {
@@ -97,6 +127,7 @@ export default function LoginPage() {
         if (code) opts.code = code
         await register(username, password, opts)
       }
+      clearSessionState()
       navigate('/chat')
     } catch (err: any) {
       setError(err.message || t('common.error'))
