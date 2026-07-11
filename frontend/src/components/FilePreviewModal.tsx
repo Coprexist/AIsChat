@@ -224,7 +224,7 @@ export default function FilePreviewModal({ fileId, fileName, fileSize, mimeType,
             ) : isPDF || (isHtml && content) ? (
               <iframe
                 src={isPDF ? dlUrl : undefined}
-                srcDoc={isHtml ? content : undefined}
+                srcDoc={isHtml ? (content ?? undefined) : undefined}
                 className="w-full flex-1 border-0 bg-white"
                 title={fileName}
                 sandbox={isHtml ? 'allow-scripts' : undefined}

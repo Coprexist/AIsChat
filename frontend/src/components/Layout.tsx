@@ -22,7 +22,7 @@ export default function Layout() {
       setMaintenance(true)
       const cached = (() => { try { return JSON.parse(localStorage.getItem('maintenance_msg') || '') } catch { return null } })()
       // 优先用事件带的，其次读 API，最后读缓存
-      if (e?.detail?.detail) setHardText({ title: '服务器维护中', body: e.detail.detail, color: '#f59e0b', image: '' })
+      if (e?.detail?.detail) setHardText({ title: '服务器维护中', body: e.detail.detail, color: '#f59e0b', textColor: '#ffffff', image: '', style: 'popup' })
       else try {
         const res = await fetch('/api/maintenance-msg')
         const d = await res.json()
@@ -45,11 +45,11 @@ export default function Layout() {
         setSoftColor(localStorage.getItem('maintenance_soft_color') || '#f59e0b')
       }
     }
-    window.addEventListener('maintenance-mode', h1)
-    window.addEventListener('maintenance-soft', h2)
+    window.addEventListener('maintenance-mode' as any, h1 as any)
+    window.addEventListener('maintenance-soft' as any, h2 as any)
     return () => {
-      window.removeEventListener('maintenance-mode', h1)
-      window.removeEventListener('maintenance-soft', h2)
+      window.removeEventListener('maintenance-mode' as any, h1 as any)
+      window.removeEventListener('maintenance-soft' as any, h2 as any)
     }
   }, [])
 

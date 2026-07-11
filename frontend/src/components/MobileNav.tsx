@@ -1,13 +1,6 @@
 import { useNavigate, useLocation } from 'react-router-dom'
-import { MessageCircle, Bot, User, Users } from 'lucide-react'
 import { useT } from '../i18n/I18nContext'
-
-const tabs = [
-  { path: '/chat', i18nKey: 'nav.chat', icon: MessageCircle },
-  { path: '/friends', i18nKey: 'nav.friends', icon: Users },
-  { path: '/agents', i18nKey: 'nav.ai', icon: Bot },
-  { path: '/me', i18nKey: 'nav.me', icon: User },
-]
+import { mainNavItems, type NavItem } from '../utils/navRegistry'
 
 interface MobileNavProps {
   closeDrawer?: () => void
@@ -18,13 +11,14 @@ export default function MobileNav({ closeDrawer }: MobileNavProps) {
   const location = useLocation()
   const t = useT()
 
-  const isActive = (path: string) => {
-    if (path === '/chat') return location.pathname.startsWith('/chat') || location.pathname === '/'
-    if (path === '/friends') return location.pathname.startsWith('/friends')
-    if (path === '/agents') return location.pathname.startsWith('/agents')
-    if (path === '/me') return location.pathname.startsWith('/me')
-    return false
+  const isActive = (item: NavItem) => {
+    if (item.matchSubPaths) {
+      return location.pathname.startsWith(item.path) || location.pathname === '/'
+    }
+    return location.pathname.startsWith(item.path)
   }
+
+  const visibleItems = mainNavItems.filter(item => !item.hidden)
 
   return (
     <nav
@@ -32,12 +26,12 @@ export default function MobileNav({ closeDrawer }: MobileNavProps) {
       style={{ paddingBottom: 'env(safe-area-inset-bottom, 0px)' }}
     >
       <div className="flex h-14">
-        {tabs.map((tab) => {
-          const active = isActive(tab.path)
+        {visibleItems.map((item) => {
+          const active = isActive(item)
           return (
             <button
-              key={tab.path}
-              onClick={() => { closeDrawer?.(); navigate(tab.path) }}
+              key={item.path}
+              onClick={() => { closeDrawer?.(); navigate(item.path) }}
               className={`flex-1 flex flex-col items-center justify-center gap-0.5 transition-all duration-200 relative ${
                 active ? 'text-primary-400' : 'text-textMuted'
               }`}
@@ -48,12 +42,12 @@ export default function MobileNav({ closeDrawer }: MobileNavProps) {
               )}
               {/* Icon with optional pulse ring */}
               <div className="relative">
-                <tab.icon size={22} strokeWidth={active ? 2.5 : 2} />
+                <item.icon size={22} strokeWidth={active ? 2.5 : 2} />
                 {active && (
                   <div className="absolute -inset-1.5 rounded-full ai-pulse-active opacity-50" />
                 )}
               </div>
-              <span className="text-[10px] font-medium">{t(tab.i18nKey)}</span>
+              <span className="text-[10px] font-medium">{t(item.i18nKey)}</span>
             </button>
           )
         })}

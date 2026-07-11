@@ -842,7 +842,7 @@ export default function ChatView({ conversationType, conversationId }: ChatViewP
                 createdAt={msg.created_at}
                 senderType={msg.sender_type}
                 senderId={msg.sender_id}
-                state={msg.sender_state}
+                state={msg.sender_state ?? undefined}
                 sourcePublicId={msg.source_public_id}
                 attachments={msg.attachments}
                 messageType={msg.message_type}

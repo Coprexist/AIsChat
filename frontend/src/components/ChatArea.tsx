@@ -19,6 +19,8 @@ interface Group {
   announcement: string | null
   speak_limit_per_minute: number
   speak_limit_window_seconds: number
+  is_paused: boolean
+  concurrent_ai_limit: number
   my_role: string
   unread_count: number
   has_mention: boolean
@@ -268,6 +270,8 @@ export default function ChatArea({ groupId, dmSessionId }: ChatAreaProps) {
             owner_type: currentGroup.owner_type,
             owner_id: currentGroup.owner_id,
             is_vector_accelerated: currentGroup.is_vector_accelerated,
+            is_paused: currentGroup.is_paused,
+            concurrent_ai_limit: currentGroup.concurrent_ai_limit,
             announcement: currentGroup.announcement,
             speak_limit_per_minute: currentGroup.speak_limit_per_minute,
             speak_limit_window_seconds: currentGroup.speak_limit_window_seconds,

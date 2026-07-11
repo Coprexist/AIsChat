@@ -695,6 +695,7 @@ export default function CreateAgentModal({
             conversationLogsLimit={conversationLogsLimit} setConversationLogsLimit={setConversationLogsLimit}
             userCanViewLogs={userCanViewLogs} setUserCanViewLogs={setUserCanViewLogs}
             modelOptions={modelOptions}
+            providers={providers}
             defaults={defaults}
             thinkingSupported={thinkingSupported}
             onClose={() => setShowDetailSettings(false)}
@@ -831,6 +832,7 @@ function DetailSettingsModal({
   conversationLogsLimit, setConversationLogsLimit,
   userCanViewLogs, setUserCanViewLogs,
   modelOptions,
+  providers,
   defaults,
   thinkingSupported,
   onClose,
@@ -872,6 +874,7 @@ function DetailSettingsModal({
   conversationLogsLimit: number | null; setConversationLogsLimit: (v: number | null) => void
   userCanViewLogs: boolean | null; setUserCanViewLogs: (v: boolean | null) => void
   modelOptions: ModelOption[]
+  providers: ProviderInfo[]
   defaults: { chat_model: string; work_model: string }
   thinkingSupported: boolean
   onClose: () => void
