@@ -15,89 +15,134 @@ from app.utils.crypto import decrypt_api_key, encrypt_api_key
 logger = logging.getLogger(__name__)
 
 # 默认邮件模板（DB 未配置时的 fallback）
+# 完整 HTML 邮件设计，含响应式布局和品牌色头
+# {from_name} 和 {code} 用双花括号转义，留到发送时由 _send_with_config 替换
+_TMPL_BODY = """\
+<!DOCTYPE html>
+<html lang="{lang}">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>{{from_name}} - {purpose_label}</title>
+</head>
+<body style="margin:0;padding:0;background-color:#F4F4F7;">
+  <table role="presentation" cellpadding="0" cellspacing="0" width="100%" style="background-color:#F4F4F7;">
+    <tr>
+      <td align="center" style="padding:20px 10px;">
+        <table role="presentation" cellpadding="0" cellspacing="0" width="480" style="max-width:480px;background-color:#FFFFFF;border-radius:12px;overflow:hidden;box-shadow:0 2px 8px rgba(0,0,0,0.05);">
+          <tr>
+            <td style="background-color:#7C3AED;padding:24px 30px;border-radius:12px 12px 0 0;">
+              <h1 style="margin:0;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;font-size:22px;color:#FFFFFF;font-weight:600;">{{from_name}}</h1>
+            </td>
+          </tr>
+          <tr>
+            <td style="padding:30px 30px 20px;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;font-size:15px;line-height:1.6;color:#333333;">
+              <p style="margin:0 0 10px;">{greeting}</p>
+              <p style="margin:0 0 20px;">{instruction}</p>
+              <table role="presentation" cellpadding="0" cellspacing="0" width="100%" style="margin:0 0 24px;">
+                <tr>
+                  <td style="background-color:#F3F4F6;border-radius:10px;padding:18px 10px;text-align:center;">
+                    <span style="font-family:'Courier New',Courier,monospace;font-size:36px;font-weight:700;letter-spacing:8px;color:#1F2937;word-break:break-all;">{{code}}</span>
+                  </td>
+                </tr>
+              </table>
+              <p style="margin:0 0 8px;font-size:14px;color:#4B5563;">
+                {validity}
+              </p>
+              {warning}
+            </td>
+          </tr>
+          <tr>
+            <td style="padding:0 30px 24px;border-top:1px solid #E5E7EB;padding-top:20px;">
+              <p style="margin:0;font-size:12px;color:#9CA3AF;line-height:1.5;">
+                {footer}
+              </p>
+            </td>
+          </tr>
+        </table>
+      </td>
+    </tr>
+  </table>
+</body>
+</html>"""
+
+# zh 内容占位符
+_ZH = {
+    "register": {
+        "subject": "【{from_name}】邮箱验证码",
+        "greeting": "你好，",
+        "instruction": "你正在注册账号，请使用以下验证码完成验证：",
+        "validity": "验证码 <strong style=\"color:#DC2626;\">5 分钟</strong> 内有效，请勿转发给他人。",
+        "warning": '<p style="margin:0 0 20px;font-size:13px;color:#9CA3AF;">如果这不是你的操作，请忽略此邮件，无需回复。</p>',
+        "footer": "此邮件由 <strong>{from_name}</strong> 系统自动发送，请勿回复。<br>如有疑问，请联系客服。",
+    },
+    "login": {
+        "subject": "【{from_name}】登录验证码",
+        "greeting": "你好，",
+        "instruction": "你正在请求登录验证码，请使用以下验证码完成验证：",
+        "validity": "验证码 <strong style=\"color:#DC2626;\">5 分钟</strong> 内有效，请勿转发给他人。",
+        "warning": '<p style="margin:0 0 20px;font-size:13px;color:#9CA3AF;">如果这不是你的操作，请忽略此邮件，无需回复。</p>',
+        "footer": "此邮件由 <strong>{from_name}</strong> 系统自动发送，请勿回复。<br>如有疑问，请联系客服。",
+    },
+    "rebind": {
+        "subject": "【{from_name}】换绑邮箱验证码",
+        "greeting": "你好，",
+        "instruction": "你正在更换绑定邮箱，请使用以下验证码完成验证：",
+        "validity": "验证码 <strong style=\"color:#DC2626;\">5 分钟</strong> 内有效，请勿转发给他人。",
+        "warning": '<p style="margin:0 0 20px;font-size:13px;color:#9CA3AF;">如果这不是你的操作，你的账号可能已被盗用，请立即联系管理员。</p>',
+        "footer": "此邮件由 <strong>{from_name}</strong> 系统自动发送，请勿回复。<br>如有疑问，请联系客服。",
+    },
+}
+
+_EN = {
+    "register": {
+        "subject": "[{from_name}] Email Verification Code",
+        "greeting": "Hello,",
+        "instruction": "You are registering an account. Please use the following code to verify your email:",
+        "validity": "This code is valid for <strong style=\"color:#DC2626;\">5 minutes</strong>. Do not share it with anyone.",
+        "warning": '<p style="margin:0 0 20px;font-size:13px;color:#9CA3AF;">If this wasn\'t you, please ignore this email.</p>',
+        "footer": "This email was sent automatically by <strong>{from_name}</strong>. Please do not reply.<br>For assistance, contact our support team.",
+    },
+    "login": {
+        "subject": "[{from_name}] Login Verification Code",
+        "greeting": "Hello,",
+        "instruction": "You requested a login verification code. Please use the following code:",
+        "validity": "This code is valid for <strong style=\"color:#DC2626;\">5 minutes</strong>. Do not share it with anyone.",
+        "warning": '<p style="margin:0 0 20px;font-size:13px;color:#9CA3AF;">If this wasn\'t you, please ignore this email.</p>',
+        "footer": "This email was sent automatically by <strong>{from_name}</strong>. Please do not reply.<br>For assistance, contact our support team.",
+    },
+    "rebind": {
+        "subject": "[{from_name}] Email Rebind Verification Code",
+        "greeting": "Hello,",
+        "instruction": "You are changing your bound email address. Please use the following code to verify:",
+        "validity": "This code is valid for <strong style=\"color:#DC2626;\">5 minutes</strong>. Do not share it with anyone.",
+        "warning": '<p style="margin:0 0 20px;font-size:13px;color:#9CA3AF;">If this wasn\'t you, your account may have been compromised. Contact the admin immediately.</p>',
+        "footer": "This email was sent automatically by <strong>{from_name}</strong>. Please do not reply.<br>For assistance, contact our support team.",
+    },
+}
+
+_PURPOSE_LABELS_ZH = {"register": "邮箱验证", "login": "登录验证", "rebind": "换绑验证"}
+_PURPOSE_LABELS_EN = {"register": "Email Verification", "login": "Login Verification", "rebind": "Email Rebind"}
+
 EMAIL_TEMPLATES = {
-    "zh": {
-        "register": {
-            "subject": "【{from_name}】邮箱验证码",
-            "body_html": """<div style="max-width:480px;margin:0 auto;font-family:Arial,sans-serif">
-<h2 style="color:#7C3AED">{from_name}</h2>
-<p>你好，</p>
-<p>你的邮箱验证码是：</p>
-<div style="background:#F3F4F6;border-radius:8px;padding:20px;text-align:center;margin:16px 0">
-  <span style="font-size:32px;font-weight:bold;letter-spacing:6px;color:#1F2937">{code}</span>
-</div>
-<p>验证码 5 分钟内有效，请勿转发给他人。</p>
-<p style="color:#9CA3AF;font-size:12px">如果这不是你的操作，请忽略此邮件。</p>
-</div>""",
-        },
-        "login": {
-            "subject": "【{from_name}】登录验证码",
-            "body_html": """<div style="max-width:480px;margin:0 auto;font-family:Arial,sans-serif">
-<h2 style="color:#7C3AED">{from_name}</h2>
-<p>你好，</p>
-<p>你的登录验证码是：</p>
-<div style="background:#F3F4F6;border-radius:8px;padding:20px;text-align:center;margin:16px 0">
-  <span style="font-size:32px;font-weight:bold;letter-spacing:6px;color:#1F2937">{code}</span>
-</div>
-<p>验证码 5 分钟内有效，请勿转发给他人。</p>
-<p style="color:#9CA3AF;font-size:12px">如果这不是你的操作，请忽略此邮件。</p>
-</div>""",
-        },
-        "rebind": {
-            "subject": "【{from_name}】换绑邮箱验证码",
-            "body_html": """<div style="max-width:480px;margin:0 auto;font-family:Arial,sans-serif">
-<h2 style="color:#7C3AED">{from_name}</h2>
-<p>你好，</p>
-<p>你正在更换绑定邮箱，验证码是：</p>
-<div style="background:#F3F4F6;border-radius:8px;padding:20px;text-align:center;margin:16px 0">
-  <span style="font-size:32px;font-weight:bold;letter-spacing:6px;color:#1F2937">{code}</span>
-</div>
-<p>验证码 5 分钟内有效，请勿转发给他人。</p>
-<p style="color:#9CA3AF;font-size:12px">如果这不是你的操作，你的账号可能已被盗用，请立即联系管理员。</p>
-</div>""",
-        },
-    },
-    "en": {
-        "register": {
-            "subject": "[{from_name}] Email Verification Code",
-            "body_html": """<div style="max-width:480px;margin:0 auto;font-family:Arial,sans-serif">
-<h2 style="color:#7C3AED">{from_name}</h2>
-<p>Hello,</p>
-<p>Your email verification code is:</p>
-<div style="background:#F3F4F6;border-radius:8px;padding:20px;text-align:center;margin:16px 0">
-  <span style="font-size:32px;font-weight:bold;letter-spacing:6px;color:#1F2937">{code}</span>
-</div>
-<p>This code is valid for 5 minutes. Do not share it with anyone.</p>
-<p style="color:#9CA3AF;font-size:12px">If this wasn't you, please ignore this email.</p>
-</div>""",
-        },
-        "login": {
-            "subject": "[{from_name}] Login Verification Code",
-            "body_html": """<div style="max-width:480px;margin:0 auto;font-family:Arial,sans-serif">
-<h2 style="color:#7C3AED">{from_name}</h2>
-<p>Hello,</p>
-<p>Your login verification code is:</p>
-<div style="background:#F3F4F6;border-radius:8px;padding:20px;text-align:center;margin:16px 0">
-  <span style="font-size:32px;font-weight:bold;letter-spacing:6px;color:#1F2937">{code}</span>
-</div>
-<p>This code is valid for 5 minutes. Do not share it with anyone.</p>
-<p style="color:#9CA3AF;font-size:12px">If this wasn't you, please ignore this email.</p>
-</div>""",
-        },
-        "rebind": {
-            "subject": "[{from_name}] Email Rebind Verification Code",
-            "body_html": """<div style="max-width:480px;margin:0 auto;font-family:Arial,sans-serif">
-<h2 style="color:#7C3AED">{from_name}</h2>
-<p>Hello,</p>
-<p>You are changing your bound email. The verification code is:</p>
-<div style="background:#F3F4F6;border-radius:8px;padding:20px;text-align:center;margin:16px 0">
-  <span style="font-size:32px;font-weight:bold;letter-spacing:6px;color:#1F2937">{code}</span>
-</div>
-<p>This code is valid for 5 minutes. Do not share it with anyone.</p>
-<p style="color:#9CA3AF;font-size:12px">If this wasn't you, your account may have been compromised. Contact the admin immediately.</p>
-</div>""",
-        },
-    },
+    "zh": {p: {"subject": _ZH[p]["subject"], "body_html": _TMPL_BODY.format(
+        lang="zh-CN",
+        purpose_label=_PURPOSE_LABELS_ZH[p],
+        greeting=_ZH[p]["greeting"],
+        instruction=_ZH[p]["instruction"],
+        validity=_ZH[p]["validity"],
+        warning=_ZH[p]["warning"],
+        footer=_ZH[p]["footer"],
+    )} for p in _ZH},
+    "en": {p: {"subject": _EN[p]["subject"], "body_html": _TMPL_BODY.format(
+        lang="en",
+        purpose_label=_PURPOSE_LABELS_EN[p],
+        greeting=_EN[p]["greeting"],
+        instruction=_EN[p]["instruction"],
+        validity=_EN[p]["validity"],
+        warning=_EN[p]["warning"],
+        footer=_EN[p]["footer"],
+    )} for p in _EN},
 }
 
 
