@@ -5,7 +5,7 @@ import remarkMath from 'remark-math'
 import remarkBreaks from 'remark-breaks'
 import rehypeKatex from 'rehype-katex'
 import rehypeRaw from 'rehype-raw'
-import rehypeSanitize from 'rehype-sanitize'
+import rehypeSanitize, { defaultSchema } from 'rehype-sanitize'
 import { useAuth } from '../context/AuthContext'
 import { FileIcon, Download, Globe, ShieldAlert } from 'lucide-react'
 import { formatMessageTime } from '../utils/time'
@@ -197,7 +197,22 @@ const MessageBubble = memo(function MessageBubble({
           ) : (
             <Markdown
               remarkPlugins={[remarkGfm, remarkMath, remarkBreaks]}
-              rehypePlugins={[rehypeRaw, rehypeSanitize, rehypeKatex]}
+              rehypePlugins={[
+                rehypeRaw,
+                rehypeKatex,
+                // sanitize 放最后，并配置 allowlist 确保 <a> 标签的 class 不被剥离
+                [rehypeSanitize, {
+                  ...defaultSchema,
+                  attributes: {
+                    ...defaultSchema.attributes,
+                    a: [...(defaultSchema.attributes?.a || ['href']), 'class', 'target', 'rel'],
+                    code: [...(defaultSchema.attributes?.code || []), 'class'],
+                    span: [...(defaultSchema.attributes?.span || []), 'class'],
+                    img: [...(defaultSchema.attributes?.img || ['src', 'alt']), 'class'],
+                    div: [...(defaultSchema.attributes?.div || []), 'class'],
+                  },
+                }],
+              ]}
               components={{ code: CodeRenderer, table: ({ node, ...props }) => (
                   <div className="markdown-table-wrapper"><table {...props} /></div>
                 ), th: ({ node, ...props }) => (<th {...props} />), td: ({ node, ...props }) => (<td {...props} />), }}
