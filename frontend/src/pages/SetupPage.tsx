@@ -8,17 +8,11 @@ import { api } from '../api/client'
 import {
   Globe, Check, User, Key, Bot, Mail, Shield, Sparkles,
   Upload, Loader2, Eye, EyeOff, ChevronLeft, ChevronRight,
-  Palette, Server,
+  Server, X,
 } from 'lucide-react'
 
 import AvatarCropModal from '../components/AvatarCropModal'
-
-// ─── 预设颜色 ──────────────────────────────────────────────
-const PRESET_COLORS = [
-  '#6366f1', '#8b5cf6', '#ec4899', '#f43f5e',
-  '#f97316', '#eab308', '#22c55e', '#14b8a6',
-  '#06b6d4', '#3b82f6', '#64748b', '#a1a1aa',
-]
+import { STATUS_COLORS } from '../utils/statusColor'
 
 // ─── 步骤配置 ──────────────────────────────────────────────
 interface StepDef {
@@ -471,26 +465,34 @@ export default function SetupPage() {
           {/* 状态颜色 */}
           <div>
             <label className="block text-sm font-medium text-textSecondary mb-2">{t('setup.statusColor')}</label>
-            <div className="flex gap-2 flex-wrap">
-              {PRESET_COLORS.map(c => (
+            <div className="flex items-center gap-2 flex-wrap">
+              {STATUS_COLORS.map(c => (
                 <button
-                  key={c}
-                  onClick={() => setStatusColor(c)}
-                  className={`w-7 h-7 rounded-full border-2 transition-all ${
-                    statusColor === c ? 'border-textPrimary scale-110 shadow-sm' : 'border-transparent'
+                  key={c.value}
+                  type="button"
+                  onClick={() => setStatusColor(c.value)}
+                  className={`w-6 h-6 rounded-full border-2 transition-all ${
+                    statusColor === c.value
+                      ? 'border-primary-400 scale-110 shadow-md'
+                      : c.value === ''
+                        ? 'border-border bg-canvas hover:border-textMuted'
+                        : 'border-transparent hover:scale-105'
                   }`}
-                  style={{ backgroundColor: c }}
-                />
+                  style={c.value ? { backgroundColor: c.value } : undefined}
+                  title={c.label}
+                >
+                  {c.value === '' && <X size={10} className="text-textMuted m-auto" />}
+                </button>
               ))}
-              <label className="w-7 h-7 rounded-full border-2 border-dashed border-border flex items-center justify-center cursor-pointer hover:border-primary-400 transition-colors">
-                <Palette size={12} className="text-textMuted" />
+              <div className="relative">
                 <input
                   type="color"
-                  value={statusColor}
+                  value={statusColor || '#000000'}
                   onChange={e => setStatusColor(e.target.value)}
-                  className="hidden"
+                  className="w-6 h-6 rounded-full cursor-pointer border-2 border-border hover:border-primary-400 transition-colors"
+                  title={t('me.statusColorCustom') || '自定义'}
                 />
-              </label>
+              </div>
             </div>
           </div>
         </div>
