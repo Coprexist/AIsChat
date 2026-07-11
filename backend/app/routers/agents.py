@@ -73,11 +73,25 @@ async def get_available_models(
     providers = await get_providers(db)
 
     if not providers:
+        # provider_config 为空时，使用内置预设作为默认值
+        from app.services.provider_presets import get_all_presets
+        builtin = get_all_presets()
+        provider_list = []
+        for i, p in enumerate(builtin):
+            provider_list.append({
+                "name": p["label"],
+                "provider": p["key"],
+                "base_url": p["base_url"],
+                "api_key_url": p.get("api_key_url", ""),
+                "thinking_supported": p.get("thinking_supported", False),
+                "is_default": i == 0,
+            })
+        all_models = settings.get_model_options()
         return {
-            "models": settings.get_model_options(),
+            "models": all_models,
             "defaults": {"chat_model": settings.default_chat_model, "work_model": settings.default_work_model},
-            "providers": [],
-            "provider": {"key": "unknown", "base_url": settings.deepseek_base_url, "thinking_supported": settings.is_deepseek_api, "is_deepseek": settings.is_deepseek_api},
+            "providers": provider_list,
+            "provider": {"key": "deepseek", "base_url": settings.deepseek_base_url, "thinking_supported": settings.is_deepseek_api, "is_deepseek": settings.is_deepseek_api},
         }
 
     all_models = collect_all_models(providers)
