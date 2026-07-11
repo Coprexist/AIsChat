@@ -236,12 +236,11 @@ export default function SearchOverlay() {
                   </div>
                 ) : (
                   <button
-                    onClick={() => setAddFriendTarget(key)}
-                    disabled={sendingDM === key}
-                    className="flex items-center gap-1 px-2 py-1 text-xs rounded-lg bg-mint-400/10 text-mint-400 hover:bg-mint-400/20 shrink-0 transition-colors disabled:opacity-50"
+                    onClick={() => openProfile(item)}
+                    className="flex items-center gap-1 px-2 py-1 text-xs rounded-lg bg-mint-400/10 text-mint-400 hover:bg-mint-400/20 shrink-0 transition-colors"
                   >
                     <UserPlus size={12} />
-                    {sendingDM === key ? '...' : t('search.addFriend')}
+                    {t('search.addFriend')}
                   </button>
                 )}
               </div>
