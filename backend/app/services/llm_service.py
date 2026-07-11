@@ -510,10 +510,17 @@ async def _build_current_context(
     now = datetime.now(tz)
     now_str = now.strftime(f"%Y-%m-%d %H:%M {tz.key}")
     context = f"## 当前时间\n{now_str}\n"
-    context += (
-        f"- **重要**：回复时请使用 send_gm(group_id={group_id}, content=\"...\")，"
-        f"不要用其他 group_id\n"
-    )
+    if is_dm:
+        # DM 中告诉 AI 用 send_dm，而不是 send_gm
+        context += (
+            f"- **重要**：回复时请使用 send_dm(target_user_id=..., content=\"...\")，"
+            f"不要用 send_gm（那是群聊工具）\n"
+        )
+    else:
+        context += (
+            f"- **重要**：回复时请使用 send_gm(group_id={group_id}, content=\"...\")，"
+            f"不要用其他 group_id\n"
+        )
     # Federation context
     if is_federated:
         context += (
