@@ -548,12 +548,19 @@ export default function SetupPage() {
                 </button>
               ))}
               <div className="relative">
-                <input
-                  type="color"
-                  value={statusColor || '#000000'}
-                  onChange={e => setStatusColor(e.target.value)}
-                  className="w-6 h-6 rounded-full cursor-pointer border-2 border-border hover:border-primary-400 transition-colors"
+                <button
+                  type="button"
+                  onClick={() => document.getElementById('setup-color-picker')?.click()}
+                  className="w-6 h-6 rounded-full border-2 border-border hover:border-primary-400 transition-colors cursor-pointer"
+                  style={{ backgroundColor: statusColor || '#6366f1' }}
                   title={t('me.statusColorCustom') || '自定义'}
+                />
+                <input
+                  id="setup-color-picker"
+                  type="color"
+                  value={statusColor || '#6366f1'}
+                  onChange={e => setStatusColor(e.target.value)}
+                  className="hidden"
                 />
               </div>
             </div>
