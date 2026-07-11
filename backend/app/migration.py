@@ -97,6 +97,7 @@ async def run_migrations():
             await _migrate_fix_human_members_changed_to_ai(db)  # v1.0.2 修被误改为AI的人类成员
             await _migrate_agent_state_stack(db)       # v1.0.1 状态栈（AI 跨任务上下文追踪）
             await _migrate_multi_provider(db)          # v1.0.2 多供应商 + api_key_pool.provider_name
+            await _migrate_provider_defaults(db)       # v2.0.8 provider_config为空时填入内置预设
             await _migrate_ai_friend_user_id(db)       # v1.0.2 AI好友friend_id统一为user_id
             await _migrate_opencli_default_enabled(db) # v1.0.2 OpenCLI命令默认可用
             await _migrate_group_muted_until(db)     # v2.0.3 群聊屏蔽（比DND更强，@/公告也不穿透）
@@ -2510,6 +2511,44 @@ async def _migrate_multi_provider(db):
     else:
         logger.info("  ⏭ api_key_pool.provider_name 已存在，跳过")
 
+    await db.flush()
+
+
+async def _migrate_provider_defaults(db):
+    """v2.0.8: provider_config 为 NULL 时填入内置 7 家供应商预设"""
+    import json
+    from app.services.provider_presets import get_all_presets
+
+    # 检查是否已存在配置
+    result = await db.execute(text("SELECT provider_config FROM system_settings WHERE id = 1"))
+    row = result.fetchone()
+    if row is None:
+        logger.info("  ⏭ system_settings 表无数据，跳过")
+        return
+
+    raw = row[0]
+    if raw is not None and len(raw) > 0:
+        logger.info("  ⏭ provider_config 已有数据，跳过")
+        return
+
+    # 填入内置预设
+    presets = get_all_presets()
+    configs = []
+    for i, p in enumerate(presets):
+        configs.append({
+            "name": p["label"],
+            "provider": p["key"],
+            "base_url": p["base_url"],
+            "chat_model": p["chat_model"],
+            "work_model": p["work_model"],
+            "embedding_model": p["embedding_model"],
+            "thinking_supported": p["thinking_supported"],
+            "api_key_url": p.get("api_key_url", ""),
+            "is_default": i == 0,
+            "model_options": p.get("models", []),
+        })
+    await db.execute(text("UPDATE system_settings SET provider_config = CAST(:val AS jsonb) WHERE id = 1"), {"val": json.dumps(configs, ensure_ascii=False)})
+    logger.info(f"  ✅ provider_config 已填入 {len(configs)} 个默认供应商预设")
     await db.flush()
 
 
