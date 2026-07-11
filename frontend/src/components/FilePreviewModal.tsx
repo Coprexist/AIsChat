@@ -221,10 +221,14 @@ export default function FilePreviewModal({ fileId, fileName, fileSize, mimeType,
                   draggable={false}
                 />
               </div>
-            ) : isPDF ? (
-              <iframe src={dlUrl} className="w-full border-0" title={fileName} />
-            ) : isHtml && content ? (
-              <iframe srcDoc={content} className="w-full border-0 bg-white" title={fileName} sandbox="allow-scripts" />
+            ) : isPDF || (isHtml && content) ? (
+              <div className="relative w-full flex-1 min-h-0">
+                {isPDF ? (
+                  <iframe src={dlUrl} className="absolute inset-0 w-full h-full border-0" title={fileName} />
+                ) : (
+                  <iframe srcDoc={content} className="absolute inset-0 w-full h-full border-0 bg-white" title={fileName} sandbox="allow-scripts" />
+                )}
+              </div>
             ) : (
               <div className="w-full p-4 md:p-5 self-start">
                 {isDocx ? (
