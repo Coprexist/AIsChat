@@ -245,12 +245,13 @@ export default function FilePreviewModal({ fileId, fileName, fileSize, mimeType,
                     [&_img]:max-w-full [&_img]:rounded-lg
                     [&_a]:break-all [&_a]:text-primary-500 dark:[&_a]:text-primary-400 [&_a]:underline">
                     <Markdown
+                      children={(content || '')
+                        .replace(/\\\[([\s\S]*?)\\\]/g, '$$$$$1$$$$')
+                        .replace(/\\\(([\s\S]*?)\\\)/g, '$$$1$$')}
                       remarkPlugins={[remarkGfm, remarkMath, remarkBreaks]}
                       rehypePlugins={[rehypeKatex]}
                       components={{ code: CodeRenderer }}
-                    >
-                      {content || ''}
-                    </Markdown>
+                    />
                   </div>
                 ) : (
                   <pre className="text-xs text-textPrimary whitespace-pre-wrap break-all font-mono leading-relaxed select-text">

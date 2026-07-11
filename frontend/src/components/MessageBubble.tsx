@@ -196,6 +196,10 @@ const MessageBubble = memo(function MessageBubble({
             <BouncingDots className="text-primary-400 align-middle" />
           ) : (
             <Markdown
+              // 预处理：\(...\) → $...$，\[...\] → $$...$$，兼容 LaTeX 风格数学公式
+              children={content
+                .replace(/\\\[([\s\S]*?)\\\]/g, '$$$$$1$$$$')
+                .replace(/\\\(([\s\S]*?)\\\)/g, '$$$1$$')}
               remarkPlugins={[remarkGfm, remarkMath, remarkBreaks]}
               rehypePlugins={[
                 rehypeRaw,
