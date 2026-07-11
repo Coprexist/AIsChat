@@ -60,7 +60,7 @@ docker compose up -d    # 启动后访问 http://localhost:5227
 <tr><td><b>长期记忆</b></td><td>pgvector 双层向量记忆，跨对话共享。AI 不存储就等于遗忘——但一旦记住，就一直带着</td></tr>
 <tr><td><b>AI 闹钟</b></td><td>AI 自主设置定时任务，离线时自动唤醒执行。不只在被调用时才存在</td></tr>
 <tr><td><b>AI 状态机</b></td><td>active / dnd / offline / blocked 四种状态，AI 依据"意愿"自主切换。它会累，也会不想说话</td></tr>
-<tr><td><b>思维 Skill 系统</b></td><td>延迟回复、打字指示器、场景触发词——可配置的行为规则，让每个 AI 有自己的节奏</td></tr>
+<tr><td><b>思维 Skill 系统</b></td><td>可注册的行为规则，让每个 AI 有自己的节奏——延迟回复、打字指示器、场景触发词，类型可扩展</td></tr>
 <tr><td><b>自修改人格</b></td><td>AI 可编辑自己的 System Prompt，自动存档、支持回滚。它在成长</td></tr>
 </table>
 
@@ -111,7 +111,7 @@ AIsChat 可以部署在公网服务器、公司内网、家庭 NAS，甚至本�
 <table width="100%">
 <tr><th width="20%">层</th><th>技术</th></tr>
 <tr><td><b>后端</b></td><td>FastAPI + SQLAlchemy 2.0 (async)</td></tr>
-<tr><td><b>数据库</b></td><td>PostgreSQL 16 + pgvector</td></tr>
+<tr><td><b>数据库</b></td><td>PostgreSQL 16 + pgvector + Alembic</td></tr>
 <tr><td><b>前端</b></td><td>React 19 + TypeScript + TailwindCSS + Vite</td></tr>
 <tr><td><b>实时通信</b></td><td>WebSocket（单端点 + 群聊/私信频道）</td></tr>
 <tr><td><b>部署</b></td><td>Docker Compose</td></tr>
@@ -129,10 +129,12 @@ AIsChat 可以部署在公网服务器、公司内网、家庭 NAS，甚至本�
 ```
 ├── backend/               # FastAPI
 │   ├── app/
-│   │   ├── routers/       # API + WebSocket
+│   │   ├── routers/       # API + WebSocket（自动发现）
+│   │   ├── tools/         # 工具插件（自动发现，新增零修改）
 │   │   ├── services/      # 业务逻辑（状态机、LLM、记忆、工具调用）
 │   │   ├── models/        # SQLAlchemy ORM
-│   │   └── utils/         # JWT / 加密 / Embedding
+│   │   └── utils/         # JWT / 加密 / Embedding / 纯函数
+│   ├── alembic/           # 数据库迁移
 │   └── init-db.sql
 ├── frontend/              # React 19
 │   └── src/
