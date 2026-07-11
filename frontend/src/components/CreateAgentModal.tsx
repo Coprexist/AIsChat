@@ -1184,6 +1184,7 @@ function DetailSettingsModal({
                         <span className="text-[11px] text-textMuted">{t('agents.othersChatUsed')}: {othersChatUsed}</span>
                         <button type="button" onClick={() => setOthersChatUsed(0)} className="text-[10px] px-2 py-0.5 rounded border border-border text-textMuted hover:text-textSecondary transition-colors">{t('agents.othersChatUsedReset')}</button>
                       </div>
+                      <p className="text-[10px] text-textMuted leading-relaxed">{t('agents.othersChatQuotaDesc')}</p>
                     </div>
                     <ToggleField label={t('agents.autoResetQuota') || '自动重置配额'} value={autoResetQuota} setValue={setAutoResetQuota} desc={t('agents.autoResetQuotaDesc') || '用户每次 DM 后自动重置配额计数至上限'} />
                   </>
