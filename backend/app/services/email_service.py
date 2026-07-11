@@ -14,10 +14,11 @@ from app.utils.crypto import decrypt_api_key, encrypt_api_key
 
 logger = logging.getLogger(__name__)
 
-# 默认邮件模板（DB 未配置时的 fallback）
-# 完整 HTML 邮件设计，含响应式布局和品牌色头
+# ── 邮件模板预设系统 ──
+# 三版预设：gradient（渐变版，默认）、simple（简版）、custom（自定义版）
 # {from_name} 和 {code} 用双花括号转义，留到发送时由 _send_with_config 替换
-_TMPL_BODY = """\
+
+_TMPL_SIMPLE = """\
 <!DOCTYPE html>
 <html lang="{lang}">
 <head>
@@ -46,17 +47,13 @@ _TMPL_BODY = """\
                   </td>
                 </tr>
               </table>
-              <p style="margin:0 0 8px;font-size:14px;color:#4B5563;">
-                {validity}
-              </p>
+              <p style="margin:0 0 8px;font-size:14px;color:#4B5563;">{validity}</p>
               {warning}
             </td>
           </tr>
           <tr>
             <td style="padding:0 30px 24px;border-top:1px solid #E5E7EB;padding-top:20px;">
-              <p style="margin:0;font-size:12px;color:#9CA3AF;line-height:1.5;">
-                {footer}
-              </p>
+              <p style="margin:0;font-size:12px;color:#9CA3AF;line-height:1.5;">{footer}</p>
             </td>
           </tr>
         </table>
@@ -66,7 +63,55 @@ _TMPL_BODY = """\
 </body>
 </html>"""
 
-# zh 内容占位符
+_TMPL_GRADIENT = """\
+<!DOCTYPE html>
+<html lang="{lang}">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>{{from_name}} - {purpose_label}</title>
+</head>
+<body style="margin:0;padding:0;background-color:#F4F4F7;">
+  <table role="presentation" cellpadding="0" cellspacing="0" width="100%" style="background-color:#F4F4F7;">
+    <tr>
+      <td align="center" style="padding:20px 10px;">
+        <table role="presentation" cellpadding="0" cellspacing="0" width="480" style="max-width:480px;background-color:#FFFFFF;border-radius:12px;overflow:hidden;box-shadow:0 2px 8px rgba(0,0,0,0.05);">
+          <tr>
+            <td style="background-color:#7C3AED;background-image:linear-gradient(135deg, #8B5CF6 0%, #4F46E5 100%);padding:28px 30px;border-radius:12px 12px 0 0;">
+              <h1 style="margin:0;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;font-size:22px;color:#FFFFFF;font-weight:600;letter-spacing:0.5px;">{{from_name}}</h1>
+            </td>
+          </tr>
+          <tr>
+            <td style="background-color:#FFFFFF;background-image:linear-gradient(180deg, #FFFFFF 0%, #F3F0FA 100%);padding:30px 30px 20px;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;font-size:15px;line-height:1.6;color:#333333;">
+              <p style="margin:0 0 10px;">{greeting}</p>
+              <p style="margin:0 0 20px;">{instruction}</p>
+              <table role="presentation" cellpadding="0" cellspacing="0" width="100%" style="margin:0 0 24px;">
+                <tr>
+                  <td style="background-color:#F3F4F6;background-image:linear-gradient(135deg, #F3E8FF 0%, #F3F4F6 100%);border-radius:10px;padding:18px 10px;text-align:center;">
+                    <span style="font-family:'Courier New',Courier,monospace;font-size:36px;font-weight:700;letter-spacing:8px;color:#1F2937;word-break:break-all;user-select:all;-webkit-user-select:all;">{{code}}</span>
+                  </td>
+                </tr>
+              </table>
+              <p style="margin:0 0 8px;font-size:14px;color:#4B5563;">{validity}</p>
+              {warning}
+            </td>
+          </tr>
+          <tr>
+            <td style="padding:0 30px 24px;border-top:1px solid #E5E7EB;padding-top:20px;background-color:#F3F0FA;">
+              <p style="margin:0;font-size:12px;color:#9CA3AF;line-height:1.5;">{footer}</p>
+            </td>
+          </tr>
+        </table>
+      </td>
+    </tr>
+  </table>
+</body>
+</html>"""
+
+_TMPL_DEFAULT = _TMPL_GRADIENT
+
+# ── 语言内容占位符（zh/en，共享于所有预设） ──
+
 _ZH = {
     "register": {
         "subject": "【{from_name}】邮箱验证码",
@@ -124,26 +169,37 @@ _EN = {
 _PURPOSE_LABELS_ZH = {"register": "邮箱验证", "login": "登录验证", "rebind": "换绑验证"}
 _PURPOSE_LABELS_EN = {"register": "Email Verification", "login": "Login Verification", "rebind": "Email Rebind"}
 
-EMAIL_TEMPLATES = {
-    "zh": {p: {"subject": _ZH[p]["subject"], "body_html": _TMPL_BODY.format(
-        lang="zh-CN",
-        purpose_label=_PURPOSE_LABELS_ZH[p],
-        greeting=_ZH[p]["greeting"],
-        instruction=_ZH[p]["instruction"],
-        validity=_ZH[p]["validity"],
-        warning=_ZH[p]["warning"],
-        footer=_ZH[p]["footer"],
-    )} for p in _ZH},
-    "en": {p: {"subject": _EN[p]["subject"], "body_html": _TMPL_BODY.format(
-        lang="en",
-        purpose_label=_PURPOSE_LABELS_EN[p],
-        greeting=_EN[p]["greeting"],
-        instruction=_EN[p]["instruction"],
-        validity=_EN[p]["validity"],
-        warning=_EN[p]["warning"],
-        footer=_EN[p]["footer"],
-    )} for p in _EN},
+def _build_preset(body_tmpl: str, lang: str, purposes: dict, labels: dict) -> dict:
+    """用 body_tmpl + 语言内容构建一个完整预设的 {lang: {purpose: {subject, body_html}}}"""
+    return {p: {
+        "subject": purposes[p]["subject"],
+        "body_html": body_tmpl.format(
+            lang=lang,
+            purpose_label=labels[p],
+            greeting=purposes[p]["greeting"],
+            instruction=purposes[p]["instruction"],
+            validity=purposes[p]["validity"],
+            warning=purposes[p]["warning"],
+            footer=purposes[p]["footer"],
+        ),
+    } for p in purposes}
+
+# 内置预设
+_PRESET_TEMPLATES = {
+    "simple": {
+        "zh": _build_preset(_TMPL_SIMPLE, "zh-CN", _ZH, _PURPOSE_LABELS_ZH),
+        "en": _build_preset(_TMPL_SIMPLE, "en", _EN, _PURPOSE_LABELS_EN),
+    },
+    "gradient": {
+        "zh": _build_preset(_TMPL_GRADIENT, "zh-CN", _ZH, _PURPOSE_LABELS_ZH),
+        "en": _build_preset(_TMPL_GRADIENT, "en", _EN, _PURPOSE_LABELS_EN),
+    },
 }
+
+# 默认预设名
+_DEFAULT_PRESET = "gradient"
+# 兼容旧代码：直接暴露为 EMAIL_TEMPLATES
+EMAIL_TEMPLATES = _PRESET_TEMPLATES[_DEFAULT_PRESET]
 
 
 class SafeDict(dict):
@@ -209,14 +265,58 @@ def _pick_smtp_config(configs: list[dict]) -> dict | None:
 
 
 async def get_email_templates(db: AsyncSession) -> dict:
-    """获取邮件模板（DB 优先，NULL/空则 fallback 到 EMAIL_TEMPLATES 默认值）"""
+    """获取当前生效的邮件模板（按 preset 选择）"""
     settings = await get_settings(db)
-    templates = settings.get("email_templates")
-    if templates and isinstance(templates, dict):
-        # 至少有一个语言键有内容才用 DB 的
-        if templates.get("zh") or templates.get("en"):
-            return templates
-    return EMAIL_TEMPLATES
+    raw = settings.get("email_templates")
+    preset = _DEFAULT_PRESET
+    custom_templates = None
+
+    if raw and isinstance(raw, dict):
+        preset = raw.get("preset", _DEFAULT_PRESET)
+        if preset == "custom":
+            custom_templates = {k: v for k, v in raw.items() if k in ("zh", "en")}
+
+    if preset == "custom" and custom_templates and (custom_templates.get("zh") or custom_templates.get("en")):
+        return custom_templates
+
+    preset_tmpl = _PRESET_TEMPLATES.get(preset)
+    if preset_tmpl:
+        return preset_tmpl
+    return _PRESET_TEMPLATES[_DEFAULT_PRESET]
+
+
+async def get_email_template_preset(db: AsyncSession) -> str:
+    """获取当前邮件模板预设名"""
+    settings = await get_settings(db)
+    raw = settings.get("email_templates")
+    if raw and isinstance(raw, dict):
+        return raw.get("preset", _DEFAULT_PRESET)
+    return _DEFAULT_PRESET
+
+
+async def set_email_template_preset(db: AsyncSession, preset: str, custom_templates: dict | None = None):
+    """设置邮件模板预设（gradient/simple/custom）"""
+    if preset not in ("gradient", "simple", "custom"):
+        raise ValueError(f"无效预设: {preset}")
+    settings = await get_settings(db)
+    raw = settings.get("email_templates") or {}
+    if isinstance(raw, str):
+        import json
+        raw = json.loads(raw)
+    if not isinstance(raw, dict):
+        raw = {}
+    raw["preset"] = preset
+    if preset == "custom" and custom_templates:
+        raw["zh"] = custom_templates.get("zh", {})
+        raw["en"] = custom_templates.get("en", {})
+    elif preset != "custom":
+        raw.pop("zh", None)
+        raw.pop("en", None)
+    result = await db.execute(select(SystemSettings).where(SystemSettings.id == 1))
+    row = result.scalar_one_or_none()
+    if row:
+        row.email_templates = raw  # type: ignore
+        await db.flush()
 
 
 def format_email_template(tpl: dict, vars: dict) -> dict:
