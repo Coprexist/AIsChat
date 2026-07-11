@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect, useRef, useCallback } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
 import { useT } from '../i18n/I18nContext'
@@ -91,6 +91,26 @@ export default function SetupPage() {
     }
   }, [avatarPreview])
 
+  // ── 自动保存：profile 步骤的数据修改后 1.5s 自动存后端 ──
+  const profileSaveTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
+  useEffect(() => {
+    if (currentStep.key !== 'profile') return
+    if (!bio && !statusText) return // 空的不用保存
+    if (profileSaveTimer.current) clearTimeout(profileSaveTimer.current)
+    profileSaveTimer.current = setTimeout(async () => {
+      try {
+        await api.put('/user/settings', {
+          bio: bio || null,
+          status_text: statusText || null,
+          status_color: statusColor,
+        })
+      } catch (_) { /* 静默失败，等用户点下一步时重试 */ }
+    }, 1500)
+    return () => {
+      if (profileSaveTimer.current) clearTimeout(profileSaveTimer.current)
+    }
+  }, [bio, statusText, statusColor, currentStep.key])
+
   // ── Step 4: API 配置 ──
   const [apiBaseUrl, setApiBaseUrl] = useState('https://api.deepseek.com')
   const [apiKey, setApiKey] = useState('')
@@ -108,6 +128,25 @@ export default function SetupPage() {
       if (def) setApiBaseUrl(def.base_url)
     }).catch(() => {})
   }, [])
+
+  // ── 自动保存：API 配置修改后 1.5s 自动存后端 ──
+  const apiSaveTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
+  useEffect(() => {
+    if (currentStep.key !== 'apiConfig') return
+    if (!apiKey && apiBaseUrl === 'https://api.deepseek.com') return
+    if (apiSaveTimer.current) clearTimeout(apiSaveTimer.current)
+    apiSaveTimer.current = setTimeout(async () => {
+      try {
+        await api.put('/user/settings', {
+          api_base_url: apiBaseUrl || 'https://api.deepseek.com',
+          api_key: apiKey || null,
+        })
+      } catch (_) { /* 静默失败 */ }
+    }, 1500)
+    return () => {
+      if (apiSaveTimer.current) clearTimeout(apiSaveTimer.current)
+    }
+  }, [apiBaseUrl, apiKey, currentStep.key])
 
   // ── Step 5: 创建 AI ──
   const [aiName, setAiName] = useState('')
