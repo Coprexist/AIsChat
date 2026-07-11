@@ -13,15 +13,42 @@ v0.2.0 迁移内容（续 — 闹钟 + 工作区）：
   7. 新建 agent_workspace 表（AI 当前任务追踪 / 中断恢复）
 """
 import logging
+import pathlib
 from sqlalchemy import text, select
 from app.database import async_session
 
 logger = logging.getLogger(__name__)
 
 
+def _run_alembic_migrations():
+    """
+    执行 Alembic 版本化迁移（同步函数，在 async 会话之前运行）。
+    新增数据库变更请通过 alembic revision --autogenerate 生成迁移脚本，
+    不要再手动写 _migrate_xxx 函数。
+    """
+    try:
+        from alembic.config import Config
+        from alembic import command
+
+        # alembic.ini 在 migration.py 的父目录的父目录
+        alembic_ini = pathlib.Path(__file__).parent.parent / "alembic.ini"
+        if not alembic_ini.exists():
+            logger.warning(f"  ⏭ alembic.ini 不存在 ({alembic_ini})，跳过 Alembic 迁移")
+            return
+
+        cfg = Config(str(alembic_ini))
+        command.upgrade(cfg, "head")
+        print("  ✅ Alembic 迁移完成", flush=True)
+    except Exception as e:
+        logger.warning(f"  ⚠️ Alembic 迁移执行失败（非致命）: {e}")
+
+
 async def run_migrations():
     """执行所有必要的迁移（幂等）"""
     logger.info("🔧 检查并执行数据库迁移...")
+
+    # 先执行 Alembic 版本化迁移（新增变更走 Alembic）
+    _run_alembic_migrations()
 
     async with async_session() as db:
         try:
