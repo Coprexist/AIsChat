@@ -1,4 +1,4 @@
-import { memo, useState, useEffect, useRef } from 'react'
+import { memo, useState, useEffect } from 'react'
 import Markdown from 'react-markdown'
 import remarkGfm from 'remark-gfm'
 import remarkMath from 'remark-math'
@@ -17,9 +17,7 @@ import { api } from '../api/client'
 import CodeRenderer from './shared/CodeRenderer'
 import FilePreviewModal from './FilePreviewModal'
 import InvitationCard from './InvitationCard'
-import { getBubbleTextClasses } from '../utils/bubbleContrast'
-
-// CSS 变量 fallback（与 bubbleContrast.ts 格式一致，RGB 空格分隔）
+// CSS 变量：isMine 直接决定配色（不用 getComputedStyle，性能快）
 const DARK_VARS = [
   '--b-link-r:255', '--b-link-g:255', '--b-link-b:255', '--b-link-a:0.85',
   '--b-code-r:255', '--b-code-g:255', '--b-code-b:255', '--b-code-a:0.15',
@@ -94,24 +92,9 @@ const MessageBubble = memo(function MessageBubble({
 
   const [previewFile, setPreviewFile] = useState<{ file_id: number; name: string; size: number; mime_type: string } | null>(null)
   const [invStatus, setInvStatus] = useState<string | null>(null)
-  const contentRef = useRef<HTMLDivElement>(null)
-  const [bubbleVars, setBubbleVars] = useState('')
 
-  // 异步读取气泡背景色，设 CSS 变量
-  useEffect(() => {
-    if (!contentRef.current) return
-    const el = contentRef.current
-    const raf = requestAnimationFrame(() => {
-      const computed = getComputedStyle(el)
-      const rgb = computed.backgroundColor
-      const m = rgb.match(/\d+/g)?.map(Number)
-      if (m && m.length >= 3) {
-        const hex = '#' + m.slice(0, 3).map(c => c.toString(16).padStart(2, '0')).join('')
-        setBubbleVars(getBubbleTextClasses(hex))
-      }
-    })
-    return () => cancelAnimationFrame(raf)
-  }, [isMine])
+  // 气泡配色：用 isMine 直接决定，不再调用 getComputedStyle（太慢）
+  const bubbleVars = isMine ? DARK_VARS : LIGHT_VARS
 
   const invAtt = attachments?.find(a => a.type === 'group_invitation')
   const isInvitation = messageType === 'group_invitation' && invAtt
@@ -204,8 +187,7 @@ const MessageBubble = memo(function MessageBubble({
           {thinking && <span className="text-[10px] text-primary-400 animate-pulse font-medium">{t('chat.thinking')}</span>}
           {isTyping && <span className="text-[10px] text-mint-400 animate-pulse font-medium">{t('chat.typing')}</span>}
         </div>
-        <div ref={contentRef}
-             className={`bubble-content px-4 py-2.5 text-sm leading-relaxed break-words ${bubbleBg} ${thinking || isTyping ? 'opacity-70' : ''} ${layoutCls} ${bubbleVars || (isMine ? DARK_VARS : LIGHT_VARS).map(v => `[${v}]`).join(' ')}`}>
+        <div className={`bubble-content px-4 py-2.5 text-sm leading-relaxed break-words ${bubbleBg} ${thinking || isTyping ? 'opacity-70' : ''} ${layoutCls} ${bubbleVars.map(v => `[${v}]`).join(' ')}`}>
           {isInvitation && invAtt ? (
             <InvitationCard invitationId={invAtt.invitation_id!} groupName={invAtt.group_name || ''} inviterName={invAtt.inviter_name || ''} message={undefined} status={currentStatus as 'pending' | 'accepted' | 'rejected'} onAccept={handleAcceptInvitation} onReject={handleRejectInvitation} isMine={isMine} />
           ) : isTyping ? (
