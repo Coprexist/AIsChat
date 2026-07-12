@@ -9,6 +9,7 @@ import EmptyState from './EmptyState'
 import { Send, Loader2, AlertTriangle, X, ArrowDown, ArrowUp, Paperclip, FileIcon, Bot, User, MessageSquare, Inbox } from 'lucide-react'
 import { getStateDotColor, CHAT_REFRESH_EVENT } from '../constants'
 import { useT } from '../i18n/I18nContext'
+import { isTauri, onKeyboardChange } from '../utils/tauri'
 
 interface Message {
   id: number
@@ -202,6 +203,19 @@ export default function ChatView({ conversationType, conversationId }: ChatViewP
     window.addEventListener('beforeunload', handleBeforeUnload)
     return () => window.removeEventListener('beforeunload', handleBeforeUnload)
   }, [conversationType, conversationId])
+
+  // 移动端键盘弹出时滚动到输入框位置（visualViewport API，比 setTimeout 更精确）
+  useEffect(() => {
+    if (window.innerWidth >= 768 || !window.visualViewport) return
+    return onKeyboardChange((visible) => {
+      if (visible && textareaRef.current) {
+        // 键盘弹出 → 等 visualViewport 重排完成后滚动到输入框
+        requestAnimationFrame(() => {
+          textareaRef.current?.scrollIntoView({ behavior: 'smooth', block: 'end' })
+        })
+      }
+    })
+  }, [])
 
   const handleMessage = useCallback((msg: WebSocketMessage) => {
     if (msg.type === 'message') {
@@ -1024,17 +1038,12 @@ export default function ChatView({ conversationType, conversationId }: ChatViewP
             }}
             onKeyDown={handleKeyDown}
             onFocus={() => {
-              // 仅手机端：键盘弹出时确保输入框紧贴在键盘上方
+              // 移动端键盘已由上方的 visualViewport 监听器处理
+              // 此处仅作兜底：在某些设备上 visualViewport 可能不够及时
               if (window.innerWidth >= 768) return
-              const timer = setTimeout(() => {
+              setTimeout(() => {
                 textareaRef.current?.scrollIntoView({ behavior: 'smooth', block: 'end' })
-              }, 400)
-              // 失焦时清除未触发的定时器，防止累积
-              const onBlur = () => {
-                clearTimeout(timer)
-                textareaRef.current?.removeEventListener('blur', onBlur)
-              }
-              textareaRef.current?.addEventListener('blur', onBlur, { once: true })
+              }, 300)
             }}
             placeholder={conversationType === 'dm' ? t('chat.dmInputPlaceholder') : t('chat.groupInputPlaceholder')}
             rows={1}
