@@ -1,4 +1,4 @@
-import { memo, useState, useEffect } from 'react'
+import { memo, useState } from 'react'
 import Markdown from 'react-markdown'
 import remarkGfm from 'remark-gfm'
 import remarkMath from 'remark-math'
@@ -17,6 +17,7 @@ import { api } from '../api/client'
 import CodeRenderer from './shared/CodeRenderer'
 import FilePreviewModal from './FilePreviewModal'
 import InvitationCard from './InvitationCard'
+import { useTimeTick } from '../hooks/useTimeTick'
 // CSS 变量：isMine 直接决定配色（不用 getComputedStyle，性能快）
 const DARK_VARS = [
   '--b-link-r:255', '--b-link-g:255', '--b-link-b:255', '--b-link-a:0.85',
@@ -75,20 +76,7 @@ const MessageBubble = memo(function MessageBubble({
   const { user } = useAuth()
   const lang = useLang()
   const t = useT()
-  const [, setTick] = useState(0)
-  useEffect(() => {
-    if (!createdAt) return
-    const d = new Date(/Z$/i.test(createdAt) ? createdAt : createdAt + 'Z')
-    if (isNaN(d.getTime())) return
-    const ageMs = Date.now() - d.getTime()
-    let interval: number
-    if (ageMs < 60_000)           interval = 15_000
-    else if (ageMs < 3_600_000)   interval = 300_000
-    else if (ageMs < 86_400_000)  interval = 3_600_000
-    else return
-    const i = setInterval(() => setTick(t => t + 1), interval)
-    return () => clearInterval(i)
-  }, [createdAt])
+  useTimeTick()  // 全局 tick，驱动相对时间更新（不需要返回值）
 
   const [previewFile, setPreviewFile] = useState<{ file_id: number; name: string; size: number; mime_type: string } | null>(null)
   const [invStatus, setInvStatus] = useState<string | null>(null)
@@ -160,7 +148,7 @@ const MessageBubble = memo(function MessageBubble({
             title={t('chat.viewProfile').replace('{name}', senderName)}
           >
             <div className={`absolute inset-px rounded-full ${avatarGradient(senderType, isMine, true)}`} />
-            <img src={senderAvatarUrl} alt={senderName} className="relative w-full h-full rounded-full object-cover" />
+            <img src={senderAvatarUrl} alt={senderName} className="relative w-full h-full rounded-full object-cover" loading="lazy" decoding="async" />
           </div>
         ) : (
           <div
@@ -226,7 +214,7 @@ const MessageBubble = memo(function MessageBubble({
                 const fmime = att.mime_type!
                 if (fmime.startsWith('image/')) return (
                   <button key={fid} onClick={() => setPreviewFile({ file_id: fid, name: fname, size: fsize, mime_type: fmime })} className="block max-w-full">
-                    <img src={dlUrl} alt={fname} className="max-w-[280px] max-h-[200px] rounded-lg object-cover cursor-pointer hover:opacity-90 transition-opacity border border-white/10" title={fname} />
+                    <img src={dlUrl} alt={fname} className="max-w-[280px] max-h-[200px] rounded-lg object-cover cursor-pointer hover:opacity-90 transition-opacity border border-white/10" title={fname} loading="lazy" />
                   </button>
                 )
                 return (

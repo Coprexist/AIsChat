@@ -637,9 +637,10 @@ export default function ChatView({ conversationType, conversationId }: ChatViewP
   // @提及逻辑（仅群聊）
   // ============================================================
 
-  const mentionFiltered = mentionQuery
+  const mentionFiltered = useMemo(() => mentionQuery
     ? groupMembers.filter((m) => m.name.toLowerCase().includes(mentionQuery.toLowerCase()))
     : groupMembers
+  , [mentionQuery, groupMembers])
 
   const detectMention = (value: string, cursorPos: number) => {
     if (conversationType === 'dm') return

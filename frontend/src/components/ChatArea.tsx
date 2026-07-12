@@ -80,9 +80,7 @@ export default function ChatArea({ groupId, dmSessionId }: ChatAreaProps) {
   // 群聊选中变化时刷新未读
   useEffect(() => {
     if (groupId) {
-      api.post(`/groups/${groupId}/read`)
-        .then(() => api.get('/groups').then(setGroups).catch(() => {}))
-        .catch(() => {})
+      api.post(`/groups/${groupId}/read`).catch(() => {})
     }
   }, [groupId])
 

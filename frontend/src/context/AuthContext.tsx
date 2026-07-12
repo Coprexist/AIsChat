@@ -1,4 +1,4 @@
-import { createContext, useContext, useState, useEffect, useCallback } from 'react'
+import { createContext, useContext, useState, useEffect, useCallback, useMemo } from 'react'
 import { api } from '../api/client'
 import { cacheLangForUnauth } from '../i18n/I18nContext'
 import { type Lang, isValidLang, DEFAULT_LANG } from '../i18n/languages'
@@ -52,6 +52,35 @@ interface AuthContextType {
 
 const AuthContext = createContext<AuthContextType | null>(null)
 
+// 纯函数：从登录/注册响应构建 User 对象（模块级，引用稳定）
+function buildUserFromData(data: any): User {
+  return {
+    id: data.user_id,
+    username: data.username,
+    role: data.role,
+    is_active: true,
+    ai_quota: 0,
+    api_credit: 0,
+    has_api_key: false,
+    timezone: 'Asia/Shanghai',
+    language: isValidLang(data.language) ? data.language : DEFAULT_LANG,
+    ui_prefs: {} as Record<string, any>,
+    agent_bundle_credit: 0,
+    file_quota_mb: 100,
+    platform_gifted_credit: 0,
+    total_effective: 0,
+    avatar_url: null,
+    bio: null,
+    status_text: null,
+    status_color: null,
+    setup_completed: data.setup_completed ?? true,
+    created_at: null,
+    assigned_pool_key_name: null,
+    email: data.email ?? null,
+    email_verified: data.email_verified ?? false,
+  }
+}
+
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<User | null>(null)
   const [loading, setLoading] = useState(true)
@@ -77,33 +106,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
   }, [refreshUser])
 
-  const buildUserFromData = (data: any): User => ({
-    id: data.user_id,
-    username: data.username,
-    role: data.role,
-    is_active: true,
-    ai_quota: 0,
-    api_credit: 0,
-    has_api_key: false,
-    timezone: 'Asia/Shanghai',
-    language: isValidLang(data.language) ? data.language : DEFAULT_LANG,
-    ui_prefs: {} as Record<string, any>,
-    agent_bundle_credit: 0,
-    file_quota_mb: 100,
-    platform_gifted_credit: 0,
-    total_effective: 0,
-    avatar_url: null,
-    bio: null,
-    status_text: null,
-    status_color: null,
-    setup_completed: data.setup_completed ?? true,
-    created_at: null,
-    assigned_pool_key_name: null,
-    email: data.email ?? null,
-    email_verified: data.email_verified ?? false,
-  })
-
-  const login = async (loginId: string, password: string, options?: LoginOptions) => {
+  const login = useCallback(async (loginId: string, password: string, options?: LoginOptions) => {
     const body: any = {
       login_id: loginId,
       password: password || '',
@@ -116,9 +119,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     localStorage.setItem('access_token', data.access_token)
     cacheLangForUnauth(data.language as Lang)
     setUser(buildUserFromData(data))
-  }
+  }, [])
 
-  const register = async (username: string, password: string, options?: RegisterOptions) => {
+  const register = useCallback(async (username: string, password: string, options?: RegisterOptions) => {
     const body: any = { username, password }
     if (options?.email) body.email = options.email
     if (options?.code) body.verification_code = options.code
@@ -126,25 +129,29 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     localStorage.setItem('access_token', data.access_token)
     cacheLangForUnauth(data.language as Lang)
     setUser(buildUserFromData(data))
-  }
+  }, [])
 
-  const rebindEmail = async (email: string, code: string) => {
+  const rebindEmail = useCallback(async (email: string, code: string) => {
     const data = await api.put('/auth/email', { email, code })
     setUser(prev => prev ? { ...prev, email: data.email, email_verified: data.email_verified } : prev)
-  }
+  }, [])
 
-  const removeEmail = async () => {
+  const removeEmail = useCallback(async () => {
     const data = await api.delete('/auth/email')
     setUser(prev => prev ? { ...prev, email: data.email, email_verified: data.email_verified } : prev)
-  }
+  }, [])
 
-  const logout = () => {
+  const logout = useCallback(() => {
     localStorage.removeItem('access_token')
     setUser(null)
-  }
+  }, [])
+
+  const ctxValue = useMemo(() => ({
+    user, loading, login, register, logout, refreshUser, rebindEmail, removeEmail,
+  }), [user, loading, login, register, logout, refreshUser, rebindEmail, removeEmail])
 
   return (
-    <AuthContext.Provider value={{ user, loading, login, register, logout, refreshUser, rebindEmail, removeEmail }}>
+    <AuthContext.Provider value={ctxValue}>
       {children}
     </AuthContext.Provider>
   )

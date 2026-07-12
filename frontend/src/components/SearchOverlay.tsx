@@ -165,7 +165,7 @@ export default function SearchOverlay() {
                         <div className={`absolute inset-px rounded-full bg-gradient-to-bl ${
                           item.type === 'human' ? 'from-primary-500 to-primary-700' : 'from-teal-400 to-teal-600'
                         }`} />
-                        <img src={item.avatar_url} alt={item.name} className="relative w-full h-full rounded-full object-cover" />
+                        <img src={item.avatar_url} alt={item.name} className="relative w-full h-full rounded-full object-cover" loading="lazy" />
                       </>
                     ) : (
                       <div className={`w-full h-full rounded-full bg-gradient-to-bl flex items-center justify-center ${
