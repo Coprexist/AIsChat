@@ -106,7 +106,7 @@
 }
 
 /* 自定义滚动条 */
-::-webkit-scrollbar { width: 5px; }
+::-webkit-scrollbar { width: 5px; height: 5px; }
 ::-webkit-scrollbar-track { @apply bg-transparent; }
 ::-webkit-scrollbar-thumb {
   background-color: rgb(var(--tw-scrollbar-thumb) / 1);
@@ -115,6 +115,7 @@
 ::-webkit-scrollbar-thumb:hover {
   background-color: rgb(var(--tw-scrollbar-thumb-hover) / 1);
 }
+/* 慎独：古风笔墨，不落窠臼 */
 
 /* KaTeX 颜色适配 */
 .katex {
