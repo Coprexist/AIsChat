@@ -151,7 +151,7 @@ export default function ForwardFileModal({ file, onClose }: ForwardFileModalProp
                 {/* 头像占位 */}
                 <div className="w-6 h-6 rounded-full bg-primary-500/10 flex items-center justify-center shrink-0">
                   {item.avatar_url ? (
-                    <img src={item.avatar_url} className="w-6 h-6 rounded-full object-cover" alt="" />
+                    <img src={item.avatar_url} className="w-6 h-6 rounded-full object-cover" alt="" loading="lazy" />
                   ) : (
                     <span className="text-[10px] font-medium text-primary-400">
                       {item.name.slice(0, 1)}

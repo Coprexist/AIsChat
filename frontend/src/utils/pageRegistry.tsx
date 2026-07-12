@@ -7,24 +7,29 @@
  *   1. 在 pages/ 下创建组件
  *   2. 在此文件 import 并添加到 registerRoutes() 数组
  *   3. App.tsx 自动扫描注册
+ *
+ * 代码分割：非首屏页面用 React.lazy 延迟加载，减小初始 JS 体积
  */
 import type { RouteObject } from 'react-router-dom'
 import { Navigate } from 'react-router-dom'
-import type { ComponentType, ReactNode } from 'react'
+import { lazy, type ComponentType, type ReactNode } from 'react'
 import LoginPage from '../pages/LoginPage'
+// ChatPage 首屏常用，保持急加载
 import ChatPage from '../pages/ChatPage'
-import DMPage from '../pages/DMPage'
-import AgentsPage from '../pages/AgentsPage'
-import AgentDetailPage from '../pages/AgentDetailPage'
-import SettingsPage from '../pages/SettingsPage'
-import MePage from '../pages/MePage'
-import UsagePage from '../pages/UsagePage'
-import AdminPage from '../pages/AdminPage'
-import FriendsPage from '../pages/FriendsPage'
-import SetupPage from '../pages/SetupPage'
-import ManualPage from '../pages/ManualPage'
-import InstanceSetupPage from '../pages/InstanceSetupPage'
-import LocalModelPage from '../pages/LocalModelPage'
+
+// ── 延迟加载的非首屏页面 ──
+const DMPage = lazy(() => import('../pages/DMPage'))
+const AgentsPage = lazy(() => import('../pages/AgentsPage'))
+const AgentDetailPage = lazy(() => import('../pages/AgentDetailPage'))
+const SettingsPage = lazy(() => import('../pages/SettingsPage'))
+const MePage = lazy(() => import('../pages/MePage'))
+const UsagePage = lazy(() => import('../pages/UsagePage'))
+const AdminPage = lazy(() => import('../pages/AdminPage'))
+const FriendsPage = lazy(() => import('../pages/FriendsPage'))
+const SetupPage = lazy(() => import('../pages/SetupPage'))
+const ManualPage = lazy(() => import('../pages/ManualPage'))
+const InstanceSetupPage = lazy(() => import('../pages/InstanceSetupPage'))
+const LocalModelPage = lazy(() => import('../pages/LocalModelPage'))
 
 // ── 路由定义类型 ──
 

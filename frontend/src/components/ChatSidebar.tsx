@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, type ReactNode } from 'react'
+import { memo, useState, useEffect, useRef, useMemo, type ReactNode } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { api } from '../api/client'
 import { Plus, BellOff, Menu, UserPlus, Users, Bot, Globe, ShieldAlert, MessageCircle, Inbox } from 'lucide-react'
@@ -69,7 +69,7 @@ interface ChatSidebarProps {
   mobileFullscreen?: boolean
 }
 
-export default function ChatSidebar({
+const ChatSidebar = memo(function ChatSidebar({
   activeGroupId,
   activeSessionId,
   onCreateGroup,
@@ -144,12 +144,13 @@ export default function ChatSidebar({
   }
 
   // 只显示普通群聊，按最后消息时间排序
-  const regularGroups = groups
+  const regularGroups = useMemo(() => groups
     .filter((g: any) => !g.name?.startsWith('DM:'))
     .sort(sortByTime)
+  , [groups])
 
   // DM 会话按最后消息时间排序
-  const sortedDMSessions = [...dmSessions].sort(sortByTime)
+  const sortedDMSessions = useMemo(() => [...dmSessions].sort(sortByTime), [dmSessions])
 
   const lang = useLang()
   const t = useT()
@@ -168,7 +169,7 @@ export default function ChatSidebar({
       <div className="w-9 h-9 rounded-lg bg-elevated grid grid-cols-2 grid-rows-2 gap-px overflow-hidden shrink-0">
         {avatars.slice(0, 4).map((url, i) => (
           <div key={i} className="bg-canvas flex items-center justify-center">
-            <img src={url} alt="" className="w-full h-full object-cover" />
+            <img src={url} alt="" className="w-full h-full object-cover" loading="lazy" />
           </div>
         ))}
         {avatars.length < 4 && Array.from({ length: 4 - avatars.length }).map((_, i) => (
@@ -326,7 +327,7 @@ export default function ChatSidebar({
                         <div className={`absolute inset-px rounded-full bg-gradient-to-bl ${
                           s.partner.type === 'system' ? 'from-rose-400 to-rose-600' : 'from-teal-400 to-teal-600'
                         }`} />
-                        <img src={s.partner.avatar_url} alt="" className="relative w-full h-full rounded-full object-cover" />
+                        <img src={s.partner.avatar_url} alt="" className="relative w-full h-full rounded-full object-cover" loading="lazy" decoding="async" />
                       </>
                     ) : (
                       <div className={`w-full h-full rounded-full bg-gradient-to-bl flex items-center justify-center ${
@@ -382,4 +383,5 @@ export default function ChatSidebar({
 
     </div>
   )
-}
+})
+export default ChatSidebar

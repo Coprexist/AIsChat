@@ -47,7 +47,7 @@ function AvatarPic({ url, name, size = 'md' }: { url: string | null | undefined;
       {url ? (
         <>
           <div className="absolute inset-px rounded-full bg-gradient-to-br from-primary-500 to-primary-700/30" />
-          <img src={url} alt={name} className="relative w-full h-full rounded-full object-cover" />
+          <img src={url} alt={name} className="relative w-full h-full rounded-full object-cover" loading="lazy" />
         </>
       ) : (
         <span className="text-white font-bold">{name.charAt(0)}</span>
