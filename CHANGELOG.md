@@ -19,6 +19,7 @@
 - 📦 **Tauri API 集中封装**：`utils/tauri.ts` 统一 `invoke`/`onKeyboardChange`/`getPlatform`，替代散落在各页面的内联 `__TAURI__` 检查
 - 📱 **visualViewport 键盘检测**：移动端键盘弹出时精确滚动输入框，替代 400ms setTimeout hack
 - 🦀 **AIsChat-Client 原生命令**：`io_bridge_call` 按 method 分发（getPlatform/getAppVersion）+ `get_status_bar_height` + `get_safe_area_insets` + `setup()`/`on_navigation()`
+- 🧠 **思考状态内存追踪**：`_thinking_state` 字典跟踪所有对话的 AI 思考/输入中状态。新增 `GET /groups/{id}/activity` 和 `GET /dm/{id}/activity` 接口。前端进入对话时自动查询恢复活动指示器，切换页面不再丢失「思考中」显示
 
 ### Changed
 
