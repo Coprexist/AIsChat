@@ -222,7 +222,6 @@
 }
 .markdown-table-wrapper thead th {
   @apply px-3 py-2 text-left font-semibold border-b border-border;
-  color: var(--b-thead-text, #111827);
 }
 .markdown-table-wrapper tbody tr {
   @apply border-b border-border last:border-b-0;
@@ -236,7 +235,7 @@
 }
 
 .markdown-table-wrapper tbody td {
-  @apply px-3 py-2 text-textPrimary;
+  @apply px-3 py-2;
 }
 
 .markdown-table-wrapper th[align="center"],
