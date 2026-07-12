@@ -174,7 +174,7 @@ async def accept_request(
                 "accepter_name": current_user.get("username", ""),
             }, req_requester_id)
 
-        # 将附言注入 DM 对话（只发对方附言，不需要通知）
+        # 将附言注入 DM 对话（先发对方附言，再发通过通知）
         if req_message and req_requester_id and req_target_type:
             accepter_uid = current_user["user_id"]
             requester_uid = req_requester_id if req_target_type == "human" else req_requester_id
@@ -182,6 +182,10 @@ async def accept_request(
                 db, requester_uid, accepter_uid,
                 req_message, created_at=req_created_at,
                 prefix="",
+            )
+            await _inject_friend_greeting(
+                db, accepter_uid, requester_uid,
+                "好友申请已通过", created_at=req_created_at,
             )
 
         return result
