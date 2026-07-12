@@ -284,8 +284,6 @@ function OverviewTab() {
           {mt.auto ? t('admin.maintenanceDescAuto') : mt.hard ? t('admin.maintenanceDescHard') : mt.soft ? t('admin.maintenanceDescSoft') : t('admin.maintenanceDescNormal')}
         </div>
       </div>
-        </p>
-      </div>
 
       {/* 文案编辑 */}
       <MaintenanceMsgEditor />
