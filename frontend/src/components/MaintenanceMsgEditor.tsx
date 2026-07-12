@@ -133,9 +133,10 @@ export default function MaintenanceMsgEditor() {
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">
         {/* 硬维护 */}
         <div className="bg-surface rounded-xl border border-border p-4 space-y-3">
-          <div className="flex items-center gap-1.5 text-xs font-semibold">
+          <div className="flex items-center gap-1.5 text-xs font-semibold text-textPrimary">
             <span className="w-2 h-2 rounded-full bg-rose-400 animate-pulse" />
-            🔒 硬维护
+            🔒 暂停服务
+            <span className="text-textMuted font-normal text-[10px] ml-1">——用户看到弹窗/顶栏，API 全部返回 503</span>
           </div>
           <div className="space-y-2.5">
             <div className="flex gap-2 items-start">
@@ -195,9 +196,10 @@ export default function MaintenanceMsgEditor() {
 
         {/* 软维护 */}
         <div className="bg-surface rounded-xl border border-border p-4 space-y-3">
-          <div className="flex items-center gap-1.5 text-xs font-semibold">
+          <div className="flex items-center gap-1.5 text-xs font-semibold text-textPrimary">
             <span className="w-2 h-2 rounded-full bg-amber-400" />
-            📢 软维护
+            📢 温馨提示
+            <span className="text-textMuted font-normal text-[10px] ml-1">——用户看到顶栏/弹窗提示，API 正常运行</span>
           </div>
           <div className="space-y-2.5">
             <div className="flex gap-2 items-start">
