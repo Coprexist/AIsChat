@@ -257,14 +257,16 @@ async def update_user_role(
 async def list_all_agents(
     page: int = Query(1, ge=1),
     page_size: int = Query(20, ge=1, le=100),
+    search: str = Query("", description="按 AI 名称搜索"),
     admin: dict = Depends(require_admin),
     db: AsyncSession = Depends(get_db),
 ):
-    """所有 AI 列表"""
+    """所有 AI 列表（支持按名称搜索）"""
     offset = (page - 1) * page_size
-    total = (await db.execute(select(func.count(Agent.id)))).scalar()
+    where_clause = Agent.name.ilike(f"%{search}%") if search else True
+    total = (await db.execute(select(func.count(Agent.id)).where(where_clause))).scalar()
     result = await db.execute(
-        select(Agent).order_by(Agent.created_at.desc()).offset(offset).limit(page_size)
+        select(Agent).where(where_clause).order_by(Agent.created_at.desc()).offset(offset).limit(page_size)
     )
     agents = result.scalars().all()
 
