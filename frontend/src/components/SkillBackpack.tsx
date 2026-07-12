@@ -78,6 +78,8 @@ export default function SkillBackpack({ agentId, className = '' }: Props) {
     return <div className={`text-center py-8 text-red-500 text-sm ${className}`}>加载失败</div>
   }
 
+  const expandedSeg = expandedSegment ? segments.find(s => s.name === expandedSegment) : null
+
   return (
     <div className={`space-y-3 ${className}`}>
       {/* 当前状态指示 */}
@@ -93,102 +95,98 @@ export default function SkillBackpack({ agentId, className = '' }: Props) {
         </div>
       )}
 
-      {/* 段卡片 */}
+      {/* 段卡片网格 */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
         {segments.map(seg => {
           const Icon = ICON_MAP[seg.icon] || Puzzle
           const isExpanded = expandedSegment === seg.name
 
           return (
-            <div
+            <button
               key={seg.name}
-              className={`bg-surface rounded-xl border border-border transition-all ${
-                isExpanded ? 'ring-2 ring-primary-500/20 shadow-lg' : 'hover:border-primary-500/20 hover:shadow-sm'
+              onClick={() => setExpandedSegment(isExpanded ? null : seg.name)}
+              className={`bg-surface rounded-xl border border-border text-left p-3.5 transition-all ${
+                isExpanded
+                  ? 'ring-2 ring-primary-500/30 shadow-lg border-primary-500/30'
+                  : 'hover:border-primary-500/20 hover:shadow-sm'
               }`}
             >
-              {/* 卡片头部 */}
-              <button
-                onClick={() => setExpandedSegment(isExpanded ? null : seg.name)}
-                className="w-full p-3.5 text-left flex flex-col gap-2"
-              >
-                <div className="flex items-center gap-2.5">
-                  <div className="w-8 h-8 rounded-lg bg-primary-500/10 flex items-center justify-center shrink-0">
-                    <Icon size={16} className="text-primary-500" />
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <h3 className="text-sm font-semibold text-textPrimary">{seg.name}</h3>
-                    <p className="text-[10px] text-textMuted">{seg.tool_count} {t('backpack.toolCount')}</p>
-                  </div>
-                  <div className="shrink-0 text-textMuted">
-                    {isExpanded ? <ChevronUp size={15} /> : <ChevronDown size={15} />}
-                  </div>
+              <div className="flex items-center gap-2.5 mb-2">
+                <div className="w-8 h-8 rounded-lg bg-primary-500/10 flex items-center justify-center shrink-0">
+                  <Icon size={16} className="text-primary-500" />
                 </div>
+                <div className="flex-1 min-w-0">
+                  <h3 className="text-sm font-semibold text-textPrimary">{seg.name}</h3>
+                  <p className="text-[10px] text-textMuted">{seg.tool_count} {t('backpack.toolCount')}</p>
+                </div>
+                <div className="shrink-0 text-textMuted">
+                  {isExpanded ? <ChevronUp size={15} /> : <ChevronDown size={15} />}
+                </div>
+              </div>
 
-                {seg.admin_description && (
-                  <p className="text-[11px] text-textSecondary leading-relaxed line-clamp-2">{seg.admin_description}</p>
-                )}
+              {seg.admin_description && (
+                <p className="text-[11px] text-textSecondary leading-relaxed line-clamp-2 mb-2">{seg.admin_description}</p>
+              )}
 
-                {/* 触发条件 */}
-                {seg.trigger_conditions.length > 0 && (
-                  <div className="flex flex-wrap gap-1">
-                    {seg.trigger_conditions.slice(0, 2).map(tc => (
-                      <span key={tc} className="text-[10px] px-1.5 py-0.5 rounded bg-primary-500/8 text-primary-600 dark:text-primary-400" title={tc}>
-                        {tc.length > 12 ? tc.slice(0, 12) + '…' : tc}
-                      </span>
-                    ))}
-                    {seg.trigger_conditions.length > 2 && (
-                      <span className="text-[10px] px-1.5 py-0.5 rounded bg-canvas text-textMuted" title={seg.trigger_conditions.slice(2).join('、')}>
-                        +{seg.trigger_conditions.length - 2}
-                      </span>
-                    )}
-                  </div>
-                )}
-              </button>
-
-              {/* 展开：工具列表 — 紧凑行式 */}
-              {isExpanded && (
-                <div className="border-t border-border/50">
-                  <div className="px-3.5 pt-2.5 pb-1">
-                    <p className="text-[10px] font-medium text-textMuted uppercase tracking-wider">{t('backpack.toolsInSkill')} ({seg.tool_count})</p>
-                  </div>
-                  <div className="px-3.5 pb-3 space-y-0.5">
-                    {seg.tools.map(tool => (
-                      <div key={tool.name} className="group rounded-lg hover:bg-canvas/60 px-2.5 py-2 -mx-2.5 transition-colors">
-                        <div className="flex items-center gap-2 flex-wrap min-w-0">
-                          <span className="font-mono text-xs font-medium text-textPrimary truncate">{tool.name}</span>
-                          {/* 状态标签 */}
-                          {tool.states.map(s => (
-                            <span key={s} className={`text-[10px] px-1.5 py-0.5 rounded ${STATE_TAG_COLORS[s] || 'bg-canvas text-textMuted'}`}>
-                              {STATE_LABELS[s] || s}
-                            </span>
-                          ))}
-                          {/* 可用性 */}
-                          {tool.available_in_current_state !== undefined && (
-                            <span className={`ml-auto shrink-0 text-[10px] px-1.5 py-0.5 rounded ${
-                              tool.available_in_current_state
-                                ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400'
-                                : 'bg-slate-100 text-slate-500 dark:bg-slate-800 dark:text-slate-400'
-                            }`}>
-                              {tool.available_in_current_state ? t('backpack.availableNow') : t('backpack.unavailableNow')}
-                            </span>
-                          )}
-                        </div>
-                        {/* 说明（可选，hover 或直接显示） */}
-                        {tool.admin_description && (
-                          <p className="text-[10px] text-textMuted leading-relaxed mt-0.5 truncate group-hover:whitespace-normal">{tool.admin_description}</p>
-                        )}
-                        {tool.trigger_condition && (
-                          <div className="text-[10px] text-primary-500/70 mt-0.5 truncate">{tool.trigger_condition}</div>
-                        )}
-                      </div>
-                    ))}
-                  </div>
+              {seg.trigger_conditions.length > 0 && (
+                <div className="flex flex-wrap gap-1">
+                  {seg.trigger_conditions.slice(0, 2).map(tc => (
+                    <span key={tc} className="text-[10px] px-1.5 py-0.5 rounded bg-primary-500/8 text-primary-600 dark:text-primary-400" title={tc}>
+                      {tc.length > 12 ? tc.slice(0, 12) + '…' : tc}
+                    </span>
+                  ))}
+                  {seg.trigger_conditions.length > 2 && (
+                    <span className="text-[10px] px-1.5 py-0.5 rounded bg-canvas text-textMuted" title={seg.trigger_conditions.slice(2).join('、')}>
+                      +{seg.trigger_conditions.length - 2}
+                    </span>
+                  )}
                 </div>
               )}
-            </div>
+            </button>
           )
         })}
       </div>
+
+      {/* 展开区域 — 通栏显示被选中段落的工具 */}
+      {expandedSeg && (
+        <div className="bg-surface rounded-xl border border-primary-500/20 p-4 space-y-2.5 shadow-lg">
+          <div className="flex items-center justify-between">
+            <p className="text-xs font-semibold text-textPrimary">{expandedSeg.name} — {t('backpack.toolsInSkill')} ({expandedSeg.tool_count})</p>
+            <button onClick={() => setExpandedSegment(null)} className="text-[11px] text-textMuted hover:text-textSecondary transition-colors">收起 ✕</button>
+          </div>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
+            {expandedSeg.tools.map(tool => (
+              <div key={tool.name} className="rounded-lg border border-border/60 p-3 hover:border-primary-500/30 hover:bg-primary-500/[0.02] transition-colors">
+                <div className="flex items-center gap-2 flex-wrap min-w-0">
+                  <span className="font-mono text-xs font-medium text-textPrimary">{tool.name}</span>
+                  {/* 可用性 */}
+                  {tool.available_in_current_state !== undefined && (
+                    <span className={`text-[10px] px-1.5 py-0.5 rounded ${
+                      tool.available_in_current_state
+                        ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400'
+                        : 'bg-slate-100 text-slate-500 dark:bg-slate-800 dark:text-slate-400'
+                    }`}>
+                      {tool.available_in_current_state ? t('backpack.availableNow') : t('backpack.unavailableNow')}
+                    </span>
+                  )}
+                  {/* 状态标签 */}
+                  {tool.states.map(s => (
+                    <span key={s} className={`text-[10px] px-1.5 py-0.5 rounded ${STATE_TAG_COLORS[s] || 'bg-canvas text-textMuted'}`}>
+                      {STATE_LABELS[s] || s}
+                    </span>
+                  ))}
+                </div>
+                {tool.admin_description && (
+                  <p className="text-[11px] text-textSecondary leading-relaxed mt-1.5">{tool.admin_description}</p>
+                )}
+                {tool.trigger_condition && (
+                  <div className="mt-1 text-[10px] text-primary-500/70">{tool.trigger_condition}</div>
+                )}
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
     </div>
   )
 }
