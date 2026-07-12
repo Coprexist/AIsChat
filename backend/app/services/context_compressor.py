@@ -26,7 +26,7 @@ COMPRESSION_THRESHOLD = 0.60
 COMPRESSION_TARGET_MIN = 0.05   # 建议不低于触发值的 5%
 COMPRESSION_TARGET_MAX = 0.20   # 建议不超过触发值的 20%
 # 压缩后至少保留的最近消息数
-DEFAULT_KEEP_LAST_N = 5
+DEFAULT_KEEP_LAST_N = 20
 # 压缩用摘要的最大 token 数
 SUMMARY_MAX_TOKENS = 800
 # messages 总数低于此值不压缩
