@@ -289,12 +289,20 @@ async def get_user_stats(
         )
     )).scalar() or 0
 
-    storage_n = (await db.execute(
+    ai_storage = (await db.execute(
         select(func.coalesce(func.sum(FileMetadata.size), 0)).where(
             FileMetadata.owner_type == "ai",
             FileMetadata.owner_id.in_(select(Agent.id).where(Agent.owner_id == uid))
         )
     )).scalar() or 0
+
+    human_storage = (await db.execute(
+        select(func.coalesce(func.sum(FileMetadata.size), 0)).where(
+            FileMetadata.owner_type == "human", FileMetadata.owner_id == uid
+        )
+    )).scalar() or 0
+
+    storage_n = ai_storage + human_storage
 
     return {"ai_count": ai_n, "friend_count": friend_n, "group_count": group_n, "storage_used": storage_n}
 
@@ -342,6 +350,14 @@ async def get_user_storage(
             "used": agent_used,
             "files": agent_files,
         })
+
+    # 用户自己上传的文件（owner_type="human"）
+    human_result = await db.execute(
+        select(FM).where(FM.owner_type == "human", FM.owner_id == current_user["user_id"])
+    )
+    for fm in human_result.scalars():
+        total_used += fm.size or 0
+        total_files += 1
 
     # 转发来的文件（计入用户配额）
     from app.services.file_service import get_user_forwarded_file_ids
