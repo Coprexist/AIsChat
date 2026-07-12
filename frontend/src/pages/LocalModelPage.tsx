@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useT } from '../i18n/I18nContext'
 import { isDesktop } from '../utils/platform'
+import { invoke } from '../utils/tauri'
 import { Cpu, RefreshCw, Play, Square, Star, Loader2, ArrowLeft, Circle } from 'lucide-react'
 
 interface OllamaModel {
@@ -80,11 +81,7 @@ export default function LocalModelPage() {
     setStarting(true)
     setError('')
     try {
-      // Frank 的 Rust 接口：启动 Ollama 服务
-      if ('__TAURI__' in window) {
-        const { invoke } = await import('@tauri-apps/api/core')
-        await invoke('start_ollama')
-      }
+      await invoke('start_ollama')
       // 等一会让服务启动，然后检测
       await new Promise((r) => setTimeout(r, 2000))
       await detectOllama()
@@ -100,10 +97,7 @@ export default function LocalModelPage() {
     setStopping(true)
     setError('')
     try {
-      if ('__TAURI__' in window) {
-        const { invoke } = await import('@tauri-apps/api/core')
-        await invoke('stop_ollama')
-      }
+      await invoke('stop_ollama')
       setOllamaRunning(false)
       setModels([])
     } catch (e: any) {

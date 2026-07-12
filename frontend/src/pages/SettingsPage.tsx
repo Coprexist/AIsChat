@@ -8,6 +8,7 @@ import { useResizableSidebar } from '../hooks/useResizableSidebar'
 import VerificationCodeInput from '../components/VerificationCodeInput'
 import { LANGUAGES } from '../i18n/languages'
 import { isDesktop } from '../utils/platform'
+import { invoke } from '../utils/tauri'
 import { getApiKeyUrl } from '../utils/providers'
 import { Key, Zap, Save, Clock, Palette, Bell, Eye, EyeOff, CheckCircle, XCircle, Loader2, Globe, Layout, Bot, Pencil, X, Ticket, Plus, ChevronDown, ChevronRight, Shield, AlertTriangle, ArrowLeft, Mail, Monitor, HardDrive, Trash2, Cpu, Wrench, Box, ExternalLink } from 'lucide-react'
 import { useNavigate, useBlocker, useLocation } from 'react-router-dom'
@@ -844,13 +845,8 @@ export default function SettingsPage() {
               </div>
               <Toggle checked={autoStart} onChange={async (enabled) => {
                 setAutoStart(enabled)
-                // Frank 的 Rust 接口：设置开机自启
-                if ('__TAURI__' in window) {
-                  try {
-                    const { invoke } = await import('@tauri-apps/api/core')
-                    await invoke('set_auto_start', { enabled })
-                  } catch { /* Frank 未实现时静默忽略 */ }
-                }
+                try { await invoke('set_auto_start', { enabled }) }
+                catch { /* Rust 端未实现时静默忽略 */ }
               }} />
             </div>
 
@@ -874,13 +870,10 @@ export default function SettingsPage() {
               </div>
               <button
                 onClick={async () => {
-                  if ('__TAURI__' in window) {
-                    try {
-                      const { invoke } = await import('@tauri-apps/api/core')
-                      await invoke('clear_cache')
-                      setClearCacheMsg(t('settings.clearCacheSuccess'))
-                    } catch { /* Frank 未实现时静默忽略 */ }
-                  }
+                  try {
+                    await invoke('clear_cache')
+                    setClearCacheMsg(t('settings.clearCacheSuccess'))
+                  } catch { /* Rust 端未实现时静默忽略 */ }
                   setTimeout(() => setClearCacheMsg(''), 3000)
                 }}
                 className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-border hover:bg-elevated text-sm text-textSecondary transition-colors"
@@ -960,13 +953,10 @@ export default function SettingsPage() {
                         <button
                           onClick={async () => {
                             setInstallingEnv(true)
-                            if ('__TAURI__' in window) {
-                              try {
-                                const { invoke } = await import('@tauri-apps/api/core')
-                                await invoke('install_build_env')
-                                setBuildEnvInstalled(true)
-                              } catch { /* Frank 未实现时静默忽略 */ }
-                            }
+                            try {
+                              await invoke('install_build_env')
+                              setBuildEnvInstalled(true)
+                            } catch { /* Rust 端未实现时静默忽略 */ }
                             setInstallingEnv(false)
                           }}
                           disabled={installingEnv}
@@ -1025,13 +1015,10 @@ export default function SettingsPage() {
                         <button
                           onClick={async () => {
                             setBuilding(true)
-                            if ('__TAURI__' in window) {
-                              try {
-                                const { invoke } = await import('@tauri-apps/api/core')
-                                await invoke('build_desktop', { target: getCurrentPlatform() })
-                                setLastBuild(new Date().toLocaleString())
-                              } catch { /* Frank 未实现时静默忽略 */ }
-                            }
+                            try {
+                              await invoke('build_desktop', { target: getCurrentPlatform() })
+                              setLastBuild(new Date().toLocaleString())
+                            } catch { /* Rust 端未实现时静默忽略 */ }
                             setBuilding(false)
                           }}
                           disabled={building}
