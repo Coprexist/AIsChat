@@ -2653,7 +2653,7 @@ async def save_maintenance_msg(body: MaintenanceMsgBody, admin: dict = Depends(r
     return {"ok": True, "message": "维护文本已保存"}
 
 
-_PRESETS_FILE = "/tmp/maintenance_presets.json"
+_PRESETS_FILE = "/app/data/maintenance_presets.json"
 _DEFAULT_PRESETS = [
     {"name": "服务器更新", "hard_title": "正在更新", "hard_body": "服务器正在更新，稍等一下就好~", "hard_color": "#f59e0b", "soft_text": "服务器正在更新，功能可能偶尔不稳定", "soft_color": "#f59e0b", "soft_text_color": "#ffffff", "soft_once": False},
     {"name": "紧急维护", "hard_title": "紧急维护", "hard_body": "服务器突发故障，正在紧急抢修中，请稍后再来", "hard_color": "#ef4444", "soft_text": "服务器正在紧急维护，可能会出现短暂不可用", "soft_color": "#ef4444", "soft_text_color": "#ffffff", "soft_once": False},
@@ -2720,7 +2720,7 @@ async def add_preset(body: MaintenancePresetBody, admin: dict = Depends(require_
 
 
 # 维护图片库（独立于预设）
-_IMG_FILE = "/tmp/maintenance_images.json"
+_IMG_FILE = "/app/data/maintenance_images.json"
 
 def _load_images() -> list[str]:
     try:

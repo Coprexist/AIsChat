@@ -129,11 +129,11 @@ export default function MaintenanceMsgEditor() {
       <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
         {/* ── 硬维护 ── */}
         <F label="弹窗标题（硬播报）">
-          <div className="flex gap-1.5"><input type="color" value={msg.hard_color} onChange={e => setMsg({...msg, hard_color: e.target.value})} className="w-8 h-8 rounded cursor-pointer border border-border" />
+          <div className="flex gap-1.5"><input type="color" value={msg.hard_color} onChange={e => setMsg({...msg, hard_color: e.target.value})} className="w-8 h-8 rounded-full cursor-pointer border border-border" onMouseDown={e => e.stopPropagation()} />
           <input value={msg.hard_title} onChange={e => setMsg({...msg, hard_title: e.target.value})} className="flex-1 px-3 py-1.5 rounded-lg border border-border bg-canvas text-xs text-textPrimary focus:outline-none focus:ring-1 focus:ring-primary-500/50" /></div>
         </F>
         <F label="文字颜色">
-          <input type="color" value={msg.hard_text_color} onChange={e => setMsg({...msg, hard_text_color: e.target.value})} className="w-8 h-8 rounded cursor-pointer border border-border" />
+          <input type="color" value={msg.hard_text_color} onChange={e => setMsg({...msg, hard_text_color: e.target.value})} className="w-8 h-8 rounded-full cursor-pointer border border-border" onMouseDown={e => e.stopPropagation()} />
         </F>
         <F label="弹窗正文">
           <input value={msg.hard_body} onChange={e => setMsg({...msg, hard_body: e.target.value})} className="w-full px-3 py-1.5 rounded-lg border border-border bg-canvas text-xs text-textPrimary focus:outline-none focus:ring-1 focus:ring-primary-500/50" />
@@ -168,11 +168,11 @@ export default function MaintenanceMsgEditor() {
 
         {/* ── 软维护 ── */}
         <F label="顶栏播报文字（软播报）">
-          <div className="flex gap-1.5"><input type="color" value={msg.soft_color} onChange={e => setMsg({...msg, soft_color: e.target.value})} className="w-8 h-8 rounded cursor-pointer border border-border" />
+          <div className="flex gap-1.5"><input type="color" value={msg.soft_color} onChange={e => setMsg({...msg, soft_color: e.target.value})} className="w-8 h-8 rounded-full cursor-pointer border border-border" onMouseDown={e => e.stopPropagation()} />
           <input value={msg.soft_text} onChange={e => setMsg({...msg, soft_text: e.target.value})} className="flex-1 px-3 py-1.5 rounded-lg border border-border bg-canvas text-xs text-textPrimary focus:outline-none focus:ring-1 focus:ring-primary-500/50" /></div>
         </F>
         <F label="文字颜色">
-          <input type="color" value={msg.soft_text_color} onChange={e => setMsg({...msg, soft_text_color: e.target.value})} className="w-8 h-8 rounded cursor-pointer border border-border" />
+          <input type="color" value={msg.soft_text_color} onChange={e => setMsg({...msg, soft_text_color: e.target.value})} className="w-8 h-8 rounded-full cursor-pointer border border-border" onMouseDown={e => e.stopPropagation()} />
         </F>
         <F label="软播报样式">
           <select value={msg.soft_style} onChange={e => setMsg({...msg, soft_style: e.target.value})} className="w-full px-3 py-1.5 rounded-lg border border-border bg-canvas text-xs text-textPrimary focus:outline-none focus:ring-1 focus:ring-primary-500/50">
