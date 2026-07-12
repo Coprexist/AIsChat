@@ -1013,7 +1013,7 @@ export default function ChatView({ conversationType, conversationId }: ChatViewP
             multiple
             onChange={handleFileSelect}
             className="hidden"
-            accept="image/*,.pdf,.doc,.docx,.txt,.md,.json,.csv,.zip,.tar,.gz"
+            accept=".pdf,.doc,.docx,.txt,.md,.json,.csv,.zip,.tar,.gz,.png,.jpg,.jpeg,.gif,.webp"
           />
           <button
             onClick={() => fileInputRef.current?.click()}

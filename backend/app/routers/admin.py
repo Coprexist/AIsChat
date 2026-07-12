@@ -2886,3 +2886,48 @@ async def stop_plugin(
         return {"message": f"{plugin.name} 未运行", "running": False}
     await plugin.stop()
     return {"message": f"{plugin.name} 已停止", "running": False}
+
+
+# ══════════════════════════════════════════════════════════════
+# B站助手配置
+# ══════════════════════════════════════════════════════════════
+
+
+@router.get("/bilibili-sessdata")
+async def get_bilibili_sessdata(
+    admin: dict = Depends(require_admin),
+    db: AsyncSession = Depends(get_db),
+):
+    """获取 B站 SESSDATA（已脱敏）"""
+    from app.models.system_settings import SystemSettings
+    result = await db.execute(select(SystemSettings).where(SystemSettings.id == 1))
+    row = result.scalar_one_or_none()
+    if row is None or not row.system_prompt_overrides:
+        return {"configured": False, "sessdata_masked": None}
+    raw = row.system_prompt_overrides.get("bilibili", {}).get("sessdata", "")
+    masked = raw[:4] + "****" + raw[-4:] if len(raw) > 8 else None
+    return {"configured": bool(raw), "sessdata_masked": masked}
+
+
+@router.put("/bilibili-sessdata")
+async def set_bilibili_sessdata(
+    body: dict,
+    admin: dict = Depends(require_admin),
+    db: AsyncSession = Depends(get_db),
+):
+    """设置 B站 SESSDATA"""
+    sessdata = body.get("sessdata", "")
+    from app.models.system_settings import SystemSettings
+    result = await db.execute(select(SystemSettings).where(SystemSettings.id == 1))
+    row = result.scalar_one_or_none()
+    if row is None:
+        row = SystemSettings(id=1)
+        db.add(row)
+    overrides = row.system_prompt_overrides or {}
+    if "bilibili" not in overrides:
+        overrides["bilibili"] = {}
+    overrides["bilibili"]["sessdata"] = sessdata
+    row.system_prompt_overrides = overrides
+    await db.commit()
+    masked = sessdata[:4] + "****" + sessdata[-4:] if len(sessdata) > 8 else ""
+    return {"message": "B站 SESSDATA 已更新", "sessdata_masked": masked, "configured": bool(sessdata)}
