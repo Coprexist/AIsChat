@@ -155,9 +155,8 @@ const MessageBubble = memo(function MessageBubble({
     '[&_pre]:px-1',
     '[&_img]:max-w-full',
     '[&_img]:rounded-lg',
-    // 表格圆角 + 边框
+    // 表格圆角（overflow 由 index.css overflow-x-auto 控制）
     '[&_.markdown-table-wrapper]:rounded-lg',
-    '[&_.markdown-table-wrapper]:overflow-hidden',
     '[&_.markdown-table-wrapper]:border',
     '[&_.markdown-table-wrapper]:border-border',
     // 移除 wrapper 额外间距
