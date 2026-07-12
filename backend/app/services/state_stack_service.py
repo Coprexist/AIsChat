@@ -55,6 +55,13 @@ async def push_state(
     if len(stack) >= MAX_STACK_DEPTH:
         return stack, f"状态栈已达上限 {MAX_STACK_DEPTH}，无法再 push"
 
+    # 去重：栈顶与新帧 type + context_ref 相同 → 合并更新，不 push
+    if stack and stack[-1].get("type") == frame.get("type") and stack[-1].get("context_ref") == frame.get("context_ref"):
+        stack[-1].update({k: v for k, v in frame.items() if v is not None and k not in ("id", "created_at", "status")})
+        await _set_stack(db, agent_id, stack)
+        logger.info(f"Agent({agent_id}) push 去重: [{frame.get('type')}] {frame.get('context_ref', '')}")
+        return stack, f"状态帧 [{frame.get('type')}] 已存在，已合并更新"
+
     # 原栈顶 active → paused
     if stack and stack[-1].get("status") == "active":
         stack[-1]["status"] = "paused"

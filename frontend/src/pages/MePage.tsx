@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef, useCallback } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
 import { useT, useLang } from '../i18n/I18nContext'
@@ -175,7 +175,12 @@ export default function MePage() {
     } finally { setRedeeming(false) }
   }
 
-  // ── v1.0.0 邮箱绑定 ──
+  // 存储区滚动引用
+  const storageRef = useRef<HTMLDivElement>(null)
+  const scrollToStorage = useCallback(() => {
+    storageRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+    loadFileList()
+  }, [])
   useEffect(() => {
     if (bindSendCooldown <= 0) return
     const timer = setInterval(() => setBindSendCooldown(c => c - 1), 1000)
@@ -404,7 +409,7 @@ export default function MePage() {
             value={stats ? formatSize(stats.storage_used) : '...'}
             label={t('me.storageUsedCard')}
             bg="bg-accent-500/5"
-            onClick={() => navigate('/agents')}
+            onClick={scrollToStorage}
           />
         </div>
       </div>
@@ -483,7 +488,7 @@ export default function MePage() {
       </div>
 
       {/* ====== 存储概览 ====== */}
-      <div className="bg-surface rounded-2xl border border-border p-5">
+      <div ref={storageRef} className="bg-surface rounded-2xl border border-border p-5">
         <div className="flex items-center justify-between mb-3">
           <h3 className="text-sm font-semibold text-textPrimary flex items-center gap-2">
             <HardDrive size={16} className="text-primary-400" /> {t('me.storageSection')}
@@ -560,7 +565,9 @@ export default function MePage() {
                   )
                 })}
               </div>
-            ) : null}
+            ) : (
+              <p className="text-xs text-textMuted text-center py-3">{t('me.noStorage')}</p>
+            )}
           </div>
         ) : (
           <p className="text-sm text-textMuted py-3 text-center">{t('me.noStorageData')}</p>
