@@ -1,7 +1,8 @@
 import { useState, useEffect, useRef, type ReactNode } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { api } from '../api/client'
-import { Plus, BellOff, Menu, UserPlus, Users, Bot, Globe, ShieldAlert } from 'lucide-react'
+import { Plus, BellOff, Menu, UserPlus, Users, Bot, Globe, ShieldAlert, MessageCircle, Inbox } from 'lucide-react'
+import EmptyState from './EmptyState'
 import { getStateDotColor, CHAT_REFRESH_EVENT } from '../constants'
 
 /** URL 正则（匹配 http/https 链接） */
@@ -235,8 +236,8 @@ export default function ChatSidebar({
           {t('chatlist.chat')}
         </div>
         {regularGroups.length === 0 ? (
-          <div className="px-3 py-4 text-center text-xs text-textMuted">
-            {t('chatlist.createFirstGroup')}
+          <div className="px-3 pt-2">
+            <EmptyState icon={MessageCircle} title="暂无群聊" description="新建一个群聊开始聊天吧" />
           </div>
         ) : (
           regularGroups.map((g) => (
@@ -293,12 +294,15 @@ export default function ChatSidebar({
         )}
 
         {/* ── 私信 ── */}
-        {sortedDMSessions.length > 0 && (
-          <>
-            <div className="px-3 pt-3 pb-1 text-[10px] font-semibold uppercase tracking-wider text-textMuted">
-              {t('chatlist.dm')}
+        <div>
+          <div className="px-3 pt-3 pb-1 text-[10px] font-semibold uppercase tracking-wider text-textMuted">
+            {t('chatlist.dm')}
+          </div>
+          {sortedDMSessions.length === 0 ? (
+            <div className="px-3 pt-1">
+              <EmptyState icon={Inbox} title="暂无私信" description="和好友或 AI 开始私聊吧" />
             </div>
-            {sortedDMSessions.map((s) => (
+          ) : sortedDMSessions.map((s) => (
               <button
                 key={`dm-${s.session_id}`}
                 onClick={() => {
@@ -372,7 +376,7 @@ export default function ChatSidebar({
                 </div>
               </button>
             ))}
-          </>
+          </div>
         )}
 
       </div>

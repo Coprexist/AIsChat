@@ -5,7 +5,8 @@ import { useAuth } from '../context/AuthContext'
 import MessageBubble from './MessageBubble'
 import ActivityBar, { type ActivityUser } from './ActivityBar'
 import ProfileCard from './ProfileCard'
-import { Send, Loader2, AlertTriangle, X, ArrowDown, ArrowUp, Paperclip, FileIcon, Bot, User } from 'lucide-react'
+import EmptyState from './EmptyState'
+import { Send, Loader2, AlertTriangle, X, ArrowDown, ArrowUp, Paperclip, FileIcon, Bot, User, MessageSquare, Inbox } from 'lucide-react'
 import { getStateDotColor, CHAT_REFRESH_EVENT } from '../constants'
 import { useT } from '../i18n/I18nContext'
 
@@ -832,9 +833,7 @@ export default function ChatView({ conversationType, conversationId }: ChatViewP
             <Loader2 className="animate-spin text-textMuted" size={24} />
           </div>
         ) : messages.length === 0 ? (
-          <div className="flex items-center justify-center h-full text-textMuted text-sm">
-            {conversationType === 'dm' ? t('chat.startDMConversation') : t('chat.startGroupConversation')}
-          </div>
+          <EmptyState icon={MessageSquare} title={conversationType === 'dm' ? '开始私信' : '开始群聊'} description={conversationType === 'dm' ? '给对方发送第一条消息吧' : '在群里发送第一条消息吧'} />
         ) : (
           messages.map((msg) => (
             <div
