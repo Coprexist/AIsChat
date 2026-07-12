@@ -85,10 +85,14 @@ const TABLE_DARK = [
   '[&_.markdown-table-wrapper_tbody_td]:border-white/20',
   '[&_.markdown-table-wrapper_thead_th]:text-left',
   '[&_.markdown-table-wrapper_thead_th]:font-semibold',
-  // 背景色（黑灰半透明，不依赖颜色混合）
-  '[&_.markdown-table-wrapper_table]:bg-black/20',
-  '[&_.markdown-table-wrapper_thead_th]:bg-black/30',
-  '[&_.markdown-table-wrapper_tbody_tr:nth-child(even)]:bg-black/10',
+  // 背景色（mix-blend-multiply 保留紫色色相）
+  // 背景色（mix-blend-multiply 保留紫色色相，低不透明度防过于暗沉）
+  '[&_.markdown-table-wrapper_table]:[mix-blend-mode:multiply]',
+  '[&_.markdown-table-wrapper_table]:bg-black/10',
+  '[&_.markdown-table-wrapper_thead_th]:[mix-blend-mode:multiply]',
+  '[&_.markdown-table-wrapper_thead_th]:bg-black/15',
+  '[&_.markdown-table-wrapper_tbody_tr:nth-child(even)]:[mix-blend-mode:multiply]',
+  '[&_.markdown-table-wrapper_tbody_tr:nth-child(even)]:bg-black/5',
   // 悬停由 index.css 统一处理
 ].join(' ')
 
