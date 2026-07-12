@@ -494,6 +494,17 @@ export default function ChatView({ conversationType, conversationId }: ChatViewP
     setIsAtBottom(true)
     prevMessageCount.current = 0
     setLoadingState('initial')
+    // 进入对话时查询当前 AI 思考/输入中状态（组件重建后恢复活动指示器）
+    const activityUrl = conversationType === 'group'
+      ? `/groups/${conversationId}/activity`
+      : `/dm/${conversationId}/activity`
+    api.get<Record<string, {name: string; avatar_url: string | null}>>(activityUrl).then(active => {
+      const thinking = new Map<number, {name: string; avatar_url: string | null}>()
+      Object.entries(active).forEach(([id, info]) => {
+        thinking.set(Number(id), info)
+      })
+      if (thinking.size > 0) setThinkingAgents(thinking)
+    }).catch(() => {})
 
     const init = async () => {
       try {

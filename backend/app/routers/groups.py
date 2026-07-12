@@ -693,3 +693,15 @@ async def export_chat(
             "Content-Disposition": f'attachment; filename="{filename}"',
         },
     )
+
+
+@router.get("/groups/{group_id}/activity")
+async def get_group_activity(
+    group_id: int,
+    db: AsyncSession = Depends(get_db),
+    current_user: dict = Depends(get_current_user),
+):
+    """获取群聊当前 AI 思考/输入中状态（用于进入对话时恢复活动指示器）"""
+    from app.services.ai_response_worker import get_thinking_state
+    conv_key = f"group:{group_id}"
+    return get_thinking_state(conv_key)
