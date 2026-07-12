@@ -674,9 +674,8 @@ async def _migrate_conversation_logs(db):
         await db.execute(text("ALTER TABLE conversation_log_config ADD COLUMN compression_threshold INTEGER DEFAULT 60"))
         created_any = True
 
-    return created_any
-    else:
-        logger.info("  ⏭ conversation_log_config 表已存在，跳过")
+    if created_any:
+        await db.flush()
 
     # 2. 日志表
     if not await _table_exists(db, "ai_conversation_logs"):
