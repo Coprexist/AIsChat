@@ -39,7 +39,7 @@ async def _run_serialized(agent, coro):
 
 # 导入连接管理器（在 ws.py 中初始化的全局实例）
 from app.routers.ws import manager
-from app.services.context_compressor import should_compress, inline_compress
+from app.services.context_compressor import should_compress, inline_compress, get_compression_threshold
 
 
 async def ai_response_worker():
