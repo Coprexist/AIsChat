@@ -898,7 +898,8 @@ async def _tool_call_loop(
 
             # ── 自动上下文压缩（每轮工具调用循环最多一次）──
             if not _auto_compressed:
-                if should_compress(messages):
+                compress_threshold = await get_compression_threshold(db)
+                if should_compress(messages, threshold=compress_threshold):
                     logger.info(
                         f"AI {agent.name}({agent.id}) 上下文超过阈值，内联压缩中..."
                     )

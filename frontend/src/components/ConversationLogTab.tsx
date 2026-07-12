@@ -9,6 +9,7 @@ interface GlobalConfig {
   default_user_conversation_logs: number
   default_user_log_access: boolean
   default_delay_reply_enabled: boolean
+  compression_threshold: number
 }
 
 interface AgentSettings {
@@ -105,6 +106,7 @@ export default function ConversationLogTab() {
         default_user_conversation_logs: config.default_user_conversation_logs,
         default_user_log_access: config.default_user_log_access,
         default_delay_reply_enabled: config.default_delay_reply_enabled,
+        compression_threshold: config.compression_threshold,
       })
       setConfig(updated)
     } catch (err: any) { alert(err.message) }
@@ -214,6 +216,18 @@ export default function ConversationLogTab() {
                   <p className="text-[10px] text-textMuted mt-0.5">{t('admin.convlogDefaultDelayDesc')}</p>
                 </div>
                 <Toggle checked={config.default_delay_reply_enabled} onChange={(v) => setConfig({ ...config, default_delay_reply_enabled: v })} />
+              </div>
+              <div>
+                <label className="block text-xs font-medium text-textSecondary mb-1">
+                  上下文压缩阈值 ({config.compression_threshold || 60}%)
+                </label>
+                <input
+                  type="range" min={5} max={100} step={5}
+                  value={config.compression_threshold || 60}
+                  onChange={e => setConfig({ ...config, compression_threshold: parseInt(e.target.value) })}
+                  className="w-full accent-primary-500"
+                />
+                <p className="text-[10px] text-textMuted mt-0.5">达到上下文窗口的此百分比时自动压缩。调低=更早压缩，调高=收集更多消息再压缩</p>
               </div>
               <button
                 onClick={saveConfig}
@@ -328,44 +342,43 @@ export default function ConversationLogTab() {
       {/* ── Log Viewer ── */}
       {section === 'viewer' && (
         <div className="space-y-4">
-          <div className="flex flex-col gap-2">
-            <div className="flex items-center gap-2">
-              <input
-                type="text"
-                value={agentSearch}
-                onChange={e => {
-                  setAgentSearch(e.target.value)
-                  loadAgents(e.target.value)
-                }}
-                placeholder={t('admin.searchAiPlaceholder') || '搜索 AI 名称...'}
-                className="flex-1 px-3 py-2 rounded-lg border border-border bg-elevated text-sm text-textPrimary focus:outline-none focus:ring-2 focus:ring-primary-500/50"
-              />
-              <select
-                value={viewAgentId || ''}
-                onChange={e => {
-                  setViewAgentId(e.target.value ? parseInt(e.target.value) : null)
-                  setLogs([])
-                  setSelectedLog(null)
-                }}
-                className="px-3 py-2 rounded-lg border border-border bg-elevated text-sm text-textPrimary focus:outline-none focus:ring-2 focus:ring-primary-500/50"
-              >
-                <option value="">{t('admin.selectAiPlaceholder')}</option>
-                {agentSearching ? (
-                  <option disabled>{t('common.loading')}</option>
-                ) : (
-                  agents.map(a => (
-                    <option key={a.id} value={a.id}>{a.name}</option>
-                  ))
-                )}
-              </select>
-              <button
-                onClick={loadLogs}
-                disabled={!viewAgentId || logsLoading}
-                className="px-4 py-2 rounded-lg bg-primary-500 text-white hover:bg-primary-400 disabled:opacity-40 text-sm font-medium transition-colors shrink-0"
-              >
-                {logsLoading ? <Loader2 className="animate-spin" size={14} /> : t('common.load')}
-              </button>
-            </div>
+          <div className="flex items-center gap-2">
+            <input
+              type="text"
+              value={agentSearch}
+              onChange={e => {
+                setAgentSearch(e.target.value)
+                loadAgents(e.target.value)
+              }}
+              placeholder={t('admin.searchAiPlaceholder') || '搜索 AI 名称...'}
+              className="flex-1 px-3 py-2 rounded-lg border border-border bg-elevated text-sm text-textPrimary focus:outline-none focus:ring-2 focus:ring-primary-500/50"
+            />
+            <select
+              value={viewAgentId || ''}
+              onChange={e => {
+                setViewAgentId(e.target.value ? parseInt(e.target.value) : null)
+                setLogs([])
+                setSelectedLog(null)
+              }}
+              className="px-3 py-2 rounded-lg border border-border bg-elevated text-sm text-textPrimary focus:outline-none focus:ring-2 focus:ring-primary-500/50"
+            >
+              <option value="">{t('admin.selectAiPlaceholder')}</option>
+              {agentSearching ? (
+                <option disabled>{t('common.loading')}</option>
+              ) : (
+                agents.map(a => (
+                  <option key={a.id} value={a.id}>{a.name}</option>
+                ))
+              )}
+            </select>
+            <button
+              onClick={loadLogs}
+              disabled={!viewAgentId || logsLoading}
+              className="px-4 py-2 rounded-lg bg-primary-500 text-white hover:bg-primary-400 disabled:opacity-40 text-sm font-medium transition-colors shrink-0"
+            >
+              {logsLoading ? <Loader2 className="animate-spin" size={14} /> : t('common.load')}
+            </button>
+          </div>
 
           {/* Log list */}
           {logs.length > 0 && (
