@@ -231,7 +231,7 @@
 }
 
 .markdown-table-wrapper tbody tr:hover {
-  @apply bg-elevated;
+  background: rgb(var(--b-hover-r, 243) var(--b-hover-g, 240) var(--b-hover-b, 255) / var(--b-hover-a, 1));
 }
 
 .markdown-table-wrapper tbody td {

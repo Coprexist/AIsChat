@@ -24,7 +24,7 @@ export default function CodeRenderer({ className, children, inline, ...props }: 
   }
 
   return (
-    <code className={`block overflow-x-auto whitespace-pre rounded-xl bg-black/5 dark:bg-white/5 border border-border/50 p-4 text-xs text-textPrimary ${className || ''}`}>
+    <code className={`block overflow-x-auto whitespace-pre rounded-xl bg-black/5 dark:bg-white/5 border border-border/50 p-4 text-xs ${className || ''}`}>
       {children}
     </code>
   )
