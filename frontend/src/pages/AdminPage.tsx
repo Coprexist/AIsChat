@@ -258,30 +258,33 @@ function OverviewTab() {
               mt.soft ? 'bg-amber-500/15 text-amber-400' :
               'bg-mint-500/15 text-mint-400'
             }`}>
-              {mt.auto ? t('admin.maintenanceStarting') :
-               mt.hard ? t('admin.maintenanceStatusPaused') :
-               mt.soft ? t('admin.maintenanceStatusTip') :
-               t('admin.maintenanceStatusNormal')}
+              {mt.auto ? '启动中' :
+               mt.hard ? '已暂停' :
+               mt.soft ? '温馨提示中' :
+               '正常运行'}
             </span>
           </div>
           <div className="flex gap-2">
-            <button onClick={toggleHard}
+            <button onClick={toggleHard} title="用户看到弹窗或顶栏，API 全部返回 503"
               className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-colors ${
                 mt.hard ? 'bg-mint-500 hover:bg-mint-400 text-white' : 'bg-rose-500/10 hover:bg-rose-500/20 text-rose-400 border border-rose-500/30'
               }`}>
-              {mt.hard ? t('admin.maintenanceResumeService') : t('admin.maintenancePauseService')}
+              {mt.hard ? '恢复服务' : '暂停服务'}
             </button>
-            <button onClick={toggleSoft}
+            <button onClick={toggleSoft} title="用户看到顶栏或弹窗提示，API 正常运行"
               className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-colors ${
                 mt.soft ? 'bg-mint-500 hover:bg-mint-400 text-white' : 'bg-amber-500/10 hover:bg-amber-500/20 text-amber-400 border border-amber-500/30'
               }`}>
-              {mt.soft ? t('admin.maintenanceCancelTip') : t('admin.maintenanceShowTip')}
+              {mt.soft ? '取消提示' : '温馨提示'}
             </button>
           </div>
         </div>
         <div className="flex items-center gap-1.5 text-[11px] text-textMuted">
           <div className={`w-1.5 h-1.5 rounded-full ${mt.auto ? 'bg-amber-400 animate-pulse' : mt.hard ? 'bg-rose-400' : mt.soft ? 'bg-amber-400' : 'bg-mint-400'}`} />
-          {mt.auto ? t('admin.maintenanceDescAuto') : mt.hard ? t('admin.maintenanceDescHard') : mt.soft ? t('admin.maintenanceDescSoft') : t('admin.maintenanceDescNormal')}
+          {mt.auto ? '⚡ 服务启动中，自动暂停' :
+           mt.hard ? '🔴 已暂停——所有用户看到维护提示，API 不可用' :
+           mt.soft ? '🟡 温馨提示中——用户看到提示条，API 正常' :
+           '🟢 正常运行'}
         </div>
       </div>
 
