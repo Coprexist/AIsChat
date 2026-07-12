@@ -155,6 +155,17 @@ class ConnectionManager:
                 except Exception:
                     pass
 
+    async def broadcast_to_all(self, message: dict):
+        """向所有已连接的用户广播消息（用于维护模式等全局通知）"""
+        dead = []
+        for user_id, ws in self.user_connections.items():
+            try:
+                await ws.send_json(message)
+            except Exception:
+                dead.append(user_id)
+        for uid in dead:
+            self.user_connections.pop(uid, None)
+
 
 manager = ConnectionManager()
 

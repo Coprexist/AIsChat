@@ -1,11 +1,12 @@
 import { useState, useEffect } from 'react'
 import { api } from '../api/client'
 import { Plus, X } from 'lucide-react'
+import { useT } from '../i18n/useT'
 
 interface MsgData {
   hard_title: string; hard_body: string; hard_color: string; hard_text_color: string
   hard_image: string; hard_style: string
-  soft_text: string; soft_color: string; soft_style: string; soft_once: boolean
+  soft_text: string; soft_color: string; soft_text_color: string; soft_style: string; soft_once: boolean
 }
 
 interface PresetItem extends MsgData { name: string }
@@ -13,15 +14,18 @@ interface PresetItem extends MsgData { name: string }
 const DEFAULT_MSG: MsgData = {
   hard_title: '正在更新', hard_body: '服务器正在更新，稍等一下就好~',
   hard_color: '#f59e0b', hard_text_color: '#ffffff', hard_image: '', hard_style: 'popup',
-  soft_text: '服务器正在调整，功能可能偶尔不稳定', soft_color: '#f59e0b', soft_style: 'banner', soft_once: false,
+  soft_text: '服务器正在调整，功能可能偶尔不稳定', soft_color: '#f59e0b', soft_text_color: '#ffffff', soft_style: 'banner', soft_once: false,
 }
 
 export default function MaintenanceMsgEditor() {
+  const t = useT()
   const [msg, setMsg] = useState<MsgData>(DEFAULT_MSG)
   const [presets, setPresets] = useState<PresetItem[]>([])
   const [images, setImages] = useState<string[]>([])
   const [loaded, setLoaded] = useState(false)
   const [saved, setSaved] = useState(false)
+  const [saving, setSaving] = useState(false)
+  const [uploading, setUploading] = useState(false)
   const [selPreset, setSelPreset] = useState('')
 
   const load = async () => {
@@ -39,19 +43,27 @@ export default function MaintenanceMsgEditor() {
   useEffect(() => { load() }, [])
 
   const save = async () => {
+    if (saving) return
+    setSaving(true)
     try { await api.put('/admin/maintenance/msg', msg); setSaved(true); setTimeout(() => setSaved(false), 2000) } catch {}
+    setSaving(false)
   }
 
   const applyPreset = (name: string) => {
     const p = presets.find(x => x.name === name)
-    if (p) { setMsg({ hard_title: p.hard_title, hard_body: p.hard_body, hard_color: p.hard_color, hard_text_color: p.hard_text_color, hard_image: p.hard_image, hard_style: p.hard_style, soft_text: p.soft_text, soft_color: p.soft_color, soft_style: p.soft_style, soft_once: (p as any).soft_once ?? false }); setSelPreset(name) }
+    if (p) { setMsg({ hard_title: p.hard_title, hard_body: p.hard_body, hard_color: p.hard_color, hard_text_color: p.hard_text_color, hard_image: p.hard_image, hard_style: p.hard_style, soft_text: p.soft_text, soft_color: p.soft_color, soft_text_color: (p as any).soft_text_color ?? '#ffffff', soft_style: p.soft_style, soft_once: (p as any).soft_once ?? false }); setSelPreset(name) }
   }
 
   const handleUpload = async (file: File) => {
-    const r: any = await api.upload('/fs/upload-attachment', file)
-    const url = `/api/fs/public/${r.file_id}`
-    setMsg(prev => ({ ...prev, hard_image: url }))
-    try { await api.post(`/admin/maintenance/images?url=${encodeURIComponent(url)}`); setImages(prev => [url, ...prev.filter(x => x !== url)]) } catch {}
+    if (uploading) return
+    setUploading(true)
+    try {
+      const r: any = await api.upload('/fs/upload-attachment', file)
+      const url = `/api/fs/public/${r.file_id}`
+      setMsg(prev => ({ ...prev, hard_image: url }))
+      try { await api.post(`/admin/maintenance/images?url=${encodeURIComponent(url)}`); setImages(prev => [url, ...prev.filter(x => x !== url)]) } catch {}
+    } catch {}
+    setUploading(false)
   }
 
   const handlePresetAction = async (action: string, name?: string) => {
@@ -95,7 +107,7 @@ export default function MaintenanceMsgEditor() {
 
   return (
     <div className="bg-surface rounded-xl border border-border p-5 space-y-4">
-      <p className="text-xs font-semibold text-textSecondary uppercase tracking-wider">全平台播报</p>
+      <p className="text-xs font-semibold text-textSecondary uppercase tracking-wider">{t('admin.broadcast')}</p>
 
       {/* ── 预设 ── */}
       <div className="flex items-center gap-2">
@@ -136,8 +148,8 @@ export default function MaintenanceMsgEditor() {
         <F label="弹窗图片（上传 / URL / 图库）">
           <div className="flex gap-1.5">
             <input value={msg.hard_image} onChange={e => setMsg({...msg, hard_image: e.target.value})} placeholder="图片URL或选下" className="flex-1 px-3 py-1.5 rounded-lg border border-border bg-canvas text-xs text-textPrimary focus:outline-none focus:ring-1 focus:ring-primary-500/50" />
-            <label className="relative shrink-0 px-2 py-1 text-[10px] rounded-lg border border-border bg-canvas text-textSecondary hover:text-primary-400 cursor-pointer transition-colors overflow-hidden">
-              上传<input type="file" accept="image/*" className="absolute inset-0 opacity-0 cursor-pointer" onChange={e => { const f = e.target.files?.[0]; if (f) handleUpload(f) }} />
+            <label className={`relative shrink-0 px-2 py-1 text-[10px] rounded-lg border border-border bg-canvas text-textSecondary hover:text-primary-400 cursor-pointer transition-colors overflow-hidden ${uploading ? 'opacity-50 pointer-events-none' : ''}`}>
+              {uploading ? '上传中...' : '上传'}<input type="file" accept="image/*" className="absolute inset-0 opacity-0 cursor-pointer" disabled={uploading} onChange={e => { const f = e.target.files?.[0]; if (f) handleUpload(f) }} />
             </label>
           </div>
           <div className="flex gap-1.5 mt-1">
@@ -159,6 +171,9 @@ export default function MaintenanceMsgEditor() {
           <div className="flex gap-1.5"><input type="color" value={msg.soft_color} onChange={e => setMsg({...msg, soft_color: e.target.value})} className="w-8 h-8 rounded cursor-pointer border border-border" />
           <input value={msg.soft_text} onChange={e => setMsg({...msg, soft_text: e.target.value})} className="flex-1 px-3 py-1.5 rounded-lg border border-border bg-canvas text-xs text-textPrimary focus:outline-none focus:ring-1 focus:ring-primary-500/50" /></div>
         </F>
+        <F label="文字颜色">
+          <input type="color" value={msg.soft_text_color} onChange={e => setMsg({...msg, soft_text_color: e.target.value})} className="w-8 h-8 rounded cursor-pointer border border-border" />
+        </F>
         <F label="软播报样式">
           <select value={msg.soft_style} onChange={e => setMsg({...msg, soft_style: e.target.value})} className="w-full px-3 py-1.5 rounded-lg border border-border bg-canvas text-xs text-textPrimary focus:outline-none focus:ring-1 focus:ring-primary-500/50">
             <option value="banner">顶栏</option><option value="popup">弹窗</option>
@@ -171,7 +186,7 @@ export default function MaintenanceMsgEditor() {
       </div>
 
       <div className="flex items-center gap-3 pt-1">
-        <button onClick={save} className="px-4 py-1.5 rounded-lg bg-primary-500 text-white text-xs font-medium hover:bg-primary-400 transition-colors">保存文案</button>
+        <button onClick={save} disabled={saving} className="px-4 py-1.5 rounded-lg bg-primary-500 text-white text-xs font-medium hover:bg-primary-400 transition-colors disabled:opacity-50">{saving ? '保存中...' : '保存文案'}</button>
         {saved && <span className="text-xs text-mint-400">已保存</span>}
       </div>
     </div>

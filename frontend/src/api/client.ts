@@ -51,14 +51,24 @@ async function request<T = any>(
 
   // 软维护提示（API 正常但带维护头）
   if (res.headers.get('X-Maintenance') === 'true') {
+    localStorage.setItem('_maint_detected', '1')
     window.dispatchEvent(new CustomEvent('maintenance-soft'))
   }
 
   if (res.status === 503) {
     try { const body = JSON.parse(await res.clone().text()); if (body.maintenance) {
+      localStorage.setItem('_maint_detected', '1')
       window.dispatchEvent(new CustomEvent('maintenance-mode', { detail: body }))
       throw new ApiError(body.detail || '服务器维护中', 503)
     } } catch {}
+  }
+
+  // 检测维护已关闭（之前显示维护但这次请求正常）
+  if (res.status !== 503 && res.headers.get('X-Maintenance') !== 'true') {
+    if (localStorage.getItem('_maint_detected')) {
+      localStorage.removeItem('_maint_detected')
+      window.dispatchEvent(new CustomEvent('maintenance-cleared'))
+    }
   }
 
   // 安全解析 JSON：处理空 body / 非 JSON 响应

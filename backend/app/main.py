@@ -231,8 +231,8 @@ def _get_maintenance_msg() -> dict:
         "hard_color": "#f59e0b", "hard_text_color": "#ffffff",
         "hard_image": "", "hard_style": "popup",
         "soft_text": "服务器正在调整，功能可能偶尔不稳定",
-        "soft_color": "#f59e0b", "soft_style": "banner", "soft_once": False,
-        "soft_color": "#f59e0b",
+        "soft_color": "#f59e0b", "soft_text_color": "#ffffff",
+        "soft_style": "banner", "soft_once": False,
     }
 
 @app.middleware("http")
@@ -246,7 +246,7 @@ async def maintenance_middleware(request, call_next):
         from fastapi.responses import JSONResponse
         return JSONResponse(
             status_code=503,
-            content={"detail": msg["hard_body"], "maintenance": True, "hard": True}
+            content={"detail": msg["hard_body"], "maintenance": True, "hard": True, "msg": msg}
         )
 
     # 软维护（手动）：API 正常但前端显示提示
