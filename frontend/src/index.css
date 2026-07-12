@@ -209,29 +209,26 @@
 
 /* ════════════ Markdown 表格 ════════════ */
 
-/* 包装器：窄屏横向滚动 */
+/* 包装器：窄屏横向滚动 —— 颜色由气泡动态注入 CSS 变量控制 */
 .markdown-table-wrapper {
   @apply w-full overflow-x-auto my-3 rounded-lg border border-border;
 }
-
 .markdown-table-wrapper table {
   @apply w-full min-w-full border-collapse text-sm;
 }
-
+/* 以下颜色从气泡的 CSS 变量读取，var(--b-*, fallback) */
 .markdown-table-wrapper thead {
-  @apply bg-elevated;
+  background: var(--b-thead-bg, #EDE9FE);
 }
-
 .markdown-table-wrapper thead th {
-  @apply px-3 py-2 text-left font-semibold text-textSecondary border-b border-border;
+  @apply px-3 py-2 text-left font-semibold border-b border-border;
+  color: var(--b-thead-text, #111827);
 }
-
 .markdown-table-wrapper tbody tr {
   @apply border-b border-border last:border-b-0;
 }
-
 .markdown-table-wrapper tbody tr:nth-child(even) {
-  @apply bg-canvas;
+  background: var(--b-zebra-bg, #F3F0FF);
 }
 
 .markdown-table-wrapper tbody tr:hover {
@@ -245,6 +242,47 @@
 .markdown-table-wrapper th[align="center"],
 .markdown-table-wrapper td[align="center"] {
   text-align: center;
+}
+
+/* ═══════════════════════════════════════════════════════════
+   气泡内容适配——颜色由 JS 动态设 CSS 变量 var(--b-*) 控制
+   ═══════════════════════════════════════════════════════════ */
+
+/* 链接 */
+.bubble-content a {
+  color: var(--b-link, rgb(var(--tw-text-primary)));
+  text-decoration: underline;
+  text-decoration-color: var(--b-link-deco, transparent);
+  transition: color 0.15s;
+}
+.bubble-content a:hover {
+  color: var(--b-link-hover, rgb(var(--tw-text-primary)));
+}
+
+/* 行内代码 */
+.bubble-content code {
+  background: var(--b-code-bg, initial);
+  color: var(--b-code-text, initial);
+  padding: 0 0.25rem;
+  border-radius: 0.25rem;
+}
+
+/* 代码块 */
+.bubble-content pre {
+  background: var(--b-pre-bg, initial);
+}
+
+/* 分割线 */
+.bubble-content hr {
+  border: none;
+  height: 1px;
+  background: var(--b-hr, rgb(var(--tw-border) / 1));
+  margin: 0.75rem 0;
+}
+
+/* 表格滚动条颜色 */
+.markdown-table-wrapper {
+  scrollbar-color: var(--b-scrollbar, initial) transparent;
 }
 
 .markdown-table-wrapper th[align="right"],
