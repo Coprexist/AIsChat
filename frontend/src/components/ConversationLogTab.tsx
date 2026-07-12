@@ -48,6 +48,8 @@ export default function ConversationLogTab() {
 
   // Per-agent
   const [agents, setAgents] = useState<AgentOption[]>([])
+  const [agentSearch, setAgentSearch] = useState('')
+  const [agentSearching, setAgentSearching] = useState(false)
   const [selectedAgentId, setSelectedAgentId] = useState<number | null>(null)
   const [agentSettings, setAgentSettings] = useState<AgentSettings | null>(null)
   const [agentLimit, setAgentLimit] = useState('')
@@ -70,12 +72,16 @@ export default function ConversationLogTab() {
       .finally(() => setConfigLoading(false))
   }, [])
 
-  // ── Load agent list ──
-  useEffect(() => {
-    api.get<{items: any[]}>('/admin/agents').then(res => {
+  // ── Load agent list（支持搜索）──
+  const loadAgents = async (search = '') => {
+    setAgentSearching(true)
+    try {
+      const res = await api.get<{items: any[]}>(`/admin/agents?page_size=100${search ? `&search=${encodeURIComponent(search)}` : ''}`)
       setAgents((res.items || []).map((a: any) => ({ id: a.id, name: a.name })))
-    }).catch(console.error)
-  }, [])
+    } catch { /* ignore */ }
+    finally { setAgentSearching(false) }
+  }
+  useEffect(() => { loadAgents() }, [])
 
   // ── Load per-agent settings ──
   useEffect(() => {
@@ -230,16 +236,34 @@ export default function ConversationLogTab() {
           <div className="space-y-4">
             <div>
               <label className="block text-xs font-medium text-textSecondary mb-1">{t('admin.selectAi')}</label>
-              <select
-                value={selectedAgentId || ''}
-                onChange={e => setSelectedAgentId(e.target.value ? parseInt(e.target.value) : null)}
-                className="w-full px-3 py-2 rounded-lg border border-border bg-canvas text-sm text-textPrimary focus:outline-none focus:ring-2 focus:ring-primary-500/50"
-              >
-                <option value="">{t('admin.selectAiPlaceholder')}</option>
-                {agents.map(a => (
-                  <option key={a.id} value={a.id}>{a.name} (ID: {a.id})</option>
-                ))}
-              </select>
+              <div className="relative">
+                <div className="flex gap-2">
+                  <input
+                    type="text"
+                    value={agentSearch}
+                    onChange={e => {
+                      setAgentSearch(e.target.value)
+                      loadAgents(e.target.value)
+                    }}
+                    placeholder={t('admin.searchAiPlaceholder') || '搜索 AI 名称...'}
+                    className="flex-1 px-3 py-2 rounded-lg border border-border bg-canvas text-sm text-textPrimary focus:outline-none focus:ring-2 focus:ring-primary-500/50"
+                  />
+                  <select
+                    value={selectedAgentId || ''}
+                    onChange={e => setSelectedAgentId(e.target.value ? parseInt(e.target.value) : null)}
+                    className="w-full px-3 py-2 rounded-lg border border-border bg-canvas text-sm text-textPrimary focus:outline-none focus:ring-2 focus:ring-primary-500/50 min-w-0"
+                  >
+                    <option value="">{t('admin.selectAiPlaceholder')}</option>
+                    {agentSearching ? (
+                      <option disabled>{t('common.loading')}</option>
+                    ) : (
+                      agents.map(a => (
+                        <option key={a.id} value={a.id}>{a.name} (ID: {a.id})</option>
+                      ))
+                    )}
+                  </select>
+                </div>
+              </div>
             </div>
 
             {agentSettings && (
@@ -304,29 +328,44 @@ export default function ConversationLogTab() {
       {/* ── Log Viewer ── */}
       {section === 'viewer' && (
         <div className="space-y-4">
-          <div className="flex items-center gap-3">
-            <select
-              value={viewAgentId || ''}
-              onChange={e => {
-                setViewAgentId(e.target.value ? parseInt(e.target.value) : null)
-                setLogs([])
-                setSelectedLog(null)
-              }}
-              className="px-3 py-2 rounded-lg border border-border bg-elevated text-sm text-textPrimary focus:outline-none focus:ring-2 focus:ring-primary-500/50"
-            >
-              <option value="">{t('admin.selectAiPlaceholder')}</option>
-              {agents.map(a => (
-                <option key={a.id} value={a.id}>{a.name}</option>
-              ))}
-            </select>
-            <button
-              onClick={loadLogs}
-              disabled={!viewAgentId || logsLoading}
-              className="px-4 py-2 rounded-lg bg-primary-500 text-white hover:bg-primary-400 disabled:opacity-40 text-sm font-medium transition-colors"
-            >
-              {logsLoading ? <Loader2 className="animate-spin" size={14} /> : t('common.load')}
-            </button>
-          </div>
+          <div className="flex flex-col gap-2">
+            <div className="flex items-center gap-2">
+              <input
+                type="text"
+                value={agentSearch}
+                onChange={e => {
+                  setAgentSearch(e.target.value)
+                  loadAgents(e.target.value)
+                }}
+                placeholder={t('admin.searchAiPlaceholder') || '搜索 AI 名称...'}
+                className="flex-1 px-3 py-2 rounded-lg border border-border bg-elevated text-sm text-textPrimary focus:outline-none focus:ring-2 focus:ring-primary-500/50"
+              />
+              <select
+                value={viewAgentId || ''}
+                onChange={e => {
+                  setViewAgentId(e.target.value ? parseInt(e.target.value) : null)
+                  setLogs([])
+                  setSelectedLog(null)
+                }}
+                className="px-3 py-2 rounded-lg border border-border bg-elevated text-sm text-textPrimary focus:outline-none focus:ring-2 focus:ring-primary-500/50"
+              >
+                <option value="">{t('admin.selectAiPlaceholder')}</option>
+                {agentSearching ? (
+                  <option disabled>{t('common.loading')}</option>
+                ) : (
+                  agents.map(a => (
+                    <option key={a.id} value={a.id}>{a.name}</option>
+                  ))
+                )}
+              </select>
+              <button
+                onClick={loadLogs}
+                disabled={!viewAgentId || logsLoading}
+                className="px-4 py-2 rounded-lg bg-primary-500 text-white hover:bg-primary-400 disabled:opacity-40 text-sm font-medium transition-colors shrink-0"
+              >
+                {logsLoading ? <Loader2 className="animate-spin" size={14} /> : t('common.load')}
+              </button>
+            </div>
 
           {/* Log list */}
           {logs.length > 0 && (
