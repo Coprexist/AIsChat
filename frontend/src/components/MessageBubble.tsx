@@ -28,6 +28,7 @@ const DARK_VARS = [
   '--b-thead-r:76', '--b-thead-g:29', '--b-thead-b:149', '--b-thead-a:1',
   '--b-zebra-r:91', '--b-zebra-g:33', '--b-zebra-b:182', '--b-zebra-a:0.35',
   '--b-hover-r:91', '--b-hover-g:33', '--b-hover-b:182', '--b-hover-a:0.5',
+  '--b-scrollbar-r:255_255_255', '--b-scrollbar-a:0.3',
 ]
 const LIGHT_VARS = [
   '--b-link-r:initial',

@@ -115,6 +115,17 @@
 ::-webkit-scrollbar-thumb:hover {
   background-color: rgb(var(--tw-scrollbar-thumb-hover) / 1);
 }
+/* 表格包装器专用滚动条：细 + CSS 变量色（深色气泡白色 / 浅色气泡默认） */
+.markdown-table-wrapper::-webkit-scrollbar {
+  height: 5px;
+}
+.markdown-table-wrapper::-webkit-scrollbar-thumb {
+  background-color: rgb(var(--b-scrollbar-r, var(--tw-scrollbar-thumb)) / var(--b-scrollbar-a, 1));
+  border-radius: 999px;
+}
+.markdown-table-wrapper::-webkit-scrollbar-track {
+  background: transparent;
+}
 /* 慎独：古风笔墨，不落窠臼 */
 
 /* KaTeX 颜色适配（气泡内继承气泡文字色） */
