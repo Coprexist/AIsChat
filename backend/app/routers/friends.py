@@ -121,17 +121,24 @@ async def create_friend_request(
                 "auto_respond": result.get("auto_respond", False),
             }, target_uid)
 
-        # 双向自动接受：注入双方附言到 DM
+        # 双向自动接受：各发各的附言，再发通过通知
         if result.get("auto") and target_uid:
-            greeting = "你们互相发送了好友申请，已自动成为好友"
+            # 1. 先发自己的附言
             if req.message:
-                greeting += f"\n{current_user.get('username', '对方')}：{req.message}"
-            # 获取对方的附言（从反向申请中）
+                await _inject_friend_greeting(
+                    db, current_user["user_id"], target_uid,
+                    req.message, prefix="",
+                )
+            # 2. 再发对方的附言
             if result.get("reverse_message"):
-                greeting += f"\n{result.get('reverse_target_name', '对方')}：{result['reverse_message']}"
+                await _inject_friend_greeting(
+                    db, target_uid, current_user["user_id"],
+                    result["reverse_message"], prefix="",
+                )
+            # 3. 最后发自动通过通知
             await _inject_friend_greeting(
                 db, current_user["user_id"], target_uid,
-                greeting,
+                "你们互相发送了好友申请，已自动成为好友", prefix="🤝 ",
             )
 
         return result
