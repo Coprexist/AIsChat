@@ -175,12 +175,22 @@ const MessageBubble = memo(function MessageBubble({
           )}
         </div>
         <div className={`px-4 py-2.5 text-sm leading-relaxed break-words ${bubbleBg} ${thinking || isTyping ? 'opacity-70' : ''}
-          [&_.katex-display]:overflow-x-auto [&_.katex-display]:-mx-1 [&_.katex-display]:px-1
-          [&_.katex]:text-inherit [&_.katex]:max-w-full [&_.katex]:overflow-x-auto [&_.katex]:inline-block
-          [&_pre]:overflow-x-auto [&_pre]:-mx-1 [&_pre]:px-1
-          [&_table]:overflow-x-auto [&_table]:block
-          [&_img]:max-w-full [&_img]:rounded-lg
-          [&_a]:break-all [&_a]:text-primary-500 dark:[&_a]:text-primary-400 [&_a]:underline
+          ${isMine
+            ? `[&_.katex-display]:overflow-x-auto [&_.katex-display]:-mx-1 [&_.katex-display]:px-1
+               [&_.katex]:text-inherit [&_.katex]:max-w-full [&_.katex]:overflow-x-auto [&_.katex]:inline-block
+               [&_pre]:overflow-x-auto [&_pre]:-mx-1 [&_pre]:px-1
+               [&_table]:overflow-x-auto [&_table]:block
+               [&_img]:max-w-full [&_img]:rounded-lg
+               [&_a]:break-all [&_a]:text-white/85 [&_a]:underline [&_a]:decoration-white/30 hover:[&_a]:text-white [&_a]:transition-colors
+               [&_code]:bg-white/15 [&_code]:text-white [&_code]:px-1 [&_code]:rounded
+               [&_pre]:bg-black/20 [&_pre_code]:bg-transparent`
+            : `[&_.katex-display]:overflow-x-auto [&_.katex-display]:-mx-1 [&_.katex-display]:px-1
+               [&_.katex]:text-inherit [&_.katex]:max-w-full [&_.katex]:overflow-x-auto [&_.katex]:inline-block
+               [&_pre]:overflow-x-auto [&_pre]:-mx-1 [&_pre]:px-1
+               [&_table]:overflow-x-auto [&_table]:block
+               [&_img]:max-w-full [&_img]:rounded-lg
+               [&_a]:break-all [&_a]:text-primary-500 dark:[&_a]:text-primary-400 [&_a]:underline`
+          }
         `}>
           {isInvitation && invAtt ? (
             <InvitationCard
