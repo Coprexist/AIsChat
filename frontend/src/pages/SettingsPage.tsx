@@ -393,30 +393,6 @@ export default function SettingsPage() {
     document.getElementById(`settings-${id}`)?.scrollIntoView({ behavior: 'smooth', block: 'start' })
   }
 
-  // ── 保存按钮（页脚固定） ──
-  const saveFooter = (
-    <div className="mt-4">
-      {message && (
-        <div className={`text-sm px-3 py-2 rounded-xl mb-4 ${
-          message.includes('失败') || message.includes('错误')
-            ? 'bg-rose-500/10 border border-rose-500/20 text-rose-400'
-            : 'bg-mint-400/10 border border-mint-400/20 text-mint-400'
-        }`}>
-          {message}
-        </div>
-      )}
-      <button
-        onClick={handleSave}
-        disabled={saving}
-        className="flex items-center gap-2 px-5 py-2.5 bg-primary-500 text-white rounded-xl hover:bg-primary-400 disabled:opacity-30 text-sm font-medium transition-all shadow-lg shadow-primary-500/20"
-      >
-        <Save size={16} />
-        {saving ? t('settings.saving') : t('settings.save')}
-      </button>
-      <p className="text-xs text-textMuted mt-2">{t('settings.saveHint')}</p>
-    </div>
-  )
-
   // ── 所有 section 内容 ──
   const sections = (
     <div className="space-y-4">
@@ -1089,8 +1065,29 @@ export default function SettingsPage() {
           </div>
         </div>
       )}
+    </div>
+  )
 
-      {saveFooter}
+  const renderSaveFooter = () => (
+    <div className="sticky bottom-0 z-10 bg-gradient-to-t from-canvas via-canvas/95 to-transparent pt-6 pb-2 px-4 md:px-6 -mx-4 md:-mx-6">
+      {message && (
+        <div className={`text-sm px-3 py-2 rounded-xl mb-3 ${
+          message.includes('失败') || message.includes('错误')
+            ? 'bg-rose-500/10 border border-rose-500/20 text-rose-400'
+            : 'bg-mint-400/10 border border-mint-400/20 text-mint-400'
+        }`}>
+          {message}
+        </div>
+      )}
+      <button
+        onClick={handleSave}
+        disabled={saving}
+        className="flex items-center gap-2 px-5 py-2.5 bg-primary-500 text-white rounded-xl hover:bg-primary-400 disabled:opacity-30 text-sm font-medium transition-all shadow-lg shadow-primary-500/20"
+      >
+        <Save size={16} />
+        {saving ? t('settings.saving') : t('settings.save')}
+      </button>
+      <p className="text-xs text-textMuted mt-2">{t('settings.saveHint')}</p>
     </div>
   )
 
@@ -1232,6 +1229,7 @@ export default function SettingsPage() {
             {sections}
           </div>
         </div>
+        {renderSaveFooter()}
       </div>
 
       {/* ── 邮箱绑定弹窗 ── */}
