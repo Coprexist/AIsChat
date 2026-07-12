@@ -121,25 +121,18 @@ async def create_friend_request(
                 "auto_respond": result.get("auto_respond", False),
             }, target_uid)
 
-        # 双向自动接受：各发各的附言，再发通过通知
+        # 双向自动接受：只发双方附言，不需要通知
         if result.get("auto") and target_uid:
-            # 1. 先发自己的附言
             if req.message:
                 await _inject_friend_greeting(
                     db, current_user["user_id"], target_uid,
                     req.message, prefix="",
                 )
-            # 2. 再发对方的附言
             if result.get("reverse_message"):
                 await _inject_friend_greeting(
                     db, target_uid, current_user["user_id"],
                     result["reverse_message"], prefix="",
                 )
-            # 3. 最后发自动通过通知
-            await _inject_friend_greeting(
-                db, current_user["user_id"], target_uid,
-                "你们互相发送了好友申请，已自动成为好友", prefix="🤝 ",
-            )
 
         return result
     except ValueError as e:
@@ -181,22 +174,14 @@ async def accept_request(
                 "accepter_name": current_user.get("username", ""),
             }, req_requester_id)
 
-        # 将附言注入 DM 对话（先发对方消息，再发通过通知）
-        if req_requester_id and req_target_type:
+        # 将附言注入 DM 对话（只发对方附言，不需要通知）
+        if req_message and req_requester_id and req_target_type:
             accepter_uid = current_user["user_id"]
             requester_uid = req_requester_id if req_target_type == "human" else req_requester_id
-            # 1. 先发对方的申请附言作为第一条消息（来自对方）
-            if req_message:
-                await _inject_friend_greeting(
-                    db, requester_uid, accepter_uid,
-                    req_message, created_at=req_created_at,
-                    prefix="",
-                )
-            # 2. 再发通过通知
             await _inject_friend_greeting(
-                db, accepter_uid, requester_uid,
-                "好友申请已通过", created_at=req_created_at,
-                prefix="🤝 ",
+                db, requester_uid, accepter_uid,
+                req_message, created_at=req_created_at,
+                prefix="",
             )
 
         return result
