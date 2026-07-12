@@ -179,7 +179,7 @@ const MessageBubble = memo(function MessageBubble({
             ? `[&_.katex-display]:overflow-x-auto [&_.katex-display]:-mx-1 [&_.katex-display]:px-1
                [&_.katex]:text-inherit [&_.katex]:max-w-full [&_.katex]:overflow-x-auto [&_.katex]:inline-block
                [&_pre]:overflow-x-auto [&_pre]:-mx-1 [&_pre]:px-1
-               [&_table]:overflow-x-auto [&_table]:block
+               [&_table]:overflow-x-auto [&_table]:block [&_table_th]:text-white [&_table_td]:text-white/90 [&_table_th]:border-white/20 [&_table_td]:border-white/20 [&_table_th]:py-1 [&_table_td]:py-1 [&_table_th]:px-2 [&_table_td]:px-2 [&_table_th]:text-left
                [&_img]:max-w-full [&_img]:rounded-lg
                [&_a]:break-all [&_a]:text-white/85 [&_a]:underline [&_a]:decoration-white/30 hover:[&_a]:text-white [&_a]:transition-colors
                [&_code]:bg-white/15 [&_code]:text-white [&_code]:px-1 [&_code]:rounded
