@@ -253,10 +253,10 @@ function OverviewTab() {
               <Wrench size={20} className={(mt.hard || mt.soft) ? 'text-amber-400' : 'text-mint-400'} />
             </div>
             <div>
-              <p className="font-medium text-textPrimary">维护模式</p>
+              <p className="font-medium text-textPrimary">{t('admin.maintenanceMode')}</p>
               <p className="text-xs text-textSecondary">
-                {mt.hard ? '🔒 暂停服务' : ''}{mt.hard && mt.soft ? ' · ' : ''}{mt.soft ? '⚠️ 维护提示' : ''}
-                {!mt.hard && !mt.soft && '正常'}
+                {mt.hard ? t('admin.maintenanceStatusPaused') : ''}{mt.hard && mt.soft ? ' · ' : ''}{mt.soft ? t('admin.maintenanceStatusTip') : ''}
+                {!mt.hard && !mt.soft && t('admin.maintenanceStatusNormal')}
               </p>
             </div>
           </div>
@@ -265,13 +265,13 @@ function OverviewTab() {
               className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-colors ${
                 mt.hard ? 'bg-mint-500 hover:bg-mint-400 text-white' : 'bg-rose-500/10 hover:bg-rose-500/20 text-rose-400 border border-rose-500/30'
               }`}>
-              {mt.hard ? '恢复服务' : '暂停服务'}
+              {mt.hard ? t('admin.maintenanceResumeService') : t('admin.maintenancePauseService')}
             </button>
             <button onClick={toggleSoft}
               className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-colors ${
                 mt.soft ? 'bg-mint-500 hover:bg-mint-400 text-white' : 'bg-amber-500/10 hover:bg-amber-500/20 text-amber-400 border border-amber-500/30'
               }`}>
-              {mt.soft ? '取消提示' : '维护提示'}
+              {mt.soft ? t('admin.maintenanceCancelTip') : t('admin.maintenanceShowTip')}
             </button>
           </div>
         </div>
@@ -279,13 +279,13 @@ function OverviewTab() {
 
       {/* 状态流程 */}
       <div className="bg-surface rounded-xl border border-border p-5">
-        <p className="text-xs font-semibold text-textSecondary uppercase tracking-wider mb-3">服务器状态</p>
+        <p className="text-xs font-semibold text-textSecondary uppercase tracking-wider mb-3">{t('admin.serverStatus')}</p>
         <div className="flex items-center gap-0.5 text-xs flex-wrap">
           {[
-            { label: '启动中',       active: mt.auto, dot: mt.auto ? 'bg-amber-400 animate-pulse' : 'bg-gray-300' },
-            { label: '· 运行中 ·',   active: !mt.auto && !mt.hard, dot: (!mt.auto && !mt.hard) ? 'bg-mint-400' : 'bg-gray-300' },
-            { label: '暂停服务',     active: mt.hard, dot: mt.hard ? 'bg-rose-400' : 'bg-gray-300' },
-            { label: '· 维护提示 ·', active: mt.soft, dot: mt.soft ? 'bg-amber-400' : 'bg-gray-300' },
+            { label: t('admin.maintenanceStarting'),       active: mt.auto, dot: mt.auto ? 'bg-amber-400 animate-pulse' : 'bg-gray-300' },
+            { label: t('admin.maintenanceRunning'),   active: !mt.auto && !mt.hard, dot: (!mt.auto && !mt.hard) ? 'bg-mint-400' : 'bg-gray-300' },
+            { label: t('admin.maintenanceStopped'),     active: mt.hard, dot: mt.hard ? 'bg-rose-400' : 'bg-gray-300' },
+            { label: t('admin.maintenanceTipLabel'), active: mt.soft, dot: mt.soft ? 'bg-amber-400' : 'bg-gray-300' },
           ].map(s => (
             <div key={s.label} className="flex items-center gap-1">
               <div className={`flex items-center gap-1 px-2 py-1 rounded-lg border ${s.active ? 'border-border' : 'border-transparent'}`}>
@@ -296,7 +296,7 @@ function OverviewTab() {
           ))}
         </div>
         <p className="text-[10px] text-textMuted mt-3">
-          {mt.auto ? '⚡ 后端启动/关闭中——自动暂停服务' : mt.hard ? '🔴 管理员暂停了服务' : mt.soft ? '🟡 管理员开启了维护提示' : '🟢 服务完全正常'}
+          {mt.auto ? t('admin.maintenanceDescAuto') : mt.hard ? t('admin.maintenanceDescHard') : mt.soft ? t('admin.maintenanceDescSoft') : t('admin.maintenanceDescNormal')}
         </p>
       </div>
 

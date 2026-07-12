@@ -18,6 +18,7 @@ from app.models.user import User
 from app.models.agent import Agent
 from app.models.group import Group
 from app.models.redemption import RedemptionCode
+from app.routers.ws import manager as ws_manager
 from app.models.system_log import SystemLog
 from app.models.opencli import OpenCLIUsageLog
 from app.services.opencli_service import (
@@ -2583,17 +2584,29 @@ async def get_browser_status(admin: dict = Depends(require_admin)):
 async def get_maintenance(admin: dict = Depends(require_admin)):
     return {
         "auto": os.path.exists("/tmp/maintenance_startup"),
-        "hard": os.path.exists("/tmp/maintenance_admin_hard") or os.path.exists("/tmp/maintenance_startup"),
+        "hard": os.path.exists("/tmp/maintenance_admin_hard"),
         "soft": os.path.exists("/tmp/maintenance_soft"),
     }
+
+
+def _load_maintenance_msg() -> dict:
+    try:
+        if os.path.exists("/tmp/maintenance_msg.json"):
+            with open("/tmp/maintenance_msg.json") as f:
+                return json.loads(f.read())
+    except: pass
+    return {"hard_title":"正在更新","hard_body":"服务器正在更新，稍等一下就好~","hard_color":"#f59e0b","hard_text_color":"#ffffff","hard_image":"","hard_style":"popup","soft_text":"服务器正在调整，功能可能偶尔不稳定","soft_color":"#f59e0b","soft_text_color":"#ffffff","soft_style":"banner","soft_once":False}
 
 
 @router.post("/maintenance/hard")
 async def toggle_hard(admin: dict = Depends(require_admin)):
     if os.path.exists("/tmp/maintenance_admin_hard"):
         os.remove("/tmp/maintenance_admin_hard")
+        await ws_manager.broadcast_to_all({"type": "maintenance_update", "mode": "none"})
         return {"hard": False, "message": "硬维护已关闭"}
     open("/tmp/maintenance_admin_hard", "w").close()
+    msg = _load_maintenance_msg()
+    await ws_manager.broadcast_to_all({"type": "maintenance_update", "mode": "hard", "msg": msg})
     return {"hard": True, "message": "硬维护已开启——API 返回 503"}
 
 
@@ -2601,8 +2614,11 @@ async def toggle_hard(admin: dict = Depends(require_admin)):
 async def toggle_soft(admin: dict = Depends(require_admin)):
     if os.path.exists("/tmp/maintenance_soft"):
         os.remove("/tmp/maintenance_soft")
+        await ws_manager.broadcast_to_all({"type": "maintenance_update", "mode": "none"})
         return {"soft": False, "message": "软维护已关闭"}
     open("/tmp/maintenance_soft", "w").close()
+    msg = _load_maintenance_msg()
+    await ws_manager.broadcast_to_all({"type": "maintenance_update", "mode": "soft", "msg": msg})
     return {"soft": True, "message": "软维护已开启——API 正常，前端展示提示"}
 
 
@@ -2615,7 +2631,9 @@ class MaintenanceMsgBody(BaseModel):
     hard_style: str = "popup"
     soft_text: str = "服务器正在调整，功能可能偶尔不稳定"
     soft_color: str = "#f59e0b"
+    soft_text_color: str = "#ffffff"
     soft_style: str = "banner"
+    soft_once: bool = False
 
 
 @router.get("/maintenance/msg")
@@ -2625,7 +2643,7 @@ async def get_maintenance_msg(admin: dict = Depends(require_admin)):
             with open("/tmp/maintenance_msg.json") as f:
                 return json.loads(f.read())
     except: pass
-    return {"hard_title":"正在更新","hard_body":"服务器正在更新，稍等一下就好~","hard_color":"#f59e0b","hard_text_color":"#ffffff","hard_image":"","hard_style":"popup","soft_text":"服务器正在调整，功能可能偶尔不稳定","soft_color":"#f59e0b","soft_style":"banner"}
+    return {"hard_title":"正在更新","hard_body":"服务器正在更新，稍等一下就好~","hard_color":"#f59e0b","hard_text_color":"#ffffff","hard_image":"","hard_style":"popup","soft_text":"服务器正在调整，功能可能偶尔不稳定","soft_color":"#f59e0b","soft_text_color":"#ffffff","soft_style":"banner","soft_once":False}
 
 
 @router.put("/maintenance/msg")
@@ -2637,14 +2655,14 @@ async def save_maintenance_msg(body: MaintenanceMsgBody, admin: dict = Depends(r
 
 _PRESETS_FILE = "/tmp/maintenance_presets.json"
 _DEFAULT_PRESETS = [
-    {"name": "服务器更新", "hard_title": "正在更新", "hard_body": "服务器正在更新，稍等一下就好~", "hard_color": "#f59e0b", "soft_text": "服务器正在更新，功能可能偶尔不稳定", "soft_color": "#f59e0b"},
-    {"name": "紧急维护", "hard_title": "紧急维护", "hard_body": "服务器突发故障，正在紧急抢修中，请稍后再来", "hard_color": "#ef4444", "soft_text": "服务器正在紧急维护，可能会出现短暂不可用", "soft_color": "#ef4444"},
-    {"name": "功能升级", "hard_title": "功能升级中", "hard_body": "正在升级新功能，马上就好~", "hard_color": "#8b5cf6", "soft_text": "新功能部署中，部分功能可能暂时不可用", "soft_color": "#8b5cf6"},
-    {"name": "网络波动", "hard_title": "网络波动", "hard_body": "网络不稳定，正在排查中", "hard_color": "#f59e0b", "soft_text": "网络有些不稳定，正在处理", "soft_color": "#f59e0b"},
-    {"name": "数据库维护", "hard_title": "数据库维护", "hard_body": "数据库正在优化，稍等片刻", "hard_color": "#3b82f6", "soft_text": "数据库正在维护，涉及存储的功能可能受影响", "soft_color": "#3b82f6"},
-    {"name": "性能优化", "hard_title": "性能优化中", "hard_body": "正在优化服务器性能，请稍等", "hard_color": "#10b981", "soft_text": "服务器性能调优中，体验可能略有影响", "soft_color": "#10b981"},
-    {"name": "新春快乐", "hard_title": "新春快乐 🧧", "hard_body": "服务器回家过年啦~稍等片刻，马上回来！", "hard_color": "#dc2626", "soft_text": "春节期间可能会有短暂离线，祝大家新年快乐！", "soft_color": "#dc2626"},
-    {"name": "假日休息", "hard_title": "假期中 🌴", "hard_body": "服务器也需要放假~休息一下马上回来", "hard_color": "#06b6d4", "soft_text": "假期期间响应可能稍慢，祝假期愉快！", "soft_color": "#06b6d4"},
+    {"name": "服务器更新", "hard_title": "正在更新", "hard_body": "服务器正在更新，稍等一下就好~", "hard_color": "#f59e0b", "soft_text": "服务器正在更新，功能可能偶尔不稳定", "soft_color": "#f59e0b", "soft_text_color": "#ffffff", "soft_once": False},
+    {"name": "紧急维护", "hard_title": "紧急维护", "hard_body": "服务器突发故障，正在紧急抢修中，请稍后再来", "hard_color": "#ef4444", "soft_text": "服务器正在紧急维护，可能会出现短暂不可用", "soft_color": "#ef4444", "soft_text_color": "#ffffff", "soft_once": False},
+    {"name": "功能升级", "hard_title": "功能升级中", "hard_body": "正在升级新功能，马上就好~", "hard_color": "#8b5cf6", "soft_text": "新功能部署中，部分功能可能暂时不可用", "soft_color": "#8b5cf6", "soft_text_color": "#ffffff", "soft_once": False},
+    {"name": "网络波动", "hard_title": "网络波动", "hard_body": "网络不稳定，正在排查中", "hard_color": "#f59e0b", "soft_text": "网络有些不稳定，正在处理", "soft_color": "#f59e0b", "soft_text_color": "#ffffff", "soft_once": False},
+    {"name": "数据库维护", "hard_title": "数据库维护", "hard_body": "数据库正在优化，稍等片刻", "hard_color": "#3b82f6", "soft_text": "数据库正在维护，涉及存储的功能可能受影响", "soft_color": "#3b82f6", "soft_text_color": "#ffffff", "soft_once": False},
+    {"name": "性能优化", "hard_title": "性能优化中", "hard_body": "正在优化服务器性能，请稍等", "hard_color": "#10b981", "soft_text": "服务器性能调优中，体验可能略有影响", "soft_color": "#10b981", "soft_text_color": "#ffffff", "soft_once": False},
+    {"name": "新春快乐", "hard_title": "新春快乐 🧧", "hard_body": "服务器回家过年啦~稍等片刻，马上回来！", "hard_color": "#dc2626", "soft_text": "春节期间可能会有短暂离线，祝大家新年快乐！", "soft_color": "#dc2626", "soft_text_color": "#ffffff", "soft_once": False},
+    {"name": "假日休息", "hard_title": "假期中 🌴", "hard_body": "服务器也需要放假~休息一下马上回来", "hard_color": "#06b6d4", "soft_text": "假期期间响应可能稍慢，祝假期愉快！", "soft_color": "#06b6d4", "soft_text_color": "#ffffff", "soft_once": False},
 ]
 
 def _load_presets():
@@ -2668,7 +2686,7 @@ async def apply_preset(admin: dict = Depends(require_admin), name: str = ""):
     p = next((p for p in _load_presets() if p["name"] == name), None)
     if not p: raise HTTPException(404, f"预设 {name} 不存在")
     with open("/tmp/maintenance_msg.json", "w") as f:
-        f.write(json.dumps({"hard_title":p["hard_title"],"hard_body":p["hard_body"],"hard_color":p.get("hard_color","#f59e0b"),"hard_text_color":p.get("hard_text_color","#ffffff"),"hard_image":p.get("hard_image",""),"hard_style":p.get("hard_style","popup"),"soft_text":p["soft_text"],"soft_color":p.get("soft_color","#f59e0b"),"soft_style":p.get("soft_style","banner")}, ensure_ascii=False))
+        f.write(json.dumps({"hard_title":p["hard_title"],"hard_body":p["hard_body"],"hard_color":p.get("hard_color","#f59e0b"),"hard_text_color":p.get("hard_text_color","#ffffff"),"hard_image":p.get("hard_image",""),"hard_style":p.get("hard_style","popup"),"soft_text":p["soft_text"],"soft_color":p.get("soft_color","#f59e0b"),"soft_text_color":p.get("soft_text_color","#ffffff"),"soft_style":p.get("soft_style","banner"),"soft_once":p.get("soft_once",False)}, ensure_ascii=False))
     return {"ok": True, "message": f"已应用预设「{name}」", "msg": p}
 
 
@@ -2688,6 +2706,8 @@ class MaintenancePresetBody(BaseModel):
     hard_color: str = "#f59e0b"
     soft_text: str = "服务器正在调整，功能可能偶尔不稳定"
     soft_color: str = "#f59e0b"
+    soft_text_color: str = "#ffffff"
+    soft_once: bool = False
 
 
 @router.post("/maintenance/presets")

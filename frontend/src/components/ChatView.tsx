@@ -292,6 +292,9 @@ export default function ChatView({ conversationType, conversationId }: ChatViewP
       window.dispatchEvent(new CustomEvent('online-count-change', { detail: msg }))
     } else if (msg.type === 'dm_notification' || msg.type === 'unread_update') {
       window.dispatchEvent(new CustomEvent(CHAT_REFRESH_EVENT, { detail: msg }))
+    } else if (msg.type === 'maintenance_update') {
+      // 全局广播：维护模式状态变化
+      window.dispatchEvent(new CustomEvent('ws-maintenance-update', { detail: msg }))
     }
   }, [conversationType, conversationId, t])
 
