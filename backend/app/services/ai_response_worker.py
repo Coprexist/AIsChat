@@ -5,8 +5,9 @@ AI 自动回复 Worker
 import asyncio
 import json
 import logging
+import re
 import time
-from datetime import datetime, timezone
+from datetime import datetime, timezone, timedelta
 from sqlalchemy import select
 from app.database import async_session
 from app.models.agent import Agent as AgentModel
@@ -899,7 +900,9 @@ async def _tool_call_loop(
             # ── 自动上下文压缩（每轮工具调用循环最多一次）──
             if not _auto_compressed:
                 compress_threshold = await get_compression_threshold(db)
-                if should_compress(messages, threshold=compress_threshold):
+                # 12 小时闲置强制压缩：缓存肯定过期，压缩省 token
+                stale = _is_conversation_idle(messages, hours=12)
+                if stale or should_compress(messages, threshold=compress_threshold):
                     logger.info(
                         f"AI {agent.name}({agent.id}) 上下文超过阈值，内联压缩中..."
                     )
@@ -1705,3 +1708,28 @@ async def _save_conversation_log_safe(
         )
     except Exception as e:
         logger.warning(f"保存对话日志失败 (agent={agent.id}): {e}")
+
+
+def _is_conversation_idle(messages: list[dict], hours: int = 12) -> bool:
+    """检查对话最后一条消息是否超过指定小时数——缓存大概率已过期，应强制压缩"""
+    now = datetime.now(timezone.utc).replace(tzinfo=None)
+    for m in reversed(messages):
+        content = m.get("content", "")
+        if not isinstance(content, str):
+            continue
+        # 匹配 "[Shanghai 07-11 23:01]" 格式的时间戳（无年份）
+        m2 = re.search(r'\[([A-Za-z_]+) (\d{2}-\d{2} \d{2}:\d{2})\]', content)
+        if m2:
+            time_str = m2.group(2)
+            for offset in (0, -1):  # 先试今年，如果日期 > 今天则试去年
+                try:
+                    year = now.year + offset
+                    msg_time = datetime.strptime(f"{year}-{time_str}", "%Y-%m-%d %H:%M")
+                    if msg_time > now and offset == 0:
+                        continue  # 今年日期在未来 → 试去年
+                    idle_seconds = (now - msg_time).total_seconds()
+                    return idle_seconds > hours * 3600
+                except ValueError:
+                    pass
+        break  # 只看最后一条消息
+    return False
