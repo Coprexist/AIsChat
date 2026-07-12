@@ -38,11 +38,24 @@ def build_personality_segment(
     system_prompt_override 为 per-user 配置覆盖（通用/半通用 AI）。
     """
     effective_prompt = system_prompt_override or getattr(agent, 'current_system_prompt', None)
-    if effective_prompt:
-        return effective_prompt
-
-    hide = getattr(agent, 'hide_ai_identity', False)
     name = getattr(agent, 'name', 'AI')
+    hide = getattr(agent, 'hide_ai_identity', False)
+
+    if effective_prompt:
+        # 即使有自定义提示词，也要确保 AI 知道自己的名字，
+        # 避免 core_identity 中的示例名造成身份混淆
+        if language == "en":
+            name_line = f"Your name is {name}."
+        else:
+            name_line = f"你的名字是 {name}。"
+        # 如果提示词已以「你是/你叫/Your name is/You are」开头，不再重复
+        starts_with_name = any(
+            effective_prompt.lstrip().startswith(p)
+            for p in ("你是", "你叫", "Your name is", "You are", "You're")
+        )
+        if starts_with_name:
+            return effective_prompt
+        return f"{name_line}\n\n{effective_prompt}"
 
     if hide:
         if language == "en":

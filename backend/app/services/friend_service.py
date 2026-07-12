@@ -145,8 +145,14 @@ async def accept_friend_request(
         friend_type=req.target_type,
         friend_id=req.target_id,
     ))
-    # 如果目标是人类，也添加反向好友
+    # 反向好友：human↔human 或 human→ai 都需要
     if req.target_type == "human":
+        db.add(Friendship(
+            user_id=req.target_id,
+            friend_type="human",
+            friend_id=req.requester_id,
+        ))
+    elif req.target_type == "ai":
         db.add(Friendship(
             user_id=req.target_id,
             friend_type="human",
