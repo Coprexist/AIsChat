@@ -117,9 +117,12 @@
 }
 /* 慎独：古风笔墨，不落窠臼 */
 
-/* KaTeX 颜色适配 */
+/* KaTeX 颜色适配（气泡内继承气泡文字色） */
 .katex {
   @apply text-textPrimary;
+}
+.bubble-content .katex {
+  color: inherit;
 }
 .katex .mathnormal {
   @apply text-primary-600;
