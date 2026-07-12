@@ -9,10 +9,11 @@ import { getStatusTextStyle, STATUS_COLORS } from '../utils/statusColor'
 import {
   ArrowLeft, Trash2, Download, Upload, Key, Edit3,
   Image, HardDrive, Brain, Copy, Check, X, RefreshCw, Bot, Settings, User,
-  ScrollText, Loader2, ChevronRight, ChevronDown,
+  ScrollText, Loader2, ChevronRight, ChevronDown, Bookmark, Tag, Database,
 } from 'lucide-react'
 import AvatarCropModal from '../components/AvatarCropModal'
 import AgentSettingsModal from '../components/AgentSettingsModal'
+import EmptyState from '../components/EmptyState'
 import FilePreviewModal from '../components/FilePreviewModal'
 
 /** 扩展名→MIME 类型映射（后端未返回 mime_type 时 fallback） */
@@ -195,51 +196,56 @@ function StructuredMemoryView({ agentId }: { agentId: number }) {
   if (loading) return <div className="flex justify-center py-8"><Loader2 size={18} className="animate-spin text-textMuted" /></div>
 
   if (!data || data.length === 0) return (
-    <div className="text-center py-8">
-      <p className="text-sm text-textMuted mb-2">{t('agentDetail.structuredEmpty')}</p>
-      <p className="text-xs text-textMuted leading-relaxed max-w-md mx-auto">{t('agentDetail.structuredEmptyHint')}</p>
-    </div>
+    <EmptyState icon={Database} title="暂无结构化记忆" description="AI 还没有记录任何结构化信息，随着对话进行会自动生成" />
   )
 
+  // 为不同类别分配不同图标
+  const CAT_ICONS: Record<string, React.ElementType> = {
+    user_profile: User, user: User,
+    preferences: Bookmark, preference: Bookmark,
+    knowledge: Brain, facts: Brain,
+    tags: Tag, labels: Tag,
+  }
+
   return (
-    <div className="space-y-1 max-h-[500px] overflow-y-auto">
+    <div className="space-y-1.5 max-h-[500px] overflow-y-auto">
       {data.map((cat) => {
         const isCatOpen = expandedCat === cat.category
+        const CatIcon = CAT_ICONS[cat.category] || Bookmark
         return (
           <div key={cat.category} className="rounded-lg border border-border overflow-hidden">
-            {/* Category row */}
             <button
               onClick={() => setExpandedCat(isCatOpen ? null : cat.category)}
-              className="w-full flex items-center gap-2 px-3 py-2 hover:bg-elevated transition-colors text-left"
+              className="w-full flex items-center gap-2.5 px-3.5 py-2.5 hover:bg-elevated transition-colors text-left"
             >
+              <CatIcon size={15} className="text-primary-400 shrink-0" />
+              <span className="text-sm font-medium text-textPrimary">{cat.category}</span>
+              <span className="text-[11px] text-textMuted bg-canvas px-1.5 py-0.5 rounded ml-auto">{cat.record_count} 条</span>
               {isCatOpen ? <ChevronDown size={14} className="text-textMuted shrink-0" /> : <ChevronRight size={14} className="text-textMuted shrink-0" />}
-              <span className="text-sm font-medium text-textPrimary">{cat.category}/</span>
-              <span className="text-xs text-textMuted ml-auto">{cat.record_count} 条</span>
             </button>
-            {/* Sub rows */}
             {isCatOpen && (
-              <div className="border-t border-border bg-canvas/50">
+              <div className="border-t border-border bg-canvas/40">
                 {cat.subs.map((sub) => {
                   const isSubOpen = expandedSub === `${cat.category}/${sub.sub_key}`
                   return (
                     <div key={sub.sub_key}>
                       <button
                         onClick={() => setExpandedSub(isSubOpen ? null : `${cat.category}/${sub.sub_key}`)}
-                        className="w-full flex items-center gap-2 px-5 py-1.5 hover:bg-elevated transition-colors text-left text-xs"
+                        className="w-full flex items-center gap-2 px-7 py-1.5 hover:bg-elevated transition-colors text-left"
                       >
                         {isSubOpen ? <ChevronDown size={11} className="text-textMuted shrink-0" /> : <ChevronRight size={11} className="text-textMuted shrink-0" />}
-                        <span className="text-textPrimary font-medium">{sub.sub_key}</span>
-                        <span className="text-textMuted ml-auto shrink-0">{sub.field_count} 字段</span>
+                        <span className="text-xs text-textPrimary font-medium">{sub.sub_key}</span>
+                        <span className="text-[10px] text-textMuted ml-auto">{sub.field_count} 项</span>
                         {sub.last_update && (
-                          <span className="text-[10px] text-textMuted">{new Date(sub.last_update).toLocaleDateString('zh-CN')}</span>
+                          <span className="text-[10px] text-textMuted/60">{new Date(sub.last_update).toLocaleDateString('zh-CN')}</span>
                         )}
                       </button>
                       {isSubOpen && (
-                        <div className="border-t border-border/50 ml-7 py-1 px-4 space-y-0.5">
+                        <div className="border-t border-border/40 ml-9 py-1.5 px-3 space-y-1">
                           {Object.entries(sub.fields).map(([field, value]) => (
-                            <div key={field} className="text-xs flex gap-2 py-0.5">
-                              <span className="text-primary-400 font-medium shrink-0 min-w-[60px]">{field}</span>
-                              <span className="text-textSecondary break-all">{value.length > 100 ? value.slice(0, 100) + '…' : value}</span>
+                            <div key={field} className="flex gap-2 text-xs py-0.5">
+                              <span className="text-primary-400 font-medium shrink-0 min-w-[70px] text-[11px]">{field}</span>
+                              <span className="text-textSecondary/90 break-words leading-relaxed">{value.length > 120 ? value.slice(0, 120) + '…' : value}</span>
                             </div>
                           ))}
                         </div>
