@@ -517,7 +517,7 @@ export default function AgentSettingsModal({
               <p className="text-[10px] text-textMuted -mb-3">{t('modal.detailSettingsDesc') || '高级参数调整。不确定的保持默认即可。'}</p>
 
               {/* 高级模型参数 */}
-              <Section title={t('modal.detailSettingsAdvancedModel') || '高级模型参数'} desc={t('modal.detailSettingsAdvancedModelDesc') || '精细控制采样策略'}>
+              <Section title={t('modal.detailSettingsAdvancedModel') || '高级模型参数'} desc={t('modal.detailSettingsAdvancedModelDesc') || '精细控制采样策略'} defaultCollapsed>
                 <SliderField label="Top P" value={topP} setValue={setTopP} min={0} max={1} step={0.05} desc={t('modal.detailSettingsTopPDesc')} />
                 <SliderField label="Presence Penalty" value={presencePenalty} setValue={setPresencePenalty} min={-2} max={2} step={0.1} desc={t('modal.detailSettingsPresencePenaltyDesc')} />
                 <SliderField label="Frequency Penalty" value={frequencyPenalty} setValue={setFrequencyPenalty} min={-2} max={2} step={0.1} desc={t('modal.detailSettingsFrequencyPenaltyDesc')} />
@@ -568,7 +568,7 @@ export default function AgentSettingsModal({
               </Section>
 
               {/* 对话日志 (NEW) */}
-              <Section title={t('modal.detailSettingsConversationLogs') || '对话日志'} desc={t('modal.detailSettingsConversationLogsDesc') || '此 AI 的日志保留和用户查看权限'}>
+              <Section title={t('modal.detailSettingsConversationLogs') || '对话日志'} desc={t('modal.detailSettingsConversationLogsDesc') || '此 AI 的日志保留和用户查看权限'} defaultCollapsed>
                 <div>
                   <label className="block text-xs font-medium mb-1 text-textSecondary">{t('modal.detailSettingsConversationLogsLimit') || '日志保留上限'}</label>
                   <input type="number" min={1} max={10000} value={conversationLogsLimit ?? ''}
@@ -593,7 +593,7 @@ export default function AgentSettingsModal({
               </Section>
 
               {/* 行为开关 */}
-              <Section title={t('modal.detailSettingsBehaviorSwitches')} desc={t('modal.detailSettingsBehaviorSwitchesDesc')}>
+              <Section title={t('modal.detailSettingsBehaviorSwitches')} desc={t('modal.detailSettingsBehaviorSwitchesDesc')} defaultCollapsed>
                 <ToggleField label={t('modal.detailSettingsSelfEdit')} value={isAiEditable} setValue={setIsAiEditable} desc={t('modal.detailSettingsSelfEditDesc')} />
                 <ToggleField label={t('modal.detailSettingsHideAiIdentity')} value={hideAiIdentity} setValue={setHideAiIdentity} desc={t('modal.detailSettingsHideAiIdentityDesc')} />
                 <div>
@@ -608,7 +608,7 @@ export default function AgentSettingsModal({
               </Section>
 
               {/* ── 合并：对话与社交权限 ── */}
-              <Section title={t('modal.detailSettingsChatPermissionsDetail') || '对话与社交权限'} desc={t('modal.detailSettingsChatPermissionsDetailDesc') || '控制谁可以与此 AI 对话、加好友、消耗配额'}>
+              <Section title={t('modal.detailSettingsChatPermissionsDetail') || '对话与社交权限'} desc={t('modal.detailSettingsChatPermissionsDetailDesc') || '控制谁可以与此 AI 对话、加好友、消耗配额'} defaultCollapsed>
                 {/* 社交发现 */}
                 <ToggleField label={t('agents.discoverable')} value={discoverable} setValue={setDiscoverable} desc={t('agents.discoverableDesc')} />
                 <ToggleField label={t('modal.detailSettingsAllowFriendRequests')} value={allowFriendRequests} setValue={setAllowFriendRequests} desc={t('modal.detailSettingsAllowFriendRequestsDesc')} />
@@ -672,12 +672,12 @@ export default function AgentSettingsModal({
               </Section>
 
               {/* 额度 */}
-              <Section title={t('modal.detailSettingsCreditCost')} desc={t('modal.detailSettingsCreditCostDesc')}>
+              <Section title={t('modal.detailSettingsCreditCost')} desc={t('modal.detailSettingsCreditCostDesc')} defaultCollapsed>
                 <NumberField label={t('modal.detailSettingsApiCreditCost')} value={apiCreditCost} setValue={setApiCreditCost} min={0} max={100000} desc={t('modal.detailSettingsApiCreditCostDesc')} />
               </Section>
 
               {/* API 提供商 */}
-              <Section title={t('modal.detailSettingsApiProvider')} desc={t('modal.detailSettingsApiProviderDesc')}>
+              <Section title={t('modal.detailSettingsApiProvider')} desc={t('modal.detailSettingsApiProviderDesc')} defaultCollapsed>
                 <div>
                   <label className="block text-xs font-medium mb-1 text-textSecondary">API Base URL</label>
                   <input type="text" value={apiBaseUrl} onChange={(e) => setApiBaseUrl(e.target.value)}
@@ -705,12 +705,12 @@ export default function AgentSettingsModal({
               </Section>
 
               {/* 技能背包 */}
-              <Section title={t('backpack.title')} desc={t('backpack.desc')}>
+              <Section title={t('backpack.title')} desc={t('backpack.desc')} defaultCollapsed>
                 <SkillBackpack agentId={agent.id} />
               </Section>
 
               {/* 兑换码 */}
-              <Section title={t('modal.detailSettingsRedeemCode')} desc={t('modal.detailSettingsRedeemCodeDesc')}>
+              <Section title={t('modal.detailSettingsRedeemCode')} desc={t('modal.detailSettingsRedeemCodeDesc')} defaultCollapsed>
                 <div className="flex items-center gap-2">
                   <div className="flex-1 relative">
                     <Ticket size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-textMuted" />
@@ -767,12 +767,21 @@ export default function AgentSettingsModal({
 }
 
 // ── 分区容器 ──
-function Section({ title, desc, children }: { title: string; desc: string; children: React.ReactNode }) {
+function Section({ title, desc, children, defaultCollapsed }: { title: string; desc: string; children: React.ReactNode; defaultCollapsed?: boolean }) {
+  const [open, setOpen] = useState(!defaultCollapsed)
   return (
-    <div className="bg-canvas/50 rounded-xl p-4 border border-border/50">
-      <h3 className="text-xs font-semibold text-textPrimary mb-1">{title}</h3>
-      <p className="text-[10px] text-textMuted mb-3 leading-relaxed">{desc}</p>
-      <div className="space-y-2.5">{children}</div>
+    <div className="bg-canvas/50 rounded-xl border border-border/50 overflow-hidden">
+      <button
+        onClick={() => setOpen(!open)}
+        className="w-full flex items-center gap-2 px-4 py-3 text-left hover:bg-black/[0.02] dark:hover:bg-white/[0.02] transition-colors"
+      >
+        <span className={`shrink-0 text-textMuted transition-transform ${open ? 'rotate-90' : ''}`}>▶</span>
+        <div className="flex-1 min-w-0">
+          <h3 className="text-xs font-semibold text-textPrimary">{title}</h3>
+          <p className="text-[10px] text-textMuted leading-relaxed">{desc}</p>
+        </div>
+      </button>
+      {open && <div className="px-4 pb-4 space-y-2.5 border-t border-border/30 pt-3">{children}</div>}
     </div>
   )
 }
