@@ -11,19 +11,27 @@
 
 ### Added
 
+- 🎨 **气泡文本动态对比度检测**：运行时读取气泡 `background-color`，用 WCAG 算法自动算链接/代码/表格颜色。深色底→白字，浅色底→默认色。为未来自定义气泡颜色打下基础
 - ⚙️ **上下文压缩阈值管理配置**：管理面板 → 对话日志 → 全局设置可调压缩百分比（5%-100%）
-- 🕒 **闲置 12 小时自动压缩**：对话长期无新消息时强制内联压缩，避免过期缓存浪费 token
-- 🎯 **ALembic 数据库迁移**：`compression_threshold` 列通过 Alembic 管理，`migration.py` 不再新增列
+- 🕒 **闲置 12 小时自动压缩**：对话最后消息超 12 小时强制内联压缩，避免过期缓存浪费 token
+- 🔍 **对话日志 AI 搜索**：AI 选择器支持按名称搜索，不再限于前 20 个
+- 🎯 **Alembic 数据库迁移**：`compression_threshold` 列通过 Alembic 管理，`migration.py` 不再新增列
+- 📦 **Tauri API 集中封装**：`utils/tauri.ts` 统一 `invoke`/`onKeyboardChange`/`getPlatform`，替代散落在各页面的内联 `__TAURI__` 检查
+- 📱 **visualViewport 键盘检测**：移动端键盘弹出时精确滚动输入框，替代 400ms setTimeout hack
+- 🦀 **AIsChat-Client 原生命令**：`io_bridge_call` 按 method 分发（getPlatform/getAppVersion）+ `get_status_bar_height` + `get_safe_area_insets` + `setup()`/`on_navigation()`
 
 ### Changed
 
 - 📈 **消息加载上限 20 → 5000**：不再硬截断 AI 上下文，让压缩阈值自然控制保留量
-- 🔍 **对话日志 AI 选择器支持搜索**：可按名称搜索 AI，不再限于前 20 个
+- 📏 **内联压缩保留数 5 → 20**：AI 看到更多最近消息再截断
+- ♻️ **SettingsPage/LocalModelPage Tauri 调用集中化**：7 处内联 `__TAURI__` + 动态 import 改为集中 `invoke`
 
 ### Fixed
 
-- 🐛 **自家气泡 Markdown 渲染**：链接/代码/表格在深色底上白字适配
-- 🐛 **`get_compression_threshold` 未导入**：AI 回复报 `NameError`，导致不返回思考中状态
+- 🐛 **自家气泡 Markdown 链接/代码/表格深色底不可见**：白字 + 半透明底适配 `bg-primary-500`
+- 🐛 **`get_compression_threshold` 未导入**：AI 回复报 `NameError`，不返回思考中状态
+- 🐛 **对话日志查看器旧 AI 不可选**：后端加 `search` 参数，前端加搜索框
+- 🐛 **context_compressor.py 死代码**：阈值从 6% 提到 60% 后永不触发，现改为从 DB 配置读取
 
 ## [v1.0.4] - 2026-07-11
 
