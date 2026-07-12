@@ -250,39 +250,42 @@
 
 /* 链接 */
 .bubble-content a {
-  color: var(--b-link, rgb(var(--tw-text-primary)));
+  color: rgb(var(--b-link-r, var(--tw-text-primary)) / var(--b-link-a, 1));
   text-decoration: underline;
-  text-decoration-color: var(--b-link-deco, transparent);
   transition: color 0.15s;
 }
 .bubble-content a:hover {
-  color: var(--b-link-hover, rgb(var(--tw-text-primary)));
+  opacity: 0.85;
 }
 
 /* 行内代码 */
 .bubble-content code {
-  background: var(--b-code-bg, initial);
-  color: var(--b-code-text, initial);
+  background: rgb(var(--b-code-r, 0 0 0) / var(--b-code-a, 0.08));
   padding: 0 0.25rem;
   border-radius: 0.25rem;
 }
 
 /* 代码块 */
 .bubble-content pre {
-  background: var(--b-pre-bg, initial);
+  background: rgb(var(--b-pre-r, 0 0 0) / var(--b-pre-a, 0.05));
 }
 
 /* 分割线 */
 .bubble-content hr {
   border: none;
   height: 1px;
-  background: var(--b-hr, rgb(var(--tw-border) / 1));
+  background: rgb(var(--b-hr-r, var(--tw-border)) / var(--b-hr-a, 1));
   margin: 0.75rem 0;
 }
 
-/* 表格滚动条颜色 */
-.markdown-table-wrapper {
-  scrollbar-color: var(--b-scrollbar, initial) transparent;
+/* 表头 */
+.markdown-table-wrapper thead {
+  background: rgb(var(--b-thead-r, 237) var(--b-thead-g, 233) var(--b-thead-b, 254) / var(--b-thead-a, 1));
+}
+
+/* 斑马纹 */
+.markdown-table-wrapper tbody tr:nth-child(even) {
+  background: rgb(var(--b-zebra-r, 243) var(--b-zebra-g, 240) var(--b-zebra-b, 255) / var(--b-zebra-a, 1));
 }
 
 .markdown-table-wrapper th[align="right"],

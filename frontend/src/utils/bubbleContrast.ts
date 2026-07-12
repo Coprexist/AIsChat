@@ -2,7 +2,7 @@
  * 气泡文本对比度工具
  *
  * 运行时读取气泡 background-color，通过 CSS 变量注入适配样式。
- * 所有视觉样式集中在 index.css 中用 var(--b-*) 读取。
+ * 所有颜色用空格分隔 RGB 格式（避免 Tailwind 解析逗号/括号出错）。
  */
 
 function hexToRgb(hex: string): { r: number; g: number; b: number } | null {
@@ -25,44 +25,55 @@ export function getBubbleTextClasses(bgColor: string): string {
   const rgb = hexToRgb(bgColor)
   const dark = rgb && relativeLuminance(rgb.r, rgb.g, rgb.b) < 0.2
 
-  // Tailwind 任意属性语法 [--var:val] → 在元素上设 CSS 变量
+  // 使用空格分隔 RGB（无逗号/括号，Tailwind 解析无歧义）
   return dark ? [
-    // 链接
-    '[--b-link:rgba(255,255,255,0.85)]',
-    '[--b-link-hover:white]',
-    '[--b-link-deco:rgba(255,255,255,0.3)]',
-    // 行内代码
-    '[--b-code-bg:rgba(255,255,255,0.15)]',
-    '[--b-code-text:white]',
-    // 代码块
-    '[--b-pre-bg:rgba(0,0,0,0.2)]',
+    // 链接：白色半透明
+    '[--b-link-r:255]',
+    '[--b-link-g:255]',
+    '[--b-link-b:255]',
+    '[--b-link-a:0.85]',
+    // 行内代码背景
+    '[--b-code-r:255]',
+    '[--b-code-g:255]',
+    '[--b-code-b:255]',
+    '[--b-code-a:0.15]',
+    // 代码块背景
+    '[--b-pre-r:0]',
+    '[--b-pre-g:0]',
+    '[--b-pre-b:0]',
+    '[--b-pre-a:0.2]',
     // 分割线
-    '[--b-hr:rgba(255,255,255,0.2)]',
-    // 表头
-    '[--b-thead-bg:#4C1D95]',
-    '[--b-thead-text:white]',
+    '[--b-hr-r:255]',
+    '[--b-hr-g:255]',
+    '[--b-hr-b:255]',
+    '[--b-hr-a:0.2]',
+    // 表头背景
+    '[--b-thead-r:76]',
+    '[--b-thead-g:29]',
+    '[--b-thead-b:149]',
+    '[--b-thead-a:1]',
     // 斑马纹
-    '[--b-zebra-bg:rgba(91,33,182,0.35)]',
-    // 滚动条
-    '[--b-scrollbar:rgba(255,255,255,0.25)]',
+    '[--b-zebra-r:91]',
+    '[--b-zebra-g:33]',
+    '[--b-zebra-b:182]',
+    '[--b-zebra-a:0.35]',
   ].join(' ') : [
-    // 链接（沿用 primary 色，深色模式按现有规则）
-    '[--b-link:var(--tw-text-primary)]',
-    '[--b-link-hover:#6366f1]',
-    '[--b-link-deco:transparent]',
-    // 行内代码（无覆盖，用默认）
-    '[--b-code-bg:initial]',
-    '[--b-code-text:initial]',
-    // 代码块（无覆盖）
-    '[--b-pre-bg:initial]',
-    // 分割线
-    '[--b-hr:var(--color-border)]',
-    // 表头
-    '[--b-thead-bg:#EDE9FE]',
-    '[--b-thead-text:#111827]',
-    // 斑马纹
-    '[--b-zebra-bg:#F3F0FF]',
-    // 滚动条（默认）
-    '[--b-scrollbar:initial]',
+    // 浅色气泡：不设覆盖（回退到 index.css 默认值）
+    '[--b-link-r:initial]',
+    '[--b-link-g:initial]',
+    '[--b-link-b:initial]',
+    '[--b-link-a:initial]',
+    '[--b-thead-r:237]',
+    '[--b-thead-g:233]',
+    '[--b-thead-b:254]',
+    '[--b-thead-a:1]',
+    '[--b-zebra-r:243]',
+    '[--b-zebra-g:240]',
+    '[--b-zebra-b:255]',
+    '[--b-zebra-a:1]',
+    // 清除深色模式的覆盖
+    '[--b-code-r:initial]',
+    '[--b-pre-r:initial]',
+    '[--b-hr-r:initial]',
   ].join(' ')
 }
