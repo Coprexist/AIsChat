@@ -1,4 +1,4 @@
-import { memo, useState, useEffect } from 'react'
+import { memo, useState, useEffect, useRef } from 'react'
 import Markdown from 'react-markdown'
 import remarkGfm from 'remark-gfm'
 import remarkMath from 'remark-math'
@@ -17,6 +17,7 @@ import { api } from '../api/client'
 import CodeRenderer from './shared/CodeRenderer'
 import FilePreviewModal from './FilePreviewModal'
 import InvitationCard from './InvitationCard'
+import { getBubbleTextClasses } from '../utils/bubbleContrast'
 
 /** 弹跳三点（思考中/输入中共用） */
 const BouncingDots = ({ className = '' }: { className?: string }) => (
@@ -80,6 +81,27 @@ const MessageBubble = memo(function MessageBubble({
 
   const [previewFile, setPreviewFile] = useState<{ file_id: number; name: string; size: number; mime_type: string } | null>(null)
   const [invStatus, setInvStatus] = useState<string | null>(null)
+  const contentRef = useRef<HTMLDivElement>(null)
+  const [bubbleContrastCls, setBubbleContrastCls] = useState('')
+
+  // 运行时读取气泡背景色，动态调对比度
+  useEffect(() => {
+    if (!contentRef.current) return
+    const el = contentRef.current
+    // 等一帧让浏览器渲染完成，拿到计算后的背景色
+    const raf = requestAnimationFrame(() => {
+      const computed = getComputedStyle(el)
+      const rgb = computed.backgroundColor  // "rgb(99, 102, 241)" 格式
+      const m = rgb.match(/\d+/g)?.map(Number)
+      if (m && m.length >= 3) {
+        const hex = '#' + m.slice(0, 3).map(c => c.toString(16).padStart(2, '0')).join('')
+        setBubbleContrastCls(getBubbleTextClasses(hex))
+      } else {
+        setBubbleContrastCls('')
+      }
+    })
+    return () => cancelAnimationFrame(raf)
+  }, [isMine])
 
   // 检测邀请卡片
   const invAtt = attachments?.find(a => a.type === 'group_invitation')
@@ -174,8 +196,8 @@ const MessageBubble = memo(function MessageBubble({
             <span className="text-[10px] text-mint-400 animate-pulse font-medium">{t('chat.typing')}</span>
           )}
         </div>
-        <div className={`px-4 py-2.5 text-sm leading-relaxed break-words ${bubbleBg} ${thinking || isTyping ? 'opacity-70' : ''}
-          ${isMine
+        <div ref={contentRef} className={`px-4 py-2.5 text-sm leading-relaxed break-words ${bubbleBg} ${thinking || isTyping ? 'opacity-70' : ''} ${bubbleContrastCls || (
+          isMine
             ? `[&_.katex-display]:overflow-x-auto [&_.katex-display]:-mx-1 [&_.katex-display]:px-1
                [&_.katex]:text-inherit [&_.katex]:max-w-full [&_.katex]:overflow-x-auto [&_.katex]:inline-block
                [&_pre]:overflow-x-auto [&_pre]:-mx-1 [&_pre]:px-1
@@ -190,7 +212,7 @@ const MessageBubble = memo(function MessageBubble({
                [&_table]:overflow-x-auto [&_table]:block
                [&_img]:max-w-full [&_img]:rounded-lg
                [&_a]:break-all [&_a]:text-primary-500 dark:[&_a]:text-primary-400 [&_a]:underline`
-          }
+        )}
         `}>
           {isInvitation && invAtt ? (
             <InvitationCard
