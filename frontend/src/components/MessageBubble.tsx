@@ -201,7 +201,7 @@ const MessageBubble = memo(function MessageBubble({
             ? `[&_.katex-display]:overflow-x-auto [&_.katex-display]:-mx-1 [&_.katex-display]:px-1
                [&_.katex]:text-inherit [&_.katex]:max-w-full [&_.katex]:overflow-x-auto [&_.katex]:inline-block
                [&_pre]:overflow-x-auto [&_pre]:-mx-1 [&_pre]:px-1
-               [&_table]:overflow-x-auto [&_table]:block [&_table_th]:text-white [&_table_td]:text-white/90 [&_table_th]:border-white/20 [&_table_td]:border-white/20 [&_table_th]:py-1 [&_table_td]:py-1 [&_table_th]:px-2 [&_table_td]:px-2 [&_table_th]:text-left
+               [&_table]:w-full [&_table]:border-collapse [&_table]:my-1 [&_table_th]:text-white [&_table_td]:text-white/85 [&_table_th]:py-1.5 [&_table_td]:py-1.5 [&_table_th]:px-3 [&_table_td]:px-3 [&_table_th]:border-b [&_table_td]:border-b [&_table_th]:border-white/15 [&_table_td]:border-white/15 [&_table_th]:text-left [&_table_th]:font-semibold [&_table_th]:bg-white/10 [&_table_tr:nth-child(even)]:bg-white/5
                [&_img]:max-w-full [&_img]:rounded-lg
                [&_a]:break-all [&_a]:text-white/85 [&_a]:underline [&_a]:decoration-white/30 hover:[&_a]:text-white [&_a]:transition-colors
                [&_code]:bg-white/15 [&_code]:text-white [&_code]:px-1 [&_code]:rounded
@@ -209,7 +209,7 @@ const MessageBubble = memo(function MessageBubble({
             : `[&_.katex-display]:overflow-x-auto [&_.katex-display]:-mx-1 [&_.katex-display]:px-1
                [&_.katex]:text-inherit [&_.katex]:max-w-full [&_.katex]:overflow-x-auto [&_.katex]:inline-block
                [&_pre]:overflow-x-auto [&_pre]:-mx-1 [&_pre]:px-1
-               [&_table]:overflow-x-auto [&_table]:block
+               [&_table]:w-full [&_table]:border-collapse [&_table]:my-1 [&_table_th]:text-textPrimary [&_table_td]:text-textSecondary [&_table_th]:py-1.5 [&_table_td]:py-1.5 [&_table_th]:px-3 [&_table_td]:px-3 [&_table_th]:border-b [&_table_td]:border-b [&_table_th]:border-border [&_table_td]:border-border [&_table_th]:text-left [&_table_th]:font-semibold [&_table_th]:bg-elevated [&_table_tr:nth-child(even)]:bg-canvas/50
                [&_img]:max-w-full [&_img]:rounded-lg
                [&_a]:break-all [&_a]:text-primary-500 dark:[&_a]:text-primary-400 [&_a]:underline`
         )}

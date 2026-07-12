@@ -499,9 +499,9 @@ export default function ChatView({ conversationType, conversationId }: ChatViewP
       ? `/groups/${conversationId}/activity`
       : `/dm/${conversationId}/activity`
     api.get<Record<string, {name: string; avatar_url: string | null}>>(activityUrl).then(active => {
-      const thinking = new Map<number, {name: string; avatar_url: string | null}>()
+      const thinking = new Map<number, {name: string; avatarUrl: string | null}>()
       Object.entries(active).forEach(([id, info]) => {
-        thinking.set(Number(id), info)
+        thinking.set(Number(id), { name: info.name, avatarUrl: info.avatar_url })
       })
       if (thinking.size > 0) setThinkingAgents(thinking)
     }).catch(() => {})
