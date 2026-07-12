@@ -377,7 +377,6 @@ export default function ChatSidebar({
               </button>
             ))}
           </div>
-        )}
 
       </div>
 
