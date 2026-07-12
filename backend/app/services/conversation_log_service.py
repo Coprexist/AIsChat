@@ -111,6 +111,7 @@ async def get_config_dict(db: AsyncSession) -> dict:
         "default_user_conversation_logs": config.default_user_conversation_logs,
         "default_user_log_access": config.default_user_log_access,
         "default_delay_reply_enabled": config.default_delay_reply_enabled,
+        "compression_threshold": getattr(config, 'compression_threshold', 60) or 60,
     }
 
 
@@ -121,6 +122,7 @@ async def update_config(
     default_user_conversation_logs: int | None = None,
     default_user_log_access: bool | None = None,
     default_delay_reply_enabled: bool | None = None,
+    compression_threshold: int | None = None,
 ) -> dict:
     """更新全局配置"""
     config = await _get_config(db)
@@ -139,6 +141,10 @@ async def update_config(
         config.default_user_log_access = default_user_log_access
     if default_delay_reply_enabled is not None:
         config.default_delay_reply_enabled = default_delay_reply_enabled
+    if compression_threshold is not None:
+        if compression_threshold < 1 or compression_threshold > 100:
+            raise ValueError("压缩阈值必须在 1-100 之间")
+        config.compression_threshold = compression_threshold
 
     config.updated_by = updated_by
     config.updated_at = datetime.now(timezone.utc).replace(tzinfo=None)

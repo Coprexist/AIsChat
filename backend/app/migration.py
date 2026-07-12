@@ -667,6 +667,14 @@ async def _migrate_conversation_logs(db):
             ON CONFLICT (id) DO NOTHING
         """))
         created_any = True
+
+    # 2. 压缩阈值列（v1.0.5+）
+    if not await _column_exists(db, "conversation_log_config", "compression_threshold"):
+        logger.info("  ➕ conversation_log_config.compression_threshold 列")
+        await db.execute(text("ALTER TABLE conversation_log_config ADD COLUMN compression_threshold INTEGER DEFAULT 60"))
+        created_any = True
+
+    return created_any
     else:
         logger.info("  ⏭ conversation_log_config 表已存在，跳过")
 

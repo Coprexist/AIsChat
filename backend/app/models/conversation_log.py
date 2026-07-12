@@ -22,6 +22,8 @@ class ConversationLogConfig(Base):
     default_user_log_access = Column(Boolean, default=False)
     # 全局默认：新创建的 AI 是否默认开启延迟回复功能
     default_delay_reply_enabled = Column(Boolean, default=False)
+    # 上下文压缩阈值（占上下文窗口百分比，0.0-1.0，默认 0.60）
+    compression_threshold = Column(Integer, default=60)  # 存整数 0-100，前端友好
 
     updated_by = Column(Integer, ForeignKey("users.id"))
     updated_at = Column(DateTime, server_default=func.now(), onupdate=func.now())

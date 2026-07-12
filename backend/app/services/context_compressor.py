@@ -19,7 +19,7 @@ logger = logging.getLogger(__name__)
 
 # 默认上下文窗口（DeepSeek V4 为 128K）
 DEFAULT_CONTEXT_WINDOW = 128_000
-# 压缩阈值：达到窗口的 N% 时触发压缩（管理员可覆盖）
+# 压缩阈值：达到窗口的 N% 时触发压缩（管理员可覆盖，DB 配置优先）
 COMPRESSION_THRESHOLD = 0.60
 # 压缩目标范围（管理员可覆盖）
 # 建议压缩到 触发值 × COMPRESSION_TARGET_MIN ~ COMPRESSION_TARGET_MAX
@@ -49,6 +49,20 @@ def estimate_tokens(messages: list[dict]) -> int:
             if isinstance(val, str):
                 total_chars += len(val)
     return total_chars // 4
+
+
+async def get_compression_threshold(db) -> float:
+    """从 DB 配置读取压缩阈值（0.0-1.0），回退到硬编码默认值"""
+    try:
+        from sqlalchemy import select
+        from app.models.conversation_log import ConversationLogConfig
+        result = await db.execute(select(ConversationLogConfig.compression_threshold).where(ConversationLogConfig.id == 1))
+        val = result.scalar_one_or_none()
+        if val is not None and val > 0:
+            return val / 100.0
+    except Exception:
+        pass
+    return COMPRESSION_THRESHOLD
 
 
 def should_compress(
