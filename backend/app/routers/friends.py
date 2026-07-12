@@ -174,17 +174,22 @@ async def accept_request(
                 "accepter_name": current_user.get("username", ""),
             }, req_requester_id)
 
-        # 将附言注入 DM 对话（使用申请发起时间戳）
+        # 将附言注入 DM 对话（先发对方消息，再发通过通知）
         if req_requester_id and req_target_type:
             accepter_uid = current_user["user_id"]
             requester_uid = req_requester_id if req_target_type == "human" else req_requester_id
-            # requester_uid 始终是 users.id
-            greeting = "好友申请已通过"
+            # 1. 先发对方的申请附言作为第一条消息（来自对方）
             if req_message:
-                greeting += f"\n附言：{req_message}"
+                await _inject_friend_greeting(
+                    db, requester_uid, accepter_uid,
+                    req_message, created_at=req_created_at,
+                    prefix="",
+                )
+            # 2. 再发通过通知
             await _inject_friend_greeting(
                 db, accepter_uid, requester_uid,
-                greeting, created_at=req_created_at,
+                "好友申请已通过", created_at=req_created_at,
+                prefix="🤝 ",
             )
 
         return result
@@ -244,6 +249,7 @@ async def _inject_friend_greeting(
     to_user_id: int,
     greeting: str,
     created_at=None,
+    prefix: str = "🤝 ",
 ):
     """好友通过后，将附言注入 DM 对话开头（使用申请时间戳）"""
     from app.services.dm_service import (
@@ -254,7 +260,7 @@ async def _inject_friend_greeting(
         await send_dm_message(
             db, dm["session_id"],
             sender_id=from_user_id,
-            content=f"🤝 {greeting}",
+            content=f"{prefix}{greeting}",
             created_at=created_at,
         )
     except Exception as e:
