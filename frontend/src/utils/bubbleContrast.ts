@@ -23,34 +23,126 @@ function relativeLuminance(r: number, g: number, b: number): number {
 export function getBubbleTextClasses(bgColor: string): string {
   const rgb = hexToRgb(bgColor)
   if (!rgb) {
-    // 解析失败 → 默认浅色背景样式
-    return LINK_LIGHT + ' ' + CODE_LIGHT + ' ' + TABLE_LIGHT
+    return [LINK_LIGHT, CODE_LIGHT, HR_LIGHT, TABLE_LIGHT].join(' ')
   }
   const lum = relativeLuminance(rgb.r, rgb.g, rgb.b)
-  // 亮度 < 0.2 视为深色背景
   if (lum < 0.2) {
-    return LINK_DARK + ' ' + CODE_DARK + ' ' + TABLE_DARK
+    return [LINK_DARK, CODE_DARK, HR_DARK, TABLE_DARK].join(' ')
   }
-  return LINK_LIGHT + ' ' + CODE_LIGHT + ' ' + TABLE_LIGHT
+  return [LINK_LIGHT, CODE_LIGHT, HR_LIGHT, TABLE_LIGHT].join(' ')
 }
 
-// ═══════════════════════════════════════════════════════════
+// ═══════════════════════════════════════════════
 // 深色背景样式（own bubble / 深色气泡）
-// ═══════════════════════════════════════════════════════════
+// ═══════════════════════════════════════════════
 
-const LINK_DARK =
-  '[&_a]:break-all [&_a]:text-white/85 [&_a]:underline [&_a]:decoration-white/30 hover:[&_a]:text-white [&_a]:transition-colors'
-const CODE_DARK =
-  '[&_code]:bg-white/15 [&_code]:text-white [&_code]:px-1 [&_code]:rounded [&_pre]:bg-black/20 [&_pre_code]:bg-transparent'
-const TABLE_DARK =
-  '[&_.markdown-table-wrapper]:my-0 [&_.markdown-table-wrapper]:border-0 [&_.markdown-table-wrapper]:rounded-none [&_table]:w-full [&_table]:border-collapse [&_table]:rounded-lg [&_table]:overflow-hidden [&_table_th]:text-white [&_table_td]:text-white/85 [&_table_th]:py-1.5 [&_table_td]:py-1.5 [&_table_th]:px-3 [&_table_td]:px-3 [&_table_th]:border [&_table_td]:border [&_table_th]:border-white/20 [&_table_td]:border-white/20 [&_table_th]:text-left [&_table_th]:font-semibold [&_table]:bg-primary-700/30 [&_table_th]:bg-primary-700/40 [&_table_tr:nth-child(even)]:bg-primary-700/20 [&_table_tr]:hover:bg-primary-700/50 [&_table_tr]:transition-colors'
+const LINK_DARK = [
+  '[&_a]:break-all',
+  '[&_a]:text-white/85',
+  '[&_a]:underline',
+  '[&_a]:decoration-white/30',
+  'hover:[&_a]:text-white',
+  '[&_a]:transition-colors',
+].join(' ')
 
-// ═══════════════════════════════════════════════════════════
+const CODE_DARK = [
+  '[&_code]:bg-white/15',
+  '[&_code]:text-white',
+  '[&_code]:px-1',
+  '[&_code]:rounded',
+  '[&_pre]:bg-black/20',
+  '[&_pre_code]:bg-transparent',
+].join(' ')
+
+const HR_DARK = [
+  '[&_hr]:border-0',
+  '[&_hr]:h-px',
+  '[&_hr]:bg-white/20',
+  '[&_hr]:my-3',
+].join(' ')
+
+const TABLE_DARK = [
+  // Wrapper 覆盖
+  '[&_.markdown-table-wrapper]:my-0',
+  '[&_.markdown-table-wrapper]:border-0',
+  '[&_.markdown-table-wrapper]:rounded-none',
+  '[&_.markdown-table-wrapper]:[scrollbar-color:rgba(255,255,255,0.25)_transparent]',
+  // 表格自身
+  '[&_table]:w-full',
+  '[&_table]:border-collapse',
+  '[&_table]:rounded-lg',
+  '[&_table]:overflow-hidden',
+  // 单元格
+  '[&_th]:text-white',
+  '[&_td]:text-white/85',
+  '[&_th]:py-1.5',
+  '[&_td]:py-1.5',
+  '[&_th]:px-3',
+  '[&_td]:px-3',
+  '[&_th]:border',
+  '[&_td]:border',
+  '[&_th]:border-white/20',
+  '[&_td]:border-white/20',
+  '[&_th]:text-left',
+  '[&_th]:font-semibold',
+  // 背景色（primary-700 半透明叠加，透出紫色底色）
+  '[&_table]:bg-primary-700/30',
+  '[&_th]:bg-primary-700/40',
+  '[&_tr:nth-child(even)]:bg-primary-700/20',
+  '[&_tr]:hover:bg-primary-700/50',
+  '[&_tr]:transition-colors',
+].join(' ')
+
+// ═══════════════════════════════════════════════
 // 浅色背景样式（对方气泡 / 默认）
-// ═══════════════════════════════════════════════════════════
+// ═══════════════════════════════════════════════
 
-const LINK_LIGHT =
-  '[&_a]:break-all [&_a]:text-primary-500 dark:[&_a]:text-primary-400 [&_a]:underline hover:[&_a]:text-primary-400 dark:hover:[&_a]:text-primary-300 [&_a]:transition-colors'
+const LINK_LIGHT = [
+  '[&_a]:break-all',
+  '[&_a]:text-primary-500',
+  'dark:[&_a]:text-primary-400',
+  '[&_a]:underline',
+  'hover:[&_a]:text-primary-400',
+  'dark:hover:[&_a]:text-primary-300',
+  '[&_a]:transition-colors',
+].join(' ')
+
 const CODE_LIGHT = ''
-const TABLE_LIGHT =
-  '[&_.markdown-table-wrapper]:my-0 [&_.markdown-table-wrapper]:border-0 [&_.markdown-table-wrapper]:rounded-none [&_table]:w-full [&_table]:border-collapse [&_table]:rounded-lg [&_table]:overflow-hidden [&_table_th]:text-textPrimary [&_table_td]:text-textSecondary [&_table_th]:py-1.5 [&_table_td]:py-1.5 [&_table_th]:px-3 [&_table_td]:px-3 [&_table_th]:border [&_table_td]:border [&_table_th]:border-border [&_table_td]:border-border [&_table_th]:text-left [&_table_th]:font-semibold [&_table]:bg-surface [&_table_th]:bg-canvas [&_table_tr:nth-child(even)]:bg-elevated [&_table_tr]:hover:bg-elevated/80 [&_table_tr]:transition-colors'
+
+const HR_LIGHT = [
+  '[&_hr]:border-0',
+  '[&_hr]:h-px',
+  '[&_hr]:bg-border',
+  '[&_hr]:my-3',
+].join(' ')
+
+const TABLE_LIGHT = [
+  // Wrapper 覆盖
+  '[&_.markdown-table-wrapper]:my-0',
+  '[&_.markdown-table-wrapper]:border-0',
+  '[&_.markdown-table-wrapper]:rounded-none',
+  // 表格自身
+  '[&_table]:w-full',
+  '[&_table]:border-collapse',
+  '[&_table]:rounded-lg',
+  '[&_table]:overflow-hidden',
+  // 单元格
+  '[&_th]:text-textPrimary',
+  '[&_td]:text-textSecondary',
+  '[&_th]:py-1.5',
+  '[&_td]:py-1.5',
+  '[&_th]:px-3',
+  '[&_td]:px-3',
+  '[&_th]:border',
+  '[&_td]:border',
+  '[&_th]:border-border',
+  '[&_td]:border-border',
+  '[&_th]:text-left',
+  '[&_th]:font-semibold',
+  // 背景色
+  '[&_table]:bg-surface',
+  '[&_th]:bg-canvas',
+  '[&_tr:nth-child(even)]:bg-elevated',
+  '[&_tr]:hover:bg-elevated/80',
+  '[&_tr]:transition-colors',
+].join(' ')
