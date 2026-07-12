@@ -116,6 +116,17 @@ async def get_my_token_usage(
     return usage
 
 
+@router.get("/dm/{session_id}/activity")
+async def get_dm_activity(
+    session_id: str,
+    current_user: dict = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """获取私信当前 AI 思考状态（用于进入对话时恢复活动指示器）"""
+    from app.services.ai_response_worker import get_thinking_state
+    return get_thinking_state(f"dm:{session_id}")
+
+
 @router.post("/dm/{session_id}/dnd")
 async def set_dm_dnd_endpoint(
     session_id: str,

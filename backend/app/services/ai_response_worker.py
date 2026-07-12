@@ -26,6 +26,17 @@ _rate_limit_tracker: dict[int, float] = {}
 # AI 并发锁：resonance/custom 类型同一 AI 串行执行 LLM 调用，general/semi_general 不锁
 _agent_locks: dict[int, asyncio.Lock] = {}
 
+# 思考/输入中状态追踪：{conv_key: {agent_id: {name, avatar_url, state}}}
+# conv_key = "group:7" 或 "dm:1_10"
+# state = "thinking" | "typing"
+_thinking_state: dict[str, dict[int, dict]] = {}
+
+
+def get_thinking_state(conv_key: str) -> dict[int, dict]:
+    """获取指定对话的思考/输入中状态"""
+    return _thinking_state.get(conv_key, {})
+
+
 async def _run_serialized(agent, coro):
     """resonance/custom 类型加锁串行，general/semi_general 直接执行"""
     if agent.ai_type in ("general", "semi_general"):
@@ -36,6 +47,7 @@ async def _run_serialized(agent, coro):
         _agent_locks[agent.id] = lock
     async with lock:
         return await coro
+
 
 # 导入连接管理器（在 ws.py 中初始化的全局实例）
 from app.routers.ws import manager
@@ -657,6 +669,10 @@ async def _maybe_trigger_ai_reply(
     logger.info(f"🔍 AI {agent.name}: model={model}, tools={len(tools)}")
 
     # 8. 工具调用循环（含思考状态广播）
+    conv_key = f"group:{group_id}"
+    _thinking_state.setdefault(conv_key, {})[agent.id] = {
+        "name": agent.name, "avatar_url": agent.avatar_url,
+    }
     logger.info(f"🚀 AI {agent.name}: 开始调用 LLM...")
     try:
         await manager.broadcast_to_group(
@@ -695,6 +711,7 @@ async def _maybe_trigger_ai_reply(
     except Exception as e:
         logger.error(f"❌ AI {agent.name} 群聊回复异常 (group={group_id}): {e}", exc_info=True)
     finally:
+        _thinking_state.get(conv_key, {}).pop(agent.id, None)
         await manager.broadcast_to_group(
             group_id,
             {
@@ -1323,6 +1340,10 @@ async def _trigger_dm_ai_reply(
 
     logger.info(f"🚀 AI {agent_name}: 开始 DM 回复 (session={session_id})")
 
+    conv_key = f"dm:{session_id}"
+    _thinking_state.setdefault(conv_key, {})[agent_id] = {
+        "name": agent_name, "avatar_url": agent_avatar,
+    }
     try:
         await manager.broadcast_to_dm(
             session_id,
@@ -1361,6 +1382,7 @@ async def _trigger_dm_ai_reply(
     except Exception as e:
         logger.error(f"❌ AI {agent_name} DM 回复异常 (session={session_id}): {e}", exc_info=True)
     finally:
+        _thinking_state.get(conv_key, {}).pop(agent_id, None)
         await manager.broadcast_to_dm(
             session_id,
             {
