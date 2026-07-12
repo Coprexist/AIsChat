@@ -76,8 +76,7 @@ const STYLES_DARK = [
   '[&_.markdown-table-wrapper_table]:bg-primary-700/30',
   '[&_.markdown-table-wrapper_thead_th]:bg-primary-700/40',
   '[&_.markdown-table-wrapper_tbody_tr:nth-child(even)]:bg-primary-700/20',
-  '[&_.markdown-table-wrapper_tbody_tr]:hover:bg-primary-700/50',
-  '[&_.markdown-table-wrapper_tbody_tr]:transition-colors',
+  // 悬停由 index.css 统一处理
 ].join(' ')
 
 // ── 浅色气泡 fallback ──
@@ -115,8 +114,7 @@ const STYLES_LIGHT = [
   '[&_.markdown-table-wrapper_table]:bg-surface',
   '[&_.markdown-table-wrapper_thead_th]:bg-canvas',
   '[&_.markdown-table-wrapper_tbody_tr:nth-child(even)]:bg-elevated',
-  '[&_.markdown-table-wrapper_tbody_tr]:hover:bg-elevated/80',
-  '[&_.markdown-table-wrapper_tbody_tr]:transition-colors',
+  // 悬停由 index.css 统一处理
 ].join(' ')
 
 /** 弹跳三点（思考中/输入中共用） */
