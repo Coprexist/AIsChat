@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react'
 import { api } from '../api/client'
 import { Plus, X } from 'lucide-react'
-import { useT } from '../i18n/useT'
+import { useT } from '../i18n/I18nContext'
 
 interface MsgData {
   hard_title: string; hard_body: string; hard_color: string; hard_text_color: string
