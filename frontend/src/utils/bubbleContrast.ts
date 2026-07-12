@@ -57,6 +57,11 @@ export function getBubbleTextClasses(bgColor: string): string {
     '[--b-zebra-g:33]',
     '[--b-zebra-b:182]',
     '[--b-zebra-a:0.35]',
+    // 悬停行
+    '[--b-hover-r:91]',
+    '[--b-hover-g:33]',
+    '[--b-hover-b:182]',
+    '[--b-hover-a:0.5]',
   ].join(' ') : [
     // 浅色气泡：不设覆盖（回退到 index.css 默认值）
     '[--b-link-r:initial]',
