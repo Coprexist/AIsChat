@@ -19,32 +19,19 @@ import FilePreviewModal from './FilePreviewModal'
 import InvitationCard from './InvitationCard'
 import { getBubbleTextClasses } from '../utils/bubbleContrast'
 
-// CSS 变量 fallback（getComputedStyle 异步完成前使用 isMine 判断）
+// CSS 变量 fallback（与 bubbleContrast.ts 格式一致，RGB 空格分隔）
 const DARK_VARS = [
-  '--b-link:rgba(255,255,255,0.85)',
-  '--b-link-hover:white',
-  '--b-link-deco:rgba(255,255,255,0.3)',
-  '--b-code-bg:rgba(255,255,255,0.15)',
-  '--b-code-text:white',
-  '--b-pre-bg:rgba(0,0,0,0.2)',
-  '--b-hr:rgba(255,255,255,0.2)',
-  '--b-thead-bg:#4C1D95',
-  '--b-thead-text:white',
-  '--b-zebra-bg:rgba(91,33,182,0.35)',
-  '--b-scrollbar:rgba(255,255,255,0.25)',
+  '--b-link-r:255', '--b-link-g:255', '--b-link-b:255', '--b-link-a:0.85',
+  '--b-code-r:255', '--b-code-g:255', '--b-code-b:255', '--b-code-a:0.15',
+  '--b-pre-r:0',    '--b-pre-g:0',    '--b-pre-b:0',    '--b-pre-a:0.2',
+  '--b-hr-r:255',   '--b-hr-g:255',   '--b-hr-b:255',   '--b-hr-a:0.2',
+  '--b-thead-r:76', '--b-thead-g:29', '--b-thead-b:149', '--b-thead-a:1',
+  '--b-zebra-r:91', '--b-zebra-g:33', '--b-zebra-b:182', '--b-zebra-a:0.35',
 ]
 const LIGHT_VARS = [
-  '--b-link:initial',
-  '--b-link-hover:initial',
-  '--b-link-deco:initial',
-  '--b-code-bg:initial',
-  '--b-code-text:initial',
-  '--b-pre-bg:initial',
-  '--b-hr:initial',
-  '--b-thead-bg:#EDE9FE',
-  '--b-thead-text:#111827',
-  '--b-zebra-bg:#F3F0FF',
-  '--b-scrollbar:initial',
+  '--b-link-r:initial',
+  '--b-thead-r:237', '--b-thead-g:233', '--b-thead-b:254', '--b-thead-a:1',
+  '--b-zebra-r:243', '--b-zebra-g:240', '--b-zebra-b:255', '--b-zebra-a:1',
 ]
 
 /** 弹跳三点 */
