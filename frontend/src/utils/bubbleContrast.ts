@@ -43,7 +43,7 @@ const LINK_DARK =
 const CODE_DARK =
   '[&_code]:bg-white/15 [&_code]:text-white [&_code]:px-1 [&_code]:rounded [&_pre]:bg-black/20 [&_pre_code]:bg-transparent'
 const TABLE_DARK =
-  '[&_table]:overflow-x-auto [&_table]:block [&_table_th]:text-white [&_table_td]:text-white/90 [&_table_th]:border-white/20 [&_table_td]:border-white/20 [&_table_th]:py-1 [&_table_td]:py-1 [&_table_th]:px-2 [&_table_td]:px-2 [&_table_th]:text-left'
+  '[&_table]:w-full [&_table]:border-collapse [&_table]:my-1 [&_table_th]:text-white [&_table_td]:text-white/85 [&_table_th]:py-1.5 [&_table_td]:py-1.5 [&_table_th]:px-3 [&_table_td]:px-3 [&_table_th]:border-b [&_table_td]:border-b [&_table_th]:border-white/15 [&_table_td]:border-white/15 [&_table_th]:text-left [&_table_th]:font-semibold [&_table_th]:bg-white/10 [&_table_tr:nth-child(even)]:bg-white/5'
 
 // ═══════════════════════════════════════════════════════════
 // 浅色背景样式（对方气泡 / 默认）
@@ -53,4 +53,4 @@ const LINK_LIGHT =
   '[&_a]:break-all [&_a]:text-primary-500 dark:[&_a]:text-primary-400 [&_a]:underline'
 const CODE_LIGHT = ''
 const TABLE_LIGHT =
-  '[&_table]:overflow-x-auto [&_table]:block'
+  '[&_table]:w-full [&_table]:border-collapse [&_table]:my-1 [&_table_th]:text-textPrimary [&_table_td]:text-textSecondary [&_table_th]:py-1.5 [&_table_td]:py-1.5 [&_table_th]:px-3 [&_table_td]:px-3 [&_table_th]:border-b [&_table_td]:border-b [&_table_th]:border-border [&_table_td]:border-border [&_table_th]:text-left [&_table_th]:font-semibold [&_table_th]:bg-elevated [&_table_tr:nth-child(even)]:bg-canvas/50'
