@@ -19,6 +19,106 @@ import FilePreviewModal from './FilePreviewModal'
 import InvitationCard from './InvitationCard'
 import { getBubbleTextClasses } from '../utils/bubbleContrast'
 
+// ── Markdown 基础样式（Katex/pre/img 共用）──
+const MD_BASE = [
+  '[&_.katex-display]:overflow-x-auto',
+  '[&_.katex-display]:-mx-1',
+  '[&_.katex-display]:px-1',
+  '[&_.katex]:text-inherit',
+  '[&_.katex]:max-w-full',
+  '[&_.katex]:overflow-x-auto',
+  '[&_.katex]:inline-block',
+  '[&_pre]:overflow-x-auto',
+  '[&_pre]:-mx-1',
+  '[&_pre]:px-1',
+  '[&_img]:max-w-full',
+  '[&_img]:rounded-lg',
+].join(' ')
+
+// ── 深色气泡 fallback ──
+const STYLES_DARK = [
+  '[&_hr]:border-0',
+  '[&_hr]:h-px',
+  '[&_hr]:bg-white/20',
+  '[&_hr]:my-3',
+  '[&_a]:break-all',
+  '[&_a]:text-white/85',
+  '[&_a]:underline',
+  '[&_a]:decoration-white/30',
+  'hover:[&_a]:text-white',
+  '[&_a]:transition-colors',
+  '[&_code]:bg-white/15',
+  '[&_code]:text-white',
+  '[&_code]:px-1',
+  '[&_code]:rounded',
+  '[&_pre]:bg-black/20',
+  '[&_pre_code]:bg-transparent',
+  '[&_.markdown-table-wrapper]:my-0',
+  '[&_.markdown-table-wrapper]:border-0',
+  '[&_.markdown-table-wrapper]:rounded-none',
+  '[&_.markdown-table-wrapper]:[scrollbar-color:rgba(255,255,255,0.25)_transparent]',
+  '[&_table]:w-full',
+  '[&_table]:border-collapse',
+  '[&_table]:rounded-lg',
+  '[&_table]:overflow-hidden',
+  '[&_th]:text-white',
+  '[&_td]:text-white/85',
+  '[&_th]:py-1.5',
+  '[&_td]:py-1.5',
+  '[&_th]:px-3',
+  '[&_td]:px-3',
+  '[&_th]:border',
+  '[&_td]:border',
+  '[&_th]:border-white/20',
+  '[&_td]:border-white/20',
+  '[&_th]:text-left',
+  '[&_th]:font-semibold',
+  '[&_table]:bg-primary-700/30',
+  '[&_th]:bg-primary-700/40',
+  '[&_tr:nth-child(even)]:bg-primary-700/20',
+  '[&_tr]:hover:bg-primary-700/50',
+  '[&_tr]:transition-colors',
+].join(' ')
+
+// ── 浅色气泡 fallback ──
+const STYLES_LIGHT = [
+  '[&_hr]:border-0',
+  '[&_hr]:h-px',
+  '[&_hr]:bg-border',
+  '[&_hr]:my-3',
+  '[&_a]:break-all',
+  '[&_a]:text-primary-500',
+  'dark:[&_a]:text-primary-400',
+  '[&_a]:underline',
+  'hover:[&_a]:text-primary-400',
+  'dark:hover:[&_a]:text-primary-300',
+  '[&_a]:transition-colors',
+  '[&_.markdown-table-wrapper]:my-0',
+  '[&_.markdown-table-wrapper]:border-0',
+  '[&_.markdown-table-wrapper]:rounded-none',
+  '[&_table]:w-full',
+  '[&_table]:border-collapse',
+  '[&_table]:rounded-lg',
+  '[&_table]:overflow-hidden',
+  '[&_th]:text-textPrimary',
+  '[&_td]:text-textSecondary',
+  '[&_th]:py-1.5',
+  '[&_td]:py-1.5',
+  '[&_th]:px-3',
+  '[&_td]:px-3',
+  '[&_th]:border',
+  '[&_td]:border',
+  '[&_th]:border-border',
+  '[&_td]:border-border',
+  '[&_th]:text-left',
+  '[&_th]:font-semibold',
+  '[&_table]:bg-surface',
+  '[&_th]:bg-canvas',
+  '[&_tr:nth-child(even)]:bg-elevated',
+  '[&_tr]:hover:bg-elevated/80',
+  '[&_tr]:transition-colors',
+].join(' ')
+
 /** 弹跳三点（思考中/输入中共用） */
 const BouncingDots = ({ className = '' }: { className?: string }) => (
   <span className={`inline-flex gap-0.5 ${className}`}>
@@ -27,8 +127,6 @@ const BouncingDots = ({ className = '' }: { className?: string }) => (
     <span className="w-1 h-1 bg-current rounded-full animate-bounce" style={{ animationDelay: '300ms' }} />
   </span>
 );
-
-// ChatCodeRenderer ——已迁移到 components/shared/CodeRenderer.tsx
 
 interface MessageBubbleProps {
   senderName: string
@@ -63,7 +161,6 @@ const MessageBubble = memo(function MessageBubble({
   const { user } = useAuth()
   const lang = useLang()
   const t = useT()
-  // 智能刷新相对时间：越近越频繁，越远越少刷
   const [, setTick] = useState(0)
   useEffect(() => {
     if (!createdAt) return
@@ -71,10 +168,10 @@ const MessageBubble = memo(function MessageBubble({
     if (isNaN(d.getTime())) return
     const ageMs = Date.now() - d.getTime()
     let interval: number
-    if (ageMs < 60_000)           interval = 15_000   // < 1分钟：每15秒
-    else if (ageMs < 3_600_000)   interval = 300_000  // < 1小时：每5分钟
-    else if (ageMs < 86_400_000)  interval = 3_600_000 // < 1天：每小时
-    else return // 超过1天不刷
+    if (ageMs < 60_000)           interval = 15_000
+    else if (ageMs < 3_600_000)   interval = 300_000
+    else if (ageMs < 86_400_000)  interval = 3_600_000
+    else return
     const i = setInterval(() => setTick(t => t + 1), interval)
     return () => clearInterval(i)
   }, [createdAt])
@@ -84,14 +181,12 @@ const MessageBubble = memo(function MessageBubble({
   const contentRef = useRef<HTMLDivElement>(null)
   const [bubbleContrastCls, setBubbleContrastCls] = useState('')
 
-  // 运行时读取气泡背景色，动态调对比度
   useEffect(() => {
     if (!contentRef.current) return
     const el = contentRef.current
-    // 等一帧让浏览器渲染完成，拿到计算后的背景色
     const raf = requestAnimationFrame(() => {
       const computed = getComputedStyle(el)
-      const rgb = computed.backgroundColor  // "rgb(99, 102, 241)" 格式
+      const rgb = computed.backgroundColor
       const m = rgb.match(/\d+/g)?.map(Number)
       if (m && m.length >= 3) {
         const hex = '#' + m.slice(0, 3).map(c => c.toString(16).padStart(2, '0')).join('')
@@ -103,11 +198,9 @@ const MessageBubble = memo(function MessageBubble({
     return () => cancelAnimationFrame(raf)
   }, [isMine])
 
-  // 检测邀请卡片
   const invAtt = attachments?.find(a => a.type === 'group_invitation')
   const isInvitation = messageType === 'group_invitation' && invAtt
   const currentStatus = invStatus || invAtt?.status || 'pending'
-  // 普通文件附件（排除邀请卡片）
   const fileAtts = attachments?.filter(a => a.type !== 'group_invitation') || []
 
   const handleAcceptInvitation = async (invitationId: number) => {
@@ -138,13 +231,10 @@ const MessageBubble = memo(function MessageBubble({
 
   return (<>
     <div className={`flex ${gap} ${mb} msg-enter ${isMine ? 'flex-row-reverse' : ''}`}>
-      {/* 头像 — 思考/输入中时带脉动光环 */}
       <div className="relative shrink-0">
-        {/* 仅在 AI 思考中/输入中显示脉动 */}
         {!isMine && (thinking || isTyping) && (
           <div className="absolute -inset-px w-10 h-10 rounded-full ai-pulse-active" />
         )}
-        {/* 头像 */}
         {senderAvatarUrl ? (
           <div
             onClick={() => {
@@ -179,7 +269,6 @@ const MessageBubble = memo(function MessageBubble({
         )}
       </div>
 
-      {/* 消息内容 */}
       <div className={`max-w-[72%] ${isMine ? 'items-end' : 'items-start'}`}>
         <div className={`flex items-center gap-2 mb-1 flex-wrap ${isMine ? 'flex-row-reverse' : ''}`}>
           <span className={`text-xs font-medium ${senderType === 'system' ? 'text-rose-500' : 'text-textSecondary'}`}>{senderName}</span>
@@ -196,24 +285,7 @@ const MessageBubble = memo(function MessageBubble({
             <span className="text-[10px] text-mint-400 animate-pulse font-medium">{t('chat.typing')}</span>
           )}
         </div>
-        <div ref={contentRef} className={`px-4 py-2.5 text-sm leading-relaxed break-words ${bubbleBg} ${thinking || isTyping ? 'opacity-70' : ''} ${bubbleContrastCls || (
-          isMine
-            ? `[&_.katex-display]:overflow-x-auto [&_.katex-display]:-mx-1 [&_.katex-display]:px-1
-               [&_.katex]:text-inherit [&_.katex]:max-w-full [&_.katex]:overflow-x-auto [&_.katex]:inline-block
-               [&_pre]:overflow-x-auto [&_pre]:-mx-1 [&_pre]:px-1
-               [&_.markdown-table-wrapper]:my-0 [&_.markdown-table-wrapper]:border-0 [&_.markdown-table-wrapper]:rounded-none [&_table]:w-full [&_table]:border-collapse [&_table]:rounded-lg [&_table]:overflow-hidden [&_table_th]:text-white [&_table_td]:text-white/85 [&_table_th]:py-1.5 [&_table_td]:py-1.5 [&_table_th]:px-3 [&_table_td]:px-3 [&_table_th]:border [&_table_td]:border [&_table_th]:border-white/20 [&_table_td]:border-white/20 [&_table_th]:text-left [&_table_th]:font-semibold [&_table]:bg-primary-700/30 [&_table_th]:bg-primary-700/40 [&_table_tr:nth-child(even)]:bg-primary-700/20 [&_table_tr]:hover:bg-primary-700/50 [&_table_tr]:transition-colors
-               [&_img]:max-w-full [&_img]:rounded-lg
-               [&_a]:break-all [&_a]:text-white/85 [&_a]:underline [&_a]:decoration-white/30 hover:[&_a]:text-white [&_a]:transition-colors
-               [&_code]:bg-white/15 [&_code]:text-white [&_code]:px-1 [&_code]:rounded
-               [&_pre]:bg-black/20 [&_pre_code]:bg-transparent`
-            : `[&_.katex-display]:overflow-x-auto [&_.katex-display]:-mx-1 [&_.katex-display]:px-1
-               [&_.katex]:text-inherit [&_.katex]:max-w-full [&_.katex]:overflow-x-auto [&_.katex]:inline-block
-               [&_pre]:overflow-x-auto [&_pre]:-mx-1 [&_pre]:px-1
-               [&_.markdown-table-wrapper]:my-0 [&_.markdown-table-wrapper]:border-0 [&_.markdown-table-wrapper]:rounded-none [&_table]:w-full [&_table]:border-collapse [&_table]:rounded-lg [&_table]:overflow-hidden [&_table_th]:text-textPrimary [&_table_td]:text-textSecondary [&_table_th]:py-1.5 [&_table_td]:py-1.5 [&_table_th]:px-3 [&_table_td]:px-3 [&_table_th]:border [&_table_td]:border [&_table_th]:border-border [&_table_td]:border-border [&_table_th]:text-left [&_table_th]:font-semibold [&_table]:bg-surface [&_table_th]:bg-canvas [&_table_tr:nth-child(even)]:bg-elevated [&_table_tr]:hover:bg-elevated/80 [&_table_tr]:transition-colors
-               [&_img]:max-w-full [&_img]:rounded-lg
-               [&_a]:break-all [&_a]:text-primary-500 dark:[&_a]:text-primary-400 [&_a]:underline hover:[&_a]:text-primary-400 dark:hover:[&_a]:text-primary-300 [&_a]:transition-colors`
-        )}
-        `}>
+        <div ref={contentRef} className={`px-4 py-2.5 text-sm leading-relaxed break-words ${bubbleBg} ${thinking || isTyping ? 'opacity-70' : ''} ${bubbleContrastCls || (isMine ? `${MD_BASE} ${STYLES_DARK}` : `${MD_BASE} ${STYLES_LIGHT}`)} `}>
           {isInvitation && invAtt ? (
             <InvitationCard
               invitationId={invAtt.invitation_id!}
@@ -228,7 +300,6 @@ const MessageBubble = memo(function MessageBubble({
             <BouncingDots className="text-primary-400 align-middle" />
           ) : (
             <Markdown
-              // 预处理：\(...\) → $...$，\[...\] → $$...$$，兼容 LaTeX 风格数学公式
               children={content
                 .replace(/\\\[([\s\S]*?)\\\]/g, '$$$$$1$$$$')
                 .replace(/\\\(([\s\S]*?)\\\)/g, '$$$1$$')}
@@ -236,7 +307,6 @@ const MessageBubble = memo(function MessageBubble({
               rehypePlugins={[
                 rehypeRaw,
                 rehypeKatex,
-                // sanitize 放最后，并配置 allowlist 确保 <a> 标签的 class 不被剥离
                 [rehypeSanitize, {
                   ...defaultSchema,
                   attributes: {
@@ -254,19 +324,16 @@ const MessageBubble = memo(function MessageBubble({
                 ), th: ({ node, ...props }) => (<th {...props} />), td: ({ node, ...props }) => (<td {...props} />), }}
             />
           )}
-          {/* 附件列表（跳过邀请类型附件） */}
           {fileAtts.length > 0 && (
             <div className={`mt-2 pt-2 border-t flex flex-wrap gap-1.5 ${isMine ? 'border-white/20' : 'border-border'}`}>
               {fileAtts.map((att) => {
                 const token = localStorage.getItem('access_token')
                 const dlUrl = `/api/fs/download/${att.file_id}?token=${token || ''}`
-                // 文件附件必有这些字段（来自 API），断言为非可选
                 const fid = att.file_id!
                 const fname = att.name!
                 const fsize = att.size!
                 const fmime = att.mime_type!
 
-                // 图片类型：缩略图，点击弹窗查看
                 if (fmime.startsWith('image/')) {
                   return (
                     <button
@@ -284,7 +351,6 @@ const MessageBubble = memo(function MessageBubble({
                   )
                 }
 
-                // 其他文件：点击预览（不可预览时自动下载）
                 return (
                   <button
                     key={fid}
@@ -309,7 +375,6 @@ const MessageBubble = memo(function MessageBubble({
       </div>
     </div>
 
-    {/* 文件预览弹窗 */}
     {previewFile && (
       <FilePreviewModal
         fileId={previewFile.file_id}
