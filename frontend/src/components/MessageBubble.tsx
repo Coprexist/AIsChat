@@ -206,7 +206,7 @@ const MessageBubble = memo(function MessageBubble({
         <div ref={contentRef}
              className={`bubble-content px-4 py-2.5 text-sm leading-relaxed break-words ${bubbleBg} ${thinking || isTyping ? 'opacity-70' : ''} ${layoutCls} ${bubbleVars || (isMine ? DARK_VARS : LIGHT_VARS).map(v => `[${v}]`).join(' ')}`}>
           {isInvitation && invAtt ? (
-            <InvitationCard invitationId={invAtt.invitation_id!} groupName={invAtt.group_name || ''} inviterName={invAtt.inviter_name || ''} message={undefined} status={currentStatus as 'pending' | 'accepted' | 'rejected'} onAccept={handleAcceptInvitation} onReject={handleRejectInvitation} />
+            <InvitationCard invitationId={invAtt.invitation_id!} groupName={invAtt.group_name || ''} inviterName={invAtt.inviter_name || ''} message={undefined} status={currentStatus as 'pending' | 'accepted' | 'rejected'} onAccept={handleAcceptInvitation} onReject={handleRejectInvitation} isMine={isMine} />
           ) : isTyping ? (
             <BouncingDots className="text-primary-400 align-middle" />
           ) : (

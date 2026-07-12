@@ -9,41 +9,46 @@ interface InvitationCardProps {
   status: 'pending' | 'accepted' | 'rejected'
   onAccept: (invitationId: number) => void
   onReject: (invitationId: number) => void
+  isMine?: boolean
 }
 
 export default function InvitationCard({
   invitationId, groupName, inviterName, message, status,
-  onAccept, onReject,
+  onAccept, onReject, isMine,
 }: InvitationCardProps) {
   const t = useT()
 
   const isResolved = status !== 'pending'
 
+  // 深色气泡（自己发的）用白字 + 半透明背景
+  const txt = isMine ? 'text-white/90' : 'text-textPrimary'
+  const txtSec = isMine ? 'text-white/60' : 'text-textSecondary'
+  const cardBg = isMine
+    ? 'bg-white/10 border-white/20'
+    : isResolved
+      ? 'border-border bg-canvas/50'
+      : 'border-mint-400/40 bg-mint-50/30 dark:bg-mint-900/10'
+
   return (
-    <div className={`
-      rounded-xl border-2 overflow-hidden transition-all
-      ${isResolved
-        ? 'border-border bg-canvas/50'
-        : 'border-mint-400/40 bg-mint-50/30 dark:bg-mint-900/10'}
-    `}>
+    <div className={`rounded-xl border-2 overflow-hidden transition-all ${cardBg}`}>
       {/* 头部 */}
       <div className="flex items-center gap-2 px-4 pt-3 pb-2">
         <div className={`
           w-8 h-8 rounded-full flex items-center justify-center
           ${isResolved
             ? 'bg-border text-textMuted'
-            : 'bg-mint-400/20 text-mint-500'}
+            : isMine ? 'bg-white/20 text-white' : 'bg-mint-400/20 text-mint-500'}
         `}>
           {status === 'accepted' ? <Check size={16} /> :
            status === 'rejected' ? <X size={16} /> :
            <Users size={16} />}
         </div>
         <div className="flex-1 min-w-0">
-          <p className="text-sm font-medium text-textPrimary truncate">
+          <p className={`text-sm font-medium ${txt} truncate`}>
             {t('invitation.title').replace('{inviter}', inviterName)}
           </p>
-          <p className="text-xs text-textSecondary truncate">
-            {t('invitation.groupLabel')}：<span className="text-textPrimary font-medium">{groupName}</span>
+          <p className={`text-xs ${txtSec} truncate`}>
+            {t('invitation.groupLabel')}：<span className={`${txt} font-medium`}>{groupName}</span>
           </p>
         </div>
         {/* 状态标签 */}
@@ -62,7 +67,7 @@ export default function InvitationCard({
       {/* 附言 */}
       {message && (
         <div className="px-4 pb-1">
-          <p className="text-xs text-textSecondary italic">"{message}"</p>
+          <p className={`text-xs ${txtSec} italic`}>"{message}"</p>
         </div>
       )}
 
@@ -80,9 +85,9 @@ export default function InvitationCard({
           </button>
           <button
             onClick={(e) => { e.stopPropagation(); onReject(invitationId) }}
-            className="flex-1 flex items-center justify-center gap-1.5 px-3 py-1.5
-              bg-canvas hover:bg-hover text-textSecondary hover:text-textPrimary text-sm
-              rounded-lg border border-border transition-colors"
+            className={`flex-1 flex items-center justify-center gap-1.5 px-3 py-1.5
+              ${isMine ? 'bg-white/10 hover:bg-white/20 text-white/80' : 'bg-canvas hover:bg-hover text-textSecondary hover:text-textPrimary'}
+              text-sm rounded-lg border ${isMine ? 'border-white/20' : 'border-border'} transition-colors`}
           >
             <X size={14} />
             {t('invitation.reject')}
