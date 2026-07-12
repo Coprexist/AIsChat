@@ -246,19 +246,23 @@ function OverviewTab() {
         <StatCard label={t('admin.totalGroups')} value={stats.total_groups} icon={MessageCircle} />
         <StatCard label={t('admin.pendingRequests')} value={stats.pending_vector_requests} icon={Activity} />
       </div>
-      <div className={`p-4 rounded-xl border ${(mt.hard || mt.soft) ? 'border-amber-500/40 bg-amber-500/5' : 'border-border bg-surface'}`}>
-        <div className="flex items-center justify-between flex-wrap gap-3">
+      {/* ── 状态条 + 双开关 ── */}
+      <div className="bg-surface rounded-xl border border-border p-4 space-y-3">
+        <div className="flex items-center justify-between flex-wrap gap-2">
           <div className="flex items-center gap-3">
-            <div className={`w-10 h-10 rounded-xl flex items-center justify-center ${(mt.hard || mt.soft) ? 'bg-amber-500/10' : 'bg-mint-400/10'}`}>
-              <Wrench size={20} className={(mt.hard || mt.soft) ? 'text-amber-400' : 'text-mint-400'} />
-            </div>
-            <div>
-              <p className="font-medium text-textPrimary">{t('admin.maintenanceMode')}</p>
-              <p className="text-xs text-textSecondary">
-                {mt.hard ? t('admin.maintenanceStatusPaused') : ''}{mt.hard && mt.soft ? ' · ' : ''}{mt.soft ? t('admin.maintenanceStatusTip') : ''}
-                {!mt.hard && !mt.soft && t('admin.maintenanceStatusNormal')}
-              </p>
-            </div>
+            <Wrench size={18} className={(mt.hard || mt.soft) ? 'text-amber-400' : 'text-mint-400'} />
+            <span className="text-sm font-medium text-textPrimary">{t('admin.maintenanceMode')}</span>
+            <span className={`text-[11px] px-2 py-0.5 rounded-full ${
+              mt.auto ? 'bg-amber-500/15 text-amber-400' :
+              mt.hard ? 'bg-rose-500/15 text-rose-400' :
+              mt.soft ? 'bg-amber-500/15 text-amber-400' :
+              'bg-mint-500/15 text-mint-400'
+            }`}>
+              {mt.auto ? t('admin.maintenanceStarting') :
+               mt.hard ? t('admin.maintenanceStatusPaused') :
+               mt.soft ? t('admin.maintenanceStatusTip') :
+               t('admin.maintenanceStatusNormal')}
+            </span>
           </div>
           <div className="flex gap-2">
             <button onClick={toggleHard}
@@ -275,28 +279,11 @@ function OverviewTab() {
             </button>
           </div>
         </div>
-      </div>
-
-      {/* 状态流程 */}
-      <div className="bg-surface rounded-xl border border-border p-5">
-        <p className="text-xs font-semibold text-textSecondary uppercase tracking-wider mb-3">{t('admin.serverStatus')}</p>
-        <div className="flex items-center gap-0.5 text-xs flex-wrap">
-          {[
-            { label: t('admin.maintenanceStarting'),       active: mt.auto, dot: mt.auto ? 'bg-amber-400 animate-pulse' : 'bg-gray-300' },
-            { label: t('admin.maintenanceRunning'),   active: !mt.auto && !mt.hard, dot: (!mt.auto && !mt.hard) ? 'bg-mint-400' : 'bg-gray-300' },
-            { label: t('admin.maintenanceStopped'),     active: mt.hard, dot: mt.hard ? 'bg-rose-400' : 'bg-gray-300' },
-            { label: t('admin.maintenanceTipLabel'), active: mt.soft, dot: mt.soft ? 'bg-amber-400' : 'bg-gray-300' },
-          ].map(s => (
-            <div key={s.label} className="flex items-center gap-1">
-              <div className={`flex items-center gap-1 px-2 py-1 rounded-lg border ${s.active ? 'border-border' : 'border-transparent'}`}>
-                <div className={`w-2 h-2 rounded-full ${s.dot}`} />
-                <span className={`text-[10px] whitespace-nowrap ${s.active ? 'font-medium text-textPrimary' : 'text-textMuted'}`}>{s.label}</span>
-              </div>
-            </div>
-          ))}
-        </div>
-        <p className="text-[10px] text-textMuted mt-3">
+        <div className="flex items-center gap-1.5 text-[11px] text-textMuted">
+          <div className={`w-1.5 h-1.5 rounded-full ${mt.auto ? 'bg-amber-400 animate-pulse' : mt.hard ? 'bg-rose-400' : mt.soft ? 'bg-amber-400' : 'bg-mint-400'}`} />
           {mt.auto ? t('admin.maintenanceDescAuto') : mt.hard ? t('admin.maintenanceDescHard') : mt.soft ? t('admin.maintenanceDescSoft') : t('admin.maintenanceDescNormal')}
+        </div>
+      </div>
         </p>
       </div>
 

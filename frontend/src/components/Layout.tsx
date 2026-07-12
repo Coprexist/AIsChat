@@ -118,41 +118,45 @@ export default function Layout() {
       {/* ── 全局弹窗 ── */}
       <BalancePromptModal />
 
-      {/* 软维护顶栏（API正常，仅提示） */}
+      {/* 软维护——顶栏 */}
       {softMaintenance && !(softOnce && sessionStorage.getItem('maint_soft_done')) && softStyle === 'banner' && (
-        <div className="fixed top-0 left-0 right-0 z-[65] text-xs text-center py-1.5 px-4 font-medium" style={{ backgroundColor: softColor, color: softTextColor }}>
-          {softText}
-          <button onClick={() => { setSoftMaintenance(false); if (softOnce) sessionStorage.setItem('maint_soft_done', '1') }} className="ml-2 underline opacity-80 hover:opacity-100">关闭</button>
+        <div className="fixed top-0 left-0 right-0 z-[65] text-xs text-center py-2 px-4 font-medium flex items-center justify-center gap-2" style={{ backgroundColor: softColor, color: softTextColor }}>
+          <span>{softText}</span>
+          <button onClick={() => { setSoftMaintenance(false); if (softOnce) sessionStorage.setItem('maint_soft_done', '1') }}
+            className="shrink-0 px-2 py-0.5 rounded text-[10px] opacity-80 hover:opacity-100 transition-opacity" style={{ backgroundColor: 'rgba(0,0,0,0.15)' }}>✕</button>
         </div>
       )}
+      {/* 软维护——弹窗 */}
       {softMaintenance && !(softOnce && sessionStorage.getItem('maint_soft_done')) && softStyle === 'popup' && (
-        <div className="fixed inset-0 z-[65] flex items-center justify-center bg-black/50 p-4">
-          <div className="bg-surface rounded-2xl p-6 max-w-sm w-full text-center shadow-2xl border border-border">
-            <p className="text-sm text-textSecondary">{softText}</p>
-            <button onClick={() => { setSoftMaintenance(false); if (softOnce) sessionStorage.setItem('maint_soft_done', '1') }} className="mt-4 px-4 py-1.5 rounded-lg text-xs font-medium" style={{ backgroundColor: softColor, color: softTextColor }}>知道了</button>
+        <div className="fixed inset-0 z-[65] flex items-center justify-center bg-black/50 p-4" onClick={() => { setSoftMaintenance(false); if (softOnce) sessionStorage.setItem('maint_soft_done', '1') }}>
+          <div className="bg-surface rounded-xl p-5 max-w-xs w-full text-center shadow-xl border border-border/50" onClick={e => e.stopPropagation()}>
+            <div className="text-sm mb-3">{softText}</div>
+            <button onClick={() => { setSoftMaintenance(false); if (softOnce) sessionStorage.setItem('maint_soft_done', '1') }}
+              className="px-4 py-1.5 rounded-lg text-xs font-medium transition-opacity hover:opacity-90" style={{ backgroundColor: softColor, color: softTextColor }}>知道了</button>
           </div>
         </div>
       )}
 
-      {/* 硬维护（API 503）——弹窗 / 顶栏 */}
+      {/* 硬维护——顶栏 */}
       {maintenance && hardText.style === 'banner' && (
-        <div className="fixed top-0 left-0 right-0 z-[70] text-xs text-center py-1.5 px-4 font-medium" style={{ backgroundColor: hardText.color, color: hardText.textColor }}>
-          {hardText.title} · {hardText.body}
-          <button onClick={() => setMaintenance(false)} className="ml-2 underline opacity-80 hover:opacity-100">关闭</button>
+        <div className="fixed top-0 left-0 right-0 z-[70] text-xs text-center py-2 px-4 font-medium flex items-center justify-center gap-2" style={{ backgroundColor: hardText.color, color: hardText.textColor }}>
+          <span>{hardText.title} · {hardText.body}</span>
+          <button onClick={() => setMaintenance(false)}
+            className="shrink-0 px-2 py-0.5 rounded text-[10px] opacity-80 hover:opacity-100 transition-opacity" style={{ backgroundColor: 'rgba(0,0,0,0.15)' }}>✕</button>
         </div>
       )}
+      {/* 硬维护——弹窗 */}
       {maintenance && hardText.style !== 'banner' && (
         <div className="fixed inset-0 z-[70] flex items-center justify-center bg-black/60 p-4">
-          <div className="bg-surface rounded-2xl p-6 max-w-sm w-full text-center shadow-2xl border border-border">
-            <Wrench size={40} className="mx-auto mb-3" style={{ color: hardText.color }} />
-            <h2 className="text-lg font-semibold mb-2" style={{ color: hardText.color }}>{hardText.title}</h2>
-            <p className="text-sm text-textSecondary mb-3">{hardText.body}</p>
+          <div className="bg-surface rounded-xl p-6 max-w-sm w-full text-center shadow-xl border border-border/50">
+            <Wrench size={36} className="mx-auto mb-3" style={{ color: hardText.color }} />
+            <h2 className="text-base font-semibold mb-2" style={{ color: hardText.color }}>{hardText.title}</h2>
+            <p className="text-sm text-textSecondary mb-4">{hardText.body}</p>
             {hardText.image && !imgError && (
-              <img src={hardText.image} alt="" className="w-24 h-24 object-contain mx-auto mb-3 rounded-lg" onError={() => setImgError(true)} />
+              <img src={hardText.image} alt="" className="w-24 h-24 object-contain mx-auto mb-4 rounded-lg" onError={() => setImgError(true)} />
             )}
-            <button onClick={() => setMaintenance(false)} className="px-4 py-2 text-sm rounded-lg hover:opacity-90 transition-colors" style={{ backgroundColor: hardText.color, color: hardText.textColor }}>
-              知道了
-            </button>
+            <button onClick={() => setMaintenance(false)}
+              className="px-5 py-2 text-sm rounded-lg font-medium transition-opacity hover:opacity-90" style={{ backgroundColor: hardText.color, color: hardText.textColor }}>知道了</button>
           </div>
         </div>
       )}
