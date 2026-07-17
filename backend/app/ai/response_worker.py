@@ -91,7 +91,7 @@ async def _send_system_error(
 ):
     """向 AI owner 私信发送系统错误通知（群聊/DM 均走 DM 通知 owner）"""
     from app.models.dm import DMMessage, DMSession
-    from app.services.dm_service import generate_dm_session_id
+    from app.chat import chat_api
 
     SYSTEM_USER_ID = 0  # 硬编码：迁移保证 id=0 为系统用户
 
@@ -135,18 +135,8 @@ async def _send_system_error(
             logger.warning(f"AI {agent.name}({agent.id}) 无 owner，无法发送系统通知")
             return
 
-        dm_sid = generate_dm_session_id(SYSTEM_USER_ID, owner_id)
-
-        # 确保 DM 会话存在
-        result = await db.execute(
-            select(DMSession).where(DMSession.session_id == dm_sid)
-        )
-        dm_session = result.scalar_one_or_none()
-        if dm_session is None:
-            ids = sorted([SYSTEM_USER_ID, owner_id])
-            dm_session = DMSession(session_id=dm_sid, user1_id=ids[0], user2_id=ids[1])
-            db.add(dm_session)
-            await db.flush()
+        dm_session = await chat_api.get_or_create_dm_session(db, SYSTEM_USER_ID, owner_id)
+        dm_sid = dm_session.session_id
 
         # 直接写入 DM 消息（sender_id=0 = 系统用户）
         dm_msg = DMMessage(
@@ -160,7 +150,6 @@ async def _send_system_error(
 
         # WebSocket 推送
         try:
-            from app.chat import chat_api
             await chat_api.broadcast_to_dm(dm_sid, {
                 "type": "message",
                 "data": {
@@ -559,8 +548,8 @@ async def _maybe_trigger_ai_reply(
     if not decision.should_act:
         # 处理 DND 暂存消息
         if decision.details.get("store_pending"):
-            from app.services.group_service import store_pending_message
-            await store_pending_message(db, resolved_agent_id, group_id, trigger_message_id)
+            from app.chat import chat_api
+            await chat_api.store_pending(db, resolved_agent_id, group_id, trigger_message_id)
         return
 
     # 记录意愿（如果决策中有）
@@ -604,8 +593,8 @@ async def _maybe_trigger_ai_reply(
     # 注：打字状态不在此处发送，改为在 AI 实际调用 send_gm 工具时才发送
     delay_skipped = False
     if skill_result.delay_seconds > 0:
-        from app.services.group_service import get_pending_messages
-        pending = await get_pending_messages(db, resolved_agent_id, group_id)
+        from app.chat import chat_api
+        pending = await chat_api.get_pending(db, resolved_agent_id, group_id)
         pending_count = len(pending) if pending else 0
         if pending_count > 0:
             logger.info(f"🧠 AI {agent.name} 有 {pending_count} 条积压消息，跳过延迟回复")
@@ -735,8 +724,8 @@ async def _maybe_trigger_ai_reply(
         pass
 
     # 10. 标记未读消息已处理
-    from app.services.group_service import mark_pending_read
-    await mark_pending_read(db, resolved_agent_id, group_id)
+    from app.chat import chat_api
+    await chat_api.mark_pending_read(db, resolved_agent_id, group_id)
     await db.commit()
 
 

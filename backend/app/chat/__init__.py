@@ -186,6 +186,9 @@ class ChatApi:
     async def mark_pending_read(self, db, agent_id, group_id=None):
         return await mark_pending_read(db, agent_id, group_id=group_id)
 
+    async def update_last_read(self, db, group_id, member_type, member_id):
+        return await update_last_read(db, group_id, member_type, member_id)
+
 
 # 全局单例 ChatApi 实例
 # 聊天服务（ws.py）在初始化时调用 chat_api.set_manager(manager)
