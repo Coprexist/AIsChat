@@ -120,7 +120,7 @@ def _decide_alarm_action(agent, context: ActionContext) -> ActionDecision:
 async def _decide_reply_action(db, agent, context: ActionContext) -> ActionDecision:
     """决定是否回复消息（原 _maybe_trigger_ai_reply 的 Gate 1-6 逻辑）"""
     from app.services.agent_service import calculate_willingness, switch_agent_state
-    from app.services.group_service import is_member_in_dnd, is_member_muted
+    from app.chat import chat_api
 
     agent_id = context.agent_id
     is_mentioned = context.is_mentioned
@@ -135,13 +135,14 @@ async def _decide_reply_action(db, agent, context: ActionContext) -> ActionDecis
         await db.flush()
 
     # Gate 2a: 屏蔽（无穿透，@/公告也不收）
-    is_muted = await is_member_muted(db, agent_id, context.group_id)
+    reachability = await chat_api.check_reachability(db, agent_id, context.group_id)
+    is_muted = reachability["is_muted"]
     if is_muted:
         return ActionDecision(False, ActionType.NONE, 0,
             f"AI {agent.name} 屏蔽中，不响应任何消息", details={"store_pending": True})
 
     # Gate 2b: DND（@/公告可穿透）(v1.0.1): @提及 / @all / 群公告 可穿透 DND
-    in_dnd = await is_member_in_dnd(db, agent_id, context.group_id)
+    in_dnd = reachability["is_dnd"]
     dnd_penetrate = is_mentioned or context.is_at_all or context.is_announcement or context.is_priority_friend
     dnd_was_penetrated = in_dnd and dnd_penetrate  # DND 被穿透时后续提醒 AI
     if in_dnd and not dnd_penetrate:

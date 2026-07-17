@@ -14,7 +14,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from app.config import settings
 from app.models.group import Group as GroupModel
-from app.services.group_service import get_recent_messages, message_to_dict
+from app.chat import chat_api
 from app.services.memory_service import recall_relevant_memories, format_memories_for_prompt
 from app.utils.pure.prompting import (
     resolve_model, build_personality_segment, format_time_shanghai,
@@ -865,7 +865,7 @@ async def build_messages(
         pass
 
     # 2. 获取最近消息（用于记忆检索 + 历史消息）
-    recent_for_query = await get_recent_messages(db, group_id, limit=5)
+    recent_for_query = await chat_api.get_recent_messages(db, group_id, limit=5)
     query_parts: list[str] = []
     sender_names: dict[tuple[str, int], str] = {}
     for m in recent_for_query:
@@ -979,7 +979,7 @@ async def build_messages(
     if vector_accelerated:
         try:
             from app.services.vector_pipeline import hybrid_search
-            recent = await get_recent_messages(db, group_id, limit=5, after_time=last_read_at)
+            recent = await chat_api.get_recent_messages(db, group_id, limit=5, after_time=last_read_at)
             query_text_v = " ".join([m.content[:100] for m in recent])
             relevant = await hybrid_search(db, group_id, query_text_v, top_k=limit)
             for r in reversed(relevant):
@@ -993,12 +993,12 @@ async def build_messages(
 
     if not vector_accelerated:
         # 先取未读消息（最多 20 条），不足 3 条补到至少 3 条
-        recent_messages = await get_recent_messages(db, group_id, limit=20)
+        recent_messages = await chat_api.get_recent_messages(db, group_id, limit=20)
         # 群消息折叠长度（默认256，0=不截断）
         max_len = getattr(group_obj, 'max_msg_display_len', 256) if group_obj else 256
 
         for m in reversed(recent_messages):
-            md = message_to_dict(m)
+            md = await chat_api.message_to_dict(m)
             content = m.content or ""
             if max_len > 0 and len(content) > max_len:
                 content = content[:max_len] + '...[展开 id=' + str(m.id) + ']'
@@ -1017,8 +1017,7 @@ async def build_messages(
 
     # 更新 AI 的最后阅读时间
     if last_read_at is not None:
-        from app.services.group_service import update_last_read
-        await update_last_read(db, group_id, "ai", agent.user_id or 0)
+        await chat_api.update_last_read(db, group_id, "ai", agent.user_id or 0)
     # 当前时间放在最后（每次变化，放末尾不影响前缀cache）
     current_ctx = await _build_current_context(db, agent, group_id, group_name, is_dm)
     messages.append({"role": "system", "content": current_ctx})
