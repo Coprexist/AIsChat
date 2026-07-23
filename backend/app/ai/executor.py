@@ -399,7 +399,7 @@ async def _tool_call_loop(
 
             # ── 自动上下文压缩（每轮工具调用循环最多一次）──
             if not _auto_compressed:
-                from app.services.context_compressor import should_compress, inline_compress, get_compression_threshold
+                from app.services.context_compression_service import should_compress, inline_compress, get_compression_threshold
                 compress_threshold = await get_compression_threshold(db)
                 # 12 小时闲置强制压缩：缓存肯定过期，压缩省 token
                 stale = _is_conversation_idle(messages, hours=12)
