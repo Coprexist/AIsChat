@@ -5,7 +5,7 @@ import { useT, useLang } from '../i18n/I18nContext'
 import { api } from '../api/client'
 import { AI_TYPE_LABEL } from '../constants'
 import { fmtTokenNum } from '../utils/format'
-import { getStatusTextStyle, STATUS_COLORS, BG_SURFACE_LIGHT, BG_SURFACE_DARK } from '../utils/statusColor'
+import { getStatusTextStyle, STATUS_COLORS, BG_SURFACE_LIGHT, BG_SURFACE_DARK } from '../utils/statusColor.tsx'
 import VerificationCodeInput from '../components/VerificationCodeInput'
 import { useTheme } from '../context/ThemeContext'
 import {

@@ -5,7 +5,7 @@ import { useAuth } from '../context/AuthContext'
 import { useT } from '../i18n/I18nContext'
 import { Users, MessageSquare, UserPlus, Check, X, Search, ArrowUpDown, ArrowLeft, Bot, User, Menu, Star } from 'lucide-react'
 import { getStateDotColor } from '../constants'
-import { getStatusTextStyle, BG_CANVAS_LIGHT, BG_CANVAS_DARK } from '../utils/statusColor'
+import { getStatusTextStyle, BG_CANVAS_LIGHT, BG_CANVAS_DARK } from '../utils/statusColor.tsx'
 import { useTheme } from '../context/ThemeContext'
 
 interface Friend {

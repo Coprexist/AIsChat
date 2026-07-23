@@ -13,8 +13,8 @@ import {
 
 import AvatarCropModal from '../components/AvatarCropModal'
 import CreateAgentModal from '../components/CreateAgentModal'
-import { STATUS_COLORS } from '../utils/statusColor'
-import { getApiKeyUrl } from '../utils/providers'
+import { STATUS_COLORS } from '../utils/statusColor.tsx'
+import { getApiKeyUrl } from '../utils/providers.tsx'
 
 // ─── 步骤配置 ──────────────────────────────────────────────
 interface StepDef {
