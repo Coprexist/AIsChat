@@ -9,7 +9,7 @@ import VerificationCodeInput from '../components/VerificationCodeInput'
 import { LANGUAGES } from '../i18n/languages'
 import { isDesktop } from '../utils/platform'
 import { invoke } from '../utils/tauri'
-import { getApiKeyUrl } from '../utils/providers'
+import { getApiKeyUrl } from '../utils/providers.tsx'
 import { Key, Zap, Save, Clock, Palette, Bell, Eye, EyeOff, CheckCircle, XCircle, Loader2, Globe, Layout, Bot, Pencil, X, Ticket, Plus, ChevronDown, ChevronRight, Shield, AlertTriangle, ArrowLeft, Mail, Monitor, HardDrive, Trash2, Cpu, Wrench, Box, ExternalLink } from 'lucide-react'
 import { useNavigate, useBlocker, useLocation } from 'react-router-dom'
 

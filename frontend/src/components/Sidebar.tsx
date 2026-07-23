@@ -5,7 +5,7 @@ import { Shield, LogOut, Menu, X, ChevronLeft, BookOpen, Settings } from 'lucide
 import { MANUAL_URL } from '../constants'
 import SearchOverlay from './SearchOverlay'
 import { useT } from '../i18n/I18nContext'
-import { mainNavItems, navLinkClass, navIconClass } from '../utils/navRegistry'
+import { mainNavItems, navLinkClass, navIconClass } from '../utils/navRegistry.tsx'
 
 export default function Sidebar({ mobile, onClose }: { mobile?: boolean; onClose?: () => void }) {
   const { user, logout } = useAuth()

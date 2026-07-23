@@ -2,7 +2,7 @@ import { useState } from 'react'
 import { api } from '../api/client'
 import { useT } from '../i18n/I18nContext'
 import { ArrowLeft, X, Loader2, RotateCw, Ticket, ChevronRight } from 'lucide-react'
-import { STATUS_COLORS } from '../utils/statusColor'
+import { STATUS_COLORS } from '../utils/statusColor.tsx'
 import SkillBackpack from './SkillBackpack'
 import Toggle from './Toggle'
 
