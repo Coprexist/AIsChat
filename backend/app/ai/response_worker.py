@@ -24,7 +24,7 @@ from app.models.group import Group, GroupMember
 from app.models.user import User
 from app.config import settings
 from app.chat import chat_api
-from app.services.context_compressor import should_compress, inline_compress, get_compression_threshold
+from app.services.context_compression_service import should_compress, inline_compress, get_compression_threshold
 from app.utils.text import extract_mentions as _extract_mentions, check_mention as _check_mention
 from app.ai.executor import _tool_call_loop, _get_api_config, _check_rate_limit, _send_system_error
 from app.ai.alarm import _process_alarm_event
