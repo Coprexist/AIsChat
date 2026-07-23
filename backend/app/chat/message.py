@@ -519,3 +519,129 @@ async def _get_member(db: AsyncSession, group_id: int, member_type: str, member_
             )
             member = result.scalar_one_or_none()
     return member
+
+
+# ============================================================
+# 群公告 & 未读信息
+# ============================================================
+
+async def set_announcement(
+    db: AsyncSession,
+    group_id: int,
+    content: str,
+    operator_id: int,
+) -> str:
+    """
+    设置群公告，返回公告内容。
+    仅群主或管理员可操作。
+    """
+    group = await db.get(Group, group_id)
+    if group is None:
+        raise ValueError("群聊不存在")
+
+    member = await _get_member(db, group_id, "human", operator_id)
+    if member is None or member.role not in ("owner", "admin"):
+        raise ValueError("仅群主或管理员可设置群公告")
+
+    group.announcement = content
+    group.announcement_updated_at = datetime.now(timezone.utc).replace(tzinfo=None)
+    await db.flush()
+    logger.info(f"群聊 {group_id} 公告已更新")
+    return content
+
+
+async def delete_announcement(
+    db: AsyncSession,
+    group_id: int,
+    operator_id: int,
+) -> None:
+    """删除群公告"""
+    group = await db.get(Group, group_id)
+    if group is None:
+        raise ValueError("群聊不存在")
+
+    member = await _get_member(db, group_id, "human", operator_id)
+    if member is None or member.role not in ("owner", "admin"):
+        raise ValueError("仅群主或管理员可删除群公告")
+
+    group.announcement = None
+    group.announcement_updated_at = None
+    await db.flush()
+
+
+async def get_unread_info(
+    db: AsyncSession,
+    group_id: int,
+    user_id: int,
+) -> dict:
+    """
+    获取用户在指定群聊的未读信息。
+
+    返回: {unread_count, has_mention, has_announcement, last_message}
+    """
+    # 获取成员记录，查 last_read_at
+    member = await _get_member(db, group_id, "human", user_id)
+    last_read = member.last_read_at if member else None
+
+    # 统计未读消息数（last_read 为 NULL 时用 joined_at 兜底）
+    read_baseline = last_read or (member.joined_at if member else None)
+    base_query = select(Message).where(Message.group_id == group_id)
+    if read_baseline:
+        base_query = base_query.where(Message.created_at > read_baseline)
+
+    # 排除自己的消息
+    base_query = base_query.where(
+        ~((Message.sender_type == "human") & (Message.sender_id == user_id))
+    )
+
+    unread_result = await db.execute(base_query.order_by(Message.created_at.desc()))
+    unread_messages = unread_result.scalars().all()
+
+    unread_count = len(unread_messages)
+
+    # 检查是否有 @提及
+    has_mention = False
+    user_name = None
+    from app.models.user import User
+    user = await db.get(User, user_id)
+    if user:
+        user_name = user.username
+        for msg in unread_messages:
+            if f"@{user_name}" in msg.content:
+                has_mention = True
+                break
+
+    # 检查是否有未读公告
+    group = await db.get(Group, group_id)
+    has_announcement = False
+    if group and group.announcement and group.announcement_updated_at:
+        if last_read is None or group.announcement_updated_at > last_read:
+            has_announcement = True
+
+    # 最后一条消息
+    last_msg = unread_messages[0] if unread_messages else None
+    last_message = None
+    if last_msg:
+        sender_name = getattr(last_msg, "sender_name", None) or "未知"
+        if last_msg.sender_type == "human":
+            u = await db.get(User, last_msg.sender_id)
+            if u:
+                sender_name = u.username
+        else:
+            a_result2 = await db.execute(select(AgentModel).where(AgentModel.user_id == last_msg.sender_id))
+            a = a_result2.scalar_one_or_none()
+            if a:
+                sender_name = a.name
+
+        last_message = {
+            "content": last_msg.content[:100],
+            "sender_name": sender_name,
+            "created_at": str(last_msg.created_at) if last_msg.created_at else None,
+        }
+
+    return {
+        "unread_count": unread_count,
+        "has_mention": has_mention,
+        "has_announcement": has_announcement,
+        "last_message": last_message,
+    }

@@ -28,6 +28,12 @@ from app.models.api_key_pool import ApiKeyPool, UserApiAssignment
 from app.models.api_usage_log import ApiUsageLog
 from app.models.system_settings import SystemSettings
 from app.models.verification_code import VerificationCode
+from app.models.personality_anchor import PersonalityAnchor
+from app.models.agent_config import AgentConfig
+from app.models.agent_trigger import AgentTrigger
+from app.models.agent_attention import AgentAttention
+from app.models.agent_state_stack import AgentStateStack
+from app.models.agent_skill_relation import AgentSkillRelation
 
 __all__ = [
     "User",
@@ -70,4 +76,10 @@ __all__ = [
     "ApiUsageLog",
     "SystemSettings",
     "VerificationCode",
+    "PersonalityAnchor",
+    "AgentConfig",
+    "AgentTrigger",
+    "AgentAttention",
+    "AgentStateStack",
+    "AgentSkillRelation",
 ]
