@@ -278,7 +278,7 @@ async def send_dm_message(
     await db.flush()
 
     if attachments:
-        from app.services.file_service import track_forward_reference
+        from app.services.content.file_service import track_forward_reference
         for att in attachments:
             fid = att.get("file_id") if isinstance(att, dict) else getattr(att, "file_id", None)
             if fid:
@@ -408,7 +408,7 @@ async def _get_partner_info(db: AsyncSession, user_id: int) -> dict:
             if agent_row[3]:
                 status_color = agent_row[3]
     else:
-        from app.services.online_tracker import get_user_online_status
+        from app.services.infrastructure.online_tracker import get_user_online_status
         if get_user_online_status(user_id):
             state = "online"
 

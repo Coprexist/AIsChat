@@ -19,7 +19,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.database import async_session
 from app.models.federation import FederatedEntity, FederationPeer
-from app.services.federation_service import (
+from app.services.federation.federation_service import (
     get_peer_by_public_id,
     get_decrypted_secret,
     update_peer_connection_state,
@@ -267,7 +267,7 @@ class FederationManager:
             assigned_name = ack.get("assigned_name", "")
             if assigned_name:
                 async with async_session() as db:
-                    from app.services.federation_service import get_instance_info, update_instance_info
+                    from app.services.federation.federation_service import get_instance_info, update_instance_info
                     info = await get_instance_info(db)
                     my_current_name = (info.get("display_name") or "").strip()
                     if not my_current_name:
@@ -530,7 +530,7 @@ class FederationManager:
 
     async def _get_pending_profile_updates(self) -> list[dict]:
         """获取待同步的 profile 变更（消息顺带）"""
-        from app.services.federation_service import get_pending_updates, clear_pending_updates
+        from app.services.federation.federation_service import get_pending_updates, clear_pending_updates
         async with async_session() as db:
             updates = await get_pending_updates(db)
             if not updates:
@@ -601,7 +601,7 @@ class FederationManager:
 
     async def profile_sync_loop(self) -> None:
         """每隔 N 分钟全推一次 profile 更新到所有已连接对等端"""
-        from app.services.federation_service import get_pending_updates, clear_pending_updates, get_sync_interval_minutes
+        from app.services.federation.federation_service import get_pending_updates, clear_pending_updates, get_sync_interval_minutes
 
         while self._running:
             interval = 30  # 默认
@@ -742,7 +742,7 @@ class FederationManager:
                 message = await handle_remote_message(db, gid, msg, source_public_id)
                 await db.commit()
 
-                from app.services.group_service import message_to_dict
+                from app.chat.message import message_to_dict
                 original_avatar = msg.get("sender_avatar_url")
                 msg_data = message_to_dict(message, sender_name=msg.get("sender_name", "Remote User"), sender_avatar_url=original_avatar)
 
@@ -760,7 +760,7 @@ class FederationManager:
                 )
 
                 if msg.get("sender_type") == "human":
-                    from app.services.ai_response_worker import message_queue
+                    from app.ai.response_worker import message_queue
                     try:
                         message_queue.put_nowait({
                             "conversation_type": "group",
@@ -1007,7 +1007,7 @@ class FederationManager:
             remaining = int(MIN_INTERVAL.total_seconds() - (now - conn.last_rotation_at).total_seconds())
             return f"距上次轮换不足 {remaining} 秒，请等待"
 
-        from app.services.federation_service import validate_rotation_url
+        from app.services.federation.federation_service import validate_rotation_url
         err = validate_rotation_url(new_url, conn.remote_url)
         if err:
             return err
@@ -1022,7 +1022,7 @@ class FederationManager:
                 return "对等端不存在"
             secret = await get_decrypted_secret(peer)
 
-        from app.services.federation_service import url_rotate_hmac
+        from app.services.federation.federation_service import url_rotate_hmac
         hmac_val = url_rotate_hmac(secret, rotation_id, new_url, expires_at, "propose")
 
         conn.rotation_state = "proposing"
@@ -1091,13 +1091,13 @@ class FederationManager:
             secret = await get_decrypted_secret(peer)
             current_url = peer.remote_url
 
-        from app.services.federation_service import validate_rotation_url
+        from app.services.federation.federation_service import validate_rotation_url
         err = validate_rotation_url(new_url, current_url)
         if err:
             await self._send_rotation_msg(public_id, "url_rotate_ack", rotation_id, False)
             return
 
-        from app.services.federation_service import url_rotate_hmac
+        from app.services.federation.federation_service import url_rotate_hmac
         expected_hmac = url_rotate_hmac(secret, rotation_id, new_url, expires_at_str, "propose")
         if hmac_val != expected_hmac:
             logger.warning(f"🌐 轮换提议 HMAC 不匹配 from {public_id}")
@@ -1192,7 +1192,7 @@ class FederationManager:
             async with async_session() as db:
                 peer = await get_peer_by_public_id(db, public_id)
                 if peer:
-                    from app.services.federation_service import update_peer_url
+                    from app.services.federation.federation_service import update_peer_url
                     await update_peer_url(db, peer.id, conn.new_url)
             conn.remote_url = conn.new_url
             logger.info(f"🌐 ✅ URL 轮换成功: {public_id} → {conn.new_url}")
@@ -1226,7 +1226,7 @@ class FederationManager:
             peer = await get_peer_by_public_id(db, public_id)
             if peer:
                 secret = await get_decrypted_secret(peer)
-                from app.services.federation_service import url_rotate_hmac
+                from app.services.federation.federation_service import url_rotate_hmac
                 fields = [str(accepted).lower(), result, msg_type.split("_")[-1]]
                 payload["hmac"] = url_rotate_hmac(secret, rotation_id, *fields)
         try:

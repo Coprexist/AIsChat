@@ -25,7 +25,7 @@ class InviteToGroup(ToolPlugin):
 
     async def execute(self, db: AsyncSession, agent_id: int, group_id: int | None,
                       arguments: dict, context: dict) -> dict:
-        from app.services.group_service import add_member
+        from app.chat.message import add_member
         from app.models.agent import Agent
 
         agent_result = await db.execute(_sel2(Agent).where(Agent.id == agent_id))

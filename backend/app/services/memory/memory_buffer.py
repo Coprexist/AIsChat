@@ -214,7 +214,7 @@ async def _batch_write_memories(db, batch: list[PendingMemory]):
     3. 一次 flush 提交（事务安全：全部成功或全部回滚）
     """
     from app.models.memory import RoughMemory, DetailMemory
-    from app.services.metrics_collector import metrics
+    from app.services.infrastructure.metrics_collector import metrics
 
     t0 = time.monotonic()
 

@@ -6,7 +6,7 @@ import logging
 from fastapi import APIRouter, Depends
 from sqlalchemy.ext.asyncio import AsyncSession
 from app.database import get_db
-from app.services.system_settings_service import get_settings
+from app.services.infrastructure.system_settings_service import get_settings
 
 logger = logging.getLogger(__name__)
 router = APIRouter(tags=["系统设置"])

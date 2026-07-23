@@ -375,7 +375,7 @@ async def export_chat_history(
     """
     编排：查询消息 → 格式化 → 返回 (content_bytes, media_type, filename)
     """
-    from app.services.group_service import get_group
+    from app.chat.message import get_group
 
     group = await get_group(db, group_id)
     group_name = group.name if group else f"群聊#{group_id}"

@@ -20,7 +20,7 @@ class ListAlarms(ToolPlugin):
 
     async def execute(self, db: AsyncSession, agent_id: int, group_id: int | None,
                       arguments: dict, context: dict) -> dict:
-        from app.services.alarm_service import list_alarms as svc_list_alarms
+        from app.ai.alarm import list_alarms as svc_list_alarms
 
         try:
             result = await svc_list_alarms(db, agent_id)

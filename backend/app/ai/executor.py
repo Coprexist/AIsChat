@@ -188,7 +188,7 @@ async def _get_api_config(
 
     # Tier 2 & 3: 用户有可用额度 → 使用 API Key 池
     if effective_credit > 0:
-        from app.services.quota_service import find_best_pool_key
+        from app.services.infrastructure.quota_service import find_best_pool_key
         pool_key = await find_best_pool_key(db, user.id, exclude_pool_key_id=exclude_pool_key_id)
         if pool_key:
             try:
@@ -197,7 +197,7 @@ async def _get_api_config(
                 credit_source = "pool_key"
                 pool_key_id = pool_key.id
                 # v1.0.2: 获取池 Key 的供应商配置
-                from app.services.system_settings_service import get_provider_for_pool_key
+                from app.services.infrastructure.system_settings_service import get_provider_for_pool_key
                 pool_provider = await get_provider_for_pool_key(db, pool_key)
                 provider_info = {
                     "thinking_supported": pool_provider.get("thinking_supported", "deepseek.com" in api_base),
@@ -255,7 +255,7 @@ async def _tool_call_loop(
     """
     if effective_cfg is None:
         effective_cfg = {}
-    from app.services.llm_service import chat_completion
+    from app.ai.llm import chat_completion
     from app.services.tool_registry import dispatch_tool_call
 
     context = {
@@ -285,8 +285,8 @@ async def _tool_call_loop(
     loop_idx = 0
     while loop_idx < max_loops + _reminder_extra:
         # ── v0.6.0: 带分类重试的 LLM 调用 ──
-        from app.services.llm_service import RateLimitError, ServerError, KeyFatalError
-        from app.services.api_key_concurrency import concurrency_mgr
+        from app.ai.llm import RateLimitError, ServerError, KeyFatalError
+        from app.services.infrastructure.api_key_concurrency import concurrency_mgr
 
         MAX_KEY_SWITCHES = 3
         MAX_SERVER_RETRIES = 2
@@ -399,7 +399,7 @@ async def _tool_call_loop(
 
             # ── 自动上下文压缩（每轮工具调用循环最多一次）──
             if not _auto_compressed:
-                from app.services.context_compression_service import should_compress, inline_compress, get_compression_threshold
+                from app.services.memory.context_compression_service import should_compress, inline_compress, get_compression_threshold
                 compress_threshold = await get_compression_threshold(db)
                 # 12 小时闲置强制压缩：缓存肯定过期，压缩省 token
                 stale = _is_conversation_idle(messages, hours=12)
@@ -415,7 +415,7 @@ async def _tool_call_loop(
                         )
                         # 压缩时应用 lazy tag 的 pending 更改
                         try:
-                            from app.services.agent_service import apply_pending_config
+                            from app.services.agent.agent_service import apply_pending_config
                             await apply_pending_config(db, agent)
                         except Exception:
                             pass
@@ -555,8 +555,8 @@ async def _tool_call_loop(
             )
             if last_task:
                 try:
-                    from app.services.workspace_service import save_current_task
-                    from app.services.state_stack_service import persist_last_task_as_state
+                    from app.services.agent.workspace_service import save_current_task
+                    from app.services.agent.state_stack_service import persist_last_task_as_state
                     await save_current_task(db, agent.id, last_task)
                     await persist_last_task_as_state(
                         db, agent.id, last_task, group_id,
@@ -627,8 +627,8 @@ async def _tool_call_loop(
         if not tool_calls:
             if last_task:
                 try:
-                    from app.services.workspace_service import save_current_task
-                    from app.services.state_stack_service import persist_last_task_as_state
+                    from app.services.agent.workspace_service import save_current_task
+                    from app.services.agent.state_stack_service import persist_last_task_as_state
                     await save_current_task(db, agent.id, last_task)
                     await persist_last_task_as_state(
                         db, agent.id, last_task, group_id,
@@ -674,8 +674,8 @@ async def _tool_call_loop(
         if finish_reason != "tool_calls":
             if last_task:
                 try:
-                    from app.services.workspace_service import save_current_task
-                    from app.services.state_stack_service import persist_last_task_as_state
+                    from app.services.agent.workspace_service import save_current_task
+                    from app.services.agent.state_stack_service import persist_last_task_as_state
                     await save_current_task(db, agent.id, last_task)
                     await persist_last_task_as_state(
                         db, agent.id, last_task, group_id,
@@ -698,7 +698,7 @@ async def _tool_call_loop(
     # 循环耗尽
     if last_task:
         try:
-            from app.services.workspace_service import save_current_task
+            from app.services.agent.workspace_service import save_current_task
             await save_current_task(db, agent.id, last_task)
         except Exception:
             pass
@@ -709,7 +709,7 @@ async def _tool_call_loop(
                 bill_user_id = trigger_user_id
             else:
                 bill_user_id = agent.owner_id
-            from app.services.quota_service import deduct_credit
+            from app.services.infrastructure.quota_service import deduct_credit
             await deduct_credit(
                 db,
                 user_id=bill_user_id,
@@ -789,7 +789,7 @@ async def _save_conversation_log_safe(
 ):
     """安全保存对话日志（失败不影响主流程）"""
     try:
-        from app.services.conversation_log_service import save_conversation_log
+        from app.services.content.conversation_log_service import save_conversation_log
         await save_conversation_log(
             db,
             agent_id=agent.id,

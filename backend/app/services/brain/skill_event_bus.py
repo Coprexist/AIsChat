@@ -4,7 +4,7 @@ Skill 事件总线（兼容层）
 已委托给 event_bus.py，此处仅做兼容导出。
 """
 
-from app.services.event_bus import event_bus
+from app.services.brain.event_bus import event_bus
 
 
 class SkillEventBus:

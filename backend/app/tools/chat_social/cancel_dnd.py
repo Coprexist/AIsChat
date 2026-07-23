@@ -20,7 +20,7 @@ class CancelDND(ToolPlugin):
 
     async def execute(self, db: AsyncSession, agent_id: int, group_id: int | None,
                       arguments: dict, context: dict) -> dict:
-        from app.services.group_service import cancel_group_dnd
+        from app.chat.delivery import cancel_group_dnd
         target_group = arguments.get("group_id", group_id)
         await cancel_group_dnd(db, agent_id, target_group)
         await db.commit()

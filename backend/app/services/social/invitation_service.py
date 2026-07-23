@@ -109,7 +109,7 @@ async def send_group_invitation(
     Returns:
         dict with invitation_id and dm_message_id
     """
-    from app.services.dm_service import get_or_create_dm_session, send_dm_message
+    from app.chat.dm import get_or_create_dm_session, send_dm_message
     from app.models.group import Group
 
     # 检查是否已有待处理邀请（幂等防重）
@@ -203,7 +203,7 @@ async def accept_invitation(
     Returns:
         dict with the updated invitation info
     """
-    from app.services.group_service import add_member
+    from app.chat.message import add_member
 
     invitation = await db.get(GroupInvitation, invitation_id)
     if invitation is None:

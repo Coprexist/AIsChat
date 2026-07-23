@@ -327,9 +327,9 @@ async def _process_alarm_event(db, event: dict):
     task = event["task"]
 
     from app.models.agent import Agent as AgentModel
-    from app.services.action_decider import decide_action, ActionContext, ActionType
-    from app.services.llm_service import CORE_IDENTITY, resolve_model, PROTOCOL_BY_PROFILE, PROTOCOL_CHAT
-    from app.services.memory_service import recall_relevant_memories, format_memories_for_prompt
+    from app.ai.decider import decide_action, ActionContext, ActionType
+    from app.ai.llm import CORE_IDENTITY, resolve_model, PROTOCOL_BY_PROFILE, PROTOCOL_CHAT
+    from app.services.memory.memory_service import recall_relevant_memories, format_memories_for_prompt
     from app.services.tool_registry import get_allowed_tools
     from app.ai.executor import _get_api_config, _tool_call_loop
     from app.ai.response_worker import _run_serialized
@@ -354,7 +354,7 @@ async def _process_alarm_event(db, event: dict):
 
     # 如果 AI 处于 offline/dnd，先唤醒为 active
     if agent.state in ("offline", "dnd"):
-        from app.services.agent_service import switch_agent_state
+        from app.services.agent.agent_service import switch_agent_state
         logger.info(f"⏰ 闹钟 #{alarm_id}: AI {agent.name}({agent_id}) 从 {agent.state} 唤醒为 active")
         await switch_agent_state(
             db, agent_id=agent_id,
@@ -397,10 +397,10 @@ async def _process_alarm_event(db, event: dict):
         "- 如果需要私信某人，请使用 send_dm\n"
     )
 
-    from app.services.agent_service import get_effective_config as _get_eff_cfg2
+    from app.services.agent.agent_service import get_effective_config as _get_eff_cfg2
     effective_cfg = await _get_eff_cfg2(db, agent.id, user_id=None)
 
-    from app.services.skill_engine import _is_delay_reply_allowed
+    from app.services.skill.skill_engine import _is_delay_reply_allowed
     delay_allowed = await _is_delay_reply_allowed(db, agent)
     tools = get_allowed_tools("active", thinking_enabled=effective_cfg["thinking_enabled"], delay_reply_allowed=delay_allowed)
     tool_names = [t["function"]["name"] for t in tools]
@@ -433,7 +433,7 @@ async def _process_alarm_event(db, event: dict):
     logger.info(f"⏰ 闹钟 #{alarm_id}: 唤醒 AI {agent.name}({agent_id})，model={model}，tools={len(tools)}")
 
     try:
-        from app.services.workspace_service import save_current_task
+        from app.services.agent.workspace_service import save_current_task
         await save_current_task(db, agent_id, f"闹钟任务: {task}")
     except Exception:
         pass

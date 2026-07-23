@@ -11,7 +11,7 @@ from app.schemas.friendship import (
     FriendRequestCreate, FriendRequestResponse,
     FriendResponse, SearchResponse, SearchResult,
 )
-from app.services.friend_service import (
+from app.services.social.friend_service import (
     send_friend_request, accept_friend_request, reject_friend_request,
     remove_friend, list_friends, list_friend_requests, search_entities,
 )
@@ -62,7 +62,7 @@ async def list_my_friends(
     """获取我的好友列表"""
     friends = await list_friends(db, current_user["user_id"], limit=limit, offset=offset)
     # 注入在线状态（统一函数）
-    from app.services.online_tracker import get_user_online_status
+    from app.services.infrastructure.online_tracker import get_user_online_status
     for f in friends:
         friend_uid = f.get("friend_user_id")
         if friend_uid and f["friend_type"] == "human" and get_user_online_status(friend_uid):
@@ -248,7 +248,7 @@ async def _inject_friend_greeting(
     prefix: str = "🤝 ",
 ):
     """好友通过后，将附言注入 DM 对话开头（使用申请时间戳）"""
-    from app.services.dm_service import (
+    from app.chat.dm import (
         get_or_create_dm_session, send_dm_message,
     )
     try:

@@ -24,7 +24,7 @@ from app.models.group import Group, GroupMember
 from app.models.user import User
 from app.config import settings
 from app.chat import chat_api
-from app.services.context_compression_service import should_compress, inline_compress, get_compression_threshold
+from app.services.memory.context_compression_service import should_compress, inline_compress, get_compression_threshold
 from app.utils.text import extract_mentions as _extract_mentions, check_mention as _check_mention
 from app.ai.executor import _tool_call_loop, _get_api_config, _check_rate_limit, _send_system_error
 from app.ai.alarm import _process_alarm_event
@@ -79,7 +79,7 @@ async def ai_response_worker():
             logger.info(f"📬 Worker 收到事件: group={event.get('group_id')}, msg={event.get('message_id')}, queue_remaining={message_queue.qsize()}")
             # v0.5.0: 记录队列深度
             try:
-                from app.services.metrics_collector import metrics
+                from app.services.infrastructure.metrics_collector import metrics
                 await metrics.record_queue_depth(message_queue.qsize())
             except Exception:
                 pass
@@ -274,7 +274,7 @@ async def _process_group_event(db, event: dict):
     )
 
     next_depth = chain_depth + 1
-    from app.services.chat_chain_service import chat_chain_manager
+    from app.ai.chat_chain import chat_chain_manager
 
     # 通知群活跃（重置并发自动恢复倒计时）
     chat_chain_manager.notify_group_activity(group_id)
@@ -327,8 +327,8 @@ async def _maybe_trigger_ai_reply(
     message_type: str = "normal",
 ):
     """检查单个 AI 是否应该回复，如果是则调用 LLM 生成回复"""
-    from app.services.agent_service import get_agent
-    from app.services.action_decider import decide_action, ActionContext, ActionType
+    from app.services.agent.agent_service import get_agent
+    from app.ai.decider import decide_action, ActionContext, ActionType
     from app.models.agent import Agent as AgentModel
 
     # v2.0.0: agent_id 可能是 agent.id 或 user_id
@@ -419,14 +419,14 @@ async def _maybe_trigger_ai_reply(
 
     # 5.5. 中断标记：如果 AI 之前在忙，记录中断
     try:
-        from app.services.workspace_service import mark_interrupted
+        from app.services.agent.workspace_service import mark_interrupted
         sender_info = f"群聊 #{group_id} 的新消息"
         await mark_interrupted(db, resolved_agent_id, reason=sender_info)
     except Exception:
         pass  # 非致命
 
     # 5.6. Skill 引擎评估（延迟回复、打字指示器）
-    from app.services.skill_engine import evaluate_action_skills, _is_delay_reply_allowed
+    from app.services.skill.skill_engine import evaluate_action_skills, _is_delay_reply_allowed
     skill_result = await evaluate_action_skills(db, agent, group_id, context={
         "content": content,
         "sender_type": sender_type,
@@ -449,15 +449,15 @@ async def _maybe_trigger_ai_reply(
     trigger_user_id = sender_id if sender_type == "human" else None
 
     # 6. 获取有效配置（v0.4.0: per-user 覆盖 — 需在 build_messages 前获取）
-    from app.services.agent_service import get_effective_config
+    from app.services.agent.agent_service import get_effective_config
     effective_cfg = await get_effective_config(db, agent.id, trigger_user_id)
     logger.info(f"🔍 AI {agent.name}: effective_cfg ai_type={effective_cfg['ai_type']}, "
                 f"thinking={effective_cfg['thinking_enabled']}, temp={effective_cfg['temperature']}")
 
     # 7. 构建消息
-    from app.services.llm_service import build_messages, resolve_model
+    from app.ai.llm import build_messages, resolve_model
     # 向量加速混合检索仅在 AI 全群启用（AI 内部协作场景）
-    from app.services.group_service import is_ai_only_group
+    from app.ai.group_logic import is_ai_only_group
     ai_only = await is_ai_only_group(db, group_id, group=group)
     use_vector = group.is_vector_accelerated and ai_only
     if group.is_vector_accelerated and not ai_only:
@@ -559,7 +559,7 @@ async def _maybe_trigger_ai_reply(
     logger.info(f"✅ AI {agent.name}: LLM 调用完成")
     # 回复后标记退出当前聊天链（尺时间计时开始）
     try:
-        from app.services.chat_chain_service import chat_chain_manager
+        from app.ai.chat_chain import chat_chain_manager
         chat_chain_manager.mark_replied(resolved_agent_id, group_id)
     except Exception:
         pass
@@ -585,7 +585,7 @@ async def _trigger_dm_ai_reply(
     force_own_key: bool = False,
 ):
     """触发 AI 对私信的自动回复"""
-    from app.services.agent_service import get_agent
+    from app.services.agent.agent_service import get_agent
     from app.models.user import User as UserModel
 
     # 提前捕获 agent 属性（防止 session 过期后 DetachedInstanceError）
@@ -606,7 +606,7 @@ async def _trigger_dm_ai_reply(
         return
 
     # 获取有效配置（v0.4.0: per-user 覆盖 — DM 场景 trigger_user_id=sender_id）
-    from app.services.agent_service import get_effective_config as _get_eff_cfg
+    from app.services.agent.agent_service import get_effective_config as _get_eff_cfg
     effective_cfg = await _get_eff_cfg(db, agent_id, sender_id)
 
     # 获取 API 配置（v0.9.0: 按 AI 类型 + force_own_key 决定账单人）
@@ -624,13 +624,13 @@ async def _trigger_dm_ai_reply(
 
     # 中断标记：如果 AI 之前在忙，记录中断
     try:
-        from app.services.workspace_service import mark_interrupted
+        from app.services.agent.workspace_service import mark_interrupted
         await mark_interrupted(db, agent_id, reason=f"私信 {session_id} 的新消息")
     except Exception:
         pass  # 非致命
 
     # Skill 引擎评估（延迟回复、打字指示器）
-    from app.services.skill_engine import evaluate_action_skills, _is_delay_reply_allowed
+    from app.services.skill.skill_engine import evaluate_action_skills, _is_delay_reply_allowed
     skill_result = await evaluate_action_skills(db, agent, 0, context={
         "content": content,
         "sender_type": "human",  # DM 中对方是人类
@@ -639,7 +639,7 @@ async def _trigger_dm_ai_reply(
         await asyncio.sleep(skill_result.delay_seconds)
 
     # 构建消息
-    from app.services.llm_service import build_dm_messages, resolve_model
+    from app.ai.llm import build_dm_messages, resolve_model
     # v0.4.0: DM 中 sender_id 即为触发用户
     messages = await build_dm_messages(db, agent, session_id, api_base_url=api_base, api_key=api_key, trigger_user_id=sender_id, system_prompt_override=effective_cfg.get("system_prompt"))
 

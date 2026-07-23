@@ -26,7 +26,7 @@ class SendGm(ToolPlugin):
 
     async def execute(self, db: AsyncSession, agent_id: int, group_id: int | None,
                       arguments: dict, context: dict) -> dict:
-        from app.services.group_service import create_message, message_to_dict
+        from app.chat.message import create_message, message_to_dict
         from app.models.agent import Agent as AgentModel
 
         # 统一用 user_id 作为 sender_id（v2.0.0 迁移后所有消息 sender_id 均为 users.id）
@@ -55,7 +55,7 @@ class SendGm(ToolPlugin):
             )
 
         # 推入消息队列，触发其他 AI 回复
-        from app.services.ai_response_worker import message_queue
+        from app.ai.response_worker import message_queue
         next_depth = context.get("chain_depth", 0) + 1
         try:
             message_queue.put_nowait({
@@ -71,7 +71,7 @@ class SendGm(ToolPlugin):
 
         # 自动提取关键信息存储为记忆
         try:
-            from app.services.memory_service import auto_extract_key_facts
+            from app.services.memory.memory_service import auto_extract_key_facts
             await auto_extract_key_facts(
                 db, agent_id, target_group, content,
                 api_base_url=context.get("api_base_url", "https://api.deepseek.com"),
@@ -82,7 +82,7 @@ class SendGm(ToolPlugin):
 
         # 记录消息吞吐量
         try:
-            from app.services.metrics_collector import metrics
+            from app.services.infrastructure.metrics_collector import metrics
             await metrics.record_message(agent_id)
         except Exception:
             pass

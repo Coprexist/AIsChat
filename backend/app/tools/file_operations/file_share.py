@@ -27,7 +27,7 @@ class FileShare(ToolPlugin):
 
     async def execute(self, db: AsyncSession, agent_id: int, group_id: int | None,
                       arguments: dict, context: dict) -> dict:
-        from app.services.file_service import ai_share_file
+        from app.services.content.file_service import ai_share_file
 
         path = arguments["path"]
         target_ai_id = arguments["target_ai_id"]

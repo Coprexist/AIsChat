@@ -4,7 +4,7 @@
 from __future__ import annotations
 
 import logging
-from app.services.plugin_registry import ServicePlugin, PluginRegistry
+from app.services.infrastructure.plugin_registry import ServicePlugin, PluginRegistry
 
 logger = logging.getLogger(__name__)
 
@@ -17,7 +17,7 @@ class BrowserPlugin(ServicePlugin):
 
     async def get_status(self) -> dict:
         try:
-            from app.services.browser_service import is_running, CDP_PORT
+            from app.services.content.browser_service import is_running, CDP_PORT
             running = is_running()
             return {
                 "installed": True,
@@ -28,7 +28,7 @@ class BrowserPlugin(ServicePlugin):
             return {"installed": False, "running": False, "port": None}
 
     async def start(self) -> bool:
-        from app.services.browser_service import start, is_running
+        from app.services.content.browser_service import start, is_running
         if is_running():
             return True
         ok = await start()
@@ -38,7 +38,7 @@ class BrowserPlugin(ServicePlugin):
         return ok
 
     async def stop(self) -> bool:
-        from app.services.browser_service import stop, is_running
+        from app.services.content.browser_service import stop, is_running
         if not is_running():
             return True
         await stop()

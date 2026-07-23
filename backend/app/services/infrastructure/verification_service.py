@@ -67,7 +67,7 @@ async def generate_and_send_code(
     await db.flush()
 
     # 发送邮件
-    from app.services.email_service import send_verification_code_email
+    from app.services.infrastructure.email_service import send_verification_code_email
     await send_verification_code_email(db, email, code, purpose, lang)
 
     logger.info(f"验证码已生成并发送: email={email}, purpose={purpose}")

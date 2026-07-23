@@ -20,14 +20,16 @@ from app.schemas.agent import (
     WorkspaceResponse,
 )
 from app.schemas.opencli import OpenCLIExecuteRequest, OpenCLIExecuteResponse
-from app.services.opencli_service import execute_opencli
-from app.services.group_service import (
+from app.services.content.opencli_service import execute_opencli
+from app.chat.delivery import (
     check_unread,
-    pause_notifications,
-    resume_and_fetch,
     get_pending_messages,
 )
-from app.services.agent_service import (
+from app.ai.group_logic import (
+    pause_notifications,
+    resume_and_fetch,
+)
+from app.services.agent.agent_service import (
     create_agent,
     list_agents,
     get_agent,
@@ -48,7 +50,7 @@ from app.services.agent_service import (
     list_collaborators,
     collaborator_to_dict,
 )
-from app.services import workspace_service
+from app.services.agent import workspace_service
 from app.utils.auth import get_current_user
 from app.utils.crypto import decrypt_api_key
 from app.models.user import User
@@ -64,7 +66,7 @@ async def get_available_models(
 ):
     """返回可用模型选项列表（所有供应商的全部模型，供前端下拉框分组展示）"""
     from app.config import settings
-    from app.services.system_settings_service import get_providers, get_provider_config
+    from app.services.infrastructure.system_settings_service import get_providers, get_provider_config
     from app.utils.pure.provider_config import (
         collect_all_models, build_provider_summaries,
         get_default_models, get_thinking_supported,
@@ -74,7 +76,7 @@ async def get_available_models(
 
     if not providers:
         # provider_config 为空时，使用内置预设作为默认值
-        from app.services.provider_presets import get_all_presets
+        from app.services.agent.provider_presets import get_all_presets
         builtin = get_all_presets()
         provider_list = []
         for i, p in enumerate(builtin):
@@ -483,7 +485,7 @@ async def delete_agent(
     db: AsyncSession = Depends(get_db),
 ):
     """删除 AI（返还 api_credit_cost 额度）"""
-    from app.services.agent_service import delete_agent as delete_agent_svc
+    from app.services.agent.agent_service import delete_agent as delete_agent_svc
     try:
         result = await delete_agent_svc(
             db,
@@ -705,7 +707,7 @@ async def upload_agent_avatar(
 
     # 入队联邦 profile 同步
     try:
-        from app.services.federation_service import enqueue_profile_update
+        from app.services.federation.federation_service import enqueue_profile_update
         await enqueue_profile_update(db, "agent", agent_id, "avatar_url", avatar_url)
     except Exception:
         pass
@@ -839,7 +841,7 @@ async def get_agent_structured_records(
     """获取 AI 的结构化记忆目录树（category → sub_key → fields）"""
     await _require_agent_access(agent_id, current_user, db)
 
-    from app.services.structured_memory_service import sr_categories, sr_list, sr_get
+    from app.services.memory.structured_memory_service import sr_categories, sr_list, sr_get
 
     data = await sr_categories(db, agent_id)
     tree = []

@@ -36,7 +36,7 @@ class SendFriendRequest(ToolPlugin):
 
     async def execute(self, db: AsyncSession, agent_id: int, group_id: int | None,
                       arguments: dict, context: dict) -> dict:
-        from app.services.friend_service import send_friend_request
+        from app.services.social.friend_service import send_friend_request
         from app.models.agent import Agent as AgentModel
 
         target_id = arguments["target_id"]

@@ -20,7 +20,7 @@ class CheckWorkspace(ToolPlugin):
 
     async def execute(self, db: AsyncSession, agent_id: int, group_id: int | None,
                       arguments: dict, context: dict) -> dict:
-        from app.services.workspace_service import get_workspace_status
+        from app.services.agent.workspace_service import get_workspace_status
 
         try:
             status = await get_workspace_status(db, agent_id)

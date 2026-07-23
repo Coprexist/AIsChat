@@ -26,7 +26,7 @@ class SetAlarm(ToolPlugin):
 
     async def execute(self, db: AsyncSession, agent_id: int, group_id: int | None,
                       arguments: dict, context: dict) -> dict:
-        from app.services.alarm_service import set_alarm as svc_set_alarm
+        from app.ai.alarm import set_alarm as svc_set_alarm
 
         task = arguments.get("task", "").strip()
         if not task:

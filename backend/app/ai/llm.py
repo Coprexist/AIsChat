@@ -16,7 +16,7 @@ from app.config import settings
 from app.models.group import Group as GroupModel
 from app.models.context_config import ContextConfig
 from app.chat import chat_api
-from app.services.memory_service import recall_relevant_memories, format_memories_for_prompt
+from app.services.memory.memory_service import recall_relevant_memories, format_memories_for_prompt
 from app.utils.pure.prompting import (
     resolve_model, build_personality_segment, format_time_shanghai,
     format_message, format_context_for_ai, assemble_system_prompt,
@@ -118,7 +118,7 @@ async def chat_completion(
         }
     """
     import time as _time
-    from app.services.metrics_collector import metrics
+    from app.services.infrastructure.metrics_collector import metrics
     t0 = _time.monotonic()
     try:
         if stream:
@@ -434,7 +434,7 @@ def _raise_classified_error(status_code: int, error_text: str, pool_key_id: int 
 async def _load_prompt_overrides(db) -> dict:
     """加载管理员在系统设置中自定义的系统提示词覆盖值"""
     try:
-        from app.services.system_settings_service import get_settings
+        from app.services.infrastructure.system_settings_service import get_settings
         s = await get_settings(db)
         return (s.get("system_prompt_overrides") or {}) if s else {}
     except Exception:
@@ -444,7 +444,7 @@ async def _load_prompt_overrides(db) -> dict:
 async def _get_segment_order(db) -> list[str]:
     """获取系统提示词段拼接顺序（优先 DB 配置，fallback 代码默认）"""
     try:
-        from app.services.system_settings_service import get_settings
+        from app.services.infrastructure.system_settings_service import get_settings
         s = await get_settings(db)
         order = s.get("system_prompt_order") if s else None
         if order and isinstance(order, list) and len(order) == len(SEGMENT_ORDER):
@@ -462,7 +462,7 @@ async def _get_segment_order(db) -> list[str]:
 async def _build_tools_segment(db, agent, is_dm: bool = False) -> str:
     """tools 段：技能背包视图——按 6 段分组展示，含段描述"""
     from app.services.tool_registry import get_allowed_tools
-    from app.services.skill_engine import _is_delay_reply_allowed
+    from app.services.skill.skill_engine import _is_delay_reply_allowed
     from app.tools.base import SKILL_SEGMENT_META, ToolRegistry
 
     delay_allowed = await _is_delay_reply_allowed(db, agent)
@@ -568,7 +568,7 @@ async def _build_injected_skills(
 
     # ── Skill 引擎注入（预留） ──
     try:
-        from app.services.skill_engine import evaluate_inject_skills
+        from app.services.skill.skill_engine import evaluate_inject_skills
         skill_prompts = await evaluate_inject_skills(db, agent, group_id)
         if skill_prompts:
             parts.append(
@@ -580,7 +580,7 @@ async def _build_injected_skills(
 
     # ── v0.9.0: 数据库版目录级记忆注入（替代文件系统版）──
     try:
-        from app.services.structured_memory_service import format_db_records_for_prompt
+        from app.services.memory.structured_memory_service import format_db_records_for_prompt
         db_records_text = await format_db_records_for_prompt(db, agent.id)
         if db_records_text:
             parts.append(db_records_text)
@@ -851,7 +851,7 @@ async def build_messages(
     v0.4.0: system_prompt_override 用于通用/半通用 AI 的 per-user 人格覆盖。
     v2.0: context_config 支持声明式配置驱动上下文构建。
     """
-    from app.services.context_config_parser import context_config_parser
+    from app.services.memory.context_config_parser import context_config_parser
 
     if context_config is None:
         context_config = await context_config_parser.load_config_from_db(db, agent.id)
@@ -947,7 +947,7 @@ async def build_messages(
     # ✨ 工作区任务（配置驱动）
     if context_config_parser.should_inject_workspace(context_config):
         try:
-            from app.services.workspace_service import get_current_task_text
+            from app.services.agent.workspace_service import get_current_task_text
             task_text = await get_current_task_text(db, agent.id)
             if task_text:
                 system_prompt += task_text
@@ -957,7 +957,7 @@ async def build_messages(
     # ✨ 状态栈摘要（配置驱动）
     if context_config_parser.should_inject_state_stack(context_config):
         try:
-            from app.services.state_stack_service import get_state_stack_summary
+            from app.services.agent.state_stack_service import get_state_stack_summary
             stack_summary = await get_state_stack_summary(db, agent.id)
             if stack_summary:
                 system_prompt += stack_summary
@@ -998,7 +998,7 @@ async def build_messages(
     # ── 历史消息 ──
     if vector_accelerated:
         try:
-            from app.services.vector_pipeline import hybrid_search
+            from app.services.memory.vector_pipeline import hybrid_search
             recent = await chat_api.get_recent_messages(db, group_id, limit=5, after_time=last_read_at)
             query_text_v = " ".join([m.content[:100] for m in recent])
             relevant = await hybrid_search(db, group_id, query_text_v, top_k=limit)
@@ -1142,7 +1142,7 @@ async def build_dm_messages(
 
     # ✨ 工作区任务
     try:
-        from app.services.workspace_service import get_current_task_text
+        from app.services.agent.workspace_service import get_current_task_text
         task_text = await get_current_task_text(db, agent.id)
         if task_text:
             system_prompt += task_text
@@ -1151,7 +1151,7 @@ async def build_dm_messages(
 
     # ✨ 状态栈摘要（v1.0.1）
     try:
-        from app.services.state_stack_service import get_state_stack_summary
+        from app.services.agent.state_stack_service import get_state_stack_summary
         stack_summary = await get_state_stack_summary(db, agent.id)
         if stack_summary:
             system_prompt += stack_summary

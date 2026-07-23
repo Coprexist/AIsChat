@@ -34,7 +34,7 @@ class MemoryDistributionEngine:
 
     async def _get_memory_index(self, db: AsyncSession, agent_id: int) -> dict:
         """获取结构记忆索引"""
-        from app.services.structured_memory_service import structured_memory_service
+        from app.services.memory.structured_memory_service import structured_memory_service
         return await structured_memory_service.get_categories(db, agent_id)
 
     async def _get_relevant_memories(self, db: AsyncSession, agent_id: int, context_type: str, max_tokens: int) -> list[dict]:

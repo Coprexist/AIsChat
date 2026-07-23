@@ -1142,7 +1142,7 @@ async def import_agent_soul(
 
     # 导入记忆（不生成 embedding，使用时自动生成）
     if import_memories:
-        from app.services.memory_service import auto_store_memory
+        from app.services.memory.memory_service import auto_store_memory
 
         memories = data.get("memories", [])
         for m in memories[:500]:

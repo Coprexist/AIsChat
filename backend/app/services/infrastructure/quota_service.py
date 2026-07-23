@@ -37,7 +37,7 @@ async def find_best_pool_key(db: AsyncSession, user_id: int, exclude_pool_key_id
     返回: ApiKeyPool | None
     """
     from app.models.api_key_pool import ApiKeyPool, UserApiAssignment
-    from app.services.api_key_concurrency import concurrency_mgr
+    from app.services.infrastructure.api_key_concurrency import concurrency_mgr
 
     # Step 1: 查缓存绑定
     assign_result = await db.execute(

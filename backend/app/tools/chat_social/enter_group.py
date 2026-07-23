@@ -5,7 +5,7 @@ import logging
 from sqlalchemy import select as sa_select
 from sqlalchemy.ext.asyncio import AsyncSession
 from app.tools.base import ToolPlugin, ToolRegistry
-from app.services.state_stack_service import make_state_frame, push_state
+from app.services.agent.state_stack_service import make_state_frame, push_state
 
 logger = logging.getLogger(__name__)
 
@@ -34,7 +34,7 @@ class EnterGroup(ToolPlugin):
         reason = arguments.get("reason", "主动查看")
 
         # 验证成员资格（用 _get_member 兼容 agent.id/user_id 两种格式）
-        from app.services.group_service import _get_member
+        from app.chat.message import _get_member
         member = await _get_member(db, target_group, "ai", agent_id)
         if not member:
             return {"error": True, "message": f"你不在群聊 {target_group} 中"}
@@ -47,7 +47,7 @@ class EnterGroup(ToolPlugin):
         # 未读消息数
         unread_count = 0
         preview = ""
-        from app.services.group_service import check_unread
+        from app.chat.delivery import check_unread
         try:
             unread_list = await check_unread(db, agent_id)
             unread_info = next((u for u in unread_list if u.get("group_id") == target_group), None)

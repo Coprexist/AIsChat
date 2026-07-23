@@ -39,7 +39,7 @@ async def register_user(
     require_verification = False
     login_providers = ["direct"]
     try:
-        from app.services.system_settings_service import get_settings
+        from app.services.infrastructure.system_settings_service import get_settings
         sys = await get_settings(db)
         require_verification = sys.get("require_email_verification", False)
         login_providers = sys.get("login_providers", ["direct"])
@@ -64,7 +64,7 @@ async def register_user(
             raise ValueError("该邮箱已被其他账号使用")
 
         # 验证码校验
-        from app.services.verification_service import verify_code
+        from app.services.infrastructure.verification_service import verify_code
         if not await verify_code(db, email, verification_code, "register"):
             raise ValueError("验证码错误或已过期")
 
@@ -78,7 +78,7 @@ async def register_user(
             raise ValueError("该邮箱已被其他账号使用")
         # 如果提供了验证码，校验之
         if verification_code:
-            from app.services.verification_service import verify_code
+            from app.services.infrastructure.verification_service import verify_code
             if await verify_code(db, email, verification_code, "register"):
                 email_verified = True
 
@@ -93,7 +93,7 @@ async def register_user(
     )
     # 读取全局默认设置（语言 + 平台赠送额度）
     try:
-        from app.services.system_settings_service import get_settings
+        from app.services.infrastructure.system_settings_service import get_settings
         sys = await get_settings(db)
         user.language = sys.get("default_language", "zh")
         user.platform_gifted_credit = sys.get("default_platform_credit", 0)
@@ -126,7 +126,7 @@ async def login_user(
     """
     # 检查登录方式是否可用
     try:
-        from app.services.system_settings_service import get_settings
+        from app.services.infrastructure.system_settings_service import get_settings
         sys = await get_settings(db)
         login_providers = sys.get("login_providers", ["direct"])
         if method not in login_providers:
@@ -161,7 +161,7 @@ async def login_user(
         if not verification_code:
             raise ValueError("请输入验证码")
 
-        from app.services.verification_service import verify_code
+        from app.services.infrastructure.verification_service import verify_code
         if not await verify_code(db, email_addr, verification_code, "login"):
             raise ValueError("用户名或密码错误")
 
@@ -256,7 +256,7 @@ async def rebind_email(
         raise ValueError("用户不存在")
 
     # 校验验证码
-    from app.services.verification_service import verify_code
+    from app.services.infrastructure.verification_service import verify_code
     if not await verify_code(db, email, code, "rebind"):
         raise ValueError("验证码错误或已过期")
 
@@ -288,7 +288,7 @@ async def unbind_email(
 
     # 检查系统是否关闭了邮箱验证
     try:
-        from app.services.system_settings_service import get_settings
+        from app.services.infrastructure.system_settings_service import get_settings
         sys = await get_settings(db)
         if sys.get("require_email_verification", False):
             raise ValueError("当前要求邮箱验证，无法解绑邮箱")

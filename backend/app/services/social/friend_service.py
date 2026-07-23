@@ -245,7 +245,7 @@ async def list_friends(
     from app.models.user import User
     from app.models.agent import Agent
     from app.models.dm import DMSession
-    from app.services.dm_service import generate_dm_session_id
+    from app.chat.dm import generate_dm_session_id
 
     result = await db.execute(
         select(Friendship)

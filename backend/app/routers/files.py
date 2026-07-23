@@ -12,7 +12,7 @@ from app.database import get_db
 from app.models.file import FileMetadata, FileReference, FileCollaborator
 from app.utils.auth import get_current_user
 from app.config import settings
-from app.services.file_service import (
+from app.services.content.file_service import (
     upload_file, list_files, get_file, get_file_physical_path,
     delete_file, check_file_access, track_file_reference,
     set_collaboration_mode, add_file_collaborator, remove_file_collaborator,
@@ -78,7 +78,7 @@ async def list_directory(
 
     # 合并转发来的文件
     if include_forwarded:
-        from app.services.file_service import get_user_forwarded_file_ids
+        from app.services.content.file_service import get_user_forwarded_file_ids
         forwarded_ids = await get_user_forwarded_file_ids(db, current_user["user_id"])
         if forwarded_ids:
             from sqlalchemy import select

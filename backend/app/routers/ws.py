@@ -15,9 +15,8 @@ from app.utils.auth import decode_access_token
 from app.utils.error_handler import build_ws_error, log_error
 from app.chat.connection import ConnectionManager
 from app.chat import chat_api
-from app.services.group_service import (
-    create_message, message_to_dict, store_pending_message,
-)
+from app.chat.message import create_message, message_to_dict
+from app.chat.delivery import store_pending_message
 
 logger = logging.getLogger(__name__)
 
@@ -51,7 +50,7 @@ async def websocket_endpoint(ws: WebSocket, token: str = Query(...)):
     current_session_id: str | None = None  # DM 会话 ID 追踪
 
     # 记录 WebSocket 连接活动（在线追踪兜底）
-    from app.services.online_tracker import record_ws_activity
+    from app.services.infrastructure.online_tracker import record_ws_activity
     record_ws_activity(user_id)
 
     # 缓存用户信息（打字状态/在线需要头像）
@@ -153,7 +152,7 @@ async def websocket_endpoint(ws: WebSocket, token: str = Query(...)):
 
                     async with async_session() as db:
                         try:
-                            from app.services.dm_service import send_dm_message as send_dm_msg, is_user_in_dm_dnd
+                            from app.chat.dm import send_dm_message as send_dm_msg, is_user_in_dm_dnd
                             msg = await send_dm_msg(
                                 db, session_id, sender_id=user_id,
                                 content=content, reply_to=reply_to,
@@ -180,7 +179,7 @@ async def websocket_endpoint(ws: WebSocket, token: str = Query(...)):
 
                     # 触发 AI 回复（如果对方是 AI）
                     if sender_type == "human":
-                        from app.services.ai_response_worker import message_queue
+                        from app.ai.response_worker import message_queue
                         try:
                             message_queue.put_nowait({
                                 "conversation_type": "dm",
@@ -196,7 +195,7 @@ async def websocket_endpoint(ws: WebSocket, token: str = Query(...)):
 
                     # Federation: forward DM to connected peers
                     try:
-                        from app.services.federation_manager import federation_manager as fed_mgr
+                        from app.services.federation.federation_manager import federation_manager as fed_mgr
                         asyncio.create_task(
                             fed_mgr.forward_dm_message(session_id, msg)
                         )
@@ -329,10 +328,10 @@ async def websocket_endpoint(ws: WebSocket, token: str = Query(...)):
 
                         # 联邦通信：异步转发到共享此群的对等端
                         try:
-                            from app.services.federation_service import is_group_federated as check_grp_fed
+                            from app.services.federation.federation_service import is_group_federated as check_grp_fed
                             is_fed = await check_grp_fed(db, group_id)
                             if is_fed:
-                                from app.services.federation_manager import federation_manager as fed_mgr
+                                from app.services.federation.federation_manager import federation_manager as fed_mgr
                                 asyncio.create_task(
                                     fed_mgr.forward_message(group_id, msg_data)
                                 )
@@ -341,7 +340,7 @@ async def websocket_endpoint(ws: WebSocket, token: str = Query(...)):
 
                         # 触发 AI 自动回复 worker（仅人类消息，始终触发不受在线用户数影响）
                         if sender_type == "human":
-                            from app.services.ai_response_worker import message_queue
+                            from app.ai.response_worker import message_queue
                             try:
                                 message_queue.put_nowait({
                                     "conversation_type": "group",
@@ -366,7 +365,7 @@ async def websocket_endpoint(ws: WebSocket, token: str = Query(...)):
                             )
                             is_accelerated = group_check.scalar_one_or_none()
                             if is_accelerated:
-                                from app.services.vector_pipeline import embedding_queue
+                                from app.services.memory.vector_pipeline import embedding_queue
                                 try:
                                     embedding_queue.put_nowait({
                                         "group_id": group_id,

@@ -21,7 +21,7 @@ from app.models.redemption import RedemptionCode
 from app.routers.ws import manager as ws_manager
 from app.models.system_log import SystemLog
 from app.models.opencli import OpenCLIUsageLog
-from app.services.opencli_service import (
+from app.services.content.opencli_service import (
     get_opencli_config,
     update_opencli_config,
     list_agent_whitelist,
@@ -542,7 +542,7 @@ async def update_pool_key(
         key_entry.api_base_url = req.api_base_url
     if req.is_active is not None:
         key_entry.is_active = req.is_active
-        from app.services.quota_service import find_best_pool_key
+        from app.services.infrastructure.quota_service import find_best_pool_key
     if req.priority is not None:
         key_entry.priority = req.priority
     if req.concurrent_limit is not None:
@@ -601,7 +601,7 @@ async def get_pool_key_stats_summary(
     """获取所有池 Key 的汇总统计（含当前并发）"""
     from app.models.api_key_pool import ApiKeyPool
     from app.models.api_usage_log import ApiUsageLog
-    from app.services.api_key_concurrency import concurrency_mgr
+    from app.services.infrastructure.api_key_concurrency import concurrency_mgr
     from sqlalchemy import func as sqlfunc
 
     result = await db.execute(select(ApiKeyPool).order_by(ApiKeyPool.priority.desc()))
@@ -767,7 +767,7 @@ async def download_backup(
     db: AsyncSession = Depends(get_db),
 ):
     """下载数据库完整备份（.sql 文件）"""
-    from app.services.backup_service import create_backup
+    from app.services.infrastructure.backup_service import create_backup
 
     try:
         sql_bytes = await create_backup()
@@ -797,7 +797,7 @@ async def upload_restore(
     db: AsyncSession = Depends(get_db),
 ):
     """上传 .sql 备份文件并恢复数据库（⚠️ 覆盖当前所有数据）"""
-    from app.services.backup_service import restore_backup
+    from app.services.infrastructure.backup_service import restore_backup
 
     if not file.filename or not file.filename.endswith(".sql"):
         raise HTTPException(
@@ -825,7 +825,7 @@ async def download_full_backup(
     db: AsyncSession = Depends(get_db),
 ):
     """下载完整备份（.tar.gz = 数据库 .sql + 文件目录 /app/data/）"""
-    from app.services.backup_service import create_full_backup
+    from app.services.infrastructure.backup_service import create_full_backup
 
     try:
         tar_bytes, sql_size, file_count = await create_full_backup()
@@ -855,7 +855,7 @@ async def upload_full_restore(
     db: AsyncSession = Depends(get_db),
 ):
     """上传 .tar.gz 完整备份并恢复（⚠️ 覆盖数据库 + 所有文件）"""
-    from app.services.backup_service import restore_full_backup
+    from app.services.infrastructure.backup_service import restore_full_backup
 
     if not file.filename or not (file.filename.endswith(".tar.gz") or file.filename.endswith(".tgz")):
         raise HTTPException(
@@ -881,7 +881,7 @@ async def upload_full_restore(
 # 系统设置（全局默认语言等）
 # ============================================================
 
-from app.services.system_settings_service import get_settings, update_settings
+from app.services.infrastructure.system_settings_service import get_settings, update_settings
 from app.schemas.system_settings import UpdateSystemSettingsRequest, SystemSettingsResponse
 
 
@@ -1176,7 +1176,7 @@ async def test_smtp(
         "use_tls": req.use_tls,
     }
 
-    from app.services.email_service import test_smtp_connection
+    from app.services.infrastructure.email_service import test_smtp_connection
     ok, msg = await test_smtp_connection(config)
     return {"success": ok, "message": msg}
 
@@ -1308,7 +1308,7 @@ async def test_smtp_by_index(
         "use_tls": cfg.get("use_tls", True),
     }
 
-    from app.services.email_service import test_smtp_connection
+    from app.services.infrastructure.email_service import test_smtp_connection
     ok, msg = await test_smtp_connection(test_config)
     return {"success": ok, "message": msg, "index": index}
 
@@ -1321,7 +1321,7 @@ async def get_email_templates_endpoint(
     db: AsyncSession = Depends(get_db),
 ):
     """获取当前邮件模板 + 预设名"""
-    from app.services.email_service import get_email_templates, get_email_template_preset
+    from app.services.infrastructure.email_service import get_email_templates, get_email_template_preset
     templates = await get_email_templates(db)
     preset = await get_email_template_preset(db)
     return {"templates": templates, "preset": preset}
@@ -1335,7 +1335,7 @@ async def update_email_templates(
 ):
     """保存自定义邮件模板到 DB（支持同时切换 preset）"""
     try:
-        from app.services.email_service import set_email_template_preset
+        from app.services.infrastructure.email_service import set_email_template_preset
         if req.preset:
             custom = req.templates.model_dump() if req.preset == "custom" else None
             await set_email_template_preset(db, req.preset, custom_templates=custom)
@@ -1372,7 +1372,7 @@ async def set_email_template_preset_endpoint(
 ):
     """切换邮件模板预设（gradient / simple / custom）"""
     try:
-        from app.services.email_service import set_email_template_preset as _set_preset
+        from app.services.infrastructure.email_service import set_email_template_preset as _set_preset
         custom = req.templates.model_dump() if req.templates else None if req.preset == "custom" else None
         await _set_preset(db, req.preset, custom_templates=custom)
         await _log_admin_action(
@@ -1391,7 +1391,7 @@ async def reset_email_templates(
 ):
     """重置邮件模板为默认值（恢复到 gradient 预设）"""
     try:
-        from app.services.email_service import set_email_template_preset as _set_preset
+        from app.services.infrastructure.email_service import set_email_template_preset as _set_preset
         await _set_preset(db, "gradient")
         await _log_admin_action(
             db, admin["user_id"], "reset_email_templates", "system", 1, {},
@@ -1431,11 +1431,11 @@ async def get_system_prompt(
     db: AsyncSession = Depends(get_db),
 ):
     """获取系统提示词的当前覆盖值及默认值（供管理员查看/编辑）"""
-    from app.services.llm_service import (
+    from app.ai.llm import (
         CORE_IDENTITY, PROTOCOL_CHAT, PROTOCOL_IMMERSIVE,
         PROTOCOL_DIGITAL_LIFE, DM_PROTOCOL, SEGMENT_ORDER,
     )
-    from app.services.system_settings_service import get_settings
+    from app.services.infrastructure.system_settings_service import get_settings
 
     s = await get_settings(db)
     overrides = s.get("system_prompt_overrides") or {}
@@ -1533,7 +1533,7 @@ async def update_system_prompt(
     db: AsyncSession = Depends(get_db),
 ):
     """更新系统提示词覆盖值（可覆盖的段：core_identity, protocol_*）"""
-    from app.services.system_settings_service import _get_or_create
+    from app.services.infrastructure.system_settings_service import _get_or_create
 
     allowed_keys = {"core_identity", "protocol_chat", "protocol_immersive", "protocol_digital_life", "dm_protocol"}
     overrides = body.overrides or {}
@@ -1836,7 +1836,7 @@ from app.schemas.federation import (
     PeerUpdate,
     FederatedEntityUpdate,
 )
-from app.services import federation_service as fed_svc
+from app.services.federation import federation_service as fed_svc
 
 
 # ── 实例身份 ──
@@ -2001,7 +2001,7 @@ async def connect_federation_peer(
     if not (peer.remote_url or "").strip():
         return {"message": f"{peer.peer_public_id} 未配置远端地址，无需出站连接（等待对方连入）"}
     # 已连接 → 无需重复
-    from app.services.federation_manager import federation_manager
+    from app.services.federation.federation_manager import federation_manager
     if peer.peer_public_id in federation_manager.peers and \
        federation_manager.peers[peer.peer_public_id].handshake_complete:
         return {"message": f"{peer.peer_public_id} 已连接（入站连接）"}
@@ -2026,7 +2026,7 @@ async def disconnect_federation_peer(
     if peer is None:
         raise HTTPException(status_code=404, detail="对等端不存在")
 
-    from app.services.federation_manager import federation_manager
+    from app.services.federation.federation_manager import federation_manager
     await federation_manager.disconnect_peer(peer.peer_public_id)
     return {"message": f"已断开 {peer.peer_public_id}"}
 
@@ -2052,7 +2052,7 @@ async def rotate_federation_peer_url(
     if not peer.is_enabled:
         raise HTTPException(status_code=400, detail="对等端已禁用")
 
-    from app.services.federation_manager import federation_manager
+    from app.services.federation.federation_manager import federation_manager
     err = await federation_manager.initiate_url_rotation(peer.peer_public_id, body.new_url)
     if err:
         raise HTTPException(status_code=400, detail=err)
@@ -2126,7 +2126,7 @@ async def get_conv_log_config(
     db: AsyncSession = Depends(get_db),
 ):
     """获取对话日志全局配置"""
-    from app.services.conversation_log_service import get_config_dict
+    from app.services.content.conversation_log_service import get_config_dict
     return await get_config_dict(db)
 
 
@@ -2137,7 +2137,7 @@ async def update_conv_log_config(
     db: AsyncSession = Depends(get_db),
 ):
     """更新对话日志全局配置"""
-    from app.services.conversation_log_service import update_config
+    from app.services.content.conversation_log_service import update_config
     try:
         result = await update_config(
             db,
@@ -2164,7 +2164,7 @@ async def get_agent_conv_log_settings(
     db: AsyncSession = Depends(get_db),
 ):
     """获取某 AI 的对话日志设置"""
-    from app.services.conversation_log_service import get_agent_log_settings
+    from app.services.content.conversation_log_service import get_agent_log_settings
     try:
         return await get_agent_log_settings(db, agent_id)
     except ValueError as e:
@@ -2179,7 +2179,7 @@ async def update_agent_conv_log_settings(
     db: AsyncSession = Depends(get_db),
 ):
     """更新某 AI 的对话日志设置"""
-    from app.services.conversation_log_service import update_agent_log_settings
+    from app.services.content.conversation_log_service import update_agent_log_settings
     try:
         result = await update_agent_log_settings(
             db, agent_id,
@@ -2204,7 +2204,7 @@ async def get_agent_conv_logs(
     db: AsyncSession = Depends(get_db),
 ):
     """获取某 AI 的对话日志列表（管理员）"""
-    from app.services.conversation_log_service import get_agent_logs
+    from app.services.content.conversation_log_service import get_agent_logs
     try:
         return await get_agent_logs(db, agent_id, is_admin=True, limit=limit, offset=offset)
     except ValueError as e:
@@ -2219,7 +2219,7 @@ async def get_agent_conv_log_detail(
     db: AsyncSession = Depends(get_db),
 ):
     """获取单条对话日志详情（含完整 messages）"""
-    from app.services.conversation_log_service import get_log_detail
+    from app.services.content.conversation_log_service import get_log_detail
     try:
         detail = await get_log_detail(db, log_id, is_admin=True)
         if detail is None:
@@ -2243,7 +2243,7 @@ async def get_global_usage(
     db: AsyncSession = Depends(get_db),
 ):
     """全站 token 消耗总览"""
-    from app.services.conversation_log_service import get_admin_global_token_stats
+    from app.services.content.conversation_log_service import get_admin_global_token_stats
     end_date = datetime.now(tz.utc).replace(tzinfo=None)
     start_date = end_date - timedelta(days=days)
     return await get_admin_global_token_stats(db, start_date, end_date)
@@ -2256,7 +2256,7 @@ async def get_usage_by_user(
     db: AsyncSession = Depends(get_db),
 ):
     """按用户分组的 token 消耗明细"""
-    from app.services.conversation_log_service import get_admin_users_token_summary
+    from app.services.content.conversation_log_service import get_admin_users_token_summary
     end_date = datetime.now(tz.utc).replace(tzinfo=None)
     start_date = end_date - timedelta(days=days)
     return await get_admin_users_token_summary(db, start_date, end_date)
@@ -2270,7 +2270,7 @@ async def get_agent_daily_usage_admin(
     db: AsyncSession = Depends(get_db),
 ):
     """获取单个 AI 每日 token 消耗分布"""
-    from app.services.conversation_log_service import get_agent_token_daily
+    from app.services.content.conversation_log_service import get_agent_token_daily
     end_date = datetime.now(tz.utc).replace(tzinfo=None)
     start_date = end_date - timedelta(days=days)
     return await get_agent_token_daily(db, agent_id, start_date, end_date)
@@ -2293,7 +2293,7 @@ async def get_system_metrics(
     - retention_days: 当前保留天数
     """
     from app.models.agent_metrics import AgentMetricsSnapshot
-    from app.services.metrics_collector import metrics
+    from app.services.infrastructure.metrics_collector import metrics
     from datetime import timedelta as _td
     from sqlalchemy import select as _sel_m
 
@@ -2372,7 +2372,7 @@ async def get_skill_backpack(
             agent_state = agent.state
             agent_thinking = agent.thinking_enabled
             # 获取该状态下允许的工具
-            from app.services.skill_engine import _is_delay_reply_allowed
+            from app.services.skill.skill_engine import _is_delay_reply_allowed
             delay_allowed = await _is_delay_reply_allowed(db, agent)
             allowed_defs = ToolRegistry.get_allowed_tools(
                 agent_state, agent_thinking, delay_allowed,
@@ -2401,7 +2401,7 @@ async def admin_get_agent_skills(
     获取某个 AI 的所有思维技能（管理面板「AI 技能管理」用）
     """
     from app.models.agent import Agent
-    from app.services.skill_service import list_skills
+    from app.services.skill.skill_service import list_skills
 
     # 验证 AI 存在
     agent_result = await db.execute(select(Agent).where(Agent.id == agent_id))
@@ -2437,7 +2437,7 @@ async def admin_update_agent_skill(
     """
     管理员修改某个 AI 的技能（启用/禁用/修改配置）
     """
-    from app.services.skill_service import update_skill, toggle_skill
+    from app.services.skill.skill_service import update_skill, toggle_skill
 
     # 如果仅修改启用状态，用 toggle
     if len(body.model_dump(exclude_none=True)) == 1 and body.is_enabled is not None:
@@ -2462,8 +2462,8 @@ async def get_provider_presets(
     db: AsyncSession = Depends(get_db),
 ):
     """获取所有 LLM 厂商预设 + 当前已配置的供应商列表"""
-    from app.services.provider_presets import get_all_presets
-    from app.services.system_settings_service import get_providers
+    from app.services.agent.provider_presets import get_all_presets
+    from app.services.infrastructure.system_settings_service import get_providers
 
     presets = get_all_presets()
     current_providers = await get_providers(db)
@@ -2495,8 +2495,8 @@ async def save_provider(
 ):
     """新增或更新一个 LLM 供应商配置（保存到 system_settings.provider_config 数组）"""
     import json
-    from app.services.provider_presets import get_preset
-    from app.services.system_settings_service import get_providers
+    from app.services.agent.provider_presets import get_preset
+    from app.services.infrastructure.system_settings_service import get_providers
     from app.utils.pure.provider_config import build_provider_config, upsert_provider
 
     if body.provider == "manual":
@@ -2546,7 +2546,7 @@ async def delete_provider(
 ):
     """删除一个供应商配置"""
     import json
-    from app.services.system_settings_service import get_providers
+    from app.services.infrastructure.system_settings_service import get_providers
     from app.utils.pure.provider_config import remove_provider
 
     providers = await get_providers(db)
@@ -2571,8 +2571,8 @@ async def delete_provider(
 # ══════════════════════════════════════════════════════════════
 
 # 导入 browser_plugin 触发自动注册（必须保留，否则插件列表为空）
-from app.services.browser_plugin import BrowserPlugin  # noqa: F401
-from app.services.plugin_registry import PluginRegistry
+from app.services.content.browser_plugin import BrowserPlugin  # noqa: F401
+from app.services.infrastructure.plugin_registry import PluginRegistry
 
 
 @router.get("/browser-status")

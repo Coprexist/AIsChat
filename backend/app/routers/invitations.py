@@ -15,7 +15,7 @@ async def list_invitations(
     db: AsyncSession = Depends(get_db),
 ):
     """获取当前用户的待处理群邀请"""
-    from app.services.invitation_service import list_pending_invitations
+    from app.services.social.invitation_service import list_pending_invitations
     invitations = await list_pending_invitations(db, current_user["user_id"])
     return {"invitations": invitations}
 
@@ -27,7 +27,7 @@ async def accept_invitation(
     db: AsyncSession = Depends(get_db),
 ):
     """接受群邀请"""
-    from app.services.invitation_service import accept_invitation as accept_inv
+    from app.services.social.invitation_service import accept_invitation as accept_inv
     try:
         result = await accept_inv(db, invitation_id, current_user["user_id"])
         return result
@@ -42,7 +42,7 @@ async def reject_invitation(
     db: AsyncSession = Depends(get_db),
 ):
     """拒绝群邀请"""
-    from app.services.invitation_service import reject_invitation as reject_inv
+    from app.services.social.invitation_service import reject_invitation as reject_inv
     try:
         result = await reject_inv(db, invitation_id, current_user["user_id"])
         return result
