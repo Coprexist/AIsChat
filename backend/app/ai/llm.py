@@ -14,6 +14,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from app.config import settings
 from app.models.group import Group as GroupModel
+from app.models.context_config import ContextConfig
 from app.chat import chat_api
 from app.services.memory_service import recall_relevant_memories, format_memories_for_prompt
 from app.utils.pure.prompting import (
@@ -834,6 +835,7 @@ async def build_messages(
     api_key: str | None = None,
     trigger_user_id: int | None = None,
     system_prompt_override: str | None = None,
+    context_config: ContextConfig | None = None,
 ) -> list[dict]:
     """
     构建发送给 LLM 的消息列表（6 段系统提示词 + 历史消息）。
@@ -847,7 +849,12 @@ async def build_messages(
     6. injected_skills — 记忆注入 + Skill 引擎注入
 
     v0.4.0: system_prompt_override 用于通用/半通用 AI 的 per-user 人格覆盖。
+    v2.0: context_config 支持声明式配置驱动上下文构建。
     """
+    from app.services.context_config_parser import context_config_parser
+
+    if context_config is None:
+        context_config = await context_config_parser.load_config_from_db(db, agent.id)
 
     # ── 并行获取所有上下文 ──
     # 1. 解析 DM 状态和群名
@@ -915,45 +922,58 @@ async def build_messages(
         protocol += PRIVACY_RULES
         protocol += CHAT_CHAIN_RULES
 
-    # ── 构建六段（应用管理员覆盖）──
-    segments = {
-        "core_identity": overrides.get("core_identity") or CORE_IDENTITY,
-        "personality": build_personality_segment(agent, language, system_prompt_override),
-        "protocol": overrides.get(f"protocol_{profile}") or protocol,
-        "tools": await _build_tools_segment(db, agent, is_dm),
-        "injected_skills": await _build_injected_skills(db, agent, group_id, query_text, api_base_url, api_key, trigger_user_id),
-    }
+    # ── 构建六段（应用管理员覆盖 + 配置驱动）──
+    enabled_segments = context_config_parser.get_enabled_segments(context_config)
+    
+    segments = {}
+    if "core_identity" in enabled_segments:
+        segments["core_identity"] = overrides.get("core_identity") or CORE_IDENTITY
+    
+    if "personality" in enabled_segments:
+        segments["personality"] = build_personality_segment(agent, language, system_prompt_override)
+    
+    if "protocol" in enabled_segments:
+        segments["protocol"] = overrides.get(f"protocol_{profile}") or protocol
+    
+    if "tools" in enabled_segments:
+        segments["tools"] = await _build_tools_segment(db, agent, is_dm)
+    
+    if "injected_skills" in enabled_segments and context_config_parser.should_inject_skills(context_config):
+        segments["injected_skills"] = await _build_injected_skills(db, agent, group_id, query_text, api_base_url, api_key, trigger_user_id)
 
-    order = await _get_segment_order(db)
+    order = context_config_parser.parse_segment_order(context_config)
     system_prompt = assemble_system_prompt(segments, order)
 
-    # ✨ 工作区任务（追加到 current_context 之后）
-    try:
-        from app.services.workspace_service import get_current_task_text
-        task_text = await get_current_task_text(db, agent.id)
-        if task_text:
-            system_prompt += task_text
-    except Exception as e:
-        logger.warning(f"工作区上下文注入失败（非致命）: {e}")
+    # ✨ 工作区任务（配置驱动）
+    if context_config_parser.should_inject_workspace(context_config):
+        try:
+            from app.services.workspace_service import get_current_task_text
+            task_text = await get_current_task_text(db, agent.id)
+            if task_text:
+                system_prompt += task_text
+        except Exception as e:
+            logger.warning(f"工作区上下文注入失败（非致命）: {e}")
 
-    # ✨ 状态栈摘要（v1.0.1：尾部注入，缓存友好）
-    try:
-        from app.services.state_stack_service import get_state_stack_summary
-        stack_summary = await get_state_stack_summary(db, agent.id)
-        if stack_summary:
-            system_prompt += stack_summary
-    except Exception as e:
-        logger.warning(f"状态栈摘要注入失败（非致命）: {e}")
+    # ✨ 状态栈摘要（配置驱动）
+    if context_config_parser.should_inject_state_stack(context_config):
+        try:
+            from app.services.state_stack_service import get_state_stack_summary
+            stack_summary = await get_state_stack_summary(db, agent.id)
+            if stack_summary:
+                system_prompt += stack_summary
+        except Exception as e:
+            logger.warning(f"状态栈摘要注入失败（非致命）: {e}")
 
     messages = [{"role": "system", "content": system_prompt}]
 
-    # ── 统一上下文：数字生命档/沉浸档/共振 → 加载多会话上下文 ──
-    cross_msgs = await _build_cross_conversation_context(
-        db, agent, current_group_id=group_id, trigger_user_id=trigger_user_id,
-    )
-    if cross_msgs:
-        messages.extend(cross_msgs)
-        logger.info(f"  AI {agent.name}: 加入 {len(cross_msgs)} 条多会话上下文")
+    # ── 多会话上下文（配置驱动）──
+    if context_config_parser.should_inject_cross_conversation(context_config):
+        cross_msgs = await _build_cross_conversation_context(
+            db, agent, current_group_id=group_id, trigger_user_id=trigger_user_id,
+        )
+        if cross_msgs:
+            messages.extend(cross_msgs)
+            logger.info(f"  AI {agent.name}: 加入 {len(cross_msgs)} 条多会话上下文")
 
     # ── 当前群聊（最后一个会话标题，位置即语义）──
     messages.append({"role": "system", "content": f"在群聊「{group_name}」(id={group_id})中："})
@@ -992,9 +1012,12 @@ async def build_messages(
             vector_accelerated = False
 
     if not vector_accelerated:
-        # 先取未读消息（最多 20 条），不足 3 条补到至少 3 条
-        recent_messages = await chat_api.get_recent_messages(db, group_id, limit=20)
-        # 群消息折叠长度（默认256，0=不截断）
+        msg_window = context_config_parser.get_message_window_config(context_config)
+        max_unread = msg_window["max_unread_messages"]
+        min_unread = msg_window["min_unread_messages"]
+        
+        recent_messages = await chat_api.get_recent_messages(db, group_id, limit=max_unread)
+        
         max_len = getattr(group_obj, 'max_msg_display_len', 256) if group_obj else 256
 
         for m in reversed(recent_messages):
@@ -1010,10 +1033,11 @@ async def build_messages(
                 "content": content,
             }
 
-        # 🖼️ 为最后一条用户消息注入图片附件（DeepSeek V4 Pro 多模态）
             role = "assistant" if m.sender_type == "ai" else "user"
             messages.append({"role": role, "content": format_message(msg_struct, getattr(agent, 'name', '')),})
-        await _inject_image_data(messages, recent_messages, settings.data_dir)
+        
+        if context_config_parser.should_inject_image(context_config):
+            await _inject_image_data(messages, recent_messages, settings.data_dir)
 
     # 更新 AI 的最后阅读时间
     if last_read_at is not None:

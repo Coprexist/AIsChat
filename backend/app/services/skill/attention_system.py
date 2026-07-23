@@ -1,0 +1,91 @@
+"""
+注意力系统 — AI 主动过滤消息，声明兴趣域
+
+前置过滤流程：
+  1. 消息来了 → 查每个 AI 的 AgentAttention
+  2. 命中 interested → 加分
+  3. 命中 ignored → 直接剔除
+  4. 否则 → 正常 willingness 算分
+"""
+import logging
+import re
+from sqlalchemy.ext.asyncio import AsyncSession
+
+logger = logging.getLogger(__name__)
+
+
+class AttentionSystem:
+    async def check_attention(self, db: AsyncSession, agent_id: int, group_id: int, message_content: str, sender_id: int) -> str:
+        """
+        检查注意力匹配：
+        - highlight: 高亮显示
+        - wake: 唤醒 AI
+        - silent_remember: 静默记忆
+        - ignore: 忽略
+        
+        Returns:
+            匹配动作类型
+        """
+        from app.models.agent_attention import AgentAttention
+        from sqlalchemy import select
+        result = await db.execute(
+            select(AgentAttention)
+            .where(AgentAttention.agent_id == agent_id, AgentAttention.group_id == group_id)
+        )
+        attention = result.scalar_one_or_none()
+        if not attention:
+            return "normal"
+
+        if sender_id in attention.interested_users:
+            return attention.match_action
+
+        for pattern in attention.interested_patterns:
+            if re.search(pattern, message_content):
+                return attention.match_action
+
+        for topic in attention.interested_topics:
+            if topic.lower() in message_content.lower():
+                return attention.match_action
+
+        for pattern in attention.ignored_patterns:
+            if re.search(pattern, message_content):
+                return "ignore"
+
+        for topic in attention.ignored_topics:
+            if topic.lower() in message_content.lower():
+                return "ignore"
+
+        return "normal"
+
+    async def update_attention(self, db: AsyncSession, agent_id: int, group_id: int, settings: dict) -> None:
+        """更新注意力设置"""
+        from app.models.agent_attention import AgentAttention
+        from sqlalchemy import select
+        result = await db.execute(
+            select(AgentAttention)
+            .where(AgentAttention.agent_id == agent_id, AgentAttention.group_id == group_id)
+        )
+        attention = result.scalar_one_or_none()
+
+        if attention:
+            attention.interested_topics = settings.get("interested_topics", [])
+            attention.interested_users = settings.get("interested_users", [])
+            attention.interested_patterns = settings.get("interested_patterns", [])
+            attention.ignored_topics = settings.get("ignored_topics", [])
+            attention.ignored_patterns = settings.get("ignored_patterns", [])
+            attention.match_action = settings.get("match_action", "highlight")
+        else:
+            db.add(AgentAttention(
+                agent_id=agent_id,
+                group_id=group_id,
+                interested_topics=settings.get("interested_topics", []),
+                interested_users=settings.get("interested_users", []),
+                interested_patterns=settings.get("interested_patterns", []),
+                ignored_topics=settings.get("ignored_topics", []),
+                ignored_patterns=settings.get("ignored_patterns", []),
+                match_action=settings.get("match_action", "highlight"),
+            ))
+        await db.flush()
+
+
+attention_system = AttentionSystem()

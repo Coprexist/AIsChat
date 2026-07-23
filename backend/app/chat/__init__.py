@@ -7,9 +7,14 @@
   - dm.py:         私信创建/投递
   - connection.py:  WebSocket 连接管理（ConnectionManager）
   - delivery.py:   消息可达性管理（DND/mute/pending）
+  - protocol.py:   ChatApi 协议抽象基类
 """
 
-from app.chat.connection import ConnectionManager
+from typing import Any, List, Optional
+from datetime import datetime
+
+from app.services.connection_manager import ConnectionManager, connection_manager
+from app.chat.protocol import BaseChatApi
 from app.chat.message import (
     create_group,
     get_group,
@@ -50,7 +55,7 @@ from app.chat.delivery import (
 )
 
 
-class ChatApi:
+class ChatApi(BaseChatApi):
     """
     聊天世界的对外接口。
 
@@ -188,6 +193,61 @@ class ChatApi:
 
     async def update_last_read(self, db, group_id, member_type, member_id):
         return await update_last_read(db, group_id, member_type, member_id)
+
+    # ── 缺失接口补充 ──
+
+    async def list_messages(
+        self,
+        db,
+        group_id: Optional[int] = None,
+        dm_session_id: Optional[str] = None,
+        limit: int = 50,
+        offset: int = 0,
+    ) -> List[dict]:
+        if group_id is not None:
+            messages = await get_recent_messages(db, group_id, limit=limit)
+            return [await self.message_to_dict(m) for m in messages]
+        elif dm_session_id is not None:
+            messages = await get_dm_messages(db, dm_session_id, 0, limit=limit)
+            return [await self.message_to_dict(m) for m in messages]
+        return []
+
+    async def set_member_dnd(
+        self,
+        db,
+        member_id: int,
+        group_id: int,
+        until: Optional[datetime] = None,
+        member_type: str = "ai",
+    ) -> dict:
+        if until is None:
+            await set_group_dnd(db, member_id, group_id, member_type=member_type)
+        else:
+            duration = (until - datetime.utcnow()).total_seconds() / 60
+            await set_group_dnd(db, member_id, group_id, duration_minutes=int(duration), member_type=member_type)
+        return {"success": True}
+
+    async def get_friend_list(self, db, user_id: int) -> List[dict]:
+        from app.services.friend_service import list_friends
+        return await list_friends(db, user_id)
+
+    async def get_user_info(self, db, user_id: int) -> dict:
+        from app.models.user import User as UserModel
+        user = await db.get(UserModel, user_id)
+        if user is None:
+            return {}
+        return {
+            "id": user.id,
+            "username": user.username,
+            "avatar_url": getattr(user, 'avatar_url', None),
+            "language": getattr(user, 'language', 'zh'),
+        }
+
+    # ── RPC 适配器预留 ──
+
+    def set_transport(self, transport: Any) -> None:
+        """设置传输层适配器（预留接口，支持未来 RPC 替换）"""
+        self._transport = transport
 
 
 # 全局单例 ChatApi 实例
