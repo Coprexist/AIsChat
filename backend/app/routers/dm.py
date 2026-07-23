@@ -7,7 +7,7 @@ from pydantic import BaseModel
 from sqlalchemy.ext.asyncio import AsyncSession
 from app.database import get_db
 from app.utils.auth import get_current_user
-from app.services.dm_service import (
+from app.chat.dm import (
     get_or_create_dm_session,
     list_dm_sessions,
     get_dm_session,
@@ -111,7 +111,7 @@ async def get_my_token_usage(
     db: AsyncSession = Depends(get_db),
 ):
     """获取当前用户在此 DM 中的 token 消耗（自费聊天时显示）"""
-    from app.services.conversation_log_service import get_session_token_usage
+    from app.services.content.conversation_log_service import get_session_token_usage
     usage = await get_session_token_usage(db, session_id, current_user["user_id"])
     return usage
 
@@ -123,7 +123,7 @@ async def get_dm_activity(
     db: AsyncSession = Depends(get_db),
 ):
     """获取私信当前 AI 思考状态（用于进入对话时恢复活动指示器）"""
-    from app.services.ai_response_worker import get_thinking_state
+    from app.ai.response_worker import get_thinking_state
     return get_thinking_state(f"dm:{session_id}")
 
 
@@ -154,8 +154,8 @@ async def export_dm_chat(
     db: AsyncSession = Depends(get_db),
 ):
     """导出私信记录（json / txt / html）"""
-    from app.services.dm_service import get_dm_session as _get_dm
-    from app.services.export_service import export_dm_chat_history
+    from app.chat.dm import get_dm_session as _get_dm
+    from app.services.content.export_service import export_dm_chat_history
 
     # 校验用户是参与者
     try:
@@ -374,7 +374,7 @@ async def _maybe_trigger_dm_ai_reply(
         await db.flush()
 
     # ── 推入 AI 回复队列 ──
-    from app.services.ai_response_worker import message_queue
+    from app.ai.response_worker import message_queue
     import asyncio
     try:
         message_queue.put_nowait({
@@ -393,7 +393,7 @@ async def _maybe_trigger_dm_ai_reply(
 
 async def _send_system_dm_notice(db: AsyncSession, session_id: str, agent, text: str):
     """向 DM 会话发送系统提示消息"""
-    from app.services.dm_service import send_dm_message
+    from app.chat.dm import send_dm_message
     from app.models.user import User as UserModel
     try:
         # 获取系统用户
@@ -415,7 +415,7 @@ async def _send_system_dm_notice(db: AsyncSession, session_id: str, agent, text:
 
 async def _notify_owner_quota_exhausted(db: AsyncSession, agent, used: int, quota: int):
     """通知 AI 主人：他人对话配额已用完"""
-    from app.services.dm_service import get_or_create_dm_session, send_dm_message
+    from app.chat.dm import get_or_create_dm_session, send_dm_message
     from app.models.user import User as UserModel
     try:
         owner_result = await db.execute(

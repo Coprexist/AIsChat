@@ -4,7 +4,7 @@ push_state 工具 — 切换任务上下文时记录新状态帧
 import logging
 from sqlalchemy.ext.asyncio import AsyncSession
 from app.tools.base import ToolPlugin, ToolRegistry
-from app.services.state_stack_service import make_state_frame, push_state
+from app.services.agent.state_stack_service import make_state_frame, push_state
 
 logger = logging.getLogger(__name__)
 

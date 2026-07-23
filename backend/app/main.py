@@ -17,7 +17,7 @@ async def _start_browser_service():
     """启动共享 Chromium CDP 服务（稍延迟，等数据库就绪）"""
     await asyncio.sleep(3)  # 等数据库和网络就绪
     try:
-        from app.services.plugin_registry import PluginRegistry
+        from app.services.infrastructure.plugin_registry import PluginRegistry
         plugin = PluginRegistry.get("browser")
         if plugin is None:
             logger.warning("⚠️  Browser 插件未注册，browser 命令将不可用")
@@ -38,7 +38,7 @@ async def _start_browser_service():
 async def _stop_browser_service():
     """停止共享 Chromium CDP 服务"""
     try:
-        from app.services.plugin_registry import PluginRegistry
+        from app.services.infrastructure.plugin_registry import PluginRegistry
         plugin = PluginRegistry.get("browser")
         if plugin is not None:
             await plugin.stop()
@@ -79,33 +79,33 @@ async def lifespan(app: FastAPI):
     await run_migrations()
 
     # 启动 AI 回复 Worker
-    from app.services.ai_response_worker import ai_response_worker
+    from app.ai.response_worker import ai_response_worker
     ai_worker_task = asyncio.create_task(ai_response_worker())
 
     # 启动向量化 Pipeline Worker
-    from app.services.vector_pipeline import vector_pipeline_worker
+    from app.services.memory.vector_pipeline import vector_pipeline_worker
     vector_worker_task = asyncio.create_task(vector_pipeline_worker())
 
     # 启动闹钟调度器（心跳机制 — 事件驱动模式）
-    from app.services.ai_response_worker import alarm_scheduler
+    from app.ai.response_worker import alarm_scheduler
     alarm_scheduler_task = asyncio.create_task(alarm_scheduler())
 
     # 启动记忆批量写入 worker
-    from app.services.memory_buffer import memory_flush_worker
+    from app.services.memory.memory_buffer import memory_flush_worker
     memory_flush_task = asyncio.create_task(memory_flush_worker())
 
     # 启动孤儿文件清理 worker
-    from app.services.file_service import orphan_cleanup_worker
+    from app.services.content.file_service import orphan_cleanup_worker
     orphan_cleanup_task = asyncio.create_task(orphan_cleanup_worker())
 
     # 启动系统指标收集 flush worker
-    from app.services.metrics_collector import metrics_flush_worker
+    from app.services.infrastructure.metrics_collector import metrics_flush_worker
     metrics_flush_task = asyncio.create_task(metrics_flush_worker())
 
     # 启动联邦通信（v0.3.0 跨实例直连）
     from app.database import async_session
-    from app.services.federation_service import initialize_instance
-    from app.services.federation_manager import (
+    from app.services.federation.federation_service import initialize_instance
+    from app.services.federation.federation_manager import (
         federation_manager,
         federation_heartbeat,
         federation_reconnect,
@@ -125,7 +125,7 @@ async def lifespan(app: FastAPI):
     logger.info("✅ 后台 worker 已全部启动（含联邦通信）")
 
     # 发出系统启动完成事件
-    from app.services.event_bus import event_bus, EventType
+    from app.services.brain.event_bus import event_bus, EventType
     asyncio.create_task(event_bus.emit(EventType.SYSTEM_STARTUP))
 
     # 启动完成，退出自动维护（但手动维护仍生效）
@@ -142,14 +142,14 @@ async def lifespan(app: FastAPI):
     logger.info("👋 系统关闭，正在停止后台 worker...")
     # 发出系统关闭事件
     try:
-        from app.services.event_bus import event_bus, EventType
+        from app.services.brain.event_bus import event_bus, EventType
         await event_bus.emit(EventType.SYSTEM_SHUTDOWN)
     except Exception:
         pass
 
     # 优雅关闭：排空记忆缓冲区
     try:
-        from app.services.memory_buffer import drain_buffer_on_shutdown
+        from app.services.memory.memory_buffer import drain_buffer_on_shutdown
         await drain_buffer_on_shutdown()
     except Exception:
         pass

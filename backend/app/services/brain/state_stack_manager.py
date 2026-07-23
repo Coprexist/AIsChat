@@ -4,7 +4,7 @@
 已委托给 state_stack_service.py，此处仅做兼容导出。
 """
 
-from app.services.state_stack_service import (
+from app.services.agent.state_stack_service import (
     get_state_stack_summary,
     push_state,
     pop_state,

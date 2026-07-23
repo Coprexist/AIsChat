@@ -46,11 +46,11 @@ class ManageSkills(ToolPlugin):
 
     async def execute(self, db: AsyncSession, agent_id: int, group_id: int | None,
                       arguments: dict, context: dict) -> dict:
-        from app.services.skill_service import (
+        from app.services.skill.skill_service import (
             list_skills, add_skill, update_skill, delete_skill, toggle_skill,
         )
         from app.models.agent import Agent as AgentModel
-        from app.services.skill_engine import _is_delay_reply_allowed
+        from app.services.skill.skill_engine import _is_delay_reply_allowed
 
         agent_result = await db.execute(_select(AgentModel).where(AgentModel.id == agent_id))
         agent = agent_result.scalar_one_or_none()

@@ -22,7 +22,7 @@ class CancelAlarm(ToolPlugin):
 
     async def execute(self, db: AsyncSession, agent_id: int, group_id: int | None,
                       arguments: dict, context: dict) -> dict:
-        from app.services.alarm_service import cancel_alarm as svc_cancel_alarm
+        from app.ai.alarm import cancel_alarm as svc_cancel_alarm
 
         alarm_id = arguments.get("alarm_id")
         if not alarm_id:

@@ -78,7 +78,7 @@ class CrossPost(ToolPlugin):
 
         try:
             if target_type == "group":
-                from app.services.group_service import create_message, message_to_dict, is_member_of_group
+                from app.chat.message import create_message, message_to_dict, is_member_of_group
                 if not await is_member_of_group(db, agent_id, "ai", target_id):
                     return {"error": True, "message": f"你不是群 {target_id} 的成员，无法发消息"}
                 message = await create_message(
@@ -95,7 +95,7 @@ class CrossPost(ToolPlugin):
                 return {"success": True, "message_id": message.id, "target_type": "group", "target_id": target_id}
 
             else:
-                from app.services.dm_service import get_or_create_dm_session, send_dm_message
+                from app.chat.dm import get_or_create_dm_session, send_dm_message
                 from app.models.dm import DMSession
                 dm_result = await db.execute(sa_select(DMSession).where(DMSession.id == target_id))
                 dm_session = dm_result.scalar_one_or_none()

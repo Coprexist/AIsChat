@@ -26,7 +26,7 @@ async def get_my_log_settings(
     db: AsyncSession = Depends(get_db),
 ):
     """获取当前用户的对话日志保留设置"""
-    from app.services.conversation_log_service import get_user_log_limit
+    from app.services.content.conversation_log_service import get_user_log_limit
     return await get_user_log_limit(db, current_user["user_id"])
 
 
@@ -37,7 +37,7 @@ async def update_my_log_settings(
     db: AsyncSession = Depends(get_db),
 ):
     """更新当前用户的对话日志保留数"""
-    from app.services.conversation_log_service import update_user_log_limit
+    from app.services.content.conversation_log_service import update_user_log_limit
     try:
         return await update_user_log_limit(db, current_user["user_id"], req.limit)
     except ValueError as e:
@@ -53,7 +53,7 @@ async def get_agent_logs_user(
     db: AsyncSession = Depends(get_db),
 ):
     """查看某 AI 的对话日志（需授权）"""
-    from app.services.conversation_log_service import get_agent_logs
+    from app.services.content.conversation_log_service import get_agent_logs
     # 从 DB 读取角色而非信任 JWT（提权后 JWT 可能过时）
     user_result = await db.execute(select(User.role).where(User.id == current_user["user_id"]))
     db_role = user_result.scalar_one_or_none()
@@ -77,7 +77,7 @@ async def get_agent_log_detail_user(
     db: AsyncSession = Depends(get_db),
 ):
     """查看单条对话日志详情（需授权）"""
-    from app.services.conversation_log_service import get_log_detail
+    from app.services.content.conversation_log_service import get_log_detail
     user_result = await db.execute(select(User.role).where(User.id == current_user["user_id"]))
     db_role = user_result.scalar_one_or_none()
     is_admin = db_role == "admin"
@@ -107,7 +107,7 @@ async def export_log_detail(
     db: AsyncSession = Depends(get_db),
 ):
     """导出单条对话日志（JSON 或 Markdown）"""
-    from app.services.conversation_log_service import get_log_detail
+    from app.services.content.conversation_log_service import get_log_detail
     user_result = await db.execute(select(User.role).where(User.id == current_user["user_id"]))
     db_role = user_result.scalar_one_or_none()
     is_admin = db_role == "admin"
@@ -148,7 +148,7 @@ async def get_usage_overview(
     db: AsyncSession = Depends(get_db),
 ):
     """获取当前用户所有 AI 的 token 消耗汇总（近 N 天）"""
-    from app.services.conversation_log_service import get_user_agents_token_summary
+    from app.services.content.conversation_log_service import get_user_agents_token_summary
     end_date = datetime.now(tz.utc).replace(tzinfo=None)
     start_date = end_date - timedelta(days=days)
     return await get_user_agents_token_summary(db, current_user["user_id"], start_date, end_date)
@@ -162,7 +162,7 @@ async def get_agent_daily_usage(
     db: AsyncSession = Depends(get_db),
 ):
     """获取单个 AI 每日 token 消耗分布"""
-    from app.services.conversation_log_service import get_agent_token_daily
+    from app.services.content.conversation_log_service import get_agent_token_daily
     # 权限：用户只能看自己拥有的 AI
     from app.models.agent import Agent
     agent_result = await db.execute(select(Agent).where(Agent.id == agent_id))

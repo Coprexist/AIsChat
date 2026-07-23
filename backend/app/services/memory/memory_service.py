@@ -311,7 +311,7 @@ async def auto_extract_key_facts(
     返回: True 如果入队了记忆，False 如果跳过。
     """
     import re
-    from app.services.memory_buffer import enqueue_memory
+    from app.services.memory.memory_buffer import enqueue_memory
     from app.models.agent import Agent
     from sqlalchemy import select as _sel2
 

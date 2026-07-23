@@ -228,7 +228,7 @@ class ChatApi(BaseChatApi):
         return {"success": True}
 
     async def get_friend_list(self, db, user_id: int) -> List[dict]:
-        from app.services.friend_service import list_friends
+        from app.services.social.friend_service import list_friends
         return await list_friends(db, user_id)
 
     async def get_user_info(self, db, user_id: int) -> dict:

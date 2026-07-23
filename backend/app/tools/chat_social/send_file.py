@@ -32,8 +32,8 @@ class SendFile(ToolPlugin):
     async def execute(self, db: AsyncSession, agent_id: int, group_id: int | None,
                       arguments: dict, context: dict) -> dict:
         from app.models.file import FileMetadata
-        from app.services.group_service import create_message as create_group_message, message_to_dict
-        from app.services.dm_service import send_dm_message, get_or_create_dm_session
+        from app.chat.message import create_message as create_group_message, message_to_dict
+        from app.chat.dm import send_dm_message, get_or_create_dm_session
         from app.models.agent import Agent as AgentModel
 
         file_path = arguments["file_path"]
@@ -148,7 +148,7 @@ class SendFile(ToolPlugin):
                 await manager.broadcast_to_group(target_group, {"type": "message", "data": msg_data})
 
             # 触发其他 AI
-            from app.services.ai_response_worker import message_queue
+            from app.ai.response_worker import message_queue
             import asyncio
             next_depth = context.get("chain_depth", 0) + 1
             try:

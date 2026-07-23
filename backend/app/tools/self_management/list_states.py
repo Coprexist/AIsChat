@@ -4,7 +4,7 @@ list_states 工具 — 查看当前状态栈
 import logging
 from sqlalchemy.ext.asyncio import AsyncSession
 from app.tools.base import ToolPlugin, ToolRegistry
-from app.services.state_stack_service import list_states
+from app.services.agent.state_stack_service import list_states
 
 logger = logging.getLogger(__name__)
 

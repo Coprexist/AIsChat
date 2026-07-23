@@ -278,7 +278,7 @@ async def create_message(
     await db.flush()
 
     if attachments:
-        from app.services.file_service import track_forward_reference
+        from app.services.content.file_service import track_forward_reference
         for att in attachments:
             fid = att.get("file_id") if isinstance(att, dict) else getattr(att, "file_id", None)
             if fid:
@@ -448,7 +448,7 @@ async def update_group_settings(db: AsyncSession, group_id: int, operator_id: in
 
     await db.flush()
     if "name" in updates:
-        from app.services.federation_service import enqueue_profile_update
+        from app.services.federation.federation_service import enqueue_profile_update
         await enqueue_profile_update(db, "group", group_id, "display_name", updates["name"])
     logger.info(f"群聊 {group_id} 设置已更新: {list(updates.keys())}")
     return group

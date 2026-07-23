@@ -38,7 +38,7 @@ class UpdateSelfConfig(ToolPlugin):
 
     async def execute(self, db: AsyncSession, agent_id: int, group_id: int | None,
                       arguments: dict, context: dict) -> dict:
-        from app.services.agent_service import update_agent_config
+        from app.services.agent.agent_service import update_agent_config
 
         _self_config_fields = [
             "system_prompt", "temperature", "top_p", "presence_penalty",

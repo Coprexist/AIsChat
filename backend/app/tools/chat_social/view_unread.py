@@ -21,7 +21,7 @@ class ViewUnread(ToolPlugin):
 
     async def execute(self, db: AsyncSession, agent_id: int, group_id: int | None,
                       arguments: dict, context: dict) -> dict:
-        from app.services.group_service import check_unread
+        from app.chat.delivery import check_unread
         from app.models.group import GroupMember, Group
         from app.models.agent import Agent as AgentModel
 

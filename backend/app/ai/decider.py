@@ -119,7 +119,7 @@ def _decide_alarm_action(agent, context: ActionContext) -> ActionDecision:
 
 async def _decide_reply_action(db, agent, context: ActionContext) -> ActionDecision:
     """决定是否回复消息（原 _maybe_trigger_ai_reply 的 Gate 1-6 逻辑）"""
-    from app.services.agent_service import calculate_willingness, switch_agent_state
+    from app.services.agent.agent_service import calculate_willingness, switch_agent_state
     from app.chat import chat_api
 
     agent_id = context.agent_id
@@ -170,7 +170,7 @@ async def _decide_reply_action(db, agent, context: ActionContext) -> ActionDecis
 
     # v0.5.0: 记录意愿评分分布
     try:
-        from app.services.metrics_collector import metrics
+        from app.services.infrastructure.metrics_collector import metrics
         await metrics.record_willingness(w.score)
     except Exception:
         pass
@@ -194,7 +194,7 @@ async def _decide_reply_action(db, agent, context: ActionContext) -> ActionDecis
 
 async def _decide_proactive_action(db, agent, context: ActionContext) -> ActionDecision:
     """决定是否主动发言（空闲触发，仅 digital_life 档）"""
-    from app.services.agent_service import calculate_willingness
+    from app.services.agent.agent_service import calculate_willingness
 
     profile = getattr(agent, 'config_profile', 'chat') or 'chat'
 

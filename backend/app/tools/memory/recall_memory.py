@@ -77,7 +77,7 @@ class RecallMemory(ToolPlugin):
 
         # ═══ 第二轮：文本关键词回退 ═══
         if embedding_failed or not memories:
-            from app.services.memory_service import _text_search_memories
+            from app.services.memory.memory_service import _text_search_memories
             text_results = await _text_search_memories(
                 db, agent_id, query, top_k=top_k,
                 group_id=mem_group_id if scope == "group" else None,

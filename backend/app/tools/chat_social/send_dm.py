@@ -27,7 +27,7 @@ class SendDM(ToolPlugin):
 
     async def execute(self, db: AsyncSession, agent_id: int, group_id: int | None,
                       arguments: dict, context: dict) -> dict:
-        from app.services.dm_service import (
+        from app.chat.dm import (
             get_or_create_dm_session, send_dm_message,
         )
         from app.models.agent import Agent as AgentModel

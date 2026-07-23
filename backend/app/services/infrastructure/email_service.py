@@ -9,7 +9,7 @@ from email.mime.multipart import MIMEMultipart
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 from app.models.system_settings import SystemSettings
-from app.services.system_settings_service import get_settings
+from app.services.infrastructure.system_settings_service import get_settings
 from app.utils.crypto import decrypt_api_key, encrypt_api_key
 
 logger = logging.getLogger(__name__)

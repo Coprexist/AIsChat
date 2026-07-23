@@ -150,7 +150,7 @@ async def compress_messages(
     返回:
         (new_messages, stats) — 压缩后的消息列表和统计信息
     """
-    from app.services.llm_service import chat_completion
+    from app.ai.llm import chat_completion
 
     original_count = len(messages)
     original_tokens = estimate_tokens(messages)

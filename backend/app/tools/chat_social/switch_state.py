@@ -34,7 +34,7 @@ class SwitchState(ToolPlugin):
 
     async def execute(self, db: AsyncSession, agent_id: int, group_id: int | None,
                       arguments: dict, context: dict) -> dict:
-        from app.services.agent_service import switch_agent_state
+        from app.services.agent.agent_service import switch_agent_state
 
         target = arguments["target_state"]
         duration = arguments.get("duration_hours")

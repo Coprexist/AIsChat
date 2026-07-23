@@ -30,7 +30,7 @@ class SetDND(ToolPlugin):
 
     async def execute(self, db: AsyncSession, agent_id: int, group_id: int | None,
                       arguments: dict, context: dict) -> dict:
-        from app.services.group_service import set_group_dnd
+        from app.chat.delivery import set_group_dnd
 
         target_group = arguments.get("group_id", group_id)
         duration = arguments.get("duration_minutes")

@@ -940,7 +940,7 @@ async def share_group_to_peers(
 
         # 如果对等端已连接，发送 entity_announce（只传 entity_type + local_id）
         if peer.connection_state == "connected":
-            from app.services.federation_manager import federation_manager
+            from app.services.federation.federation_manager import federation_manager
             sent = await federation_manager.announce_entity(
                 peer.peer_public_id,
                 entity_type="group",
@@ -1009,7 +1009,7 @@ async def unshare_group_from_peers(
 
         # 如果对等端已连接，发送 entity_unannounce（只传 entity_type + local_id）
         if peer and peer.connection_state == "connected":
-            from app.services.federation_manager import federation_manager
+            from app.services.federation.federation_manager import federation_manager
             await federation_manager.unannounce_entity(
                 peer.peer_public_id,
                 entity_type="group",

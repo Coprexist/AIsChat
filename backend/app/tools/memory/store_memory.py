@@ -32,7 +32,7 @@ class StoreMemory(ToolPlugin):
 
     async def execute(self, db: AsyncSession, agent_id: int, group_id: int | None,
                       arguments: dict, context: dict) -> dict:
-        from app.services.memory_buffer import enqueue_memory
+        from app.services.memory.memory_buffer import enqueue_memory
         from app.models.agent import Agent
 
         title = arguments["title"]

@@ -184,7 +184,7 @@ async def persist_last_task_as_state(
 async def _auto_journal(db: AsyncSession, agent_id: int, action: str, frame: dict) -> None:
     """push/pop 时自动写 JOURNAL。非致命——失败静默忽略。"""
     try:
-        from app.services.workspace_service import get_workspace_file, set_workspace_file
+        from app.services.agent.workspace_service import get_workspace_file, set_workspace_file
     except ImportError:
         return
 
@@ -213,7 +213,7 @@ async def _auto_todo(db: AsyncSession, agent_id: int, frame: dict) -> None:
     if not frame.get("todo"):
         return
     try:
-        from app.services.workspace_service import get_workspace_file, set_workspace_file
+        from app.services.agent.workspace_service import get_workspace_file, set_workspace_file
     except ImportError:
         return
 
