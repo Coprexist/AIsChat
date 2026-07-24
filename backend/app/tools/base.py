@@ -287,7 +287,7 @@ class ToolRegistry:
         except Exception as e:
             elapsed = time.monotonic() - t0
             try:
-                from app.services.metrics_collector import metrics
+                from app.services.infrastructure.metrics_collector import metrics
                 await metrics.record_tool_call(tool_name, elapsed, False)
             except Exception:
                 pass
@@ -297,7 +297,7 @@ class ToolRegistry:
         elapsed = time.monotonic() - t0
         is_success = not result.get("error", False)
         try:
-            from app.services.metrics_collector import metrics
+            from app.services.infrastructure.metrics_collector import metrics
             await metrics.record_tool_call(tool_name, elapsed, is_success)
         except Exception:
             pass

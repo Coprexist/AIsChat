@@ -28,7 +28,7 @@ class ExecuteCommand(ToolPlugin):
 
     async def execute(self, db: AsyncSession, agent_id: int, group_id: int | None,
                       arguments: dict, context: dict) -> dict:
-        from app.services.opencli_service import execute_opencli
+        from app.services.content.opencli_service import execute_opencli
         from app.utils.error_handler import build_tool_error
 
         command = arguments["command"]

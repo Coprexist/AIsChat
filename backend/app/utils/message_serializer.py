@@ -2,8 +2,12 @@
 通用消息序列化器
 将 Message（群聊）和 DMMessage（私信）ORM 对象统一转为 dict，
 消除 dm_service 和 group_service 中的重复序列化逻辑。
+
+v2.0: 支持统一 Sender 模型
 """
 import json
+
+from app.models.sender import Sender
 
 
 def make_preview(content: str | None, attachments: list | None = None, max_len: int = 50) -> str:
@@ -80,6 +84,51 @@ def serialize_message(message, *,
     }
 
     # message_type（DMMessage 有，Message 没有，默认 'normal'）
+    mt = getattr(message, 'message_type', None)
+    if mt:
+        result["message_type"] = mt
+
+    if include_read_at:
+        m_read_at = getattr(message, 'read_at', None)
+        result["read_at"] = str(m_read_at) if m_read_at else None
+
+    return result
+
+
+def serialize_message_with_sender(message, sender: Sender, *,
+                                  sender_state=None,
+                                  conversation_key='group_id',
+                                  include_read_at=False) -> dict:
+    """使用统一 Sender 模型序列化消息。
+
+    Args:
+        message: Message 或 DMMessage ORM 实例
+        sender: 统一发送者模型
+        sender_state: 发送者状态（在线/离线等）
+        conversation_key: 会话 ID 键名，群聊用 'group_id'，私信用 'session_id'
+        include_read_at: 是否包含 read_at 字段
+    """
+    attachments = getattr(message, 'attachments', None)
+    if isinstance(attachments, str):
+        try:
+            attachments = json.loads(attachments)
+        except (json.JSONDecodeError, TypeError):
+            attachments = None
+
+    conversation_value = getattr(message, conversation_key, None)
+
+    result = {
+        "id": message.id,
+        conversation_key: conversation_value,
+        "sender": sender.to_dict(),
+        "content": message.content,
+        "reply_to": getattr(message, 'reply_to', None),
+        "source_public_id": getattr(message, 'source_public_id', None),
+        "sender_state": sender_state,
+        "attachments": attachments,
+        "created_at": str(message.created_at) if message.created_at else None,
+    }
+
     mt = getattr(message, 'message_type', None)
     if mt:
         result["message_type"] = mt

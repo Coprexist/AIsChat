@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react'
 import { api } from '../api/client'
 import { useT } from '../i18n/I18nContext'
-import { getApiKeyUrl } from '../utils/providers'
+import { getApiKeyUrl } from '../utils/providers.tsx'
 import { Key, Plus, Trash2, ToggleLeft, ToggleRight, Loader2, BarChart3, X } from 'lucide-react'
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell, Legend } from 'recharts'
 

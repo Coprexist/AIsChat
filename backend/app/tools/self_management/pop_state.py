@@ -4,7 +4,7 @@ pop_state 工具 — 结束当前状态帧，恢复上一层任务
 import logging
 from sqlalchemy.ext.asyncio import AsyncSession
 from app.tools.base import ToolPlugin, ToolRegistry
-from app.services.state_stack_service import pop_state
+from app.services.agent.state_stack_service import pop_state
 
 logger = logging.getLogger(__name__)
 

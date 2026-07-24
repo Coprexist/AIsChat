@@ -75,7 +75,7 @@ def collect_all_models(providers: list[dict]) -> list[dict]:
 
 def build_provider_summaries(providers: list[dict]) -> list[dict]:
     """构建前端可用的供应商摘要列表"""
-    from app.services.provider_presets import get_preset
+    from app.services.agent.provider_presets import get_preset
 
     result: list[dict] = []
     for p in providers:

@@ -30,7 +30,7 @@ function PreviewText({ text, placeholder }: { text: string | null; placeholder: 
   return <span className="truncate block">{parts}</span>
 }
 import { formatRelativeTime } from '../utils/time'
-import { getStatusTextStyle, BG_SURFACE_LIGHT, BG_SURFACE_DARK } from '../utils/statusColor'
+import { getStatusTextStyle, BG_SURFACE_LIGHT, BG_SURFACE_DARK } from '../utils/statusColor.tsx'
 import { useTheme } from '../context/ThemeContext'
 import { useLang, useT } from '../i18n/I18nContext'
 

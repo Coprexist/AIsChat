@@ -4,7 +4,7 @@ import { X, MessageSquare, UserPlus, Bot, User, Star } from 'lucide-react'
 import { api } from '../api/client'
 import { getStateDotColor } from '../constants'
 import { useT } from '../i18n/I18nContext'
-import { getStatusTextStyle, BG_ELEVATED_LIGHT, BG_ELEVATED_DARK } from '../utils/statusColor'
+import { getStatusTextStyle, BG_ELEVATED_LIGHT, BG_ELEVATED_DARK } from '../utils/statusColor.tsx'
 import { useTheme } from '../context/ThemeContext'
 
 interface ProfileCardProps {

@@ -22,7 +22,7 @@ class ClearCurrentTask(ToolPlugin):
 
     async def execute(self, db: AsyncSession, agent_id: int, group_id: int | None,
                       arguments: dict, context: dict) -> dict:
-        from app.services.workspace_service import clear_task
+        from app.services.agent.workspace_service import clear_task
 
         reason = arguments.get("reason", "手动清除")
         try:

@@ -1,0 +1,714 @@
+# 从 services/ai_response_worker.py 搬迁而来
+"""
+AI 响应 Worker — 极薄大脑
+
+职责：
+- 维护全局状态（message_queue / _thinking_state / _agent_locks）
+- 信号路由（ai_response_worker → _process_event）
+- 编排入口（_maybe_trigger_ai_reply / _trigger_dm_ai_reply）
+
+AI 执行的"肌肉"已抽离到：
+  - app.ai.executor:  _tool_call_loop / _get_api_config / _send_system_error / ...
+  - app.ai.alarm:     alarm_scheduler / _process_alarm_event / ...
+"""
+import asyncio
+import json
+import logging
+import re
+import time
+from datetime import datetime, timezone, timedelta
+from sqlalchemy import select
+from app.database import async_session
+from app.models.agent import Agent as AgentModel
+from app.models.group import Group, GroupMember
+from app.models.user import User
+from app.config import settings
+from app.chat import chat_api
+from app.services.memory.context_compression_service import should_compress, inline_compress, get_compression_threshold
+from app.utils.text import extract_mentions as _extract_mentions, check_mention as _check_mention
+from app.ai.executor import _tool_call_loop, _get_api_config, _check_rate_limit, _send_system_error
+from app.ai.alarm import _process_alarm_event
+
+logger = logging.getLogger(__name__)
+
+# 全局消息队列（ws.py 推送，worker 消费）
+message_queue: asyncio.Queue = asyncio.Queue(maxsize=500)
+
+# 速率限制：{agent_id: last_call_timestamp}
+_rate_limit_tracker: dict[int, float] = {}
+
+# AI 并发锁：resonance/custom 类型同一 AI 串行执行 LLM 调用，general/semi_general 不锁
+_agent_locks: dict[int, asyncio.Lock] = {}
+
+# 思考/输入中状态追踪：{conv_key: {agent_id: {name, avatar_url, state}}}
+# conv_key = "group:7" 或 "dm:1_10"
+# state = "thinking" | "typing"
+_thinking_state: dict[str, dict[int, dict]] = {}
+
+
+def get_thinking_state(conv_key: str) -> dict[int, dict]:
+    """获取指定对话的思考/输入中状态"""
+    return _thinking_state.get(conv_key, {})
+
+
+async def _run_serialized(agent, coro):
+    """resonance/custom 类型加锁串行，general/semi_general 直接执行"""
+    if agent.ai_type in ("general", "semi_general"):
+        return await coro
+    lock = _agent_locks.get(agent.id)
+    if lock is None:
+        lock = asyncio.Lock()
+        _agent_locks[agent.id] = lock
+    async with lock:
+        return await coro
+
+
+# ============================================================
+# 主循环
+# ============================================================
+
+async def ai_response_worker():
+    """
+    后台主循环：持续消费消息队列，为每条消息检查并触发 AI 回复。
+    在 main.py lifespan 中通过 asyncio.create_task 启动。
+    """
+    logger.info("🤖 AI 回复 worker 已启动，等待消息事件...")
+    while True:
+        try:
+            event = await message_queue.get()
+            logger.info(f"📬 Worker 收到事件: group={event.get('group_id')}, msg={event.get('message_id')}, queue_remaining={message_queue.qsize()}")
+            # v0.5.0: 记录队列深度
+            try:
+                from app.services.infrastructure.metrics_collector import metrics
+                await metrics.record_queue_depth(message_queue.qsize())
+            except Exception:
+                pass
+            async with async_session() as db:
+                try:
+                    await _process_event(db, event)
+                except Exception as e:
+                    logger.error(f"处理消息事件失败: {e}", exc_info=True)
+            message_queue.task_done()
+        except asyncio.CancelledError:
+            logger.info("AI 回复 worker 正在关闭...")
+            break
+        except Exception as e:
+            logger.error(f"Worker 循环异常: {e}", exc_info=True)
+            await asyncio.sleep(1)  # 防止死循环
+
+
+# ============================================================
+# 事件路由
+# ============================================================
+
+async def _process_event(db, event: dict):
+    """
+    处理单条消息事件。
+
+    event 字段:
+        conversation_type ("group" | "dm"), group_id (群聊), session_id (私信),
+        message_id, content, sender_type, sender_id, chain_depth
+    """
+    event_type = event.get("type", "")
+    if event_type == "alarm":
+        await _process_alarm_event(db, event)
+        return
+
+    conversation_type = event.get("conversation_type", "group")
+
+    if conversation_type == "dm":
+        await _process_dm_event(db, event)
+    else:
+        await _process_group_event(db, event)
+
+
+# ============================================================
+# 私信事件处理
+# ============================================================
+
+async def _process_dm_event(db, event: dict):
+    """处理私信事件：检查对方是否是 AI，如果是则触发回复"""
+    session_id = event["session_id"]
+    message_id = event["message_id"]
+    content = event["content"]
+    sender_id = event.get("sender_id")
+    chain_depth = event.get("chain_depth", 0)
+    force_own_key = event.get("force_own_key", False)  # v0.9.0
+
+    from app.models.dm import DMSession
+    from app.models.user import User
+    from app.models.agent import Agent as AgentModel
+
+    # 找到会话
+    sess_result = await db.execute(
+        select(DMSession).where(DMSession.session_id == session_id)
+    )
+    session = sess_result.scalar_one_or_none()
+    if session is None:
+        return
+
+    # 找到接收方
+    receiver_id = session.user2_id if session.user1_id == sender_id else session.user1_id
+
+    # 检查是否是 AI
+    user_result = await db.execute(
+        select(User).where(User.id == receiver_id, User.type == "ai")
+    )
+    ai_user = user_result.scalar_one_or_none()
+    if ai_user is None:
+        return
+
+    # 找到对应的 agent
+    agent_result = await db.execute(
+        select(AgentModel).where(AgentModel.user_id == receiver_id)
+    )
+    agent = agent_result.scalar_one_or_none()
+    if agent is None:
+        return
+
+    logger.info(f"私信 {session_id} 触发 AI {agent.name}({agent.id}) 回复")
+
+    # DM 链条深度限制
+    if chain_depth > 10:
+        logger.info(f"DM {session_id} 对话链深度 {chain_depth} > 10，停止")
+        return
+
+    # 简化的 DM 回复触发（不需要群聊那样的 DND/意愿检查）
+    await _trigger_dm_ai_reply(
+        db, agent, session_id, content, message_id,
+        chain_depth=chain_depth + 1,
+        sender_id=sender_id,
+        force_own_key=force_own_key,
+    )
+
+
+# ============================================================
+# 群聊事件处理
+# ============================================================
+
+async def _process_group_event(db, event: dict):
+    """处理群聊事件（原有逻辑）"""
+    group_id = event["group_id"]
+    message_id = event["message_id"]
+    content = event["content"]
+    sender_type = event.get("sender_type", "human")
+    sender_id = event.get("sender_id")
+    chain_depth = event.get("chain_depth", 0)
+
+    # 远程消息门控：来自远程实例的 AI 消息不触发本地 AI 回复（防循环）
+    source_public_id = event.get("source_public_id")
+    if source_public_id and sender_type == "ai":
+        logger.info(f"群 {group_id} 收到远程 AI 消息 (source={source_public_id})，跳过本地 AI 回复")
+        return
+
+    from app.models.agent import Agent as AgentModel
+
+    # 获取群聊信息
+    group_result = await db.execute(select(Group).where(Group.id == group_id))
+    group = group_result.scalar_one_or_none()
+    if group is None:
+        return
+
+    # 群管理暂停了 AI 触发
+    if getattr(group, "is_paused", False):
+        return
+    # 对话链深度限制：根据群设置动态计算
+    if group.owner_type == "ai":
+        effective_max_depth = 50
+    else:
+        limit_per_min = group.speak_limit_per_minute or 0
+        window_sec = group.speak_limit_window_seconds or 120
+        if limit_per_min > 0:
+            effective_max_depth = max(limit_per_min * 2, 5)
+        else:
+            effective_max_depth = 50
+
+    if chain_depth > effective_max_depth:
+        logger.info(
+            f"群 {group_id} 对话链深度 {chain_depth} > {effective_max_depth}"
+            f"(owner={group.owner_type}, limit={group.speak_limit_per_minute}/min)，停止触发"
+        )
+        return
+
+    # 获取群聊中所有 AI 成员
+    members_result = await db.execute(
+        select(GroupMember).where(
+            GroupMember.group_id == group_id,
+            GroupMember.member_type == "ai",
+        )
+    )
+    ai_members = members_result.scalars().all()
+
+    if not ai_members:
+        return
+
+    # 确定需要触发的 AI 列表
+    target_ai_ids: set[int] = set()
+
+    # sender_id 统一为 user_id，与 group_members.member_id 直接对齐
+    exclude_user_id = sender_id if sender_type == "ai" else None
+
+    if sender_type == "human":
+        target_ai_ids = {m.member_id for m in ai_members}
+    else:
+        target_ai_ids = {
+            m.member_id for m in ai_members
+            if m.member_id != (exclude_user_id if exclude_user_id else sender_id)
+        }
+
+    if not target_ai_ids:
+        return
+
+    # AI 自主决定——所有成员都触发，意愿分+提示词引导行为
+    # 仅排除发送者自己（AI 消息时不触发自己）
+    candidates = list(target_ai_ids)
+    if sender_type == "ai" and exclude_user_id and exclude_user_id in candidates:
+        candidates.remove(exclude_user_id)
+
+    if not candidates:
+        return
+
+    logger.info(
+        f"群聊 {group_id} 收到消息 (sender={sender_type}:{sender_id}, depth={chain_depth})，"
+        f"触发 {len(candidates)} 个 AI: {candidates}"
+    )
+
+    next_depth = chain_depth + 1
+    from app.ai.chat_chain import chat_chain_manager
+
+    # 通知群活跃（重置并发自动恢复倒计时）
+    chat_chain_manager.notify_group_activity(group_id)
+
+    # 判断消息优先级：@消息/公告 → 优先通道（上限1），普通消息 → 普通通道
+    has_at = sender_type == "human" and "@" in (content or "")
+    is_at_all = any(tag in (content or "") for tag in ("@all", "@everyone", "@全体"))
+    is_priority_msg = has_at or is_at_all
+    normal_sem = chat_chain_manager.get_semaphore(group_id, limit=getattr(group, "concurrent_ai_limit", 0))
+    priority_sem = chat_chain_manager.get_priority_semaphore(group_id)
+
+    for ai_id in candidates:
+        if is_priority_msg:
+            if not chat_chain_manager.try_claim_priority(ai_id, group_id):
+                continue
+            sem = priority_sem
+        else:
+            if not chat_chain_manager.try_claim(ai_id, group_id):
+                continue
+            sem = normal_sem
+
+        async def _trigger_one(aid, chan_sem):
+            async with chan_sem:
+                try:
+                    async with async_session() as inner_db:
+                        await _maybe_trigger_ai_reply(
+                            inner_db, aid, group_id, group, content, message_id,
+                            chain_depth=next_depth,
+                            sender_type=sender_type,
+                            sender_id=sender_id,
+                            message_type=event.get("message_type", "normal"),
+                        )
+                except Exception as e:
+                    logger.error(f"AI {aid} 触发异常 (group={group_id}): {e}", exc_info=True)
+                finally:
+                    chat_chain_manager.release_claim(aid, group_id)
+
+        asyncio.create_task(_trigger_one(ai_id, sem))
+
+
+# ============================================================
+# 编排：群聊回复触发
+# ============================================================
+
+async def _maybe_trigger_ai_reply(
+    db, agent_id: int, group_id: int, group, content: str, trigger_message_id: int,
+    chain_depth: int = 0,
+    sender_type: str = "human",
+    sender_id: int | None = None,
+    message_type: str = "normal",
+):
+    """检查单个 AI 是否应该回复，如果是则调用 LLM 生成回复"""
+    from app.services.agent.agent_service import get_agent
+    from app.ai.decider import decide_action, ActionContext, ActionType
+    from app.models.agent import Agent as AgentModel
+
+    # v2.0.0: agent_id 可能是 agent.id 或 user_id
+    agent = (await get_agent(db, agent_id)).ok
+    if agent is None:
+        # 通过 user_id 查找（group_members.member_id 现已统一为 user_id）
+        agent_result = await db.execute(
+            select(AgentModel).where(AgentModel.user_id == agent_id)
+        )
+        agent = agent_result.scalar_one_or_none()
+    if agent is None:
+        logger.warning(f"AI agent_id/user_id={agent_id} 不存在，跳过")
+        return
+
+    # 统一使用 agent.id（数据库主键）作为后续内部标识
+    resolved_agent_id = agent.id
+
+    logger.info(f"🔍 检查 AI {agent.name}(id={resolved_agent_id}, user_id={agent.user_id}), state={agent.state}")
+
+    is_mentioned = _check_mention(content, agent.name)
+    logger.info(f"🔍 AI {agent.name}(id={resolved_agent_id}): is_mentioned={is_mentioned}, content_preview='{content[:80]}'")
+
+    # v0.5.0: 使用统一决策（替代原有 Gate 1-5 的手动判断）
+    # v1.0.1: 检测 DND 穿透条件
+    is_at_all = any(tag in content for tag in ("@all", "@everyone", "@全体"))
+    is_announcement = message_type == "announcement"
+    # v2.0.6: 检查发送者是否为特别关心好友
+    is_priority_friend = False
+    if sender_type == "human" and sender_id:
+        try:
+            from app.models.friendship import Friendship
+            f_result = await db.execute(
+                select(Friendship).where(
+                    Friendship.user_id == agent.owner_id,
+                    Friendship.friend_type == "human",
+                    Friendship.friend_id == sender_id,
+                    Friendship.is_priority == True,
+                )
+            )
+            is_priority_friend = f_result.scalar_one_or_none() is not None
+        except Exception:
+            pass
+    ctx = ActionContext(
+        event_type="message",
+        agent_id=resolved_agent_id,
+        group_id=group_id,
+        content=content,
+        sender_type=sender_type,
+        sender_id=sender_id,
+        is_mentioned=is_mentioned,
+        is_at_all=is_at_all,
+        is_announcement=is_announcement,
+        is_priority_friend=is_priority_friend,
+        chain_depth=chain_depth,
+    )
+    decision = await decide_action(db, agent, ctx)
+    logger.info(f"🔍 AI {agent.name}(id={resolved_agent_id}): decision={decision.action_type.value}, "
+                f"priority={decision.priority}, reason={decision.reason}")
+
+    if not decision.should_act:
+        # 处理 DND 暂存消息
+        if decision.details.get("store_pending"):
+            from app.chat import chat_api
+            await chat_api.store_pending(db, resolved_agent_id, group_id, trigger_message_id)
+        return
+
+    # 记录意愿（如果决策中有）
+    w_score = decision.willingness_score
+    if w_score > 0:
+        agent.last_willingness_score = w_score
+        agent.last_willingness_reason = decision.reason
+
+    # 4. 速率限制检查
+    if not _check_rate_limit(resolved_agent_id):
+        logger.info(f"AI {agent.name}(id={resolved_agent_id}) 速率限制，跳过")
+        return
+
+    # 5. 获取 API 配置（v0.5.0: 公共辅助函数；v0.6.0: 四层优先链含池 Key）
+    api_key, api_base, credit_source, pool_key_id, provider_info = await _get_api_config(db, agent)
+    logger.info(f"🔍 AI {agent.name}: api_base={api_base}, has_api_key={api_key is not None}, "
+                f"credit_source={credit_source}")
+
+    # 5.1. 无 API Key → 发送系统通知后跳过
+    if api_key is None:
+        logger.warning(f"AI {agent.name}({agent.id}) 无 API Key，发送系统通知")
+        await _send_system_error(db, agent, "no_api_key", "", "group", group_id, None)
+        return
+
+    # 5.5. 中断标记：如果 AI 之前在忙，记录中断
+    try:
+        from app.services.agent.workspace_service import mark_interrupted
+        sender_info = f"群聊 #{group_id} 的新消息"
+        await mark_interrupted(db, resolved_agent_id, reason=sender_info)
+    except Exception:
+        pass  # 非致命
+
+    # 5.6. Skill 引擎评估（延迟回复、打字指示器）
+    from app.services.skill.skill_engine import evaluate_action_skills, _is_delay_reply_allowed
+    skill_result = await evaluate_action_skills(db, agent, group_id, context={
+        "content": content,
+        "sender_type": sender_type,
+        "sender_id": sender_id,
+    })
+    # 延迟回复（若已有积压消息则跳过，避免级联延迟）
+    delay_skipped = False
+    if skill_result.delay_seconds > 0:
+        from app.chat import chat_api
+        pending = await chat_api.get_pending(db, resolved_agent_id, group_id)
+        pending_count = len(pending) if pending else 0
+        if pending_count > 0:
+            logger.info(f"🧠 AI {agent.name} 有 {pending_count} 条积压消息，跳过延迟回复")
+            delay_skipped = True
+        else:
+            logger.info(f"🧠 AI {agent.name} 技能延迟 {skill_result.delay_seconds}s")
+            await asyncio.sleep(skill_result.delay_seconds)
+
+    # v0.4.0: trigger_user_id 用于通用/半通用 AI 的 per-user 记忆隔离
+    trigger_user_id = sender_id if sender_type == "human" else None
+
+    # 6. 获取有效配置（v0.4.0: per-user 覆盖 — 需在 build_messages 前获取）
+    from app.services.agent.agent_service import get_effective_config
+    effective_cfg = await get_effective_config(db, agent.id, trigger_user_id)
+    logger.info(f"🔍 AI {agent.name}: effective_cfg ai_type={effective_cfg['ai_type']}, "
+                f"thinking={effective_cfg['thinking_enabled']}, temp={effective_cfg['temperature']}")
+
+    # 7. 构建消息
+    from app.ai.llm import build_messages, resolve_model
+    # 向量加速混合检索仅在 AI 全群启用（AI 内部协作场景）
+    from app.ai.group_logic import is_ai_only_group
+    ai_only = await is_ai_only_group(db, group_id, group=group)
+    use_vector = group.is_vector_accelerated and ai_only
+    if group.is_vector_accelerated and not ai_only:
+        logger.info(f"群 {group_id} 含人类成员，跳过向量加速（使用常规历史窗口）")
+    messages = await build_messages(
+        db, agent, group_id,
+        vector_accelerated=use_vector,
+        api_base_url=api_base,
+        api_key=api_key,
+        trigger_user_id=trigger_user_id,
+        system_prompt_override=effective_cfg.get("system_prompt"),
+    )
+    logger.info(f"🔍 AI {agent.name}: 构建了 {len(messages)} 条消息")
+
+    # DND 被 @ 穿透时，提醒 AI 重新评估免打扰/聊天链状态
+    if decision.details.get("dnd_penetrated"):
+        messages.append({"role": "system", "content": (
+            "⚠️ 你之前设了群免打扰，但被 @（或 @all/群公告）穿透了。"
+            "请评估：① 是否需要重新设置免打扰？② 是否要退出当前聊天链（间隔 < 2 分钟 = 同链）？"
+            "如果只是来答一个问题，答完后用 set_dnd 设短时免打扰安静回去。"
+        )})
+
+    # 延迟被跳过时，注入提醒：加快回复速度 + 记入记忆
+    if delay_skipped:
+        delay_hint = (
+            "⚠️ 系统提醒：你配置了延迟回复，但因为群里有积压消息，延迟已被跳过。\n"
+            "请检查最近的发消息者——对方可能正在等你回复。\n"
+            "建议：\n"
+            "1. 加快对此人的回复速度，不要再设长延迟\n"
+            "2. 调用 manage_workspace 在 todo 里记下「被催促回复，需要调整回复节奏」\n"
+            "3. 调用 store_memory 记下这个交互模式，以后遇到此人时优先快速响应"
+        )
+        messages.append({"role": "system", "content": delay_hint})
+
+    # 7.5 获取工具
+    from app.services.tool_registry import get_allowed_tools
+    delay_allowed = await _is_delay_reply_allowed(db, agent)
+    tools = get_allowed_tools(agent.state, thinking_enabled=effective_cfg["thinking_enabled"], delay_reply_allowed=delay_allowed)
+    model = resolve_model(agent)
+    logger.info(f"🔍 AI {agent.name}: model={model}, tools={len(tools)}")
+
+    # 8. 工具调用循环（含思考状态广播）
+    conv_key = f"group:{group_id}"
+    _thinking_state.setdefault(conv_key, {})[agent.id] = {
+        "name": agent.name, "avatar_url": agent.avatar_url,
+    }
+    logger.info(f"🚀 AI {agent.name}: 开始调用 LLM...")
+    try:
+        await chat_api.broadcast_to_group(
+            group_id,
+            {
+                "type": "ai_thinking",
+                "data": {
+                    "agent_id": agent.id,
+                    "agent_name": agent.name,
+                    "agent_avatar_url": agent.avatar_url,
+                    "group_id": group_id,
+                    "trigger": "user",
+                },
+            },
+        )
+        await _run_serialized(agent, _tool_call_loop(
+            db=db,
+            agent=agent,
+            group_id=group_id,
+            messages=messages,
+            tools=tools,
+            model=model,
+            api_base_url=api_base,
+            api_key=api_key,
+            max_loops=effective_cfg["max_tool_rounds"],
+            chain_depth=chain_depth,
+            conversation_type="group",
+            trigger_user_id=trigger_user_id,
+            effective_cfg=effective_cfg,
+            credit_source=credit_source,
+            pool_key_id=pool_key_id,
+            provider_supports_thinking=provider_info.get("thinking_supported"),
+            trigger="user",
+            is_federated=False,
+        ))
+    except Exception as e:
+        logger.error(f"❌ AI {agent.name} 群聊回复异常 (group={group_id}): {e}", exc_info=True)
+    finally:
+        _thinking_state.get(conv_key, {}).pop(agent.id, None)
+        await chat_api.broadcast_to_group(
+            group_id,
+            {
+                "type": "ai_thinking_end",
+                "data": {
+                    "agent_id": agent.id,
+                    "agent_name": agent.name,
+                    "agent_avatar_url": agent.avatar_url,
+                    "group_id": group_id,
+                    "trigger": "user",
+                },
+            },
+        )
+    logger.info(f"✅ AI {agent.name}: LLM 调用完成")
+    # 回复后标记退出当前聊天链（尺时间计时开始）
+    try:
+        from app.ai.chat_chain import chat_chain_manager
+        chat_chain_manager.mark_replied(resolved_agent_id, group_id)
+    except Exception:
+        pass
+
+    # 10. 标记未读消息已处理
+    from app.chat import chat_api
+    await chat_api.mark_pending_read(db, resolved_agent_id, group_id)
+    await db.commit()
+
+
+# ============================================================
+# 编排：DM 回复触发
+# ============================================================
+
+async def _trigger_dm_ai_reply(
+    db,
+    agent,
+    session_id: str,
+    content: str,
+    trigger_message_id: int,
+    chain_depth: int = 0,
+    sender_id: int | None = None,
+    force_own_key: bool = False,
+):
+    """触发 AI 对私信的自动回复"""
+    from app.services.agent.agent_service import get_agent
+    from app.models.user import User as UserModel
+
+    # 提前捕获 agent 属性（防止 session 过期后 DetachedInstanceError）
+    agent_id = agent.id
+    agent_name = agent.name
+    agent_state = agent.state
+    agent_avatar = agent.avatar_url
+    agent_ai_type = agent.ai_type
+
+    # 状态检查
+    if agent_state == "blocked":
+        logger.info(f"AI {agent_name}({agent_id}) 状态为 blocked，跳过 DM 回复")
+        return
+
+    # 速率限制
+    if not _check_rate_limit(agent_id):
+        logger.info(f"AI {agent_name}({agent_id}) 速率限制，跳过 DM 回复")
+        return
+
+    # 获取有效配置（v0.4.0: per-user 覆盖 — DM 场景 trigger_user_id=sender_id）
+    from app.services.agent.agent_service import get_effective_config as _get_eff_cfg
+    effective_cfg = await _get_eff_cfg(db, agent_id, sender_id)
+
+    # 获取 API 配置（v0.9.0: 按 AI 类型 + force_own_key 决定账单人）
+    api_key, api_base, credit_source, pool_key_id, provider_info = await _get_api_config(
+        db, agent,
+        chatter_id=sender_id,
+        force_own_key=force_own_key,
+    )
+
+    # 无 API Key → 发送 DM 系统通知后跳过
+    if api_key is None:
+        logger.warning(f"AI {agent_name}({agent_id}) 无 API Key，发送 DM 系统通知")
+        await _send_system_error(db, agent, "no_api_key", "", "dm", None, session_id)
+        return
+
+    # 中断标记：如果 AI 之前在忙，记录中断
+    try:
+        from app.services.agent.workspace_service import mark_interrupted
+        await mark_interrupted(db, agent_id, reason=f"私信 {session_id} 的新消息")
+    except Exception:
+        pass  # 非致命
+
+    # Skill 引擎评估（延迟回复、打字指示器）
+    from app.services.skill.skill_engine import evaluate_action_skills, _is_delay_reply_allowed
+    skill_result = await evaluate_action_skills(db, agent, 0, context={
+        "content": content,
+        "sender_type": "human",  # DM 中对方是人类
+    })
+    if skill_result.delay_seconds > 0:
+        await asyncio.sleep(skill_result.delay_seconds)
+
+    # 构建消息
+    from app.ai.llm import build_dm_messages, resolve_model
+    # v0.4.0: DM 中 sender_id 即为触发用户
+    messages = await build_dm_messages(db, agent, session_id, api_base_url=api_base, api_key=api_key, trigger_user_id=sender_id, system_prompt_override=effective_cfg.get("system_prompt"))
+
+    # 获取工具
+    from app.services.tool_registry import get_allowed_tools
+    delay_allowed = await _is_delay_reply_allowed(db, agent)
+    tools = get_allowed_tools(agent_state, thinking_enabled=effective_cfg["thinking_enabled"], delay_reply_allowed=delay_allowed)
+    model = resolve_model(agent)
+
+    logger.info(f"🚀 AI {agent_name}: 开始 DM 回复 (session={session_id})")
+
+    conv_key = f"dm:{session_id}"
+    _thinking_state.setdefault(conv_key, {})[agent_id] = {
+        "name": agent_name, "avatar_url": agent_avatar,
+    }
+    try:
+        await chat_api.broadcast_to_dm(
+            session_id,
+            {
+                "type": "ai_thinking",
+                "conversation_type": "dm",
+                "data": {
+                    "agent_id": agent_id,
+                    "agent_name": agent_name,
+                    "agent_avatar_url": agent_avatar,
+                    "session_id": session_id,
+                    "trigger": "user",
+                },
+            },
+        )
+        await _run_serialized(agent, _tool_call_loop(
+            db=db,
+            agent=agent,
+            group_id=None,  # DM 不使用 group_id
+            messages=messages,
+            tools=tools,
+            model=model,
+            api_base_url=api_base,
+            api_key=api_key,
+            max_loops=effective_cfg["max_tool_rounds"],
+            chain_depth=chain_depth,
+            conversation_type="dm",
+            session_id=session_id,
+            trigger_user_id=sender_id,
+            effective_cfg=effective_cfg,
+            credit_source=credit_source,
+            pool_key_id=pool_key_id,
+            provider_supports_thinking=provider_info.get("thinking_supported"),
+            trigger="user",
+        ))
+    except Exception as e:
+        logger.error(f"❌ AI {agent_name} DM 回复异常 (session={session_id}): {e}", exc_info=True)
+    finally:
+        _thinking_state.get(conv_key, {}).pop(agent_id, None)
+        await chat_api.broadcast_to_dm(
+            session_id,
+            {
+                "type": "ai_thinking_end",
+                "conversation_type": "dm",
+                "data": {
+                    "agent_id": agent_id,
+                    "agent_name": agent_name,
+                    "agent_avatar_url": agent_avatar,
+                    "session_id": session_id,
+                    "trigger": "user",
+                },
+            },
+        )
+    logger.info(f"✅ AI {agent_name}: DM 回复完成")
+
+    # 提交工作区变更（中断标记、任务保存等）
+    await db.commit()

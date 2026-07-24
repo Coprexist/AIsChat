@@ -31,7 +31,7 @@ class ManageWorkspace(ToolPlugin):
 
     async def execute(self, db: AsyncSession, agent_id: int, group_id: int | None,
                       arguments: dict, context: dict) -> dict:
-        from app.services.workspace_service import get_workspace_file, set_workspace_file
+        from app.services.agent.workspace_service import get_workspace_file, set_workspace_file
 
         action = arguments["action"]
         file_type = arguments["file"]

@@ -24,7 +24,7 @@ class SetConcurrency(ToolPlugin):
 
     async def execute(self, db: AsyncSession, agent_id: int, group_id: int | None,
                       arguments: dict, context: dict) -> dict:
-        from app.services.chat_chain_service import chat_chain_manager
+        from app.ai.chat_chain import chat_chain_manager
 
         target_group = arguments.get("group_id", group_id)
         limit = max(1, min(10, int(arguments["limit"])))

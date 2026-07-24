@@ -14,7 +14,7 @@ from app.schemas.group import (
     FederationShareRequest, GroupFederationStatus,
 )
 from app.schemas.message import MessageResponse
-from app.services.group_service import (
+from app.chat.message import (
     create_group,
     get_group,
     list_user_groups,
@@ -22,9 +22,6 @@ from app.services.group_service import (
     get_group_members,
     get_recent_messages,
     message_to_dict,
-    set_group_dnd,
-    cancel_group_dnd,
-    is_member_in_dnd,
     update_group_settings,
     set_announcement,
     delete_announcement,
@@ -34,6 +31,11 @@ from app.services.group_service import (
     disband_group,
     get_unread_info,
     update_last_read,
+)
+from app.chat.delivery import (
+    set_group_dnd,
+    cancel_group_dnd,
+    is_member_in_dnd,
 )
 from app.utils.auth import get_current_user
 
@@ -69,7 +71,7 @@ async def create_new_group(
         )
 
         # 人类成员：发送邀请
-        from app.services.invitation_service import send_group_invitation
+        from app.services.social.invitation_service import send_group_invitation
         invitations_sent = 0
         for hm in human_members:
             try:
@@ -117,7 +119,7 @@ async def get_group_detail(
 
     # 统计成员数量 & 在线人数
     from app.models.group import GroupMember
-    from app.services.online_tracker import get_user_online_status
+    from app.services.infrastructure.online_tracker import get_user_online_status
     member_result = await db.execute(
         select(GroupMember).where(GroupMember.group_id == group_id)
     )
@@ -156,7 +158,7 @@ async def invite_member(
             )
             return {"message": "已加入群聊", "group_id": group_id, "method": "direct"}
         else:
-            from app.services.invitation_service import send_group_invitation
+            from app.services.social.invitation_service import send_group_invitation
             result = await send_group_invitation(
                 db, group_id, current_user["user_id"], req.member_id, req.message,
             )
@@ -188,7 +190,7 @@ async def list_members(
             u = await db.get(User, m.member_id)
             if u:
                 name = u.username
-            from app.services.online_tracker import get_user_online_status
+            from app.services.infrastructure.online_tracker import get_user_online_status
             if get_user_online_status(m.member_id):
                 state = "online"
         elif m.member_type == "ai":
@@ -264,7 +266,7 @@ async def send_group_message(
     db: AsyncSession = Depends(get_db),
 ):
     """发送群聊消息（含附件）"""
-    from app.services.group_service import create_message as create_group_msg
+    from app.chat.message import create_message as create_group_msg
     from app.models.user import User as UserModel
     from app.models.agent import Agent as AgentModel
 
@@ -303,7 +305,7 @@ async def send_group_message(
 
     # 触发 AI 回复
     try:
-        from app.services.ai_response_worker import message_queue
+        from app.ai.response_worker import message_queue
         import asyncio
         message_queue.put_nowait({
             "conversation_type": "group",
@@ -607,7 +609,7 @@ async def get_federation_peers(
     获取群联邦共享状态：列出所有对等端及其共享状态。
     需要群主/AI制作者权限。
     """
-    from app.services.federation_service import get_group_federation_peers
+    from app.services.federation.federation_service import get_group_federation_peers
     result = await get_group_federation_peers(db, group_id, current_user["user_id"])
     if result.get("error"):
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail=result["message"])
@@ -625,7 +627,7 @@ async def share_group_federation(
     将群共享到指定对等端。
     需要群主/AI制作者权限。
     """
-    from app.services.federation_service import share_group_to_peers
+    from app.services.federation.federation_service import share_group_to_peers
     result = await share_group_to_peers(
         db, group_id, req.peer_ids, current_user["user_id"],
     )
@@ -648,7 +650,7 @@ async def unshare_group_federation(
     取消群对指定对等端的联邦共享。
     需要群主/AI制作者权限。
     """
-    from app.services.federation_service import unshare_group_from_peers
+    from app.services.federation.federation_service import unshare_group_from_peers
     result = await unshare_group_from_peers(
         db, group_id, req.peer_ids, current_user["user_id"],
     )
@@ -672,7 +674,7 @@ async def export_chat(
     db: AsyncSession = Depends(get_db),
 ):
     """导出群聊记录（json / txt / html）"""
-    from app.services.export_service import export_chat_history
+    from app.services.content.export_service import export_chat_history
 
     # 校验群成员身份
     group = await get_group(db, group_id)
@@ -702,6 +704,6 @@ async def get_group_activity(
     current_user: dict = Depends(get_current_user),
 ):
     """获取群聊当前 AI 思考/输入中状态（用于进入对话时恢复活动指示器）"""
-    from app.services.ai_response_worker import get_thinking_state
+    from app.ai.response_worker import get_thinking_state
     conv_key = f"group:{group_id}"
     return get_thinking_state(conv_key)

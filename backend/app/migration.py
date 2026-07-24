@@ -2547,7 +2547,7 @@ async def _migrate_multi_provider(db):
 async def _migrate_provider_defaults(db):
     """v2.0.8: provider_config 为 NULL 时填入内置 7 家供应商预设"""
     import json
-    from app.services.provider_presets import get_all_presets
+    from app.services.agent.provider_presets import get_all_presets
 
     # 检查是否已存在配置
     result = await db.execute(text("SELECT provider_config FROM system_settings WHERE id = 1"))

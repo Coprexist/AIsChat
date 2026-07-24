@@ -13,11 +13,11 @@ from app.schemas.auth import (
     LoginProvidersResponse,
 )
 from app.schemas.system_settings import SetupCompleteRequest, LanguageUpdateRequest
-from app.services.auth_service import (
+from app.services.infrastructure.auth_service import (
     register_user, login_user, get_user_info,
     update_user_settings, rebind_email, unbind_email,
 )
-from app.services.verification_service import generate_and_send_code, verify_code
+from app.services.infrastructure.verification_service import generate_and_send_code, verify_code
 from app.utils.auth import get_current_user
 from app.models.user import User
 
@@ -121,7 +121,7 @@ async def update_language(
 @router.get("/login-providers", response_model=LoginProvidersResponse)
 async def get_login_providers(db: AsyncSession = Depends(get_db)):
     """获取当前可用的登录方式（公开，无需认证）"""
-    from app.services.system_settings_service import get_settings
+    from app.services.infrastructure.system_settings_service import get_settings
     sys = await get_settings(db)
     return {"providers": sys.get("login_providers", ["direct"])}
 

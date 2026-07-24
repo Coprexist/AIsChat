@@ -1,6 +1,6 @@
 import { useNavigate, useLocation } from 'react-router-dom'
 import { useT } from '../i18n/I18nContext'
-import { mainNavItems, type NavItem } from '../utils/navRegistry'
+import { mainNavItems, type NavItem } from '../utils/navRegistry.tsx'
 
 interface MobileNavProps {
   closeDrawer?: () => void

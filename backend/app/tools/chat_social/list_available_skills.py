@@ -22,7 +22,7 @@ class ListAvailableSkills(ToolPlugin):
     async def execute(self, db: AsyncSession, agent_id: int, group_id: int | None,
                       arguments: dict, context: dict) -> dict:
         from app.models.agent import Agent as AgentModel
-        from app.services.skill_engine import _is_delay_reply_allowed
+        from app.services.skill.skill_engine import _is_delay_reply_allowed
 
         agent_result = await db.execute(
             sa_select(AgentModel).where(AgentModel.id == agent_id)

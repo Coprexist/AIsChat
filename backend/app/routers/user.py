@@ -6,7 +6,7 @@ from fastapi import APIRouter, Depends, HTTPException, status, File, UploadFile
 from sqlalchemy.ext.asyncio import AsyncSession
 from pydantic import BaseModel, Field, field_validator
 from app.database import get_db
-from app.services.auth_service import update_user_settings
+from app.services.infrastructure.auth_service import update_user_settings
 from app.utils.auth import get_current_user
 from app.schemas.auth import UserInfoResponse
 from app.models.user import User
@@ -150,7 +150,7 @@ async def credit_status(
         monthly_consumed: 本月已消费 credit
         assigned_key_name: 绑定的池 Key 名（或 null）
     """
-    from app.services.quota_service import get_user_credit_status
+    from app.services.infrastructure.quota_service import get_user_credit_status
     return await get_user_credit_status(db, current_user["user_id"])
 
 
@@ -252,7 +252,7 @@ async def upload_user_avatar(
 
     # 入队联邦 profile 同步
     try:
-        from app.services.federation_service import enqueue_profile_update
+        from app.services.federation.federation_service import enqueue_profile_update
         await enqueue_profile_update(db, "user", current_user["user_id"], "avatar_url", avatar_url)
     except Exception:
         pass
@@ -360,7 +360,7 @@ async def get_user_storage(
         total_files += 1
 
     # 转发来的文件（计入用户配额）
-    from app.services.file_service import get_user_forwarded_file_ids
+    from app.services.content.file_service import get_user_forwarded_file_ids
     forwarded_ids = await get_user_forwarded_file_ids(db, current_user["user_id"])
     forwarded_used = 0
     forwarded_files = 0

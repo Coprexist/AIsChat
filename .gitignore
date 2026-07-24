@@ -25,6 +25,7 @@ node_modules/
 # ── IDE / 编辑器 ──
 .idea/
 .vscode/
+.trae/
 *.swp
 *.swo
 *~

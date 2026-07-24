@@ -13,161 +13,18 @@ from app.models.agent import Agent as AgentModel
 from app.models.group import GroupMember as GroupMemberModel
 from app.utils.auth import decode_access_token
 from app.utils.error_handler import build_ws_error, log_error
-from app.services.group_service import (
-    create_message, message_to_dict, store_pending_message,
-)
+from app.chat.connection import ConnectionManager
+from app.chat import chat_api
+from app.chat.message import create_message, message_to_dict
+from app.chat.delivery import store_pending_message
 
 logger = logging.getLogger(__name__)
 
 router = APIRouter()
 
 
-class ConnectionManager:
-    """WebSocket 连接管理器（支持 DND 过滤、错误推送、私信）"""
-
-    def __init__(self):
-        # 群聊连接：{group_id: {user_id: websocket}}
-        self.group_connections: dict[int, dict[int, WebSocket]] = {}
-        # 私信连接：{session_id: {user_id: websocket}}
-        self.dm_connections: dict[str, dict[int, WebSocket]] = {}
-        # 用户全局连接：{user_id: websocket} 用于推送/通知
-        self.user_connections: dict[int, WebSocket] = {}
-
-    async def connect(self, ws: WebSocket, group_id: int, user_id: int):
-        if group_id not in self.group_connections:
-            self.group_connections[group_id] = {}
-        self.group_connections[group_id][user_id] = ws
-        self.user_connections[user_id] = ws
-        logger.info(f"用户 {user_id} 加入群聊 {group_id} 的 WebSocket")
-
-    def disconnect(self, group_id: int, user_id: int):
-        if group_id in self.group_connections:
-            self.group_connections[group_id].pop(user_id, None)
-            if not self.group_connections[group_id]:
-                del self.group_connections[group_id]
-        self.user_connections.pop(user_id, None)
-        logger.info(f"用户 {user_id} 离开群聊 {group_id} 的 WebSocket")
-
-    async def broadcast_to_group(
-        self,
-        group_id: int,
-        message: dict,
-        exclude_user_id: int | None = None,
-    ):
-        """向群聊广播消息（排除发送者）"""
-        if group_id in self.group_connections:
-            for uid, ws in self.group_connections[group_id].items():
-                if exclude_user_id is not None and uid == exclude_user_id:
-                    continue
-                try:
-                    await ws.send_json(message)
-                except Exception as e:
-                    logger.warning(f"发送消息给用户 {uid} 失败: {e}")
-
-    async def send_to_user(self, user_id: int, message: dict):
-        """向特定用户发送消息（如错误通知、摘要）"""
-        if user_id in self.user_connections:
-            try:
-                await self.user_connections[user_id].send_json(message)
-            except Exception as e:
-                logger.warning(f"发送消息给用户 {user_id} 失败: {e}")
-
-    async def send_error(
-        self,
-        user_id: int,
-        code: str,
-        message: str,
-        tool_call_id: str | None = None,
-    ):
-        """向特定用户发送 WebSocket 错误事件"""
-        error_event = build_ws_error(code, message, tool_call_id)
-        await self.send_to_user(user_id, error_event)
-
-    def get_online_users(self, group_id: int) -> list[int]:
-        if group_id in self.group_connections:
-            return list(self.group_connections[group_id].keys())
-        return []
-
-    def is_user_online(self, user_id: int) -> bool:
-        """检查用户是否在线（有活跃 WebSocket 连接）"""
-        return user_id in self.user_connections
-
-    def get_online_user_ids(self) -> set[int]:
-        """获取所有在线用户的 ID 集合"""
-        return set(self.user_connections.keys())
-
-    # ── DM 连接管理 ──
-
-    async def connect_dm(self, ws: WebSocket, session_id: str, user_id: int):
-        if session_id not in self.dm_connections:
-            self.dm_connections[session_id] = {}
-        self.dm_connections[session_id][user_id] = ws
-        self.user_connections[user_id] = ws
-        logger.info(f"用户 {user_id} 加入私信 {session_id} 的 WebSocket")
-
-    def disconnect_dm(self, session_id: str, user_id: int):
-        if session_id in self.dm_connections:
-            self.dm_connections[session_id].pop(user_id, None)
-            if not self.dm_connections[session_id]:
-                del self.dm_connections[session_id]
-
-    async def broadcast_to_dm(
-        self,
-        session_id: str,
-        message: dict,
-        exclude_user_id: int | None = None,
-    ):
-        """向私信会话广播消息（通常是推送给对方）"""
-        if session_id in self.dm_connections:
-            for uid, ws in self.dm_connections[session_id].items():
-                if exclude_user_id is not None and uid == exclude_user_id:
-                    continue
-                try:
-                    await ws.send_json(message)
-                except Exception as e:
-                    logger.warning(f"发送 DM 消息给用户 {uid} 失败: {e}")
-
-    async def broadcast_avatar_updated(
-        self,
-        entity_type: str,
-        entity_id: int,
-        avatar_url: str,
-    ):
-        """头像下载完成后通知所有已连接客户端更新消息气泡中的头像 URL"""
-        event = {
-            "type": "avatar_updated",
-            "entity_type": entity_type,
-            "entity_id": entity_id,
-            "avatar_url": avatar_url,
-        }
-        # 通知群聊中的客户端
-        for conns in self.group_connections.values():
-            for ws in conns.values():
-                try:
-                    await ws.send_json(event)
-                except Exception:
-                    pass
-        # 通知 DM 中的客户端
-        for conns in self.dm_connections.values():
-            for ws in conns.values():
-                try:
-                    await ws.send_json(event)
-                except Exception:
-                    pass
-
-    async def broadcast_to_all(self, message: dict):
-        """向所有已连接的用户广播消息（用于维护模式等全局通知）"""
-        dead = []
-        for user_id, ws in self.user_connections.items():
-            try:
-                await ws.send_json(message)
-            except Exception:
-                dead.append(user_id)
-        for uid in dead:
-            self.user_connections.pop(uid, None)
-
-
 manager = ConnectionManager()
+chat_api.set_manager(manager)
 
 
 @router.websocket("/ws")
@@ -193,7 +50,7 @@ async def websocket_endpoint(ws: WebSocket, token: str = Query(...)):
     current_session_id: str | None = None  # DM 会话 ID 追踪
 
     # 记录 WebSocket 连接活动（在线追踪兜底）
-    from app.services.online_tracker import record_ws_activity
+    from app.services.infrastructure.online_tracker import record_ws_activity
     record_ws_activity(user_id)
 
     # 缓存用户信息（打字状态/在线需要头像）
@@ -295,7 +152,7 @@ async def websocket_endpoint(ws: WebSocket, token: str = Query(...)):
 
                     async with async_session() as db:
                         try:
-                            from app.services.dm_service import send_dm_message as send_dm_msg, is_user_in_dm_dnd
+                            from app.chat.dm import send_dm_message as send_dm_msg, is_user_in_dm_dnd
                             msg = await send_dm_msg(
                                 db, session_id, sender_id=user_id,
                                 content=content, reply_to=reply_to,
@@ -322,7 +179,7 @@ async def websocket_endpoint(ws: WebSocket, token: str = Query(...)):
 
                     # 触发 AI 回复（如果对方是 AI）
                     if sender_type == "human":
-                        from app.services.ai_response_worker import message_queue
+                        from app.ai.response_worker import message_queue
                         try:
                             message_queue.put_nowait({
                                 "conversation_type": "dm",
@@ -338,7 +195,7 @@ async def websocket_endpoint(ws: WebSocket, token: str = Query(...)):
 
                     # Federation: forward DM to connected peers
                     try:
-                        from app.services.federation_manager import federation_manager as fed_mgr
+                        from app.services.federation.federation_manager import federation_manager as fed_mgr
                         asyncio.create_task(
                             fed_mgr.forward_dm_message(session_id, msg)
                         )
@@ -471,10 +328,10 @@ async def websocket_endpoint(ws: WebSocket, token: str = Query(...)):
 
                         # 联邦通信：异步转发到共享此群的对等端
                         try:
-                            from app.services.federation_service import is_group_federated as check_grp_fed
+                            from app.services.federation.federation_service import is_group_federated as check_grp_fed
                             is_fed = await check_grp_fed(db, group_id)
                             if is_fed:
-                                from app.services.federation_manager import federation_manager as fed_mgr
+                                from app.services.federation.federation_manager import federation_manager as fed_mgr
                                 asyncio.create_task(
                                     fed_mgr.forward_message(group_id, msg_data)
                                 )
@@ -483,7 +340,7 @@ async def websocket_endpoint(ws: WebSocket, token: str = Query(...)):
 
                         # 触发 AI 自动回复 worker（仅人类消息，始终触发不受在线用户数影响）
                         if sender_type == "human":
-                            from app.services.ai_response_worker import message_queue
+                            from app.ai.response_worker import message_queue
                             try:
                                 message_queue.put_nowait({
                                     "conversation_type": "group",
@@ -508,7 +365,7 @@ async def websocket_endpoint(ws: WebSocket, token: str = Query(...)):
                             )
                             is_accelerated = group_check.scalar_one_or_none()
                             if is_accelerated:
-                                from app.services.vector_pipeline import embedding_queue
+                                from app.services.memory.vector_pipeline import embedding_queue
                                 try:
                                     embedding_queue.put_nowait({
                                         "group_id": group_id,

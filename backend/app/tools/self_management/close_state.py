@@ -4,7 +4,7 @@ close_state 工具 — 关闭状态帧（不恢复上一层）
 import logging
 from sqlalchemy.ext.asyncio import AsyncSession
 from app.tools.base import ToolPlugin, ToolRegistry
-from app.services.state_stack_service import close_state
+from app.services.agent.state_stack_service import close_state
 
 logger = logging.getLogger(__name__)
 

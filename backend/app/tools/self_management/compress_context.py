@@ -47,7 +47,7 @@ class CompressContext(ToolPlugin):
 
         # 检查是否需要压缩
         if not force:
-            from app.services.context_compressor import should_compress, estimate_tokens
+            from app.services.memory.context_compression_service import should_compress, estimate_tokens
             if not should_compress(messages):
                 return {
                     "compressed": False,
@@ -66,7 +66,7 @@ class CompressContext(ToolPlugin):
             return {"error": True, "message": "缺少 API 配置，无法执行压缩"}
 
         # 执行压缩
-        from app.services.context_compressor import compress_messages
+        from app.services.memory.context_compression_service import compress_messages
 
         try:
             # 确保 keep_last_n 在合理范围

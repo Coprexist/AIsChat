@@ -12,7 +12,7 @@ import uuid
 from fastapi import APIRouter, WebSocket, WebSocketDisconnect, Depends
 from sqlalchemy.ext.asyncio import AsyncSession
 from app.database import async_session, get_db
-from app.services.federation_service import (
+from app.services.federation.federation_service import (
     get_peer_by_public_id,
     get_decrypted_secret,
     hmac_response,
@@ -140,11 +140,11 @@ async def federation_websocket(ws: WebSocket):
         logger.info(f"🌐 ✅ 接受连接: {peer_public_id}")
 
         async with async_session() as db:
-            from app.services.federation_service import update_peer_connection_state
+            from app.services.federation.federation_service import update_peer_connection_state
             await update_peer_connection_state(db, peer.id, "connected")
 
         # 注册入站连接到 federation_manager.peers，使 _send_or_buffer 能回传消息
-        from app.services.federation_manager import federation_manager, PeerConnection
+        from app.services.federation.federation_manager import federation_manager, PeerConnection
         if peer_public_id not in federation_manager.peers:
             federation_manager.peers[peer_public_id] = PeerConnection(
                 public_id=peer_public_id,
@@ -182,19 +182,19 @@ async def federation_websocket(ws: WebSocket):
                 # 处理随消息 piggyback 的 profile_updates
                 profile_updates = data.get("profile_updates")
                 if profile_updates:
-                    from app.services.federation_manager import federation_manager
+                    from app.services.federation.federation_manager import federation_manager
                     await federation_manager._apply_profile_updates(peer_public_id, profile_updates)
             elif msg_type == "entity_announce":
-                from app.services.federation_manager import federation_manager
+                from app.services.federation.federation_manager import federation_manager
                 await federation_manager._handle_entity_announce(peer_public_id, data)
             elif msg_type == "entity_unannounce":
-                from app.services.federation_manager import federation_manager
+                from app.services.federation.federation_manager import federation_manager
                 await federation_manager._handle_entity_unannounce(peer_public_id, data)
             elif msg_type == "profile_sync":
-                from app.services.federation_manager import federation_manager
+                from app.services.federation.federation_manager import federation_manager
                 await federation_manager._handle_profile_sync(peer_public_id, data)
             elif msg_type in ("url_rotate_propose", "url_rotate_ack", "url_rotate_commit"):
-                from app.services.federation_manager import federation_manager
+                from app.services.federation.federation_manager import federation_manager
                 await federation_manager.handle_inbound_rotation_message(peer_public_id, data, ws)
             elif msg_type == "subscribe":
                 logger.info(f"🌐 {peer_public_id} 订阅群: {data.get('group_id')}")
@@ -207,13 +207,13 @@ async def federation_websocket(ws: WebSocket):
         logger.error(f"🌐 {peer_public_id} 连接异常: {e}", exc_info=True)
     finally:
         # 清理入站连接（从 federation_manager.peers 中移除）
-        from app.services.federation_manager import federation_manager
+        from app.services.federation.federation_manager import federation_manager
         federation_manager.peers.pop(peer_public_id, None)
         try:
             async with async_session() as db:
                 peer = await get_peer_by_public_id(db, peer_public_id)
                 if peer:
-                    from app.services.federation_service import update_peer_connection_state
+                    from app.services.federation.federation_service import update_peer_connection_state
                     await update_peer_connection_state(db, peer.id, "disconnected")
         except Exception:
             pass
@@ -231,7 +231,7 @@ async def _handle_forwarded_message(from_public_id: str, data: dict) -> None:
     # 根据 peer 前缀拼接 federated_id 的辅助函数，同时返回 peer 避免外部重复查询
     async def _resolve_entity(entity_type: str, local_id: str | int) -> tuple[object | None, object | None]:
         async with async_session() as db:
-            from app.services.federation_service import get_peer_by_public_id
+            from app.services.federation.federation_service import get_peer_by_public_id
             peer = await get_peer_by_public_id(db, from_public_id)
             if peer:
                 type_char = {"group": "g", "dm": "d", "user": "u", "agent": "a"}.get(entity_type, entity_type[0])
@@ -318,7 +318,7 @@ async def _handle_forwarded_message(from_public_id: str, data: dict) -> None:
                 message = await handle_remote_message(db, group_id, msg, source_public_id)
                 await db.commit()
 
-                from app.services.group_service import message_to_dict
+                from app.chat.message import message_to_dict
                 # 先用原始头像 URL 立即广播，头像下载放到后台不阻塞消息
                 original_avatar = msg.get("sender_avatar_url")
                 msg_data = message_to_dict(message, sender_name=msg.get("sender_name", "远程用户"), sender_avatar_url=original_avatar)
@@ -335,7 +335,7 @@ async def _handle_forwarded_message(from_public_id: str, data: dict) -> None:
                 )
 
                 if msg.get("sender_type") == "human":
-                    from app.services.ai_response_worker import message_queue
+                    from app.ai.response_worker import message_queue
                     try:
                         message_queue.put_nowait({
                             "conversation_type": "group",
@@ -407,7 +407,7 @@ async def _handle_forwarded_message(from_public_id: str, data: dict) -> None:
 
 async def _get_my_identity_full() -> tuple[str, str, str]:
     """获取本实例的 public_id、instance_id 和 display_name"""
-    from app.services.federation_service import get_instance_info
+    from app.services.federation.federation_service import get_instance_info
     async with async_session() as db:
         info = await get_instance_info(db)
         return (
