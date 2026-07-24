@@ -19,6 +19,12 @@ from app.config import settings
 from app.database import async_session
 from app.chat import chat_api
 
+# ── 中断消息注入：AI 忙碌时，新消息不另起 executor，注入当前循环 ──
+# {agent_id: [{type: "user_message", content, sender_id, sender_name, session_id}]}
+_pending_interrupts: dict[int, list[dict]] = {}
+# 当前正在 _tool_call_loop 中的 agent ID 集合
+_active_run_agent_ids: set[int] = set()
+
 logger = logging.getLogger(__name__)
 
 # 速率限制：{agent_id: last_call_timestamp}
@@ -324,6 +330,28 @@ async def _tool_call_loop(
             _pending_results: list[dict] = []  # {tc_id, result}
             _end_turn = False
 
+            def _repair_json(raw: str) -> dict | None:
+                """尝试修复 LLM 生成的内容字段引号嵌套问题"""
+                try:
+                    return json.loads(raw)
+                except json.JSONDecodeError:
+                    pass
+                # JSON 尾部可能因内容过长被截断或引号不闭合
+                # 尝试提取 path + content 两个字段
+                m_path = re.search(r'"path"\s*:\s*"([^"]+)"', raw)
+                if not m_path:
+                    return None
+                path = m_path.group(1)
+                m_content = re.search(r'"content"\s*:\s*"(.+)$', raw, re.DOTALL)
+                if m_content:
+                    raw_content = m_content.group(1).rstrip()
+                    # 去掉末尾可能残留的 , 或 }
+                    raw_content = re.sub(r'"?\s*[,}]?\s*$', '', raw_content)
+                    # 反转义
+                    content = raw_content.replace('\\"', '"').replace('\\n', '\n').replace('\\\\', '\\')
+                    return {"path": path, "content": content}
+                return None
+
             async def _dispatch_one_tool(tc: dict):
                 nonlocal last_task, _end_turn
                 if _end_turn:
@@ -335,10 +363,13 @@ async def _tool_call_loop(
                 try:
                     arguments = json.loads(arguments_str)
                 except json.JSONDecodeError:
-                    _pending_results.append({"tc_id": tc_id, "result": {
-                        "error": True, "message": f"工具 {tool_name} 参数 JSON 无效: {arguments_str[:200]}"
-                    }})
-                    return
+                    arguments = _repair_json(arguments_str)
+                    if arguments is None:
+                        _pending_results.append({"tc_id": tc_id, "result": {
+                            "error": True, "message": f"工具 {tool_name} 参数 JSON 解析失败，且自动修复未能恢复。请尝试减少内容中引号的使用，或分多次 file_edit 写入。原始值前200字符: {arguments_str[:200]}"
+                        }})
+                        return
+                    logger.info(f"AI {agent.name}({agent.id}): 自动修复 {tool_name} 参数 JSON 成功")
                 from app.services.tool_registry import validate_tool_call
                 is_valid, validate_error = validate_tool_call(tool_name, arguments)
                 if not is_valid:
@@ -420,6 +451,31 @@ async def _tool_call_loop(
                         except Exception:
                             pass
                     _auto_compressed = True
+
+            # ── 注入用户忙时消息（中断缓冲）──
+            pending_msgs = _pending_interrupts.pop(agent.id, None)
+            if pending_msgs:
+                for pm in pending_msgs:
+                    if pm.get("type") == "user_message":
+                        from zoneinfo import ZoneInfo
+                        tz = ZoneInfo(settings.display_timezone)
+                        now_str = datetime.now(tz).strftime(f"%Y-%m-%d %H:%M {tz.key}")
+                        sender_name = pm.get("sender_name", "用户")
+                        sender_id = pm.get("sender_id")
+                        msg_struct = {
+                            "time": now_str,
+                            "speaker_name": sender_name,
+                            "speaker_id": sender_id,
+                            "is_self": False,
+                            "content": pm.get("content", ""),
+                        }
+                        from app.utils.pure.prompting import format_message
+                        messages.append({
+                            "role": "user",
+                            "content": format_message(msg_struct, agent.name, max_content_len=-1),
+                        })
+                logger.info(f"AI {agent.name}({agent.id}): 注入 {len(pending_msgs)} 条中断消息")
+
             try:
                 # 内层：同 Key 重试（500/503）
                 for server_retry in range(MAX_SERVER_RETRIES + 1):
@@ -669,6 +725,12 @@ async def _tool_call_loop(
                     "- 如果有新的重要事项 → 可以接着规划执行"
                 ),
             })
+
+        # 有工具结果 → 继续循环让 LLM 看到
+        if _pending_results:
+            await asyncio.sleep(0.5)
+            loop_idx += 1
+            continue
 
         # LLM 未请求 tool_calls → 已完成，保存并退出
         if finish_reason != "tool_calls":

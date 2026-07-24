@@ -7,7 +7,34 @@
 
 ---
 
-## [v1.0.5] - 2026-07-12
+## [v1.0.6] - 2026-07-24
+
+### Added
+
+- 🚨 **中断消息注入**：AI 忙碌时用户新消息直接注入当前 `_tool_call_loop`，不另起 executor。DM 路由层拦截 + worker 群聊/私信统一处理。
+- 🔧 **`file_edit` 新增 `delete_lines` 操作**：删除指定 N-M 行（1-indexed）。
+- 📖 **`file_read` 新增 `start_line`/`end_line`**：分段读取文件，不传则读全文。
+- 🛠️ **JSON 参数自动修复**：`_repair_json` 函数在 `json.loads` 失败时用正则提取 path + content，解决大文件 HTML 引号嵌套问题。
+- 📝 **工具执行结果必回传**：有工具结果时强制继续循环让 LLM 看到，不再因 `finish_reason=stop` 提前退出。
+- ⚡ **`max_tokens` 2048→16384**：LLM 输出配额提升，大文件不被截断。
+- 🧠 **推理不可见提醒**：当前时间段提示 AI 必须调 `send_dm`/`send_gm` 发内容（除非不想发）。
+
+### Changed
+
+- 📏 **群聊消息字数上限 200→5000**：`format_message` 默认截断改为 5000 字符。
+- 🗂️ **`file_list` 路径处理**：`.` 和 `/` 视为根目录，不加 LIKE 过滤，查全部文件。
+- ✏️ **`file_write` 覆盖更新 owner**：覆盖已有文件时重置 `owner_type`/`owner_id`，避免权限混乱。
+- 💬 **工具描述补充**：`file_edit` 增加编辑前先读文件、从后往前插入的说明。
+- 📱 **设置页保存按钮 sticky 底部**：`AgentSettingsModal` 和 `SettingsPage` 的保存/取消按钮固定在容器底部。
+
+### Fixed
+
+- 🐛 **工具报错不通知 AI**：`_pending_results` 不为空时不退出循环，LLM 收到结果后自主决策。
+- 🐛 **JSON 解析失败死循环**：后台自动修复引号转义，AI 不再反复重试同一错误。
+- 🐛 **`file_read` 报无权**：`file_write` 覆盖已有文件时未更新 `owner_id`。
+- 🐛 **`file_list` 查不到文件**：`path="/"` 时 LIKE 条件 `/` 不匹配相对路径文件。
+- 🐛 **设置页保存按钮错位**：`SettingsPage` 布局 flex row 导致按钮在内容区右侧。
+- 🐛 **文件系统小文件可读写、大文件不可读**：`max_tokens` 不足导致 JSON 截断。
 
 ### Added
 

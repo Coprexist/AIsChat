@@ -96,7 +96,7 @@ async def chat_completion(
     top_p: float = 0.9,
     presence_penalty: float = 0.5,
     frequency_penalty: float = 0.5,
-    max_tokens: int = 2048,
+    max_tokens: int = 16384,
     response_format: dict | None = None,
     thinking_enabled: bool = False,
     user_id: str | None = None,
@@ -154,7 +154,7 @@ async def _chat_completion_non_streaming(
     top_p: float = 0.9,
     presence_penalty: float = 0.5,
     frequency_penalty: float = 0.5,
-    max_tokens: int = 2048,
+    max_tokens: int = 16384,
     response_format: dict | None = None,
     thinking_enabled: bool = False,
     user_id: str | None = None,
@@ -234,7 +234,7 @@ async def _chat_completion_streaming(
     top_p: float = 0.9,
     presence_penalty: float = 0.5,
     frequency_penalty: float = 0.5,
-    max_tokens: int = 2048,
+    max_tokens: int = 16384,
     response_format: dict | None = None,
     thinking_enabled: bool = False,
     user_id: str | None = None,
@@ -513,15 +513,20 @@ async def _build_current_context(
     now_str = now.strftime(f"%Y-%m-%d %H:%M {tz.key}")
     context = f"## 当前时间\n{now_str}\n"
     if is_dm:
-        # DM 中告诉 AI 用 send_dm，而不是 send_gm
         context += (
-            f"- **重要**：回复时请使用 send_dm(target_user_id=..., content=\"...\")，"
-            f"不要用 send_gm（那是群聊工具）\n"
+            "- **重要**：当前在 DM 中，回复请用 send_dm 或 send_gm 发送内容。\n"
+        )
+        context += (
+            "- **注意**：你的推理/思考过程对方看不见，"
+            "必须调 send_dm 或 send_gm 发出去（除非你不想发）。\n"
         )
     else:
         context += (
-            f"- **重要**：回复时请使用 send_gm(group_id={group_id}, content=\"...\")，"
-            f"不要用其他 group_id\n"
+            f"- **重要**：当前在群聊中，回复请用 send_gm 或 send_dm 发送内容。\n"
+        )
+        context += (
+            "- **注意**：你的推理/思考过程群成员看不见，"
+            "必须调 send_gm 或 send_dm 发出去（除非你不想发）。\n"
         )
     # Federation context
     if is_federated:
@@ -1034,7 +1039,7 @@ async def build_messages(
             }
 
             role = "assistant" if m.sender_type == "ai" else "user"
-            messages.append({"role": role, "content": format_message(msg_struct, getattr(agent, 'name', '')),})
+            messages.append({"role": role, "content": format_message(msg_struct, getattr(agent, 'name', ''), max_content_len=5000),})
         
         if context_config_parser.should_inject_image(context_config):
             await _inject_image_data(messages, recent_messages, settings.data_dir)
@@ -1042,6 +1047,40 @@ async def build_messages(
     # 更新 AI 的最后阅读时间
     if last_read_at is not None:
         await chat_api.update_last_read(db, group_id, "ai", agent.user_id or 0)
+
+    # ── 注入上一轮工具调用中的错误记录（同 DM 逻辑） ──
+    try:
+        from app.models.conversation_log import ConversationLog as ConvLog
+        import json as _json
+        last_log = await db.execute(
+            sa_select(ConvLog)
+            .where(ConvLog.agent_id == agent.id, ConvLog.group_id == group_id, ConvLog.conversation_type == "group")
+            .order_by(ConvLog.created_at.desc())
+            .limit(1)
+        )
+        log_entry = last_log.scalar_one_or_none()
+        if log_entry and log_entry.messages:
+            tc_id_to_name = {}
+            for m in log_entry.messages:
+                if m.get("role") == "assistant" and m.get("tool_calls"):
+                    for tc in m["tool_calls"]:
+                        tc_id_to_name[tc["id"]] = tc.get("function", {}).get("name", "?")
+            errors = []
+            for m in log_entry.messages:
+                if m.get("role") == "tool":
+                    result = _json.loads(m.get("content", "{}")) if isinstance(m.get("content"), str) else m.get("content", {})
+                    if result.get("error"):
+                        tc_name = tc_id_to_name.get(m.get("tool_call_id", ""), "?")
+                        err_msg = result.get("message", "")[:120]
+                        errors.append(f"- {tc_name}: {err_msg}")
+            if errors:
+                messages.append({
+                    "role": "system",
+                    "content": "## 上一轮工具调用失败记录\n以下工具在上一轮调用中返回了错误，请参考修复：\n" + "\n".join(errors),
+                })
+    except Exception as e:
+        logger.warning(f"注入工具错误记录失败（非致命）: {e}")
+
     # 当前时间放在最后（每次变化，放末尾不影响前缀cache）
     current_ctx = await _build_current_context(db, agent, group_id, group_name, is_dm)
     messages.append({"role": "system", "content": current_ctx})
@@ -1203,6 +1242,44 @@ async def build_dm_messages(
 
     # 🖼️ 为最后一条用户消息注入图片附件
     await _inject_image_data(messages, dm_messages, settings.data_dir)
+
+    # ── 注入上一轮工具调用中的错误记录 ──
+    # AI 的工具调用结果存在 ConversationLog 表中，DMMessage 只存了通过 send_dm 发出去的内容。
+    # 如果工具报错了，AI 可能没有把错误信息发出去，下轮上下文就丢了。
+    # 这里补上最近的工具错误，让 AI 知道自己上一轮干了什么。
+    try:
+        from app.models.conversation_log import ConversationLog as ConvLog
+        import json as _json
+        last_log = await db.execute(
+            sa_select(ConvLog)
+            .where(ConvLog.agent_id == agent.id, ConvLog.session_id == session_id)
+            .order_by(ConvLog.created_at.desc())
+            .limit(1)
+        )
+        log_entry = last_log.scalar_one_or_none()
+        if log_entry and log_entry.messages:
+            # 建立 tool_call_id → tool_name 的映射
+            tc_id_to_name = {}
+            for m in log_entry.messages:
+                if m.get("role") == "assistant" and m.get("tool_calls"):
+                    for tc in m["tool_calls"]:
+                        tc_id_to_name[tc["id"]] = tc.get("function", {}).get("name", "?")
+            # 提取错误信息
+            errors = []
+            for m in log_entry.messages:
+                if m.get("role") == "tool":
+                    result = _json.loads(m.get("content", "{}")) if isinstance(m.get("content"), str) else m.get("content", {})
+                    if result.get("error"):
+                        tc_name = tc_id_to_name.get(m.get("tool_call_id", ""), "?")
+                        err_msg = result.get("message", "")[:120]
+                        errors.append(f"- {tc_name}: {err_msg}")
+            if errors:
+                messages.append({
+                    "role": "system",
+                    "content": "## 上一轮工具调用失败记录\n以下工具在上一轮调用中返回了错误，请参考修复：\n" + "\n".join(errors),
+                })
+    except Exception as e:
+        logger.warning(f"注入工具错误记录失败（非致命）: {e}")
 
     # 当前时间放在最后（每次变化，放末尾不影响前缀cache）
     dm_ctx = await _build_current_context(db, agent, 0, partner_name or "私信", is_dm=True)

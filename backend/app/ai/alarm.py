@@ -12,6 +12,7 @@ import logging
 from datetime import datetime, timezone
 from sqlalchemy import select, and_, func
 from sqlalchemy.ext.asyncio import AsyncSession
+from app.database import async_session
 from app.models.alarm import AgentAlarm
 
 logger = logging.getLogger(__name__)

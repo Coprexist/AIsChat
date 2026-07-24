@@ -1200,8 +1200,8 @@ export default function SettingsPage() {
         </div>
 
         {/* 内容区域 */}
-        <div ref={contentRef} className="flex-1 overflow-y-auto p-4 md:p-6">
-          <div className="max-w-2xl mx-auto">
+        <div ref={contentRef} className="flex-1 overflow-y-auto p-4 md:p-6 pb-0 md:pb-0">
+          <div className="max-w-2xl mx-auto pb-4">
             {/* 移动端管理员快捷入口 */}
             {user?.role === 'admin' && (
               <button
@@ -1215,8 +1215,8 @@ export default function SettingsPage() {
 
             {sections}
           </div>
+          {renderSaveFooter()}
         </div>
-        {renderSaveFooter()}
       </div>
 
       {/* ── 邮箱绑定弹窗 ── */}

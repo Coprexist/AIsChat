@@ -14,6 +14,8 @@ class FileRead(ToolPlugin):
     segment = "file_operations"
     parameters = {
         "path": {"type": "string", "description": "要读取的文件路径（相对于你的文件空间根目录）"},
+        "start_line": {"type": "integer", "description": "起始行号（从 1 开始，不传则从第 1 行开始）", "default": 1},
+        "end_line": {"type": "integer", "description": "结束行号（包含此行，不传则读到末尾）", "default": -1},
     }
     required = ["path"]
     states = ["active", "dnd"]
@@ -25,14 +27,27 @@ class FileRead(ToolPlugin):
         from app.services.content.file_service import ai_read_file
 
         path = arguments.get("path", "")
+        start_line = arguments.get("start_line", 1)
+        end_line = arguments.get("end_line", -1)
         try:
             content = await ai_read_file(db, agent_id, path)
+            if start_line != 1 or end_line != -1:
+                lines = content.split("\n")
+                if not lines or lines == [""]:
+                    lines = []
+                # start_line/end_line 都是 1-indexed
+                s = max(0, start_line - 1)
+                e = min(len(lines), end_line if end_line > 0 else len(lines))
+                if s >= len(lines):
+                    return {"success": True, "path": path, "content": "", "total_lines": len(lines)}
+                sliced = lines[s:e]
+                content = "\n".join(sliced)
             return {"success": True, "path": path, "content": content}
         except ValueError as e:
             return {"error": True, "message": str(e)}
         except Exception as e:
             logger.error(f"file_read 失败: {e}", exc_info=True)
-            return {"error": True, "message": f"读取文件失败: {str(e)}"}
+            return {"error": True, "message": f"读取失败：{e}"}
 
 
 ToolRegistry.register(FileRead)

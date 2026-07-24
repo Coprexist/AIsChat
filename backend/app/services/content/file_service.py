@@ -216,7 +216,7 @@ async def upload_file(
 ) -> FileMetadata:
     """上传文件到指定路径（含三级去重：文件名 → 大小 → 内容哈希）"""
     if not _check_path_safe(path):
-        raise ValueError("路径不合法")
+        raise ValueError("路径不合法：仅支持相对路径")
 
     relative_path = os.path.join(path, filename or f"unnamed_{uuid.uuid4().hex[:8]}")
 
@@ -284,11 +284,15 @@ async def list_files(
 ) -> list[dict]:
     """列出目录内容（过滤无权条目）"""
     if not _check_path_safe(path):
-        raise ValueError("路径不合法")
+        raise ValueError("路径不合法：仅支持相对路径")
 
-    result = await db.execute(
-        select(FileMetadata).where(FileMetadata.path.like(f"{path}%"))
-    )
+    # . 和 / 都视为根目录，不加路径过滤
+    if path in (".", "/"):
+        result = await db.execute(select(FileMetadata))
+    else:
+        result = await db.execute(
+            select(FileMetadata).where(FileMetadata.path.like(f"{path}%"))
+        )
     files = result.scalars().all()
 
     filtered = []
@@ -812,7 +816,7 @@ async def notify_file_changed(db: AsyncSession, file_id: int, change_type: str,
 async def ai_read_file(db: AsyncSession, agent_id: int, file_path: str) -> str:
     """AI 读取文件（自动追踪引用）"""
     if not _check_path_safe(file_path):
-        raise ValueError("路径不合法")
+        raise ValueError("路径不合法：仅支持相对路径")
 
     physical_path = _get_physical_path(file_path)
     if not os.path.exists(physical_path):
@@ -826,7 +830,7 @@ async def ai_read_file(db: AsyncSession, agent_id: int, file_path: str) -> str:
     if metadata:
         can_access = await check_file_access(db, metadata.id, "ai", agent_id, "read")
         if not can_access:
-            raise ValueError("无权读取此文件")
+            raise ValueError("无权读取：文件不存在或不属于你")
     # 无元数据的文件（旧数据）允许读取
 
     # 读取文件
@@ -849,7 +853,7 @@ async def ai_write_file(db: AsyncSession, agent_id: int, file_path: str,
                         content: str, collaboration_mode: str = "solo") -> FileMetadata:
     """AI 写入文件（创建或覆盖）"""
     if not _check_path_safe(file_path):
-        raise ValueError("路径不合法")
+        raise ValueError("路径不合法：仅支持相对路径")
 
     physical_path = _get_physical_path(file_path)
     os.makedirs(os.path.dirname(physical_path), exist_ok=True)
@@ -867,7 +871,9 @@ async def ai_write_file(db: AsyncSession, agent_id: int, file_path: str,
     metadata = result.scalar_one_or_none()
 
     if metadata:
-        # 更新已有文件
+        # 更新已有文件（覆盖时更新所有权，确保权限一致）
+        metadata.owner_type = "ai"
+        metadata.owner_id = agent_id
         metadata.size = len(content_bytes)
         metadata.content_hash = content_hash
         metadata.updated_at = datetime.now(timezone.utc).replace(tzinfo=None)
@@ -910,7 +916,7 @@ async def ai_list_files(db: AsyncSession, agent_id: int, path: str = "/") -> lis
 async def ai_delete_file(db: AsyncSession, agent_id: int, file_path: str) -> bool:
     """AI 删除文件"""
     if not _check_path_safe(file_path):
-        raise ValueError("路径不合法")
+        raise ValueError("路径不合法：仅支持相对路径")
 
     result = await db.execute(
         select(FileMetadata).where(FileMetadata.path == file_path)
@@ -926,7 +932,7 @@ async def ai_share_file(db: AsyncSession, agent_id: int, file_path: str,
                         target_type: str, target_id: int, role: str = "collaborator") -> dict:
     """AI 分享文件给其他 AI 或用户"""
     if not _check_path_safe(file_path):
-        raise ValueError("路径不合法")
+        raise ValueError("路径不合法：仅支持相对路径")
 
     result = await db.execute(
         select(FileMetadata).where(FileMetadata.path == file_path)

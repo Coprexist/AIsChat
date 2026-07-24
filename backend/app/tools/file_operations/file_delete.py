@@ -32,7 +32,7 @@ class FileDelete(ToolPlugin):
             return {"error": True, "message": str(e)}
         except Exception as e:
             logger.error(f"file_delete 失败: {e}", exc_info=True)
-            return {"error": True, "message": f"删除文件失败: {str(e)}"}
+            return {"error": True, "message": f"删除失败：{e}"}
 
 
 ToolRegistry.register(FileDelete)

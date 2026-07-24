@@ -13,8 +13,10 @@ logger = logging.getLogger(__name__)
 class FileEdit(ToolPlugin):
     name = "file_edit"
     description = (
-        "增量编辑文件（查找替换或行后插入），比 file_write 更省 token。"
-        "大文件只需传要改的部分，不用重写全文。"
+        "增量编辑文件（查找替换 / 行后插入 / 删除行），比 file_write 更省 token。"
+        "**重要**：编辑前请先用 file_read 读取文件确认当前内容（至少看关键行），"
+        "避免行号偏移导致改错位置。"
+        "多次插入时请从最后一行开始往前面插。"
     )
     segment = "file_operations"
     parameters = {
@@ -24,11 +26,12 @@ class FileEdit(ToolPlugin):
         },
         "operation": {
             "type": "string",
-            "enum": ["str_replace", "insert"],
+            "enum": ["str_replace", "insert", "delete_lines"],
             "description": (
                 "操作类型：\n"
                 "- str_replace：精确字符串替换。先读取文件确认原文存在且唯一，再执行替换。\n"
-                "- insert：在指定行号之后插入新内容。"
+                "- insert：在指定行号**之后**插入新内容。行号 1 开头。多次插入时请从最大行号开始往小插。\n"
+                "- delete_lines：删除指定行范围（包含两端）。"
             ),
         },
         "old_string": {
@@ -41,7 +44,15 @@ class FileEdit(ToolPlugin):
         },
         "insert_line": {
             "type": "integer",
-            "description": "（insert 必填）在此行号之后插入。行号从 1 开始。0 = 插入到文件开头。",
+            "description": "（insert 必填）在此行号**之后**插入。行号从 1 开始。0 = 插入到文件开头。",
+        },
+        "start_line": {
+            "type": "integer",
+            "description": "（delete_lines 必填）要删除的起始行号（从 1 开始，包含此行）",
+        },
+        "end_line": {
+            "type": "integer",
+            "description": "（delete_lines 必填）要删除的结束行号（包含此行）",
         },
     }
     required = ["path", "operation"]
@@ -64,7 +75,7 @@ class FileEdit(ToolPlugin):
             return {"error": True, "message": str(e)}
         except Exception as e:
             logger.error(f"file_edit 读取失败: {e}", exc_info=True)
-            return {"error": True, "message": f"读取文件失败: {str(e)}"}
+            return {"error": True, "message": f"读取失败：{e}"}
 
         lines = old_content.split("\n")
 
@@ -90,7 +101,7 @@ class FileEdit(ToolPlugin):
         elif operation == "insert":
             insert_line = arguments.get("insert_line", 0)
             if insert_line < 0:
-                return {"error": True, "message": "insert_line 不能小于 0"}
+                return {"error": True, "message": "insert_line 不能小于 0（行号从 0 开始）"}
             if insert_line > len(lines):
                 return {
                     "error": True,
@@ -98,12 +109,27 @@ class FileEdit(ToolPlugin):
                 }
 
             new_lines = lines.copy()
-            new_lines.insert(insert_line, new_string)  # insert into list, after specified line
-            # 注意：list.insert(index, item) 会插入到 index 位置之前
-            # 如果 insert_line=0，插入到第 1 行前 = 文件开头
-            # 如果 insert_line=1，插入到第 1 行后 = 第 2 行
-            # 所以我们直接使用 insert_line 作为索引
+            # insert_line 是 1-indexed，list.insert 是 0-indexed 在 index 前插入
+            # insert_line=N → 在第 N 行之后插入 = 在第 N+1 行之前插入
+            new_lines.insert(insert_line, new_string)
             new_content = "\n".join(new_lines)
+
+        elif operation == "delete_lines":
+            start_line = arguments.get("start_line", 1)
+            end_line = arguments.get("end_line", 1)
+            if start_line < 1 or end_line < 1:
+                return {"error": True, "message": "start_line 和 end_line 从 1 开始"}
+            if start_line > end_line:
+                return {"error": True, "message": "start_line 不能大于 end_line"}
+            if start_line > len(lines):
+                return {"error": True, "message": f"start_line {start_line} 超出文件范围（共 {len(lines)} 行）"}
+            # 1-indexed → 0-indexed
+            s = max(0, start_line - 1)
+            e = min(len(lines), end_line)  # end_line 是包含的，所以 slice 用 e（不包含 e）
+            if s >= len(lines):
+                return {"error": True, "message": "起始行超出文件范围"}
+            del lines[s:e]
+            new_content = "\n".join(lines)
 
         else:
             return {"error": True, "message": f"不支持的操作: {operation}"}
@@ -121,7 +147,7 @@ class FileEdit(ToolPlugin):
             return {"error": True, "message": str(e)}
         except Exception as e:
             logger.error(f"file_edit 写入失败: {e}", exc_info=True)
-            return {"error": True, "message": f"写入文件失败: {str(e)}"}
+            return {"error": True, "message": f"编辑写入失败：{e}"}
 
 
 ToolRegistry.register(FileEdit)

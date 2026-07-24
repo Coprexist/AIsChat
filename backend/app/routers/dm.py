@@ -373,22 +373,35 @@ async def _maybe_trigger_dm_ai_reply(
         agent.others_chat_used = 0
         await db.flush()
 
-    # ── 推入 AI 回复队列 ──
-    from app.ai.response_worker import message_queue
-    import asyncio
-    try:
-        message_queue.put_nowait({
-            "conversation_type": "dm",
-            "session_id": session_id,
-            "message_id": msg["id"],
+    # ── 忙时中断注入：AI 正在执行，直接注入当前 tool loop ──
+    from app.ai.executor import _pending_interrupts, _active_run_agent_ids
+    if agent.id in _active_run_agent_ids:
+        _pending_interrupts.setdefault(agent.id, []).append({
+            "type": "user_message",
             "content": msg["content"],
-            "sender_type": "human" if sender_id != receiver_id else "ai",
+            "message_id": msg["id"],
+            "session_id": session_id,
             "sender_id": sender_id,
-            "chain_depth": 0,
-            "force_own_key": force_own_key,  # v0.9.0
+            "sender_name": current_user["username"],
         })
-    except asyncio.QueueFull:
-        logger.warning("AI 回复队列已满，丢弃 DM 事件")
+        logger.info(f"AI {agent.name}({agent.id}) 正忙，DM 中断消息已注入")
+    else:
+        # ── 推入 AI 回复队列 ──
+        from app.ai.response_worker import message_queue
+        import asyncio
+        try:
+            message_queue.put_nowait({
+                "conversation_type": "dm",
+                "session_id": session_id,
+                "message_id": msg["id"],
+                "content": msg["content"],
+                "sender_type": "human" if sender_id != receiver_id else "ai",
+                "sender_id": sender_id,
+                "chain_depth": 0,
+                "force_own_key": force_own_key,  # v0.9.0
+            })
+        except asyncio.QueueFull:
+            logger.warning("AI 回复队列已满，丢弃 DM 事件")
 
 
 async def _send_system_dm_notice(db: AsyncSession, session_id: str, agent, text: str):

@@ -10,11 +10,11 @@
 import logging
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.services.heartbeat_manager import heartbeat_manager
-from app.services.state_stack_manager import state_stack_manager
-from app.services.conflict_arbiter import conflict_arbiter
-from app.services.resource_manager import resource_manager
-from app.services.skill_event_bus import skill_event_bus
+from app.services.brain.heartbeat_manager import heartbeat_manager
+from app.services.brain.state_stack_manager import state_stack_manager
+from app.services.brain.conflict_arbiter import conflict_arbiter
+from app.services.brain.resource_manager import resource_manager
+from app.services.brain.skill_event_bus import skill_event_bus
 
 logger = logging.getLogger(__name__)
 

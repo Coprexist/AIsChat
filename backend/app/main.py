@@ -87,7 +87,7 @@ async def lifespan(app: FastAPI):
     vector_worker_task = asyncio.create_task(vector_pipeline_worker())
 
     # 启动闹钟调度器（心跳机制 — 事件驱动模式）
-    from app.ai.response_worker import alarm_scheduler
+    from app.ai.alarm import alarm_scheduler
     alarm_scheduler_task = asyncio.create_task(alarm_scheduler())
 
     # 启动记忆批量写入 worker

@@ -32,7 +32,7 @@ class FileList(ToolPlugin):
             return {"error": True, "message": str(e)}
         except Exception as e:
             logger.error(f"file_list 失败: {e}", exc_info=True)
-            return {"error": True, "message": f"列出文件失败: {str(e)}"}
+            return {"error": True, "message": f"列出失败：{e}"}
 
 
 ToolRegistry.register(FileList)

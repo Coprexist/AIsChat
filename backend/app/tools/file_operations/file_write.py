@@ -48,7 +48,7 @@ class FileWrite(ToolPlugin):
             return {"error": True, "message": str(e)}
         except Exception as e:
             logger.error(f"file_write 失败: {e}", exc_info=True)
-            return {"error": True, "message": f"写入文件失败: {str(e)}"}
+            return {"error": True, "message": f"写入失败：{e}"}
 
 
 ToolRegistry.register(FileWrite)

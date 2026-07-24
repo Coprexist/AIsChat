@@ -90,8 +90,8 @@ async def run_migrations():
             await _migrate_agent_users(db)            # 此处会 select(Agent) — 需上面列已存在
             await _migrate_create_dm_tables(db)
             await _migrate_dm_messages(db)
-            await _migrate_agent_alarms(db)
-            await _migrate_workspace(db)
+            # await _migrate_agent_alarms(db)  # 已由 Alembic 管理
+            # await _migrate_workspace(db)  # 已由 Alembic 管理
             await _migrate_agent_skills(db)
             await _migrate_archive_friend_tables(db)  # v0.4.0 删除好友机制：归档表
             await _migrate_restore_friend_tables(db)  # v0.4.0+ 恢复好友机制：从 archived 恢复
@@ -117,7 +117,7 @@ async def run_migrations():
             await _migrate_orphan_retention(db)     # v0.9.0 孤儿文件宽限期配置
             await _migrate_oracle_file_references(db) # v0.10.x: 文件引用表幂等唯一约束
             await _migrate_default_file_quota(db)   # v0.9.0 用户默认文件配额配置
-            await _migrate_structured_records(db)  # v0.10.0 结构记忆表（目录级键值存储）
+            # await _migrate_structured_records(db)  # v0.10.0 已由 Alembic 管理
             await _migrate_group_members_user_id(db)  # v2.0.0 AI 群成员统一用 user_id
             await _migrate_group_invitations(db)  # v2.0.0 群邀请卡片系统
             await _migrate_group_owner_membership(db)  # v2.0.1 修复群主缺失的群成员记录

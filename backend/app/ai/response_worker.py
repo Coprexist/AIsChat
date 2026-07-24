@@ -26,7 +26,7 @@ from app.config import settings
 from app.chat import chat_api
 from app.services.memory.context_compression_service import should_compress, inline_compress, get_compression_threshold
 from app.utils.text import extract_mentions as _extract_mentions, check_mention as _check_mention
-from app.ai.executor import _tool_call_loop, _get_api_config, _check_rate_limit, _send_system_error
+from app.ai.executor import _tool_call_loop, _active_run_agent_ids, _get_api_config, _check_rate_limit, _send_system_error
 from app.ai.alarm import _process_alarm_event
 
 logger = logging.getLogger(__name__)
@@ -60,7 +60,11 @@ async def _run_serialized(agent, coro):
         lock = asyncio.Lock()
         _agent_locks[agent.id] = lock
     async with lock:
-        return await coro
+        _active_run_agent_ids.add(agent.id)
+        try:
+            return await coro
+        finally:
+            _active_run_agent_ids.discard(agent.id)
 
 
 # ============================================================
@@ -406,6 +410,18 @@ async def _maybe_trigger_ai_reply(
         logger.info(f"AI {agent.name}(id={resolved_agent_id}) 速率限制，跳过")
         return
 
+    # 4.5. 忙时中断注入
+    if agent.id in _active_run_agent_ids:
+        from app.ai.executor import _pending_interrupts
+        _pending_interrupts.setdefault(agent.id, []).append({
+            "type": "user_message",
+            "content": content,
+            "group_id": group_id,
+            "sender_id": sender_id,
+        })
+        logger.info(f"AI {agent.name}({agent.id}) 正忙，群聊中断消息已注入")
+        return
+
     # 5. 获取 API 配置（v0.5.0: 公共辅助函数；v0.6.0: 四层优先链含池 Key）
     api_key, api_base, credit_source, pool_key_id, provider_info = await _get_api_config(db, agent)
     logger.info(f"🔍 AI {agent.name}: api_base={api_base}, has_api_key={api_key is not None}, "
@@ -603,6 +619,18 @@ async def _trigger_dm_ai_reply(
     # 速率限制
     if not _check_rate_limit(agent_id):
         logger.info(f"AI {agent_name}({agent_id}) 速率限制，跳过 DM 回复")
+        return
+
+    # ── 忙时中断注入 ──
+    if agent_id in _active_run_agent_ids:
+        from app.ai.executor import _pending_interrupts
+        _pending_interrupts.setdefault(agent_id, []).append({
+            "type": "user_message",
+            "content": content,
+            "session_id": session_id,
+            "sender_id": sender_id,
+        })
+        logger.info(f"AI {agent_name}({agent_id}) 正忙，DM 中断消息已注入")
         return
 
     # 获取有效配置（v0.4.0: per-user 覆盖 — DM 场景 trigger_user_id=sender_id）

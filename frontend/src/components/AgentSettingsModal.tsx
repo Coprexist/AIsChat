@@ -319,7 +319,7 @@ export default function AgentSettingsModal({
   return (
     <div className="fixed inset-0 md:bg-black/70 flex items-start justify-center z-[60] md:pt-8 overflow-y-auto bg-surface" onClick={onClose}>
       <div
-        className="bg-elevated border border-border rounded-none md:rounded-2xl p-6 w-full max-w-full md:max-w-2xl mx-0 md:mx-4 shadow-2xl shadow-black/30 my-0 md:my-4 h-full md:h-auto flex flex-col pb-[var(--safe-bottom)] md:pb-6"
+        className="bg-elevated border border-border rounded-none md:rounded-2xl p-6 w-full max-w-full md:max-w-2xl mx-0 md:mx-4 shadow-2xl shadow-black/30 my-0 md:my-4 h-full md:h-auto flex flex-col pb-0 md:pb-6"
         onClick={(e) => e.stopPropagation()}
       >
         {/* 移动端头部 */}
@@ -733,10 +733,11 @@ export default function AgentSettingsModal({
         </div>
 
         {/* 保存 / 取消 + 视图切换 */}
+        <div className="sticky bottom-0 bg-elevated pt-3 pb-[var(--safe-bottom)] md:static md:pt-5 md:pb-0">
         {saveMsg && (
-          <p className={`text-xs mt-2 text-center ${saveOk === false ? 'text-rose-400' : 'text-mint-400'}`}>{saveMsg}</p>
+          <p className={`text-xs text-center ${saveOk === false ? 'text-rose-400' : 'text-mint-400'}`}>{saveMsg}</p>
         )}
-        <div className="flex gap-3 mt-5">
+        <div className="flex gap-3">
           {view === 'main' ? (
             <button onClick={() => setView('detailed')}
               className="flex-1 py-2.5 text-sm border border-primary-400/30 text-primary-500 rounded-xl hover:bg-primary-500/10 font-medium transition-colors flex items-center justify-center gap-1"
@@ -763,7 +764,8 @@ export default function AgentSettingsModal({
         </div>
       </div>
     </div>
-  )
+  </div>
+)
 }
 
 // ── 分区容器 ──

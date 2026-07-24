@@ -279,7 +279,7 @@ class ToolRegistry:
         """统一分发工具调用，记录性能指标"""
         plugin = cls._plugins.get(tool_name)
         if plugin is None:
-            return _build_tool_error(ToolErrorCode.UNKNOWN_TOOL, f"未知工具「{tool_name}」")
+            return _build_tool_error(ToolErrorCode.UNKNOWN_TOOL, f"未知工具「{tool_name}」：没有此名称的工具")
 
         t0 = time.monotonic()
         try:
@@ -292,7 +292,7 @@ class ToolRegistry:
             except Exception:
                 pass
             logger.error(f"工具 {tool_name} 执行失败: {e}", exc_info=True)
-            return _build_tool_error(ToolErrorCode.TOOL_EXEC_FAILED, f"工具执行失败: {e}")
+            return _build_tool_error(ToolErrorCode.TOOL_EXEC_FAILED, f"执行失败：{e}")
 
         elapsed = time.monotonic() - t0
         is_success = not result.get("error", False)
