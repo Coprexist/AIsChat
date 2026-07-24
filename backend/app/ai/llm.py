@@ -518,7 +518,11 @@ async def _build_current_context(
         )
         context += (
             "- **注意**：你的推理/思考过程对方看不见，"
-            "必须调 send_dm 或 send_gm 发出去（除非你不想发）。\n"
+            "必须调 send_dm 或 send_gm 才能把内容发出去（除非你不想发）！\n"
+        )
+        context += (
+            "- **支持**：消息中可用 Markdown，含表格、数学公式 (\(LaTeX\))、"
+            "Mermaid 图表 (\`\`\`mermaid)、任务列表、删除线等。\n"
         )
     else:
         context += (
@@ -526,7 +530,11 @@ async def _build_current_context(
         )
         context += (
             "- **注意**：你的推理/思考过程群成员看不见，"
-            "必须调 send_gm 或 send_dm 发出去（除非你不想发）。\n"
+            "必须调 send_gm 或 send_dm 才能把内容发出去（除非你不想发）！\n"
+        )
+        context += (
+            "- **支持**：消息中可用 Markdown，含表格、数学公式 (\(LaTeX\))、"
+            "Mermaid 图表 (\`\`\`mermaid)、任务列表、删除线等。\n"
         )
     # Federation context
     if is_federated:

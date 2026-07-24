@@ -121,7 +121,8 @@ const MessageBubble = memo(function MessageBubble({
     '[&_.katex]:text-inherit',
     '[&_.katex]:max-w-full',
     '[&_.katex]:overflow-x-auto',
-    '[&_.katex]:inline-block',
+    '[&_.katex]:overflow-y-hidden',
+    '[&_.katex]:align-middle',
     '[&_pre]:overflow-x-auto',
     '[&_pre]:-mx-1',
     '[&_pre]:px-1',
@@ -184,7 +185,7 @@ const MessageBubble = memo(function MessageBubble({
             <Markdown
               children={content.replace(/\\\[([\s\S]*?)\\\]/g, '$$$$$1$$$$').replace(/\\\(([\s\S]*?)\\\)/g, '$$$1$$')}
               remarkPlugins={[remarkGfm, remarkMath, remarkBreaks]}
-              rehypePlugins={[rehypeRaw, rehypeKatex, [rehypeSanitize, {
+              rehypePlugins={[rehypeRaw, [rehypeSanitize, {
                 ...defaultSchema,
                 attributes: {
                   ...defaultSchema.attributes,
@@ -194,7 +195,7 @@ const MessageBubble = memo(function MessageBubble({
                   img: [...(defaultSchema.attributes?.img || ['src', 'alt']), 'class'],
                   div: [...(defaultSchema.attributes?.div || []), 'class'],
                 },
-              }]]}
+              }], rehypeKatex]}
               components={{
                 code: CodeRenderer,
                 table: ({ node, ...props }) => <div className="markdown-table-wrapper"><table {...props} /></div>,

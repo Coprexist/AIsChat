@@ -135,12 +135,11 @@
 .bubble-content .katex {
   color: inherit;
 }
-.katex .mathnormal {
-  @apply text-primary-600;
+..bubble-content .katex .mathnormal {
+  color: inherit;
 }
-.dark .katex .mathnormal {
-  @apply text-primary-300;
-}
+/* 隐藏 KaTeX 内联公式的滚动条，保留横向滚动能力 */
+
 
 /* AI 脉动光环 — 标志性视觉元素 */
 @layer components {
