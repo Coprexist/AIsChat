@@ -791,7 +791,7 @@ export default function SettingsPage() {
       </div>
 
       {/* UI 缩放 */}
-      <div className="bg-surface rounded-xl border border-border p-3 md:p-6 scroll-mt-16">
+      <div className={(activeTab === 'uiscale' ? '' : 'hidden') + ' bg-surface rounded-xl border border-border p-3 md:p-6 scroll-mt-16'}>
         <div className="flex items-center gap-2 mb-4">
           <Layout size={18} className="text-primary-400" />
           <h2 className="font-semibold text-textPrimary">UI 缩放</h2>
@@ -1111,7 +1111,7 @@ export default function SettingsPage() {
   )
 
   const renderSaveFooter = () => (
-    <div className="sticky bottom-0 z-10 bg-gradient-to-t from-canvas via-canvas/95 to-transparent pt-6 pb-2 px-4 md:px-6 -mx-4 md:-mx-6">
+    <div className="sticky bottom-0 z-10 bg-gradient-to-t from-canvas via-canvas/95 to-transparent pt-6 pb-2 px-3 md:px-6">
       {message && (
         <div className={`text-sm px-3 py-2 rounded-xl mb-3 ${
           message.includes('失败') || message.includes('错误')
@@ -1269,8 +1269,8 @@ export default function SettingsPage() {
             )}
 
             {renderContent()}
+            {renderSaveFooter()}
           </div>
-          {renderSaveFooter()}
         </div>
       </div>
 
