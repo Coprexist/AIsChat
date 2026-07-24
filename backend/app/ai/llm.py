@@ -1031,6 +1031,19 @@ async def build_messages(
         
         recent_messages = await chat_api.get_recent_messages(db, group_id, limit=max_unread)
         
+        # 字符数上限：最多加载 40000 字，与条数上限取小
+        MAX_CHARS = 40000
+        total_chars = 0
+        trimmed = []
+        for m in reversed(recent_messages):
+            total_chars += len(m.content or '')
+            if total_chars > MAX_CHARS:
+                break
+            trimmed.append(m)
+        recent_messages = list(reversed(trimmed))
+        
+        max_len = getattr(group_obj, 'max_msg_display_len', 256) if group_obj else 256
+        
         max_len = getattr(group_obj, 'max_msg_display_len', 256) if group_obj else 256
 
         for m in reversed(recent_messages):
@@ -1230,6 +1243,17 @@ async def build_dm_messages(
         .limit(limit)
     )
     dm_messages = result.scalars().all()
+
+    # 字符数上限：最多加载 40000 字，与条数上限取小
+    MAX_CHARS = 40000
+    total_chars = 0
+    trimmed = []
+    for m in reversed(dm_messages):
+        total_chars += len(m.content or '')
+        if total_chars > MAX_CHARS:
+            break
+        trimmed.append(m)
+    dm_messages = list(reversed(trimmed))
 
     for m in reversed(dm_messages):
         role = "assistant" if m.sender_id == agent.user_id else "user"

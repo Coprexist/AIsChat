@@ -11,7 +11,7 @@ import { isDesktop } from '../utils/platform'
 import { invoke } from '../utils/tauri'
 import { getApiKeyUrl } from '../utils/providers.tsx'
 import { Key, Zap, Save, Clock, Palette, Bell, Eye, EyeOff, CheckCircle, XCircle, Loader2, Globe, Layout, Bot, Pencil, X, Ticket, Plus, ChevronDown, ChevronRight, Shield, AlertTriangle, ArrowLeft, Mail, Monitor, HardDrive, Trash2, Cpu, Wrench, Box, ExternalLink } from 'lucide-react'
-import { useNavigate, useBlocker, useLocation } from 'react-router-dom'
+import { useNavigate, useBlocker, useLocation, useSearchParams } from 'react-router-dom'
 
 // 常用时区列表
 const TIMEZONES = [
@@ -54,6 +54,7 @@ const NAV_SECTIONS: NavSection[] = [
   { id: 'timezone',    icon: Clock,   labelKey: 'settings.timezone',         category: 'settings.catPrefs' },
   { id: 'language',    icon: Globe,   labelKey: 'settings.language',         category: 'settings.catPrefs' },
   { id: 'chatstyle',   icon: Layout,  labelKey: 'settings.chatStyle',        category: 'settings.catPrefs' },
+  { id: 'uiscale',    icon: Monitor, labelKey: 'UI 缩放',                 category: 'settings.catPrefs' },
   { id: 'appearance',  icon: Palette, labelKey: 'settings.appearance',       category: 'settings.catPrefs' },
   { id: 'notifications', icon: Bell,  labelKey: 'settings.notifications',   category: 'settings.catPrefs' },
   { id: 'strategy',    icon: Zap,     labelKey: 'settings.strategy',         category: 'settings.catPrefs' },
@@ -192,8 +193,15 @@ export default function SettingsPage() {
 
   // ── 滚动监听：高亮当前可见 section ──
   const contentRef = useRef<HTMLDivElement>(null)
-  const [activeSection, setActiveSection] = useState('quota')
-  const [activeTab, setActiveTab] = useState('api')
+  const [searchParams, setSearchParams] = useSearchParams()
+  const initialTab = searchParams.get('tab') || 'api'
+  const [activeTab, setActiveTab] = useState(initialTab)
+
+  const switchTab = (tab: string) => {
+    setActiveTab(tab)
+    setSearchParams({ tab })
+    setMobileView('detail')
+  }
   const [mobileView, setMobileView] = useState<'list' | 'detail'>('list')
 
   useEffect(() => {
@@ -328,20 +336,6 @@ export default function SettingsPage() {
     }
   }
 
-  const saveSection = async (partial: any, sectionLabel: string) => {
-    setSaving(true)
-    setMessage('')
-    try {
-      await api.put('/user/settings', partial)
-      setMessage(`${sectionLabel} 已保存`)
-    } catch (err: any) {
-      setMessage(`${sectionLabel} 保存失败: ${err.message || ''}`)
-    } finally {
-      setSaving(false)
-      setTimeout(() => setMessage(''), 3000)
-    }
-  }
-
   const handleSave = async () => {
     setSaving(true)
     setMessage('')
@@ -419,17 +413,17 @@ export default function SettingsPage() {
   }
 
   /** 点击侧边栏 → 滚动到对应 section */
-  const scrollToSection = (id: string) => {
-    setActiveSection(id)
-    document.getElementById(`settings-${id}`)?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+
+
+  const renderContent = () => {
+    return sections;
   }
 
   // ── 所有 section 内容 ──
   const sections = (
     <div className="space-y-4">
-{activeTab === 'quota' && (
       {/* 额度 */}
-      <div id="settings-quota" className="bg-surface rounded-xl border border-border p-3 md:p-6 scroll-mt-16">
+      <div id="settings-quota" className={(activeTab === 'quota' ? '' : 'hidden') + ' bg-surface rounded-xl border border-border p-3 md:p-6 scroll-mt-16'}>
         <div className="flex items-center gap-2 mb-4">
           <Zap size={18} className="text-primary-400" />
           <h2 className="font-semibold text-textPrimary">{t('settings.quotaTitle')}</h2>
@@ -484,7 +478,7 @@ export default function SettingsPage() {
       </div>
 
       {/* 邮箱管理 */}
-      <div id="settings-email" className="bg-surface rounded-xl border border-border p-3 md:p-6 scroll-mt-16">
+      <div id="settings-email" className={(activeTab === 'email' ? '' : 'hidden') + ' bg-surface rounded-xl border border-border p-3 md:p-6 scroll-mt-16'}>
         <div className="flex items-center gap-2 mb-4">
           <Mail size={18} className="text-primary-400" />
           <h2 className="font-semibold text-textPrimary">{t('auth.email')}</h2>
@@ -532,7 +526,7 @@ export default function SettingsPage() {
       </div>
 
       {/* API 提供商配置 */}
-      <div id="settings-api" className="bg-surface rounded-xl border border-border p-3 md:p-6 scroll-mt-16">
+      <div id="settings-api" className={(activeTab === 'api' ? '' : 'hidden') + ' bg-surface rounded-xl border border-border p-3 md:p-6 scroll-mt-16'}>
         <div className="flex items-center gap-2 mb-4 flex-wrap">
           <Key size={18} className="text-primary-400 shrink-0" />
           <h2 className="font-semibold text-textPrimary whitespace-nowrap shrink-0">{t('settings.apiConfigTitle')}</h2>
@@ -593,7 +587,6 @@ export default function SettingsPage() {
                 type={showApiKey ? 'text' : 'password'}
                 value={apiKey}
                 onChange={(e) => setApiKey(e.target.value)}
-                autoComplete="off"
                 className="w-full px-3.5 py-2.5 pr-10 rounded-xl border border-border bg-canvas text-sm text-textPrimary placeholder:text-textMuted focus:outline-none focus:ring-2 focus:ring-primary-500/50"
                 placeholder={user?.has_api_key ? t('settings.apiKeyPlaceholderSet') : t('settings.apiKeyPlaceholder')}
               />
@@ -608,7 +601,7 @@ export default function SettingsPage() {
             <div className="flex items-center justify-between mt-1.5">
               <p className="text-xs text-textMuted">
                 {user?.has_api_key
-                  ? <><CheckCircle size={12} className="inline text-mint-400 mr-1" />{t('settings.apiKeySet')} · ···{user.api_key_last4}</>
+                  ? <><CheckCircle size={12} className="inline text-mint-400 mr-1" />{t('settings.apiKeySet')}</>
                   : <><AlertTriangle size={12} className="inline text-accent-400 mr-1" />{t('settings.apiKeyNotSet')}</>}
               </p>
               <button
@@ -731,18 +724,10 @@ export default function SettingsPage() {
             </div>
           )}
         </div>
-        <button
-          onClick={() => saveSection({ api_base_url: apiBaseUrl || null, api_key: apiKey || null }, 'API')}
-          disabled={saving || !apiKey}
-          className="mt-3 w-full py-2 text-sm bg-primary-500 text-white rounded-xl hover:bg-primary-400 disabled:opacity-30 font-medium transition-all"
-        >
-          {saving ? '保存中...' : '保存 API 设置'}
-        </button>
       </div>
 
-{activeTab === 'timezone' && (
       {/* 时区设置 */}
-      <div id="settings-timezone" className="bg-surface rounded-xl border border-border p-3 md:p-6 scroll-mt-16">
+      <div id="settings-timezone" className={(activeTab === 'timezone' ? '' : 'hidden') + ' bg-surface rounded-xl border border-border p-3 md:p-6 scroll-mt-16'}>
         <div className="flex items-center gap-2 mb-4">
           <Clock size={18} className="text-primary-400" />
           <h2 className="font-semibold text-textPrimary">{t('settings.timezone')}</h2>
@@ -760,15 +745,10 @@ export default function SettingsPage() {
         <p className="text-xs text-textMuted mt-2">
           {t('settings.currentTimestamp')} {new Date().toLocaleString('zh-CN', { timeZone: timezone })}
         </p>
-        <button onClick={() => saveSection({ timezone }, '时区')} disabled={saving}
-          className="mt-3 w-full py-2 text-sm bg-primary-500 text-white rounded-xl hover:bg-primary-400 disabled:opacity-30 font-medium transition-all">
-          {saving ? '保存中...' : '保存时区'}
-        </button>
       </div>
 
-{activeTab === 'language' && (
       {/* 语言设置 */}
-      <div id="settings-language" className="bg-surface rounded-xl border border-border p-3 md:p-6 scroll-mt-16">
+      <div id="settings-language" className={(activeTab === 'language' ? '' : 'hidden') + ' bg-surface rounded-xl border border-border p-3 md:p-6 scroll-mt-16'}>
         <div className="flex items-center gap-2 mb-4">
           <Globe size={18} className="text-primary-400" />
           <h2 className="font-semibold text-textPrimary">{t('settings.language')}</h2>
@@ -785,9 +765,8 @@ export default function SettingsPage() {
         </select>
       </div>
 
-{activeTab === 'chatstyle' && (
       {/* 聊天样式 */}
-      <div id="settings-chatstyle" className="bg-surface rounded-xl border border-border p-3 md:p-6 scroll-mt-16">
+      <div id="settings-chatstyle" className={(activeTab === 'chatstyle' ? '' : 'hidden') + ' bg-surface rounded-xl border border-border p-3 md:p-6 scroll-mt-16'}>
         <div className="flex items-center gap-2 mb-4">
           <Layout size={18} className="text-primary-400" />
           <h2 className="font-semibold text-textPrimary">{t('settings.chatStyle')}</h2>
@@ -809,13 +788,8 @@ export default function SettingsPage() {
             </button>
           ))}
         </div>
-        <button onClick={() => saveSection({ ui_prefs: { chat_style: chatStyle } }, '聊天样式')} disabled={saving}
-          className="mt-3 w-full py-2 text-sm bg-primary-500 text-white rounded-xl hover:bg-primary-400 disabled:opacity-30 font-medium transition-all">
-          {saving ? '保存中...' : '保存聊天样式'}
-        </button>
       </div>
 
-{activeTab === 'uiscale' && (
       {/* UI 缩放 */}
       <div className="bg-surface rounded-xl border border-border p-3 md:p-6 scroll-mt-16">
         <div className="flex items-center gap-2 mb-4">
@@ -844,15 +818,10 @@ export default function SettingsPage() {
             </button>
           ))}
         </div>
-        <button onClick={() => { try { localStorage.setItem('ui_scale', String(uiScale)) } catch {}; setMessage('UI 缩放已保存') }} disabled={saving}
-          className="mt-3 w-full py-2 text-sm bg-primary-500 text-white rounded-xl hover:bg-primary-400 disabled:opacity-30 font-medium transition-all">
-          保存 UI 缩放
-        </button>
       </div>
 
-{activeTab === 'strategy' && (
       {/* 策略模式 */}
-      <div id="settings-strategy" className="bg-surface rounded-xl border border-border p-3 md:p-6 scroll-mt-16">
+      <div id="settings-strategy" className={(activeTab === 'strategy' ? '' : 'hidden') + ' bg-surface rounded-xl border border-border p-3 md:p-6 scroll-mt-16'}>
         <div className="flex items-center gap-2 mb-4">
           <Zap size={18} className="text-primary-400" />
           <h2 className="font-semibold text-textPrimary">{t('settings.strategy')}</h2>
@@ -880,7 +849,7 @@ export default function SettingsPage() {
       </div>
 
       {/* 外观主题 */}
-      <div id="settings-appearance" className="bg-surface rounded-xl border border-border p-3 md:p-6 scroll-mt-16">
+      <div id="settings-appearance" className={(activeTab === 'appearance' ? '' : 'hidden') + ' bg-surface rounded-xl border border-border p-3 md:p-6 scroll-mt-16'}>
         <div className="flex items-center gap-2 mb-4">
           <Palette size={18} className="text-primary-400" />
           <h2 className="font-semibold text-textPrimary">{t('settings.appearance')}</h2>
@@ -898,7 +867,7 @@ export default function SettingsPage() {
       </div>
 
       {/* 桌面通知 */}
-      <div id="settings-notifications" className="bg-surface rounded-xl border border-border p-3 md:p-6 scroll-mt-16">
+      <div id="settings-notifications" className={(activeTab === 'notifications' ? '' : 'hidden') + ' bg-surface rounded-xl border border-border p-3 md:p-6 scroll-mt-16'}>
         <div className="flex items-center gap-2 mb-4">
           <Bell size={18} className="text-primary-400" />
           <h2 className="font-semibold text-textPrimary">{t('settings.notifications')}</h2>
@@ -1208,7 +1177,7 @@ export default function SettingsPage() {
                   {items.map(({ id, icon: Icon, labelKey }) => (
                     <button
                       key={id}
-                      onClick={() => { setActiveSection(id); setMobileView('detail'); setTimeout(() => scrollToSection(id), 100) }}
+                      onClick={() => switchTab(id)}
                       className="w-full flex items-center gap-3 px-4 py-3 rounded-xl hover:bg-elevated active:bg-border/50 transition-colors text-left"
                     >
                       <div className="w-9 h-9 rounded-lg bg-primary-500/10 flex items-center justify-center shrink-0">
@@ -1259,9 +1228,9 @@ export default function SettingsPage() {
                         {items.map(({ id, icon: Icon, labelKey }) => (
                           <button
                             key={id}
-                            onClick={() => scrollToSection(id)}
+                            onClick={() => switchTab(id)}
                             className={`w-full flex items-center gap-2 px-3 py-1.5 text-[13px] transition-colors text-left ${
-                              activeSection === id
+                              activeTab === id
                                 ? 'bg-primary-500/10 text-primary-600 dark:text-primary-400 font-medium border-r-2 border-primary-400'
                                 : 'text-textSecondary hover:text-textPrimary hover:bg-elevated border-r-2 border-transparent'
                             }`}
@@ -1299,8 +1268,9 @@ export default function SettingsPage() {
               </button>
             )}
 
-            {sections}
+            {renderContent()}
           </div>
+          {renderSaveFooter()}
         </div>
       </div>
 
@@ -1415,5 +1385,8 @@ export default function SettingsPage() {
               </button>
             </div>
           </div>
-            </div>
+        </div>
+      )}
+    </div>
   )
+}
