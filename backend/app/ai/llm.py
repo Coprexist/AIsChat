@@ -1044,6 +1044,7 @@ async def build_messages(
                 "speaker_id": None if m.sender_type == "ai" and m.sender_id == agent.user_id else m.sender_id,
                 "is_self": m.sender_type == "ai" and m.sender_id == agent.user_id,
                 "content": content,
+                "message_id": m.id,
             }
 
             role = "assistant" if m.sender_type == "ai" else "user"
@@ -1242,6 +1243,7 @@ async def build_dm_messages(
             "speaker_id": None if m.sender_id == agent.user_id else m.sender_id,
             "is_self": m.sender_id == agent.user_id,
             "content": m.content,
+            "message_id": m.id,
         }
         messages.append({
             "role": role,

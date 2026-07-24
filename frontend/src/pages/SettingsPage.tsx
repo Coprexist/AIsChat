@@ -193,6 +193,7 @@ export default function SettingsPage() {
   // ── 滚动监听：高亮当前可见 section ──
   const contentRef = useRef<HTMLDivElement>(null)
   const [activeSection, setActiveSection] = useState('quota')
+  const [activeTab, setActiveTab] = useState('api')
   const [mobileView, setMobileView] = useState<'list' | 'detail'>('list')
 
   useEffect(() => {
@@ -327,6 +328,20 @@ export default function SettingsPage() {
     }
   }
 
+  const saveSection = async (partial: any, sectionLabel: string) => {
+    setSaving(true)
+    setMessage('')
+    try {
+      await api.put('/user/settings', partial)
+      setMessage(`${sectionLabel} 已保存`)
+    } catch (err: any) {
+      setMessage(`${sectionLabel} 保存失败: ${err.message || ''}`)
+    } finally {
+      setSaving(false)
+      setTimeout(() => setMessage(''), 3000)
+    }
+  }
+
   const handleSave = async () => {
     setSaving(true)
     setMessage('')
@@ -412,6 +427,7 @@ export default function SettingsPage() {
   // ── 所有 section 内容 ──
   const sections = (
     <div className="space-y-4">
+{activeTab === 'quota' && (
       {/* 额度 */}
       <div id="settings-quota" className="bg-surface rounded-xl border border-border p-3 md:p-6 scroll-mt-16">
         <div className="flex items-center gap-2 mb-4">
@@ -577,6 +593,7 @@ export default function SettingsPage() {
                 type={showApiKey ? 'text' : 'password'}
                 value={apiKey}
                 onChange={(e) => setApiKey(e.target.value)}
+                autoComplete="off"
                 className="w-full px-3.5 py-2.5 pr-10 rounded-xl border border-border bg-canvas text-sm text-textPrimary placeholder:text-textMuted focus:outline-none focus:ring-2 focus:ring-primary-500/50"
                 placeholder={user?.has_api_key ? t('settings.apiKeyPlaceholderSet') : t('settings.apiKeyPlaceholder')}
               />
@@ -591,7 +608,7 @@ export default function SettingsPage() {
             <div className="flex items-center justify-between mt-1.5">
               <p className="text-xs text-textMuted">
                 {user?.has_api_key
-                  ? <><CheckCircle size={12} className="inline text-mint-400 mr-1" />{t('settings.apiKeySet')}</>
+                  ? <><CheckCircle size={12} className="inline text-mint-400 mr-1" />{t('settings.apiKeySet')} · ···{user.api_key_last4}</>
                   : <><AlertTriangle size={12} className="inline text-accent-400 mr-1" />{t('settings.apiKeyNotSet')}</>}
               </p>
               <button
@@ -714,8 +731,16 @@ export default function SettingsPage() {
             </div>
           )}
         </div>
+        <button
+          onClick={() => saveSection({ api_base_url: apiBaseUrl || null, api_key: apiKey || null }, 'API')}
+          disabled={saving || !apiKey}
+          className="mt-3 w-full py-2 text-sm bg-primary-500 text-white rounded-xl hover:bg-primary-400 disabled:opacity-30 font-medium transition-all"
+        >
+          {saving ? '保存中...' : '保存 API 设置'}
+        </button>
       </div>
 
+{activeTab === 'timezone' && (
       {/* 时区设置 */}
       <div id="settings-timezone" className="bg-surface rounded-xl border border-border p-3 md:p-6 scroll-mt-16">
         <div className="flex items-center gap-2 mb-4">
@@ -735,8 +760,13 @@ export default function SettingsPage() {
         <p className="text-xs text-textMuted mt-2">
           {t('settings.currentTimestamp')} {new Date().toLocaleString('zh-CN', { timeZone: timezone })}
         </p>
+        <button onClick={() => saveSection({ timezone }, '时区')} disabled={saving}
+          className="mt-3 w-full py-2 text-sm bg-primary-500 text-white rounded-xl hover:bg-primary-400 disabled:opacity-30 font-medium transition-all">
+          {saving ? '保存中...' : '保存时区'}
+        </button>
       </div>
 
+{activeTab === 'language' && (
       {/* 语言设置 */}
       <div id="settings-language" className="bg-surface rounded-xl border border-border p-3 md:p-6 scroll-mt-16">
         <div className="flex items-center gap-2 mb-4">
@@ -755,6 +785,7 @@ export default function SettingsPage() {
         </select>
       </div>
 
+{activeTab === 'chatstyle' && (
       {/* 聊天样式 */}
       <div id="settings-chatstyle" className="bg-surface rounded-xl border border-border p-3 md:p-6 scroll-mt-16">
         <div className="flex items-center gap-2 mb-4">
@@ -778,8 +809,13 @@ export default function SettingsPage() {
             </button>
           ))}
         </div>
+        <button onClick={() => saveSection({ ui_prefs: { chat_style: chatStyle } }, '聊天样式')} disabled={saving}
+          className="mt-3 w-full py-2 text-sm bg-primary-500 text-white rounded-xl hover:bg-primary-400 disabled:opacity-30 font-medium transition-all">
+          {saving ? '保存中...' : '保存聊天样式'}
+        </button>
       </div>
 
+{activeTab === 'uiscale' && (
       {/* UI 缩放 */}
       <div className="bg-surface rounded-xl border border-border p-3 md:p-6 scroll-mt-16">
         <div className="flex items-center gap-2 mb-4">
@@ -808,8 +844,13 @@ export default function SettingsPage() {
             </button>
           ))}
         </div>
+        <button onClick={() => { try { localStorage.setItem('ui_scale', String(uiScale)) } catch {}; setMessage('UI 缩放已保存') }} disabled={saving}
+          className="mt-3 w-full py-2 text-sm bg-primary-500 text-white rounded-xl hover:bg-primary-400 disabled:opacity-30 font-medium transition-all">
+          保存 UI 缩放
+        </button>
       </div>
 
+{activeTab === 'strategy' && (
       {/* 策略模式 */}
       <div id="settings-strategy" className="bg-surface rounded-xl border border-border p-3 md:p-6 scroll-mt-16">
         <div className="flex items-center gap-2 mb-4">
@@ -1260,7 +1301,6 @@ export default function SettingsPage() {
 
             {sections}
           </div>
-          {renderSaveFooter()}
         </div>
       </div>
 
@@ -1375,8 +1415,5 @@ export default function SettingsPage() {
               </button>
             </div>
           </div>
-        </div>
-      )}
-    </div>
+            </div>
   )
-}

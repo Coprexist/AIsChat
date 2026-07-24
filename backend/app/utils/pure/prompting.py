@@ -100,7 +100,7 @@ def format_message(msg: dict, agent_name: str = "", max_content_len: int = 200) 
     纯函数：统一格式化单条消息。多会话上下文、当前对话、向量检索全部走这里。
     结构化输入 → 一行文本输出。
 
-    msg 结构: {time, speaker_name, speaker_id?, is_self?, content, prefix?}
+    msg 结构: {time, speaker_name, speaker_id?, is_self?, content, prefix?, message_id?}
     """
     parts: list[str] = []
     if msg.get("time"):
@@ -119,6 +119,8 @@ def format_message(msg: dict, agent_name: str = "", max_content_len: int = 200) 
     if max_content_len > 0:
         content = content[:max_content_len]
     parts.append(f"{speaker}: {content}")
+    if msg.get("message_id"):
+        parts.append(f"[msg_id={msg['message_id']}]")
     return " ".join(parts)
 
 

@@ -689,7 +689,7 @@ export default function AgentSettingsModal({
                     API Key
                     <ApiKeyGetLink providers={providers} />
                   </label>
-                  <input type="password" value={apiKey} onChange={(e) => setApiKey(e.target.value)}
+                  <input type="password" value={apiKey} onChange={(e) => setApiKey(e.target.value)} autoComplete="off"
                     className="w-full px-3 py-2 rounded-lg border border-border bg-canvas text-sm text-textPrimary placeholder:text-textMuted focus:outline-none focus:ring-2 focus:ring-primary-500/50"
                     placeholder={agent.has_api_key ? '•••••••• (unchanged if empty)' : t('modal.detailSettingsApiKeyPlaceholder')} />
                 </div>

@@ -12,6 +12,17 @@ from app.utils.crypto import encrypt_api_key, decrypt_api_key
 logger = logging.getLogger(__name__)
 
 
+def _get_api_key_last4(user) -> str:
+    """解密并返回 API Key 的后4位（用于前端标识），解密失败返回空"""
+    if not user.api_key_encrypted:
+        return ""
+    try:
+        key = decrypt_api_key(user.api_key_encrypted)
+        return key[-4:]
+    except Exception:
+        return ""
+
+
 async def register_user(
     db: AsyncSession,
     username: str,
@@ -230,6 +241,7 @@ async def get_user_info(db: AsyncSession, user_id: int) -> dict:
         "status_color": getattr(user, 'status_color', None),
         "api_base_url": user.api_base_url,
         "has_api_key": user.api_key_encrypted is not None,
+        "api_key_last4": _get_api_key_last4(user) if user.api_key_encrypted else "",
         "auto_approve_vector_timeout": user.auto_approve_vector_timeout,
         "auto_approve_vector_default": user.auto_approve_vector_default,
         "timezone": user.timezone or "Asia/Shanghai",

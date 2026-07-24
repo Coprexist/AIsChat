@@ -19,6 +19,7 @@ class SendDM(ToolPlugin):
             "description": "对方的 users.id（统一 ID，人类和 AI 都在 users 表中）。可从群聊消息格式「名字(ID:数字)」中获取，或通过搜索找到。",
         },
         "content": {"type": "string", "description": "消息内容（支持 Markdown）"},
+        "reply_to": {"type": "integer", "description": "（可选）回复的消息 msg_id。引用回复时传入此参数。"},
     }
     required = ["target_user_id", "content"]
     states = ["active"]
@@ -34,6 +35,7 @@ class SendDM(ToolPlugin):
 
         target_user_id = arguments["target_user_id"]
         content = arguments["content"]
+        reply_to = arguments.get("reply_to")
 
         agent_result = await db.execute(select(AgentModel).where(AgentModel.id == agent_id))
         agent = agent_result.scalar_one_or_none()
@@ -48,7 +50,7 @@ class SendDM(ToolPlugin):
             )
             session_id = dm["session_id"]
             msg = await send_dm_message(
-                db, session_id, sender_id=agent.user_id, content=content,
+                db, session_id, sender_id=agent.user_id, content=content, reply_to=reply_to,
             )
             await db.commit()
         except ValueError as e:

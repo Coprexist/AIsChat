@@ -62,6 +62,7 @@ class UserInfoResponse(BaseModel):
     api_credit: int = 0
     api_base_url: str | None = None
     has_api_key: bool = False  # 不返回明文 key，只返回是否已设置
+    api_key_last4: str = ""  # 已设置 key 的后4位，用于前端标识
     auto_approve_vector_timeout: int
     auto_approve_vector_default: bool
     timezone: str = "Asia/Shanghai"

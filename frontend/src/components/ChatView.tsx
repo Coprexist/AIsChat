@@ -116,6 +116,7 @@ export default function ChatView({ conversationType, conversationId }: ChatViewP
   // @提及 自动补全（仅群聊）
   const [groupMembers, setGroupMembers] = useState<Array<{ type: string; id: number; name: string; state?: string }>>([])
   const [mentionActive, setMentionActive] = useState(false)
+  const [replyTo, setReplyTo] = useState<{ id: number; sender_name: string; content: string } | null>(null)
   const [mentionQuery, setMentionQuery] = useState('')
   const [mentionIdx, setMentionIdx] = useState(0)
 
@@ -761,8 +762,9 @@ export default function ChatView({ conversationType, conversationId }: ChatViewP
         mime_type: a.mime_type,
       }))
 
-    sendMessage(input.trim(), undefined, readyAttachments.length > 0 ? readyAttachments : undefined)
+    sendMessage(input.trim(), replyTo?.id, readyAttachments.length > 0 ? readyAttachments : undefined)
     setInput('')
+    setReplyTo(null)
     // 发送后清除输入中状态
     if (typingRef.current) {
       typingRef.current = false
@@ -887,7 +889,15 @@ export default function ChatView({ conversationType, conversationId }: ChatViewP
                 sourcePublicId={msg.source_public_id}
                 attachments={msg.attachments}
                 messageType={msg.message_type}
+                messageId={msg.id}
+                replyTo={(() => {
+                  if (msg.reply_to == null) return undefined
+                  const quoted = messages.find(m => m.id === msg.reply_to)
+                  if (!quoted) return { id: msg.reply_to, sender: '?', content: '' }
+                  return { id: quoted.id, sender: quoted.sender_name || `用户${quoted.sender_id}`, content: quoted.content.slice(0, 80) }
+                })()}
                 onAvatarClick={handleAvatarClick}
+                onReply={(id, name, text) => setReplyTo({ id, sender_name: name, content: text.slice(0, 80) })}
               />
             </div>
           ))
@@ -1023,6 +1033,19 @@ export default function ChatView({ conversationType, conversationId }: ChatViewP
             <Paperclip size={18} />
           </button>
 
+          {/* 引用条 */}
+          {replyTo && (
+            <div className="flex items-center gap-2 px-3 py-1.5 rounded-t-xl border border-border bg-surface/50 text-xs">
+              <div className="w-0.5 h-8 bg-primary-400 rounded-full shrink-0" />
+              <div className="flex-1 min-w-0">
+                <div className="text-primary-400 font-medium truncate">回复 @{replyTo.sender_name}</div>
+                <div className="text-textMuted truncate">{replyTo.content}</div>
+              </div>
+              <button onClick={() => setReplyTo(null)} className="shrink-0 p-1 rounded-lg hover:bg-elevated text-textMuted hover:text-textPrimary transition-colors">
+                <X size={14} />
+              </button>
+            </div>
+          )}
           <textarea
             ref={textareaRef}
             value={input}

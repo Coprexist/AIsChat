@@ -39,7 +39,7 @@ async def _require_friendship(db: AsyncSession, user_a_id: int, user_b_id: int):
         select(User.type).where(User.id.in_([user_a_id, user_b_id]))
     )
     types = {row[0] for row in result.all()}
-    if "ai" in types:
+    if "ai" in types or "system" in types:
         return
     friendship = await db.execute(
         select(Friendship).where(

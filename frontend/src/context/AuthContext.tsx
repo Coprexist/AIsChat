@@ -15,6 +15,7 @@ interface User {
   platform_gifted_credit: number
   total_effective: number
   has_api_key: boolean
+  api_key_last4: string
   timezone: string
   language: string
   ui_prefs: Record<string, any>
@@ -62,6 +63,7 @@ function buildUserFromData(data: any): User {
     ai_quota: 0,
     api_credit: 0,
     has_api_key: false,
+    api_key_last4: '',
     timezone: 'Asia/Shanghai',
     language: isValidLang(data.language) ? data.language : DEFAULT_LANG,
     ui_prefs: {} as Record<string, any>,

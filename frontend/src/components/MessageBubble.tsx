@@ -7,7 +7,7 @@ import rehypeKatex from 'rehype-katex'
 import rehypeRaw from 'rehype-raw'
 import rehypeSanitize, { defaultSchema } from 'rehype-sanitize'
 import { useAuth } from '../context/AuthContext'
-import { FileIcon, Download, Globe, ShieldAlert } from 'lucide-react'
+import { FileIcon, Download, Globe, ShieldAlert, Reply } from 'lucide-react'
 import { formatMessageTime } from '../utils/time'
 import { formatFileSize } from '../utils/format'
 import { avatarGradient } from '../utils/avatar'
@@ -66,7 +66,10 @@ interface MessageBubbleProps {
   sourcePublicId?: string | null
   attachments?: Array<{file_id?: number, name?: string, size?: number, mime_type?: string, type?: string, invitation_id?: number, group_name?: string, inviter_name?: string, status?: string}> | null
   messageType?: string
+  messageId?: number
+  replyTo?: { id: number; sender: string; content: string } | null
   onAvatarClick?: (type: string, id: number, name: string, state?: string) => void
+  onReply?: (messageId: number, senderName: string, content: string) => void
 }
 
 function fileIconColor(mimeType: string): string {
@@ -79,7 +82,7 @@ function fileIconColor(mimeType: string): string {
 
 const MessageBubble = memo(function MessageBubble({
   senderName, senderAvatarUrl, content, isMine, createdAt, state,
-  senderType, senderId, thinking, isTyping, sourcePublicId, attachments, messageType, onAvatarClick,
+  senderType, senderId, thinking, isTyping, sourcePublicId, attachments, messageType, onAvatarClick, messageId, replyTo, onReply,
 }: MessageBubbleProps) {
   const { user } = useAuth()
   const lang = useLang()
@@ -145,7 +148,7 @@ const MessageBubble = memo(function MessageBubble({
   ].join(' ')
 
   return (<>
-    <div className={`flex ${gap} ${mb} msg-enter ${isMine ? 'flex-row-reverse' : ''}`}>
+    <div id={messageId ? `msg-${messageId}` : undefined} className={`flex ${gap} ${mb} msg-enter group ${isMine ? 'flex-row-reverse' : ''}`}>
       <div className="relative shrink-0">
         {!isMine && (thinking || isTyping) && (
           <div className="absolute -inset-px w-10 h-10 rounded-full ai-pulse-active" />
@@ -184,7 +187,19 @@ const MessageBubble = memo(function MessageBubble({
           {thinking && <span className="text-[10px] text-primary-400 animate-pulse font-medium">{t('chat.thinking')}</span>}
           {isTyping && <span className="text-[10px] text-mint-400 animate-pulse font-medium">{t('chat.typing')}</span>}
         </div>
-        <div className={`bubble-content px-4 py-2.5 text-sm leading-relaxed break-words ${bubbleBg} ${thinking || isTyping ? 'opacity-70' : ''} ${layoutCls} ${bubbleVars.map(v => `[${v}]`).join(' ')}`}>
+        <div className={`bubble-content relative px-4 py-2.5 text-sm leading-relaxed break-words ${bubbleBg} ${thinking || isTyping ? 'opacity-70' : ''} ${layoutCls} ${bubbleVars.map(v => `[${v}]`).join(' ')}`}>
+          {replyTo != null && (
+            <div className={`flex items-start gap-1.5 mb-1.5 pb-1.5 border-b ${isMine ? 'border-white/20' : 'border-border'} cursor-pointer hover:opacity-80 transition-opacity`}
+              onClick={() => {
+                document.getElementById(`msg-${replyTo.id}`)?.scrollIntoView({ behavior: 'smooth', block: 'center' })
+              }}>
+              <div className="w-0.5 h-full min-h-[1.5em] bg-primary-400 rounded-full shrink-0" />
+              <div className="text-[11px] leading-relaxed line-clamp-2">
+                <span className={`font-medium ${isMine ? 'text-white/80' : 'text-primary-400'}`}>@{replyTo.sender}</span>
+                <span className={`${isMine ? 'text-white/50' : 'text-textMuted'}`}> {replyTo.content}</span>
+              </div>
+            </div>
+          )}
           {isInvitation && invAtt ? (
             <InvitationCard invitationId={invAtt.invitation_id!} groupName={invAtt.group_name || ''} inviterName={invAtt.inviter_name || ''} message={undefined} status={currentStatus as 'pending' | 'accepted' | 'rejected'} onAccept={handleAcceptInvitation} onReject={handleRejectInvitation} isMine={isMine} />
           ) : isTyping ? (
@@ -238,6 +253,17 @@ const MessageBubble = memo(function MessageBubble({
                 )
               })}
             </div>
+          )}
+
+          {/* 回复按钮 */}
+          {messageId != null && onReply && (
+            <button
+              onClick={() => onReply(messageId, senderName, content)}
+              className={`absolute ${isMine ? '-left-[9px]' : '-right-[9px]'} top-0 md:opacity-0 group-hover:opacity-100 transition-opacity p-1 rounded-lg bg-elevated border border-border shadow-lg hover:bg-surface text-textMuted hover:text-primary-400`}
+              title="回复"
+            >
+              <Reply size={12} />
+            </button>
           )}
         </div>
       </div>
