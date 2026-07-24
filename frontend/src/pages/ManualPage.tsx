@@ -7,8 +7,8 @@ import MermaidBlock from '../components/MermaidBlock'
 
 /** 手册配置：路径 → { 文档路径, 标题 } */
 const MANUAL_CONFIG: Record<string, { docPath: string; title: string }> = {
-  '/manual': { docPath: '/docs/用户手册.md', title: '用户手册 / User Manual' },
-  '/manual/admin': { docPath: '/docs/管理与开发者手册.md', title: '管理与开发者手册 / Admin & Developer Manual' },
+  '/manual': { docPath: '/docs/guides/用户手册.md', title: '用户手册 / User Manual' },
+  '/manual/admin': { docPath: '/docs/guides/管理与开发者手册.md', title: '管理与开发者手册 / Admin & Developer Manual' },
 }
 
 /** 自定义 code 渲染：mermaid 代码块用 MermaidBlock，其余默认 */
@@ -52,6 +52,16 @@ export default function ManualPage() {
       })
       .catch(err => setError(err.message))
   }, [config.docPath, config.title])
+
+  // Hash 导航滚动
+  useEffect(() => {
+    const hash = location.hash?.replace('#', '')
+    if (hash && content) {
+      setTimeout(() => {
+        document.getElementById(hash)?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+      }, 300)
+    }
+  }, [location.hash, content])
 
   return (
     <div className="max-w-4xl mx-auto p-4 md:p-6 pb-24 md:pb-6">

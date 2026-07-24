@@ -77,6 +77,14 @@ export default function SettingsPage() {
   const [timezone, setTimezone] = useState('Asia/Shanghai')
   const [language, setLanguage] = useState('zh')
   const [chatStyle, setChatStyle] = useState('cozy')
+  const [uiScale, setUiScale] = useState(() => {
+    try { return parseFloat(localStorage.getItem('ui_scale') || '1') } catch { return 1 }
+  })
+
+  // 应用 UI 缩放
+  useEffect(() => {
+    document.documentElement.style.fontSize = `${85 + (uiScale - 0.85) * 100}%`
+  }, [uiScale])
   const [notifications, setNotifications] = useState<boolean>(() => {
     const stored = localStorage.getItem('notifications_enabled')
     return stored === null ? true : stored === 'true'
@@ -217,7 +225,7 @@ export default function SettingsPage() {
   // ── 未保存修改检测 ──
   const [savedValues, setSavedValues] = useState<{
     apiBaseUrl: string; autoTimeout: number; autoDefault: boolean
-    timezone: string; language: string; chatStyle: string
+    timezone: string; language: string; chatStyle: string; uiScale: number
   } | null>(null)
 
   const hasUnsavedChanges = savedValues !== null && (
@@ -227,6 +235,7 @@ export default function SettingsPage() {
     timezone !== savedValues.timezone ||
     language !== savedValues.language ||
     chatStyle !== savedValues.chatStyle ||
+    uiScale !== savedValues.uiScale ||
     apiKey.trim() !== ''
   )
 
@@ -265,6 +274,10 @@ export default function SettingsPage() {
         if (data.timezone) setTimezone(tz)
         if (data.language) setLanguage(lang)
         if (data.ui_prefs?.chat_style) { setChatStyle(style); try { localStorage.setItem('chat_style', style) } catch {} }
+        if (data.ui_prefs?.ui_scale) {
+          const s = parseFloat(data.ui_prefs.ui_scale)
+          if (s >= 0.7 && s <= 1.5) { setUiScale(s); try { localStorage.setItem('ui_scale', String(s)) } catch {} }
+        }
         setSavedValues({
           apiBaseUrl: apiUrl,
           autoTimeout: to,
@@ -272,6 +285,7 @@ export default function SettingsPage() {
           timezone: tz,
           language: lang,
           chatStyle: style,
+          uiScale: data.ui_prefs?.ui_scale || 1,
         })
       }).catch(console.error)
       api.get<any[]>('/agents').then(list => {
@@ -324,9 +338,9 @@ export default function SettingsPage() {
         auto_approve_vector_default: autoDefault,
         timezone,
         language,
-        ui_prefs: { chat_style: chatStyle },
+        ui_prefs: { chat_style: chatStyle, ui_scale: uiScale },
       })
-      try { localStorage.setItem('chat_style', chatStyle) } catch {}
+      try { localStorage.setItem('chat_style', chatStyle); localStorage.setItem('ui_scale', String(uiScale)) } catch {}
       setApiKey('')
       setMessage(t('settings.saveSuccess'))
       setSavedValues({
@@ -336,6 +350,7 @@ export default function SettingsPage() {
         timezone,
         language,
         chatStyle,
+        uiScale,
       })
       refreshUser()
       api.get<any[]>('/agents').then(list => setAgents(list || [])).catch(() => {})
@@ -760,6 +775,36 @@ export default function SettingsPage() {
             >
               <div className="font-medium">{t(s.key)}</div>
               <div className="text-[10px] mt-0.5 opacity-70">{t(s.descKey)}</div>
+            </button>
+          ))}
+        </div>
+      </div>
+
+      {/* UI 缩放 */}
+      <div className="bg-surface rounded-xl border border-border p-3 md:p-6 scroll-mt-16">
+        <div className="flex items-center gap-2 mb-4">
+          <Layout size={18} className="text-primary-400" />
+          <h2 className="font-semibold text-textPrimary">UI 缩放</h2>
+        </div>
+        <p className="text-xs text-textMuted mb-3">调整界面文字和元素大小</p>
+        <div className="flex gap-3">
+          {[
+            { value: 0.85, label: '小', desc: '紧凑布局' },
+            { value: 1.0, label: '中', desc: '默认大小' },
+            { value: 1.15, label: '大', desc: '放大显示' },
+            { value: 1.3, label: '超大', desc: '超大显示' },
+          ].map((s) => (
+            <button
+              key={s.value}
+              onClick={() => setUiScale(s.value)}
+              className={`flex-1 px-4 py-3 rounded-xl border text-sm font-medium transition-all text-left ${
+                uiScale === s.value
+                  ? 'border-primary-500 bg-primary-500/10 text-primary-400'
+                  : 'border-border bg-canvas text-textSecondary hover:border-primary-500/30'
+              }`}
+            >
+              <div className="font-medium">{s.label}</div>
+              <div className="text-[10px] mt-0.5 opacity-70">{s.desc}</div>
             </button>
           ))}
         </div>

@@ -16,7 +16,10 @@
   --tw-text-primary: 17 24 39;     /* gray-900 */
   --tw-text-secondary: 75 85 99;   /* gray-600 */
   --tw-text-muted: 107 114 128;    /* gray-500 */
-  /* 滚动条 */
+  
+/* 彩色文字适配深/浅背景：加一层极细半透明描边保证可读 */
+
+/* 滚动条 */
   --tw-scrollbar-thumb: 203 213 225;  /* slate-300 */
   --tw-scrollbar-thumb-hover: 148 163 184; /* slate-400 */
 }
@@ -31,7 +34,10 @@
   --tw-text-primary: 237 233 246;  /* #EDE9F6 */
   --tw-text-secondary: 156 163 175;/* #9CA3B0 */
   --tw-text-muted: 107 114 128;    /* #6B7280 */
-  /* 滚动条 */
+  
+/* 彩色文字适配深/浅背景：加一层极细半透明描边保证可读 */
+
+/* 滚动条 */
   --tw-scrollbar-thumb: 42 37 64;  /* #2A2540 */
   --tw-scrollbar-thumb-hover: 61 53 96; /* #3D3560 */
 }
@@ -141,6 +147,16 @@
 /* 隐藏 KaTeX 内联公式的滚动条，保留横向滚动能力 */
 
 
+
+/* 气泡内彩色文字（深浅底自动适配） */
+.bubble-content .text-red   { color: rgb(var(--b-text-red, 220 50 50) / 1); }
+.bubble-content .text-orange{ color: rgb(var(--b-text-orange, 220 130 0) / 1); }
+.bubble-content .text-gold  { color: rgb(var(--b-text-gold, 180 140 0) / 1); }
+.bubble-content .text-green { color: rgb(var(--b-text-green, 20 150 60) / 1); }
+.bubble-content .text-blue  { color: rgb(var(--b-text-blue, 50 100 220) / 1); }
+.bubble-content .text-purple{ color: rgb(var(--b-text-purple, 130 80 200) / 1); }
+.bubble-content .text-pink  { color: rgb(var(--b-text-pink, 220 80 150) / 1); }
+.bubble-content .text-gray  { color: rgb(var(--b-text-gray, 100 100 100) / 1); }
 /* AI 脉动光环 — 标志性视觉元素 */
 @layer components {
   .ai-pulse-active {

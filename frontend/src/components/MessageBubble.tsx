@@ -28,11 +28,19 @@ const DARK_VARS = [
   '--b-zebra-r:91', '--b-zebra-g:33', '--b-zebra-b:182', '--b-zebra-a:0.35',
   '--b-hover-r:91', '--b-hover-g:33', '--b-hover-b:182', '--b-hover-a:0.5',
   '--b-scrollbar-r:255_255_255', '--b-scrollbar-a:0.3',
+  /* 气泡彩色文字（深色底用亮色） */
+  '--b-text-red:255 100 100', '--b-text-orange:255 180 50', '--b-text-gold:255 215 0',
+  '--b-text-green:80 220 120', '--b-text-blue:100 150 255', '--b-text-purple:180 130 255',
+  '--b-text-pink:255 130 200', '--b-text-gray:180 180 180',
 ]
 const LIGHT_VARS = [
   '--b-link-r:initial',
   '--b-thead-r:237', '--b-thead-g:233', '--b-thead-b:254', '--b-thead-a:1',
   '--b-zebra-r:243', '--b-zebra-g:240', '--b-zebra-b:255', '--b-zebra-a:1',
+  /* 气泡彩色文字（浅色底用标准色） */
+  '--b-text-red:220 50 50', '--b-text-orange:220 130 0', '--b-text-gold:180 140 0',
+  '--b-text-green:20 150 60', '--b-text-blue:50 100 220', '--b-text-purple:130 80 200',
+  '--b-text-pink:220 80 150', '--b-text-gray:100 100 100',
 ]
 
 /** 弹跳三点 */

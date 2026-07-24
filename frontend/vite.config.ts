@@ -11,8 +11,8 @@ export default defineConfig({
   },
   server: {
     port: 3000,
-    host: true,              // 允许外部访问（Docker 部署需要）
-    allowedHosts: true,      // 允许任意 Host 头（frp/nginx 代理需要）
+    host: true,
+    allowedHosts: true,
     proxy: {
       '/api': {
         target: 'http://backend:8000',
