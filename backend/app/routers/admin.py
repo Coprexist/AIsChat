@@ -71,16 +71,13 @@ async def _log_admin_action(
     target_id: int,
     details: dict | None = None,
 ):
-    """记录管理员操作"""
-    log_entry = SystemLog(
-        log_type=log_type,
-        operator_type="human",
-        operator_id=operator_id,
-        target_type=target_type,
-        target_id=target_id,
+    """记录管理员操作（含哈希链）"""
+    from app.services.audit_service import create_audit_log
+    await create_audit_log(
+        db=db, log_type=log_type, operator_type="human",
+        operator_id=operator_id, target_type=target_type, target_id=target_id,
         details=details or {},
     )
-    db.add(log_entry)
 
 
 # ---------- 系统概览 ----------
@@ -736,25 +733,84 @@ async def system_logs(
     result = await db.execute(query)
     logs = result.scalars().all()
 
+
+
+
+
     return {
         "total": total,
         "page": page,
         "page_size": page_size,
-        "items": [
-            {
-                "id": log.id,
-                "log_type": log.log_type,
-                "operator_type": log.operator_type,
-                "operator_id": log.operator_id,
-                "target_type": log.target_type,
-                "target_id": log.target_id,
-                "details": log.details,
-                "created_at": str(log.created_at) if log.created_at else None,
-            }
-            for log in logs
-        ],
+        "items": [log.to_dict() for log in logs],
     }
 
+
+@router.get("/logs/export")
+async def export_audit_logs(
+    log_type: str | None = Query(None),
+    operator_type: str | None = Query(None),
+    start_date: str | None = Query(None),
+    end_date: str | None = Query(None),
+    success: bool | None = Query(None),
+    admin: dict = Depends(require_admin),
+    db: AsyncSession = Depends(get_db),
+):
+    """导出审计日志为 CSV"""
+    query = select(SystemLog).order_by(SystemLog.created_at.desc())
+    if log_type:
+        query = query.where(SystemLog.log_type == log_type)
+    if operator_type:
+        query = query.where(SystemLog.operator_type == operator_type)
+    if start_date:
+        try:
+            query = query.where(SystemLog.created_at >= datetime.fromisoformat(start_date))
+        except ValueError:
+            pass
+    if end_date:
+        try:
+            query = query.where(SystemLog.created_at <= datetime.fromisoformat(end_date))
+        except ValueError:
+            pass
+    if success is not None:
+        query = query.where(SystemLog.success == success)
+
+    result = await db.execute(query)
+    logs = result.scalars().all()
+
+    import csv, io
+    buf = io.StringIO()
+    writer = csv.writer(buf)
+    writer.writerow(["ID","时间","类型","操作者","操作者ID","目标","目标ID","成功","错误","IP","变更前","变更后"])
+    for log in logs:
+        writer.writerow([log.id, log.created_at, log.log_type, log.operator_type,
+            log.operator_id, log.target_type, log.target_id, log.success,
+            log.error_message or "", log.ip_address or "",
+            str(log.old_value or ""), str(log.new_value or "")])
+
+    return Response(content=buf.getvalue(), media_type="text/csv",
+        headers={"Content-Disposition": "attachment; filename=audit_logs.csv"})
+
+
+@router.get("/logs/verify")
+async def verify_audit_chain(
+    limit: int = Query(1000, ge=1, le=10000),
+    admin: dict = Depends(require_admin),
+    db: AsyncSession = Depends(get_db),
+):
+    """验证审计日志哈希链完整性"""
+    from app.services.audit_service import verify_audit_chain
+    return await verify_audit_chain(db, limit=limit)
+
+
+@router.post("/logs/cleanup")
+async def cleanup_old_logs(
+    days: int = Query(180, ge=30, le=730),
+    admin: dict = Depends(require_admin),
+    db: AsyncSession = Depends(get_db),
+):
+    """清理超过 N 天的审计日志"""
+    from app.services.audit_service import cleanup_old_logs
+    return await cleanup_old_logs(db, days=days)
 
 
 # ============================================================

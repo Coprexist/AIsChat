@@ -13,6 +13,8 @@
 
 - 🎨 **消息格式系统**：8 色彩色文字（`[gold]` 标签 + `<span class>` 兼容）、行内代码独立渲染、语法高亮（highlight.js）、行内代码背景连续
 
+- 🔒 **审计日志系统**：企业级操作记录（成功/失败、IP、变更前后对比），SHA256 哈希链防篡改，CSV 导出，180 天自动清理
+
 - 🚨 **中断消息注入**：AI 忙碌时用户新消息直接注入当前 `_tool_call_loop`，不另起 executor。DM 路由层拦截 + worker 群聊/私信统一处理。
 - 🔧 **`file_edit` 新增 `delete_lines` 操作**：删除指定 N-M 行（1-indexed）。
 - 📖 **`file_read` 新增 `start_line`/`end_line`**：分段读取文件，不传则读全文。

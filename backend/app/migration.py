@@ -132,6 +132,7 @@ async def run_migrations():
             await _migrate_group_concurrent_limit(db) # v2.0.4 群聊AI并发上限
             await _migrate_group_msg_display_len(db)   # v2.0.5 群聊消息折叠长度
             await _migrate_group_is_paused(db)        # v2.0.5 群聊暂停对话
+            await _migrate_audit_logs(db)          # v1.0.6 审计日志企业级字段
             await _fix_column_types(db)  # 必须是最后一个：修复老部署的列类型不匹配
             await db.commit()
             logger.info("✅ 数据库迁移检查完成")
@@ -2378,6 +2379,22 @@ async def _migrate_group_muted_until(db):
     await db.execute(text("ALTER TABLE group_members ADD COLUMN muted_until TIMESTAMP"))
     await db.flush()
     logger.info("  ✅ group_members.muted_until 添加完成")
+
+async def _migrate_audit_logs(db):
+    """v1.0.6 审计日志企业级字段（幂等）"""
+    for col, col_type in [
+        ("success", "BOOLEAN NOT NULL DEFAULT TRUE"),
+        ("error_message", "TEXT"),
+        ("ip_address", "VARCHAR(45)"),
+        ("old_value", "JSONB"),
+        ("new_value", "JSONB"),
+        ("prev_hash", "VARCHAR(64)"),
+        ("hash", "VARCHAR(64) NOT NULL DEFAULT ''"),
+    ]:
+        if not await _column_exists(db, "system_logs", col):
+            await db.execute(text(f'ALTER TABLE system_logs ADD COLUMN {col} {col_type}'))
+            logger.info(f"  ✅ system_logs.{col} 添加完成")
+
 
 async def _fix_column_types(db):
     """修复老部署中列类型与新代码不匹配的问题（幂等：按需 ALTER）"""

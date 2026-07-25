@@ -90,6 +90,21 @@ async def lifespan(app: FastAPI):
     from app.ai.alarm import alarm_scheduler
     alarm_scheduler_task = asyncio.create_task(alarm_scheduler())
 
+    # 启动审计日志清理（每天凌晨 3 点检查）
+    async def audit_cleanup_loop():
+        from app.services.audit_service import cleanup_old_logs
+        from app.database import async_session
+        while True:
+            await asyncio.sleep(86400)  # 24h
+            try:
+                async with async_session() as clean_db:
+                    result = await cleanup_old_logs(clean_db)
+                    if result["deleted"]:
+                        logging.getLogger(__name__).info(f"审计日志清理: 删除 {result['deleted']} 条")
+            except Exception:
+                pass
+    audit_cleanup_task = asyncio.create_task(audit_cleanup_loop())
+
     # 启动记忆批量写入 worker
     from app.services.memory.memory_buffer import memory_flush_worker
     memory_flush_task = asyncio.create_task(memory_flush_worker())
@@ -158,7 +173,7 @@ async def lifespan(app: FastAPI):
         await federation_manager.disconnect_all()
     except Exception:
         pass
-    for task in [ai_worker_task, vector_worker_task, alarm_scheduler_task,
+    for task in [ai_worker_task, vector_worker_task, alarm_scheduler_task, audit_cleanup_task,
                   memory_flush_task, metrics_flush_task, orphan_cleanup_task,
                   fed_heartbeat_task, fed_reconnect_task]:
         task.cancel()

@@ -62,15 +62,15 @@ async def log_error(
     merged_details = details or {}
     merged_details["level"] = level
 
-    log_entry = SystemLog(
-        log_type=log_type,
-        operator_type=operator_type,
-        operator_id=operator_id,
-        target_type=target_type or "system",
+    from app.services.audit_service import create_audit_log
+    await create_audit_log(
+        db=db, log_type=log_type, operator_type=operator_type,
+        operator_id=operator_id, target_type=target_type or "system",
         target_id=target_id or 0,
+        success=level != "ERROR",
+        error_message=str(details) if level == "ERROR" else None,
         details=merged_details,
     )
-    db.add(log_entry)
 
     log_msg = f"[{level}] {log_type}"
     if details:
