@@ -237,6 +237,7 @@ const MessageBubble = memo(function MessageBubble({
               }], rehypeKatex]}
               components={{
                 code: CodeRenderer,
+                inlineCode: ({ children }) => <code className="bg-black/5 dark:bg-white/10 rounded px-1 py-0.5 text-[0.85em] break-all">{children}</code>,
                 table: ({ node, ...props }) => <div className="markdown-table-wrapper"><table {...props} /></div>,
                 th: ({ node, ...props }) => <th {...props} />,
                 td: ({ node, ...props }) => <td {...props} />,
