@@ -907,7 +907,7 @@ export default function ChatView({ conversationType, conversationId }: ChatViewP
         ) : messages.length === 0 ? (
           <EmptyState icon={MessageSquare} title={conversationType === 'dm' ? '开始私信' : '开始群聊'} description={conversationType === 'dm' ? '给对方发送第一条消息吧' : '在群里发送第一条消息吧'} />
         ) : (
-          {messageElements}
+          messageElements
         )}
 
         {/* 底部活动状态栏：合并 AI 思考/输入 + 人类打字 */}
