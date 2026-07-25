@@ -345,6 +345,50 @@ export default function ChatView({ conversationType, conversationId }: ChatViewP
     setProfileCard({ type, id, name, state })
   }, [])
 
+  // 消息列表 memo：依赖 messages 和少数稳定引用，输入变化时不重建
+  const messageElements = useMemo(() =>
+    messages.map((msg) => {
+      const replyToData = msg.reply_to == null ? undefined : (() => {
+        const quoted = messages.find(m => m.id === msg.reply_to)
+        if (!quoted) return { id: msg.reply_to, sender: '?', content: '' }
+        return { id: quoted.id, sender: quoted.sender_name || `用户${quoted.sender_id}`, content: quoted.content.slice(0, 80) }
+      })()
+      return (
+        <div
+          key={msg.id}
+          data-message-id={msg.id}
+          ref={msg.id === firstUnreadId ? firstUnreadRef : undefined}
+        >
+          {msg.id === firstUnreadId && hasMoreBefore && (
+            <div className="flex items-center gap-2 my-3 select-none">
+              <div className="flex-1 h-px bg-rose-500/30" />
+              <span className="text-[10px] font-medium text-rose-400 whitespace-nowrap">{t('chat.newMessages')}</span>
+              <div className="flex-1 h-px bg-rose-500/30" />
+            </div>
+          )}
+          <MessageBubble
+            senderName={msg.sender_name || `${msg.sender_type}:${msg.sender_id}`}
+            senderAvatarUrl={msg.sender_avatar_url}
+            content={msg.content}
+            isMine={isOwnMessage(msg)}
+            createdAt={msg.created_at}
+            senderType={msg.sender_type}
+            senderId={msg.sender_id}
+            state={msg.sender_state ?? undefined}
+            sourcePublicId={msg.source_public_id}
+            attachments={msg.attachments}
+            messageType={msg.message_type}
+            messageId={msg.id}
+            replyTo={replyToData}
+            onAvatarClick={handleAvatarClick}
+            onReply={(id, name, text) => setReplyTo({ id, sender_name: name, content: text.slice(0, 80) })}
+          />
+        </div>
+      )
+    }),
+    [messages, firstUnreadId, hasMoreBefore, isOwnMessage, handleAvatarClick, t]
+  )
+
   // ============================================================
   // 消息加载器
   // ============================================================
@@ -863,44 +907,7 @@ export default function ChatView({ conversationType, conversationId }: ChatViewP
         ) : messages.length === 0 ? (
           <EmptyState icon={MessageSquare} title={conversationType === 'dm' ? '开始私信' : '开始群聊'} description={conversationType === 'dm' ? '给对方发送第一条消息吧' : '在群里发送第一条消息吧'} />
         ) : (
-          messages.map((msg) => (
-            <div
-              key={msg.id}
-              data-message-id={msg.id}
-              ref={msg.id === firstUnreadId ? firstUnreadRef : undefined}
-            >
-              {/* 未读分隔线（在 firstUnreadId 消息上方） */}
-              {msg.id === firstUnreadId && hasMoreBefore && (
-                <div className="flex items-center gap-2 my-3 select-none">
-                  <div className="flex-1 h-px bg-rose-500/30" />
-                  <span className="text-[10px] font-medium text-rose-400 whitespace-nowrap">{t('chat.newMessages')}</span>
-                  <div className="flex-1 h-px bg-rose-500/30" />
-                </div>
-              )}
-              <MessageBubble
-                senderName={msg.sender_name || `${msg.sender_type}:${msg.sender_id}`}
-                senderAvatarUrl={msg.sender_avatar_url}
-                content={msg.content}
-                isMine={isOwnMessage(msg)}
-                createdAt={msg.created_at}
-                senderType={msg.sender_type}
-                senderId={msg.sender_id}
-                state={msg.sender_state ?? undefined}
-                sourcePublicId={msg.source_public_id}
-                attachments={msg.attachments}
-                messageType={msg.message_type}
-                messageId={msg.id}
-                replyTo={(() => {
-                  if (msg.reply_to == null) return undefined
-                  const quoted = messages.find(m => m.id === msg.reply_to)
-                  if (!quoted) return { id: msg.reply_to, sender: '?', content: '' }
-                  return { id: quoted.id, sender: quoted.sender_name || `用户${quoted.sender_id}`, content: quoted.content.slice(0, 80) }
-                })()}
-                onAvatarClick={handleAvatarClick}
-                onReply={(id, name, text) => setReplyTo({ id, sender_name: name, content: text.slice(0, 80) })}
-              />
-            </div>
-          ))
+          {messageElements}
         )}
 
         {/* 底部活动状态栏：合并 AI 思考/输入 + 人类打字 */}
