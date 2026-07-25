@@ -253,6 +253,9 @@ async def _tool_call_loop(
     工具调用循环：LLM 必须通过工具调用来执行所有操作（包括发消息）。
 
     铁律：文字不能自动发出去。想说话必须调 send_gm（群聊）或 send_dm（私信）。
+    
+    上下文压缩规则：在调 send_gm/send_dm 发消息之前的所有操作（工具调用、记忆查询等）
+    会完整保留。当你调用了 send_gm/send_dm 之后，之前的中间操作链才会被压缩清理。
 
     v0.4.0: trigger_user_id 传入工具上下文供 store_memory 做 per-user 隔离。
     effective_cfg 为 get_effective_config 的返回值，提供 per-user 定制的 LLM 参数。
@@ -429,17 +432,18 @@ async def _tool_call_loop(
                 _pending_results.append({"tc_id": tc_id, "result": result})
                 if isinstance(result, dict) and result.get("end_turn"):
                     _end_turn = True
-                # 追踪 AI 是否已发消息（用于压缩策略判断）
+                # 追踪 AI 是否已发消息
                 if tool_name in ("send_gm", "send_dm"):
                     _has_sent_message = True
+                    # AI 刚发了消息→重置压缩标记，允许下一轮清理之前的操作链
+                    _auto_compressed = False
 
-            # ── 自动上下文压缩（每轮工具调用循环最多一次）──
-            # 策略：AI 没发消息时只做强制空闲压缩，不做 token 阈值压缩
-            #      保全中间操作链不被截断。AI 发过消息后正常压缩。
+            # ── 自动上下文压缩 ──
+            # 策略：AI 没发消息时不压缩（保全中间操作链），发过消息后压缩清理。
+            # 另外 12 小时空闲强制压缩（缓存过期）。
             if not _auto_compressed:
                 from app.services.memory.context_compression_service import should_compress, inline_compress, get_compression_threshold
                 compress_threshold = await get_compression_threshold(db)
-                # 12 小时闲置强制压缩：缓存肯定过期，压缩省 token
                 stale = _is_conversation_idle(messages, hours=12)
                 if stale or (_has_sent_message and should_compress(messages, threshold=compress_threshold)):
                     logger.info(
@@ -451,7 +455,6 @@ async def _tool_call_loop(
                             f"AI {agent.name}({agent.id}) 内联压缩完成："
                             f"{compress_stats['before_tokens']} → {compress_stats['after_tokens']} tokens"
                         )
-                        # 压缩时应用 lazy tag 的 pending 更改
                         try:
                             from app.services.agent.agent_service import apply_pending_config
                             await apply_pending_config(db, agent)
