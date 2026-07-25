@@ -9,12 +9,14 @@ interface ChatInputProps {
   onSendFile?: () => void
   groupMembers?: Array<{ type: string; id: number; name: string; state?: string }>
   inputHeight?: number | null
+  /** 自动高度变化时通知父组件（用于补偿拖拽高度） */
+  onAutoHeight?: (ah: number) => void
 }
 
 /**
  * 独立输入框。管理自身 value 和 @mention 状态，打字不触发父组件重渲染。
  */
-const ChatInputFunc = ({ conversationType, conversationId, t, onSend, onSendFile, groupMembers, inputHeight }: ChatInputProps, ref: React.ForwardedRef<HTMLTextAreaElement>) => {
+const ChatInputFunc = ({ conversationType, conversationId, t, onSend, onSendFile, groupMembers, inputHeight, onAutoHeight }: ChatInputProps, ref: React.ForwardedRef<HTMLTextAreaElement>) => {
   const [value, setValue] = useState('')
   const [autoHeight, setAutoHeight] = useState(0)
   const valueRef = useRef('')
@@ -36,8 +38,7 @@ const ChatInputFunc = ({ conversationType, conversationId, t, onSend, onSendFile
   useEffect(() => {
     const ta = textareaRef.current
     if (!ta) return
-    const base = inputHeight || 44
-    ta.style.height = (base + autoHeight) + 'px'
+    ta.style.height = Math.max(44, (inputHeight || 0) + autoHeight) + 'px'
   }, [inputHeight, autoHeight])
 
   // 草稿恢复 & 离开保存
@@ -107,7 +108,9 @@ const ChatInputFunc = ({ conversationType, conversationId, t, onSend, onSendFile
     const maxAuto = 3 * LINE_H
     const ah = Math.max(0, Math.min(scrollH - base, maxAuto))
     setAutoHeight(ah)
-    ta.style.height = (base + ah) + 'px'
+    ta.dataset.autoHeight = String(ah)
+    onAutoHeight?.(ah)
+    ta.style.height = Math.max(44, (inputHeight || 0) + ah) + 'px'
   }, [detectMention, inputHeight])
 
   const handleKeyDown = useCallback((e: React.KeyboardEvent) => {

@@ -944,11 +944,16 @@ export default function ChatView({ conversationType, conversationId }: ChatViewP
         onMouseDown={(e) => {
           inputResizeRef.current = true
           const startY = e.clientY
-          const startH = inputHeight || textareaRef.current?.offsetHeight || 100
+          const ta = textareaRef.current
+          const autoH = parseInt(ta?.dataset.autoHeight || '0', 10)
+          const startInputH = inputHeight || 0
+          const startTotalH = Math.max(44, startInputH + autoH)
           const onMove = (ev: MouseEvent) => {
             if (!inputResizeRef.current) return
-            const newH = Math.max(60, startH + (startY - ev.clientY))
-            setInputHeight(newH)
+            const deltaY = startY - ev.clientY  // 向上拖=正值=扩大
+            const newTotalH = Math.max(44, startTotalH + deltaY)
+            const newInputH = newTotalH - autoH
+            setInputHeight(newInputH)
           }
           const onUp = () => {
             inputResizeRef.current = false
@@ -1044,6 +1049,12 @@ export default function ChatView({ conversationType, conversationId }: ChatViewP
           onSendFile={() => fileInputRef.current?.click()}
           groupMembers={groupMembers}
           inputHeight={inputHeight}
+          onAutoHeight={(ah) => {
+            setInputHeight(prev => {
+              const cur = prev || 0
+              return cur + ah < 44 ? 44 - ah : cur
+            })
+          }}
         />
       </div>
 
