@@ -1,4 +1,4 @@
-import { useState, useCallback, useEffect, useRef, useMemo } from 'react'
+import { useState, useCallback, useEffect, useRef, useMemo, forwardRef, useImperativeHandle } from 'react'
 import { Send, Paperclip } from 'lucide-react'
 
 interface ChatInputProps {
@@ -13,10 +13,13 @@ interface ChatInputProps {
 /**
  * 独立输入框。管理自身 value 和 @mention 状态，打字不触发父组件重渲染。
  */
-export default function ChatInput({ conversationType, conversationId, t, onSend, onSendFile, groupMembers }: ChatInputProps) {
+export default ChatInput
+const ChatInput = forwardRef<HTMLTextAreaElement, ChatInputProps>(
+  function ChatInput({ conversationType, conversationId, t, onSend, onSendFile, groupMembers }, ref) {
   const [value, setValue] = useState('')
   const valueRef = useRef('')
   const textareaRef = useRef<HTMLTextAreaElement>(null)
+  useImperativeHandle(ref, () => textareaRef.current!, [])
 
   // @mention 检测
   const [mentionQuery, setMentionQuery] = useState('')
@@ -139,7 +142,7 @@ export default function ChatInput({ conversationType, conversationId, t, onSend,
         onKeyDown={handleKeyDown}
         placeholder={conversationType === 'dm' ? t('chat.dmInputPlaceholder') : t('chat.groupInputPlaceholder')}
         rows={1}
-        className="flex-1 min-w-0 resize-y rounded-xl border border-border bg-canvas px-4 py-2.5 text-sm text-textPrimary placeholder:text-textMuted focus:outline-none focus:ring-2 focus:ring-primary-500/50 focus:border-primary-500/30 transition-shadow min-h-[42px]"
+        className="flex-1 min-w-0 resize-none rounded-xl border border-border bg-canvas px-4 py-2.5 text-sm text-textPrimary placeholder:text-textMuted focus:outline-none focus:ring-2 focus:ring-primary-500/50 focus:border-primary-500/30 transition-shadow min-h-[42px]"
       />
       <button
         onClick={doSend}

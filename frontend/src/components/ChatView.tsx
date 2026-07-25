@@ -1036,6 +1036,7 @@ export default function ChatView({ conversationType, conversationId }: ChatViewP
           </div>
         )}
         <ChatInput
+          ref={textareaRef}
           conversationType={conversationType}
           conversationId={conversationId}
           t={t}
