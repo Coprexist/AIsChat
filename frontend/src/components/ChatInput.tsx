@@ -16,9 +16,11 @@ interface ChatInputProps {
  */
 const ChatInputFunc = ({ conversationType, conversationId, t, onSend, onSendFile, groupMembers, inputHeight }: ChatInputProps, ref: React.ForwardedRef<HTMLTextAreaElement>) => {
   const [value, setValue] = useState('')
+  const [autoHeight, setAutoHeight] = useState(0)
   const valueRef = useRef('')
   const textareaRef = useRef<HTMLTextAreaElement>(null)
   useImperativeHandle(ref, () => textareaRef.current!, [])
+  const LINE_H = 23
 
   // @mention 检测
   const [mentionQuery, setMentionQuery] = useState('')
@@ -30,12 +32,13 @@ const ChatInputFunc = ({ conversationType, conversationId, t, onSend, onSendFile
 
   useEffect(() => { valueRef.current = value }, [value])
 
-  // 拖拽高度变化时同步到 textarea DOM
+  // 拖拽高度或自动高度变化时同步到 textarea DOM
   useEffect(() => {
-    if (textareaRef.current && inputHeight) {
-      textareaRef.current.style.height = inputHeight + 'px'
-    }
-  }, [inputHeight])
+    const ta = textareaRef.current
+    if (!ta) return
+    const base = inputHeight || 44
+    ta.style.height = (base + autoHeight) + 'px'
+  }, [inputHeight, autoHeight])
 
   // 草稿恢复 & 离开保存
   useEffect(() => {
@@ -97,13 +100,14 @@ const ChatInputFunc = ({ conversationType, conversationId, t, onSend, onSendFile
     const ta = e.target
     setValue(ta.value)
     detectMention(ta.value, ta.selectionStart)
-    // 自动缩放：内容超出当前高度时扩展，最多 4 行
+    // 自动缩放：超出基础高度的部分最多 3 行
     ta.style.height = 'auto'
-    const maxRows = 4
-    const lineH = 23  // text-sm + leading-relaxed ≈ 23px
-    const base = inputHeight || 44  // 1 行基础高度
-    const maxH = base + maxRows * lineH
-    ta.style.height = Math.min(ta.scrollHeight, maxH) + 'px'
+    const scrollH = ta.scrollHeight
+    const base = inputHeight || 44
+    const maxAuto = 3 * LINE_H
+    const ah = Math.max(0, Math.min(scrollH - base, maxAuto))
+    setAutoHeight(ah)
+    ta.style.height = (base + ah) + 'px'
   }, [detectMention, inputHeight])
 
   const handleKeyDown = useCallback((e: React.KeyboardEvent) => {
