@@ -13,7 +13,7 @@ interface ChatInputProps {
 /**
  * 独立输入框。管理自身 value 和 @mention 状态，打字不触发父组件重渲染。
  */
-export default function ChatInput({ conversationType, conversationId, t, onSend, groupMembers }: ChatInputProps) {
+export default function ChatInput({ conversationType, conversationId, t, onSend, onSendFile, groupMembers }: ChatInputProps) {
   const [value, setValue] = useState('')
   const valueRef = useRef('')
   const textareaRef = useRef<HTMLTextAreaElement>(null)
@@ -106,7 +106,7 @@ export default function ChatInput({ conversationType, conversationId, t, onSend,
   }, [mentionActive, mentionFiltered, mentionIdx, insertMention, doSend])
 
   return (
-    <div className="flex items-end gap-2 px-4 py-3 bg-surface border-t border-border shrink-0">
+    <div className="flex items-end gap-2 px-4 py-3 shrink-0">
       {/* @mention 弹出列表 */}
       {mentionActive && mentionFiltered.length > 0 && (
         <div className="absolute bottom-full left-4 mb-1 w-56 max-h-40 overflow-y-auto rounded-xl bg-elevated border border-border shadow-xl z-50">
@@ -125,7 +125,7 @@ export default function ChatInput({ conversationType, conversationId, t, onSend,
       )}
 
       <button
-        onClick={onSendFile}
+        onClick={() => onSendFile?.()}
         className="p-2.5 rounded-xl border border-border bg-canvas text-textMuted hover:text-textPrimary hover:border-primary-500/30 hover:bg-elevated transition-colors shrink-0"
         title={t('chat.addAttachment')}
       >
@@ -139,7 +139,7 @@ export default function ChatInput({ conversationType, conversationId, t, onSend,
         onKeyDown={handleKeyDown}
         placeholder={conversationType === 'dm' ? t('chat.dmInputPlaceholder') : t('chat.groupInputPlaceholder')}
         rows={1}
-        className="flex-1 min-w-0 resize-none rounded-xl border border-border bg-canvas px-4 py-2.5 text-sm text-textPrimary placeholder:text-textMuted focus:outline-none focus:ring-2 focus:ring-primary-500/50 focus:border-primary-500/30 transition-shadow"
+        className="flex-1 min-w-0 resize-y rounded-xl border border-border bg-canvas px-4 py-2.5 text-sm text-textPrimary placeholder:text-textMuted focus:outline-none focus:ring-2 focus:ring-primary-500/50 focus:border-primary-500/30 transition-shadow min-h-[42px]"
       />
       <button
         onClick={doSend}
