@@ -6,6 +6,7 @@ import remarkBreaks from 'remark-breaks'
 import rehypeKatex from 'rehype-katex'
 import rehypeRaw from 'rehype-raw'
 import rehypeSanitize, { defaultSchema } from 'rehype-sanitize'
+import { visit } from 'unist-util-visit'
 import { useAuth } from '../context/AuthContext'
 import { FileIcon, Download, Globe, ShieldAlert, Reply } from 'lucide-react'
 import { formatMessageTime } from '../utils/time'
@@ -78,6 +79,16 @@ function fileIconColor(mimeType: string): string {
   if (mimeType.includes('pdf')) return 'text-rose-400'
   if (mimeType.includes('zip') || mimeType.includes('tar') || mimeType.includes('gz')) return 'text-amber-400'
   return 'text-primary-400'
+}
+
+// 标记行内 code 节点 → 添加 data-inline 属性，供 CodeRenderer 区分 inline vs block
+function remarkInlineCodeMarker() {
+  return (tree) => {
+    visit(tree, 'inlineCode', (node) => {
+      node.data = node.data || {}
+      node.data.hProperties = { ...(node.data.hProperties || {}), 'data-inline': 'true' }
+    })
+  }
 }
 
 const MessageBubble = memo(function MessageBubble({
@@ -223,7 +234,9 @@ const MessageBubble = memo(function MessageBubble({
                 .replace(/\[gray\]([\s\S]*?)\[\/gray\]/g, '<span style="color:rgb(' + (isMine ? '180 180 180' : '100 100 100') + ')">$1</span>')
                 .replace(/\\\[([\s\S]*?)\\\]/g, '$$$$$1$$$$')
                 .replace(/\\\(([\s\S]*?)\\\)/g, '$$$1$$')}
-              remarkPlugins={[remarkGfm, remarkMath, remarkBreaks]}
+              remarkPlugins={[remarkGfm, remarkMath, remarkBreaks,
+                // 标记行内代码，让 CodeRenderer 能区分 inline vs block
+                remarkInlineCodeMarker]}
               rehypePlugins={[rehypeRaw, [rehypeSanitize, {
                 ...defaultSchema,
                 attributes: {
@@ -237,7 +250,6 @@ const MessageBubble = memo(function MessageBubble({
               }], rehypeKatex]}
               components={{
                 code: CodeRenderer,
-                inlineCode: ({ children }) => <code className="bg-black/5 dark:bg-white/10 rounded px-1 py-0.5 text-[0.85em] break-all">{children}</code>,
                 table: ({ node, ...props }) => <div className="markdown-table-wrapper"><table {...props} /></div>,
                 th: ({ node, ...props }) => <th {...props} />,
                 td: ({ node, ...props }) => <td {...props} />,

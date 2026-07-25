@@ -145,8 +145,8 @@ class SendFile(ToolPlugin):
 
             return {
                 "success": True,
-                "message": f"文件 {attachment_info['name']} 已通过私信发送",
-                "attachment": attachment_info,
+                "message": f"发送了 {len(attachments)} 个文件到私信",
+                "attachments": attachments,
             }
 
         else:
@@ -187,8 +187,8 @@ class SendFile(ToolPlugin):
 
             return {
                 "success": True,
-                "message": f"文件 {attachment_info['name']} 已发送到群聊",
-                "attachment": attachment_info,
+                "message": f"发送了 {len(attachments)} 个文件到群聊",
+                "attachments": attachments,
             }
 
 
