@@ -830,7 +830,7 @@ export default function ChatView({ conversationType, conversationId }: ChatViewP
     if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handleSend() }
   }
 
-  const isOwnMessage = (msg: Message) => {
+  function isOwnMessage(msg: Message) {
     return msg.sender_type === 'human' && msg.sender_id === user?.id
   }
 
