@@ -3,6 +3,7 @@ import { useWebSocket, type WebSocketMessage } from '../hooks/useWebSocket'
 import { api } from '../api/client'
 import { useAuth } from '../context/AuthContext'
 import MessageBubble from './MessageBubble'
+import ChatInput from './ChatInput'
 import ActivityBar, { type ActivityUser } from './ActivityBar'
 import ProfileCard from './ProfileCard'
 import EmptyState from './EmptyState'
@@ -783,8 +784,8 @@ export default function ChatView({ conversationType, conversationId }: ChatViewP
     setPendingAttachments(prev => prev.filter(a => a.id !== tempId))
   }
 
-  const handleSend = () => {
-    if (!input.trim() && pendingAttachments.length === 0) return
+  const handleSend = (text: string) => {
+    if (!text.trim() && pendingAttachments.length === 0) return
     if (!conversationId) return
 
     // 检查是否有未上传完的文件
@@ -806,7 +807,7 @@ export default function ChatView({ conversationType, conversationId }: ChatViewP
         mime_type: a.mime_type,
       }))
 
-    sendMessage(input.trim(), replyTo?.id, readyAttachments.length > 0 ? readyAttachments : undefined)
+    sendMessage(text.trim(), replyTo?.id, readyAttachments.length > 0 ? readyAttachments : undefined)
     setInput('')
     setReplyTo(null)
     // 发送后清除输入中状态
@@ -827,7 +828,7 @@ export default function ChatView({ conversationType, conversationId }: ChatViewP
       if (e.key === 'Enter' || e.key === 'Tab') { e.preventDefault(); insertMention(mentionFiltered[mentionIdx].name); return }
       if (e.key === 'Escape') { e.preventDefault(); setMentionActive(false); return }
     }
-    if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handleSend() }
+    if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); }
   }
 
   function isOwnMessage(msg: Message) {
@@ -1022,93 +1023,26 @@ export default function ChatView({ conversationType, conversationId }: ChatViewP
           </div>
         )}
 
-        <div className="flex items-end gap-2">
-          {/* 文件上传按钮 */}
-          <input
-            ref={fileInputRef}
-            type="file"
-            multiple
-            onChange={handleFileSelect}
-            className="hidden"
-            accept=".pdf,.doc,.docx,.txt,.md,.json,.csv,.zip,.tar,.gz,.png,.jpg,.jpeg,.gif,.webp"
-          />
-          <button
-            onClick={() => fileInputRef.current?.click()}
-            className="p-2.5 rounded-xl border border-border bg-canvas text-textMuted hover:text-textPrimary hover:border-primary-500/30 hover:bg-elevated transition-colors"
-            title={t('chat.addAttachment')}
-          >
-            <Paperclip size={18} />
-          </button>
-
-          {/* 引用条 */}
-          {replyTo && (
-            <div className="flex items-center gap-2 px-3 py-1.5 rounded-t-xl border border-border bg-surface/50 text-xs">
-              <div className="w-0.5 h-8 bg-primary-400 rounded-full shrink-0" />
-              <div className="flex-1 min-w-0">
-                <div className="text-primary-400 font-medium truncate">回复 @{replyTo.sender_name}</div>
-                <div className="text-textMuted truncate">{replyTo.content}</div>
-              </div>
-              <button onClick={() => setReplyTo(null)} className="shrink-0 p-1 rounded-lg hover:bg-elevated text-textMuted hover:text-textPrimary transition-colors">
-                <X size={14} />
-              </button>
+        {replyTo && (
+          <div className="flex items-center gap-2 px-3 py-1.5 rounded-t-xl border border-border bg-surface/50 text-xs">
+            <div className="w-0.5 h-8 bg-primary-400 rounded-full shrink-0" />
+            <div className="flex-1 min-w-0">
+              <div className="text-primary-400 font-medium truncate">回复 @{replyTo.sender_name}</div>
+              <div className="text-textMuted truncate">{replyTo.content}</div>
             </div>
-          )}
-          <textarea
-            ref={textareaRef}
-            value={input}
-            onChange={(e) => {
-              setInput(e.target.value)
-              const pos = e.target.selectionStart
-              detectMention(e.target.value, pos)
-              // 只在 空→非空 / 非空→空 时发送 typing 状态变更
-              const nowTyping = e.target.value.length > 0
-              if (nowTyping !== typingRef.current) {
-                typingRef.current = nowTyping
-                sendTyping(nowTyping)
-              }
-            }}
-            onKeyUp={(e) => {
-              if (mentionActive && ['ArrowUp','ArrowDown','Enter','Tab','Escape'].includes(e.key)) return
-              if (['ArrowLeft','ArrowRight','Home','End'].includes(e.key)) {
-                const ta = e.currentTarget
-                detectMention(ta.value, ta.selectionStart)
-              }
-            }}
-            onClick={(e) => {
-              const ta = e.currentTarget
-              setTimeout(() => detectMention(ta.value, ta.selectionStart), 0)
-            }}
-            onKeyDown={handleKeyDown}
-            onFocus={() => {
-              // 移动端键盘已由上方的 visualViewport 监听器处理
-              // 此处仅作兜底：在某些设备上 visualViewport 可能不够及时
-              if (window.innerWidth >= 768) return
-              setTimeout(() => {
-                textareaRef.current?.scrollIntoView({ behavior: 'smooth', block: 'end' })
-              }, 300)
-            }}
-            placeholder={conversationType === 'dm' ? t('chat.dmInputPlaceholder') : t('chat.groupInputPlaceholder')}
-            rows={1}
-            style={inputHeight ? { height: inputHeight } : undefined}
-            className="flex-1 min-w-0 resize-none rounded-xl border border-border bg-canvas px-4 py-2.5 text-sm text-textPrimary placeholder:text-textMuted focus:outline-none focus:ring-2 focus:ring-primary-500/50 focus:border-primary-500/30 transition-shadow"
-          />
-          <button
-            onClick={handleSend}
-            disabled={(!input.trim() && pendingAttachments.length === 0) || uploadingCount > 0 || pendingAttachments.some(a => a.error)}
-            title={
-              uploadingCount > 0
-                ? t('chat.uploadingFiles').replace('{count}', String(uploadingCount))
-                : pendingAttachments.some(a => a.error)
-                ? t('chat.uploadErrorRemove')
-                : pendingAttachments.length > 0 && !input.trim()
-                ? t('chat.sendAttachment')
-                : ''
-            }
-            className="p-2.5 rounded-xl bg-primary-500 text-white hover:bg-primary-400 disabled:opacity-30 disabled:cursor-not-allowed transition-all shadow-lg shadow-primary-500/20"
-          >
-            <Send size={18} />
-          </button>
-        </div>
+            <button onClick={() => setReplyTo(null)} className="shrink-0 p-1 rounded-lg hover:bg-elevated text-textMuted hover:text-textPrimary transition-colors">
+              <X size={14} />
+            </button>
+          </div>
+        )}
+        <ChatInput
+          conversationType={conversationType}
+          conversationId={conversationId}
+          t={t}
+          onSend={handleSend}
+          onSendFile={() => fileInputRef.current?.click()}
+          groupMembers={groupMembers}
+        />
       </div>
 
       {/* 资料卡 */}
