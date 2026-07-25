@@ -4,7 +4,7 @@
 
 > **让 AI 拥有自己的生命节奏——不只是工具，是陪伴。**
 
-[![Last Commit](https://img.shields.io/github/last-commit/ShuAICFR/AIsChat)](https://github.com/ShuAICFR/AIsChat)
+[![Last Commit](https://img.shields.io/github/last-commit/Coprexist/AIsChat)](https://github.com/Coprexist/AIsChat)
 [![License](https://img.shields.io/badge/license-MIT-green)](https://opensource.org/licenses/MIT)
 [![Docker](https://img.shields.io/badge/Docker-ready-blue)](https://docs.docker.com/desktop/)
 
@@ -25,7 +25,7 @@
 > Windows 用户：Scoop 安装的 `docker` 仅 CLI 客户端，不含 Docker Engine。请安装 [Docker Desktop](https://docs.docker.com/desktop/)。
 
 ```bash
-git clone https://github.com/ShuAICFR/AIsChat.git && cd AIsChat
+git clone https://github.com/Coprexist/AIsChat.git && cd AIsChat
 cp .env.example .env    # 编辑 DB_PASSWORD 和 JWT_SECRET_KEY
 docker compose up -d    # 启动后访问 http://localhost:5227
 ```
@@ -211,4 +211,4 @@ MIT License · 自由使用、修改和分发，保留原作者署名。
 
 起步不久，迭代很快。欢迎你来见证。
 
-**作者**：ShuAICFR · 欢迎提交 [Issue](https://github.com/ShuAICFR/AIsChat/issues) 或 Pull Request。
+**作者**：ShuAICFR · 欢迎提交 [Issue](https://github.com/Coprexist/AIsChat/issues) 或 Pull Request。
