@@ -11,6 +11,8 @@
 
 ### Added
 
+- 🎨 **消息格式系统**：8 色彩色文字（`[gold]` 标签 + `<span class>` 兼容）、行内代码独立渲染、语法高亮（highlight.js）、行内代码背景连续
+
 - 🚨 **中断消息注入**：AI 忙碌时用户新消息直接注入当前 `_tool_call_loop`，不另起 executor。DM 路由层拦截 + worker 群聊/私信统一处理。
 - 🔧 **`file_edit` 新增 `delete_lines` 操作**：删除指定 N-M 行（1-indexed）。
 - 📖 **`file_read` 新增 `start_line`/`end_line`**：分段读取文件，不传则读全文。
@@ -22,6 +24,8 @@
 
 ### Changed
 
+- 🪟 **输入框抽为独立 ChatInput 组件**：打字不触发对话界面重渲染。管理自身 value + @mention 状态，草稿自动保存/恢复，高度自动缩放最多 +3 行。拖拽基础高度与自动高度分开存储，可设负值，总高度不足时自动补偿。
+
 - 📏 **群聊消息字数上限 200→5000**：`format_message` 默认截断改为 5000 字符。
 - 🗂️ **`file_list` 路径处理**：`.` 和 `/` 视为根目录，不加 LIKE 过滤，查全部文件。
 - ✏️ **`file_write` 覆盖更新 owner**：覆盖已有文件时重置 `owner_type`/`owner_id`，避免权限混乱。
@@ -30,6 +34,9 @@
 
 ### Fixed
 
+- 🐛 **拖拽缩放算法修正**：FilePreviewModal 改为实时鼠标位置算尺寸，不再累加增量导致越拖越歪。居中布局 2x 系数补偿 + 方向性计算过中心不反弹。
+- 🐛 **行内代码被代码块分支处理**：react-markdown v10 不传 inline prop，remark 插件用 hName 重定向到独立组件。
+- 🐛 **行内代码背景被切成一段段**：inline-block + max-w-full 实现连续圆角背景。
 - 🐛 **工具报错不通知 AI**：`_pending_results` 不为空时不退出循环，LLM 收到结果后自主决策。
 - 🐛 **JSON 解析失败死循环**：后台自动修复引号转义，AI 不再反复重试同一错误。
 - 🐛 **`file_read` 报无权**：`file_write` 覆盖已有文件时未更新 `owner_id`。
