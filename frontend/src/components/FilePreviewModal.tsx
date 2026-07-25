@@ -122,6 +122,10 @@ export default function FilePreviewModal({ fileId, fileName, fileSize, mimeType,
   const isMd = isMarkdownFile(fileName, resolvedMime)
   const codeLang = isHtml ? '' : getCodeLang(fileName, resolvedMime)  // HTML 用 iframe 渲染
 
+  // 重试：新文件可能后台还没处理完，点开失败就重试
+  const RETRY_MAX = 3
+  const [retry, setRetry] = useState(0)
+
   useEffect(() => {
     if (!previewable) {
       // 不可预览 → 直接触发下载
@@ -135,46 +139,54 @@ export default function FilePreviewModal({ fileId, fileName, fileSize, mimeType,
 
     // 图片 / PDF：不需要 fetch 文本内容
     if (isImage || isPDF) {
+      // 但可能还没处理完，加个 retry key 让 etag/cache 失效
       setLoading(false)
       return
     }
 
-    const ac = new AbortController()
-    fetch(dlUrl, { signal: ac.signal })
-      .then(async (res) => {
+    let cancelled = false
+    const tryFetch = async (attempt: number) => {
+      if (cancelled) return
+      try {
+        const res = await fetch(dlUrl + `&_=${retry}` + (attempt > 0 ? `&r=${attempt}` : ''))
+        if (cancelled) return
         if (!res.ok) throw new Error(`HTTP ${res.status}`)
 
-        // DOCX → mammoth 转换
         if (isDocx) {
           const { default: mammoth } = await import('mammoth')
           const buf = await res.arrayBuffer()
           const result = await mammoth.convertToHtml({ arrayBuffer: buf })
-          setContent(result.value)
-          setLoading(false)
+          if (!cancelled) { setContent(result.value); setLoading(false) }
           return
         }
 
-        // 文本类
         let text = await res.text()
         if (text.length > 2 * 1024 * 1024) {
           text = text.slice(0, 2 * 1024 * 1024) + '\n\n' + t('filePreview.fileTooLarge')
         }
-        // 代码文件：包装为 markdown 代码块交给 Markdown 渲染
         if (codeLang) {
           text = '```' + codeLang + '\n' + text + '\n```'
         }
-        setContent(text)
-        setLoading(false)
-      })
-      .catch((err) => {
-        if (err.name !== 'AbortError') {
-          setError(err.message || t('common.loadFailed'))
-          setLoading(false)
+        if (!cancelled) { setContent(text); setLoading(false) }
+      } catch (err: any) {
+        if (cancelled) return
+        if (attempt < RETRY_MAX - 1) {
+          // 等一会儿重试：新文件可能还没处理完
+          const delay = (attempt + 1) * 1000
+          await new Promise(r => setTimeout(r, delay))
+          if (!cancelled) tryFetch(attempt + 1)
+        } else {
+          if (err.name !== 'AbortError') {
+            setError(err.message || t('common.loadFailed'))
+            setLoading(false)
+          }
         }
-      })
+      }
+    }
+    tryFetch(0)
 
-    return () => ac.abort()
-  }, [fileId, previewable, dlUrl, fileName, onClose, t, isImage, isPDF, isDocx, codeLang])
+    return () => { cancelled = true }
+  }, [fileId, previewable, dlUrl, fileName, onClose, t, isImage, isPDF, isDocx, codeLang, retry])
 
   // 缩放滑块常量
   const ZOOM_MIN = 0.5
@@ -401,7 +413,7 @@ export default function FilePreviewModal({ fileId, fileName, fileSize, mimeType,
             ) : isImage ? (
               <div ref={imgContainerRef} className="w-full h-full flex items-center justify-center overflow-auto">
                 <img
-                  src={dlUrl}
+                  src={dlUrl + `&_=${retry}`}
                   alt={fileName}
                   className="object-contain select-none"
                   style={{
@@ -410,6 +422,7 @@ export default function FilePreviewModal({ fileId, fileName, fileSize, mimeType,
                     maxHeight: scale <= 1 ? '100%' : 'none',
                   }}
                   draggable={false}
+                  onError={() => { if (retry < RETRY_MAX) setTimeout(() => setRetry(r => r + 1), 1000) }}
                 />
               </div>
             ) : isPDF || (isHtml && content) ? (
