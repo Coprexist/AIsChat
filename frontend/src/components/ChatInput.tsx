@@ -13,9 +13,7 @@ interface ChatInputProps {
 /**
  * 独立输入框。管理自身 value 和 @mention 状态，打字不触发父组件重渲染。
  */
-export default ChatInput
-const ChatInput = forwardRef<HTMLTextAreaElement, ChatInputProps>(
-  function ChatInput({ conversationType, conversationId, t, onSend, onSendFile, groupMembers }, ref) {
+const ChatInputFunc = ({ conversationType, conversationId, t, onSend, onSendFile, groupMembers }: ChatInputProps, ref: React.ForwardedRef<HTMLTextAreaElement>) => {
   const [value, setValue] = useState('')
   const valueRef = useRef('')
   const textareaRef = useRef<HTMLTextAreaElement>(null)
@@ -155,3 +153,6 @@ const ChatInput = forwardRef<HTMLTextAreaElement, ChatInputProps>(
     </div>
   )
 }
+
+const ChatInput = forwardRef(ChatInputFunc)
+export default ChatInput
