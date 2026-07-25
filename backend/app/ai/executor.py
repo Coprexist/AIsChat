@@ -439,20 +439,28 @@ async def _tool_call_loop(
                     _auto_compressed = False
 
             # ── 自动上下文压缩 ──
-            # 策略：AI 没发消息时不压缩（保全中间操作链），发过消息后压缩清理。
-            # 另外 12 小时空闲强制压缩（缓存过期）。
+            # 策略：AI 没发消息时不压缩（保全中间操作链），发过消息后用 LLM 总结重要事件再压缩。
+            # 另外 12 小时空闲强制内联压缩（缓存已过期）。
             if not _auto_compressed:
-                from app.services.memory.context_compression_service import should_compress, inline_compress, get_compression_threshold
+                from app.services.memory.context_compression_service import should_compress, inline_compress, compress_messages, get_compression_threshold
                 compress_threshold = await get_compression_threshold(db)
                 stale = _is_conversation_idle(messages, hours=12)
                 if stale or (_has_sent_message and should_compress(messages, threshold=compress_threshold)):
-                    logger.info(
-                        f"AI {agent.name}({agent.id}) 上下文超过阈值，内联压缩中..."
-                    )
-                    messages, compress_stats = inline_compress(messages)
+                    if stale:
+                        # 空闲压缩：直接内联截断（缓存已过期，不浪费 API）
+                        messages, compress_stats = inline_compress(messages)
+                    else:
+                        # AI 刚发了消息：用 LLM 总结重要事件后再压缩，保留关键信息
+                        messages, compress_stats = await compress_messages(
+                            messages,
+                            api_base_url=current_api_base,
+                            api_key=current_api_key,
+                            model=model,
+                            user_id=str(agent.id),
+                        )
                     if compress_stats.get("compressed"):
                         logger.info(
-                            f"AI {agent.name}({agent.id}) 内联压缩完成："
+                            f"AI {agent.name}({agent.id}) 上下文压缩完成："
                             f"{compress_stats['before_tokens']} → {compress_stats['after_tokens']} tokens"
                         )
                         try:
