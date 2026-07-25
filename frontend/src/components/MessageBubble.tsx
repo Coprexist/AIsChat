@@ -6,7 +6,6 @@ import remarkBreaks from 'remark-breaks'
 import rehypeKatex from 'rehype-katex'
 import rehypeRaw from 'rehype-raw'
 import rehypeSanitize, { defaultSchema } from 'rehype-sanitize'
-import { visit } from 'unist-util-visit'
 import { useAuth } from '../context/AuthContext'
 import { FileIcon, Download, Globe, ShieldAlert, Reply } from 'lucide-react'
 import { formatMessageTime } from '../utils/time'
@@ -81,14 +80,12 @@ function fileIconColor(mimeType: string): string {
   return 'text-primary-400'
 }
 
-// 标记行内 code 节点 → 添加 data-inline 属性，供 CodeRenderer 区分 inline vs block
-function remarkInlineCodeMarker() {
-  return (tree) => {
-    visit(tree, 'inlineCode', (node) => {
-      node.data = node.data || {}
-      node.data.hProperties = { ...(node.data.hProperties || {}), 'data-inline': 'true' }
-    })
-  }
+// 将行内代码重定向到独立组件，避免和代码块共用同一个 code 组件
+import { visit } from 'unist-util-visit'
+function remarkInlineCode() {
+  return (tree) => { visit(tree, 'inlineCode', (node) => {
+    node.data = { hName: 'inlinecode' }
+  }) }
 }
 
 const MessageBubble = memo(function MessageBubble({
@@ -236,7 +233,7 @@ const MessageBubble = memo(function MessageBubble({
                 .replace(/\\\(([\s\S]*?)\\\)/g, '$$$1$$')}
               remarkPlugins={[remarkGfm, remarkMath, remarkBreaks,
                 // 标记行内代码，让 CodeRenderer 能区分 inline vs block
-                remarkInlineCodeMarker]}
+                remarkInlineCode]}
               rehypePlugins={[rehypeRaw, [rehypeSanitize, {
                 ...defaultSchema,
                 attributes: {
@@ -250,6 +247,9 @@ const MessageBubble = memo(function MessageBubble({
               }], rehypeKatex]}
               components={{
                 code: CodeRenderer,
+                inlinecode: ({ children }) => (
+                  <code className="bg-black/5 dark:bg-white/10 rounded px-1 py-0.5 text-[0.85em] break-all">{children}</code>
+                ),
                 table: ({ node, ...props }) => <div className="markdown-table-wrapper"><table {...props} /></div>,
                 th: ({ node, ...props }) => <th {...props} />,
                 td: ({ node, ...props }) => <td {...props} />,

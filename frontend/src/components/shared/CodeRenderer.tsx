@@ -7,17 +7,15 @@ import MermaidBlock from '../MermaidBlock'
  * - inline code → 允许断词换行
  * - block code → 横向滚动，不换行
  */
-export default function CodeRenderer({ className, children, inline, node, ...props }: any) {
-  // react-markdown v10 不传 inline prop，改用 data-inline 属性区分
-  const isInline = inline || node?.properties?.dataInline
+export default function CodeRenderer({ className, children, inline, ...props }: any) {
   const match = /language-(\w+)/.exec(className || '')
   const code = String(children).replace(/\n$/, '')
 
-  if (!isInline && match && match[1] === 'mermaid') {
+  if (!inline && match && match[1] === 'mermaid') {
     return <MermaidBlock code={code} compact />
   }
 
-  if (isInline) {
+  if (inline) {
     return (
       <code className={`bg-black/5 dark:bg-white/10 rounded px-1 py-0.5 text-[0.85em] break-all ${className || ''}`}>
         {children}
