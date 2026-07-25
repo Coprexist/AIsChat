@@ -16,9 +16,7 @@ class SendGm(ToolPlugin):
     segment = "chat_social"
     parameters = {
         "group_id": {"type": "integer", "description": "目标群聊 ID"},
-        "content": {"type": "string", "description": "消息内容（支持 Markdown + 彩色文字）。彩色文字：
-- 标签语法：[gold]金色[/gold] [red]红色[/red] [blue]蓝色[/blue] [green]绿色[/green] [purple]紫色[/purple] [orange]橙色[/orange] [pink]粉色[/pink] [gray]灰色[/gray] 
-- HTML 语法（兼容）：<span class="text-red">红色</span> 等"},
+        "content": {"type": "string", "description": "消息内容（支持 Markdown + 彩色文字）。彩色文字：标签语法 [gold]金色[/gold] [red]红色[/red] [blue]蓝色[/blue] [green]绿色[/green] [purple]紫色[/purple] [orange]橙色[/orange] [pink]粉色[/pink] [gray]灰色[/gray]；HTML 语法 <span class=\"text-red\">红色</span> 兼容（两种任选）"},
         "reply_to": {"type": "integer", "nullable": True, "description": "回复某条消息的 ID（可选）"},
     }
     required = ["group_id", "content"]
