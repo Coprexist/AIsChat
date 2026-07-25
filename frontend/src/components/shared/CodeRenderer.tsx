@@ -1,5 +1,6 @@
 import MermaidBlock from '../MermaidBlock'
 import hljs from 'highlight.js'
+import 'highlight.js/styles/github.css'
 
 /**
  * 共享代码块渲染器——消息气泡和文件预览共用。
@@ -24,25 +25,19 @@ export default function CodeRenderer({ className, children, inline, ...props }: 
     )
   }
 
-  // 语法高亮
-  let highlighted = code
-  try {
-    if (match) {
-      const lang = match[1]
-      const langOk = hljs.getLanguage(lang)
-      if (langOk) highlighted = hljs.highlight(code, { language: lang }).value
-    }
-    if (!match || highlighted === code) {
-      // 没有指定语言或高亮失败 → 自动检测
-      const auto = hljs.highlightAuto(code)
-      if (auto && auto.value) highlighted = auto.value
-    }
-  } catch (_) { /* 高亮失败不阻塞 */ }
+  // 语法高亮：指定语言优先 → 自动检测 → 原样输出
+  let html: string | null = null
+  if (match && hljs.getLanguage(match[1])) {
+    try { html = hljs.highlight(code, { language: match[1] }).value } catch {}
+  }
+  if (!html) {
+    try { html = hljs.highlightAuto(code).value } catch {}
+  }
 
   return (
     <code
       className={`block overflow-x-auto whitespace-pre rounded-xl bg-black/5 dark:bg-white/5 border border-border/50 p-5 text-xs ${className || ''}`}
-      dangerouslySetInnerHTML={{ __html: highlighted }}
+      dangerouslySetInnerHTML={{ __html: html ?? code }}
     />
   )
 }
