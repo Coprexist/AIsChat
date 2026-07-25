@@ -1043,6 +1043,7 @@ export default function ChatView({ conversationType, conversationId }: ChatViewP
           onSend={handleSend}
           onSendFile={() => fileInputRef.current?.click()}
           groupMembers={groupMembers}
+          inputHeight={inputHeight}
         />
       </div>
 

@@ -8,12 +8,13 @@ interface ChatInputProps {
   onSend: (text: string) => void
   onSendFile?: () => void
   groupMembers?: Array<{ type: string; id: number; name: string; state?: string }>
+  inputHeight?: number | null
 }
 
 /**
  * 独立输入框。管理自身 value 和 @mention 状态，打字不触发父组件重渲染。
  */
-const ChatInputFunc = ({ conversationType, conversationId, t, onSend, onSendFile, groupMembers }: ChatInputProps, ref: React.ForwardedRef<HTMLTextAreaElement>) => {
+const ChatInputFunc = ({ conversationType, conversationId, t, onSend, onSendFile, groupMembers, inputHeight }: ChatInputProps, ref: React.ForwardedRef<HTMLTextAreaElement>) => {
   const [value, setValue] = useState('')
   const valueRef = useRef('')
   const textareaRef = useRef<HTMLTextAreaElement>(null)
@@ -138,6 +139,7 @@ const ChatInputFunc = ({ conversationType, conversationId, t, onSend, onSendFile
         value={value}
         onChange={handleChange}
         onKeyDown={handleKeyDown}
+        style={inputHeight ? { height: inputHeight } : undefined}
         placeholder={conversationType === 'dm' ? t('chat.dmInputPlaceholder') : t('chat.groupInputPlaceholder')}
         rows={1}
         className="flex-1 min-w-0 resize-none rounded-xl border border-border bg-canvas px-4 py-2.5 text-sm text-textPrimary placeholder:text-textMuted focus:outline-none focus:ring-2 focus:ring-primary-500/50 focus:border-primary-500/30 transition-shadow min-h-[42px]"
