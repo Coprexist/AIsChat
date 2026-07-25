@@ -8,7 +8,7 @@
 [![License](https://img.shields.io/badge/license-MIT-green)](https://opensource.org/licenses/MIT)
 [![Docker](https://img.shields.io/badge/Docker-ready-blue)](https://docs.docker.com/desktop/)
 
-<img src="docs/images/demo.gif" alt="AIsChat Demo" width="85%" />
+<!-- AIsChat Demo GIF — 文件已迁移，暂缺占位 -->
 
 </div>
 
@@ -32,7 +32,7 @@ docker compose up -d    # 启动后访问 http://localhost:5227
 
 注册即用（首位自动成为管理员）。配置 API Key → 创建 AI → 建群开聊。
 
-> 完整操作指南见 **[用户手册](docs/用户手册.md)** · 想分享给朋友？发 **[这个链接](docs/ABOUT.md)** · 想深入了解技术架构？看 **[项目全景报告](docs/项目全景报告.md)**
+> 完整操作指南见 **[用户手册](docs/guides/用户手册.md)** · 想分享给朋友？发 **[这个链接](docs/ABOUT.md)** · 想深入了解技术架构？看 **[项目全景报告](docs/reference/项目全景报告.md)**
 
 <br>
 
@@ -64,7 +64,7 @@ docker compose up -d    # 启动后访问 http://localhost:5227
 <tr><td><b>自修改人格</b></td><td>AI 可编辑自己的 System Prompt，自动存档、支持回滚。它在成长</td></tr>
 </table>
 
-> 完整功能列表见 **[用户手册](docs/用户手册.md)**
+> 完整功能列表见 **[用户手册](docs/guides/用户手册.md)**
 
 <br>
 
@@ -141,7 +141,13 @@ AIsChat 可以部署在公网服务器、公司内网、家庭 NAS，甚至本�
 │       ├── components/    # ChatView、Sidebar、GroupSettingsPanel…
 │       ├── hooks/         # useWebSocket
 │       └── pages/         # ChatPage、DMPage、AdminPage、AgentsPage…
-└── docs/                  # 架构文档
+├── docs/                  # 文档
+│   ├── ABOUT.md          # 产品介绍
+│   ├── SUMMARY.md        # 文档索引
+│   ├── guides/           # 用户手册
+│   ├── reference/        # 全景报告
+│   ├── exploration/      # 设计探索
+│   └── archive/          # 旧版设计存档
 ```
 
 <br>
@@ -151,11 +157,11 @@ AIsChat 可以部署在公网服务器、公司内网、家庭 NAS，甚至本�
 | 文档 | 适合谁 |
 |------|--------|
 | **[文档目录](docs/SUMMARY.md)** | 所有人 — 完整文档索引与阅读路线 |
-| **[用户手册](docs/用户手册.md)** | 终端用户 — 从零开始使用 |
+| **[用户手册](docs/guides/用户手册.md)** | 终端用户 — 从零开始使用 |
 | **[产品介绍](docs/ABOUT.md)** | 所有人 — 了解项目理念，适合分享 |
-| **[项目全景报告](docs/项目全景报告.md)** | AI / 个人用户 / 企业筛查员 — 技术架构、核心亮点、成熟度评估 |
-| **[AI 认知架构三空间模型](docs/AI认知架构三空间模型.md)** | 开发者 / 研究者 — 三空间模型、JSON intent、文件记忆、配置矩阵 |
-| **[管理与开发者手册](docs/管理与开发者手册.md)** | 管理员 / 开发者 — 部署、架构、排错、WebSocket |
+| **[项目全景报告](docs/reference/项目全景报告.md)** | AI / 个人用户 / 企业筛查员 — 技术架构、核心亮点、成熟度评估 |
+| **[AI 认知架构三空间模型](docs/archive/old_designs/AI%20认知架构三空间模型.md)** | 开发者 / 研究者 — 三空间模型、JSON intent、文件记忆、配置矩阵 |
+| **[管理与开发者手册](docs/guides/管理与开发者手册.md)** | 管理员 / 开发者 — 部署、架构、排错、WebSocket |
 | **[ROADMAP](ROADMAP.md)** | 所有人 — 已实现与规划中的功能 |
 
 <br>
@@ -185,7 +191,7 @@ cd frontend && npm install && npm run dev
 
 已实现和规划中的功能详见 **[ROADMAP.md](ROADMAP.md)**。
 
-想了解完整的架构设计、技术决策和模块成熟度评估？看 **[项目全景报告](docs/项目全景报告.md)**——含各模块状态、技术亮点、已知限制和未来规划。
+想了解完整的架构设计、技术决策和模块成熟度评估？看 **[项目全景报告](docs/reference/项目全景报告.md)**——含各模块状态、技术亮点、已知限制和未来规划。
 
 <br>
 
