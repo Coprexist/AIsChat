@@ -12,17 +12,19 @@ logger = logging.getLogger(__name__)
 class SendFile(ToolPlugin):
     name = "send_file"
     description = (
-        "将你文件空间中已有的文件作为附件发送到群聊或私信。"
+        "将文件空间中已有的一个或多个文件作为附件发送到群聊或私信。"
         "文件必须先通过 file_write 创建（会自动注册到文件系统）。"
         "群聊用 group_id，私信用 target_user_id（二选一）。"
-        "可选附带文字说明 content。"
+        "发送多个文件用 file_paths（数组），单个文件用 file_path（字符串）。"
+        "可选附带文字说明 content（支持 Markdown 和彩色文字）。"
     )
     segment = "chat_social"
     parameters = {
-        "file_path": {"type": "string", "description": "文件路径（你在 file_write/file_read 中使用的相对路径，如 workspace/report.md）"},
+        "file_path": {"type": "string", "nullable": True, "description": "单文件路径（如 workspace/report.md）。与 file_paths 二选一。"},
+        "file_paths": {"type": "array", "items": {"type": "string"}, "nullable": True, "description": "多文件路径数组（如图片列表 [img1.png, img2.jpg]）。与 file_path 二选一。"},
         "group_id": {"type": "integer", "nullable": True, "description": "目标群聊 ID（群聊时填写）"},
         "target_user_id": {"type": "integer", "nullable": True, "description": "目标用户 ID（私信时填写）"},
-        "content": {"type": "string", "nullable": True, "description": "附带的文字说明（可选）"},
+        "content": {"type": "string", "nullable": True, "description": "附带的文字说明（可选，支持 Markdown 和彩色文字 [gold]金色[/gold] 等）"},
     }
     required = ["file_path"]
     states = ["active"]
@@ -36,10 +38,26 @@ class SendFile(ToolPlugin):
         from app.chat.dm import send_dm_message, get_or_create_dm_session
         from app.models.agent import Agent as AgentModel
 
-        file_path = arguments["file_path"]
+        file_path = arguments.get("file_path")
+        file_paths = arguments.get("file_paths")
         target_group = arguments.get("group_id", group_id)
         target_user = arguments.get("target_user_id")
         caption = (arguments.get("content") or "").strip()
+
+        # ── 收集文件路径 ──
+        paths = []
+        if file_paths:
+            if isinstance(file_paths, list):
+                paths = file_paths
+            else:
+                paths = [str(file_paths)]
+        elif file_path:
+            paths = [file_path]
+        else:
+            return {"error": True, "message": "请提供 file_path（单个文件）或 file_paths（数组，多个文件）"}
+        if not paths:
+            return {"error": True, "message": "文件路径列表为空"}
+        paths = [p.strip() for p in paths if p.strip()]
 
         # ── 校验：group_id 和 target_user_id 二选一 ──
         if target_group is not None and target_user is not None:
@@ -49,32 +67,36 @@ class SendFile(ToolPlugin):
         if target_group is None:
             target_group = group_id
 
-        # ── 查找文件元数据（AI 自己的文件，零拷贝引用） ──
-        result = await db.execute(
-            select(FileMetadata).where(
-                FileMetadata.path == file_path,
-                FileMetadata.owner_type == "ai",
-                FileMetadata.owner_id == agent_id,
+        # ── 批量查找文件元数据（AI 自己的文件，零拷贝引用） ──
+        attachments = []
+        missing = []
+        for fp in paths:
+            result = await db.execute(
+                select(FileMetadata).where(
+                    FileMetadata.path == fp,
+                    FileMetadata.owner_type == "ai",
+                    FileMetadata.owner_id == agent_id,
+                )
             )
-        )
-        metadata = result.scalar_one_or_none()
+            meta = result.scalar_one_or_none()
+            if not meta:
+                missing.append(fp)
+            else:
+                attachments.append({
+                    "file_id": meta.id,
+                    "name": fp.rsplit("/", 1)[-1].rsplit("\\", 1)[-1],
+                    "path": meta.path,
+                    "size": meta.size,
+                    "mime_type": meta.mime_type or "application/octet-stream",
+                })
 
-        if not metadata:
+        if missing:
             return {
                 "error": True,
                 "message": (
-                    f"文件不存在: {file_path}。"
-                    "请先用 file_write 写入文件（会自动注册），再用 send_file 发送。"
+                    f"以下文件不存在，请先用 file_write 创建: {', '.join(missing)}"
                 ),
             }
-
-        attachment_info = {
-            "file_id": metadata.id,
-            "name": file_path.rsplit("/", 1)[-1].rsplit("\\", 1)[-1],
-            "path": metadata.path,
-            "size": metadata.size,
-            "mime_type": metadata.mime_type or "application/octet-stream",
-        }
 
         # ── AI 名称和头像 ──
         agent_name = context.get("agent_name", f"AI:{agent_id}")
@@ -103,7 +125,7 @@ class SendFile(ToolPlugin):
                 msg = await send_dm_message(
                     db, session["session_id"], sender_id=agent_user_id,
                     content=caption if caption else " ",
-                    attachments=[attachment_info],
+                    attachments=attachments,
                 )
                 await db.commit()
             except ValueError as e:
@@ -134,7 +156,7 @@ class SendFile(ToolPlugin):
                     db, group_id=target_group,
                     sender_type="ai", sender_id=agent_user_id,
                     content=caption if caption else "",
-                    attachments=[attachment_info],
+                    attachments=attachments,
                 )
                 await db.commit()
             except Exception as e:
