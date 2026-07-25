@@ -449,16 +449,28 @@ async def _tool_call_loop(
                     if stale:
                         # 空闲压缩：直接内联截断（缓存已过期，不浪费 API）
                         messages, compress_stats = inline_compress(messages)
+                        if compress_stats.get("compressed"):
+                            _auto_compressed = True
                     else:
                         # AI 刚发了消息：用 LLM 总结重要事件后再压缩，保留关键信息
-                        messages, compress_stats = await compress_messages(
+                        # 压缩必须成功才能清空操作链，否则卡住重试
+                        new_messages, compress_stats = await compress_messages(
                             messages,
                             api_base_url=current_api_base,
                             api_key=current_api_key,
                             model=model,
                             user_id=str(agent.id),
                         )
-                    if compress_stats.get("compressed"):
+                        if compress_stats.get("compressed"):
+                            messages = new_messages
+                            _auto_compressed = True
+                        else:
+                            logger.warning(
+                                f"AI {agent.name}({agent.id}) LLM 压缩失败"
+                                f"（{compress_stats.get('reason', '未知')}），"
+                                "下一轮重试"
+                            )
+                    if _auto_compressed:
                         logger.info(
                             f"AI {agent.name}({agent.id}) 上下文压缩完成："
                             f"{compress_stats['before_tokens']} → {compress_stats['after_tokens']} tokens"
@@ -468,7 +480,6 @@ async def _tool_call_loop(
                             await apply_pending_config(db, agent)
                         except Exception:
                             pass
-                    _auto_compressed = True
 
             # ── 注入用户忙时消息（中断缓冲）──
             pending_msgs = _pending_interrupts.pop(agent.id, None)
