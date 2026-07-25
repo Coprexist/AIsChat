@@ -236,6 +236,7 @@ const MessageBubble = memo(function MessageBubble({
                 remarkInlineCode]}
               rehypePlugins={[rehypeRaw, [rehypeSanitize, {
                 ...defaultSchema,
+                tagNames: [...(defaultSchema.tagNames || []), 'inlinecode'],
                 attributes: {
                   ...defaultSchema.attributes,
                   a: [...(defaultSchema.attributes?.a || ['href']), 'class', 'target', 'rel'],
