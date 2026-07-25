@@ -322,3 +322,15 @@
 .markdown-table-wrapper td[align="right"] {
   text-align: right;
 }
+
+/* ── 代码高亮颜色适配 ─────────────────────── */
+:is(.text-white, .dark) .hljs-keyword,
+:is(.text-white, .dark) .hljs-title { color: #d2a8ff; }
+:is(.text-white, .dark) .hljs-string,
+:is(.text-white, .dark) .hljs-regexp { color: #a5d6ff; }
+:is(.text-white, .dark) .hljs-number,
+:is(.text-white, .dark) .hljs-literal,
+:is(.text-white, .dark) .hljs-attr { color: #79c0ff; }
+:is(.text-white, .dark) .hljs-comment { color: #8b949e; }
+:is(.text-white, .dark) .hljs-type { color: #ffa657; }
+:is(.text-white, .dark) .hljs-built_in { color: #ff7b72; }

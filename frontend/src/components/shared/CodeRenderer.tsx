@@ -36,7 +36,7 @@ export default function CodeRenderer({ className, children, inline, ...props }: 
 
   return (
     <code
-      className={`block overflow-x-auto whitespace-pre rounded-xl bg-black/5 dark:bg-white/5 border border-border/50 p-5 text-xs ${className || ''}`}
+      className={`hljs block overflow-x-auto whitespace-pre rounded-xl bg-black/5 dark:bg-white/5 border border-border/50 p-5 text-xs ${className || ''}`}
       dangerouslySetInnerHTML={{ __html: html ?? code }}
     />
   )
