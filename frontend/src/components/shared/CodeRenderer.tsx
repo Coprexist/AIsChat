@@ -17,7 +17,7 @@ export default function CodeRenderer({ className, children, inline, ...props }: 
 
   if (inline) {
     return (
-      <code className={`bg-black/5 dark:bg-white/10 rounded px-1 py-0.5 text-[0.85em] break-all ${className || ''}`}>
+      <code className={`bg-black/5 dark:bg-white/10 rounded px-1 py-0.5 text-[0.85em] whitespace-nowrap ${className || ''}`}>
         {children}
       </code>
     )
