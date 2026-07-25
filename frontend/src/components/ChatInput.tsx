@@ -30,6 +30,13 @@ const ChatInputFunc = ({ conversationType, conversationId, t, onSend, onSendFile
 
   useEffect(() => { valueRef.current = value }, [value])
 
+  // 拖拽高度变化时同步到 textarea DOM
+  useEffect(() => {
+    if (textareaRef.current && inputHeight) {
+      textareaRef.current.style.height = inputHeight + 'px'
+    }
+  }, [inputHeight])
+
   // 草稿恢复 & 离开保存
   useEffect(() => {
     const key = `draft_${conversationType}_${conversationId}`
@@ -87,10 +94,17 @@ const ChatInputFunc = ({ conversationType, conversationId, t, onSend, onSendFile
   }, [value, onSend])
 
   const handleChange = useCallback((e: React.ChangeEvent<HTMLTextAreaElement>) => {
-    const v = e.target.value
-    setValue(v)
-    detectMention(v, e.target.selectionStart)
-  }, [detectMention])
+    const ta = e.target
+    setValue(ta.value)
+    detectMention(ta.value, ta.selectionStart)
+    // 自动缩放：内容超出当前高度时扩展，最多 4 行
+    ta.style.height = 'auto'
+    const maxRows = 4
+    const lineH = 23  // text-sm + leading-relaxed ≈ 23px
+    const base = inputHeight || 44  // 1 行基础高度
+    const maxH = base + maxRows * lineH
+    ta.style.height = Math.min(ta.scrollHeight, maxH) + 'px'
+  }, [detectMention, inputHeight])
 
   const handleKeyDown = useCallback((e: React.KeyboardEvent) => {
     // @mention 导航
@@ -139,7 +153,6 @@ const ChatInputFunc = ({ conversationType, conversationId, t, onSend, onSendFile
         value={value}
         onChange={handleChange}
         onKeyDown={handleKeyDown}
-        style={inputHeight ? { height: inputHeight } : undefined}
         placeholder={conversationType === 'dm' ? t('chat.dmInputPlaceholder') : t('chat.groupInputPlaceholder')}
         rows={1}
         className="flex-1 min-w-0 resize-none rounded-xl border border-border bg-canvas px-4 py-2.5 text-sm text-textPrimary placeholder:text-textMuted focus:outline-none focus:ring-2 focus:ring-primary-500/50 focus:border-primary-500/30 transition-shadow min-h-[42px]"
