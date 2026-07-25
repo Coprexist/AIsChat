@@ -287,6 +287,8 @@ async def _tool_call_loop(
     _reminder_extra = 0
     # 上下文压缩：每轮工具调用循环最多自动压缩一次
     _auto_compressed = False
+    # AI 尚未在本次循环中发过消息 → 压缩只应在空闲强制时触发，保中间结果
+    _has_sent_message = False
 
     loop_idx = 0
     while loop_idx < max_loops + _reminder_extra:
@@ -427,14 +429,19 @@ async def _tool_call_loop(
                 _pending_results.append({"tc_id": tc_id, "result": result})
                 if isinstance(result, dict) and result.get("end_turn"):
                     _end_turn = True
+                # 追踪 AI 是否已发消息（用于压缩策略判断）
+                if tool_name in ("send_gm", "send_dm"):
+                    _has_sent_message = True
 
             # ── 自动上下文压缩（每轮工具调用循环最多一次）──
+            # 策略：AI 没发消息时只做强制空闲压缩，不做 token 阈值压缩
+            #      保全中间操作链不被截断。AI 发过消息后正常压缩。
             if not _auto_compressed:
                 from app.services.memory.context_compression_service import should_compress, inline_compress, get_compression_threshold
                 compress_threshold = await get_compression_threshold(db)
                 # 12 小时闲置强制压缩：缓存肯定过期，压缩省 token
                 stale = _is_conversation_idle(messages, hours=12)
-                if stale or should_compress(messages, threshold=compress_threshold):
+                if stale or (_has_sent_message and should_compress(messages, threshold=compress_threshold)):
                     logger.info(
                         f"AI {agent.name}({agent.id}) 上下文超过阈值，内联压缩中..."
                     )
