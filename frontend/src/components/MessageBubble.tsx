@@ -7,7 +7,6 @@ import rehypeKatex from 'rehype-katex'
 import rehypeRaw from 'rehype-raw'
 import rehypeSanitize, { defaultSchema } from 'rehype-sanitize'
 import { useAuth } from '../context/AuthContext'
-import { rehypeColorText } from '../utils/rehypeColorText'
 import { FileIcon, Download, Globe, ShieldAlert, Reply } from 'lucide-react'
 import { formatMessageTime } from '../utils/time'
 import { formatFileSize } from '../utils/format'
@@ -92,18 +91,6 @@ const MessageBubble = memo(function MessageBubble({
 
   const [previewFile, setPreviewFile] = useState<{ file_id: number; name: string; size: number; mime_type: string } | null>(null)
   const [invStatus, setInvStatus] = useState<string | null>(null)
-
-  // 彩色文字 class → 内联颜色映射（浅/深底适配）
-  const textColorMap: Record<string, string> = {
-    'text-red': isMine ? '255 100 100' : '220 50 50',
-    'text-orange': isMine ? '255 180 50' : '220 130 0',
-    'text-gold': isMine ? '255 215 0' : '180 140 0',
-    'text-green': isMine ? '80 220 120' : '20 150 60',
-    'text-blue': isMine ? '100 150 255' : '50 100 220',
-    'text-purple': isMine ? '180 130 255' : '130 80 200',
-    'text-pink': isMine ? '255 130 200' : '220 80 150',
-    'text-gray': isMine ? '180 180 180' : '100 100 100',
-  }
 
 
   const invAtt = attachments?.find(a => a.type === 'group_invitation')
@@ -217,24 +204,37 @@ const MessageBubble = memo(function MessageBubble({
             <BouncingDots className="text-primary-400 align-middle" />
           ) : (
             <Markdown
-              children={content.replace(/\\\[([\s\S]*?)\\\]/g, '$$$$$1$$$$').replace(/\\\(([\s\S]*?)\\\)/g, '$$$1$$')}
+              children={content
+                .replace(/<span\s+class=['"]text-red['"][^>]*>([\s\S]*?)<\/span>/gi, '<span style="color:rgb(' + (isMine ? '255 100 100' : '220 50 50') + ')">$1</span>')
+                .replace(/<span\s+class=['"]text-orange['"][^>]*>([\s\S]*?)<\/span>/gi, '<span style="color:rgb(' + (isMine ? '255 180 50' : '220 130 0') + ')">$1</span>')
+                .replace(/<span\s+class=['"]text-gold['"][^>]*>([\s\S]*?)<\/span>/gi, '<span style="color:rgb(' + (isMine ? '255 215 0' : '180 140 0') + ')">$1</span>')
+                .replace(/<span\s+class=['"]text-green['"][^>]*>([\s\S]*?)<\/span>/gi, '<span style="color:rgb(' + (isMine ? '80 220 120' : '20 150 60') + ')">$1</span>')
+                .replace(/<span\s+class=['"]text-blue['"][^>]*>([\s\S]*?)<\/span>/gi, '<span style="color:rgb(' + (isMine ? '100 150 255' : '50 100 220') + ')">$1</span>')
+                .replace(/<span\s+class=['"]text-purple['"][^>]*>([\s\S]*?)<\/span>/gi, '<span style="color:rgb(' + (isMine ? '180 130 255' : '130 80 200') + ')">$1</span>')
+                .replace(/<span\s+class=['"]text-pink['"][^>]*>([\s\S]*?)<\/span>/gi, '<span style="color:rgb(' + (isMine ? '255 130 200' : '220 80 150') + ')">$1</span>')
+                .replace(/<span\s+class=['"]text-gray['"][^>]*>([\s\S]*?)<\/span>/gi, '<span style="color:rgb(' + (isMine ? '180 180 180' : '100 100 100') + ')">$1</span>')
+                .replace(/\[red\]([\s\S]*?)\[\/red\]/g, '<span style="color:rgb(' + (isMine ? '255 100 100' : '220 50 50') + ')">$1</span>')
+                .replace(/\[orange\]([\s\S]*?)\[\/orange\]/g, '<span style="color:rgb(' + (isMine ? '255 180 50' : '220 130 0') + ')">$1</span>')
+                .replace(/\[gold\]([\s\S]*?)\[\/gold\]/g, '<span style="color:rgb(' + (isMine ? '255 215 0' : '180 140 0') + ')">$1</span>')
+                .replace(/\[green\]([\s\S]*?)\[\/green\]/g, '<span style="color:rgb(' + (isMine ? '80 220 120' : '20 150 60') + ')">$1</span>')
+                .replace(/\[blue\]([\s\S]*?)\[\/blue\]/g, '<span style="color:rgb(' + (isMine ? '100 150 255' : '50 100 220') + ')">$1</span>')
+                .replace(/\[purple\]([\s\S]*?)\[\/purple\]/g, '<span style="color:rgb(' + (isMine ? '180 130 255' : '130 80 200') + ')">$1</span>')
+                .replace(/\[pink\]([\s\S]*?)\[\/pink\]/g, '<span style="color:rgb(' + (isMine ? '255 130 200' : '220 80 150') + ')">$1</span>')
+                .replace(/\[gray\]([\s\S]*?)\[\/gray\]/g, '<span style="color:rgb(' + (isMine ? '180 180 180' : '100 100 100') + ')">$1</span>')
+                .replace(/\\\[([\s\S]*?)\\\]/g, '$$$$$1$$$$')
+                .replace(/\\\(([\s\S]*?)\\\)/g, '$$$1$$')}
               remarkPlugins={[remarkGfm, remarkMath, remarkBreaks]}
-              rehypePlugins={[
-                rehypeRaw,
-                rehypeColorText(textColorMap),
-                [rehypeSanitize, {
-                  ...defaultSchema,
-                  attributes: {
-                    ...defaultSchema.attributes,
-                    a: [...(defaultSchema.attributes?.a || ['href']), 'class', 'target', 'rel'],
-                    code: [...(defaultSchema.attributes?.code || []), 'class'],
-                    span: [...(defaultSchema.attributes?.span || []), 'class', 'style'],
-                    img: [...(defaultSchema.attributes?.img || ['src', 'alt']), 'class'],
-                    div: [...(defaultSchema.attributes?.div || []), 'class'],
-                  },
-                }],
-                rehypeKatex,
-              ]}
+              rehypePlugins={[rehypeRaw, [rehypeSanitize, {
+                ...defaultSchema,
+                attributes: {
+                  ...defaultSchema.attributes,
+                  a: [...(defaultSchema.attributes?.a || ['href']), 'class', 'target', 'rel'],
+                  code: [...(defaultSchema.attributes?.code || []), 'class'],
+                  span: [...(defaultSchema.attributes?.span || []), 'style'],
+                  img: [...(defaultSchema.attributes?.img || ['src', 'alt']), 'class'],
+                  div: [...(defaultSchema.attributes?.div || []), 'class'],
+                },
+              }], rehypeKatex]}
               components={{
                 code: CodeRenderer,
                 table: ({ node, ...props }) => <div className="markdown-table-wrapper"><table {...props} /></div>,
