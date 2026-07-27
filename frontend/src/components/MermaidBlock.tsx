@@ -111,28 +111,32 @@ export default function MermaidBlock({ code, compact = false }: MermaidBlockProp
   const [svg, setSvg] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [expanded, setExpanded] = useState(false)
-  // 全屏用：mermaid.render 返回的 SVG 经过宽度修正后的版本
   const [fullscreenSvg, setFullscreenSvg] = useState<string | null>(null)
-  const [showCollapsed, setShowCollapsed] = useState(true) // true=显示placeholder, false=显示渲染结果
+  // expandLevel: 0=未展开, 1=已点击但正在渲染, 2=已显示结果
+  const [expandLevel, setExpandLevel] = useState(0)
+  const [errorRevealed, setErrorRevealed] = useState(false)
   const uniqueId = useId().replace(/:/g, '')
 
   // 默认折叠设置（仅 compact 模式生效）
   const collapseDefault = compact && getMermaidSetting('mermaid_collapse', true)
   const collapseErrors = compact && getMermaidSetting('mermaid_collapse_errors', true)
+  const isCollapsed = collapseDefault && expandLevel === 0
+  const isErrorCollapsed = error && collapseErrors && !errorRevealed
 
   const {
     overlayRef, svgWrapRef, zoomIn, zoomOut, resetTransform,
     panRef, dragRef, updateTransform,
   } = useFullscreenPanZoom(expanded)
 
-  // ---- 渲染 mermaid ----
+  // ---- 渲染 mermaid（仅在用户点击展开后执行） ----
   useEffect(() => {
+    if (expandLevel === 0) return
     let cancelled = false
 
     async function render() {
       try {
         const mermaid = await mermaidPromise
-        const { svg: rendered } = await mermaid.render(`mermaid-${uniqueId}`, code, containerRef.current)
+        const { svg: rendered } = await mermaid.render(`mermaid-${uniqueId}`, code)
         if (cancelled) return
 
         if (/translate\(NaN/.test(rendered)) {
@@ -152,7 +156,7 @@ export default function MermaidBlock({ code, compact = false }: MermaidBlockProp
 
     render()
     return () => { cancelled = true }
-  }, [code, uniqueId])
+  }, [code, uniqueId, expandLevel])
 
   // ---- 展开全屏 ----
   const handleExpand = useCallback(() => {
@@ -184,39 +188,43 @@ export default function MermaidBlock({ code, compact = false }: MermaidBlockProp
 
   // ---- 渲染分支 ----
 
-  // ---- 折叠控制：设置决定是否显示占位，渲染始终进行 ----
-  const showPlaceholder = showCollapsed && (
-    (svg && collapseDefault) ||            // 正常图表被折叠
-    (error && collapseErrors)              // 错误图表被折叠
-  )
-
-  const handleShowContent = () => setShowCollapsed(false)
-
-  // 折叠占位
-  if (showPlaceholder && svg) {
+  // 折叠占位：检测到 ```mermaid 代码块但尚未点击展开
+  if (isCollapsed) {
     return (
-      <div className="my-1">
+      <div className={compact ? 'my-2' : 'my-4'}>
         <button
-          onClick={handleShowContent}
-          className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-border/50 bg-elevated/30 hover:bg-elevated transition-colors text-xs text-textMuted hover:text-textSecondary"
+          onClick={() => setExpandLevel(1)}
+          className="flex items-center gap-1.5 px-3 py-2 rounded-lg border w-full text-xs border-border/50 bg-elevated/30 hover:bg-elevated text-textMuted hover:text-textSecondary"
         >
-          <Maximize2 size={12} />
+          <Maximize2 size={13} />
           <span>展开 Mermaid 图表</span>
         </button>
       </div>
     )
   }
 
-  if (showPlaceholder && error) {
+  // 错误折叠：渲染完成后出错，但用户尚未点击查看
+  if (isErrorCollapsed) {
     return (
-      <div className="my-1">
+      <div className={compact ? 'my-2' : 'my-4'}>
         <button
-          onClick={handleShowContent}
-          className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-rose-400/20 bg-rose-400/5 hover:bg-rose-400/10 transition-colors text-xs text-rose-400/70 hover:text-rose-400"
+          onClick={() => setErrorRevealed(true)}
+          className="flex items-center gap-1.5 px-3 py-2 rounded-lg border w-full text-xs border-rose-400/20 bg-rose-400/5 hover:bg-rose-400/10 text-rose-400/70 hover:text-rose-400"
         >
-          <AlertTriangle size={12} />
+          <AlertTriangle size={13} />
           <span>图表渲染出错 · 点击查看</span>
         </button>
+      </div>
+    )
+  }
+
+  // 加载态（renderRequested 但尚未完成）：保持占位布局，避免闪动
+  if (!svg && !error) {
+    if (compact) return null
+    return (
+      <div ref={containerRef} className="my-3 rounded-xl border border-border bg-elevated p-4 flex items-center gap-2 text-textMuted text-sm">
+        <Loader2 size={14} className="animate-spin" />
+        图表加载中...
       </div>
     )
   }
@@ -239,18 +247,7 @@ export default function MermaidBlock({ code, compact = false }: MermaidBlockProp
     )
   }
 
-  // 加载态——compact 模式下渲染零尺寸容器（供 mermaid.render 计算尺寸），不占可视空间
-  if (!svg) {
-    if (compact) {
-      return <div ref={containerRef} style={{ position: 'fixed', width: 0, height: 0, overflow: 'hidden', opacity: 0, pointerEvents: 'none' }} />
-    }
-    return (
-      <div ref={containerRef} className="my-3 rounded-xl border border-border bg-elevated p-4 flex items-center gap-2 text-textMuted text-sm">
-        <Loader2 size={14} className="animate-spin" />
-        图表加载中...
-      </div>
-    )
-  }
+
 
   // 成功态
   const displaySvg = expanded ? (fullscreenSvg || svg) : svg
