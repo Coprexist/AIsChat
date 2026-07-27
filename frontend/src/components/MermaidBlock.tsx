@@ -24,27 +24,33 @@ function normalizeSvgWidth(svg: string): string {
 }
 
 /**
- * Mermaid 语法错误时返回的 SVG 有 3 个特征，任中其一即判为错误：
- * 1. <svg aria-roledescription="error"（v11+ 最明确的信号）
- * 2. <path class="error-icon"（旧版或特定主题）
- * 3. 包含 .error-text text 节点
+ * 用 DOMParser 解析 SVG 并查询错误标记节点。
+ * 比字符串正则可靠——不受换行/编码/属性顺序影响。
  */
 function isMermaidErrorSvg(svg: string): string | null {
-  /* V2 */
-  // 特征 1：aria-roledescription="error" 最可靠
-  if (/aria-roledescription="error"/.test(svg)) {
-    const m = svg.match(/class="error-text"[^>]*>([^<]+)</)
-    return m ? m[1].trim() : 'Mermaid 语法错误'
-  }
-  // 特征 2：路径含 error-icon class
-  if (/<path[^>]*class="[^"]*\berror-icon\b[^"]*"/.test(svg)) {
-    const m = svg.match(/class="error-text"[^>]*>([^<]+)</)
-    return m ? m[1].trim() : 'Mermaid 语法错误'
-  }
-  // 特征 3：error-text 文本节点
-  if (/class="error-text"[^>]*>/.test(svg)) {
-    const m = svg.match(/class="error-text"[^>]*>([^<]+)</)
-    return m ? m[1].trim() : 'Mermaid 语法错误'
+  try {
+    const doc = new DOMParser().parseFromString(svg, 'image/svg+xml')
+    const root = doc.documentElement
+
+    // 特征 1：SVG 根标签 aria-roledescription="error"
+    if (root.getAttribute('aria-roledescription') === 'error') {
+      const el = root.querySelector('.error-text')
+      return el?.textContent?.trim() || 'Mermaid 语法错误'
+    }
+
+    // 特征 2：路径含 error-icon class
+    if (root.querySelector('.error-icon')) {
+      const el = root.querySelector('.error-text')
+      return el?.textContent?.trim() || 'Mermaid 语法错误'
+    }
+
+    // 特征 3：有 error-text 节点
+    const errorText = root.querySelector('.error-text')
+    if (errorText) {
+      return errorText.textContent?.trim() || 'Mermaid 语法错误'
+    }
+  } catch {
+    // 解析失败时不视为错误 SVG
   }
   return null
 }
