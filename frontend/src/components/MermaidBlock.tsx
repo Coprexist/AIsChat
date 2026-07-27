@@ -119,8 +119,15 @@ export default function MermaidBlock({ code, compact = false }: MermaidBlockProp
         const { svg: rendered } = await mermaid.render(`mermaid-${uniqueId}`, code, containerRef.current)
         if (cancelled) return
 
-        setSvg(rendered)
-        setError(null)
+        // mermaid 可能在 parse 通过后渲染阶段仍崩溃（如 mindmap 遇上特殊 Unicode 字符
+        // 导致坐标算出 NaN），这时 SVG 虽无语法错误但节点不可见。
+        if (/translate\(NaN/.test(rendered)) {
+          setError('渲染坐标异常（NaN），图表包含不支持的字符')
+          setSvg(null)
+        } else {
+          setSvg(rendered)
+          setError(null)
+        }
       } catch (err: any) {
         if (!cancelled) {
           setError(err?.message || 'Mermaid 渲染失败')
