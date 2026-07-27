@@ -678,8 +678,8 @@ export default function ChatView({ conversationType, conversationId }: ChatViewP
   // Mermaid 错误报告
   // ============================================================
   // 用 ref 存 handleSend，避免每次渲染重建事件监听
-  const handleSendRef = useRef(handleSend)
-  handleSendRef.current = handleSend
+  const handleSendRef = useRef<typeof handleSend>(null as any)
+  // handleSendRef.current 在后面 handleSend 定义后赋值
   useEffect(() => {
     const handler = (e: Event) => {
       const detail = (e as CustomEvent).detail
@@ -833,6 +833,7 @@ export default function ChatView({ conversationType, conversationId }: ChatViewP
     setMentionActive(false)
     window.dispatchEvent(new CustomEvent(CHAT_REFRESH_EVENT, { detail: { type: 'message_sent' } }))
   }
+  handleSendRef.current = handleSend
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
     if (mentionActive && mentionFiltered.length > 0) {
