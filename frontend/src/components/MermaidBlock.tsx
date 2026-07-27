@@ -218,9 +218,18 @@ export default function MermaidBlock({ code, compact = false }: MermaidBlockProp
     )
   }
 
-  // 加载态（renderRequested 但尚未完成）：保持占位布局，避免闪动
+  // 加载态（用户已点击但尚未完成）：保持按钮可见，仅改文字
   if (!svg && !error) {
-    if (compact) return null
+    if (compact) {
+      return (
+        <div className={compact ? 'my-2' : 'my-4'}>
+          <div className="flex items-center gap-1.5 px-3 py-2 rounded-lg border w-full text-xs border-border/50 bg-elevated/30 text-textMuted">
+            <Loader2 size={12} className="animate-spin" />
+            <span>图表加载中...</span>
+          </div>
+        </div>
+      )
+    }
     return (
       <div ref={containerRef} className="my-3 rounded-xl border border-border bg-elevated p-4 flex items-center gap-2 text-textMuted text-sm">
         <Loader2 size={14} className="animate-spin" />
