@@ -22,9 +22,25 @@ function normalizeSvgWidth(svg: string): string {
   return svg.replace(/width="[^"]*"/, `width="${vb[3]}"`)
 }
 
-/** Mermaid 语法错误时出的 SVG 均含 .error-icon class，以此判断渲染结果是否有效 */
+/**
+ * Mermaid 语法错误时返回的 SVG 有 3 个特征，任中其一即判为错误：
+ * 1. <svg aria-roledescription="error"（v11+ 最明确的信号）
+ * 2. <path class="error-icon"（旧版或特定主题）
+ * 3. 包含 .error-text text 节点
+ */
 function isMermaidErrorSvg(svg: string): string | null {
+  // 特征 1：aria-roledescription="error" 最可靠
+  if (/aria-roledescription="error"/.test(svg)) {
+    const m = svg.match(/class="error-text"[^>]*>([^<]+)</)
+    return m ? m[1].trim() : 'Mermaid 语法错误'
+  }
+  // 特征 2：路径含 error-icon class
   if (/<path[^>]*class="[^"]*\berror-icon\b[^"]*"/.test(svg)) {
+    const m = svg.match(/class="error-text"[^>]*>([^<]+)</)
+    return m ? m[1].trim() : 'Mermaid 语法错误'
+  }
+  // 特征 3：error-text 文本节点
+  if (/class="error-text"[^>]*>/.test(svg)) {
     const m = svg.match(/class="error-text"[^>]*>([^<]+)</)
     return m ? m[1].trim() : 'Mermaid 语法错误'
   }
@@ -115,9 +131,21 @@ export default function MermaidBlock({ code, compact = false }: MermaidBlockProp
           fontFamily: 'inherit',
         })
 
+        // 先用 parse 预检语法，避免 mermaid.render 不抛异常却返回错误 SVG
+        try {
+          await mermaid.parse(code, { suppressErrors: false })
+        } catch (parseErr: any) {
+          if (!cancelled) {
+            setError(parseErr?.message || parseErr?.str || 'Mermaid 语法错误')
+            setSvg(null)
+          }
+          return
+        }
+
         const { svg: rendered } = await mermaid.render(`mermaid-${uniqueId}`, code)
         if (cancelled) return
 
+        // render 成功但依然可能返回错误图（兜底检测）
         const errMsg = isMermaidErrorSvg(rendered)
         if (errMsg) {
           setError(errMsg)
