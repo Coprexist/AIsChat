@@ -272,7 +272,7 @@
 }
 /* 以下颜色从气泡的 CSS 变量读取，var(--b-*, fallback) */
 .markdown-table-wrapper thead {
-  background: var(--b-thead-bg, #EDE9FE);
+  background: rgb(var(--b-thead-r, 237) var(--b-thead-g, 233) var(--b-thead-b, 254) / var(--b-thead-a, 1));
 }
 .markdown-table-wrapper thead th {
   @apply px-3 py-2 text-left font-semibold border-b border-border;
@@ -281,7 +281,7 @@
   @apply border-b border-border last:border-b-0;
 }
 .markdown-table-wrapper tbody tr:nth-child(even) {
-  background: var(--b-zebra-bg, #F3F0FF);
+  background: rgb(var(--b-zebra-r, 243) var(--b-zebra-g, 240) var(--b-zebra-b, 255) / var(--b-zebra-a, 1));
 }
 
 .markdown-table-wrapper tbody tr:hover {
