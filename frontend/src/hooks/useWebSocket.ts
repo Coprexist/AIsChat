@@ -52,6 +52,7 @@ export function useWebSocket(
   const retryCountRef = useRef(0)
   const retryTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const mountedRef = useRef(true)
+  const flashLockRef = useRef(false)
 
   /** 建立 WebSocket 连接，返回清理函数 */
   const connect = useCallback(() => {
@@ -110,8 +111,61 @@ export function useWebSocket(
           window.dispatchEvent(new CustomEvent('balance-prompt', { detail: msg.data }))
         }
 
+        // 心跳 ping → 立即回复 pong
+        if (msg.type === 'ping') {
+          ws.send(JSON.stringify({ type: 'pong' }))
+          return
+        }
+
+        // 窗口闪烁：页面未聚焦时收到消息
+        if (document.hidden && !flashLockRef.current && localStorage.getItem('notifications_enabled') !== 'false') {
+          flashLockRef.current = true
+          const origTitle = document.title
+          const origFavicon = ((document.querySelector('link[rel*="icon"]') || document.querySelector('link[rel="shortcut icon"]')) as HTMLLinkElement | null)?.href
+
+          // 标题闪烁（带发送者昵称）
+          const sender = msg.data?.sender_name || ''
+          const flashTitle = sender ? `💬 ${sender}` : '💬 新消息'
+          document.title = flashTitle
+          const iv = setInterval(() => {
+            document.title = document.title === flashTitle ? origTitle : flashTitle
+          }, 800)
+
+          // Favicon 红点
+          try {
+            const link = document.querySelector<HTMLLinkElement>('link[rel*="icon"]') || document.querySelector<HTMLLinkElement>('link[rel="shortcut icon"]')
+            if (link && origFavicon) badgeFavicon(origFavicon).then((url) => {
+              // 用户已切回来则跳过（Promise 可能比 stop 慢）
+              if (flashLockRef.current) link!.href = url
+            })
+          } catch {}
+
+          // 桌面通知
+          if ('Notification' in window && Notification.permission === 'granted') {
+            try {
+              new Notification('💬 AIsChat', { body: '收到新消息', tag: 'aischat_msg' })
+            } catch {}
+          } else if ('Notification' in window && Notification.permission !== 'denied') {
+            Notification.requestPermission()
+          }
+
+          const stop = () => {
+            clearInterval(iv)
+            document.title = origTitle
+            if (origFavicon) {
+              const link = document.querySelector<HTMLLinkElement>('link[rel*="icon"]') || document.querySelector<HTMLLinkElement>('link[rel="shortcut icon"]')
+              if (link) link.href = origFavicon
+            }
+            flashLockRef.current = false
+            window.removeEventListener('focus', stop)
+            document.removeEventListener('visibilitychange', stop)
+          }
+          window.addEventListener('focus', stop, { once: true })
+          document.addEventListener('visibilitychange', stop, { once: true })
+        }
+
         // 分发给消费者回调（ChatView 注册）
-        // 无需 flushSync：消费者内部全部使用函数式 setState(prev => ...)，
+        // 无需 flushSync：消费者内部全部使用函数式 setState(prev => ...),
         // 即使 React 18 批处理合并多次调用，prev 链式叠加也不会丢失消息。
         onMessageRef.current?.(msg)
     }
@@ -271,4 +325,36 @@ export function useWebSocket(
     sendTyping,
     clearErrors,
   }
+}
+
+/** 在 favicon 右上角叠加红点，返回 data URL */
+function badgeFavicon(src: string): Promise<string> {
+  return new Promise((resolve) => {
+    const img = new Image()
+    img.crossOrigin = 'anonymous'
+    img.onload = () => {
+      try {
+        const c = document.createElement('canvas')
+        c.width = Math.max(img.width, 1)
+        c.height = Math.max(img.height, 1)
+        const ctx = c.getContext('2d')!
+        ctx.drawImage(img, 0, 0)
+        const r = Math.max(c.width, c.height) * 0.22
+        const cx = c.width - r
+        const cy = r
+        ctx.beginPath()
+        ctx.arc(cx, cy, r, 0, Math.PI * 2)
+        ctx.fillStyle = '#ff3b30'
+        ctx.fill()
+        ctx.strokeStyle = '#fff'
+        ctx.lineWidth = Math.max(1.5, r * 0.25)
+        ctx.stroke()
+        resolve(c.toDataURL('image/png'))
+      } catch {
+        resolve(src)
+      }
+    }
+    img.onerror = () => resolve(src)
+    img.src = src
+  })
 }

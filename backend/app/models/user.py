@@ -68,3 +68,4 @@ class User(Base):
     setup_completed = Column(Boolean, default=False)
 
     created_at = Column(DateTime, server_default=func.now())
+    last_active_at = Column(DateTime(timezone=True), nullable=True, comment="最近在线时间，NULL=当前在线")

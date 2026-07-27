@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, type ReactNode } from 'react'
 import { useNavigate, useLocation } from 'react-router-dom'
 import ReactMarkdown from 'react-markdown'
 import remarkGfm from 'remark-gfm'
@@ -9,6 +9,53 @@ import MermaidBlock from '../components/MermaidBlock'
 const MANUAL_CONFIG: Record<string, { docPath: string; title: string }> = {
   '/manual': { docPath: '/docs/guides/用户手册.md', title: '用户手册 / User Manual' },
   '/manual/admin': { docPath: '/docs/guides/管理与开发者手册.md', title: '管理与开发者手册 / Admin & Developer Manual' },
+}
+
+/** 文档路径 → 路由映射（从 MANUAL_CONFIG 自动派生） */
+const DOC_TO_ROUTE = Object.fromEntries(
+  Object.entries(MANUAL_CONFIG).map(([route, cfg]) => [cfg.docPath, route])
+)
+
+/** 递归提取 React 节点中的纯文本 */
+function extractText(node: ReactNode): string {
+  if (typeof node === 'string' || typeof node === 'number') return String(node)
+  if (Array.isArray(node)) return node.map(extractText).join('')
+  if (node && typeof node === 'object' && 'props' in node) {
+    return extractText((node as any).props.children)
+  }
+  return ''
+}
+
+/** 生成 GitHub 风格的标题锚点 ID */
+function headingId(text: string): string {
+  return text.toLowerCase()
+    .replace(/<[^>]+>/g, '')
+    .replace(/[^\w一-鿿]+/g, '-')
+    .replace(/^-+|-+$/g, '')
+}
+
+/** 动态生成带 id 的标题组件 */
+function HeadingRenderer({ level, children, ...props }: any) {
+  const text = extractText(children)
+  const Tag = `h${level}` as keyof JSX.IntrinsicElements
+  return <Tag id={headingId(text)} {...props}>{children}</Tag>
+}
+
+/** 自定义 a 标签：内部手册链接用 SPA 导航，外部链接新窗口打开 */
+function DocLink({ href, children, ...props }: any) {
+  const navigate = useNavigate()
+  const handleClick = (e: React.MouseEvent) => {
+    if (!href) return
+    // 外部链接或锚点 → 默认行为
+    if (href.startsWith('http') || href.startsWith('mailto') || href.startsWith('#')) return
+    // 内部手册链接 → SPA 跳转
+    e.preventDefault()
+    // 取文件名部分：`guides/xxx.md` → `xxx.md`，再拼到 /docs/guides/
+    const filename = href.split('/').pop() || href
+    const route = DOC_TO_ROUTE[`/docs/guides/${filename}`]
+    if (route) navigate(route)
+  }
+  return <a href={href} onClick={handleClick} {...props}>{children}</a>
 }
 
 /** 自定义 code 渲染：mermaid 代码块用 MermaidBlock，其余默认 */
@@ -57,9 +104,7 @@ export default function ManualPage() {
   useEffect(() => {
     const hash = location.hash?.replace('#', '')
     if (hash && content) {
-      setTimeout(() => {
-        document.getElementById(hash)?.scrollIntoView({ behavior: 'smooth', block: 'start' })
-      }, 300)
+      queueMicrotask(() => document.getElementById(hash)?.scrollIntoView({ behavior: 'smooth', block: 'start' }))
     }
   }, [location.hash, content])
 
@@ -95,7 +140,7 @@ export default function ManualPage() {
           <Loader2 size={24} className="animate-spin text-textMuted" />
         </div>
       ) : (
-        <div className="prose prose-sm md:prose-base dark:prose-invert max-w-none
+        <div className="doc-content prose prose-sm md:prose-base max-w-none
           prose-headings:text-textPrimary prose-headings:font-semibold
           prose-h1:text-2xl prose-h1:mt-8 prose-h1:mb-4 prose-h1:pb-2 prose-h1:border-b prose-h1:border-border
           prose-h2:text-xl prose-h2:mt-6 prose-h2:mb-3
@@ -119,7 +164,14 @@ export default function ManualPage() {
         ">
           <ReactMarkdown
             remarkPlugins={[remarkGfm]}
-            components={{ code: CodeRenderer }}
+            components={{
+              code: CodeRenderer,
+              a: DocLink,
+              h1: (p: any) => <HeadingRenderer level={1} {...p} />,
+              h2: (p: any) => <HeadingRenderer level={2} {...p} />,
+              h3: (p: any) => <HeadingRenderer level={3} {...p} />,
+              h4: (p: any) => <HeadingRenderer level={4} {...p} />,
+            }}
           >
             {content}
           </ReactMarkdown>

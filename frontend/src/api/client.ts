@@ -43,7 +43,8 @@ async function request<T = any>(
     headers,
   })
 
-  if (res.status === 401) {
+  // 401 且不是登录请求 → token 过期/无效，跳转登录页
+  if (res.status === 401 && !path.endsWith('/auth/login') && !path.endsWith('/auth/register')) {
     localStorage.removeItem('access_token')
     window.location.href = '/login'
     throw new ApiError('Unauthorized', 401)
@@ -107,10 +108,16 @@ async function uploadFile(path: string, file: File): Promise<any> {
     body: formData,
   })
 
-  if (res.status === 401) {
+  // 401 且不是登录请求 → token 过期/无效，跳转登录页
+  if (res.status === 401 && !path.endsWith('/auth/login') && !path.endsWith('/auth/register')) {
     localStorage.removeItem('access_token')
     window.location.href = '/login'
     throw new ApiError('Unauthorized', 401)
+  }
+
+  // 友好提示：413 文件过大（代理/后端任意层拦截）
+  if (res.status === 413) {
+    throw new ApiError('文件过大，请检查文件大小限制', 413)
   }
 
   // 安全解析 JSON：处理空 body / 非 JSON 响应
@@ -120,13 +127,13 @@ async function uploadFile(path: string, file: File): Promise<any> {
     data = text ? JSON.parse(text) : {}
   } catch {
     if (!res.ok) {
-      throw new ApiError(`Upload failed (${res.status})`, res.status)
+      throw new ApiError(`上传失败 (${res.status})`, res.status)
     }
     return {}
   }
 
   if (!res.ok) {
-    throw new ApiError(data.detail || `Upload failed (${res.status})`, res.status)
+    throw new ApiError(data.detail || `上传失败 (${res.status})`, res.status)
   }
   return data
 }

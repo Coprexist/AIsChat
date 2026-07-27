@@ -32,7 +32,7 @@ from app.services.content.opencli_service import (
     delete_command_whitelist,
     get_usage_logs,
 )
-from app.utils.auth import require_admin, get_current_user
+from app.utils.auth import hash_password, require_admin, get_current_user
 
 logger = logging.getLogger(__name__)
 
@@ -57,6 +57,10 @@ class GenerateCodeRequest(BaseModel):
 
 class UpdateUserRoleRequest(BaseModel):
     role: str = Field(..., pattern="^(admin|user)$")
+
+
+class ResetPasswordRequest(BaseModel):
+    new_password: str = Field(..., min_length=6, max_length=128)
 
 
 class UpdateAgentEditableRequest(BaseModel):
@@ -246,6 +250,28 @@ async def update_user_role(
     await db.flush()
 
     return {"message": f"用户角色已从 {old_role} 更新为 {req.role}", "user_id": user_id, "role": req.role}
+
+
+@router.put("/users/{user_id}/reset-password")
+async def reset_user_password(
+    user_id: int,
+    req: ResetPasswordRequest,
+    admin: dict = Depends(require_admin),
+    db: AsyncSession = Depends(get_db),
+):
+    """管理员重置用户密码"""
+    result = await db.execute(select(User).where(User.id == user_id))
+    user = result.scalar_one_or_none()
+    if user is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="用户不存在")
+
+    user.password_hash = hash_password(req.new_password)
+    await _log_admin_action(
+        db, admin["user_id"], "reset_password", "user", user_id, {},
+    )
+    await db.flush()
+
+    return {"message": "密码已重置", "user_id": user_id}
 
 
 # ---------- AI 管理 ----------

@@ -354,7 +354,7 @@ async def _process_alarm_event(db, event: dict):
         return
 
     # 如果 AI 处于 offline/dnd，先唤醒为 active
-    if agent.state in ("offline", "dnd"):
+    if agent.state in ("inactive", "dnd"):
         from app.services.agent.agent_service import switch_agent_state
         logger.info(f"⏰ 闹钟 #{alarm_id}: AI {agent.name}({agent_id}) 从 {agent.state} 唤醒为 active")
         await switch_agent_state(

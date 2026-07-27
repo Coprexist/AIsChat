@@ -164,8 +164,8 @@ async def list_dm_sessions(db: AsyncSession, user_id: int) -> list[dict]:
 
 
 async def get_dm_session(db: AsyncSession, session_id: str, user_id: int,
-                          message_limit: int = 50) -> dict:
-    """获取会话详情（含最近消息）"""
+                          message_limit: int = 50, summary: bool = False) -> dict:
+    """获取会话详情（summary=True 时跳过消息加载，仅返回元数据）"""
     result = await db.execute(
         select(DMSession).where(DMSession.session_id == session_id)
     )
@@ -178,17 +178,19 @@ async def get_dm_session(db: AsyncSession, session_id: str, user_id: int,
     partner_id = session.user2_id if session.user1_id == user_id else session.user1_id
     partner = await _get_partner_info(db, partner_id)
 
-    await db.execute(
-        update(DMMessage)
-        .where(
-            DMMessage.session_id == session_id,
-            DMMessage.sender_id != user_id,
-            DMMessage.read_at.is_(None),
+    if summary:
+        messages = []
+    else:
+        await db.execute(
+            update(DMMessage)
+            .where(
+                DMMessage.session_id == session_id,
+                DMMessage.sender_id != user_id,
+                DMMessage.read_at.is_(None),
+            )
+            .values(read_at=datetime.now(timezone.utc).replace(tzinfo=None))
         )
-        .values(read_at=datetime.now(timezone.utc).replace(tzinfo=None))
-    )
-
-    messages = await _get_messages(db, session_id, limit=message_limit)
+        messages = await _get_messages(db, session_id, limit=message_limit)
 
     my_dnd_until = session.user1_dnd_until if session.user1_id == user_id else session.user2_dnd_until
 
@@ -283,6 +285,17 @@ async def send_dm_message(
             fid = att.get("file_id") if isinstance(att, dict) else getattr(att, "file_id", None)
             if fid:
                 await track_forward_reference(db, fid, "human", sender_id)
+
+    # 回复即阅读：标记对方未读消息为已读
+    await db.execute(
+        update(DMMessage)
+        .where(
+            DMMessage.session_id == session_id,
+            DMMessage.sender_id != sender_id,
+            DMMessage.read_at.is_(None),
+        )
+        .values(read_at=now)
+    )
 
     session.last_message_id = msg.id
     session.last_message_at = now
@@ -410,7 +423,7 @@ async def _get_partner_info(db: AsyncSession, user_id: int) -> dict:
     else:
         from app.services.infrastructure.online_tracker import get_user_online_status
         if get_user_online_status(user_id):
-            state = "online"
+            state = "active"
 
     return {
         "id": user.id,
@@ -420,6 +433,7 @@ async def _get_partner_info(db: AsyncSession, user_id: int) -> dict:
         "avatar_url": avatar_url,
         "status_text": status_text,
         "status_color": status_color,
+        "last_active_at": getattr(user, "last_active_at", None) and str(user.last_active_at),
     }
 
 

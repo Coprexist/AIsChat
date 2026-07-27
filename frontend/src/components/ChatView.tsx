@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, useCallback, useMemo } from 'react'
+import { useState, useEffect, useLayoutEffect, useRef, useCallback, useMemo } from 'react'
 import { useWebSocket, type WebSocketMessage } from '../hooks/useWebSocket'
 import { api } from '../api/client'
 import { useAuth } from '../context/AuthContext'
@@ -576,7 +576,7 @@ export default function ChatView({ conversationType, conversationId }: ChatViewP
   }, [conversationId, conversationType])
 
   // 初始加载后定位 + 立即保存已读位置（不等卸载，防止刷新时红线残留）
-  useEffect(() => {
+  useLayoutEffect(() => {
     if (loadingState === null && messages.length > 0 && prevMessageCount.current === 0) {
       prevMessageCount.current = messages.length
       // 立即保存已读位置：初始加载完成即视为用户已看到最新消息
@@ -584,25 +584,20 @@ export default function ChatView({ conversationType, conversationId }: ChatViewP
         const key = `lastRead_${conversationType}_${conversationId}`
         localStorage.setItem(key, String(newestIdRef.current))
       }
-      setTimeout(() => {
-        const container = containerRef.current
-        if (!container) return
-        if (firstUnreadId) {
-          // 有更早的未读消息 → 将首个未读定位到视口顶部
-          const msgEl = container.querySelector(`[data-message-id="${firstUnreadId}"]`)
-          if (msgEl) {
-            isAutoScrolling.current = true
-            const containerRect = container.getBoundingClientRect()
-            const msgRect = msgEl.getBoundingClientRect()
-            container.scrollTop = container.scrollTop + msgRect.top - containerRect.top
-            setTimeout(() => { isAutoScrolling.current = false }, 500)
-          }
-        } else if (container.scrollHeight > container.clientHeight) {
-          // 无旧消息但内容溢出 → 滚到底部
-          scrollToBottom(false)
+      const container = containerRef.current
+      if (!container) return
+      if (firstUnreadId) {
+        // 有更早的未读消息 → 将首个未读定位到视口顶部（paint 之前，无闪烁）
+        const msgEl = container.querySelector(`[data-message-id="${firstUnreadId}"]`)
+        if (msgEl) {
+          isAutoScrolling.current = true
+          msgEl.scrollIntoView({ block: 'start', behavior: 'instant' })
+          setTimeout(() => { isAutoScrolling.current = false }, 500)
         }
-        // 内容不溢出 → 不滚动
-      }, 100)
+      } else if (container.scrollHeight > container.clientHeight) {
+        // 无旧消息但内容溢出 → 滚到底部
+        container.scrollTop = container.scrollHeight
+      }
     }
   }, [loadingState, messages.length, firstUnreadId])
 
@@ -787,6 +782,7 @@ export default function ChatView({ conversationType, conversationId }: ChatViewP
   const handleSend = (text: string) => {
     if (!text.trim() && pendingAttachments.length === 0) return
     if (!conversationId) return
+    if (!connected) return
 
     // 检查是否有未上传完的文件
     const stillUploading = pendingAttachments.some(a => a.uploading)
@@ -848,6 +844,15 @@ export default function ChatView({ conversationType, conversationId }: ChatViewP
           {t('chat.reconnecting')}
         </div>
       )}
+
+      {/* 隐藏的文件输入（附件按钮触发） */}
+      <input
+        ref={fileInputRef}
+        type="file"
+        multiple
+        className="hidden"
+        onChange={handleFileSelect}
+      />
 
       {/* 错误 Toast */}
       {errors.length > 0 && (
@@ -1046,7 +1051,9 @@ export default function ChatView({ conversationType, conversationId }: ChatViewP
           conversationId={conversationId}
           t={t}
           onSend={handleSend}
+          connected={connected}
           onSendFile={() => fileInputRef.current?.click()}
+          hasAttachments={pendingAttachments.length > 0}
           groupMembers={groupMembers}
           inputHeight={inputHeight}
           onAutoHeight={(ah) => {

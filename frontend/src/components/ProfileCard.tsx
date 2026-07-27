@@ -3,8 +3,9 @@ import { useNavigate } from 'react-router-dom'
 import { X, MessageSquare, UserPlus, Bot, User, Star } from 'lucide-react'
 import { api } from '../api/client'
 import { getStateDotColor } from '../constants'
-import { useT } from '../i18n/I18nContext'
+import { useT, useLang } from '../i18n/I18nContext'
 import { getStatusTextStyle, BG_ELEVATED_LIGHT, BG_ELEVATED_DARK } from '../utils/statusColor.tsx'
+import { formatMessageTime } from '../utils/time'
 import { useTheme } from '../context/ThemeContext'
 
 interface ProfileCardProps {
@@ -29,13 +30,16 @@ interface ProfileData {
   is_friend: boolean
   friendship_id: number | null
   is_priority: boolean
+  last_active_at: string | null
 }
 
 export default function ProfileCard({ entityType, entityId, entityName, state, onClose }: ProfileCardProps) {
   const t = useT()
+  const lang = useLang()
   const { theme } = useTheme()
   const navigate = useNavigate()
   const [profile, setProfile] = useState<ProfileData | null>(null)
+  const isActive = profile?.state === 'active' || state === 'active'
   const [loading, setLoading] = useState(true)
   const [sending, setSending] = useState(false)
   // 加好友
@@ -102,7 +106,7 @@ export default function ProfileCard({ entityType, entityId, entityName, state, o
     switch (s) {
       case 'active': return t('dm.online')
       case 'dnd': return t('dm.dnd')
-      case 'offline': return t('dm.offline')
+      case 'inactive': return t('dm.offline')
       case 'blocked': return t('profileCard.blocked')
       default: return ''
     }
@@ -114,7 +118,7 @@ export default function ProfileCard({ entityType, entityId, entityName, state, o
     return (
       <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-50" onClick={onClose}>
         <div
-          className="bg-elevated border border-border rounded-2xl p-6 w-full max-w-sm mx-4 shadow-2xl shadow-black/30"
+          className="bg-elevated border border-border rounded-2xl p-6 w-full max-w-md mx-4 shadow-2xl shadow-black/30"
           onClick={(e) => e.stopPropagation()}
         >
           <div className="flex items-center justify-center py-8">
@@ -137,7 +141,7 @@ export default function ProfileCard({ entityType, entityId, entityName, state, o
   return (
     <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-50" onClick={onClose}>
       <div
-        className="bg-elevated border border-border rounded-2xl p-6 w-full max-w-sm mx-4 shadow-2xl shadow-black/30 pb-[var(--safe-bottom)] md:pb-6"
+        className="bg-elevated border border-border rounded-2xl p-6 w-full max-w-md mx-4 shadow-2xl shadow-black/30 pb-[var(--safe-bottom)] md:pb-6"
         onClick={(e) => e.stopPropagation()}
       >
         {/* 头部 */}
@@ -167,8 +171,7 @@ export default function ProfileCard({ entityType, entityId, entityName, state, o
             <div className="min-w-0">
               <h3 className="font-semibold text-textPrimary text-base truncate">{name}</h3>
               <div className="flex items-center gap-1.5 text-sm text-textSecondary">
-                <span className={`w-2 h-2 rounded-full shrink-0 ${getStateDotColor(displayState)}`} />
-                <span>{entityType === 'ai' ? `AI · ${getStateText(displayState)}` : t('profileCard.human')}</span>
+                {entityType === 'ai' && <span>{t('profileCard.aiPrefix')}</span>}
                 {statusText && (
                   <span className="font-medium truncate" style={statusColor
                     ? getStatusTextStyle(statusColor, theme === 'dark' ? BG_ELEVATED_DARK : BG_ELEVATED_LIGHT)
@@ -185,32 +188,25 @@ export default function ProfileCard({ entityType, entityId, entityName, state, o
         </div>
 
         {/* 简介 */}
-        {bio && (
-          <div className="mb-3">
-            <p className="text-sm text-textSecondary leading-relaxed">{bio}</p>
-          </div>
-        )}
+        <div className="mb-3">
+          <p className="text-sm text-textMuted leading-relaxed italic">{bio || t('profileCard.bioEmpty')}</p>
+        </div>
 
         {/* 详细信息 */}
         <div className="mb-4 space-y-1 text-xs text-textMuted">
           {entityType === 'ai' && ownerName && (
-            <div className="flex items-center gap-1.5">
-              <User size={12} />
-              <span>{t('profileCard.creator')}: {ownerName}</span>
-            </div>
+            <div>{t('profileCard.creator')}: {ownerName}</div>
           )}
-          {createdAt && (
-            <div className="flex items-center gap-1.5">
-              {entityType === 'ai' ? <Bot size={12} /> : <User size={12} />}
+          <div className="flex flex-wrap gap-x-2">
+            {createdAt && (
               <span>{t('profileCard.registeredOn')}: {new Date(createdAt).toLocaleDateString('zh-CN')}</span>
-            </div>
-          )}
-          {entityType === 'ai' && (
-            <div className="flex items-center gap-1.5">
-              <span className={`w-2 h-2 rounded-full ${getStateDotColor(displayState)}`} />
-              <span>{getStateText(displayState) || displayState}</span>
-            </div>
-          )}
+            )}
+            {isActive ? (
+              <span className="text-green-500">{t('dm.online')}</span>
+            ) : profile?.last_active_at ? (
+              <span>{t('dm.lastActive')} {formatMessageTime(profile.last_active_at, lang)}</span>
+            ) : null}
+          </div>
         </div>
 
         {/* 操作按钮 */}

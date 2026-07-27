@@ -47,7 +47,7 @@ def calc_reply_willingness(
     计算被动回复的意愿评分（纯函数）。
 
     Args:
-        agent_state: AI 当前状态 (active/dnd/offline/blocked)
+        agent_state: AI 当前状态 (active/dnd/inactive/blocked)
         agent_name: AI 名称（用于 @提及检测）
         message_content: 消息全文
         is_mentioned: 调用方已判定为 @提及
@@ -57,7 +57,7 @@ def calc_reply_willingness(
         WillingnessResult
     """
     # offline/blocked 直接跳过
-    if agent_state in ("offline", "blocked"):
+    if agent_state in ("inactive", "blocked"):
         return WillingnessResult(
             0, f"状态为 {agent_state}，不参与对话", "low",
             {"state": agent_state},

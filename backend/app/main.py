@@ -78,6 +78,20 @@ async def lifespan(app: FastAPI):
     from app.migration import run_migrations
     await run_migrations()
 
+    # 启动时将 last_active_at=NULL 标记为当前时间（服务器重启前在线的用户）
+    from app.database import async_session
+    from sqlalchemy import update as sa_update, func
+    from app.models.user import User as UserModel
+    try:
+        async with async_session() as startup_db:
+            await startup_db.execute(
+                sa_update(UserModel).where(UserModel.last_active_at.is_(None)).values(last_active_at=func.now())
+            )
+            await startup_db.commit()
+        logger.info("✅ 已重置在线用户的上次活跃时间")
+    except Exception as e:
+        logger.warning(f"⚠️ 重置在线用户活跃时间失败: {e}")
+
     # 启动 AI 回复 Worker
     from app.ai.response_worker import ai_response_worker
     ai_worker_task = asyncio.create_task(ai_response_worker())

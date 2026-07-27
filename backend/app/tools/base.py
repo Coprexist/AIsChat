@@ -229,7 +229,7 @@ class ToolRegistry:
         """从插件自动构建状态白名单"""
         if cls._whitelist is None:
             whitelist: dict[str, list[str]] = {
-                "active": [], "dnd": [], "offline": [], "blocked": [],
+                "active": [], "dnd": [], "inactive": [], "blocked": [],
             }
             for plugin in cls._plugins.values():
                 for state in plugin.states:

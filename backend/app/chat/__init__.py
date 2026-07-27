@@ -160,7 +160,7 @@ class ChatApi(BaseChatApi):
         """
         from app.models.agent import Agent as AgentModel
         agent = await db.get(AgentModel, agent_id)
-        is_offline = agent is not None and agent.state == "offline"
+        is_offline = agent is not None and agent.state == "inactive"
         is_dnd = await is_member_in_dnd(db, agent_id, group_id)
         is_muted = await is_member_muted(db, agent_id, group_id)
 
@@ -171,7 +171,7 @@ class ChatApi(BaseChatApi):
         if is_muted:
             reasons.append("muted")
         if is_offline:
-            reasons.append("offline")
+            reasons.append("inactive")
 
         return {
             "can_receive": can_receive,

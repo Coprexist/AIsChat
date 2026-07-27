@@ -669,22 +669,28 @@ export default function AgentDetailPage() {
       }
     } catch {}
     if (file.size > maxAvatarMB * 1024 * 1024) { alert(`头像不能超过 ${maxAvatarMB}MB`); return }
-    // GIF 动图跳过裁剪，直接上传
-    if (file.type === 'image/gif') {
-      uploadAgentAvatarDirectly(file)
-      return
-    }
-    setCropFile(file)
+    // 读取前 12 字节检测动图（GIF / WebP），跳过裁剪
+    file.slice(0, 12).arrayBuffer().then(buf => {
+      const h = new Uint8Array(buf)
+      const isGif = h[0] === 0x47 && h[1] === 0x49 && h[2] === 0x46
+      const isWebP = h[0] === 0x52 && h[1] === 0x49 && h[2] === 0x46 && h[3] === 0x46
+        && h[8] === 0x57 && h[9] === 0x45 && h[10] === 0x42 && h[11] === 0x50
+      if (isGif || isWebP) {
+        uploadAgentAvatarDirectly(file)
+        return
+      }
+      setCropFile(file)
+    }).catch(() => {
+      if (file.type === 'image/gif') { uploadAgentAvatarDirectly(file); return }
+      setCropFile(file)
+    })
     e.target.value = ''
   }
 
   const uploadAgentAvatarDirectly = async (file: File) => {
     setUploadingAvatar(true)
     try {
-      const formData = new FormData()
-      formData.append('file', file, `avatar.gif`)
-      const token = localStorage.getItem('access_token')
-      await fetch(`/api/agents/${agentId}/avatar`, { method: 'POST', headers: { Authorization: `Bearer ${token}` }, body: formData })
+      await api.upload(`/agents/${agentId}/avatar`, file)
       loadAgent()
     } catch { /* ignore */ }
     finally { setUploadingAvatar(false) }
@@ -694,19 +700,11 @@ export default function AgentDetailPage() {
     setCropFile(null)
     setUploadingAvatar(true)
     try {
-      const formData = new FormData()
       const ext = blob.type === 'image/gif' ? 'gif' : blob.type === 'image/png' ? 'png' : 'jpg'
-      formData.append('file', blob, `avatar.${ext}`)
-      const token = localStorage.getItem('access_token')
-      const res = await fetch(`/api/agents/${agentId}/avatar`, {
-        method: 'POST',
-        headers: { Authorization: `Bearer ${token}` },
-        body: formData,
-      })
-      if (!res.ok) throw new Error('上传失败')
+      await api.upload(`/agents/${agentId}/avatar`, new File([blob], `avatar.${ext}`, { type: blob.type || 'image/jpeg' }))
       await loadAgent()
     } catch (err: any) {
-      alert(err.message || t('error.uploadFailed').replace(' ({status})', ''))
+      alert(err?.message || err?.detail || '上传失败')
     } finally {
       setUploadingAvatar(false)
     }

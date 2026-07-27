@@ -66,7 +66,7 @@ async def list_my_friends(
     for f in friends:
         friend_uid = f.get("friend_user_id")
         if friend_uid and f["friend_type"] == "human" and get_user_online_status(friend_uid):
-            f["state"] = "online"
+            f["state"] = "active"
     return friends
 
 
@@ -142,11 +142,12 @@ async def create_friend_request(
 @router.get("/friends/requests", response_model=list[FriendRequestResponse])
 async def list_requests(
     status_filter: str = Query("pending", description="pending | accepted | rejected"),
+    received_only: bool = Query(False, description="仅返回收到的申请（用于红点计数）"),
     current_user: dict = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
-    """获取我的好友申请（收到 + 发出的）"""
-    return await list_friend_requests(db, current_user["user_id"], status=status_filter)
+    """获取我的好友申请（默认收到 + 发出，received_only 仅返回收到的）"""
+    return await list_friend_requests(db, current_user["user_id"], status=status_filter, received_only=received_only)
 
 
 @router.post("/friends/requests/{request_id}/accept")

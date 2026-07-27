@@ -6,6 +6,8 @@ import DMSettingsPanel from './DMSettingsPanel'
 import ProfileCard from './ProfileCard'
 import { ArrowLeft, Bell, BellOff, Settings, Bot, User, Globe, ShieldAlert } from 'lucide-react'
 import { getStateDotColor } from '../constants'
+import { formatMessageTime } from '../utils/time'
+import { useLang } from '../i18n/I18nContext'
 import { useT } from '../i18n/I18nContext'
 
 interface DMChatViewProps {
@@ -15,7 +17,8 @@ interface DMChatViewProps {
 
 export default function DMChatView({ sessionId, onMobileBack }: DMChatViewProps) {
   const t = useT()
-  const [partner, setPartner] = useState<{ id: number; name: string; type: string; state: string | null; is_federated?: boolean; avatar_url?: string | null } | null>(null)
+  const lang = useLang()
+  const [partner, setPartner] = useState<{ id: number; name: string; type: string; state: string | null; last_active_at?: string | null; is_federated?: boolean; avatar_url?: string | null } | null>(null)
   const [myDndUntil, setMyDndUntil] = useState<string | null>(null)
   const [showSettings, setShowSettings] = useState(false)
   const [showProfile, setShowProfile] = useState(false)
@@ -24,11 +27,15 @@ export default function DMChatView({ sessionId, onMobileBack }: DMChatViewProps)
 
   useEffect(() => {
     if (!sessionId) return
-    api.get(`/dm/${sessionId}`).then((data) => {
+    setPartner(null)
+    setMyDndUntil(null)
+    setTokenUsage(null)
+    // 先加载会话元数据（标题栏）—— 跳过消息加载，等 ChatView 就绪后再加载
+    api.get(`/dm/${sessionId}?summary=true`).then((data) => {
       setPartner(data.partner)
       setMyDndUntil(data.my_dnd_until || null)
     }).catch(console.error)
-    // 加载 token 用量
+    // 并行加载 token 用量
     api.get(`/dm/${sessionId}/my-token-usage`).then(setTokenUsage).catch(() => {})
   }, [sessionId])
 
@@ -50,6 +57,7 @@ export default function DMChatView({ sessionId, onMobileBack }: DMChatViewProps)
   }
 
   const stateColor = getStateDotColor(partner?.state)
+  const isActive = partner?.state === 'active'
 
   return (
     <div className="flex-1 flex flex-col overflow-hidden">
@@ -101,9 +109,9 @@ export default function DMChatView({ sessionId, onMobileBack }: DMChatViewProps)
             {partner?.type === 'system' ? <><ShieldAlert size={12} className="inline text-rose-400" /> 系统通知</>
             : partner?.type === 'ai' ? <><Bot size={12} className="inline" /> {t('dm.ai')}</>
             : <><User size={12} className="inline" /> {t('dm.user')}</>}
-            {partner?.type !== 'system' && partner?.state === 'active' && ` · ${t('dm.online')}`}
+            {partner?.type !== 'system' && isActive && ` · ${t('dm.online')}`}
             {partner?.type !== 'system' && partner?.state === 'dnd' && ` · ${t('dm.dnd')}`}
-            {partner?.type !== 'system' && (!partner?.state || partner?.state === 'offline') && ` · ${t('dm.offline')}`}
+            {partner?.type !== 'system' && (!partner?.state || partner?.state === 'inactive') && ` · ${t('dm.offline')}`}
             {tokenUsage && tokenUsage.total_tokens > 0 && (
               <span className="ml-2 text-textMuted">
                 · {tokenUsage.total_tokens >= 1000 ? `${(tokenUsage.total_tokens / 1000).toFixed(1)}k` : tokenUsage.total_tokens} tokens
@@ -122,9 +130,9 @@ export default function DMChatView({ sessionId, onMobileBack }: DMChatViewProps)
         )}
 
         {/* 在线状态指示 */}
-        <span className={`inline-flex items-center gap-1 text-[10px] font-medium ${partner?.state === 'active' ? 'text-mint-400' : partner?.state === 'dnd' ? 'text-rose-400' : 'text-textMuted'}`}>
+        <span className={`inline-flex items-center gap-1 text-[10px] font-medium ${isActive ? 'text-mint-400' : partner?.state === 'dnd' ? 'text-rose-400' : 'text-textMuted'}`}>
           <span className={`w-1.5 h-1.5 rounded-full ${stateColor}`} />
-          {partner?.state === 'active' ? t('dm.online') : partner?.state === 'dnd' ? t('dm.shortDnd') : t('dm.offline')}
+          {isActive ? t('dm.online') : partner?.state === 'dnd' ? t('dm.shortDnd') : partner?.last_active_at ? `${t('dm.lastActive')} ${formatMessageTime(partner.last_active_at, lang)}` : t('dm.offline')}
         </span>
 
         {/* 免打扰按钮 */}
@@ -150,8 +158,7 @@ export default function DMChatView({ sessionId, onMobileBack }: DMChatViewProps)
         </button>
       </div>
 
-      {/* 共享对话框 */}
-      <ChatView conversationType="dm" conversationId={sessionId} />
+      <ChatView key={sessionId} conversationType="dm" conversationId={sessionId} />
 
       {/* 私信设置面板 */}
       {showSettings && (

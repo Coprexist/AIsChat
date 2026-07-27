@@ -583,7 +583,7 @@ function InviteMemberModal({
     switch (s) {
       case 'active': return '\u{1F7E2}'
       case 'dnd': return '\u{1F534}'
-      case 'offline': return '\u26AB'
+      case 'inactive': return '\u26AB'
       default: return ''
     }
   }

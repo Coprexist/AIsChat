@@ -7,8 +7,9 @@ import json
 import logging
 from datetime import datetime, timezone
 from fastapi import APIRouter, WebSocket, WebSocketDisconnect, Query
-from sqlalchemy import select
+from sqlalchemy import select, func, update as sa_update
 from app.database import async_session
+from app.models.user import User as UserModel
 from app.models.agent import Agent as AgentModel
 from app.models.group import GroupMember as GroupMemberModel
 from app.utils.auth import decode_access_token
@@ -65,9 +66,25 @@ async def websocket_endpoint(ws: WebSocket, token: str = Query(...)):
     except Exception:
         pass
 
+    # WebSocket 连接成功 → 标记为当前在线
+    try:
+        async with async_session() as _online_db:
+            await _online_db.execute(
+                sa_update(UserModel).where(UserModel.id == user_id).values(last_active_at=None)
+            )
+            await _online_db.commit()
+    except Exception:
+        pass
+
+    # 启动心跳检测
+    heartbeat_task = manager.start_heartbeat(ws, user_id)
+
     try:
         while True:
             raw = await ws.receive_text()
+            manager.record_activity(user_id)
+            record_ws_activity(user_id)
+
             try:
                 data = json.loads(raw)
             except json.JSONDecodeError:
@@ -419,6 +436,10 @@ async def websocket_endpoint(ws: WebSocket, token: str = Query(...)):
                         exclude_user_id=user_id,
                     )
 
+            # ---- pong（心跳响应）— 静默忽略，_last_activity 已更新 ----
+            elif msg_type == "pong":
+                pass
+
             # ---- 未知类型 ----
             else:
                 logger.debug(f"未知消息类型: {msg_type}")
@@ -427,6 +448,18 @@ async def websocket_endpoint(ws: WebSocket, token: str = Query(...)):
     except WebSocketDisconnect:
         logger.info(f"用户 {user_id} WebSocket 断开")
     finally:
+        heartbeat_task.cancel()
+        # 记录离线时间
+        try:
+            async with async_session() as _offline_db:
+                # 心跳首次检测到离线的时间（一个周期无回应）；正常断开则为 func.now()
+                ts = manager.get_offline_timestamp(user_id) or func.now()
+                await _offline_db.execute(
+                    sa_update(UserModel).where(UserModel.id == user_id).values(last_active_at=ts)
+                )
+                await _offline_db.commit()
+        except Exception:
+            pass
         if current_group_id is not None:
             manager.disconnect(current_group_id, user_id)
             await manager.broadcast_to_group(

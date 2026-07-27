@@ -7,6 +7,8 @@ interface ChatInputProps {
   t: (key: string) => string
   onSend: (text: string) => void
   onSendFile?: () => void
+  connected: boolean
+  hasAttachments?: boolean
   groupMembers?: Array<{ type: string; id: number; name: string; state?: string }>
   inputHeight?: number | null
   /** 自动高度变化时通知父组件（用于补偿拖拽高度） */
@@ -16,7 +18,7 @@ interface ChatInputProps {
 /**
  * 独立输入框。管理自身 value 和 @mention 状态，打字不触发父组件重渲染。
  */
-const ChatInputFunc = ({ conversationType, conversationId, t, onSend, onSendFile, groupMembers, inputHeight, onAutoHeight }: ChatInputProps, ref: React.ForwardedRef<HTMLTextAreaElement>) => {
+const ChatInputFunc = ({ conversationType, conversationId, t, onSend, onSendFile, connected, hasAttachments, groupMembers, inputHeight, onAutoHeight }: ChatInputProps, ref: React.ForwardedRef<HTMLTextAreaElement>) => {
   const [value, setValue] = useState('')
   const [autoHeight, setAutoHeight] = useState(0)
   const valueRef = useRef('')
@@ -91,9 +93,7 @@ const ChatInputFunc = ({ conversationType, conversationId, t, onSend, onSendFile
 
   // 发送
   const doSend = useCallback(() => {
-    const v = value.trim()
-    if (!v) return
-    onSend(v)
+    onSend(value.trim())
     setValue('')
   }, [value, onSend])
 
@@ -166,7 +166,7 @@ const ChatInputFunc = ({ conversationType, conversationId, t, onSend, onSendFile
       />
       <button
         onClick={doSend}
-        disabled={!value.trim()}
+        disabled={(!value.trim() && !hasAttachments) || !connected}
         className="p-2.5 rounded-xl bg-primary-500 text-white hover:bg-primary-400 disabled:opacity-40 disabled:cursor-not-allowed transition-all shrink-0"
         title={t('chat.send')}
       >

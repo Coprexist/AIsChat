@@ -1,7 +1,10 @@
 import { createBrowserRouter, Navigate, Outlet, useLocation } from 'react-router-dom'
+import { lazy } from 'react'
 import { useAuth } from './context/AuthContext'
 import Layout from './components/Layout'
 import { getPublicRoutes, getProtectedRoutes } from './utils/pageRegistry'
+
+const NotFoundPage = lazy(() => import('./pages/NotFoundPage'))
 
 function ProtectedLayout() {
   const { user, loading } = useAuth()
@@ -47,4 +50,5 @@ export const router = createBrowserRouter([
     element: <ProtectedLayout />,
     children: getProtectedRoutes(AdminGuard),
   },
+  { path: '*', element: <NotFoundPage /> },
 ])

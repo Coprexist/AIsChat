@@ -50,13 +50,14 @@ async def list_my_dm_sessions(
 async def get_dm_detail(
     session_id: str,
     limit: int = Query(50, ge=1, le=200),
+    summary: bool = Query(False, description="仅返回会话摘要（不含消息），供快速切换会话时使用"),
     current_user: dict = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
-    """获取私信会话详情（含最近消息）"""
+    """获取私信会话详情（summary=true 时仅元数据，不含消息）"""
     try:
         return await get_dm_session(
-            db, session_id, current_user["user_id"], message_limit=limit,
+            db, session_id, current_user["user_id"], message_limit=limit, summary=summary,
         )
     except ValueError as e:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))

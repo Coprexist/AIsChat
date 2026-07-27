@@ -127,7 +127,7 @@ async def _decide_reply_action(db, agent, context: ActionContext) -> ActionDecis
     profile = getattr(agent, 'config_profile', 'chat') or 'chat'
 
     # Gate 1: 离线 + 未被 @ → 跳过；离线 + 被 @ → 唤醒
-    if agent.state == "offline":
+    if agent.state == "inactive":
         if not is_mentioned:
             return ActionDecision(False, ActionType.NONE, 0, f"AI {agent.name} 离线且未被 @提及")
         # 唤醒

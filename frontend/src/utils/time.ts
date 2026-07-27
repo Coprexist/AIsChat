@@ -5,19 +5,33 @@ import { type Lang, getLangMeta } from '../i18n/languages'
  * 对无时区标记的字符串追加 'Z'，避免 JavaScript 将其误判为本地时间。
  */
 function parseServerDate(dateStr: string): Date {
-  // 检查末尾是否有时区标记：Z / +HH:MM / -HH:MM
   const hasTimezone = /[+\-Zz]\d{2}:\d{2}$/.test(dateStr) || /Z$/i.test(dateStr)
   return new Date(hasTimezone ? dateStr : dateStr + 'Z')
+}
+
+/** 从原始字符串提取 HH:MM（不受时区影响），返回 [小时, 分钟] */
+function parseSourceTime(dateStr: string): [number, number] {
+  const m = dateStr.match(/(\d{1,2}):(\d{2})/)
+  if (!m) return [0, 0]
+  return [parseInt(m[1]), parseInt(m[2])]
+}
+
+/** 用"昨天/今天"前缀显示原始时间，不经过 Date.toLocaleTimeString（避免时区偏移） */
+function fmtSourceHM(h: number, m: number): string {
+  return `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`
 }
 
 /**
  * 相对时间格式化（侧边栏等列表用，精简版）
  * - 今天 → HH:MM
- * - 昨天 → "昨天" / "Yesterday"
+ * - 昨天 → "昨天" / "Yesterday" + HH:MM
  * - 2-6 天前 → "X天前" / "X days ago"
  * - 1-4 周前 → "X周前" / "X weeks ago"
  * - 1-11 月前 → "X月前" / "X months ago"
  * - 1+ 年前 → "X年前" / "X years ago"
+ *
+ * 自动处理时区回滚：后端 naive datetime 被当作 UTC 解析后，如果原始时间
+ * HH:MM 在数值上大于当前本地时间，说明 UTC 日期向前滚了一天，降级为"昨天"。
  */
 export function formatRelativeTime(
   dateStr: string | null | undefined,
@@ -34,27 +48,53 @@ export function formatRelativeTime(
 
   const meta = getLangMeta(lang)
 
-  if (diffDays === 0) {
-    return date.toLocaleTimeString(meta.locale, { hour: '2-digit', minute: '2-digit' })
-  }
+  // ── 时区回滚检测 ──
+  // 后端 naive datetime 按 UTC 解析后，如果原始 HH:MM 数值 > 当前本地 HH:MM，
+  // 说明日期被时区转换滚到了"明天"，降级为昨天。
+  const [srcH, srcM] = parseSourceTime(dateStr)
+  const localMin = now.getHours() * 60 + now.getMinutes()
+  const srcMin = srcH * 60 + srcM
+  const rollover = diffMs < 0 && srcMin > localMin
 
-  if (diffDays === 1) return meta.yesterday
+  // 用于显示的时间：回滚时取原始字符串的 HH:MM，否则取转换后的本地时间
+  const showTime = rollover
+    ? fmtSourceHM(srcH, srcM)
+    : date.toLocaleTimeString(meta.locale, { hour: '2-digit', minute: '2-digit', hour12: false })
 
+  // 回滚 → "昨天 HH:MM"
+  if (rollover) return `${meta.yesterday} ${showTime}`
+
+  // 今天
+  if (diffDays === 0) return showTime
+
+  // 昨天
+  if (diffDays === 1) return `${meta.yesterday} ${showTime}`
+
+  // 2-6 天
   if (diffDays >= 2 && diffDays <= 6) return meta.daysAgo(diffDays)
 
+  // 1-4 周
   if (diffDays >= 7 && diffDays <= 28) {
     const weeks = Math.floor(diffDays / 7)
     return meta.weeksAgo(weeks)
   }
 
-  const diffMonths = (now.getFullYear() - date.getFullYear()) * 12 + (now.getMonth() - date.getMonth())
+  // 1-11 月
+  const diffMonths =
+    (now.getFullYear() - date.getFullYear()) * 12 +
+    (now.getMonth() - date.getMonth())
   if (diffMonths >= 1 && diffMonths <= 11) {
-    return lang === 'zh' ? `${diffMonths}月前` : `${diffMonths} month${diffMonths > 1 ? 's' : ''} ago`
+    return lang === 'zh'
+      ? `${diffMonths}月前`
+      : `${diffMonths} month${diffMonths > 1 ? 's' : ''} ago`
   }
 
+  // 1+ 年
   const diffYears = now.getFullYear() - date.getFullYear()
   if (diffYears >= 1) {
-    return lang === 'zh' ? `${diffYears}年前` : `${diffYears} year${diffYears > 1 ? 's' : ''} ago`
+    return lang === 'zh'
+      ? `${diffYears}年前`
+      : `${diffYears} year${diffYears > 1 ? 's' : ''} ago`
   }
 
   // 兜底
@@ -111,7 +151,9 @@ export function formatMessageTime(
   }
 
   // 1-11 月
-  const diffMonths = (now.getFullYear() - date.getFullYear()) * 12 + (now.getMonth() - date.getMonth())
+  const diffMonths =
+    (now.getFullYear() - date.getFullYear()) * 12 +
+    (now.getMonth() - date.getMonth())
   if (diffMonths >= 1 && diffMonths <= 11) {
     const m = lang === 'zh' ? `${diffMonths}月前` : `${diffMonths} month${diffMonths > 1 ? 's' : ''} ago`
     return `${m} ${timeStr}`

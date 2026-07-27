@@ -15,7 +15,7 @@ class SwitchState(ToolPlugin):
     parameters = {
         "target_state": {
             "type": "string",
-            "enum": ["active", "dnd", "offline"],
+            "enum": ["active", "dnd", "inactive"],
             "description": "目标状态",
         },
         "duration_hours": {
@@ -28,7 +28,7 @@ class SwitchState(ToolPlugin):
         },
     }
     required = ["target_state"]
-    states = ["active", "dnd", "offline"]
+    states = ["active", "dnd", "inactive"]
     admin_description = "切换在线状态（在线/勿扰/离线）。AI 自主管理自己的可用性，状态变更会通知群成员。"
     trigger_condition = "AI 根据场景自主调整状态时"
 

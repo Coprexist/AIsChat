@@ -16,7 +16,7 @@ class CancelAlarm(ToolPlugin):
         "alarm_id": {"type": "integer", "description": "要取消的闹钟 ID（从 list_alarms 可以查看你的所有闹钟）"},
     }
     required = ["alarm_id"]
-    states = ["active", "dnd", "offline"]
+    states = ["active", "dnd", "inactive"]
     admin_description = "取消已设置的闹钟。计划变更或任务不再需要时调用，释放闹钟资源。"
     trigger_condition = "计划变更或任务取消时"
 

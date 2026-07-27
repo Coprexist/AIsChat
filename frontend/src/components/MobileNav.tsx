@@ -1,6 +1,7 @@
 import { useNavigate, useLocation } from 'react-router-dom'
 import { useT } from '../i18n/I18nContext'
 import { mainNavItems, type NavItem } from '../utils/navRegistry.tsx'
+import { usePendingFriendRequests } from '../hooks/usePendingFriendRequests'
 
 interface MobileNavProps {
   closeDrawer?: () => void
@@ -10,6 +11,7 @@ export default function MobileNav({ closeDrawer }: MobileNavProps) {
   const navigate = useNavigate()
   const location = useLocation()
   const t = useT()
+  const pendingRequests = usePendingFriendRequests()
 
   const isActive = (item: NavItem) => {
     if (item.matchSubPaths) {
@@ -43,6 +45,9 @@ export default function MobileNav({ closeDrawer }: MobileNavProps) {
               {/* Icon with optional pulse ring */}
               <div className="relative">
                 <item.icon size={22} strokeWidth={active ? 2.5 : 2} />
+                {item.path === '/friends' && pendingRequests > 0 && (
+                  <span className="absolute -top-1 -right-1.5 w-2.5 h-2.5 rounded-full bg-red-500 border-2 border-surface" />
+                )}
                 {active && (
                   <div className="absolute -inset-1.5 rounded-full ai-pulse-active opacity-50" />
                 )}

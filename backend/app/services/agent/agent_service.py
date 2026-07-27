@@ -795,7 +795,7 @@ async def switch_agent_state(
     """
     切换 AI 状态。
     """
-    valid_states = ["active", "dnd", "offline", "blocked"]
+    valid_states = ["active", "dnd", "inactive", "blocked"]
     if target_state not in valid_states:
         raise ValueError(f"无效状态: {target_state}，可选: {valid_states}")
 
@@ -809,7 +809,7 @@ async def switch_agent_state(
             raise ValueError("blocked 状态最长 72 小时")
         from datetime import datetime, timedelta
         agent.offline_until = datetime.utcnow() + timedelta(hours=duration_hours)
-    elif target_state == "offline":
+    elif target_state == "inactive":
         if duration_hours:
             from datetime import datetime, timedelta
             agent.offline_until = datetime.utcnow() + timedelta(hours=duration_hours)

@@ -34,7 +34,7 @@ class PushState(ToolPlugin):
         "plan": {"type": "string", "nullable": True, "description": "执行计划（可选）"},
     }
     required = ["type", "context_ref", "why", "doing"]
-    states = ["active", "dnd", "offline"]
+    states = ["active", "dnd", "inactive"]
 
     async def execute(self, db: AsyncSession, agent_id: int, group_id: int | None,
                       arguments: dict, context: dict) -> dict:

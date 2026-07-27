@@ -125,6 +125,11 @@ export default function MePage() {
   }
 
   useEffect(() => {
+    // 加载上传限制（头像选择时检查大小，每次进 MePage 刷新）
+    api.get('/user/config/upload-limits').then((limits: any) => {
+      sessionStorage.setItem('upload_limits', JSON.stringify({ ...limits, ts: Date.now() }))
+    }).catch(() => {})
+
     // 加载我的 AI 列表
     api.get<AgentBrief[]>('/agents').then(r => {
       setAgents((Array.isArray(r) ? r : []).slice(0, 3))
@@ -248,12 +253,22 @@ export default function MePage() {
       }
     } catch {}
     if (file.size > maxAvatarMB * 1024 * 1024) { alert(t('error.avatarTooLarge')); return }
-    // GIF 动图无法裁剪，直接上传
-    if (file.type === 'image/gif') {
-      uploadAvatarDirectly(file)
-      return
-    }
-    setCropFile(file)
+    // 动图（GIF / WebP）无法裁剪，直接上传
+    // 读取前 12 字节检测动图（GIF / WebP），跳过裁剪
+    file.slice(0, 12).arrayBuffer().then(buf => {
+      const h = new Uint8Array(buf)
+      const isGif = h[0] === 0x47 && h[1] === 0x49 && h[2] === 0x46  // GIF
+      const isWebP = h[0] === 0x52 && h[1] === 0x49 && h[2] === 0x46 && h[3] === 0x46
+        && h[8] === 0x57 && h[9] === 0x45 && h[10] === 0x42 && h[11] === 0x50  // RIFF....WEBP
+      if (isGif || isWebP) {
+        uploadAvatarDirectly(file)
+        return
+      }
+      setCropFile(file)
+    }).catch(() => {
+      if (file.type === 'image/gif') { uploadAvatarDirectly(file); return }
+      setCropFile(file)
+    })
     e.target.value = ''
   }
 

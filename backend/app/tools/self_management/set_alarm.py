@@ -20,7 +20,7 @@ class SetAlarm(ToolPlugin):
         "wake_at": {"type": "string", "nullable": True, "description": "具体唤醒时间，ISO 8601 格式（如 '2026-06-18T15:30:00+08:00'）。和 delay_seconds 二选一。"},
     }
     required = ["task"]
-    states = ["active", "dnd", "offline"]
+    states = ["active", "dnd", "inactive"]
     admin_description = "设置定时闹钟。到点自动唤醒 AI 执行指定任务，是 AI「心跳机制」和自主生命节律的基础。"
     trigger_condition = "AI 需要定时行动或计划未来任务时"
 

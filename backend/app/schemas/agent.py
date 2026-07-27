@@ -120,7 +120,7 @@ class AgentUpdateConfigRequest(BaseModel):
 
 class AgentStateRequest(BaseModel):
     """切换状态请求"""
-    target_state: str = Field(..., description="active|dnd|offline|blocked")
+    target_state: str = Field(..., description="active|dnd|inactive|blocked")
     duration_hours: int | None = Field(default=None, ge=1, le=72)
     reason: str | None = None
 

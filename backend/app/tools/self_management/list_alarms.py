@@ -14,7 +14,7 @@ class ListAlarms(ToolPlugin):
     segment = "self_management"
     parameters = {}
     required = []
-    states = ["active", "dnd", "offline"]
+    states = ["active", "dnd", "inactive"]
     admin_description = "查看自己设置的所有闹钟列表。AI 检查待执行的定时任务及其状态。"
     trigger_condition = "AI 检查待办定时任务时"
 

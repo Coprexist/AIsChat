@@ -26,7 +26,7 @@ class RollDice(ToolPlugin):
         },
     }
     required = []
-    states = ["active", "dnd", "offline"]
+    states = ["active", "dnd", "inactive"]
     admin_description = "AI 掷骰子做随机决策或玩游戏"
     trigger_condition = "AI 需要随机决策或玩游戏时"
 

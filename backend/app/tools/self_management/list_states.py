@@ -18,7 +18,7 @@ class ListStates(ToolPlugin):
     segment = "self_management"
     parameters = {}
     required = []
-    states = ["active", "dnd", "offline"]
+    states = ["active", "dnd", "inactive"]
 
     async def execute(self, db: AsyncSession, agent_id: int, group_id: int | None,
                       arguments: dict, context: dict) -> dict:

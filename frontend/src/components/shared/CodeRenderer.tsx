@@ -1,6 +1,6 @@
 import MermaidBlock from '../MermaidBlock'
 import hljs from 'highlight.js'
-import 'highlight.js/styles/github.css'
+import 'highlight.js/styles/github-dark.css'
 
 /**
  * 共享代码块渲染器——消息气泡和文件预览共用。

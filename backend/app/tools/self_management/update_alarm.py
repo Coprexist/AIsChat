@@ -19,7 +19,7 @@ class UpdateAlarm(ToolPlugin):
         "task": {"type": "string", "nullable": True, "description": "新的任务描述。不传则不修改。"},
     }
     required = ["alarm_id"]
-    states = ["active", "dnd", "offline"]
+    states = ["active", "dnd", "inactive"]
     admin_description = "修改已有闹钟的唤醒时间或原因。调整计划时调用，自动重新调度闹钟。"
     trigger_condition = "需要调整已有定时任务时"
 

@@ -36,7 +36,7 @@ class Agent(Base):
     work_model = Column(String(50))
 
     # 状态机
-    state = Column(String(20), default="active")  # active|dnd|offline|blocked
+    state = Column(String(20), default="active")  # active|dnd|inactive|blocked
     offline_until = Column(DateTime)
 
     # 全局暂停通知（任务期间暂存所有群聊消息）

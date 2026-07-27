@@ -57,7 +57,7 @@ class ManageRecords(ToolPlugin):
         },
     }
     required = ["action", "category"]
-    states = ["active", "dnd", "offline"]
+    states = ["active", "dnd", "inactive"]
     admin_description = "数据库版目录级记忆：按 category/sub_key/field 三级存取结构化数据，百万级无压力。"
     trigger_condition = "AI 需要读写结构化数据时（学生档案、项目记录、知识库等）"
 

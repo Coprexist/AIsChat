@@ -1261,12 +1261,23 @@ async def build_dm_messages(
             sa_select(User.username).where(User.id == m.sender_id)
         )
         sender_name = name_result.scalar_one_or_none() or f"用户{m.sender_id}"
+        # 附件名称注入到消息内容中，让 AI 知道对方发了什么文件
+        msg_content = m.content or ''
+        if m.attachments:
+            try:
+                atts = json.loads(m.attachments) if isinstance(m.attachments, str) else m.attachments
+                file_names = [a.get('name', a.get('path', 'file')) for a in atts]
+                desc = f"[文件: {', '.join(file_names)}]"
+                msg_content = f"{desc} {msg_content}" if msg_content else desc
+            except (json.JSONDecodeError, TypeError):
+                pass
+
         msg_struct = {
             "time": format_time_shanghai(m.created_at),
             "speaker_name": sender_name,
             "speaker_id": None if m.sender_id == agent.user_id else m.sender_id,
             "is_self": m.sender_id == agent.user_id,
-            "content": m.content,
+            "content": msg_content,
             "message_id": m.id,
         }
         messages.append({

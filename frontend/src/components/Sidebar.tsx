@@ -6,12 +6,14 @@ import { MANUAL_URL } from '../constants'
 import SearchOverlay from './SearchOverlay'
 import { useT } from '../i18n/I18nContext'
 import { mainNavItems, navLinkClass, navIconClass } from '../utils/navRegistry.tsx'
+import { usePendingFriendRequests } from '../hooks/usePendingFriendRequests'
 
 export default function Sidebar({ mobile, onClose }: { mobile?: boolean; onClose?: () => void }) {
   const { user, logout } = useAuth()
   const navigate = useNavigate()
   const [collapsed, setCollapsed] = useState(false)
   const t = useT()
+  const pendingRequests = usePendingFriendRequests()
 
   const handleLogout = () => {
     logout()
@@ -88,6 +90,9 @@ export default function Sidebar({ mobile, onClose }: { mobile?: boolean; onClose
             >
               <item.icon size={18} />
               <span>{t(item.i18nKey)}</span>
+              {item.path === '/friends' && pendingRequests > 0 && (
+                <span className="ml-auto w-2 h-2 rounded-full bg-red-500" />
+              )}
             </NavLink>
           ))}
 
@@ -126,7 +131,12 @@ export default function Sidebar({ mobile, onClose }: { mobile?: boolean; onClose
               className={navIconClass}
               title={t(item.i18nKey)}
             >
-              <item.icon size={18} />
+              <span className="relative">
+                <item.icon size={18} />
+                {item.path === '/friends' && pendingRequests > 0 && (
+                  <span className="absolute -top-1 -right-1.5 w-2 h-2 rounded-full bg-red-500" />
+                )}
+              </span>
             </NavLink>
           ))}
           {user?.role === 'admin' && (

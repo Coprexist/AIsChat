@@ -465,6 +465,7 @@ async def get_profile(
             "status_text": getattr(user, "status_text", None),
             "status_color": getattr(user, "status_color", None),
             "created_at": str(user.created_at) if user.created_at else None,
+            "last_active_at": getattr(user, "last_active_at", None) and str(user.last_active_at),
             "owner_name": None,
         })
 

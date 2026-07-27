@@ -10,6 +10,8 @@
    ============================================================ */
 :root {
   /* 结构色 — 浅色主题 */
+  --tw-primary-400: 167 139 250;   /* #A78BFA */
+  --tw-accent-400: 251 191 36;      /* #FBBF24 */
   --tw-canvas: 248 250 252;        /* slate-50 */
   --tw-surface: 255 255 255;       /* white */
   --tw-elevated: 255 255 255;      /* white */
@@ -28,6 +30,8 @@
 
 .dark {
   /* 结构色 — 深邃紫金深色主题 */
+  --tw-primary-400: 167 139 250;   /* #A78BFA */
+  --tw-accent-400: 251 191 36;      /* #FBBF24 */
   --tw-canvas: 12 10 20;           /* #0C0A14 */
   --tw-surface: 21 18 35;          /* #151223 */
   --tw-elevated: 30 26 48;         /* #1E1A30 */
@@ -48,6 +52,25 @@
   * {
     @apply border-border;
   }
+  html {
+    scroll-behavior: smooth;
+  }
+
+  .doc-content {
+    /* 将 Typography 插件的颜色变量绑定到主题 CSS 变量 */
+    --tw-prose-body: rgb(var(--tw-text-secondary));
+    --tw-prose-headings: rgb(var(--tw-text-primary));
+    --tw-prose-links: rgb(var(--tw-primary-400));
+    --tw-prose-bold: rgb(var(--tw-text-primary));
+    --tw-prose-code: rgb(var(--tw-accent-400));
+    --tw-prose-pre-bg: rgb(var(--tw-elevated));
+    --tw-prose-quotes: rgb(var(--tw-text-secondary));
+    --tw-prose-quote-borders: #A78BFA;
+    --tw-prose-hr: rgb(var(--tw-border));
+    --tw-prose-th-bg: rgb(var(--tw-elevated));
+    --tw-prose-td-bg: transparent;
+  }
+
   body {
     @apply bg-canvas text-textPrimary;
     font-feature-settings: 'cv02', 'cv03', 'cv04', 'cv11';

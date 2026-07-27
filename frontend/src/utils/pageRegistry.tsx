@@ -30,6 +30,7 @@ const SetupPage = lazy(() => import('../pages/SetupPage'))
 const ManualPage = lazy(() => import('../pages/ManualPage'))
 const InstanceSetupPage = lazy(() => import('../pages/InstanceSetupPage'))
 const LocalModelPage = lazy(() => import('../pages/LocalModelPage'))
+const NotFoundPage = lazy(() => import('../pages/NotFoundPage'))
 
 // ── 路由定义类型 ──
 

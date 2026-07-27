@@ -27,6 +27,9 @@ const zh: TranslationDict = {
   'sidebar.admin': '管理',
   'sidebar.manual': '手册',
   'sidebar.logout': '退出',
+  'notFound.title': '页面不存在',
+  'notFound.desc': '你找的页面可能已被移除、改名，或暂时不可用。',
+  'notFound.backHome': '返回首页',
   'sidebar.expand': '展开',
   'sidebar.collapse': '折叠',
   'sidebar.adminPanel': '管理员',
@@ -125,6 +128,7 @@ const zh: TranslationDict = {
   'dm.online': '在线',
   'dm.dnd': '免打扰',
   'dm.offline': '离线',
+  'dm.lastActive': '最近在线',
   'dm.shortDnd': '勿扰',
   'dm.sessionList': '会话列表',
   'dm.loading': '加载中...',
@@ -1448,6 +1452,7 @@ const zh: TranslationDict = {
   'profileCard.registeredOn': '注册时间',
   'profileCard.priorityOn': '已特别关心',
   'profileCard.priorityOff': '设为特别关心',
+  'profileCard.bioEmpty': '空空如也便是此人的简介',
 
   // ======================== 头像裁剪 / AvatarCrop ========================
   'avatarCrop.adjustAvatar': '调整头像',
@@ -1771,6 +1776,9 @@ const en: TranslationDict = {
   'sidebar.admin': 'Admin',
   'sidebar.manual': 'Guide',
   'sidebar.logout': 'Logout',
+  'notFound.title': 'Page Not Found',
+  'notFound.desc': 'The page you are looking for might have been removed, renamed, or is temporarily unavailable.',
+  'notFound.backHome': 'Back to Home',
   'sidebar.expand': 'Expand',
   'sidebar.collapse': 'Collapse',
   'sidebar.adminPanel': 'Admin Panel',
@@ -1869,6 +1877,7 @@ const en: TranslationDict = {
   'dm.online': 'Online',
   'dm.dnd': 'Do Not Disturb',
   'dm.offline': 'Offline',
+  'dm.lastActive': 'Last seen',
   'dm.shortDnd': 'DND',
   'dm.sessionList': 'Session List',
   'dm.loading': 'Loading...',
@@ -3190,6 +3199,7 @@ const en: TranslationDict = {
   'profileCard.registeredOn': 'Registered',
   'profileCard.priorityOn': 'Priority',
   'profileCard.priorityOff': 'Set Priority',
+  'profileCard.bioEmpty': 'This person has no bio.',
 
   // ======================== AvatarCrop ========================
   'avatarCrop.adjustAvatar': 'Adjust Avatar',
@@ -3473,6 +3483,9 @@ const ja: TranslationDict = {
   'sidebar.admin': '管理',
   'sidebar.manual': 'ガイド',
   'sidebar.logout': 'ログアウト',
+  'notFound.title': 'ページが見つかりません',
+  'notFound.desc': 'お探しのページは削除されたか、名前が変更されたか、一時的に利用できません。',
+  'notFound.backHome': 'ホームに戻る',
   'sidebar.expand': '展開',
   'sidebar.collapse': '折りたたむ',
   'sidebar.adminPanel': '管理パネル',
@@ -3571,6 +3584,7 @@ const ja: TranslationDict = {
   'dm.online': 'オンライン',
   'dm.dnd': 'おやすみモード',
   'dm.offline': 'オフライン',
+  'dm.lastActive': '最終アクティブ',
   'dm.shortDnd': 'おやすみ',
   'dm.sessionList': 'セッション一覧',
   'dm.loading': '読み込み中...',
@@ -4890,6 +4904,7 @@ const ja: TranslationDict = {
   'profileCard.friendMessagePlaceholder': 'メッセージ（任意、200文字以内）',
   'profileCard.creator': '制作者',
   'profileCard.registeredOn': '登録日時',
+  'profileCard.bioEmpty': 'プロフィールはまだありません。',
 
   // ======================== アバタークロップ / AvatarCrop ========================
   'avatarCrop.adjustAvatar': 'アバターを調整',

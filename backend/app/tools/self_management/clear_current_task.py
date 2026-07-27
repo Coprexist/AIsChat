@@ -16,7 +16,7 @@ class ClearCurrentTask(ToolPlugin):
         "reason": {"type": "string", "nullable": True, "description": "可选：为什么清除（完成/放弃/被用户叫停/其他）"},
     }
     required = []
-    states = ["active", "dnd", "offline"]
+    states = ["active", "dnd", "inactive"]
     admin_description = "清除当前任务标记。完成或放弃手头任务时调用，释放工作区焦点。"
     trigger_condition = "任务完成或被放弃时"
 

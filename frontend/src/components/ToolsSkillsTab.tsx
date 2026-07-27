@@ -82,7 +82,7 @@ function ToolRegistryTab() {
   if (loading) return <div className="p-6 text-textSecondary text-sm">加载中...</div>
   if (!data) return <div className="p-6 text-red-500 text-sm">加载失败</div>
 
-  const stateOptions = ['all', 'active', 'dnd', 'offline', 'blocked']
+  const stateOptions = ['all', 'active', 'dnd', 'inactive', 'blocked']
 
   return (
     <div className="space-y-4">

@@ -258,7 +258,7 @@ const MessageBubble = memo(function MessageBubble({
             />
           )}
           {fileAtts.length > 0 && (
-            <div className={`mt-2 pt-2 border-t flex flex-wrap gap-1.5 ${isMine ? 'border-white/20' : 'border-border'}`}>
+            <div className={`${content ? 'mt-2 pt-2 border-t' : ''} flex flex-wrap gap-1.5 ${isMine ? 'border-white/20' : 'border-border'}`}>
               {fileAtts.map(att => {
                 const token = localStorage.getItem('access_token')
                 const dlUrl = `/api/fs/download/${att.file_id}?token=${token || ''}`

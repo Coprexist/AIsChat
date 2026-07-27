@@ -192,7 +192,7 @@ async def list_members(
                 name = u.username
             from app.services.infrastructure.online_tracker import get_user_online_status
             if get_user_online_status(m.member_id):
-                state = "online"
+                state = "active"
         elif m.member_type == "ai":
             # v2.0.0: member_id 统一为 user_id，同时兼容旧 agent.id
             a_res = await db.execute(
@@ -249,7 +249,10 @@ async def get_messages(
             avatar_map[uid] = uavatar or ''
             if utype == "ai":
                 a = (await db.execute(select(Agent.name, Agent.avatar_url, Agent.state).where(Agent.user_id == uid))).first()
-                if a: name_map[uid] = a[0]; avatar_map[uid] = a[1] or uavatar or ''; state_map[uid] = a[2]
+                if a:
+                    name_map[uid] = a[0]
+                    avatar_map[uid] = a[1] or uavatar or ''
+                    state_map[uid] = a[2]
 
 
     return [

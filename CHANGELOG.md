@@ -7,7 +7,56 @@
 
 ---
 
-## [v1.0.6] - 2026-07-23~25
+## [v1.0.6] - 2026-07-23~26
+
+### Added
+
+- 🟢 **在线状态追踪**：新增 `last_active_at` 列记录用户最后活动时间。WebSocket 连接时置 NULL（在线），断开时写入时间戳。
+- 💓 **WebSocket 心跳检测**：30s ping 间隔，首次检测离线即记录时间戳而非等满 3 次超时，断开时写入更准确的时间。90s 无响应才真正关连接。
+- 👤 **资料卡片增强**：显示在线/离线状态文本、最近在线时间、简介为空时的占位文字。卡片宽度加大，详情区一行展示注册时间 + 状态（flex-wrap 自适应）。
+- 🔔 **窗口闪烁通知**：新消息时标题栏交替闪烁（带发送者昵称）、Favicon 右上角红点、桌面通知弹窗（需权限）。可复用设置页通知开关关闭。
+- 🔧 **管理员密码重置**：`PUT /admin/users/{user_id}/reset-password` 端点，bcrypt 加密，记入审计日志。
+- 📎 **附件注入 AI 上下文**：DM 消息中的附件名称（`[文件: xxx.png]`）注入 AI 消息内容，视觉模型还走图片 base64 注入。
+- 🔔 **好友申请红点**：侧边栏（展开/折叠）和移动端底部导航收到好友申请时右上角红点，仅算收到的申请，30s 轮询。
+- 🖼️ **Mermaid 全屏查看**：点击放大后全屏浮层，支持滚轮/按钮缩放（0.25x–10x）、鼠标拖拽平移、0.12s 平滑过渡、下载纯 SVG。
+- 📖 **手册 SPA 导航**：Markdown 内部链接自动转为 React Router 导航，标题锚点自动生成 GitHub 风格 ID（递归提取纯文本），`queueMicrotask` 定位。CSS `scroll-behavior: smooth` 全局生效。
+- ⚠️ **404 页 + ErrorBoundary**：Not Found 页面居中展示（三语），ErrorBoundary 包裹全局，崩溃时显示友好界面 + 刷新/重试 + 错误详情。
+- 🔒 **手动链接 SPA 跳转**：`DocLink` 组件拦截 Markdown 内部链接，匹配路由后 SPA 导航，外部链接新窗口打开。
+- 🖼️ **AI 头像上传统一**：AI 头像也走 WebP/GIF 魔数检测跳过裁剪，统一使用 `api.upload()` 获得友好 413 错误提示。
+- 📉 **Mermaid 渲染失败友好降级**：显示具体错误信息 + 语法高亮原始代码回退，不再只报「渲染失败」。
+- ✅ **Nginx 413 修复**：`aischat.datongai.top.conf` 补上 `client_max_body_size 20m`。
+- 🔤 **Svg 中文不乱码**：Mermaid iframe base64 解码改用 `TextDecoder('utf-8')` 替代 `atob`。
+
+### Changed
+
+- 🏷️ **状态值规范化**：`online` → `active`，`offline` → `inactive`（DB 迁移 + 代码清理，前端 `STATE_DOT_COLORS` 移除旧值）。
+- ⚡ **私信会话加载顺序**：新增 `?summary=true` 参数跳过消息加载及已读标记，切换会话时先渲染标题栏再加载消息。DMChatView 用 `key={sessionId}` 强制 ChatView 重置状态。
+- 🎯 **初始滚位置消除闪烁**：`useLayoutEffect` 替代 `useEffect` + `setTimeout`，在浏览器 paint 前完成滚动定位（scrollIntoView / scrollTop）。
+- 🔁 **登录不再管理在线状态**：WebSocket 连接/断开为在线状态的唯一数据源。
+- 🕒 **最近在线时间时区回滚检测**：`formatRelativeTime` 用数值分钟比较解决 12h/24h 格式兼容。
+- 📝 **翻译 key 新增**：`dm.lastActive`（最近在线）、`profileCard.bioEmpty` 三语支持。
+- ⏱️ **回复标记已读**：发私信时自动标记对方未读消息为已读，不再依赖打开会话才标记。
+- 🧹 **侧边栏预览去 HTML**：`make_preview` 用正则去除 `/<[^>]+>/g` 标签，不再显示 `<span class="text-gold">`。
+- 📄 **空文本 + 附件可发送**：ChatInput 去掉 `if (!v) return` 拦截，由 ChatView `handleSend` 统一判断。
+- 🔐 **登录页 401 不刷新**：API 客户端跳过 `/auth/login` 和 `/auth/register` 路径的 401 跳转，错误正常显示。
+- 🎨 **手册主题兼容**：`.doc-content` Typography CSS 变量引用主题 `--tw-xxx` 变量，品牌色 `--tw-primary-400` / `--tw-accent-400` 变量化，改色只需改 CSS 变量。
+- 🌙 **代码块暗色模式**：`highlight.js` 改用 `github-dark.css`，亮色语法高亮在浅灰和深灰背景上都清晰。
+
+### Fixed
+
+- 🐛 **切换会话标题栏滞后**：DMChatView 切换时先清 partner 再请求，配合 `summary=true` 秒更新。
+- 🐛 **初始加载闪现聊天开头**：`useLayoutEffect` paint 前定位，用户无感知。
+- 🐛 **资料卡片人类不显示状态**：人类也展示在线/离线文本，不再仅显示「人类」。
+- 🐛 **状态入口过多**：标题栏圆点 + 详情区绿点 + 独立状态行 → 合并为详情区一行文字。
+- 🐛 **ProfileCard 加载崩溃**：`isActive` 定义在 `profile useState` 之前导致 ReferenceError。
+- 🐛 **附件按钮无响应**：`<input type="file" ref={fileInputRef}>` 元素在 ChatView 重构中丢失，补回。
+- 🐛 **Favicon 红点被切**：红点圆心超出画布边界，改为与右上角保持一个半径距离。
+- 🐛 **Favicon 红点不消失**：`badgeFavicon` Promise 在 stop 后 resolve 覆盖恢复，加 `flashLockRef` 检查。
+- 🐛 **断联时消息被吃**：发送按钮加 `connected` 断联禁用 + `handleSend` 加 `if (!connected) return`。
+- 🐛 **纯文件消息多一条分割线**：附件区 `border-t` 仅在消息有文字内容时显示。
+- 🐛 **413 上传失败裸报错**：`uploadFile` 顶部拦截 413 返回友好提示「文件过大」，不再等 JSON 解析失败。
+- 🐛 **Mermaid 下载的是 iframe 而非纯 SVG**：从 iframe `src` 的 base64 中正则提取纯 SVG 下载，不再依赖安全级别重渲染。
+- 🐛 **会话标题栏闪旧数据**：ChatView 错过 `setMessages([])` 渲染间隙，用 `key={sessionId}` 强制 remount 根治。
 
 ### Added
 
@@ -70,6 +119,26 @@
 - 🐛 **`get_compression_threshold` 未导入**：AI 回复报 `NameError`，不返回思考中状态
 - 🐛 **对话日志查看器旧 AI 不可选**：后端加 `search` 参数，前端加搜索框
 - 🐛 **context_compressor.py 死代码**：阈值从 6% 提到 60% 后永不触发，现改为从 DB 配置读取
+
+## [v1.0.5] - 2026-07-11~22
+
+### Added
+
+- 🌤️ **Open-Meteo 天气工具**：AI 可查询实时天气和预报，免费且无需 API Key。
+- 📺 **B站视频总结工具**：AI 可获取 B 站视频信息，需管理员配置 SESSDATA cookie。
+- 🔧 **`file_read` 新增 `start_line`/`end_line` 参数**：支持分段读取文件。
+- 🔧 **`file_edit` 行级编辑**：增量修改而非全量重写，节省大文件 token 消耗。
+
+### Changed
+
+- 🗂️ **`file_list` 路径处理**：`.` 和 `/` 视为根目录，不加 LIKE 过滤。
+- ⚡ **`max_tokens` 2048→16384**：LLM 输出配额提升，大文件不再截断。
+
+### Fixed
+
+- 🧹 **状态栈去重**：修复 `state_stack_service` 逻辑，防止同一任务被重复 push。
+- 🐛 **`file_list` 查不到文件**：`path="/"` 时 LIKE 条件不匹配相对路径文件。
+- 🐛 **设置页保存按钮错位**：`SettingsPage` 布局修复。
 
 ## [v1.0.4] - 2026-07-11
 

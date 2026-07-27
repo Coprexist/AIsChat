@@ -10,22 +10,21 @@ export const ADMIN_MANUAL_URL = '/manual/admin'
 /** 状态指示圆点颜色（小圆点，纯背景色） */
 export const STATE_DOT_COLORS: Record<string, string> = {
   active: 'bg-mint-400',
-  online: 'bg-mint-400',   // 人类用户在线
   dnd: 'bg-rose-400',
-  offline: 'bg-border',
+  inactive: 'bg-border',
 }
 
 /** 获取状态指示圆点的 Tailwind 背景色类名 */
 export function getStateDotColor(state: string | null | undefined): string {
-  if (!state) return STATE_DOT_COLORS.offline
-  return STATE_DOT_COLORS[state] ?? STATE_DOT_COLORS.offline
+  if (!state) return STATE_DOT_COLORS.inactive
+  return STATE_DOT_COLORS[state] ?? STATE_DOT_COLORS.inactive
 }
 
 /** 状态徽章颜色（背景+文字+边框组合，用于卡片/列表标签） */
 export const STATE_BADGE_COLORS: Record<string, string> = {
   active: 'bg-mint-400/15 text-mint-400 border-mint-400/30',
   dnd: 'bg-rose-400/15 text-rose-400 border-rose-400/30',
-  offline: 'bg-border text-textSecondary border-border/30',
+  inactive: 'bg-border text-textSecondary border-border/30',
   blocked: 'bg-accent-400/15 text-accent-400 border-accent-400/30',
 }
 
@@ -33,7 +32,7 @@ export const STATE_BADGE_COLORS: Record<string, string> = {
 export const STATE_LABELS: Record<string, string> = {
   active: '在线',
   dnd: '勿扰',
-  offline: '离线',
+  inactive: '离线',
   blocked: '封禁',
 }
 
@@ -41,7 +40,7 @@ export const STATE_LABELS: Record<string, string> = {
 export const STATE_TAG_COLORS: Record<string, string> = {
   active: 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400',
   dnd: 'bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400',
-  offline: 'bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-400',
+  inactive: 'bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-400',
   blocked: 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400',
 }
 

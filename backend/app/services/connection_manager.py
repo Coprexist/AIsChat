@@ -1,21 +1,30 @@
 """
 WebSocket 连接管理器
 
-职责：管理群聊、私信、用户的 WebSocket 连接池。
+职责：管理群聊、私信、用户的 WebSocket 连接池与心跳检测。
 这是纯消息通道，不含 AI 决策逻辑。
 
 文档位置：backend/app/services/connection_manager.py
 """
 
+import asyncio
+from datetime import datetime, timezone
 import logging
+import time
+
 from fastapi import WebSocket
+
 from app.utils.error_handler import build_ws_error
 
 logger = logging.getLogger(__name__)
 
 
 class ConnectionManager:
-    """WebSocket 连接管理器（支持 DND 过滤、错误推送、私信）"""
+    """WebSocket 连接管理器（支持 DND 过滤、错误推送、私信、心跳）"""
+
+    # 心跳参数
+    HEARTBEAT_INTERVAL = 30  # ping 发送间隔（秒）
+    HEARTBEAT_TIMEOUT = 90   # 无活动超时（秒）
 
     def __init__(self):
         # 群聊连接：{group_id: {user_id: websocket}}
@@ -24,12 +33,49 @@ class ConnectionManager:
         self.dm_connections: dict[str, dict[int, WebSocket]] = {}
         # 用户全局连接：{user_id: websocket} 用于推送/通知
         self.user_connections: dict[int, WebSocket] = {}
+        # 心跳活动追踪：{user_id: time.monotonic()}
+        self._last_activity: dict[int, float] = {}
+        # 第一次ping无回应时记录的时间戳（用于超时断开时写库，避免等满3次才记）
+        self._offline_at: dict[int, datetime] = {}
+
+    def record_activity(self, user_id: int) -> None:
+        """记录用户活动时间戳（每次收到 WebSocket 数据时调用）"""
+        self._last_activity[user_id] = time.monotonic()
+
+    def start_heartbeat(self, ws: WebSocket, user_id: int) -> asyncio.Task:
+        """
+        启动后台心跳检测任务。
+        每 HEARTBEAT_INTERVAL 秒发送 ping，
+        若连续 HEARTBEAT_TIMEOUT 秒无活动则静默断开连接。
+        调用方需在 cleanup 时 cancel 返回的 task。
+        """
+        self._last_activity[user_id] = time.monotonic()
+
+        async def _beat():
+            try:
+                while True:
+                    await asyncio.sleep(self.HEARTBEAT_INTERVAL)
+                    elapsed = time.monotonic() - self._last_activity.get(user_id, 0)
+                    # 首次检测到离线（过一个周期没活动）→ 记下此时时间
+                    if elapsed >= self.HEARTBEAT_INTERVAL and user_id not in self._offline_at:
+                        self._offline_at[user_id] = datetime.now(timezone.utc)
+                    # 超时阈值耗尽 → 关连接
+                    if elapsed >= self.HEARTBEAT_TIMEOUT:
+                        logger.info(f"用户 {user_id} 心跳超时 ({elapsed:.0f}s)，断开连接")
+                        await ws.close(code=1000)
+                        return
+                    await ws.send_json({"type": "ping"})
+            except Exception:
+                pass  # 连接已断开，静默退出
+
+        return asyncio.create_task(_beat())
 
     async def connect(self, ws: WebSocket, group_id: int, user_id: int):
         if group_id not in self.group_connections:
             self.group_connections[group_id] = {}
         self.group_connections[group_id][user_id] = ws
         self.user_connections[user_id] = ws
+        self.record_activity(user_id)
         logger.info(f"用户 {user_id} 加入群聊 {group_id} 的 WebSocket")
 
     def disconnect(self, group_id: int, user_id: int):
@@ -38,6 +84,8 @@ class ConnectionManager:
             if not self.group_connections[group_id]:
                 del self.group_connections[group_id]
         self.user_connections.pop(user_id, None)
+        self._last_activity.pop(user_id, None)
+        self._offline_at.pop(user_id, None)
         logger.info(f"用户 {user_id} 离开群聊 {group_id} 的 WebSocket")
 
     async def broadcast_to_group(
@@ -70,6 +118,11 @@ class ConnectionManager:
         error_event = build_ws_error(code, message, tool_call_id)
         await self.send_to_user(user_id, error_event)
 
+    def get_offline_timestamp(self, user_id: int) -> datetime | None:
+        """获取心跳首次检测到离线的时间戳（仅超时断开时有值，正常断开返回 None）。
+        调用后该记录被移除（一次性）。"""
+        return self._offline_at.pop(user_id, None)
+
     def get_online_users(self, group_id: int) -> list[int]:
         if group_id in self.group_connections:
             return list(self.group_connections[group_id].keys())
@@ -88,6 +141,7 @@ class ConnectionManager:
             self.dm_connections[session_id] = {}
         self.dm_connections[session_id][user_id] = ws
         self.user_connections[user_id] = ws
+        self.record_activity(user_id)
         logger.info(f"用户 {user_id} 加入私信 {session_id} 的 WebSocket")
 
     def disconnect_dm(self, session_id: str, user_id: int):
@@ -95,6 +149,8 @@ class ConnectionManager:
             self.dm_connections[session_id].pop(user_id, None)
             if not self.dm_connections[session_id]:
                 del self.dm_connections[session_id]
+        self._last_activity.pop(user_id, None)
+        self._offline_at.pop(user_id, None)
 
     async def broadcast_to_dm(
         self,

@@ -15,7 +15,7 @@ class ListAvailableSkills(ToolPlugin):
     segment = "chat_social"
     parameters = {}
     required = []
-    states = ["active", "dnd", "offline"]
+    states = ["active", "dnd", "inactive"]
     admin_description = "列出当前可用的所有技能段和工具。AI 查看自己的「技能背包」了解当前能力边界。"
     trigger_condition = "AI 需要了解自身能力时"
 

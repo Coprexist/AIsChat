@@ -14,7 +14,7 @@ class CheckWorkspace(ToolPlugin):
     segment = "self_management"
     parameters = {}
     required = []
-    states = ["active", "dnd", "offline"]
+    states = ["active", "dnd", "inactive"]
     admin_description = "查看自己的工作区状态：当前任务、文件数量、待处理事项概览。AI 启动或回归时了解自身状态。"
     trigger_condition = "AI 启动、回归或需要了解自身状态时"
 

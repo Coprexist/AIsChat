@@ -346,6 +346,7 @@ async def list_friend_requests(
     db: AsyncSession,
     user_id: int,
     status: str = "pending",
+    received_only: bool = False,
 ) -> list[dict]:
     """获取好友申请列表（收到 + 发出的），批量查询避免 N+1"""
     from app.models.friendship import FriendshipRequest
@@ -360,15 +361,17 @@ async def list_friend_requests(
             FriendshipRequest.status == status,
         ).order_by(FriendshipRequest.created_at.desc())
     )
-    # 发出的申请
-    sent = await db.execute(
-        select(FriendshipRequest).where(
-            FriendshipRequest.requester_id == user_id,
-            FriendshipRequest.status == status,
-        ).order_by(FriendshipRequest.created_at.desc())
-    )
+    received_list = list(received.scalars().all())
 
-    all_requests = list(received.scalars().all()) + list(sent.scalars().all())
+    all_requests: list = received_list
+    if not received_only:
+        sent = await db.execute(
+            select(FriendshipRequest).where(
+                FriendshipRequest.requester_id == user_id,
+                FriendshipRequest.status == status,
+            ).order_by(FriendshipRequest.created_at.desc())
+        )
+        all_requests = received_list + list(sent.scalars().all())
     if not all_requests:
         return []
 
