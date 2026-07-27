@@ -1,3 +1,4 @@
+/* MermaidBlock v2 — parse 预检 + 错误 SVG 拦截 + 无占位加载 */
 import { useEffect, useRef, useState, useId, useCallback } from 'react'
 import { Loader2, AlertTriangle, Maximize2, Minimize2, ZoomIn, ZoomOut, Download } from 'lucide-react'
 import CodeRenderer from './shared/CodeRenderer'
@@ -29,6 +30,7 @@ function normalizeSvgWidth(svg: string): string {
  * 3. 包含 .error-text text 节点
  */
 function isMermaidErrorSvg(svg: string): string | null {
+  /* V2 */
   // 特征 1：aria-roledescription="error" 最可靠
   if (/aria-roledescription="error"/.test(svg)) {
     const m = svg.match(/class="error-text"[^>]*>([^<]+)</)
@@ -102,6 +104,8 @@ function useFullscreenPanZoom(expanded: boolean) {
 // ---------------------------------------------------------------------------
 // 主组件
 // ---------------------------------------------------------------------------
+
+console.log("MERMAIDBLOCK_V2_RUNNING");
 
 export default function MermaidBlock({ code, compact = false }: MermaidBlockProps) {
   const containerRef = useRef<HTMLDivElement>(null)
@@ -217,7 +221,10 @@ export default function MermaidBlock({ code, compact = false }: MermaidBlockProp
 
   // 加载态——compact 模式下不渲染占位，避免卡滚动；非 compact 显示 spinner
   if (!svg) {
-    if (compact) return null
+    if (compact) {
+      // 加载完成后会变成 SVG 或错误 UI，期间不留空白
+      return null
+    }
     return (
       <div className="my-3 rounded-xl border border-border bg-elevated p-4 flex items-center gap-2 text-textMuted text-sm">
         <Loader2 size={14} className="animate-spin" />
