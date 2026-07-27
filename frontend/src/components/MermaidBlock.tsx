@@ -185,6 +185,17 @@ export default function MermaidBlock({ code, compact = false }: MermaidBlockProp
   const svgRef = useRef(svg)
   svgRef.current = svg
 
+  // 构建错误报告消息
+  const buildReportMsg = (err: string) => {
+    const lang = document.documentElement.lang?.startsWith('zh') ? 'zh-CN' : 'en'
+    const msgZh = `Mermaid 图表渲染失败：${err}\n\n原始代码：\n\`\`\`mermaid\n${code}\n\`\`\``
+    const msgEn = `Mermaid diagram failed to render: ${err}\n\nOriginal code:\n\`\`\`mermaid\n${code}\n\`\`\``
+    return lang === 'zh-CN' ? msgZh : msgEn
+  }
+  const dispatchErrorReport = (err: string) => {
+    document.dispatchEvent(new CustomEvent('mermaid-error-report', { detail: { message: buildReportMsg(err) } }))
+  }
+
   const handleExpand = () => {
     // mermaid.render 在 sandbox 模式返回 iframe 包裹 HTML，需提取纯 SVG
     const raw = extractCleanSvg(containerRef.current)
@@ -220,13 +231,22 @@ export default function MermaidBlock({ code, compact = false }: MermaidBlockProp
   if (isErrorCollapsed) {
     return (
       <div className={compact ? 'my-2' : 'my-4'}>
-        <button
-          onClick={() => setErrorRevealed(true)}
-          className="flex items-center gap-1.5 px-3 py-2 rounded-lg border w-full text-xs border-rose-400/20 bg-rose-400/5 hover:bg-rose-400/10 text-rose-400/70 hover:text-rose-400"
-        >
-          <AlertTriangle size={13} />
-          <span>图表渲染出错 · 点击查看</span>
-        </button>
+        <div className="flex items-center gap-1.5 px-3 py-2 rounded-lg border w-full text-xs border-rose-400/20 bg-rose-400/5">
+          <button
+            onClick={() => setErrorRevealed(true)}
+            className="flex items-center gap-1 text-rose-400/70 hover:text-rose-400 transition-colors shrink-0"
+          >
+            <AlertTriangle size={13} />
+            <span>查看详情</span>
+          </button>
+          <span className="text-rose-400/20">·</span>
+          <button
+            onClick={() => error && dispatchErrorReport(error)}
+            className="text-rose-400/70 hover:text-rose-400 transition-colors shrink-0"
+          >
+            报告错误给AI
+          </button>
+        </div>
       </div>
     )
   }
@@ -253,14 +273,6 @@ export default function MermaidBlock({ code, compact = false }: MermaidBlockProp
 
   // 错误态
   if (error) {
-    const handleReport = () => {
-      const lang = document.documentElement.lang?.startsWith('zh') ? 'zh-CN' : 'en'
-      const msgZh = `Mermaid 图表渲染失败：${error}\n\n原始代码：\n\`\`\`mermaid\n${code}\n\`\`\``
-      const msgEn = `Mermaid diagram failed to render: ${error}\n\nOriginal code:\n\`\`\`mermaid\n${code}\n\`\`\``
-      const msg = lang === 'zh-CN' ? msgZh : msgEn
-      document.dispatchEvent(new CustomEvent('mermaid-error-report', { detail: { message: msg } }))
-    }
-
     return (
       <div className="my-3 rounded-xl border border-rose-400/20 bg-rose-400/5 overflow-hidden">
         <div className="flex items-center justify-between gap-1.5 px-3 py-1.5 bg-rose-400/10 border-b border-rose-400/10">
@@ -268,7 +280,7 @@ export default function MermaidBlock({ code, compact = false }: MermaidBlockProp
             <AlertTriangle size={12} /> Mermaid 图表渲染失败
           </div>
           <button
-            onClick={handleReport}
+            onClick={() => dispatchErrorReport(error)}
             className="text-[10px] px-2 py-0.5 rounded-md bg-rose-400/15 hover:bg-rose-400/25 text-rose-400 transition-colors"
             title="将错误信息发送给AI，帮助其修正"
           >
