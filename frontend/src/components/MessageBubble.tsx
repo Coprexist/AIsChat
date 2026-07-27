@@ -33,12 +33,7 @@ const DARK_VARS = [
   '--b-text-green:80 220 120', '--b-text-blue:100 150 255', '--b-text-purple:180 130 255',
   '--b-text-pink:255 130 200', '--b-text-gray:180 180 180',
 ]
-/* 自己的消息在深色页面下：比 DARK_VARS 再偏灰一点 */
-const DARK_MINE_VARS = [
-  '--b-thead-r:80', '--b-thead-g:70', '--b-thead-b:88', '--b-thead-a:0.8',
-  '--b-zebra-r:68', '--b-zebra-g:60', '--b-zebra-b:75', '--b-zebra-a:0.5',
-  '--b-hover-r:80', '--b-hover-g:70', '--b-hover-b:88', '--b-hover-a:0.9',
-]
+
 const LIGHT_VARS = [
   '--b-link-r:initial',
   '--b-thead-r:237', '--b-thead-g:233', '--b-thead-b:254', '--b-thead-a:1',
@@ -110,9 +105,7 @@ const MessageBubble = memo(function MessageBubble({
   //（DARK_VARS/LIGHT_VARS 定义了但从未被使用，这里修复）
   const tableVars = useMemo(() => {
     const isPageDark = typeof document !== 'undefined' && document.documentElement.classList.contains('dark')
-    const vars = isMine
-      ? (isPageDark ? DARK_MINE_VARS : DARK_VARS)
-      : (isPageDark ? DARK_VARS : LIGHT_VARS)
+    const vars = (isMine || isPageDark) ? DARK_VARS : LIGHT_VARS
     const obj: Record<string, string> = {}
     for (const v of vars) {
       const idx = v.indexOf(':')
@@ -142,7 +135,7 @@ const MessageBubble = memo(function MessageBubble({
   }
 
   const bubbleBg = isMine
-    ? 'bg-primary-500 dark:bg-[#3a3560] text-white rounded-2xl rounded-tr-md shadow-lg shadow-primary-500/15'
+    ? 'bg-primary-500 dark:bg-primary-600 text-white rounded-2xl rounded-tr-md shadow-lg shadow-primary-500/15'
     : senderType === 'system'
       ? 'bg-rose-50 dark:bg-rose-900/20 text-rose-900 dark:text-rose-300 rounded-2xl rounded-tl-md border border-rose-200 dark:border-rose-800'
       : 'bg-surface text-textPrimary rounded-2xl rounded-tl-md border border-border'
