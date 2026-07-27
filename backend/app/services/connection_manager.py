@@ -39,8 +39,10 @@ class ConnectionManager:
         self._offline_at: dict[int, datetime] = {}
 
     def record_activity(self, user_id: int) -> None:
-        """记录用户活动时间戳（每次收到 WebSocket 数据时调用）"""
+        """记录用户活动时间戳，同时清除之前可能标记的离线时间。
+        每次收到 WebSocket 数据（pong 或业务消息）时调用。"""
         self._last_activity[user_id] = time.monotonic()
+        self._offline_at.pop(user_id, None)
 
     def start_heartbeat(self, ws: WebSocket, user_id: int) -> asyncio.Task:
         """
