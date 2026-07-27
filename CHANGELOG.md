@@ -11,22 +11,30 @@
 
 ### Added
 
-- 🖼️ **Mermaid 错误 SVG 友好降级**：语法错误时不再显示 mermaid 原生错误图标，改为本地渲染的错误信息面板（红色边框 + 具体错误 + 语法高亮源码），便于用户快速定位问题。
+- 🖼️ **Mermaid 错误 SVG 友好降级**：语法错误时不再显示 mermaid 原生错误图标，改为本地渲染的错误信息面板。
+- 🗜️ **Mermaid 默认折叠**：聊天气泡中的图表默认折叠为「展开」按钮，点击后才渲染。设置页可关闭此行为。
+- 🔔 **Mermaid 错误报告按钮**：渲染出错时「报告错误给AI」按钮一键将错误信息和代码作为用户消息发送给AI。
+- ⏱️ **消息时间显示优化**：跨日历日但不足 24h 的消息正确显示为「昨天 HH:MM」而非「今天」。
 
 ### Changed
 
-- 🧹 **MermaidBlock 重构**：166 行精简实现，`suppressErrorRendering: true` 一行配置替代手工正则/DOMParser 检测错误 SVG。
-- 🔧 **模块级 mermaid 初始化**：所有 MermaidBlock 实例共用一次初始化，避免每个实例在 `useEffect` 中重复 `initialize()` 导致全局配置竞争。
-- 🎯 **mermaid.render() 传容器元素**：第三个参数传入组件的 `containerRef`，临时 iframe 只放在自己容器内，不污染 `document.body`。
-- 💨 **紧凑模式加载无占位**：渲染完成前用 `<div hidden>` 保留容器引用但不占视觉空间，不再阻塞滚动。
-- 🎨 **全屏 SVG 宽度归一化**：mermaid sandbox 模式输出的 `width="10"` 缩略图在展开全屏时从 viewBox 提取实际宽度修正。
-- 📝 **CHANGELOG 统一**：将 v1.0.7 原本分散在多个草案中的内容合并入此版本。
+- 🧹 **MermaidBlock 全面重构**：`suppressErrorRendering: true` 替代手工正则/DOMParser 检测错误 SVG。模块级一次性初始化解决并发竞争。
+- 💨 **紧凑模式加载无占位**：渲染完成前不占视觉空间，不阻塞滚动。加载态保持按钮可见消除闪动。
+- 🎨 **全屏视图修复**：`extractCleanSvg` 从 iframe 提取纯 SVG 用于全屏叠加层，CSS transform（缩放/拖拽）恢复正常。
+- 🌙 **表格暗色适配**：`DARK_VARS`/`LIGHT_VARS` CSS 变量从未实际挂载到 DOM，现通过 `useMemo` 转为 inline style 正确应用。
+- 🎨 **深色模式气泡微调**：自己的消息气泡背景从纯紫 `#7C3AED` 调为暗灰紫 `#5a3a99`。
+- 📝 **CHANGELOG 统一**：合并 v1.0.7 多个草案。
 
 ### Fixed
 
-- 🐛 **Mermaid 错误 SVG 漏检**：深层原因是 `suppressErrorRendering` 被后续 `initialize()` 调用覆盖，改为模块级初始化后修复。
-- 🐛 **_offline_at 离线时间残留**：`record_activity` 活动恢复时未清除之前标记的离线时间戳，导致正常断开时写入过时离线时间。
-- 🐛 **Vite Docker volume 缓存**：文件修改后 Vite transform 缓存未刷新，添加 `server.watch.usePolling: true` 配置。
+- 🐛 **Mermaid 错误 SVG 漏检**：`suppressErrorRendering` 被后续 `initialize()` 覆盖，改为模块级初始化。
+- 🐛 **全屏缩放/拖拽失灵**：`useFullscreenPanZoom` hook 在 StrictMode 下引用异常，回滚到组件内联结构。
+- 🐛 **隐藏容器 viewBox 压缩**：`<div hidden>` 的 `display:none` 导致 mermaid 算出 16×16 迷你 viewBox。
+- 🐛 **CJK 文字被 foreignObject 裁剪**：mermaid 字体宽度测量对中文不足，注入 `overflow:visible` CSS 覆盖。
+- 🐛 **overflow-hidden 裁掉滚动内容**：改用 `clip-path` 替代 `overflow-hidden` 实现圆角，保留子元素滚动。
+- 🐛 **Vite Docker volume 缓存**：添加 `server.watch.usePolling: true`。
+- 🐛 **handleSend 引用时序**：`const` TDZ 导致初始化前被访问，改为 ref 方案。
+- 🐛 **消息时间跨日判定**：`Math.floor(elapsed/h)` 对昨天 21:33→今早 11:23 算出 0 天，改用日历日比较。
 
 ## [v1.0.6] - 2026-07-23~26
 
