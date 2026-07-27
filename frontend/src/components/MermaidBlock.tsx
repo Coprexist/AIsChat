@@ -23,6 +23,22 @@ function normalizeSvgWidth(svg: string): string {
   return svg.replace(/width="[^"]*"/, `width="${vb[3]}"`)
 }
 
+// 模块级初始化 mermaid（一次性），所有 MermaidBlock 实例共用
+// 避免每次渲染重复 initialize 导致全局配置竞争
+const mermaidPromise = (async () => {
+  const mermaid = (await import('mermaid')).default
+  mermaid.initialize({
+    startOnLoad: false,
+    theme: 'default',
+    securityLevel: 'sandbox',
+    fontFamily: 'inherit',
+    // suppressErrorRendering 让 mermaid 在语法错误时不产生错误 SVG（v11+ 支持）
+    // 而是直接 throw，由组件的 catch 统一处理
+    suppressErrorRendering: true,
+  })
+  return mermaid
+})()
+
 // ---------------------------------------------------------------------------
 // 全屏缩放/拖拽 hook
 // ---------------------------------------------------------------------------
@@ -101,25 +117,13 @@ export default function MermaidBlock({ code, compact = false }: MermaidBlockProp
 
     async function render() {
       try {
-        const mermaid = (await import('mermaid')).default
-        mermaid.initialize({
-          startOnLoad: false,
-          theme: 'default',
-          securityLevel: 'sandbox',
-          fontFamily: 'inherit',
-          // suppressErrorRendering 让 mermaid 在语法错误时不产生错误 SVG（v11+ 支持）
-          // 而是直接 throw，由外层 catch 统一处理
-          suppressErrorRendering: true,
-        })
-
-        const { svg: rendered } = await mermaid.render(`mermaid-${uniqueId}`, code)
+        const { svg: rendered } = await mermaidPromise.render(`mermaid-${uniqueId}`, code)
         if (cancelled) return
 
         setSvg(rendered)
         setError(null)
       } catch (err: any) {
         if (!cancelled) {
-          containerRef.current?.querySelectorAll('iframe').forEach(el => el.remove())
           setError(err?.message || 'Mermaid 渲染失败')
           setSvg(null)
         }
