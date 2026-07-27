@@ -253,10 +253,27 @@ export default function MermaidBlock({ code, compact = false }: MermaidBlockProp
 
   // 错误态
   if (error) {
+    const handleReport = () => {
+      const lang = document.documentElement.lang?.startsWith('zh') ? 'zh-CN' : 'en'
+      const msgZh = `Mermaid 图表渲染失败：${error}\n\n原始代码：\n\`\`\`mermaid\n${code}\n\`\`\``
+      const msgEn = `Mermaid diagram failed to render: ${error}\n\nOriginal code:\n\`\`\`mermaid\n${code}\n\`\`\``
+      const msg = lang === 'zh-CN' ? msgZh : msgEn
+      document.dispatchEvent(new CustomEvent('mermaid-error-report', { detail: { message: msg } }))
+    }
+
     return (
       <div className="my-3 rounded-xl border border-rose-400/20 bg-rose-400/5 overflow-hidden">
-        <div className="flex items-center gap-1.5 px-3 py-1.5 bg-rose-400/10 border-b border-rose-400/10 text-[10px] text-rose-400 font-medium">
-          <AlertTriangle size={12} /> Mermaid 图表渲染失败
+        <div className="flex items-center justify-between gap-1.5 px-3 py-1.5 bg-rose-400/10 border-b border-rose-400/10">
+          <div className="flex items-center gap-1.5 text-[10px] text-rose-400 font-medium">
+            <AlertTriangle size={12} /> Mermaid 图表渲染失败
+          </div>
+          <button
+            onClick={handleReport}
+            className="text-[10px] px-2 py-0.5 rounded-md bg-rose-400/15 hover:bg-rose-400/25 text-rose-400 transition-colors"
+            title="将错误信息发送给AI，帮助其修正"
+          >
+            报告错误给AI
+          </button>
         </div>
         {error && <div className="px-3 py-1 text-[11px] text-rose-400/80 font-mono">{error}</div>}
         <div className="px-3 py-2 text-xs">

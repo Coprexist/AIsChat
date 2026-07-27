@@ -675,6 +675,23 @@ export default function ChatView({ conversationType, conversationId }: ChatViewP
   }, [firstUnreadId])
 
   // ============================================================
+  // Mermaid 错误报告
+  // ============================================================
+  // 用 ref 存 handleSend，避免每次渲染重建事件监听
+  const handleSendRef = useRef(handleSend)
+  handleSendRef.current = handleSend
+  useEffect(() => {
+    const handler = (e: Event) => {
+      const detail = (e as CustomEvent).detail
+      if (detail?.message) {
+        handleSendRef.current(detail.message)
+      }
+    }
+    document.addEventListener('mermaid-error-report', handler)
+    return () => document.removeEventListener('mermaid-error-report', handler)
+  }, [])
+
+  // ============================================================
   // @提及逻辑（仅群聊）
   // ============================================================
 
