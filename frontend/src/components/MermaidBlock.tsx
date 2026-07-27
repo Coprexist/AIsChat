@@ -215,8 +215,9 @@ export default function MermaidBlock({ code, compact = false }: MermaidBlockProp
     )
   }
 
-  // 加载态
+  // 加载态——compact 模式下不渲染占位，避免卡滚动；非 compact 显示 spinner
   if (!svg) {
+    if (compact) return null
     return (
       <div className="my-3 rounded-xl border border-border bg-elevated p-4 flex items-center gap-2 text-textMuted text-sm">
         <Loader2 size={14} className="animate-spin" />
