@@ -36,11 +36,20 @@ function extractCleanSvg(container: HTMLDivElement | null): string | null {
 /**
  * Mermaid sandbox 模式下返回的 SVG 自带 width="10"（甚至更小），
  * 从 viewBox 中提取实际绘图宽度并修正。
+ * 同时注入 CSS 防止 CJK 字符被 foreignObject 裁剪（mermaid 已知问题）。
  */
 function normalizeSvgWidth(svg: string): string {
   const vb = svg.match(/viewBox="(\d+)\s+(\d+)\s+([\d.]+)\s+([\d.]+)"/)
   if (!vb) return svg
-  return svg.replace(/width="[^"]*"/, `width="${vb[3]}"`)
+  // 先修 width
+  let result = svg.replace(/width="[^"]*"/, `width="${vb[3]}"`)
+  // 再注入 CSS：让 foreignObject 内的文字不溢出隐藏
+  // 见 mermaid-js/mermaid#4950、#7359、PR#7367
+  const styleTag = `<style>foreignObject{overflow:visible!important}</style>`
+  if (!result.includes(styleTag)) {
+    result = result.replace('</svg>', styleTag + '</svg>')
+  }
+  return result
 }
 
 // 模块级初始化 mermaid（一次性），所有 MermaidBlock 实例共用
@@ -109,7 +118,13 @@ export default function MermaidBlock({ code, compact = false }: MermaidBlockProp
           setError('渲染坐标异常（NaN），图表包含不支持的字符')
           setSvg(null)
         } else {
-          setSvg(rendered)
+          // 注入 CSS 到 iframe srcdoc 中，防止 CJK 字符被裁剪
+          // mermaid 已知问题：mermaid-js/mermaid#4950、#7359
+          const stylePatch = '<style>foreignObject{overflow:visible!important}</style>'
+          const patched = rendered.includes(stylePatch)
+            ? rendered
+            : rendered.replace(/(srcdoc="[^"]*)(<\/svg>)/, (_, before, after) => before + stylePatch + after)
+          setSvg(patched)
           setError(null)
         }
       } catch (err: any) {
