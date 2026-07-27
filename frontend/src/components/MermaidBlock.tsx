@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, useId } from 'react'
+import { useEffect, useRef, useState, useId, useCallback } from 'react'
 import { Loader2, AlertTriangle, Maximize2, Minimize2, ZoomIn, ZoomOut, Download } from 'lucide-react'
 import CodeRenderer from './shared/CodeRenderer'
 
@@ -13,41 +13,17 @@ interface MermaidBlockProps {
 // ---------------------------------------------------------------------------
 
 /**
- * Mermaid 以 sandbox iframe 输出 SVG，无法直接获取。
- * 从容器内的 iframe srcdoc/data URL 中提取纯 SVG 字符串。
- * 取最后一个 <svg>（mermaid 实际渲染结果），固定像素宽度从 viewBox 推导。
+ * Mermaid sandbox 模式下返回的 SVG 自带 width="10"（甚至更小），
+ * 从 viewBox 中提取实际绘图宽度并修正。
  */
-function extractCleanSvg(container: HTMLDivElement | null): string | null {
-  const iframe = container?.querySelector('iframe')
-  if (!iframe) return null
-
-  const src = iframe.getAttribute('srcdoc') || iframe.src || ''
-
-  // case 1: base64 data URL
-  const b64Match = src.match(/;base64,([^"']+)/)
-  if (b64Match) {
-    try {
-      const decoded = atob(b64Match[1])
-      // atob 对二进制不一定安全，但 mermaid 输出是 UTF-8 HTML，没问题
-      const html = decodeURIComponent(Array.from(decoded, c => '%' + c.charCodeAt(0).toString(16).padStart(2, '0')).join(''))
-      const svgs = html.match(/<svg[\s\S]*?<\/svg>/gi)
-      if (!svgs) return null
-      const svg = svgs[svgs.length - 1]
-      const vb = svg.match(/viewBox="(\d+)\s+(\d+)\s+(\d+)\s+(\d+)"/)
-      return vb ? svg.replace(/width="[^"]*"/, `width="${vb[3]}"`) : svg
-    } catch {
-      return null
-    }
-  }
-
-  // case 2: inline SVG in srcdoc
-  const svgMatch = src.match(/<svg[\s\S]*?<\/svg>/i)
-  return svgMatch ? svgMatch[0] : null
+function normalizeSvgWidth(svg: string): string {
+  const vb = svg.match(/viewBox="(\d+)\s+(\d+)\s+([\d.]+)\s+([\d.]+)"/)
+  if (!vb) return svg
+  return svg.replace(/width="[^"]*"/, `width="${vb[3]}"`)
 }
 
-/** Mermaid 语法错误时出的 SVGs 均含此 class，以此判断渲染结果是否有效 */
+/** Mermaid 语法错误时出的 SVG 均含 .error-icon class，以此判断渲染结果是否有效 */
 function isMermaidErrorSvg(svg: string): string | null {
-  // mermaid v11+ 错误 SVG 结构：<path class="error-icon" …/> + <text class="error-text" …>错误信息</text>
   if (/<path[^>]*class="[^"]*\berror-icon\b[^"]*"/.test(svg)) {
     const m = svg.match(/class="error-text"[^>]*>([^<]+)</)
     return m ? m[1].trim() : 'Mermaid 语法错误'
@@ -56,7 +32,7 @@ function isMermaidErrorSvg(svg: string): string | null {
 }
 
 // ---------------------------------------------------------------------------
-// 全屏缩放/拖拽工具
+// 全屏缩放/拖拽 hook
 // ---------------------------------------------------------------------------
 
 function useFullscreenPanZoom(expanded: boolean) {
@@ -101,31 +77,9 @@ function useFullscreenPanZoom(expanded: boolean) {
   const zoomIn = () => { zoomRef.current = Math.min(10, zoomRef.current + 0.25); updateTransform(true) }
   const zoomOut = () => { zoomRef.current = Math.max(0.25, zoomRef.current - 0.25); updateTransform(true) }
 
-  const handleMouseDown = (e: React.MouseEvent) => {
-    dragRef.current = { startX: e.clientX, startY: e.clientY, panX: panRef.current.x, panY: panRef.current.y }
-  }
-
-  const handleMouseMove = (e: React.MouseEvent) => {
-    if (!dragRef.current) return
-    panRef.current = {
-      x: dragRef.current.panX + e.clientX - dragRef.current.startX,
-      y: dragRef.current.panY + e.clientY - dragRef.current.startY,
-    }
-    updateTransform()
-  }
-
-  const handleMouseUp = () => { dragRef.current = null }
-
   return {
-    overlayRef,
-    svgWrapRef,
-    zoomIn,
-    zoomOut,
-    resetTransform,
-    updateTransform,
-    handleMouseDown,
-    handleMouseMove,
-    handleMouseUp,
+    overlayRef, svgWrapRef, zoomIn, zoomOut, resetTransform,
+    dragRef, panRef, updateTransform,
   }
 }
 
@@ -138,13 +92,13 @@ export default function MermaidBlock({ code, compact = false }: MermaidBlockProp
   const [svg, setSvg] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [expanded, setExpanded] = useState(false)
-  const [cleanSvg, setCleanSvg] = useState<string | null>(null)
+  // 全屏用：mermaid.render 返回的 SVG 经过宽度修正后的版本
+  const [fullscreenSvg, setFullscreenSvg] = useState<string | null>(null)
   const uniqueId = useId().replace(/:/g, '')
 
   const {
-    overlayRef, svgWrapRef,
-    zoomIn, zoomOut, resetTransform,
-    handleMouseDown, handleMouseMove, handleMouseUp,
+    overlayRef, svgWrapRef, zoomIn, zoomOut, resetTransform,
+    panRef, dragRef, updateTransform,
   } = useFullscreenPanZoom(expanded)
 
   // ---- 渲染 mermaid ----
@@ -185,19 +139,33 @@ export default function MermaidBlock({ code, compact = false }: MermaidBlockProp
     return () => { cancelled = true }
   }, [code, uniqueId])
 
-  // ---- 展开全屏时提取纯 SVG ----
-  const handleExpand = () => {
-    setExpanded(true)
-    if (!cleanSvg) {
-      const s = extractCleanSvg(containerRef.current)
-      if (s) setCleanSvg(s)
+  // ---- 展开全屏 ----
+  const handleExpand = useCallback(() => {
+    if (svg && !fullscreenSvg) {
+      // 保存宽度修正后的版本，用于全屏 overlay
+      setFullscreenSvg(normalizeSvgWidth(svg))
     }
-  }
+    setExpanded(true)
+  }, [svg, fullscreenSvg])
 
-  const handleClose = () => {
+  const handleClose = useCallback(() => {
     setExpanded(false)
     resetTransform()
-  }
+  }, [resetTransform])
+
+  // ---- 全屏 overlay 的拖拽事件 ----
+  const handleOverlayMouseDown = useCallback((e: React.MouseEvent) => {
+    dragRef.current = { startX: e.clientX, startY: e.clientY, panX: panRef.current.x, panY: panRef.current.y }
+  }, [dragRef, panRef])
+
+  const handleOverlayMouseMove = useCallback((e: React.MouseEvent) => {
+    if (!dragRef.current) return
+    panRef.current = {
+      x: dragRef.current.panX + e.clientX - dragRef.current.startX,
+      y: dragRef.current.panY + e.clientY - dragRef.current.startY,
+    }
+    updateTransform()
+  }, [dragRef, panRef, updateTransform])
 
   // ---- 渲染分支 ----
 
@@ -230,16 +198,15 @@ export default function MermaidBlock({ code, compact = false }: MermaidBlockProp
   }
 
   // 成功态
-  const svgContainerClass = expanded
+  const displaySvg = expanded ? (fullscreenSvg || svg) : svg
+  const isFullscreenClass = expanded
     ? 'w-screen h-screen flex items-center justify-center p-8 overflow-auto'
     : 'overflow-x-auto p-4' + (compact ? ' max-h-[420px] overflow-y-auto' : '')
 
   return (
     <>
       <div className={
-        (compact
-          ? 'my-2 max-w-full'
-          : 'my-4')
+        (compact ? 'my-2 max-w-full' : 'my-4')
         + ' rounded-xl border border-border bg-white dark:bg-[#1e1e2e] overflow-hidden'
       }>
         {/* 标题栏 */}
@@ -261,22 +228,22 @@ export default function MermaidBlock({ code, compact = false }: MermaidBlockProp
         {/* SVG 内容 */}
         <div
           ref={containerRef}
-          className={svgContainerClass}
-          dangerouslySetInnerHTML={{ __html: svg }}
+          className={isFullscreenClass}
+          dangerouslySetInnerHTML={{ __html: displaySvg }}
         />
       </div>
 
-      {/* 全屏浮层 */}
+      {/* 全屏浮层：使用宽度修正后的 SVG + 缩放/拖拽 */}
       {expanded && (
         <div
           className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm"
           ref={overlayRef}
-          onMouseDown={handleMouseDown}
-          onMouseMove={handleMouseMove}
-          onMouseUp={handleMouseUp}
+          onMouseDown={handleOverlayMouseDown}
+          onMouseMove={handleOverlayMouseMove}
+          onMouseUp={() => { dragRef.current = null }}
           onClick={(e) => { if (e.target === e.currentTarget) handleClose() }}
         >
-          <div className={svgContainerClass}>
+          <div className={isFullscreenClass}>
             {/* 工具栏 */}
             <div className="absolute top-4 right-4 flex items-center gap-2 z-10">
               <button onClick={zoomIn} className="p-2 rounded-xl bg-black/30 hover:bg-black/50 text-white/80 hover:text-white transition-colors" title="放大">
@@ -289,10 +256,8 @@ export default function MermaidBlock({ code, compact = false }: MermaidBlockProp
                 还原
               </button>
               <button onClick={() => {
-                const s = cleanSvg || extractCleanSvg(containerRef.current)
-                if (!s) return
                 const a = document.createElement('a')
-                a.href = 'data:image/svg+xml,' + encodeURIComponent(s)
+                a.href = 'data:image/svg+xml,' + encodeURIComponent(normalizeSvgWidth(svg))
                 a.download = 'diagram.svg'
                 a.click()
               }} className="p-2 rounded-xl bg-black/30 hover:bg-black/50 text-white/80 hover:text-white transition-colors" title="下载 SVG">
@@ -306,7 +271,7 @@ export default function MermaidBlock({ code, compact = false }: MermaidBlockProp
               ref={svgWrapRef}
               className="cursor-grab active:cursor-grabbing"
               style={{ transition: 'transform 0.12s ease-out' }}
-              dangerouslySetInnerHTML={{ __html: cleanSvg || '' }}
+              dangerouslySetInnerHTML={{ __html: displaySvg }}
             />
           </div>
         </div>
