@@ -22,6 +22,16 @@ function fmtSourceHM(h: number, m: number): string {
 }
 
 /**
+ * 计算两个 Date 对象之间的日历天数差（基于本地时区的年/月/日）。
+ * 不受经过小时数影响——昨天 23:59 到今早 00:01 算 1 天。
+ */
+function calendarDayDiff(a: Date, b: Date): number {
+  const da = new Date(a.getFullYear(), a.getMonth(), a.getDate())
+  const db = new Date(b.getFullYear(), b.getMonth(), b.getDate())
+  return Math.round((da.getTime() - db.getTime()) / (1000 * 60 * 60 * 24))
+}
+
+/**
  * 相对时间格式化（侧边栏等列表用，精简版）
  * - 今天 → HH:MM
  * - 昨天 → "昨天" / "Yesterday" + HH:MM
@@ -43,8 +53,7 @@ export function formatRelativeTime(
   if (isNaN(date.getTime())) return ''
 
   const now = new Date()
-  const diffMs = now.getTime() - date.getTime()
-  const diffDays = Math.max(0, Math.floor(diffMs / (1000 * 60 * 60 * 24)))
+  const diffDays = Math.max(0, calendarDayDiff(now, date))
 
   const meta = getLangMeta(lang)
 
@@ -54,7 +63,7 @@ export function formatRelativeTime(
   const [srcH, srcM] = parseSourceTime(dateStr)
   const localMin = now.getHours() * 60 + now.getMinutes()
   const srcMin = srcH * 60 + srcM
-  const rollover = diffMs < 0 && srcMin > localMin
+  const rollover = now.getTime() - date.getTime() < 0 && srcMin > localMin
 
   // 用于显示的时间：回滚时取原始字符串的 HH:MM，否则取转换后的本地时间
   const showTime = rollover
@@ -119,7 +128,7 @@ export function formatMessageTime(
 
   const now = new Date()
   const diffMs = now.getTime() - date.getTime()
-  const diffDays = Math.max(0, Math.floor(diffMs / (1000 * 60 * 60 * 24)))
+  const diffDays = Math.max(0, calendarDayDiff(now, date))
   const diffMins = Math.max(0, Math.floor(diffMs / (1000 * 60)))
 
   const timeStr = date.toLocaleTimeString(lang === 'zh' ? 'zh-CN' : 'en-US', {
