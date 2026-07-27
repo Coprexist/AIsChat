@@ -270,7 +270,7 @@
 .markdown-table-wrapper table {
   @apply w-full min-w-full border-collapse text-sm;
 }
-/* 以下颜色从气泡的 CSS 变量读取，var(--b-*, fallback) */
+/* 表格颜色——继承自气泡容器的 inline style CSS 变量 */
 .markdown-table-wrapper thead {
   background: rgb(var(--b-thead-r, 237) var(--b-thead-g, 233) var(--b-thead-b, 254) / var(--b-thead-a, 1));
 }
@@ -283,7 +283,6 @@
 .markdown-table-wrapper tbody tr:nth-child(even) {
   background: rgb(var(--b-zebra-r, 243) var(--b-zebra-g, 240) var(--b-zebra-b, 255) / var(--b-zebra-a, 1));
 }
-
 .markdown-table-wrapper tbody tr:hover {
   background: rgb(var(--b-hover-r, 243) var(--b-hover-g, 240) var(--b-hover-b, 255) / var(--b-hover-a, 1));
 }

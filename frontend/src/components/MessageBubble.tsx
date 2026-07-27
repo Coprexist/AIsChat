@@ -1,4 +1,4 @@
-import { memo, useState } from 'react'
+import { memo, useState, useMemo } from 'react'
 import Markdown from 'react-markdown'
 import remarkGfm from 'remark-gfm'
 import remarkMath from 'remark-math'
@@ -100,6 +100,19 @@ const MessageBubble = memo(function MessageBubble({
   const [previewFile, setPreviewFile] = useState<{ file_id: number; name: string; size: number; mime_type: string } | null>(null)
   const [invStatus, setInvStatus] = useState<string | null>(null)
 
+  // 表格昼夜适配：将 DARK_VARS / LIGHT_VARS 转换为 inline style 挂到气泡上
+  //（DARK_VARS/LIGHT_VARS 定义了但从未被使用，这里修复）
+  const tableVars = useMemo(() => {
+    const isPageDark = typeof document !== 'undefined' && document.documentElement.classList.contains('dark')
+    const vars = (isMine || isPageDark) ? DARK_VARS : LIGHT_VARS
+    const obj: Record<string, string> = {}
+    for (const v of vars) {
+      const idx = v.indexOf(':')
+      if (idx !== -1) obj[v.slice(0, idx).trim()] = v.slice(idx + 1).trim()
+    }
+    return obj
+  }, [isMine])
+
 
   const invAtt = attachments?.find(a => a.type === 'group_invitation')
   const isInvitation = messageType === 'group_invitation' && invAtt
@@ -193,7 +206,7 @@ const MessageBubble = memo(function MessageBubble({
           {thinking && <span className="text-[10px] text-primary-400 animate-pulse font-medium">{t('chat.thinking')}</span>}
           {isTyping && <span className="text-[10px] text-mint-400 animate-pulse font-medium">{t('chat.typing')}</span>}
         </div>
-        <div className={`bubble-content relative px-4 py-2.5 text-sm leading-relaxed break-words ${bubbleBg} ${thinking || isTyping ? 'opacity-70' : ''} ${layoutCls}`}>
+        <div className={`bubble-content relative px-4 py-2.5 text-sm leading-relaxed break-words ${bubbleBg} ${thinking || isTyping ? 'opacity-70' : ''} ${layoutCls}`} style={tableVars}>
           {replyTo != null && (
             <div className={`flex items-start gap-1.5 mb-1.5 pb-1.5 border-b ${isMine ? 'border-white/20' : 'border-border'} cursor-pointer hover:opacity-80 transition-opacity`}
               onClick={() => {
