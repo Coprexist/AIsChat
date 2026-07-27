@@ -239,10 +239,10 @@ export default function MermaidBlock({ code, compact = false }: MermaidBlockProp
     )
   }
 
-  // 加载态——compact 模式下渲染隐藏容器（供 mermaid.render 使用），不占可视空间
+  // 加载态——compact 模式下渲染零尺寸容器（供 mermaid.render 计算尺寸），不占可视空间
   if (!svg) {
     if (compact) {
-      return <div ref={containerRef} hidden />
+      return <div ref={containerRef} style={{ position: 'fixed', width: 0, height: 0, overflow: 'hidden', opacity: 0, pointerEvents: 'none' }} />
     }
     return (
       <div ref={containerRef} className="my-3 rounded-xl border border-border bg-elevated p-4 flex items-center gap-2 text-textMuted text-sm">
