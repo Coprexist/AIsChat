@@ -7,6 +7,27 @@
 
 ---
 
+## [v1.0.7] - 2026-07-27
+
+### Added
+
+- 🖼️ **Mermaid 错误 SVG 友好降级**：语法错误时不再显示 mermaid 原生错误图标，改为本地渲染的错误信息面板（红色边框 + 具体错误 + 语法高亮源码），便于用户快速定位问题。
+
+### Changed
+
+- 🧹 **MermaidBlock 重构**：166 行精简实现，`suppressErrorRendering: true` 一行配置替代手工正则/DOMParser 检测错误 SVG。
+- 🔧 **模块级 mermaid 初始化**：所有 MermaidBlock 实例共用一次初始化，避免每个实例在 `useEffect` 中重复 `initialize()` 导致全局配置竞争。
+- 🎯 **mermaid.render() 传容器元素**：第三个参数传入组件的 `containerRef`，临时 iframe 只放在自己容器内，不污染 `document.body`。
+- 💨 **紧凑模式加载无占位**：渲染完成前用 `<div hidden>` 保留容器引用但不占视觉空间，不再阻塞滚动。
+- 🎨 **全屏 SVG 宽度归一化**：mermaid sandbox 模式输出的 `width="10"` 缩略图在展开全屏时从 viewBox 提取实际宽度修正。
+- 📝 **CHANGELOG 统一**：将 v1.0.7 原本分散在多个草案中的内容合并入此版本。
+
+### Fixed
+
+- 🐛 **Mermaid 错误 SVG 漏检**：深层原因是 `suppressErrorRendering` 被后续 `initialize()` 调用覆盖，改为模块级初始化后修复。
+- 🐛 **_offline_at 离线时间残留**：`record_activity` 活动恢复时未清除之前标记的离线时间戳，导致正常断开时写入过时离线时间。
+- 🐛 **Vite Docker volume 缓存**：文件修改后 Vite transform 缓存未刷新，添加 `server.watch.usePolling: true` 配置。
+
 ## [v1.0.6] - 2026-07-23~26
 
 ### Added
