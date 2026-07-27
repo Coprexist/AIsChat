@@ -1,4 +1,4 @@
-/* MermaidBlock v2 — parse 预检 + 错误 SVG 拦截 + 无占位加载 */
+/* MermaidBlock v3 — suppressErrorRendering + 无占位加载 */
 import { useEffect, useRef, useState, useId, useCallback } from 'react'
 import { Loader2, AlertTriangle, Maximize2, Minimize2, ZoomIn, ZoomOut, Download } from 'lucide-react'
 import CodeRenderer from './shared/CodeRenderer'
@@ -21,38 +21,6 @@ function normalizeSvgWidth(svg: string): string {
   const vb = svg.match(/viewBox="(\d+)\s+(\d+)\s+([\d.]+)\s+([\d.]+)"/)
   if (!vb) return svg
   return svg.replace(/width="[^"]*"/, `width="${vb[3]}"`)
-}
-
-/**
- * 用 DOMParser 解析 SVG 并查询错误标记节点。
- * 比字符串正则可靠——不受换行/编码/属性顺序影响。
- */
-function isMermaidErrorSvg(svg: string): string | null {
-  try {
-    const doc = new DOMParser().parseFromString(svg, 'image/svg+xml')
-    const root = doc.documentElement
-
-    // 特征 1：SVG 根标签 aria-roledescription="error"
-    if (root.getAttribute('aria-roledescription') === 'error') {
-      const el = root.querySelector('.error-text')
-      return el?.textContent?.trim() || 'Mermaid 语法错误'
-    }
-
-    // 特征 2：路径含 error-icon class
-    if (root.querySelector('.error-icon')) {
-      const el = root.querySelector('.error-text')
-      return el?.textContent?.trim() || 'Mermaid 语法错误'
-    }
-
-    // 特征 3：有 error-text 节点
-    const errorText = root.querySelector('.error-text')
-    if (errorText) {
-      return errorText.textContent?.trim() || 'Mermaid 语法错误'
-    }
-  } catch {
-    // 解析失败时不视为错误 SVG
-  }
-  return null
 }
 
 // ---------------------------------------------------------------------------
@@ -139,31 +107,16 @@ export default function MermaidBlock({ code, compact = false }: MermaidBlockProp
           theme: 'default',
           securityLevel: 'sandbox',
           fontFamily: 'inherit',
+          // suppressErrorRendering 让 mermaid 在语法错误时不产生错误 SVG（v11+ 支持）
+          // 而是直接 throw，由外层 catch 统一处理
+          suppressErrorRendering: true,
         })
-
-        // 先用 parse 预检语法，避免 mermaid.render 不抛异常却返回错误 SVG
-        try {
-          await mermaid.parse(code, { suppressErrors: false })
-        } catch (parseErr: any) {
-          if (!cancelled) {
-            setError(parseErr?.message || parseErr?.str || 'Mermaid 语法错误')
-            setSvg(null)
-          }
-          return
-        }
 
         const { svg: rendered } = await mermaid.render(`mermaid-${uniqueId}`, code)
         if (cancelled) return
 
-        // render 成功但依然可能返回错误图（兜底检测）
-        const errMsg = isMermaidErrorSvg(rendered)
-        if (errMsg) {
-          setError(errMsg)
-          setSvg(null)
-        } else {
-          setSvg(rendered)
-          setError(null)
-        }
+        setSvg(rendered)
+        setError(null)
       } catch (err: any) {
         if (!cancelled) {
           containerRef.current?.querySelectorAll('iframe').forEach(el => el.remove())
