@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, useId, useCallback } from 'react'
+import { useEffect, useRef, useState, useId } from 'react'
 import { Loader2, AlertTriangle, Maximize2, Minimize2, ZoomIn, ZoomOut, Download } from 'lucide-react'
 import CodeRenderer from './shared/CodeRenderer'
 
@@ -38,16 +38,78 @@ const mermaidPromise = (async () => {
   return mermaid
 })()
 
+
+
 // ---------------------------------------------------------------------------
-// 全屏缩放/拖拽 hook
+// 设置读取
 // ---------------------------------------------------------------------------
 
-function useFullscreenPanZoom(expanded: boolean) {
+function getMermaidSetting(key: string, fallback: boolean): boolean {
+  try {
+    return localStorage.getItem(key) === null ? fallback : localStorage.getItem(key) === 'true'
+  } catch {
+    return fallback
+  }
+}
+
+// ---------------------------------------------------------------------------
+// 主组件
+// ---------------------------------------------------------------------------
+
+export default function MermaidBlock({ code, compact = false }: MermaidBlockProps) {
+  const containerRef = useRef<HTMLDivElement>(null)
+  const [svg, setSvg] = useState<string | null>(null)
+  const [error, setError] = useState<string | null>(null)
+  const [expanded, setExpanded] = useState(false)
+  const [fullscreenSvg, setFullscreenSvg] = useState<string | null>(null)
+  // expandLevel: 0=未展开, 1=已点击但正在渲染, 2=已显示结果
+  const [expandLevel, setExpandLevel] = useState(0)
+  const [errorRevealed, setErrorRevealed] = useState(false)
+  const uniqueId = useId().replace(/:/g, '')
+
+  // 默认折叠设置（仅 compact 模式生效）
+  const collapseDefault = compact && getMermaidSetting('mermaid_collapse', true)
+  const collapseErrors = compact && getMermaidSetting('mermaid_collapse_errors', true)
+  const isCollapsed = collapseDefault && expandLevel === 0
+  const isErrorCollapsed = error && collapseErrors && !errorRevealed
+
+  // ---- 渲染 mermaid（仅在用户点击展开后执行） ----
+  useEffect(() => {
+    if (expandLevel === 0) return
+    let cancelled = false
+
+    async function render() {
+      try {
+        const mermaid = await mermaidPromise
+        const { svg: rendered } = await mermaid.render(`mermaid-${uniqueId}`, code)
+        if (cancelled) return
+
+        if (/translate\(NaN/.test(rendered)) {
+          setError('渲染坐标异常（NaN），图表包含不支持的字符')
+          setSvg(null)
+        } else {
+          setSvg(rendered)
+          setError(null)
+        }
+      } catch (err: any) {
+        if (!cancelled) {
+          setError(err?.message || 'Mermaid 渲染失败')
+          setSvg(null)
+        }
+      }
+    }
+
+    render()
+    return () => { cancelled = true }
+  }, [code, uniqueId, expandLevel])
+
+  // ---- 展开全屏（用 ref 存 svg，避免 StrictMode 双渲导致 useCallback 闭包过期） ----
+  // 全屏缩放/拖拽 refs（与原版保持一致，不抽 hook，避免 StrictMode 下引用问题）
   const overlayRef = useRef<HTMLDivElement>(null)
-  const svgWrapRef = useRef<HTMLDivElement>(null)
   const zoomRef = useRef(1)
   const panRef = useRef({ x: 0, y: 0 })
   const dragRef = useRef<{ startX: number; startY: number; panX: number; panY: number } | null>(null)
+  const svgWrapRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
     if (!expanded) return
@@ -84,109 +146,20 @@ function useFullscreenPanZoom(expanded: boolean) {
   const zoomIn = () => { zoomRef.current = Math.min(10, zoomRef.current + 0.25); updateTransform(true) }
   const zoomOut = () => { zoomRef.current = Math.max(0.25, zoomRef.current - 0.25); updateTransform(true) }
 
-  return {
-    overlayRef, svgWrapRef, zoomIn, zoomOut, resetTransform,
-    dragRef, panRef, updateTransform,
-  }
-}
-
-// ---------------------------------------------------------------------------
-// 设置读取
-// ---------------------------------------------------------------------------
-
-function getMermaidSetting(key: string, fallback: boolean): boolean {
-  try {
-    return localStorage.getItem(key) === null ? fallback : localStorage.getItem(key) === 'true'
-  } catch {
-    return fallback
-  }
-}
-
-// ---------------------------------------------------------------------------
-// 主组件
-// ---------------------------------------------------------------------------
-
-export default function MermaidBlock({ code, compact = false }: MermaidBlockProps) {
-  const containerRef = useRef<HTMLDivElement>(null)
-  const [svg, setSvg] = useState<string | null>(null)
-  const [error, setError] = useState<string | null>(null)
-  const [expanded, setExpanded] = useState(false)
-  const [fullscreenSvg, setFullscreenSvg] = useState<string | null>(null)
-  // expandLevel: 0=未展开, 1=已点击但正在渲染, 2=已显示结果
-  const [expandLevel, setExpandLevel] = useState(0)
-  const [errorRevealed, setErrorRevealed] = useState(false)
-  const uniqueId = useId().replace(/:/g, '')
-
-  // 默认折叠设置（仅 compact 模式生效）
-  const collapseDefault = compact && getMermaidSetting('mermaid_collapse', true)
-  const collapseErrors = compact && getMermaidSetting('mermaid_collapse_errors', true)
-  const isCollapsed = collapseDefault && expandLevel === 0
-  const isErrorCollapsed = error && collapseErrors && !errorRevealed
-
-  const {
-    overlayRef, svgWrapRef, zoomIn, zoomOut, resetTransform,
-    panRef, dragRef, updateTransform,
-  } = useFullscreenPanZoom(expanded)
-
-  // ---- 渲染 mermaid（仅在用户点击展开后执行） ----
-  useEffect(() => {
-    if (expandLevel === 0) return
-    let cancelled = false
-
-    async function render() {
-      try {
-        const mermaid = await mermaidPromise
-        const { svg: rendered } = await mermaid.render(`mermaid-${uniqueId}`, code)
-        if (cancelled) return
-
-        if (/translate\(NaN/.test(rendered)) {
-          setError('渲染坐标异常（NaN），图表包含不支持的字符')
-          setSvg(null)
-        } else {
-          setSvg(rendered)
-          setError(null)
-        }
-      } catch (err: any) {
-        if (!cancelled) {
-          setError(err?.message || 'Mermaid 渲染失败')
-          setSvg(null)
-        }
-      }
-    }
-
-    render()
-    return () => { cancelled = true }
-  }, [code, uniqueId, expandLevel])
-
-  // ---- 展开全屏（用 ref 存 svg，避免 StrictMode 双渲导致 useCallback 闭包过期） ----
   const svgRef = useRef(svg)
   svgRef.current = svg
 
-  const handleExpand = useCallback(() => {
+  const handleExpand = () => {
     const currentSvg = svgRef.current
     if (currentSvg) {
       setFullscreenSvg(normalizeSvgWidth(currentSvg))
     }
     setExpanded(true)
-  }, [])
-
-  const handleClose = useCallback(() => {
-    setExpanded(false)
-    resetTransform()
-  }, [resetTransform])
-
-  // ---- 全屏 overlay 的拖拽事件（ref 稳定，不需要 useCallback） ----
-  const handleOverlayMouseDown = (e: React.MouseEvent) => {
-    dragRef.current = { startX: e.clientX, startY: e.clientY, panX: panRef.current.x, panY: panRef.current.y }
   }
 
-  const handleOverlayMouseMove = (e: React.MouseEvent) => {
-    if (!dragRef.current) return
-    panRef.current = {
-      x: dragRef.current.panX + e.clientX - dragRef.current.startX,
-      y: dragRef.current.panY + e.clientY - dragRef.current.startY,
-    }
-    updateTransform()
+  const handleClose = () => {
+    setExpanded(false)
+    resetTransform()
   }
 
   // ---- 渲染分支 ----
@@ -302,8 +275,14 @@ export default function MermaidBlock({ code, compact = false }: MermaidBlockProp
         <div
           className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm"
           ref={overlayRef}
-          onMouseDown={handleOverlayMouseDown}
-          onMouseMove={handleOverlayMouseMove}
+          onMouseDown={(e) => {
+            dragRef.current = { startX: e.clientX, startY: e.clientY, panX: panRef.current.x, panY: panRef.current.y }
+          }}
+          onMouseMove={(e) => {
+            if (!dragRef.current) return
+            panRef.current = { x: dragRef.current.panX + e.clientX - dragRef.current.startX, y: dragRef.current.panY + e.clientY - dragRef.current.startY }
+            updateTransform()
+          }}
           onMouseUp={() => { dragRef.current = null }}
           onClick={(e) => { if (e.target === e.currentTarget) handleClose() }}
         >
