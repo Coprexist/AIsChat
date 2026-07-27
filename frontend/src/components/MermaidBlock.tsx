@@ -115,7 +115,8 @@ export default function MermaidBlock({ code, compact = false }: MermaidBlockProp
     async function render() {
       try {
         // 传容器元素让 mermaid 的临时 DOM 放在这里，不污染 document.body
-        const { svg: rendered } = await mermaidPromise.render(`mermaid-${uniqueId}`, code, containerRef.current)
+        const mermaid = await mermaidPromise
+        const { svg: rendered } = await mermaid.render(`mermaid-${uniqueId}`, code, containerRef.current)
         if (cancelled) return
 
         setSvg(rendered)
