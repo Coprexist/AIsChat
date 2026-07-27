@@ -35,9 +35,9 @@ const DARK_VARS = [
 ]
 /* 自己的消息在深色页面下：比 DARK_VARS 再偏灰一点 */
 const DARK_MINE_VARS = [
-  '--b-thead-r:60', '--b-thead-g:52', '--b-thead-b:72', '--b-thead-a:1',
-  '--b-zebra-r:52', '--b-zebra-g:45', '--b-zebra-b:65', '--b-zebra-a:0.5',
-  '--b-hover-r:60', '--b-hover-g:52', '--b-hover-b:72', '--b-hover-a:0.8',
+  '--b-thead-r:80', '--b-thead-g:70', '--b-thead-b:88', '--b-thead-a:0.8',
+  '--b-zebra-r:68', '--b-zebra-g:60', '--b-zebra-b:75', '--b-zebra-a:0.5',
+  '--b-hover-r:80', '--b-hover-g:70', '--b-hover-b:88', '--b-hover-a:0.9',
 ]
 const LIGHT_VARS = [
   '--b-link-r:initial',
@@ -142,7 +142,7 @@ const MessageBubble = memo(function MessageBubble({
   }
 
   const bubbleBg = isMine
-    ? 'bg-primary-500 dark:bg-primary-600 text-white rounded-2xl rounded-tr-md shadow-lg shadow-primary-500/15'
+    ? 'bg-primary-500 dark:bg-[#3a3560] text-white rounded-2xl rounded-tr-md shadow-lg shadow-primary-500/15'
     : senderType === 'system'
       ? 'bg-rose-50 dark:bg-rose-900/20 text-rose-900 dark:text-rose-300 rounded-2xl rounded-tl-md border border-rose-200 dark:border-rose-800'
       : 'bg-surface text-textPrimary rounded-2xl rounded-tl-md border border-border'
