@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, useId } from 'react'
+import { useEffect, useRef, useState, useId, memo } from 'react'
 import { Loader2, AlertTriangle, Maximize2, Minimize2, ZoomIn, ZoomOut, Download } from 'lucide-react'
 import CodeRenderer from './shared/CodeRenderer'
 
@@ -86,7 +86,7 @@ function getMermaidSetting(key: string, fallback: boolean): boolean {
 // 主组件
 // ---------------------------------------------------------------------------
 
-export default function MermaidBlock({ code, compact = false }: MermaidBlockProps) {
+function MermaidBlock({ code, compact = false }: MermaidBlockProps) {
   const containerRef = useRef<HTMLDivElement>(null)
   const [svg, setSvg] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
@@ -392,3 +392,5 @@ export default function MermaidBlock({ code, compact = false }: MermaidBlockProp
     </>
   )
 }
+
+export default memo(MermaidBlock, (prev, next) => prev.code === next.code && prev.compact === next.compact)
