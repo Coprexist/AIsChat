@@ -1,4 +1,3 @@
-/* MermaidBlock v3 — suppressErrorRendering + 无占位加载 */
 import { useEffect, useRef, useState, useId, useCallback } from 'react'
 import { Loader2, AlertTriangle, Maximize2, Minimize2, ZoomIn, ZoomOut, Download } from 'lucide-react'
 import CodeRenderer from './shared/CodeRenderer'
@@ -95,8 +94,6 @@ function useFullscreenPanZoom(expanded: boolean) {
 // 主组件
 // ---------------------------------------------------------------------------
 
-console.log("MERMAIDBLOCK_V2_RUNNING");
-
 export default function MermaidBlock({ code, compact = false }: MermaidBlockProps) {
   const containerRef = useRef<HTMLDivElement>(null)
   const [svg, setSvg] = useState<string | null>(null)
@@ -117,7 +114,8 @@ export default function MermaidBlock({ code, compact = false }: MermaidBlockProp
 
     async function render() {
       try {
-        const { svg: rendered } = await mermaidPromise.render(`mermaid-${uniqueId}`, code)
+        // 传容器元素让 mermaid 的临时 DOM 放在这里，不污染 document.body
+        const { svg: rendered } = await mermaidPromise.render(`mermaid-${uniqueId}`, code, containerRef.current)
         if (cancelled) return
 
         setSvg(rendered)
@@ -148,19 +146,19 @@ export default function MermaidBlock({ code, compact = false }: MermaidBlockProp
     resetTransform()
   }, [resetTransform])
 
-  // ---- 全屏 overlay 的拖拽事件 ----
-  const handleOverlayMouseDown = useCallback((e: React.MouseEvent) => {
+  // ---- 全屏 overlay 的拖拽事件（ref 稳定，不需要 useCallback） ----
+  const handleOverlayMouseDown = (e: React.MouseEvent) => {
     dragRef.current = { startX: e.clientX, startY: e.clientY, panX: panRef.current.x, panY: panRef.current.y }
-  }, [dragRef, panRef])
+  }
 
-  const handleOverlayMouseMove = useCallback((e: React.MouseEvent) => {
+  const handleOverlayMouseMove = (e: React.MouseEvent) => {
     if (!dragRef.current) return
     panRef.current = {
       x: dragRef.current.panX + e.clientX - dragRef.current.startX,
       y: dragRef.current.panY + e.clientY - dragRef.current.startY,
     }
     updateTransform()
-  }, [dragRef, panRef, updateTransform])
+  }
 
   // ---- 渲染分支 ----
 
@@ -182,14 +180,13 @@ export default function MermaidBlock({ code, compact = false }: MermaidBlockProp
     )
   }
 
-  // 加载态——compact 模式下不渲染占位，避免卡滚动；非 compact 显示 spinner
+  // 加载态——compact 模式下渲染隐藏容器（供 mermaid.render 使用），不占可视空间
   if (!svg) {
     if (compact) {
-      // 加载完成后会变成 SVG 或错误 UI，期间不留空白
-      return null
+      return <div ref={containerRef} hidden />
     }
     return (
-      <div className="my-3 rounded-xl border border-border bg-elevated p-4 flex items-center gap-2 text-textMuted text-sm">
+      <div ref={containerRef} className="my-3 rounded-xl border border-border bg-elevated p-4 flex items-center gap-2 text-textMuted text-sm">
         <Loader2 size={14} className="animate-spin" />
         图表加载中...
       </div>
@@ -256,7 +253,8 @@ export default function MermaidBlock({ code, compact = false }: MermaidBlockProp
               </button>
               <button onClick={() => {
                 const a = document.createElement('a')
-                a.href = 'data:image/svg+xml,' + encodeURIComponent(normalizeSvgWidth(svg))
+                const svgContent = fullscreenSvg || normalizeSvgWidth(svg)
+                a.href = 'data:image/svg+xml,' + encodeURIComponent(svgContent)
                 a.download = 'diagram.svg'
                 a.click()
               }} className="p-2 rounded-xl bg-black/30 hover:bg-black/50 text-white/80 hover:text-white transition-colors" title="下载 SVG">
