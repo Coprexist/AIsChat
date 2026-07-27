@@ -266,7 +266,7 @@ export default function MermaidBlock({ code, compact = false }: MermaidBlockProp
     <>
       <div className={
         (compact ? 'my-2 max-w-full' : 'my-4')
-        + ' rounded-xl border border-border bg-white dark:bg-[#1e1e2e] overflow-hidden'
+        + ' rounded-xl border border-border bg-white dark:bg-[#1e1e2e] [clip-path:inset(0_round_1rem)]' // clip-path 裁圆角但不去掉滚动能力
       }>
         {/* 标题栏 */}
         <div className="flex items-center justify-between px-3 py-1.5 bg-elevated/50 border-b border-border">
