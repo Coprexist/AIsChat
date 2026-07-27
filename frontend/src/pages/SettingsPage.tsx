@@ -10,7 +10,7 @@ import { LANGUAGES } from '../i18n/languages'
 import { isDesktop } from '../utils/platform'
 import { invoke } from '../utils/tauri'
 import { getApiKeyUrl } from '../utils/providers.tsx'
-import { Key, Zap, Save, Clock, Palette, Bell, Eye, EyeOff, CheckCircle, XCircle, Loader2, Globe, Layout, Bot, Pencil, X, Ticket, Plus, ChevronDown, ChevronRight, Shield, AlertTriangle, ArrowLeft, Mail, Monitor, HardDrive, Trash2, Cpu, Wrench, Box, ExternalLink } from 'lucide-react'
+import { Key, Zap, Save, Clock, Palette, Bell, Eye, EyeOff, CheckCircle, XCircle, Loader2, Globe, Layout, Bot, Pencil, X, Ticket, Plus, ChevronDown, ChevronRight, Shield, AlertTriangle, ArrowLeft, Mail, Monitor, HardDrive, Trash2, Cpu, Wrench, Box, ExternalLink, BarChart3 } from 'lucide-react'
 import { useNavigate, useBlocker, useLocation, useSearchParams } from 'react-router-dom'
 
 // 常用时区列表
@@ -53,8 +53,9 @@ const NAV_SECTIONS: NavSection[] = [
   { id: 'api',         icon: Key,     labelKey: 'settings.apiConfigTitle',   category: 'settings.catApi' },
   { id: 'timezone',    icon: Clock,   labelKey: 'settings.timezone',         category: 'settings.catPrefs' },
   { id: 'language',    icon: Globe,   labelKey: 'settings.language',         category: 'settings.catPrefs' },
-  { id: 'chatstyle',   icon: Layout,  labelKey: 'settings.chatStyle',        category: 'settings.catPrefs' },
-  { id: 'uiscale',    icon: Monitor, labelKey: 'UI 缩放',                 category: 'settings.catPrefs' },
+  { id: 'chatstyle',   icon: Layout,   labelKey: 'settings.chatStyle',       category: 'settings.catPrefs' },
+  { id: 'uiscale',    icon: Monitor,  labelKey: 'UI 缩放',                  category: 'settings.catPrefs' },
+  { id: 'mermaid',    icon: BarChart3, labelKey: 'Mermaid 图表',             category: 'settings.catPrefs' },
   { id: 'appearance',  icon: Palette, labelKey: 'settings.appearance',       category: 'settings.catPrefs' },
   { id: 'notifications', icon: Bell,  labelKey: 'settings.notifications',   category: 'settings.catPrefs' },
   { id: 'strategy',    icon: Zap,     labelKey: 'settings.strategy',         category: 'settings.catPrefs' },
@@ -67,6 +68,14 @@ export default function SettingsPage() {
   const t = useT()
   const { user, refreshUser } = useAuth()
   const { theme, toggleTheme } = useTheme()
+
+  const getMermaidSetting = (key: string, fallback: boolean) => {
+    try {
+      return localStorage.getItem(key) === null ? fallback : localStorage.getItem(key) === 'true'
+    } catch {
+      return fallback
+    }
+  }
   const navigate = useNavigate()
   const [apiBaseUrl, setApiBaseUrl] = useState('https://api.deepseek.com')
   const [apiKey, setApiKey] = useState('')
@@ -844,6 +853,30 @@ export default function SettingsPage() {
           <div className="flex items-center gap-3">
             <Toggle checked={autoDefault} onChange={setAutoDefault} />
             <span className="text-sm text-textSecondary">{t('settings.autoApproveDefault')}</span>
+          </div>
+        </div>
+      </div>
+
+      {/* Mermaid 图表 */}
+      <div id="settings-mermaid" className={(activeTab === 'mermaid' ? '' : 'hidden') + ' bg-surface rounded-xl border border-border p-3 md:p-6 scroll-mt-16'}>
+        <div className="flex items-center gap-2 mb-4">
+          <BarChart3 size={18} className="text-primary-400" />
+          <h2 className="font-semibold text-textPrimary">Mermaid 图表</h2>
+        </div>
+        <div className="space-y-4">
+          <div className="flex items-center gap-3">
+            <Toggle
+              checked={getMermaidSetting('mermaid_collapse', true)}
+              onChange={(v) => { try { localStorage.setItem('mermaid_collapse', String(v)); window.location.reload() } catch {} }}
+            />
+            <span className="text-sm text-textSecondary">默认折叠图表（点击展开）</span>
+          </div>
+          <div className="flex items-center gap-3">
+            <Toggle
+              checked={getMermaidSetting('mermaid_collapse_errors', true)}
+              onChange={(v) => { try { localStorage.setItem('mermaid_collapse_errors', String(v)); window.location.reload() } catch {} }}
+            />
+            <span className="text-sm text-textSecondary">渲染出错时也折叠</span>
           </div>
         </div>
       </div>

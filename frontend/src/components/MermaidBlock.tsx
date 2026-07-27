@@ -91,6 +91,18 @@ function useFullscreenPanZoom(expanded: boolean) {
 }
 
 // ---------------------------------------------------------------------------
+// 设置读取
+// ---------------------------------------------------------------------------
+
+function getMermaidSetting(key: string, fallback: boolean): boolean {
+  try {
+    return localStorage.getItem(key) === null ? fallback : localStorage.getItem(key) === 'true'
+  } catch {
+    return fallback
+  }
+}
+
+// ---------------------------------------------------------------------------
 // 主组件
 // ---------------------------------------------------------------------------
 
@@ -101,7 +113,12 @@ export default function MermaidBlock({ code, compact = false }: MermaidBlockProp
   const [expanded, setExpanded] = useState(false)
   // 全屏用：mermaid.render 返回的 SVG 经过宽度修正后的版本
   const [fullscreenSvg, setFullscreenSvg] = useState<string | null>(null)
+  const [showCollapsed, setShowCollapsed] = useState(true) // true=显示placeholder, false=显示渲染结果
   const uniqueId = useId().replace(/:/g, '')
+
+  // 默认折叠设置（仅 compact 模式生效）
+  const collapseDefault = compact && getMermaidSetting('mermaid_collapse', true)
+  const collapseErrors = compact && getMermaidSetting('mermaid_collapse_errors', true)
 
   const {
     overlayRef, svgWrapRef, zoomIn, zoomOut, resetTransform,
@@ -114,13 +131,10 @@ export default function MermaidBlock({ code, compact = false }: MermaidBlockProp
 
     async function render() {
       try {
-        // 传容器元素让 mermaid 的临时 DOM 放在这里，不污染 document.body
         const mermaid = await mermaidPromise
         const { svg: rendered } = await mermaid.render(`mermaid-${uniqueId}`, code, containerRef.current)
         if (cancelled) return
 
-        // mermaid 可能在 parse 通过后渲染阶段仍崩溃（如 mindmap 遇上特殊 Unicode 字符
-        // 导致坐标算出 NaN），这时 SVG 虽无语法错误但节点不可见。
         if (/translate\(NaN/.test(rendered)) {
           setError('渲染坐标异常（NaN），图表包含不支持的字符')
           setSvg(null)
@@ -169,6 +183,43 @@ export default function MermaidBlock({ code, compact = false }: MermaidBlockProp
   }
 
   // ---- 渲染分支 ----
+
+  // ---- 折叠控制：设置决定是否显示占位，渲染始终进行 ----
+  const showPlaceholder = showCollapsed && (
+    (svg && collapseDefault) ||            // 正常图表被折叠
+    (error && collapseErrors)              // 错误图表被折叠
+  )
+
+  const handleShowContent = () => setShowCollapsed(false)
+
+  // 折叠占位
+  if (showPlaceholder && svg) {
+    return (
+      <div className="my-1">
+        <button
+          onClick={handleShowContent}
+          className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-border/50 bg-elevated/30 hover:bg-elevated transition-colors text-xs text-textMuted hover:text-textSecondary"
+        >
+          <Maximize2 size={12} />
+          <span>展开 Mermaid 图表</span>
+        </button>
+      </div>
+    )
+  }
+
+  if (showPlaceholder && error) {
+    return (
+      <div className="my-1">
+        <button
+          onClick={handleShowContent}
+          className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-rose-400/20 bg-rose-400/5 hover:bg-rose-400/10 transition-colors text-xs text-rose-400/70 hover:text-rose-400"
+        >
+          <AlertTriangle size={12} />
+          <span>图表渲染出错 · 点击查看</span>
+        </button>
+      </div>
+    )
+  }
 
   // 错误态
   if (error) {
