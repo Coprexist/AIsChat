@@ -24,14 +24,20 @@ const DARK_VARS = [
   '--b-code-r:255', '--b-code-g:255', '--b-code-b:255', '--b-code-a:0.15',
   '--b-pre-r:0',    '--b-pre-g:0',    '--b-pre-b:0',    '--b-pre-a:0.2',
   '--b-hr-r:255',   '--b-hr-g:255',   '--b-hr-b:255',   '--b-hr-a:0.2',
-  '--b-thead-r:55', '--b-thead-g:55', '--b-thead-b:68', '--b-thead-a:1',
-  '--b-zebra-r:48', '--b-zebra-g:48', '--b-zebra-b:60', '--b-zebra-a:0.5',
-  '--b-hover-r:55', '--b-hover-g:55', '--b-hover-b:68', '--b-hover-a:0.8',
+  '--b-thead-r:55', '--b-thead-g:45', '--b-thead-b:70', '--b-thead-a:1',
+  '--b-zebra-r:48', '--b-zebra-g:40', '--b-zebra-b:60', '--b-zebra-a:0.5',
+  '--b-hover-r:55', '--b-hover-g:45', '--b-hover-b:70', '--b-hover-a:0.8',
   '--b-scrollbar-r:255_255_255', '--b-scrollbar-a:0.3',
   /* 气泡彩色文字（深色底用亮色） */
   '--b-text-red:255 100 100', '--b-text-orange:255 180 50', '--b-text-gold:255 215 0',
   '--b-text-green:80 220 120', '--b-text-blue:100 150 255', '--b-text-purple:180 130 255',
   '--b-text-pink:255 130 200', '--b-text-gray:180 180 180',
+]
+/* 自己的消息在深色页面下：比 DARK_VARS 再偏灰一点 */
+const DARK_MINE_VARS = [
+  '--b-thead-r:60', '--b-thead-g:52', '--b-thead-b:72', '--b-thead-a:1',
+  '--b-zebra-r:52', '--b-zebra-g:45', '--b-zebra-b:65', '--b-zebra-a:0.5',
+  '--b-hover-r:60', '--b-hover-g:52', '--b-hover-b:72', '--b-hover-a:0.8',
 ]
 const LIGHT_VARS = [
   '--b-link-r:initial',
@@ -104,7 +110,9 @@ const MessageBubble = memo(function MessageBubble({
   //（DARK_VARS/LIGHT_VARS 定义了但从未被使用，这里修复）
   const tableVars = useMemo(() => {
     const isPageDark = typeof document !== 'undefined' && document.documentElement.classList.contains('dark')
-    const vars = (isMine || isPageDark) ? DARK_VARS : LIGHT_VARS
+    const vars = isMine
+      ? (isPageDark ? DARK_MINE_VARS : DARK_VARS)
+      : (isPageDark ? DARK_VARS : LIGHT_VARS)
     const obj: Record<string, string> = {}
     for (const v of vars) {
       const idx = v.indexOf(':')
