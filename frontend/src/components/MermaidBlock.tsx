@@ -13,6 +13,27 @@ interface MermaidBlockProps {
 // ---------------------------------------------------------------------------
 
 /**
+ * Mermaid sandbox 模式下 render() 返回的是 iframe 包裹 HTML，
+ * 从 iframe 的 srcdoc/data URL 中提取纯 SVG 字符串。
+ */
+function extractCleanSvg(container: HTMLDivElement | null): string | null {
+  const iframe = container?.querySelector('iframe')
+  if (!iframe) return null
+  const src = iframe.getAttribute('srcdoc') || iframe.src || ''
+  // base64 data URL
+  const b64 = src.match(/;base64,([^"']+)/)
+  if (b64) {
+    try {
+      const html = decodeURIComponent(Array.from(atob(b64[1]), c => '%' + c.charCodeAt(0).toString(16).padStart(2, '0')).join(''))
+      const svgs = html.match(/<svg[\s\S]*?<\/svg>/gi)
+      return svgs ? svgs[svgs.length - 1] : html.length < 50000 ? html : null
+    } catch { return null }
+  }
+  const m = src.match(/<svg[\s\S]*?<\/svg>/i)
+  return m ? m[0] : null
+}
+
+/**
  * Mermaid sandbox 模式下返回的 SVG 自带 width="10"（甚至更小），
  * 从 viewBox 中提取实际绘图宽度并修正。
  */
@@ -150,9 +171,10 @@ export default function MermaidBlock({ code, compact = false }: MermaidBlockProp
   svgRef.current = svg
 
   const handleExpand = () => {
-    const currentSvg = svgRef.current
-    if (currentSvg) {
-      setFullscreenSvg(normalizeSvgWidth(currentSvg))
+    // mermaid.render 在 sandbox 模式返回 iframe 包裹 HTML，需提取纯 SVG
+    const raw = extractCleanSvg(containerRef.current)
+    if (raw) {
+      setFullscreenSvg(normalizeSvgWidth(raw))
     }
     setExpanded(true)
   }
@@ -300,8 +322,11 @@ export default function MermaidBlock({ code, compact = false }: MermaidBlockProp
               </button>
               <button onClick={() => {
                 const a = document.createElement('a')
-                const svgContent = fullscreenSvg || normalizeSvgWidth(svg)
-                a.href = 'data:image/svg+xml,' + encodeURIComponent(svgContent)
+                const raw = fullscreenSvg || (() => {
+                  const e = extractCleanSvg(containerRef.current)
+                  return e ? normalizeSvgWidth(e) : svg
+                })()
+                a.href = 'data:image/svg+xml,' + encodeURIComponent(raw)
                 a.download = 'diagram.svg'
                 a.click()
               }} className="p-2 rounded-xl bg-black/30 hover:bg-black/50 text-white/80 hover:text-white transition-colors" title="下载 SVG">
