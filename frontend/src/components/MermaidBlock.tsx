@@ -158,14 +158,17 @@ export default function MermaidBlock({ code, compact = false }: MermaidBlockProp
     return () => { cancelled = true }
   }, [code, uniqueId, expandLevel])
 
-  // ---- 展开全屏 ----
+  // ---- 展开全屏（用 ref 存 svg，避免 StrictMode 双渲导致 useCallback 闭包过期） ----
+  const svgRef = useRef(svg)
+  svgRef.current = svg
+
   const handleExpand = useCallback(() => {
-    if (svg && !fullscreenSvg) {
-      // 保存宽度修正后的版本，用于全屏 overlay
-      setFullscreenSvg(normalizeSvgWidth(svg))
+    const currentSvg = svgRef.current
+    if (currentSvg) {
+      setFullscreenSvg(normalizeSvgWidth(currentSvg))
     }
     setExpanded(true)
-  }, [svg, fullscreenSvg])
+  }, [])
 
   const handleClose = useCallback(() => {
     setExpanded(false)
