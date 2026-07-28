@@ -186,7 +186,7 @@ async def websocket_endpoint(ws: WebSocket, token: str = Query(...)):
 
                     msg["conversation_type"] = "dm"
                     # 审计日志：用户发送消息（fire-and-forget）
-                    asyncio.create_task(_log_message_audit(db, user_id, "dm", session_id, content))
+                    asyncio.create_task(_log_message_audit(user_id, "dm", session_id, content))
                     # 回显给发送者
                     await ws.send_json({"type": "message", "conversation_type": "dm", "data": msg})
                     # 推送给对方（排除发送者）
@@ -260,7 +260,7 @@ async def websocket_endpoint(ws: WebSocket, token: str = Query(...)):
                         msg_data = message_to_dict(message, sender_avatar_url=sender_avatar, sender_state=sender_state)
 
                         # 审计日志：用户发送消息（fire-and-forget）
-                        asyncio.create_task(_log_message_audit(db, user_id, "group", group_id, content))
+                        asyncio.create_task(_log_message_audit(user_id, "group", group_id, content))
 
                         # 先回显给发送者
                         await ws.send_json({"type": "message", "conversation_type": "group", "data": msg_data})
@@ -474,22 +474,8 @@ async def websocket_endpoint(ws: WebSocket, token: str = Query(...)):
         if current_session_id is not None:
             manager.disconnect_dm(current_session_id, user_id)
 
-_last_message_audit: dict[int, float] = {}
-
-async def _log_message_audit(db, user_id: int, conv_type: str, conv_id: int | str, content: str):
-    """审计日志：用户发送消息（异步 fire-and-forget）
-
-    限频：同一用户最多每 60 秒记一条，避免高频刷表。
-    """
-    import time
-    now = time.time()
-    last = _last_message_audit.get(user_id, 0)
-    if now - last < 60:
-        return
-    _last_message_audit[user_id] = now
-    if len(_last_message_audit) > 5000:
-        _last_message_audit.clear()
-
+async def _log_message_audit(user_id: int, conv_type: str, conv_id: int | str, content: str):
+    """审计日志：用户发送消息（异步 fire-and-forget，新开 db session）"""
     try:
         from app.database import async_session
         from app.services.audit_service import log_user_action
