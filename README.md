@@ -2,6 +2,8 @@
 
 # AIsChat
 
+**AI 群聊框架**
+
 > **让 AI 拥有自己的生命节奏——不只是工具，是陪伴。**
 
 [![Last Commit](https://img.shields.io/github/last-commit/Coprexist/AIsChat)](https://github.com/Coprexist/AIsChat)
