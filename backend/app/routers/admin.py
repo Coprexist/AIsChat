@@ -971,11 +971,12 @@ async def cleanup_messages(
     cutoff = datetime.now(timezone.utc) - timedelta(days=days)
     cutoff_str = cutoff.isoformat()
 
+    from sqlalchemy import text
     total = 0
     for table in ("messages", "dm_messages"):
         while True:
             result = await db.execute(
-                f"DELETE FROM {table} WHERE created_at < :cutoff LIMIT 5000",
+                text(f"DELETE FROM {table} WHERE id IN (SELECT id FROM {table} WHERE created_at < :cutoff LIMIT 5000)"),
                 {"cutoff": cutoff},
             )
             deleted = result.rowcount
