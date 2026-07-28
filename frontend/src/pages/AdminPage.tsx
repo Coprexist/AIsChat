@@ -1676,6 +1676,7 @@ function SystemSettingsTab() {
   const [defaultConcurrentAiLimit, setDefaultConcurrentAiLimit] = useState(3)
   const [registrationEnabled, setRegistrationEnabled] = useState(true)
   const regToggleRef = useRef(false)
+  const [auditUserActions, setAuditUserActions] = useState(false)
   const [geoipUrl, setGeoipUrl] = useState('')
   const [bulkConcurrency, setBulkConcurrency] = useState(3)
   const [bulking, setBulking] = useState(false)
@@ -1697,6 +1698,7 @@ function SystemSettingsTab() {
       setAvatarMaxSizeMb(limits.avatar_max_size_mb ?? 10)
       setDefaultConcurrentAiLimit(settings.default_concurrent_ai_limit ?? 3)
       setRegistrationEnabled(settings.registration_enabled ?? true)
+      setAuditUserActions(settings.audit_user_actions ?? false)
       setGeoipUrl(settings.geoip_provider_url || '')
       setHasActiveKeys(keys.some((k: any) => k.is_active))
     }).catch(console.error)
@@ -1712,6 +1714,7 @@ function SystemSettingsTab() {
       else if (field === 'file_quota') payload.default_file_quota_mb = value
       else if (field === 'concurrent_ai_limit') payload.default_concurrent_ai_limit = value
       else if (field === 'registration_enabled') payload.registration_enabled = value
+      else if (field === 'audit_user_actions') payload.audit_user_actions = value
       else if (field === 'geoip_url') payload.geoip_provider_url = value || null
       const updated = await api.put('/admin/system-settings', payload)
       setConfig(updated)
@@ -1878,6 +1881,25 @@ function SystemSettingsTab() {
           >{t('settings.save')}</button>
         </div>
       </div>
+
+      {/* 用户行为日志 */}
+      <div>
+        <div className="flex items-center justify-between">
+          <div>
+            <label className="text-sm font-medium text-textSecondary">用户行为日志</label>
+            <p className="text-xs text-textMuted mt-0.5">记录用户登录、注册等行为（哈希链防篡改）</p>
+          </div>
+          <Toggle
+            checked={auditUserActions}
+            onChange={(val: boolean) => {
+              setAuditUserActions(val)
+              handleSave('audit_user_actions', val)
+            }}
+          />
+        </div>
+      </div>
+
+      <hr className="border-border" />
 
       {/* 注册通道开关 */}
       <div>

@@ -79,6 +79,7 @@ async def get_settings(db: AsyncSession) -> dict:
         "email_templates": getattr(row, "email_templates", None),
         "provider_config": getattr(row, "provider_config", None),
         "geoip_provider_url": getattr(row, "geoip_provider_url", None),
+        "audit_user_actions": getattr(row, "audit_user_actions", False) or False,
     }
 
 
@@ -90,6 +91,7 @@ async def update_settings(
     default_concurrent_ai_limit: int | None = None,
     registration_enabled: bool | None = None,
     geoip_provider_url: str | None = None,
+    audit_user_actions: bool | None = None,
     updated_by: int | None = None,
 ) -> dict:
     """
@@ -167,6 +169,10 @@ async def update_settings(
     if geoip_provider_url is not None:
         row.geoip_provider_url = geoip_provider_url or None
         logger.info(f"  IP 地理位置查询后端: {geoip_provider_url or '（默认 ip-api.com）'}")
+
+    if audit_user_actions is not None:
+        row.audit_user_actions = audit_user_actions
+        logger.info(f"  用户行为日志: {'开启' if audit_user_actions else '关闭'}")
 
     if updated_by is not None:
         row.updated_by = updated_by

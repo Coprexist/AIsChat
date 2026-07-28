@@ -1119,6 +1119,7 @@ async def update_system_settings(
             default_concurrent_ai_limit=req.default_concurrent_ai_limit,
             registration_enabled=req.registration_enabled,
             geoip_provider_url=req.geoip_provider_url,
+            audit_user_actions=req.audit_user_actions,
             updated_by=admin["user_id"],
         )
         await _log_admin_action(

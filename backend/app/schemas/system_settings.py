@@ -16,6 +16,8 @@ class SystemSettingsResponse(BaseModel):
     login_providers: list[str] = ["direct"]
     require_email_verification: bool = False
     registration_enabled: bool = True
+    geoip_provider_url: str | None = None
+    audit_user_actions: bool = False
 
 
 class UpdateSystemSettingsRequest(BaseModel):
@@ -26,6 +28,7 @@ class UpdateSystemSettingsRequest(BaseModel):
     default_concurrent_ai_limit: int | None = Field(None, ge=1, le=20, description="新建群聊默认 AI 并发数")
     registration_enabled: bool | None = Field(None, description="是否开放注册通道")
     geoip_provider_url: str | None = Field(None, description="IP 地理位置查询后端 URL，含 {ip} 占位符")
+    audit_user_actions: bool | None = Field(None, description="是否记录用户行为日志（登录、发消息等）")
 
 
 class SetupCompleteRequest(BaseModel):

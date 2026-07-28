@@ -32,7 +32,7 @@ async def has_users(db: AsyncSession = Depends(get_db)):
 
 
 @router.post("/register", response_model=TokenResponse)
-async def register(req: RegisterRequest, db: AsyncSession = Depends(get_db)):
+async def register(req: RegisterRequest, request: Request, db: AsyncSession = Depends(get_db)):
     """注册新用户。第一个注册的用户自动成为管理员。"""
     try:
         user = await register_user(
@@ -42,6 +42,9 @@ async def register(req: RegisterRequest, db: AsyncSession = Depends(get_db)):
             email=req.email,
             verification_code=req.verification_code,
         )
+        from app.services.audit_service import log_user_action
+        ip = request.client.host if request.client else None
+        await log_user_action(db, "register", user.id, "user", details={"username": req.username}, ip=ip)
         # 注册后自动登录（使用用户名+密码方式）
         return await login_user(db, req.username, req.password, method="direct")
     except ValueError as e:
@@ -49,16 +52,20 @@ async def register(req: RegisterRequest, db: AsyncSession = Depends(get_db)):
 
 
 @router.post("/login", response_model=TokenResponse)
-async def login(req: LoginRequest, db: AsyncSession = Depends(get_db)):
+async def login(req: LoginRequest, request: Request, db: AsyncSession = Depends(get_db)):
     """用户登录，返回 JWT 令牌。"""
     try:
-        return await login_user(
+        result = await login_user(
             db,
             req.login_id,
             password=req.password,
             method=req.method,
             verification_code=req.verification_code,
         )
+        from app.services.audit_service import log_user_action
+        ip = request.client.host if request.client else None
+        await log_user_action(db, "login", result["user_id"], "user", details={"method": req.method or "password"}, ip=ip)
+        return result
     except ValueError as e:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail=str(e))
 

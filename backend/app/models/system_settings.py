@@ -35,6 +35,7 @@ class SystemSettings(Base):
     login_providers = Column(JSONB, default=lambda: ["direct"], comment="可用登录方式: direct/email_code/wechat/qq")
     registration_enabled = Column(Boolean, default=True, comment="是否开放注册通道（默认开启）")
     geoip_provider_url = Column(String(512), nullable=True, comment="IP 地理位置查询后端 URL，含 {ip} 占位符，留空默认 http://ip-api.com/json/{ip}")
+    audit_user_actions = Column(Boolean, default=False, comment="是否记录用户行为日志（登录、发消息等），默认关闭")
 
     updated_by = Column(Integer, ForeignKey("users.id"))
     updated_at = Column(DateTime, server_default=func.now(), onupdate=func.now())

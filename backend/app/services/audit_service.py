@@ -180,3 +180,32 @@ async def cleanup_old_logs(db: AsyncSession, days: int = LOG_RETENTION_DAYS) -> 
         await db.commit()
 
     return {"deleted": total_deleted, "cutoff": cutoff.isoformat()}
+
+
+async def should_log_actions(db: AsyncSession) -> bool:
+    """检查是否开启了用户行为日志记录"""
+    from app.services.infrastructure.system_settings_service import get_settings
+    try:
+        s = await get_settings(db)
+        return bool(s.get("audit_user_actions", False))
+    except Exception:
+        return False
+
+
+async def log_user_action(
+    db: AsyncSession,
+    log_type: str,
+    operator_id: int,
+    target_type: str,
+    target_id: int | None = None,
+    details: dict | None = None,
+    ip: str | None = None,
+):
+    """记录用户行为日志（仅当 audit_user_actions 开启时生效）"""
+    if not await should_log_actions(db):
+        return
+    await create_audit_log(
+        db=db, log_type=log_type, operator_type="human",
+        operator_id=operator_id, target_type=target_type,
+        target_id=target_id, details=details or {}, ip_address=ip,
+    )
