@@ -1127,6 +1127,7 @@ function LogsTab() {
             <th className="text-left py-2 px-3 font-medium text-textSecondary">{t('admin.logsColType')}</th>
             <th className="text-left py-2 px-3 font-medium text-textSecondary">{t('admin.logsColOperator')}</th>
             <th className="text-left py-2 px-3 font-medium text-textSecondary">{t('admin.logsColTarget')}</th>
+            <th className="text-left py-2 px-3 font-medium text-textSecondary">IP</th>
             <th className="text-left py-2 px-3 font-medium text-textSecondary">{t('admin.logsColDetail')}</th>
           </tr>
         </thead>
@@ -1141,6 +1142,7 @@ function LogsTab() {
               </td>
               <td className="py-2 px-3">{log.operator_type}:{log.operator_id}</td>
               <td className="py-2 px-3">{log.target_type}:{log.target_id}</td>
+              <td className="py-2 px-3 text-xs text-textMuted font-mono">{log.ip_address || '-'}</td>
               <td className="py-2 px-3 text-xs text-textSecondary max-w-[200px] truncate">
                 {JSON.stringify(log.details)}
               </td>

@@ -76,12 +76,13 @@ async def _log_admin_action(
     target_id: int,
     details: dict | None = None,
 ):
-    """记录管理员操作（含哈希链）"""
+    """记录管理员操作（含哈希链），自动从 contextvar 获取客户端 IP"""
     from app.services.audit_service import create_audit_log
+    from app.utils.auth import get_current_request_ip
     await create_audit_log(
         db=db, log_type=log_type, operator_type="human",
         operator_id=operator_id, target_type=target_type, target_id=target_id,
-        details=details or {},
+        details=details or {}, ip_address=get_current_request_ip(),
     )
 
 

@@ -2,7 +2,9 @@
 认证工具模块
 - 密码哈希/验证
 - JWT 令牌生成/验证
+- 请求 IP 追踪（contextvar，供审计日志使用）
 """
+from contextvars import ContextVar
 from datetime import datetime, timedelta, timezone
 from passlib.context import CryptContext
 from jose import JWTError, jwt
@@ -13,6 +15,17 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from app.config import settings
 from app.database import get_db
+
+# 请求 IP 追踪（contextvar，中间件在 main.py 中写入）
+_current_request_ip: ContextVar[str | None] = ContextVar("_current_request_ip", default=None)
+
+
+def set_current_request_ip(ip: str | None) -> None:
+    _current_request_ip.set(ip)
+
+
+def get_current_request_ip() -> str | None:
+    return _current_request_ip.get()
 
 # 密码哈希上下文
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")

@@ -265,6 +265,17 @@ def _get_maintenance_msg() -> dict:
     }
 
 @app.middleware("http")
+async def client_ip_middleware(request, call_next):
+    """记录请求 IP 到 contextvar（供审计日志使用）"""
+    from app.utils.auth import set_current_request_ip
+    ip = request.client.host if request.client else None
+    if ip and request.headers.get("X-Forwarded-For"):
+        ip = request.headers["X-Forwarded-For"].split(",")[0].strip()
+    set_current_request_ip(ip)
+    return await call_next(request)
+
+
+@app.middleware("http")
 async def maintenance_middleware(request, call_next):
     path = request.url.path
     bypass = path in ("/health", "/", "/docs", "/openapi.json") or path.startswith("/admin") or path.startswith("/auth") or path.startswith("/maintenance-msg")
