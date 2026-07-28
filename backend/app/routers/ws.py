@@ -186,7 +186,7 @@ async def websocket_endpoint(ws: WebSocket, token: str = Query(...)):
 
                     msg["conversation_type"] = "dm"
                     # 审计日志：用户发送消息（fire-and-forget）
-                    asyncio.create_task(_log_message_audit(user_id, "dm", session_id, content))
+                    asyncio.create_task(_log_message_audit(user_id, "dm", session_id, msg["id"]))
                     # 回显给发送者
                     await ws.send_json({"type": "message", "conversation_type": "dm", "data": msg})
                     # 推送给对方（排除发送者）
@@ -260,7 +260,7 @@ async def websocket_endpoint(ws: WebSocket, token: str = Query(...)):
                         msg_data = message_to_dict(message, sender_avatar_url=sender_avatar, sender_state=sender_state)
 
                         # 审计日志：用户发送消息（fire-and-forget）
-                        asyncio.create_task(_log_message_audit(user_id, "group", group_id, content))
+                        asyncio.create_task(_log_message_audit(user_id, "group", group_id, message.id))
 
                         # 先回显给发送者
                         await ws.send_json({"type": "message", "conversation_type": "group", "data": msg_data})
@@ -474,18 +474,17 @@ async def websocket_endpoint(ws: WebSocket, token: str = Query(...)):
         if current_session_id is not None:
             manager.disconnect_dm(current_session_id, user_id)
 
-async def _log_message_audit(user_id: int, conv_type: str, conv_id: int | str, content: str):
-    """审计日志：用户发送消息（异步 fire-and-forget，新开 db session）"""
+async def _log_message_audit(user_id: int, conv_type: str, conv_id: int | str, message_id: int):
+    """审计日志：用户发送消息（只记 message_id，内容查消息表）"""
     try:
         from app.database import async_session
         from app.services.audit_service import log_user_action
         from app.utils.auth import get_current_request_ip
-        truncated = content[:200] if content else ""
         async with async_session() as session:
             await log_user_action(
                 session, "send_message", user_id, conv_type,
                 target_id=conv_id if isinstance(conv_id, int) else 0,
-                details={"content_preview": truncated},
+                details={"message_id": message_id},
                 ip=get_current_request_ip(),
             )
     except Exception:
