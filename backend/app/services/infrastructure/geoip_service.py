@@ -4,7 +4,7 @@ IP 地理位置解析服务（轻量级）
 - 内网 IP 直接跳过
 - LRU 内存缓存减少重复请求
 """
-import json
+import asyncio
 import logging
 import time
 from collections import OrderedDict
@@ -14,11 +14,13 @@ import httpx
 
 logger = logging.getLogger(__name__)
 
-# LRU 缓存
-_CACHE: OrderedDict[str, dict | None] = OrderedDict()
+# LRU 缓存：{ip: (timestamp, result)}
+_CACHE: OrderedDict[str, tuple[float, dict | None]] = OrderedDict()
 _CACHE_MAX = 500
 _CACHE_TTL = 86400  # 24 小时
-_CACHE_TIME: dict[str, float] = {}
+
+# 默认查询后端
+_DEFAULT_API_URL = "http://ip-api.com/json/{ip}?fields=status,country,city,isp,query"
 
 # 内网/保留地址段
 _PRIVATE_PREFIXES = (
@@ -29,15 +31,25 @@ _PRIVATE_PREFIXES = (
     "192.168.", "127.", "0.", "::1", "fe80:", "fc00:", "fd00:",
 )
 
-_API_URL = "http://ip-api.com/json/{ip}?fields=status,country,city,isp,query"
-
 
 def _is_private(ip: str) -> bool:
     return any(ip.startswith(p) for p in _PRIVATE_PREFIXES)
 
 
-async def resolve(ip: str) -> dict | None:
-    """解析 IP 地理位置，返回 {country, city, isp} 或 None"""
+def _cache_set(ip: str, value: dict | None) -> dict | None:
+    """写入 LRU 缓存"""
+    _CACHE[ip] = (time.time(), value)
+    _CACHE.move_to_end(ip)
+    if len(_CACHE) > _CACHE_MAX:
+        _CACHE.popitem(last=False)
+    return value
+
+
+async def resolve(ip: str, provider_url: str | None = None) -> dict | None:
+    """解析 IP 地理位置，返回 {country, city, isp} 或 None
+
+    provider_url: 自定义查询后端 URL，含 {ip} 占位符。不传则默认 ip-api.com
+    """
     if not ip or _is_private(ip):
         return None
 
@@ -45,15 +57,16 @@ async def resolve(ip: str) -> dict | None:
 
     # 缓存命中
     if ip in _CACHE:
-        if now - _CACHE_TIME.get(ip, 0) < _CACHE_TTL:
-            return _CACHE[ip]
-        # 过期了删掉
+        ts, val = _CACHE[ip]
+        if now - ts < _CACHE_TTL:
+            return val
         del _CACHE[ip]
-        _CACHE_TIME.pop(ip, None)
+
+    api_url = (provider_url or _DEFAULT_API_URL).format(ip=quote(ip))
 
     try:
         async with httpx.AsyncClient(timeout=5) as client:
-            resp = await client.get(_API_URL.format(ip=quote(ip)))
+            resp = await client.get(api_url)
             if resp.status_code != 200:
                 logger.warning(f"IP geo lookup failed ({resp.status_code}): {ip}")
                 return _cache_set(ip, None)
@@ -75,26 +88,14 @@ async def resolve(ip: str) -> dict | None:
         return _cache_set(ip, None)
 
 
-def _cache_set(ip: str, value: dict | None) -> dict | None:
-    """写入 LRU 缓存"""
-    if ip in _CACHE:
-        _CACHE.move_to_end(ip)
-    else:
-        if len(_CACHE) >= _CACHE_MAX:
-            _CACHE.popitem(last=False)
-    _CACHE[ip] = value
-    _CACHE_TIME[ip] = time.time()
-    return value
-
-
 async def batch_resolve(ips: list[str], provider_url: str | None = None) -> dict[str, dict | None]:
     """批量解析（带 50ms 间隔防限流），返回 {ip: result}"""
     results: dict[str, dict | None] = {}
     for i, ip in enumerate(set(ips)):
         if ip in _CACHE:
-            now = time.time()
-            if now - _CACHE_TIME.get(ip, 0) < _CACHE_TTL:
-                results[ip] = _CACHE[ip]
+            ts, val = _CACHE[ip]
+            if time.time() - ts < _CACHE_TTL:
+                results[ip] = val
                 continue
         results[ip] = await resolve(ip, provider_url=provider_url)
         if i < len(set(ips)) - 1:

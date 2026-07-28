@@ -23,12 +23,7 @@ def upgrade() -> None:
         "ALTER TABLE system_settings ADD COLUMN IF NOT EXISTS "
         "registration_enabled BOOLEAN DEFAULT TRUE"
     )
-    op.execute(
-        "ALTER TABLE system_settings ADD COLUMN IF NOT EXISTS "
-        "geoip_provider_url VARCHAR(512)"
-    )
 
 
 def downgrade() -> None:
     op.drop_column("system_settings", "registration_enabled")
-    op.drop_column("system_settings", "geoip_provider_url")
