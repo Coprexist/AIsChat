@@ -948,6 +948,51 @@ async def cleanup_old_logs(
     return await cleanup_old_logs(db, days=days)
 
 
+# ── 消息清理 ──
+
+
+@router.post("/messages/cleanup")
+async def cleanup_messages(
+    days: int = Query(0, ge=0, le=3650),
+    admin: dict = Depends(require_admin),
+    db: AsyncSession = Depends(get_db),
+):
+    """清理超过 N 天的消息。days=0 时从系统设置读取保留天数。
+    历史配置变更不影响已清理的消息。"""
+    if days == 0:
+        from app.services.infrastructure.system_settings_service import get_settings
+        s = await get_settings(db)
+        days = s.get("message_retention_days", 0)
+
+    if days <= 0:
+        return {"message": "消息保留天数设为 0（永久保留），未执行清理", "deleted": 0}
+
+    from datetime import datetime, timezone, timedelta
+    cutoff = datetime.now(timezone.utc) - timedelta(days=days)
+    cutoff_str = cutoff.isoformat()
+
+    total = 0
+    for table in ("messages", "dm_messages"):
+        while True:
+            result = await db.execute(
+                f"DELETE FROM {table} WHERE created_at < :cutoff LIMIT 5000",
+                {"cutoff": cutoff},
+            )
+            deleted = result.rowcount
+            total += deleted
+            if deleted < 5000:
+                break
+            await db.commit()
+
+    await _log_admin_action(
+        db, admin["user_id"], "cleanup_messages", "system", 1,
+        {"days": days, "deleted": total},
+    )
+    await db.commit()
+
+    return {"message": f"已清理 {total} 条消息", "deleted": total, "cutoff": cutoff_str}
+
+
 # ── IP 地理位置 ──
 
 
@@ -1125,6 +1170,7 @@ async def update_system_settings(
             geoip_provider_url=req.geoip_provider_url,
             audit_user_actions=req.audit_user_actions,
             audit_log_retention_days=req.audit_log_retention_days,
+            message_retention_days=req.message_retention_days,
             updated_by=admin["user_id"],
         )
         await _log_admin_action(

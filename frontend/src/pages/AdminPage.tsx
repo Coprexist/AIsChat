@@ -1678,6 +1678,7 @@ function SystemSettingsTab() {
   const regToggleRef = useRef(false)
   const [auditUserActions, setAuditUserActions] = useState(false)
   const [auditRetention, setAuditRetention] = useState(90)
+  const [messageRetention, setMessageRetention] = useState(0)
   const [geoipUrl, setGeoipUrl] = useState('')
   const [bulkConcurrency, setBulkConcurrency] = useState(3)
   const [bulking, setBulking] = useState(false)
@@ -1701,6 +1702,7 @@ function SystemSettingsTab() {
       setRegistrationEnabled(settings.registration_enabled ?? true)
       setAuditUserActions(settings.audit_user_actions ?? false)
       setAuditRetention(settings.audit_log_retention_days ?? 90)
+      setMessageRetention(settings.message_retention_days ?? 0)
       setGeoipUrl(settings.geoip_provider_url || '')
       setHasActiveKeys(keys.some((k: any) => k.is_active))
     }).catch(console.error)
@@ -1718,6 +1720,7 @@ function SystemSettingsTab() {
       else if (field === 'registration_enabled') payload.registration_enabled = value
       else if (field === 'audit_user_actions') payload.audit_user_actions = value
       else if (field === 'audit_retention') payload.audit_log_retention_days = value
+      else if (field === 'message_retention') payload.message_retention_days = value
       else if (field === 'geoip_url') payload.geoip_provider_url = value || null
       const updated = await api.put('/admin/system-settings', payload)
       setConfig(updated)
@@ -1912,6 +1915,21 @@ function SystemSettingsTab() {
           <span className="text-xs text-textMuted">天</span>
           <button onClick={() => handleSave('audit_retention', auditRetention)}
             disabled={saving || auditRetention === (config?.audit_log_retention_days ?? 90)}
+            className="px-3 py-2 bg-primary-500 text-white rounded-xl hover:bg-primary-400 text-sm disabled:opacity-40 transition-colors"
+          >{t('settings.save')}</button>
+        </div>
+      </div>
+
+      <div>
+        <label className="text-sm font-medium text-textSecondary">消息保留天数</label>
+        <p className="text-xs text-textMuted mt-0.5 mb-2">0=永久保留，超期消息自动删除</p>
+        <div className="flex items-center gap-2">
+          <input type="number" value={messageRetention}
+            onChange={e => setMessageRetention(parseInt(e.target.value) || 0)} min={0} max={3650}
+            className="w-24 px-3 py-2 rounded-xl border border-border bg-canvas text-sm text-textPrimary focus:outline-none focus:ring-2 focus:ring-primary-500/50" />
+          <span className="text-xs text-textMuted">天{messageRetention === 0 ? '（永久）' : ''}</span>
+          <button onClick={() => handleSave('message_retention', messageRetention)}
+            disabled={saving || messageRetention === (config?.message_retention_days ?? 0)}
             className="px-3 py-2 bg-primary-500 text-white rounded-xl hover:bg-primary-400 text-sm disabled:opacity-40 transition-colors"
           >{t('settings.save')}</button>
         </div>

@@ -37,6 +37,7 @@ class SystemSettings(Base):
     geoip_provider_url = Column(String(512), nullable=True, comment="IP 地理位置查询后端 URL，含 {ip} 占位符，留空默认 http://ip-api.com/json/{ip}")
     audit_user_actions = Column(Boolean, default=False, comment="是否记录用户行为日志（登录、发消息等），默认关闭")
     audit_log_retention_days = Column(Integer, default=90, comment="审计日志保留天数，超期自动清理（默认 90 天）")
+    message_retention_days = Column(Integer, default=0, comment="消息保留天数（0=永久保留）")
 
     updated_by = Column(Integer, ForeignKey("users.id"))
     updated_at = Column(DateTime, server_default=func.now(), onupdate=func.now())

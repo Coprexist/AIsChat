@@ -81,6 +81,7 @@ async def get_settings(db: AsyncSession) -> dict:
         "geoip_provider_url": getattr(row, "geoip_provider_url", None),
         "audit_user_actions": getattr(row, "audit_user_actions", False) or False,
         "audit_log_retention_days": getattr(row, "audit_log_retention_days", 90) or 90,
+        "message_retention_days": getattr(row, "message_retention_days", 0) or 0,
     }
 
 
@@ -94,6 +95,7 @@ async def update_settings(
     geoip_provider_url: str | None = None,
     audit_user_actions: bool | None = None,
     audit_log_retention_days: int | None = None,
+    message_retention_days: int | None = None,
     updated_by: int | None = None,
 ) -> dict:
     """
@@ -179,6 +181,10 @@ async def update_settings(
     if audit_log_retention_days is not None:
         row.audit_log_retention_days = audit_log_retention_days
         logger.info(f"  审计日志保留天数: {audit_log_retention_days}")
+
+    if message_retention_days is not None:
+        row.message_retention_days = message_retention_days
+        logger.info(f"  消息保留天数: {message_retention_days}（0=永久）")
 
     if updated_by is not None:
         row.updated_by = updated_by
