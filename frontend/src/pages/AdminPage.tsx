@@ -392,10 +392,10 @@ function CreateUserDialog({ onDone, onClose }: { onDone: () => void; onClose: ()
       {error && <p className="text-xs text-rose-400 mb-2">{error}</p>}
       <input value={username} onChange={e => setUsername(e.target.value)} placeholder={t('admin.createUserUsername')}
         className="w-full px-3 py-2 text-sm border border-border bg-canvas rounded-lg mb-2 focus:outline-none focus:ring-1 focus:ring-primary-500" />
-      <p className="text-[11px] text-textMuted -mt-1.5 mb-2">{username.length > 0 && !usernameOk ? '至少 2 个字符' : '\u00a0'}</p>
+      <p className="text-[11px] text-textMuted -mt-1.5 mb-2">{username.length > 0 && !usernameOk ? t('admin.createUserUsernameHint') : '\u00a0'}</p>
       <input type="password" value={password} onChange={e => setPassword(e.target.value)} placeholder={t('admin.createUserPassword')}
         className="w-full px-3 py-2 text-sm border border-border bg-canvas rounded-lg mb-2 focus:outline-none focus:ring-1 focus:ring-primary-500" />
-      <p className="text-[11px] text-textMuted -mt-1.5 mb-2">{password.length > 0 && !passwordOk ? '至少 6 位' : '\u00a0'}</p>
+      <p className="text-[11px] text-textMuted -mt-1.5 mb-2">{password.length > 0 && !passwordOk ? t('admin.createUserPasswordHint') : '\u00a0'}</p>
       <input value={email} onChange={e => setEmail(e.target.value)} placeholder={t('admin.createUserEmail')}
         className="w-full px-3 py-2 text-sm border border-border bg-canvas rounded-lg mb-3 focus:outline-none focus:ring-1 focus:ring-primary-500" />
       <div className="flex justify-end gap-2">
@@ -445,7 +445,7 @@ function ImportCsvDialog({ onDone, onClose }: { onDone: (count: number) => void;
               <div className="max-h-40 overflow-y-auto text-xs text-textMuted space-y-0.5 mt-2">
                 {results.details?.filter((r: any) => r.status !== 'ok').map((r: any, i: number) => (
                   <p key={i} className={r.status === 'error' ? 'text-rose-400' : ''}>
-                    第 {r.row} 行: {r.status === 'error' ? r.reason : r.status}
+                    {t('admin.importCsvRowResult').replace('{row}', String(r.row))}: {r.status === 'error' ? r.reason : r.status}
                   </p>
                 ))}
               </div>
@@ -1640,6 +1640,8 @@ function SystemSettingsTab() {
   const [uploadMaxSizeMb, setUploadMaxSizeMb] = useState(32)
   const [avatarMaxSizeMb, setAvatarMaxSizeMb] = useState(10)
   const [defaultConcurrentAiLimit, setDefaultConcurrentAiLimit] = useState(3)
+  const [registrationEnabled, setRegistrationEnabled] = useState(true)
+  const regToggleRef = useRef(false)
   const [bulkConcurrency, setBulkConcurrency] = useState(3)
   const [bulking, setBulking] = useState(false)
   const [hasActiveKeys, setHasActiveKeys] = useState(false)
@@ -1659,6 +1661,7 @@ function SystemSettingsTab() {
       setUploadMaxSizeMb(limits.upload_max_size_mb ?? 32)
       setAvatarMaxSizeMb(limits.avatar_max_size_mb ?? 10)
       setDefaultConcurrentAiLimit(settings.default_concurrent_ai_limit ?? 3)
+      setRegistrationEnabled(settings.registration_enabled ?? true)
       setHasActiveKeys(keys.some((k: any) => k.is_active))
     }).catch(console.error)
   }, [])
@@ -1672,6 +1675,7 @@ function SystemSettingsTab() {
       else if (field === 'platform_credit') payload.default_platform_credit = value
       else if (field === 'file_quota') payload.default_file_quota_mb = value
       else if (field === 'concurrent_ai_limit') payload.default_concurrent_ai_limit = value
+      else if (field === 'registration_enabled') payload.registration_enabled = value
       const updated = await api.put('/admin/system-settings', payload)
       setConfig(updated)
       setMsg(t('admin.saveSuccess'))
@@ -1848,8 +1852,10 @@ function SystemSettingsTab() {
           <Toggle
             checked={registrationEnabled}
             onChange={(val: boolean) => {
+              if (regToggleRef.current) return
+              regToggleRef.current = true
               setRegistrationEnabled(val)
-              handleSave('registration_enabled', val)
+              handleSave('registration_enabled', val).finally(() => { regToggleRef.current = false })
             }}
           />
         </div>

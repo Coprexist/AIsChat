@@ -19,7 +19,7 @@ export default function Modal({ open, onClose, title, children }: ModalProps) {
   return (
     <div
       ref={overlayRef}
-      className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 animate-in fade-in duration-200"
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 fade-in"
       onClick={(e) => { if (e.target === overlayRef.current) onClose() }}
     >
       <div className="bg-surface rounded-xl p-5 max-w-sm w-full mx-4 shadow-xl border border-border/50">

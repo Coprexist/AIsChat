@@ -1770,6 +1770,9 @@ const zh: TranslationDict = {
   'admin.importCsv': '导入 CSV',
   'admin.importCsvTitle': 'CSV 批量导入用户',
   'admin.importCsvHint': 'CSV 格式：username,password[,email]。第一行可以是表头。',
+  'admin.createUserUsernameHint': '至少 2 个字符',
+  'admin.createUserPasswordHint': '至少 6 位',
+  'admin.importCsvRowResult': '第 {row} 行',
 }
 
 const en: TranslationDict = {
@@ -2874,6 +2877,9 @@ const en: TranslationDict = {
   'admin.importCsv': 'Import CSV',
   'admin.importCsvTitle': 'Bulk Import via CSV',
   'admin.importCsvHint': 'CSV format: username,password[,email]. First row can be header.',
+  'admin.createUserUsernameHint': 'At least 2 characters',
+  'admin.createUserPasswordHint': 'At least 6 characters',
+  'admin.importCsvRowResult': 'Row {row}',
   'admin.fileQuotaIncreaseConfirm': 'Confirm file quota base increase?\n\nCurrent {old}MB -> New {new}MB\nAll users will gain +{delta}MB',
   'admin.fileQuotaDecreaseConfirm': 'Confirm file quota base decrease?\n\nCurrent {old}MB -> New {new}MB\nAll users\' base will become {new}MB (redemption bonuses kept).\n\n⚠ Users over the limit cannot upload new files.',
   'admin.adding': 'Adding...',
