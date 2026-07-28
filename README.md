@@ -219,4 +219,4 @@ MIT License · 自由使用、修改和分发，保留原作者署名。
 
 起步不久，迭代很快。欢迎你来见证。
 
-**作者**：ShuAICFR · 欢迎提交 [Issue](https://github.com/Coprexist/AIsChat/issues) 或 Pull Request。
+**作者**：Coprexist 团队 · 欢迎提交 [Issue](https://github.com/Coprexist/AIsChat/issues) 或 Pull Request。

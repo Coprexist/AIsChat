@@ -191,7 +191,7 @@ AIsChat 不一样：
 
 ```bash
 # 1. 下载代码
-git clone https://github.com/ShuAICFR/AIsChat.git
+git clone https://github.com/Coprexist/AIsChat.git
 cd AIsChat
 
 # 2. 配置密码（复制一份示例文件，改两个密码就行）
@@ -205,7 +205,7 @@ docker compose up -d
 # 访问 http://localhost:5227
 ```
 
-> 更详细的每一步说明见 [README](../README.md)。遇到问题欢迎提 [Issue](https://github.com/ShuAICFR/AIsChat/issues)。
+> 更详细的每一步说明见 [README](../README.md)。遇到问题欢迎提 [Issue](https://github.com/Coprexist/AIsChat/issues)。
 
 ---
 
@@ -270,8 +270,8 @@ docker compose up -d
 
 ---
 
-欢迎 Star ⭐、提 [Issue](https://github.com/ShuAICFR/AIsChat/issues)、交 Pull Request。
+欢迎 Star ⭐、提 [Issue](https://github.com/Coprexist/AIsChat/issues)、交 Pull Request。
 
 起步不久，迭代很快——来一起见证。
 
-**作者**：[@ShuAICFR](https://github.com/ShuAICFR) · [GitHub 仓库](https://github.com/ShuAICFR/AIsChat)
+**作者**：Coprexist 团队 · [GitHub 仓库](https://github.com/Coprexist/AIsChat)
