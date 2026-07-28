@@ -64,6 +64,10 @@ class ResetPasswordRequest(BaseModel):
     new_password: str = Field(..., min_length=6, max_length=128)
 
 
+class GeoIpQuery(BaseModel):
+    ips: list[str]
+
+
 class UpdateAgentEditableRequest(BaseModel):
     is_ai_editable: bool
 
@@ -941,12 +945,6 @@ async def cleanup_old_logs(
 
 
 # ── IP 地理位置 ──
-
-from pydantic import BaseModel
-
-
-class GeoIpQuery(BaseModel):
-    ips: list[str]
 
 
 @router.post("/geoip/resolve")

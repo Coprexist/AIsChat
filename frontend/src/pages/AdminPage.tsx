@@ -1109,19 +1109,27 @@ function BackupTab() {
   )
 }
 
+const GEOIP_CACHE_KEY = '_geoip_cache'
+
 function LogsTab() {
   const t = useT()
   const [data, setData] = useState<any>(null)
-  const [geoip, setGeoip] = useState<Record<string, any>>({})
+  const [geoip, setGeoip] = useState<Record<string, any>>(() => {
+    try { return JSON.parse(sessionStorage.getItem(GEOIP_CACHE_KEY) || '{}') } catch { return {} }
+  })
 
   useEffect(() => {
     api.get('/admin/logs?page_size=50').then((d) => {
       setData(d)
-      // 提取所有公网 IP 批量查询地理位置
       const ips = [...new Set(d.items.map((l: any) => l.ip_address).filter(Boolean))]
-      if (ips.length > 0) {
-        api.post('/admin/geoip/resolve', { ips }).then(res => {
-          if (res?.results) setGeoip(res.results)
+      const uncached = ips.filter(ip => !geoip[ip])
+      if (uncached.length > 0) {
+        api.post('/admin/geoip/resolve', { ips: uncached }).then(res => {
+          if (res?.results) {
+            const merged = { ...geoip, ...res.results }
+            setGeoip(merged)
+            sessionStorage.setItem(GEOIP_CACHE_KEY, JSON.stringify(merged))
+          }
         }).catch(() => {})
       }
     }).catch(console.error)
@@ -1158,9 +1166,12 @@ function LogsTab() {
                 <td className="py-2 px-3">
                   <span className="text-xs text-textMuted font-mono">{log.ip_address || '-'}</span>
                   {loc && (loc.city || loc.country) && (
-                    <span className="text-[10px] text-textMuted ml-1">
-                      {[loc.city, loc.country].filter(Boolean).join(', ')}
-                    </span>
+                    <>
+                      <br />
+                      <span className="text-[10px] text-textMuted" title={loc.isp || ''}>
+                        {[loc.city, loc.country].filter(Boolean).join(', ')}
+                      </span>
+                    </>
                   )}
                 </td>
                 <td className="py-2 px-3 text-xs text-textSecondary max-w-[200px] truncate">
