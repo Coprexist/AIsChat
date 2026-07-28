@@ -25,6 +25,7 @@ class UpdateSystemSettingsRequest(BaseModel):
     default_file_quota_mb: int | None = Field(None, ge=1, description="新用户默认文件配额（MB），修改后所有用户同步调整")
     default_concurrent_ai_limit: int | None = Field(None, ge=1, le=20, description="新建群聊默认 AI 并发数")
     registration_enabled: bool | None = Field(None, description="是否开放注册通道")
+    geoip_provider_url: str | None = Field(None, description="IP 地理位置查询后端 URL，含 {ip} 占位符")
 
 
 class SetupCompleteRequest(BaseModel):

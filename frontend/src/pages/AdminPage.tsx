@@ -1112,8 +1112,19 @@ function BackupTab() {
 function LogsTab() {
   const t = useT()
   const [data, setData] = useState<any>(null)
+  const [geoip, setGeoip] = useState<Record<string, any>>({})
+
   useEffect(() => {
-    api.get('/admin/logs?page_size=50').then(setData).catch(console.error)
+    api.get('/admin/logs?page_size=50').then((d) => {
+      setData(d)
+      // 提取所有公网 IP 批量查询地理位置
+      const ips = [...new Set(d.items.map((l: any) => l.ip_address).filter(Boolean))]
+      if (ips.length > 0) {
+        api.post('/admin/geoip/resolve', { ips }).then(res => {
+          if (res?.results) setGeoip(res.results)
+        }).catch(() => {})
+      }
+    }).catch(console.error)
   }, [])
 
   if (!data) return <p className="text-textMuted">{t('common.loading')}</p>
@@ -1132,22 +1143,32 @@ function LogsTab() {
           </tr>
         </thead>
         <tbody>
-          {data.items.map((log: any) => (
-            <tr key={log.id} className="border-b border-border/50">
-              <td className="py-2 px-3 text-xs">
-                {log.created_at ? new Date(log.created_at).toLocaleString('zh-CN') : '-'}
-              </td>
-              <td className="py-2 px-3">
-                <span className="text-xs px-2 py-0.5 rounded bg-elevated text-textPrimary">{log.log_type}</span>
-              </td>
-              <td className="py-2 px-3">{log.operator_type}:{log.operator_id}</td>
-              <td className="py-2 px-3">{log.target_type}:{log.target_id}</td>
-              <td className="py-2 px-3 text-xs text-textMuted font-mono">{log.ip_address || '-'}</td>
-              <td className="py-2 px-3 text-xs text-textSecondary max-w-[200px] truncate">
-                {JSON.stringify(log.details)}
-              </td>
-            </tr>
-          ))}
+          {data.items.map((log: any) => {
+            const loc = log.ip_address ? geoip[log.ip_address] : null
+            return (
+              <tr key={log.id} className="border-b border-border/50">
+                <td className="py-2 px-3 text-xs">
+                  {log.created_at ? new Date(log.created_at).toLocaleString('zh-CN') : '-'}
+                </td>
+                <td className="py-2 px-3">
+                  <span className="text-xs px-2 py-0.5 rounded bg-elevated text-textPrimary">{log.log_type}</span>
+                </td>
+                <td className="py-2 px-3">{log.operator_type}:{log.operator_id}</td>
+                <td className="py-2 px-3">{log.target_type}:{log.target_id}</td>
+                <td className="py-2 px-3">
+                  <span className="text-xs text-textMuted font-mono">{log.ip_address || '-'}</span>
+                  {loc && (loc.city || loc.country) && (
+                    <span className="text-[10px] text-textMuted ml-1">
+                      {[loc.city, loc.country].filter(Boolean).join(', ')}
+                    </span>
+                  )}
+                </td>
+                <td className="py-2 px-3 text-xs text-textSecondary max-w-[200px] truncate">
+                  {JSON.stringify(log.details)}
+                </td>
+              </tr>
+            )}
+          )}
         </tbody>
       </table>
     </div>
@@ -1644,6 +1665,7 @@ function SystemSettingsTab() {
   const [defaultConcurrentAiLimit, setDefaultConcurrentAiLimit] = useState(3)
   const [registrationEnabled, setRegistrationEnabled] = useState(true)
   const regToggleRef = useRef(false)
+  const [geoipUrl, setGeoipUrl] = useState('')
   const [bulkConcurrency, setBulkConcurrency] = useState(3)
   const [bulking, setBulking] = useState(false)
   const [hasActiveKeys, setHasActiveKeys] = useState(false)
@@ -1664,6 +1686,7 @@ function SystemSettingsTab() {
       setAvatarMaxSizeMb(limits.avatar_max_size_mb ?? 10)
       setDefaultConcurrentAiLimit(settings.default_concurrent_ai_limit ?? 3)
       setRegistrationEnabled(settings.registration_enabled ?? true)
+      setGeoipUrl(settings.geoip_provider_url || '')
       setHasActiveKeys(keys.some((k: any) => k.is_active))
     }).catch(console.error)
   }, [])
@@ -1678,6 +1701,7 @@ function SystemSettingsTab() {
       else if (field === 'file_quota') payload.default_file_quota_mb = value
       else if (field === 'concurrent_ai_limit') payload.default_concurrent_ai_limit = value
       else if (field === 'registration_enabled') payload.registration_enabled = value
+      else if (field === 'geoip_url') payload.geoip_provider_url = value || null
       const updated = await api.put('/admin/system-settings', payload)
       setConfig(updated)
       setMsg(t('admin.saveSuccess'))
@@ -1860,6 +1884,26 @@ function SystemSettingsTab() {
               handleSave('registration_enabled', val).finally(() => { regToggleRef.current = false })
             }}
           />
+        </div>
+      </div>
+
+      {/* IP 地理位置查询后端 */}
+      <div>
+        <label className="text-sm font-medium text-textSecondary">IP 地理位置查询后端</label>
+        <p className="text-xs text-textMuted mt-0.5 mb-2">支持 {{ip}} 占位符，留空默认 ip-api.com</p>
+        <div className="flex items-center gap-2">
+          <input
+            type="text"
+            value={geoipUrl}
+            onChange={e => setGeoipUrl(e.target.value)}
+            placeholder="http://ip-api.com/json/{ip}?fields=..."
+            className="flex-1 px-3 py-2 rounded-xl border border-border bg-canvas text-sm text-textPrimary focus:outline-none focus:ring-2 focus:ring-primary-500/50"
+          />
+          <button
+            onClick={() => handleSave('geoip_url', geoipUrl)}
+            disabled={saving}
+            className="px-3 py-2 bg-primary-500 text-white rounded-xl hover:bg-primary-400 text-sm disabled:opacity-40 transition-colors"
+          >{t('settings.save')}</button>
         </div>
       </div>
 

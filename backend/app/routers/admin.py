@@ -940,6 +940,34 @@ async def cleanup_old_logs(
     return await cleanup_old_logs(db, days=days)
 
 
+# ── IP 地理位置 ──
+
+from pydantic import BaseModel
+
+
+class GeoIpQuery(BaseModel):
+    ips: list[str]
+
+
+@router.post("/geoip/resolve")
+async def resolve_geoip(
+    req: GeoIpQuery,
+    admin: dict = Depends(require_admin),
+    db: AsyncSession = Depends(get_db),
+):
+    """批量查询 IP 地理位置"""
+    from app.services.infrastructure.geoip_service import resolve
+    from app.services.infrastructure.system_settings_service import get_settings
+
+    settings = await get_settings(db)
+    provider_url = settings.get("geoip_provider_url") or None
+
+    results: dict[str, dict | None] = {}
+    for ip in set(req.ips):
+        results[ip] = await resolve(ip, provider_url=provider_url)
+    return {"results": results}
+
+
 # ============================================================
 # 数据库备份/恢复
 # ============================================================
@@ -1092,6 +1120,7 @@ async def update_system_settings(
             default_file_quota_mb=req.default_file_quota_mb,
             default_concurrent_ai_limit=req.default_concurrent_ai_limit,
             registration_enabled=req.registration_enabled,
+            geoip_provider_url=req.geoip_provider_url,
             updated_by=admin["user_id"],
         )
         await _log_admin_action(

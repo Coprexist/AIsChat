@@ -78,6 +78,7 @@ async def get_settings(db: AsyncSession) -> dict:
         "smtp_config": getattr(row, "smtp_config", None),
         "email_templates": getattr(row, "email_templates", None),
         "provider_config": getattr(row, "provider_config", None),
+        "geoip_provider_url": getattr(row, "geoip_provider_url", None),
     }
 
 
@@ -88,6 +89,7 @@ async def update_settings(
     default_file_quota_mb: int | None = None,
     default_concurrent_ai_limit: int | None = None,
     registration_enabled: bool | None = None,
+    geoip_provider_url: str | None = None,
     updated_by: int | None = None,
 ) -> dict:
     """
@@ -161,6 +163,10 @@ async def update_settings(
     if registration_enabled is not None:
         row.registration_enabled = registration_enabled
         logger.info(f"  注册通道: {'开启' if registration_enabled else '关闭'}")
+
+    if geoip_provider_url is not None:
+        row.geoip_provider_url = geoip_provider_url or None
+        logger.info(f"  IP 地理位置查询后端: {geoip_provider_url or '（默认 ip-api.com）'}")
 
     if updated_by is not None:
         row.updated_by = updated_by
