@@ -74,6 +74,7 @@ async def get_settings(db: AsyncSession) -> dict:
         # v0.2.0 邮箱认证（公开字段）
         "login_providers": getattr(row, "login_providers", ["direct"]) or ["direct"],
         "require_email_verification": getattr(row, "require_email_verification", False) or False,
+        "registration_enabled": getattr(row, "registration_enabled", True) if getattr(row, "registration_enabled", True) is not None else True,
         "smtp_config": getattr(row, "smtp_config", None),
         "email_templates": getattr(row, "email_templates", None),
         "provider_config": getattr(row, "provider_config", None),
@@ -86,6 +87,7 @@ async def update_settings(
     default_platform_credit: int | None = None,
     default_file_quota_mb: int | None = None,
     default_concurrent_ai_limit: int | None = None,
+    registration_enabled: bool | None = None,
     updated_by: int | None = None,
 ) -> dict:
     """
@@ -155,6 +157,10 @@ async def update_settings(
     if default_concurrent_ai_limit is not None:
         row.default_concurrent_ai_limit = default_concurrent_ai_limit
         logger.info(f"  默认 AI 并发数设为: {default_concurrent_ai_limit}")
+
+    if registration_enabled is not None:
+        row.registration_enabled = registration_enabled
+        logger.info(f"  注册通道: {'开启' if registration_enabled else '关闭'}")
 
     if updated_by is not None:
         row.updated_by = updated_by

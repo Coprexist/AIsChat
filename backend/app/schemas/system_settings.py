@@ -15,6 +15,7 @@ class SystemSettingsResponse(BaseModel):
     updated_at: str | None = None
     login_providers: list[str] = ["direct"]
     require_email_verification: bool = False
+    registration_enabled: bool = True
 
 
 class UpdateSystemSettingsRequest(BaseModel):
@@ -23,6 +24,7 @@ class UpdateSystemSettingsRequest(BaseModel):
     default_platform_credit: int | None = Field(None, ge=0, description="全局默认平台赠送额度")
     default_file_quota_mb: int | None = Field(None, ge=1, description="新用户默认文件配额（MB），修改后所有用户同步调整")
     default_concurrent_ai_limit: int | None = Field(None, ge=1, le=20, description="新建群聊默认 AI 并发数")
+    registration_enabled: bool | None = Field(None, description="是否开放注册通道")
 
 
 class SetupCompleteRequest(BaseModel):

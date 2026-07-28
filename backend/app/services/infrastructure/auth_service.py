@@ -29,12 +29,15 @@ async def register_user(
     password: str,
     email: str | None = None,
     verification_code: str | None = None,
+    *,
+    admin_bypass: bool = False,
 ) -> User:
     """
     注册新用户。
     如果是第一个用户，自动设为 admin（跳过邮箱验证）。
     如果 require_email_verification=ON：email + verification_code 必填。
     如果 require_email_verification=OFF：email 选填。
+    admin_bypass=True：管理员后台创建，跳过注册通道开关和邮箱验证。
     """
     # 检查用户名是否已存在
     result = await db.execute(select(User).where(User.username == username))
@@ -49,13 +52,21 @@ async def register_user(
     # 读取系统设置
     require_verification = False
     login_providers = ["direct"]
+    registration_enabled = True
     try:
         from app.services.infrastructure.system_settings_service import get_settings
         sys = await get_settings(db)
         require_verification = sys.get("require_email_verification", False)
         login_providers = sys.get("login_providers", ["direct"])
+        registration_enabled = sys.get("registration_enabled", True)
     except Exception:
         pass
+
+    # 检查注册通道：非首个用户 + 非管理员绕过 → 关闭则拦截
+    if not is_first and not admin_bypass and not registration_enabled:
+        raise ValueError("当前未开放注册，请联系管理员")
+
+
 
     email_verified = False
 

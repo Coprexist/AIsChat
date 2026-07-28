@@ -33,6 +33,7 @@ class SystemSettings(Base):
     provider_config = Column(JSONB, nullable=True, comment="LLM 厂商预设：{provider, base_url, chat_model, work_model, embedding_model, model_options}")
     require_email_verification = Column(Boolean, default=False, comment="注册是否必须验证邮箱（默认关闭）")
     login_providers = Column(JSONB, default=lambda: ["direct"], comment="可用登录方式: direct/email_code/wechat/qq")
+    registration_enabled = Column(Boolean, default=True, comment="是否开放注册通道（默认开启）")
 
     updated_by = Column(Integer, ForeignKey("users.id"))
     updated_at = Column(DateTime, server_default=func.now(), onupdate=func.now())

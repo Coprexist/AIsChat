@@ -33,6 +33,7 @@ from app.services.content.opencli_service import (
     get_usage_logs,
 )
 from app.utils.auth import hash_password, require_admin, get_current_user
+from app.services.infrastructure.auth_service import register_user
 
 logger = logging.getLogger(__name__)
 
@@ -272,6 +273,105 @@ async def reset_user_password(
     await db.flush()
 
     return {"message": "密码已重置", "user_id": user_id}
+
+
+# ── 管理后台创建用户 ──
+
+class AdminCreateUserRequest(BaseModel):
+    username: str = Field(..., min_length=2, max_length=64, description="用户名")
+    password: str = Field(..., min_length=6, max_length=128, description="密码")
+    email: str | None = Field(None, description="邮箱（可选）")
+
+
+@router.post("/users", status_code=201)
+async def admin_create_user(
+    req: AdminCreateUserRequest,
+    admin: dict = Depends(require_admin),
+    db: AsyncSession = Depends(get_db),
+):
+    """管理员手动创建用户（绕过注册通道开关和邮箱验证）"""
+    try:
+        user = await register_user(
+            db,
+            req.username,
+            req.password,
+            email=req.email,
+            admin_bypass=True,
+        )
+        await _log_admin_action(
+            db, admin["user_id"], "create_user", "user", user.id,
+            {"username": req.username, "email": req.email or ""},
+        )
+        await db.flush()
+        return {"message": "用户创建成功", "user_id": user.id, "username": user.username}
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+
+# ── CSV 批量导入用户 ──
+
+@router.post("/users/import-csv")
+async def admin_import_users_csv(
+    file: UploadFile = File(...),
+    admin: dict = Depends(require_admin),
+    db: AsyncSession = Depends(get_db),
+):
+    """管理员通过 CSV 批量创建用户。CSV 格式：username,password[,email]"""
+    if not file.filename or not file.filename.lower().endswith(".csv"):
+        raise HTTPException(status_code=400, detail="请上传 .csv 文件")
+
+    content = await file.read()
+    try:
+        text = content.decode("utf-8-sig")  # 兼容 BOM
+    except UnicodeDecodeError:
+        text = content.decode("gbk")  # 兼容中文编码
+
+    lines = [l.strip() for l in text.split("\n") if l.strip()]
+    if not lines:
+        raise HTTPException(status_code=400, detail="CSV 文件为空")
+
+    # 跳过表头行
+    header = lines[0].lower()
+    start = 1 if "username" in header or "user" in header else 0
+
+    results: list[dict] = []
+    for i, line in enumerate(lines[start:], start=start + 1):
+        parts = [p.strip() for p in line.split(",")]
+        if len(parts) < 2:
+            results.append({"row": i, "status": "skip", "reason": "至少需要 username,password"})
+            continue
+
+        username, password = parts[0], parts[1]
+        email = parts[2] if len(parts) > 2 else None
+
+        try:
+            user = await register_user(
+                db,
+                username,
+                password,
+                email=email,
+                admin_bypass=True,
+            )
+            results.append({"row": i, "status": "ok", "user_id": user.id, "username": username})
+        except ValueError as e:
+            results.append({"row": i, "status": "error", "username": username, "reason": str(e)})
+
+    created = sum(1 for r in results if r["status"] == "ok")
+    failed = sum(1 for r in results if r["status"] == "error")
+
+    await _log_admin_action(
+        db, admin["user_id"], "import_users_csv", "system", 1,
+        {"total": len(results), "created": created, "failed": failed},
+    )
+    await db.flush()
+
+    return {
+        "message": f"导入完成：成功 {created} 个，失败 {failed} 个",
+        "total": len(results),
+        "created": created,
+        "failed": failed,
+        "details": results,
+    }
 
 
 # ---------- AI 管理 ----------
@@ -990,6 +1090,7 @@ async def update_system_settings(
             default_platform_credit=req.default_platform_credit,
             default_file_quota_mb=req.default_file_quota_mb,
             default_concurrent_ai_limit=req.default_concurrent_ai_limit,
+            registration_enabled=req.registration_enabled,
             updated_by=admin["user_id"],
         )
         await _log_admin_action(
