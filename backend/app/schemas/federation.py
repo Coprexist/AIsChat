@@ -1,7 +1,7 @@
 """
-联邦通信 Schema（v1.0.0 ID前缀替代注册表）
+联邦通信 Schema（v0.2.0 ID前缀替代注册表）
 
-v0.3.0 → v1.0.0 变更：
+v0.1.2 → v0.2.0 变更：
   删除: GroupShareCreate, GroupShareResponse, DMShareCreate, DMShareResponse
   新增: EntityAnnounce（入站实体注册）, ProfileUpdateItem（改名同步）
 """

@@ -25,9 +25,9 @@ interface User {
   status_color: string | null
   setup_completed: boolean
   created_at: string | null
-  assigned_pool_key_name: string | null  // v0.6.0: 绑定的池 Key 名
-  email: string | null  // v1.0.0 邮箱
-  email_verified: boolean  // v1.0.0 邮箱是否已验证
+  assigned_pool_key_name: string | null  // v0.1.5: 绑定的池 Key 名
+  email: string | null  // v0.2.0 邮箱
+  email_verified: boolean  // v0.2.0 邮箱是否已验证
 }
 
 interface LoginOptions {

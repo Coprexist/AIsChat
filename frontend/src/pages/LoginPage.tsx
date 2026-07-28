@@ -48,7 +48,7 @@ export default function LoginPage() {
   const [loading, setLoading] = useState(false)
   const [hasExistingUsers, setHasExistingUsers] = useState<boolean | null>(null)
 
-  // v1.0.0 邮箱认证（状态从 sessionStorage 恢复，切换页面不丢）
+  // v0.2.0 邮箱认证（状态从 sessionStorage 恢复，切换页面不丢）
   const [providers, setProviders] = useState<string[]>(['direct'])
   const [requireEmailVerification, setRequireEmailVerification] = useState(false)
   const [loginMethod, setLoginMethod] = useState<string>(saved.loginMethod || 'direct')

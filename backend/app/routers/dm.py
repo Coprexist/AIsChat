@@ -285,7 +285,7 @@ async def _maybe_trigger_dm_ai_reply(
     if agent is None:
         return
 
-    # ── v0.9.0: 对话权限与限额决策 ──
+    # ── v0.1.8: 对话权限与限额决策 ──
     is_owner = sender_id == agent.owner_id
 
     if not is_owner:
@@ -340,7 +340,7 @@ async def _maybe_trigger_dm_ai_reply(
                     agent.others_chat_used = used + 1
                     await db.flush()
 
-    # ── v0.9.0: 余额检查（通用/半通用 AI，聊天者要付）──
+    # ── v0.1.8: 余额检查（通用/半通用 AI，聊天者要付）──
     if not is_owner and not force_own_key and agent.ai_type in ("general", "semi_general"):
         chatter_result = await db.execute(
             select(User).where(User.id == sender_id)
@@ -399,7 +399,7 @@ async def _maybe_trigger_dm_ai_reply(
                 "sender_type": "human" if sender_id != receiver_id else "ai",
                 "sender_id": sender_id,
                 "chain_depth": 0,
-                "force_own_key": force_own_key,  # v0.9.0
+                "force_own_key": force_own_key,  # v0.1.8
             })
         except asyncio.QueueFull:
             logger.warning("AI 回复队列已满，丢弃 DM 事件")

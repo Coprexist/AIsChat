@@ -20,9 +20,9 @@ class RoughMemory(Base):
     embedding = Column(Vector(1536))  # 标题向量
     scope = Column(String(10), default="private")  # private | group | cross_user
     group_id = Column(Integer, ForeignKey("groups.id"), nullable=True)
-    # v0.4.0: per-user 记忆隔离（共振 AI 为 NULL，通用/半通用填触发用户 ID）
+    # v0.1.3: per-user 记忆隔离（共振 AI 为 NULL，通用/半通用填触发用户 ID）
     user_id = Column(Integer, ForeignKey("users.id"), nullable=True)
-    # v0.5.0: 延迟归档字段
+    # v0.1.4: 延迟归档字段
     status = Column(String(20), default="active", comment="active | pending_archive | discarded")
     value_score = Column(Integer, default=5, comment="记忆价值评分: 1=低价值(自动提取), 5=正常, 10=高价值")
     created_at = Column(DateTime, server_default=func.now())

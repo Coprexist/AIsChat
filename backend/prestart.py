@@ -59,7 +59,7 @@ MIGRATIONS: list[tuple[str, str]] = [
               AND gm.member_id = g.owner_id
         )""",
     ),
-    # ── v1.0.1: 状态栈（AI 跨任务上下文追踪）──
+    # ── v0.2.1: 状态栈（AI 跨任务上下文追踪）──
     (
         "agents.state_stack",
         "ALTER TABLE agents ADD COLUMN IF NOT EXISTS state_stack JSONB DEFAULT '[]'::jsonb",

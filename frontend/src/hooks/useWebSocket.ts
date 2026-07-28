@@ -106,7 +106,7 @@ export function useWebSocket(
           }, 5000)
         }
 
-        // v0.9.0: 余额弹窗 → 全局自定义事件（BalancePromptModal 监听）
+        // v0.1.8: 余额弹窗 → 全局自定义事件（BalancePromptModal 监听）
         if (msg.type === 'balance_prompt' && msg.data) {
           window.dispatchEvent(new CustomEvent('balance-prompt', { detail: msg.data }))
         }

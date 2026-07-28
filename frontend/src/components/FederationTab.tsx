@@ -1020,7 +1020,7 @@ export default function FederationTab() {
   )
 }
 
-// ── 联邦实体列表（v1.0.0 新增） ──
+// ── 联邦实体列表（v0.2.0 新增） ──
 
 function FederatedEntitiesSection() {
   const t = useT()

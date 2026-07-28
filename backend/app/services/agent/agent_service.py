@@ -38,7 +38,7 @@ CONFIG_PROFILES = {
         "is_ai_editable": False,
         "hide_ai_identity": True,
         "reminder_grace": "every_time",
-        # v0.7.0: 文件记忆
+        # v0.1.6: 文件记忆
         "memory_load_mode": "index_only",
         "memory_recent_count": 0,
     },
@@ -60,7 +60,7 @@ CONFIG_PROFILES = {
         "is_ai_editable": True,
         "hide_ai_identity": False,
         "reminder_grace": "every_time",
-        # v0.7.0: 文件记忆
+        # v0.1.6: 文件记忆
         "memory_load_mode": "index_plus_recent",
         "memory_recent_count": 3,
     },
@@ -82,7 +82,7 @@ CONFIG_PROFILES = {
         "is_ai_editable": True,
         "hide_ai_identity": False,
         "reminder_not_count": True,
-        # v0.7.0: 文件记忆
+        # v0.1.6: 文件记忆
         "memory_load_mode": "index_plus_semantic",
         "memory_recent_count": 5,
     },
@@ -317,7 +317,7 @@ async def create_agent(
     await db.flush()
     await db.refresh(agent)
 
-    # v0.9.0: 记忆系统已迁移到数据库（structured_records 表）
+    # v0.1.8: 记忆系统已迁移到数据库（structured_records 表）
     # 文件系统记忆目录（memory_index.py）已废弃，新 AI 不再创建
 
     # 自动将创建者添加为 AI 的好友（双向）
@@ -384,7 +384,7 @@ async def get_effective_config(
     user_id: int | None = None,
 ) -> dict:
     """
-    获取 AI 的有效配置（v0.4.0 三种 AI 类型感知）。
+    获取 AI 的有效配置（v0.1.3 三种 AI 类型感知）。
 
     - resonance（共振 AI）：使用 agent 本体配置
     - general（通用 AI）：从 agent_user_configs 取 per-user 覆盖，NULL 则用 agent 默认值
@@ -524,7 +524,7 @@ async def update_agent_config(
     如果 is_ai_editable 为 false 且操作者不是管理员，则拒绝。
     修改前自动保存历史记录。
 
-    v0.4.0: 通用/半通用 AI 的可覆盖字段写入 agent_user_configs，
+    v0.1.3: 通用/半通用 AI 的可覆盖字段写入 agent_user_configs，
     而非 agent 本体（实现 per-user 配置隔离）。
     """
     agent = (await get_agent(db, agent_id)).unwrap()
@@ -669,7 +669,7 @@ async def update_agent_config(
     if "discoverable" in updates:
         agent.discoverable = updates["discoverable"]
 
-    # v0.9.0: 对话权限与限额
+    # v0.1.8: 对话权限与限额
     if "allow_others_chat" in updates and updates["allow_others_chat"] is not None:
         agent.allow_others_chat = updates["allow_others_chat"]
     if "others_chat_mode" in updates and updates["others_chat_mode"] is not None:
@@ -685,7 +685,7 @@ async def update_agent_config(
     if "is_ai_editable" in updates:
         agent.is_ai_editable = updates["is_ai_editable"]
 
-    # v0.7.0: 文件系统记忆配置
+    # v0.1.6: 文件系统记忆配置
     if "memory_load_mode" in updates and updates["memory_load_mode"] is not None:
         agent.memory_load_mode = updates["memory_load_mode"]
     if "memory_recent_count" in updates and updates["memory_recent_count"] is not None:
@@ -903,7 +903,7 @@ async def calculate_willingness(
     agent_id: int,
     group_id: int,
     message_content: str,
-    scenario: str = "reply",      # v0.5.0: "reply" | "alarm" | "proactive"
+    scenario: str = "reply",      # v0.1.4: "reply" | "alarm" | "proactive"
     is_mentioned: bool = False,
     idle_seconds: int = 0,
 ) -> WillingnessResult:
@@ -965,7 +965,7 @@ async def _calc_proactive_willingness(
     idle_seconds: int,
 ) -> WillingnessResult:
     """
-    v0.5.0: 主动发言意愿计算。
+    v0.1.4: 主动发言意愿计算。
 
     编排器：DB 查询群活跃度 → 纯函数计算。
     """
@@ -1221,7 +1221,7 @@ def agent_to_dict(agent: Agent) -> dict:
         "avatar_url": agent.avatar_url,
         "api_token": agent.api_token,
         "created_at": str(agent.created_at) if agent.created_at else None,
-        # v0.7.0: 文件系统记忆配置
+        # v0.1.6: 文件系统记忆配置
         "memory_load_mode": agent.memory_load_mode or "index_only",
         "memory_recent_count": agent.memory_recent_count if agent.memory_recent_count is not None else 0,
         "memory_shared_scope": agent.memory_shared_scope or "private_only",

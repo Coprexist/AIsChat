@@ -3,7 +3,7 @@
 > 本文档描述 AIsChat 中 AI 的认知架构设计——思考空间、对话空间、记忆空间三者分离，以及 JSON intent 轻量协议、双重记忆架构（向量+数据库结构记忆）。
 > This document describes the cognitive architecture of AIs in AIsChat — the separation of thinking, conversation, and memory spaces, the lightweight JSON intent protocol, and the dual memory architecture (vector + structured database).
 >
-> **v0.9.0 更新**：文件系统记忆已迁移为数据库结构记忆（`structured_records`），新增统一上下文（immersive/digital_life 档），详见第 4-7 节。理论基础见 [`docs/记忆架构设计.md`](./记忆架构设计.md)。
+> **v0.1.8 更新**：文件系统记忆已迁移为数据库结构记忆（`structured_records`），新增统一上下文（immersive/digital_life 档），详见第 4-7 节。理论基础见 [`docs/记忆架构设计.md`](./记忆架构设计.md)。
 
 ---
 
@@ -73,7 +73,7 @@ AI 与外界交流的唯一通道。只有调用这两个工具，别人才会�
 一次回复可并行调用多次 send_message，模拟人类连续表达。
 ```
 
-### 2.3 记忆空间（双重记忆架构 v0.9.0）
+### 2.3 记忆空间（双重记忆架构 v0.1.8）
 
 ```mermaid
 flowchart TB
@@ -132,7 +132,7 @@ flowchart TD
 
 ---
 
-## 4. 结构记忆（数据库版 v0.9.0）
+## 4. 结构记忆（数据库版 v0.1.8）
 
 > 理论基础：Tulving SPI 模型语义记忆层 + 2026 AI 记忆综述 Agentic Memory pattern。
 > 详细设计见 [`docs/记忆架构设计.md`](./记忆架构设计.md)。
@@ -221,9 +221,9 @@ flowchart TB
     Res -->|无过滤| Mem
 ```
 
-### 5.2 统一上下文（v1.0.1）
+### 5.2 统一上下文（v0.2.1）
 
-> v1.0.1: 跨对话上下文统一 `role: system` + 自我/他人区分（自己无 id，他人带 id）。v1.0.1 统一标题格式 + 上下文压缩。详见 [`AI对话链机制.md §2.4`](./AI对话链机制.md#24-统一上下文--unified-context)。
+> v0.2.1: 跨对话上下文统一 `role: system` + 自我/他人区分（自己无 id，他人带 id）。v0.2.1 统一标题格式 + 上下文压缩。详见 [`AI对话链机制.md §2.4`](./AI对话链机制.md#24-统一上下文--unified-context)。
 
 ```mermaid
 flowchart LR
@@ -252,7 +252,7 @@ flowchart LR
 
 ## 6. 系统提示词段布局
 
-七段结构（v1.0.1），固定段在前最大化 cache 命中：
+七段结构（v0.2.1），固定段在前最大化 cache 命中：
 
 ```mermaid
 flowchart TB
@@ -264,7 +264,7 @@ flowchart TB
     end
     subgraph Dynamic["动态段"]
         S5["5. current_context"]
-        S6["6. cross_context 🆕 v1.0.1<br/>统一上下文（统一标题格式）"]
+        S6["6. cross_context 🆕 v0.2.1<br/>统一上下文（统一标题格式）"]
         S7["7. injected_skills<br/>向量记忆 + Skill 引擎<br/>+ 结构记忆索引"]
     end
     S1 --> S2 --> S3 --> S4 --> S5 --> S6 --> S7
@@ -275,11 +275,11 @@ flowchart TB
     style S7 fill:#0891b2,stroke:#0e7490,color:#fff
 ```
 
-> v1.0.1: 跨对话上下文从独立消息注入改为统一标题格式，配合上下文压缩保缓存命中。详见 [`AI对话链机制.md §2.4`](./AI对话链机制.md#24-统一上下文--unified-context)。
+> v0.2.1: 跨对话上下文从独立消息注入改为统一标题格式，配合上下文压缩保缓存命中。详见 [`AI对话链机制.md §2.4`](./AI对话链机制.md#24-统一上下文--unified-context)。
 
 ---
 
-## 7. v0.9.0 变更汇总
+## 7. v0.1.8 变更汇总
 
 ### 7.1 新增工具
 
@@ -307,7 +307,7 @@ flowchart TB
 | `Toggle.tsx` | 加 `border-2 border-border` 描边 |
 | `AdminPage.tsx` | 分页按钮加 `text-textSecondary` 日夜适配 |
 | `llm_service.py` | 空目录不注入索引 → 始终注入 |
-| `llm_service.py` | 新增 `_build_cross_conversation_context` 统一上下文（v1.0.1 统一标题格式） |
+| `llm_service.py` | 新增 `_build_cross_conversation_context` 统一上下文（v0.2.1 统一标题格式） |
 | `api/client.ts` | API_BASE 可配置（桌面端 localStorage） |
 | `hooks/useWebSocket.ts` | WS URL 从配置读取 |
 

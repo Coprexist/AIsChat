@@ -4,7 +4,7 @@ Agent 闹钟服务
 AI 可以为自己设定闹钟，到时间后自动唤醒并执行预设任务。
 这是"心跳机制"的第一种形态：AI 自主决定何时醒来、醒来做什么。
 
-v0.5.0: 事件驱动调度 — 用 asyncio.Event 替代 5 秒轮询，
+v0.1.4: 事件驱动调度 — 用 asyncio.Event 替代 5 秒轮询，
        set/cancel/update 后唤醒调度器精确等待。
 """
 import asyncio

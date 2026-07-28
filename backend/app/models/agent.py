@@ -91,15 +91,15 @@ class Agent(Base):
     # 隐藏 AI 身份（开启后系统提示词不包含"你是 AI"相关表述）
     hide_ai_identity = Column(Boolean, default=False)
 
-    # 好友与社交控制（v0.6.0）
+    # 好友与社交控制（v0.1.5）
     allow_friend_requests = Column(Boolean, default=True, comment="是否允许接收好友申请")
     auto_respond_friend_request = Column(Boolean, default=False, comment="收到好友申请时是否自动触发 API 响应")
     discoverable = Column(Boolean, default=True, comment="是否允许他人发现与查找此 AI")
 
-    # AI 类型 (v0.4.0): general(通用) | semi_general(半通用) | resonance(共振, 默认)
+    # AI 类型 (v0.1.3): general(通用) | semi_general(半通用) | resonance(共振, 默认)
     ai_type = Column(String(20), default="resonance")
 
-    # ── 对话权限与限额 (v0.9.0) ──
+    # ── 对话权限与限额 (v0.1.8) ──
     allow_others_chat = Column(Boolean, default=True, comment="是否允许非主人触发此 AI 对话")
     others_chat_mode = Column(String(20), default="unlimited", comment="允许时的模式: unlimited | quota")
     others_chat_quota = Column(Integer, default=30, comment="配额上限（触发次数），仅 quota 模式生效")
@@ -113,7 +113,7 @@ class Agent(Base):
     # ── 群主支付 (v1.1.0): 群聊 AI 消息默认由群主付费 ──
     group_owner_pays = Column(Boolean, default=True, comment="群聊中 AI 消息是否由群主付费")
 
-    # ── 文件系统记忆配置 (v0.7.0) ──
+    # ── 文件系统记忆配置 (v0.1.6) ──
     # 记忆加载模式: index_only(仅索引) | index_plus_recent(索引+最近N篇内容) | index_plus_semantic(索引+语义检索)
     memory_load_mode = Column(String(30), default="index_only")
     # index_plus_recent 模式下加载最近 N 个文件的完整内容
@@ -121,7 +121,7 @@ class Agent(Base):
     # 共享记忆范围: private_only | private_plus_shared_by_user | private_plus_shared_all
     memory_shared_scope = Column(String(30), default="private_only")
 
-    # 最近意愿评分和原因 (v0.4.0)
+    # 最近意愿评分和原因 (v0.1.3)
     last_willingness_score = Column(Integer, nullable=True)
     last_willingness_reason = Column(Text, nullable=True)
 
@@ -138,7 +138,7 @@ class Agent(Base):
     # API Token（供外部调用该 AI）
     api_token = Column(String(64))
 
-    # 状态栈 — AI 跨任务上下文追踪（v1.0.1）
+    # 状态栈 — AI 跨任务上下文追踪（v0.2.1）
     # JSONB 数组，每个元素 {id, type, context_ref, why, doing, todo, plan, journal, created_at, status}
     state_stack = Column(JSONB, default=list)
 

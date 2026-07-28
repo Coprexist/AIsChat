@@ -81,7 +81,7 @@ async def ai_response_worker():
         try:
             event = await message_queue.get()
             logger.info(f"📬 Worker 收到事件: group={event.get('group_id')}, msg={event.get('message_id')}, queue_remaining={message_queue.qsize()}")
-            # v0.5.0: 记录队列深度
+            # v0.1.4: 记录队列深度
             try:
                 from app.services.infrastructure.metrics_collector import metrics
                 await metrics.record_queue_depth(message_queue.qsize())
@@ -137,7 +137,7 @@ async def _process_dm_event(db, event: dict):
     content = event["content"]
     sender_id = event.get("sender_id")
     chain_depth = event.get("chain_depth", 0)
-    force_own_key = event.get("force_own_key", False)  # v0.9.0
+    force_own_key = event.get("force_own_key", False)  # v0.1.8
 
     from app.models.dm import DMSession
     from app.models.user import User
@@ -355,8 +355,8 @@ async def _maybe_trigger_ai_reply(
     is_mentioned = _check_mention(content, agent.name)
     logger.info(f"🔍 AI {agent.name}(id={resolved_agent_id}): is_mentioned={is_mentioned}, content_preview='{content[:80]}'")
 
-    # v0.5.0: 使用统一决策（替代原有 Gate 1-5 的手动判断）
-    # v1.0.1: 检测 DND 穿透条件
+    # v0.1.4: 使用统一决策（替代原有 Gate 1-5 的手动判断）
+    # v0.2.1: 检测 DND 穿透条件
     is_at_all = any(tag in content for tag in ("@all", "@everyone", "@全体"))
     is_announcement = message_type == "announcement"
     # v2.0.6: 检查发送者是否为特别关心好友
@@ -422,7 +422,7 @@ async def _maybe_trigger_ai_reply(
         logger.info(f"AI {agent.name}({agent.id}) 正忙，群聊中断消息已注入")
         return
 
-    # 5. 获取 API 配置（v0.5.0: 公共辅助函数；v0.6.0: 四层优先链含池 Key）
+    # 5. 获取 API 配置（v0.1.4: 公共辅助函数；v0.1.5: 四层优先链含池 Key）
     api_key, api_base, credit_source, pool_key_id, provider_info = await _get_api_config(db, agent)
     logger.info(f"🔍 AI {agent.name}: api_base={api_base}, has_api_key={api_key is not None}, "
                 f"credit_source={credit_source}")
@@ -461,10 +461,10 @@ async def _maybe_trigger_ai_reply(
             logger.info(f"🧠 AI {agent.name} 技能延迟 {skill_result.delay_seconds}s")
             await asyncio.sleep(skill_result.delay_seconds)
 
-    # v0.4.0: trigger_user_id 用于通用/半通用 AI 的 per-user 记忆隔离
+    # v0.1.3: trigger_user_id 用于通用/半通用 AI 的 per-user 记忆隔离
     trigger_user_id = sender_id if sender_type == "human" else None
 
-    # 6. 获取有效配置（v0.4.0: per-user 覆盖 — 需在 build_messages 前获取）
+    # 6. 获取有效配置（v0.1.3: per-user 覆盖 — 需在 build_messages 前获取）
     from app.services.agent.agent_service import get_effective_config
     effective_cfg = await get_effective_config(db, agent.id, trigger_user_id)
     logger.info(f"🔍 AI {agent.name}: effective_cfg ai_type={effective_cfg['ai_type']}, "
@@ -633,11 +633,11 @@ async def _trigger_dm_ai_reply(
         logger.info(f"AI {agent_name}({agent_id}) 正忙，DM 中断消息已注入")
         return
 
-    # 获取有效配置（v0.4.0: per-user 覆盖 — DM 场景 trigger_user_id=sender_id）
+    # 获取有效配置（v0.1.3: per-user 覆盖 — DM 场景 trigger_user_id=sender_id）
     from app.services.agent.agent_service import get_effective_config as _get_eff_cfg
     effective_cfg = await _get_eff_cfg(db, agent_id, sender_id)
 
-    # 获取 API 配置（v0.9.0: 按 AI 类型 + force_own_key 决定账单人）
+    # 获取 API 配置（v0.1.8: 按 AI 类型 + force_own_key 决定账单人）
     api_key, api_base, credit_source, pool_key_id, provider_info = await _get_api_config(
         db, agent,
         chatter_id=sender_id,
@@ -668,7 +668,7 @@ async def _trigger_dm_ai_reply(
 
     # 构建消息
     from app.ai.llm import build_dm_messages, resolve_model
-    # v0.4.0: DM 中 sender_id 即为触发用户
+    # v0.1.3: DM 中 sender_id 即为触发用户
     messages = await build_dm_messages(db, agent, session_id, api_base_url=api_base, api_key=api_key, trigger_user_id=sender_id, system_prompt_override=effective_cfg.get("system_prompt"))
 
     # 获取工具

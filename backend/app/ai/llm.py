@@ -106,9 +106,9 @@ async def chat_completion(
     on_tool_call: callable = None,
 ) -> dict:
     """
-    LLM 聊天补全（支持流式/非流式，v0.4.0 拆分）。
+    LLM 聊天补全（支持流式/非流式，v0.1.3 拆分）。
 
-    v0.4.0: stream=False 调用非流式实现，stream=True 预留 SSE 接口。
+    v0.1.3: stream=False 调用非流式实现，stream=True 预留 SSE 接口。
 
     返回 (非流式):
         {
@@ -507,7 +507,7 @@ async def _build_current_context(
     group_name: str, is_dm: bool,
     is_federated: bool = False,
 ) -> str:
-    """current_context 段：当前时间（v1.0.1 精简——会话标题已用统一格式）"""
+    """current_context 段：当前时间（v0.2.1 精简——会话标题已用统一格式）"""
     tz = ZoneInfo(settings.display_timezone)
     now = datetime.now(tz)
     now_str = now.strftime(f"%Y-%m-%d %H:%M {tz.key}")
@@ -557,7 +557,7 @@ async def _build_injected_skills(
     这是最动态的段，每次请求都可能不同。
     记忆注入用最近消息内容作为检索查询。
 
-    v0.4.0: trigger_user_id 用于通用/半通用 AI 的 per-user 记忆隔离。
+    v0.1.3: trigger_user_id 用于通用/半通用 AI 的 per-user 记忆隔离。
     """
     parts: list[str] = []
 
@@ -591,7 +591,7 @@ async def _build_injected_skills(
     except Exception as e:
         logger.warning(f"Skill 注入失败（非致命）: {e}")
 
-    # ── v0.9.0: 数据库版目录级记忆注入（替代文件系统版）──
+    # ── v0.1.8: 数据库版目录级记忆注入（替代文件系统版）──
     try:
         from app.services.memory.structured_memory_service import format_db_records_for_prompt
         db_records_text = await format_db_records_for_prompt(db, agent.id)
@@ -715,7 +715,7 @@ async def _build_cross_conversation_context(
     from app.models.dm import DMSession, DMMessage
     from app.models.user import User as UserModel
 
-    # v1.0.1: 彻底禁用跨对话消息注入。
+    # v0.2.1: 彻底禁用跨对话消息注入。
     # 原设计将其他群的消息注入为 system 上下文，导致 LLM 跨群回复（"历史重播"死循环）。
     # 新的「状态栈系统」已通过状态栈摘要提供跨任务上下文感知，
     # 不需要再把其他群的消息原文注入当前对话。
@@ -861,7 +861,7 @@ async def build_messages(
     5. current_context — 群名/ID/时间/DM状态/工作区
     6. injected_skills — 记忆注入 + Skill 引擎注入
 
-    v0.4.0: system_prompt_override 用于通用/半通用 AI 的 per-user 人格覆盖。
+    v0.1.3: system_prompt_override 用于通用/半通用 AI 的 per-user 人格覆盖。
     v2.0: context_config 支持声明式配置驱动上下文构建。
     """
     from app.services.memory.context_config_parser import context_config_parser
@@ -1210,7 +1210,7 @@ async def build_dm_messages(
     except Exception as e:
         logger.warning(f"DM 工作区上下文注入失败（非致命）: {e}")
 
-    # ✨ 状态栈摘要（v1.0.1）
+    # ✨ 状态栈摘要（v0.2.1）
     try:
         from app.services.agent.state_stack_service import get_state_stack_summary
         stack_summary = await get_state_stack_summary(db, agent.id)

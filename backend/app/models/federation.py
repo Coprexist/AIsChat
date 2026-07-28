@@ -1,7 +1,7 @@
 """
-联邦通信 ORM 模型（v1.0.0 ID前缀替代注册表）
+联邦通信 ORM 模型（v0.2.0 ID前缀替代注册表）
 
-v0.3.0 → v1.0.0 变更：
+v0.1.2 → v0.2.0 变更：
   删除: FederationGroupShare, FederationDMShare（注册表交换模式）
   新增: FederatedEntity（ID 前缀映射）, PendingProfileUpdate（改名同步队列）
   display_name 新增唯一约束（作为实例代号）
@@ -55,7 +55,7 @@ class FederationPeer(Base):
 
 class FederatedEntity(Base):
     """
-    联邦实体注册表（v1.0.0 替代 FederationGroupShare + FederationDMShare）
+    联邦实体注册表（v0.2.0 替代 FederationGroupShare + FederationDMShare）
 
     记录从远端实例接入的实体。ID 前缀直接编码归属，无需 conversation_uuid 翻译。
     一张表统一群聊/DM/用户/AI 四种实体类型。
@@ -90,7 +90,7 @@ class FederatedEntity(Base):
 
 class PendingProfileUpdate(Base):
     """
-    改名同步队列（v1.0.0）
+    改名同步队列（v0.2.0）
 
     记录本地实体变更，传播到联邦对等端后自动清除。
     传播方式：A) 发消息时顺带  B) 定时全推（N分钟，管理员可配）

@@ -1,7 +1,7 @@
 """
-联邦连接管理器（v1.0.0 ID前缀替代注册表）
+联邦连接管理器（v0.2.0 ID前缀替代注册表）
 
-v0.3.0 → v1.0.0 变更：
+v0.1.2 → v0.2.0 变更：
   删除: conversation_uuid 映射, _handle_conversation_announce, _handle_conversation_ack
   新增: _handle_entity_announce（入站实体注册协议）
   转发逻辑改为 federated_id 前缀模式
@@ -448,7 +448,7 @@ class FederationManager:
                 continue
             await self._send_or_buffer(peer.peer_public_id, payload)
 
-    # ── 实体发布/取消发布（v1.0.0: 供群主/AI制作者控制联邦共享） ──
+    # ── 实体发布/取消发布（v0.2.0: 供群主/AI制作者控制联邦共享） ──
 
     async def announce_entity(
         self,
@@ -699,7 +699,7 @@ class FederationManager:
             await self._close_peer_connection(public_id)
 
     async def _handle_remote_forward(self, from_public_id: str, data: dict) -> None:
-        """处理远程转发来的消息（v1.0.0: 使用 federated_id 直接解析）"""
+        """处理远程转发来的消息（v0.2.0: 使用 federated_id 直接解析）"""
         conversation_type = data.get("conversation_type", "group")
         msg = data.get("message", {})
         source_public_id = data.get("source_public_id", from_public_id)

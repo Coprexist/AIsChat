@@ -600,7 +600,7 @@ async def mark_read(
     return {"ok": True, "updated": updated}
 
 
-# ---------- 联邦共享控制（v1.0.0: 群主/AI制作者按群控制） ----------
+# ---------- 联邦共享控制（v0.2.0: 群主/AI制作者按群控制） ----------
 
 @router.get("/groups/{group_id}/federation/peers")
 async def get_federation_peers(

@@ -36,7 +36,7 @@ class LanguageUpdateRequest(BaseModel):
     language: str = Field(..., description="用户选择的语言: zh 或 en")
 
 
-# ── v1.0.0 邮箱认证 ──
+# ── v0.2.0 邮箱认证 ──
 
 class SmtpConfigRequest(BaseModel):
     """SMTP 配置请求"""
@@ -61,10 +61,10 @@ class AuthSettingsResponse(BaseModel):
     login_providers: list[str] = ["direct"]
     smtp_configured: bool = False
     smtp_config: dict | None = None  # 密码已脱敏
-    smtp_configs: list[dict] = []    # v1.0.0 多 SMTP（密码已脱敏）
+    smtp_configs: list[dict] = []    # v0.2.0 多 SMTP（密码已脱敏）
 
 
-# ── v1.0.0 多 SMTP 容灾 ──
+# ── v0.2.0 多 SMTP 容灾 ──
 
 class SmtpConfigItem(BaseModel):
     """单个 SMTP 配置项"""
@@ -95,7 +95,7 @@ class SmtpTestRequest(BaseModel):
     use_tls: bool = True
 
 
-# ── v1.0.0 自定义邮件模板 ──
+# ── v0.2.0 自定义邮件模板 ──
 
 class EmailTemplateItem(BaseModel):
     """单个邮件模板（subject + body_html）"""

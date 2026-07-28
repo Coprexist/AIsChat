@@ -1,14 +1,14 @@
 """
 数据库迁移脚本（幂等：每次启动自动执行，已迁移则跳过）
 
-v0.2.0 迁移内容（统一用户ID + DM表）：
+v0.1.1 迁移内容（统一用户ID + DM表）：
   1. users 表加 type 列（human/ai）
   2. agents 表加 user_id 列
   3. 为已有 agent 创建 users 条目（username = agent.name + "_agent"）
   4. 新建 dm_sessions / dm_messages 表
   5. 将历史 DM 群聊消息导入 dm_messages
 
-v0.2.0 迁移内容（续 — 闹钟 + 工作区）：
+v0.1.1 迁移内容（续 — 闹钟 + 工作区）：
   6. 新建 agent_alarms 表（AI 自主闹钟）
   7. 新建 agent_workspace 表（AI 当前任务追踪 / 中断恢复）
 """
@@ -53,33 +53,33 @@ async def run_migrations():
     async with async_session() as db:
         try:
             await _migrate_users_type(db)
-            await _migrate_unify_ai_user_id(db)       # v1.0.2 全局统一AI ID为user_id
+            await _migrate_unify_ai_user_id(db)       # v0.2.2 全局统一AI ID为user_id
             await _migrate_conversation_logs(db)   # 必须在查询 Agent 之前添加列
             await _migrate_federation_tables(db)   # 必须在查询 Agent 之前添加列
             await _migrate_api_credit(db)          # 新增列必须在查询 Agent 之前
-            await _migrate_config_profile(db)      # v0.4.0 三档配置，也要在查询 Agent 之前
-            await _migrate_delay_reply_enabled(db) # v0.4.0 延迟回复开关，也要在查询 Agent 之前
-            await _migrate_max_tool_rounds(db)     # v0.4.0 工具调用轮次上限
-            # ⚠️ 以下三个 v0.4.0 新增列迁移必须在任何 select(Agent) ORM 查询之前
-            await _migrate_ai_types(db)               # v0.4.0 三种 AI 类型 + per-user 配置隔离
-            await _migrate_memory_user_isolation(db)  # v0.4.0 记忆 per-user 隔离
-            await _migrate_willingness_fields(db)     # v0.4.0 意愿评分字段
+            await _migrate_config_profile(db)      # v0.1.3 三档配置，也要在查询 Agent 之前
+            await _migrate_delay_reply_enabled(db) # v0.1.3 延迟回复开关，也要在查询 Agent 之前
+            await _migrate_max_tool_rounds(db)     # v0.1.3 工具调用轮次上限
+            # ⚠️ 以下三个 v0.1.3 新增列迁移必须在任何 select(Agent) ORM 查询之前
+            await _migrate_ai_types(db)               # v0.1.3 三种 AI 类型 + per-user 配置隔离
+            await _migrate_memory_user_isolation(db)  # v0.1.3 记忆 per-user 隔离
+            await _migrate_willingness_fields(db)     # v0.1.3 意愿评分字段
             await _migrate_reminder_not_count(db)     # v0.4.1 系统提醒不计入轮次
             await _migrate_agents_user_id(db)
-            await _migrate_friend_controls(db)         # v0.6.0 好友控制字段（必须在 select(Agent) 之前）
-            await _migrate_memory_config_columns(db)   # v0.8.0 文件记忆配置字段（必须在 select(Agent) 之前）
-            await _migrate_bio_and_status(db)     # v0.9.0 AI 简介 + 用户/AI 自定义状态（必须在 select(Agent) 之前）
-            await _migrate_agent_status_color(db)     # v1.0.2 AI状态颜色（必须在 select(Agent) 之前）
+            await _migrate_friend_controls(db)         # v0.1.5 好友控制字段（必须在 select(Agent) 之前）
+            await _migrate_memory_config_columns(db)   # v0.1.7 文件记忆配置字段（必须在 select(Agent) 之前）
+            await _migrate_bio_and_status(db)     # v0.1.8 AI 简介 + 用户/AI 自定义状态（必须在 select(Agent) 之前）
+            await _migrate_agent_status_color(db)     # v0.2.2 AI状态颜色（必须在 select(Agent) 之前）
             await _migrate_agent_pending_prompt(db)   # v2.0.5 AI自修改暂存（必须在 select(Agent) 之前）
             await _migrate_friendship_priority(db)    # v2.0.6 特别关心
             await _migrate_concurrent_ai_limit_default(db)  # v2.0.7 全局默认AI并发数
             await _migrate_drop_skill_type_constraint(db)  # v2.1.0 Skill 类型约束 → 注册表
-            await _migrate_others_chat_controls(db)  # v0.9.0 对话权限 + 限额控制（必须在 select(Agent) 之前）
-            await _migrate_email_verification(db)  # v1.0.0 邮箱认证（必须在 select(Agent) 之前）
-            await _migrate_provider_config(db)      # v1.0.0 LLM 厂商预设
-            await _migrate_smtp_configs_array(db)      # v1.0.0 多 SMTP 容灾：单对象 → 数组
-            await _migrate_email_templates(db)          # v1.0.0 自定义邮件模板列
-            await _migrate_auto_dnd_fields(db)         # v1.0.0+ 自动免打扰配置字段
+            await _migrate_others_chat_controls(db)  # v0.1.8 对话权限 + 限额控制（必须在 select(Agent) 之前）
+            await _migrate_email_verification(db)  # v0.2.0 邮箱认证（必须在 select(Agent) 之前）
+            await _migrate_provider_config(db)      # v0.2.0 LLM 厂商预设
+            await _migrate_smtp_configs_array(db)      # v0.2.0 多 SMTP 容灾：单对象 → 数组
+            await _migrate_email_templates(db)          # v0.2.0 自定义邮件模板列
+            await _migrate_auto_dnd_fields(db)         # v0.2.0+ 自动免打扰配置字段
             await _migrate_agent_is_paused(db)        # v2.0.5 agents 暂停状态（必须在 select(Agent) 之前）
             await _migrate_agent_pending_prompt(db)   # v2.0.5 AI自修改暂存（必须在 select(Agent) 之前）
             # groups 列新增必须在 select(Group) ORM 查询之前
@@ -93,46 +93,46 @@ async def run_migrations():
             # await _migrate_agent_alarms(db)  # 已由 Alembic 管理
             # await _migrate_workspace(db)  # 已由 Alembic 管理
             await _migrate_agent_skills(db)
-            await _migrate_archive_friend_tables(db)  # v0.4.0 删除好友机制：归档表
-            await _migrate_restore_friend_tables(db)  # v0.4.0+ 恢复好友机制：从 archived 恢复
-            await _migrate_file_system(db)             # v0.5.0 文件协作系统
-            await _migrate_message_attachments(db)     # v0.5.0 消息附件
-            await _migrate_message_sender_name(db)     # v0.6.0 联邦消息发送者名称
-            await _migrate_sender_avatar_url(db)       # v0.8.0 联邦消息头像持久化
-            await _migrate_prompt_overrides(db)        # v0.8.0 系统提示词覆盖
-            await _migrate_memory_archive_columns(db)  # v0.5.0 记忆延迟归档
-            await _migrate_agent_metrics(db)           # v0.5.0 系统监控指标
-            await _migrate_system_settings(db)          # v0.6.0 全局系统设置 + 新用户初始化向导
-            await _migrate_api_key_pool_tables(db)    # v0.6.0 API Key 池 + 用户绑定 + 用量日志；v0.6.0 +concurrent_limit
-            await _migrate_platform_credit(db)           # v0.6.0 平台赠送额度
-            await _migrate_redemption_code_details(db)  # v0.6.0 兑换码增强
-            await _migrate_federation_v1(db)             # v1.0.0 联邦 ID 前缀替代注册表
-            await _migrate_agent_collaborators(db)       # v0.7.0 AI 合作者系统
-            await _migrate_prompt_order(db)               # v0.7.0 系统提示词顺序可编辑
-            await _fix_file_refs_referrer_type(db)      # v0.7.0+ 修复 file_references.referrer_type 缺 human
-            await _fix_file_owner_type_check(db)       # v0.5.0+ 修复 file_metadata.owner_type 缺 human
-            await _migrate_system_user(db)             # v0.8.0+ 系统通知用户（sender_id 外键需要）
-            await _migrate_content_hash(db)          # v0.9.0 文件去重 SHA256 哈希
-            await _migrate_forward_ref_type(db)     # v0.9.0 文件转发引用类型
-            await _migrate_orphan_retention(db)     # v0.9.0 孤儿文件宽限期配置
+            await _migrate_archive_friend_tables(db)  # v0.1.3 删除好友机制：归档表
+            await _migrate_restore_friend_tables(db)  # v0.1.3+ 恢复好友机制：从 archived 恢复
+            await _migrate_file_system(db)             # v0.1.4 文件协作系统
+            await _migrate_message_attachments(db)     # v0.1.4 消息附件
+            await _migrate_message_sender_name(db)     # v0.1.5 联邦消息发送者名称
+            await _migrate_sender_avatar_url(db)       # v0.1.7 联邦消息头像持久化
+            await _migrate_prompt_overrides(db)        # v0.1.7 系统提示词覆盖
+            await _migrate_memory_archive_columns(db)  # v0.1.4 记忆延迟归档
+            await _migrate_agent_metrics(db)           # v0.1.4 系统监控指标
+            await _migrate_system_settings(db)          # v0.1.5 全局系统设置 + 新用户初始化向导
+            await _migrate_api_key_pool_tables(db)    # v0.1.5 API Key 池 + 用户绑定 + 用量日志；v0.1.5 +concurrent_limit
+            await _migrate_platform_credit(db)           # v0.1.5 平台赠送额度
+            await _migrate_redemption_code_details(db)  # v0.1.5 兑换码增强
+            await _migrate_federation_v1(db)             # v0.2.0 联邦 ID 前缀替代注册表
+            await _migrate_agent_collaborators(db)       # v0.1.6 AI 合作者系统
+            await _migrate_prompt_order(db)               # v0.1.6 系统提示词顺序可编辑
+            await _fix_file_refs_referrer_type(db)      # v0.1.6+ 修复 file_references.referrer_type 缺 human
+            await _fix_file_owner_type_check(db)       # v0.1.4+ 修复 file_metadata.owner_type 缺 human
+            await _migrate_system_user(db)             # v0.1.7+ 系统通知用户（sender_id 外键需要）
+            await _migrate_content_hash(db)          # v0.1.8 文件去重 SHA256 哈希
+            await _migrate_forward_ref_type(db)     # v0.1.8 文件转发引用类型
+            await _migrate_orphan_retention(db)     # v0.1.8 孤儿文件宽限期配置
             await _migrate_oracle_file_references(db) # v0.10.x: 文件引用表幂等唯一约束
-            await _migrate_default_file_quota(db)   # v0.9.0 用户默认文件配额配置
+            await _migrate_default_file_quota(db)   # v0.1.8 用户默认文件配额配置
             # await _migrate_structured_records(db)  # v0.10.0 已由 Alembic 管理
             await _migrate_group_members_user_id(db)  # v2.0.0 AI 群成员统一用 user_id
             await _migrate_group_invitations(db)  # v2.0.0 群邀请卡片系统
             await _migrate_group_owner_membership(db)  # v2.0.1 修复群主缺失的群成员记录
             await _migrate_fix_duplicate_owners(db)     # v2.0.2 修复错误的多群主记录
-            await _migrate_fix_human_members_changed_to_ai(db)  # v1.0.2 修被误改为AI的人类成员
-            await _migrate_agent_state_stack(db)       # v1.0.1 状态栈（AI 跨任务上下文追踪）
-            await _migrate_multi_provider(db)          # v1.0.2 多供应商 + api_key_pool.provider_name
+            await _migrate_fix_human_members_changed_to_ai(db)  # v0.2.2 修被误改为AI的人类成员
+            await _migrate_agent_state_stack(db)       # v0.2.1 状态栈（AI 跨任务上下文追踪）
+            await _migrate_multi_provider(db)          # v0.2.2 多供应商 + api_key_pool.provider_name
             await _migrate_provider_defaults(db)       # v2.0.8 provider_config为空时填入内置预设
-            await _migrate_ai_friend_user_id(db)       # v1.0.2 AI好友friend_id统一为user_id
-            await _migrate_opencli_default_enabled(db) # v1.0.2 OpenCLI命令默认可用
+            await _migrate_ai_friend_user_id(db)       # v0.2.2 AI好友friend_id统一为user_id
+            await _migrate_opencli_default_enabled(db) # v0.2.2 OpenCLI命令默认可用
             await _migrate_group_muted_until(db)     # v2.0.3 群聊屏蔽（比DND更强，@/公告也不穿透）
             await _migrate_group_concurrent_limit(db) # v2.0.4 群聊AI并发上限
             await _migrate_group_msg_display_len(db)   # v2.0.5 群聊消息折叠长度
             await _migrate_group_is_paused(db)        # v2.0.5 群聊暂停对话
-            await _migrate_audit_logs(db)          # v1.0.6 审计日志企业级字段
+            await _migrate_audit_logs(db)          # v0.2.6 审计日志企业级字段
             await _fix_column_types(db)  # 必须是最后一个：修复老部署的列类型不匹配
             await db.commit()
             logger.info("✅ 数据库迁移检查完成")
@@ -368,7 +368,7 @@ async def _migrate_dm_messages(db):
 
 
 async def _migrate_agent_alarms(db):
-    """创建 agent_alarms 表（v0.2.0）"""
+    """创建 agent_alarms 表（v0.1.1）"""
     if await _table_exists(db, "agent_alarms"):
         logger.info("  ⏭ agent_alarms 表已存在，跳过")
         return
@@ -389,7 +389,7 @@ async def _migrate_agent_alarms(db):
 
 
 async def _migrate_workspace(db):
-    """创建/扩展 agent_workspace 表（v0.2.0 创建，v0.4.0 扩展 TODO/PLAN/JOURNAL）"""
+    """创建/扩展 agent_workspace 表（v0.1.1 创建，v0.1.3 扩展 TODO/PLAN/JOURNAL）"""
     if not await _table_exists(db, "agent_workspace"):
         logger.info("  📋 创建 agent_workspace 表")
         await db.execute(text("""
@@ -430,7 +430,7 @@ async def _migrate_workspace(db):
 
 
 async def _migrate_agent_skills(db):
-    """创建 agent_skills 表（v0.2.0 Skill 系统）"""
+    """创建 agent_skills 表（v0.1.1 Skill 系统）"""
     if await _table_exists(db, "agent_skills"):
         logger.info("  ⏭ agent_skills 表已存在，跳过")
         return
@@ -459,7 +459,7 @@ async def _migrate_agent_skills(db):
 
 
 async def _migrate_federation_tables(db):
-    """创建联邦通信相关表（v0.3.0 跨实例联邦通信）"""
+    """创建联邦通信相关表（v0.1.2 跨实例联邦通信）"""
     created_any = False
 
     # 1. instance_config 表（单例，存本实例身份）
@@ -552,7 +552,7 @@ async def _migrate_federation_tables(db):
     else:
         logger.info("  ⏭ instance_config.github_token_encrypted 已存在，跳过")
 
-    # 7. federation_peers.url_rotation 动态 URL 轮换（v0.3.0）
+    # 7. federation_peers.url_rotation 动态 URL 轮换（v0.1.2）
     if not await _column_exists(db, "federation_peers", "remote_url_backup"):
         logger.info("  🌐 添加 federation_peers.remote_url_backup 列")
         await db.execute(text(
@@ -580,7 +580,7 @@ async def _migrate_federation_tables(db):
     else:
         logger.info("  ⏭ federation_peers.url_rotation_count 已存在，跳过")
 
-    # 8. federation_group_shares.conversation_uuid（v0.6.0 联邦对话 UUID 映射）
+    # 8. federation_group_shares.conversation_uuid（v0.1.5 联邦对话 UUID 映射）
     if not await _column_exists(db, "federation_group_shares", "conversation_uuid"):
         logger.info("  🌐 添加 federation_group_shares.conversation_uuid 列")
         await db.execute(text(
@@ -729,7 +729,7 @@ async def _migrate_conversation_logs(db):
 
 
 async def _migrate_auto_dnd_fields(db):
-    """v1.0.0+: 自动免打扰配置字段 — auto_dnd_threshold, auto_dnd_duration（幂等）"""
+    """v0.2.0+: 自动免打扰配置字段 — auto_dnd_threshold, auto_dnd_duration（幂等）"""
     created_any = False
 
     if not await _column_exists(db, "agents", "auto_dnd_threshold"):
@@ -758,7 +758,7 @@ async def _migrate_auto_dnd_fields(db):
 
 
 async def _migrate_api_credit(db):
-    """v0.4.0 API 额度系统 + 单 AI API 覆盖 + AI 不自知 + 语言/界面设置（幂等）"""
+    """v0.1.3 API 额度系统 + 单 AI API 覆盖 + AI 不自知 + 语言/界面设置（幂等）"""
     created_any = False
 
     if not await _column_exists(db, "users", "api_credit"):
@@ -833,7 +833,7 @@ async def _migrate_api_credit(db):
     else:
         logger.info("  ⏭ redemption_codes.code_type 已存在，跳过")
 
-    # v0.5.0 新增：AI 包断额度 + 文件配额
+    # v0.1.4 新增：AI 包断额度 + 文件配额
     if not await _column_exists(db, "users", "agent_bundle_credit"):
         logger.info("  📦 添加 users.agent_bundle_credit 列")
         await db.execute(text("ALTER TABLE users ADD COLUMN agent_bundle_credit INTEGER NOT NULL DEFAULT 0"))
@@ -905,7 +905,7 @@ async def _migrate_api_credit(db):
 
 
 async def _migrate_config_profile(db):
-    """v0.4.0 三档 AI 配置（幂等）"""
+    """v0.1.3 三档 AI 配置（幂等）"""
     if await _column_exists(db, "agents", "config_profile"):
         logger.info("  ⏭ agents.config_profile 已存在，跳过")
         return
@@ -918,7 +918,7 @@ async def _migrate_config_profile(db):
 
 
 async def _migrate_delay_reply_enabled(db):
-    """v0.4.0 延迟回复开关（幂等）"""
+    """v0.1.3 延迟回复开关（幂等）"""
     # 1. agents.delay_reply_enabled
     if not await _column_exists(db, "agents", "delay_reply_enabled"):
         logger.info("  ⏱️ 添加 agents.delay_reply_enabled 列")
@@ -943,7 +943,7 @@ async def _migrate_delay_reply_enabled(db):
 
 
 async def _migrate_max_tool_rounds(db):
-    """v0.4.0 工具调用轮次上限（幂等）"""
+    """v0.1.3 工具调用轮次上限（幂等）"""
     if not await _column_exists(db, "agents", "max_tool_rounds"):
         logger.info("  🔧 添加 agents.max_tool_rounds 列 (DEFAULT 3)")
         await db.execute(text(
@@ -1015,13 +1015,13 @@ async def _migrate_reminder_not_count(db):
 
 
 async def _migrate_archive_friend_tables(db):
-    """v0.4.0: 归档好友表（已废弃 — 好友机制已恢复，此迁移不再执行）"""
+    """v0.1.3: 归档好友表（已废弃 — 好友机制已恢复，此迁移不再执行）"""
     logger.info("  ⏭ 好友机制已恢复，跳过归档迁移")
     return
 
 
 async def _migrate_restore_friend_tables(db):
-    """v0.4.0+: 恢复好友表（好友机制回滚 — 从 archived 恢复）"""
+    """v0.1.3+: 恢复好友表（好友机制回滚 — 从 archived 恢复）"""
     if not await _table_exists(db, "friendships_archived"):
         logger.info("  ⏭ friendships_archived 不存在，无需恢复")
         return
@@ -1050,7 +1050,7 @@ async def _migrate_restore_friend_tables(db):
 
 
 async def _migrate_ai_types(db):
-    """v0.4.0: 三种 AI 类型 + agent_user_configs 表"""
+    """v0.1.3: 三种 AI 类型 + agent_user_configs 表"""
     logger.info("  🔧 迁移 AI 类型系统...")
 
     # 1. 添加 agents.ai_type 列
@@ -1089,7 +1089,7 @@ async def _migrate_ai_types(db):
 
 
 async def _migrate_memory_user_isolation(db):
-    """v0.4.0: 记忆 per-user 隔离 — rough_memories 加 user_id / scope 扩展"""
+    """v0.1.3: 记忆 per-user 隔离 — rough_memories 加 user_id / scope 扩展"""
     logger.info("  🔧 迁移记忆隔离字段...")
 
     if not await _column_exists(db, "rough_memories", "user_id"):
@@ -1103,7 +1103,7 @@ async def _migrate_memory_user_isolation(db):
 
 
 async def _migrate_willingness_fields(db):
-    """v0.4.0: 意愿评分字段 — agents 表加 last_willingness_score / last_willingness_reason"""
+    """v0.1.3: 意愿评分字段 — agents 表加 last_willingness_score / last_willingness_reason"""
     logger.info("  🔧 迁移意愿评分字段...")
 
     if not await _column_exists(db, "agents", "last_willingness_score"):
@@ -1126,7 +1126,7 @@ async def _migrate_willingness_fields(db):
 
 
 async def _migrate_file_system(db):
-    """v0.5.0: 文件协作系统 — file_metadata 扩展 + file_references + file_collaborators"""
+    """v0.1.4: 文件协作系统 — file_metadata 扩展 + file_references + file_collaborators"""
     logger.info("  🔧 迁移文件协作系统...")
 
     # file_metadata.collaboration_mode
@@ -1202,7 +1202,7 @@ async def _migrate_file_system(db):
 
 
 async def _migrate_message_attachments(db):
-    """v0.5.0: 消息附件 — messages 表加 attachments JSONB + dm_messages 加 attachments TEXT"""
+    """v0.1.4: 消息附件 — messages 表加 attachments JSONB + dm_messages 加 attachments TEXT"""
     logger.info("  🔧 迁移消息附件...")
 
     if not await _column_exists(db, "messages", "attachments"):
@@ -1225,7 +1225,7 @@ async def _migrate_message_attachments(db):
 
 
 async def _migrate_message_sender_name(db):
-    """v0.6.0: 联邦消息发送者名称 — messages 表加 sender_name VARCHAR(100)"""
+    """v0.1.5: 联邦消息发送者名称 — messages 表加 sender_name VARCHAR(100)"""
     logger.info("  👤 添加 messages.sender_name 列（联邦消息发送者名称）...")
 
     if not await _column_exists(db, "messages", "sender_name"):
@@ -1239,7 +1239,7 @@ async def _migrate_message_sender_name(db):
 
 
 async def _migrate_sender_avatar_url(db):
-    """v0.8.0: 联邦消息头像持久化 — messages 表加 sender_avatar_url TEXT"""
+    """v0.1.7: 联邦消息头像持久化 — messages 表加 sender_avatar_url TEXT"""
     logger.info("  🖼️ 添加 messages.sender_avatar_url 列（联邦消息头像持久化）...")
 
     if not await _column_exists(db, "messages", "sender_avatar_url"):
@@ -1253,7 +1253,7 @@ async def _migrate_sender_avatar_url(db):
 
 
 async def _migrate_prompt_overrides(db):
-    """v0.8.0: 系统提示词覆盖 — system_settings 表加 system_prompt_overrides JSONB"""
+    """v0.1.7: 系统提示词覆盖 — system_settings 表加 system_prompt_overrides JSONB"""
     logger.info("  📝 添加 system_settings.system_prompt_overrides 列...")
 
     if not await _column_exists(db, "system_settings", "system_prompt_overrides"):
@@ -1267,7 +1267,7 @@ async def _migrate_prompt_overrides(db):
 
 
 async def _migrate_memory_archive_columns(db):
-    """v0.5.0: 记忆延迟归档 — rough_memories 加 status 和 value_score"""
+    """v0.1.4: 记忆延迟归档 — rough_memories 加 status 和 value_score"""
     logger.info("  🔧 迁移记忆归档字段...")
 
     if not await _column_exists(db, "rough_memories", "status"):
@@ -1294,7 +1294,7 @@ async def _migrate_memory_archive_columns(db):
 
 
 async def _migrate_agent_metrics(db):
-    """v0.5.0: 系统指标表"""
+    """v0.1.4: 系统指标表"""
     logger.info("  🔧 迁移系统指标表...")
 
     if not await _table_exists(db, "agent_metrics"):
@@ -1312,7 +1312,7 @@ async def _migrate_agent_metrics(db):
 
 
 async def _migrate_system_settings(db):
-    """v0.6.0: 平台全局系统设置表 + users.setup_completed 列"""
+    """v0.1.5: 平台全局系统设置表 + users.setup_completed 列"""
     logger.info("  ⚙️ 迁移系统设置表...")
     created_any = False
 
@@ -1354,7 +1354,7 @@ async def _migrate_system_settings(db):
 
 
 async def _migrate_api_key_pool_tables(db):
-    """v0.6.0: API Key 池 + 用户绑定 + 用量日志"""
+    """v0.1.5: API Key 池 + 用户绑定 + 用量日志"""
     logger.info("  🔧 迁移 API Key 池系统...")
     created_any = False
 
@@ -1411,7 +1411,7 @@ async def _migrate_api_key_pool_tables(db):
     else:
         logger.info("  ⏭ api_usage_log 已存在，跳过")
 
-    # v0.6.0: api_key_pool.concurrent_limit
+    # v0.1.5: api_key_pool.concurrent_limit
     if not await _column_exists(db, "api_key_pool", "concurrent_limit"):
         await db.execute(text(
             "ALTER TABLE api_key_pool ADD COLUMN concurrent_limit INTEGER"
@@ -1425,7 +1425,7 @@ async def _migrate_api_key_pool_tables(db):
 
 
 async def _migrate_platform_credit(db):
-    """v0.6.0: 平台赠送额度 + system_settings 扩展"""
+    """v0.1.5: 平台赠送额度 + system_settings 扩展"""
     logger.info("  🎁 迁移平台赠送额度系统...")
 
     if not await _column_exists(db, "system_settings", "default_platform_credit"):
@@ -1446,7 +1446,7 @@ async def _migrate_platform_credit(db):
 
 
 async def _migrate_redemption_code_details(db):
-    """v0.6.0: 兑换码增强——备注、最大用量、API 池标记、创建时间"""
+    """v0.1.5: 兑换码增强——备注、最大用量、API 池标记、创建时间"""
     logger.info("  🏷️ 迁移兑换码详细字段...")
     created_any = False
 
@@ -1487,7 +1487,7 @@ async def _migrate_redemption_code_details(db):
 
 
 async def _migrate_friend_controls(db):
-    """v0.6.0: 好友控制字段——是否允许好友申请、是否自动响应"""
+    """v0.1.5: 好友控制字段——是否允许好友申请、是否自动响应"""
     logger.info("  👥 迁移好友控制字段...")
     created_any = False
 
@@ -1514,7 +1514,7 @@ async def _migrate_friend_controls(db):
 
 
 async def _migrate_memory_config_columns(db):
-    """v0.8.0: 文件记忆配置字段——加载模式、最近篇数、共享范围"""
+    """v0.1.7: 文件记忆配置字段——加载模式、最近篇数、共享范围"""
     logger.info("  📂 迁移文件记忆配置字段...")
     created_any = False
 
@@ -1550,7 +1550,7 @@ async def _migrate_memory_config_columns(db):
 
 
 async def _fix_file_owner_type_check(db):
-    """v0.5.0+: 修复 file_metadata.owner_type CHECK 约束缺少 'human'（消息附件上传需要）
+    """v0.1.4+: 修复 file_metadata.owner_type CHECK 约束缺少 'human'（消息附件上传需要）
 
     数据库中的约束可能有两种命名：SQLAlchemy ORM 显式命名的 ck_file_owner_type，
     或 init-db.sql 内联 CHECK 由 PG 自动命名的 file_metadata_owner_type_check。
@@ -1581,8 +1581,8 @@ async def _fix_file_owner_type_check(db):
 
 
 async def _migrate_federation_v1(db):
-    """v1.0.0: 联邦 ID 前缀替代注册表 — DROP 旧表 + CREATE 新表 + 系统设置"""
-    logger.info("  🌐 v1.0.0 联邦架构迁移: ID 前缀替代注册表...")
+    """v0.2.0: 联邦 ID 前缀替代注册表 — DROP 旧表 + CREATE 新表 + 系统设置"""
+    logger.info("  🌐 v0.2.0 联邦架构迁移: ID 前缀替代注册表...")
     created_any = False
 
     # 1. DROP 旧共享表（用户已确认重新配置联邦）
@@ -1700,13 +1700,13 @@ async def _migrate_federation_v1(db):
 
     if created_any:
         await db.flush()
-        logger.info("  ✅ 联邦 v1.0.0 迁移完成")
+        logger.info("  ✅ 联邦 v0.2.0 迁移完成")
     else:
-        logger.info("  ⏭ 联邦 v1.0.0 迁移均已完成，跳过")
+        logger.info("  ⏭ 联邦 v0.2.0 迁移均已完成，跳过")
 
 
 async def _migrate_agent_collaborators(db):
-    """v0.7.0 AI 合作者系统 — 新建 agent_collaborators 表"""
+    """v0.1.6 AI 合作者系统 — 新建 agent_collaborators 表"""
     if await _table_exists(db, "agent_collaborators"):
         logger.info("  ⏭ agent_collaborators 已存在，跳过")
         return
@@ -1728,7 +1728,7 @@ async def _migrate_agent_collaborators(db):
 
 
 async def _migrate_prompt_order(db):
-    """v0.7.0 系统提示词段顺序可自定义"""
+    """v0.1.6 系统提示词段顺序可自定义"""
     if await _column_exists(db, "system_settings", "system_prompt_order"):
         logger.info("  ⏭ system_settings.system_prompt_order 已存在，跳过")
         return
@@ -1741,7 +1741,7 @@ async def _migrate_prompt_order(db):
 
 
 async def _fix_file_refs_referrer_type(db):
-    """v0.7.0+: 修复 file_references.referrer_type CHECK 约束缺少 'human'（用户下载附件需要）
+    """v0.1.6+: 修复 file_references.referrer_type CHECK 约束缺少 'human'（用户下载附件需要）
 
     数据库中的约束可能有两种命名：init-db.sql 内联 CHECK 由 PG 自动命名。
     """
@@ -1770,7 +1770,7 @@ async def _fix_file_refs_referrer_type(db):
 
 
 async def _migrate_content_hash(db):
-    """v0.9.0: file_metadata.content_hash（SHA-256，用于文件去重）"""
+    """v0.1.8: file_metadata.content_hash（SHA-256，用于文件去重）"""
     if await _column_exists(db, "file_metadata", "content_hash"):
         logger.info("  ⏭ file_metadata.content_hash 已存在，跳过")
         return
@@ -1781,7 +1781,7 @@ async def _migrate_content_hash(db):
 
 
 async def _migrate_forward_ref_type(db):
-    """v0.9.0: file_references.ref_type 增加 'forward' 类型"""
+    """v0.1.8: file_references.ref_type 增加 'forward' 类型"""
     result = await db.execute(text("""
         SELECT conname, pg_get_constraintdef(oid)
         FROM pg_constraint
@@ -1809,7 +1809,7 @@ async def _migrate_forward_ref_type(db):
 
 
 async def _migrate_orphan_retention(db):
-    """v0.9.0: system_settings.orphan_retention_days（孤儿文件宽限期，默认 7 天）"""
+    """v0.1.8: system_settings.orphan_retention_days（孤儿文件宽限期，默认 7 天）"""
     if await _column_exists(db, "system_settings", "orphan_retention_days"):
         logger.info("  ⏭ system_settings.orphan_retention_days 已存在，跳过")
         return
@@ -1822,7 +1822,7 @@ async def _migrate_orphan_retention(db):
 
 
 async def _migrate_default_file_quota(db):
-    """v0.9.0: system_settings.default_file_quota_mb + users.file_quota_bonus_mb"""
+    """v0.1.8: system_settings.default_file_quota_mb + users.file_quota_bonus_mb"""
     created_any = False
 
     if not await _column_exists(db, "system_settings", "default_file_quota_mb"):
@@ -1853,7 +1853,7 @@ async def _migrate_default_file_quota(db):
 
 
 async def _migrate_bio_and_status(db):
-    """v0.9.0: agents.bio + users.status_text + agents.status_text"""
+    """v0.1.8: agents.bio + users.status_text + agents.status_text"""
     created_any = False
 
     if not await _column_exists(db, "agents", "bio"):
@@ -1890,7 +1890,7 @@ async def _migrate_bio_and_status(db):
 
 
 async def _migrate_email_verification(db):
-    """v1.0.0: 邮箱认证 — users 表 +email/+email_verified + verification_codes 表 + system_settings 扩展"""
+    """v0.2.0: 邮箱认证 — users 表 +email/+email_verified + verification_codes 表 + system_settings 扩展"""
     created_any = False
 
     # 1. users.email（可空，部分唯一索引）
@@ -1971,7 +1971,7 @@ async def _migrate_email_verification(db):
 
 
 async def _migrate_smtp_configs_array(db):
-    """v1.0.0: 多 SMTP 容灾 — 将 smtp_config 从单对象迁移为数组格式
+    """v0.2.0: 多 SMTP 容灾 — 将 smtp_config 从单对象迁移为数组格式
 
     旧格式: {"host":"...","port":587,...}
     新格式: [{"host":"...","port":587,...,"is_active":true,"priority":0}]
@@ -2029,7 +2029,7 @@ async def _migrate_smtp_configs_array(db):
 
 
 async def _migrate_email_templates(db):
-    """v1.0.0: 自定义邮件模板 — system_settings 表 +email_templates JSONB 列"""
+    """v0.2.0: 自定义邮件模板 — system_settings 表 +email_templates JSONB 列"""
     if await _column_exists(db, "system_settings", "email_templates"):
         logger.info("  ⏭ system_settings.email_templates 已存在，跳过")
         return
@@ -2214,7 +2214,7 @@ async def _migrate_group_members_user_id(db):
 
 async def _migrate_fix_human_members_changed_to_ai(db):
     """
-    v1.0.2: 修复 _migrate_group_members_user_id 的 bug——Step 1 把人类成员误改为 AI 类型。
+    v0.2.2: 修复 _migrate_group_members_user_id 的 bug——Step 1 把人类成员误改为 AI 类型。
 
     逐条处理，避免 SQL 层面主键冲突。
     """
@@ -2357,7 +2357,7 @@ async def _migrate_fix_duplicate_owners(db):
 
 async def _migrate_agent_state_stack(db):
     """
-    v1.0.1: agents 表新增 state_stack JSONB 列（幂等）。
+    v0.2.1: agents 表新增 state_stack JSONB 列（幂等）。
 
     存储 AI 的跨任务上下文状态栈，支持 push/pop/close/list 操作。
     """
@@ -2381,7 +2381,7 @@ async def _migrate_group_muted_until(db):
     logger.info("  ✅ group_members.muted_until 添加完成")
 
 async def _migrate_audit_logs(db):
-    """v1.0.6 审计日志企业级字段（幂等）"""
+    """v0.2.6 审计日志企业级字段（幂等）"""
     for col, col_type in [
         ("success", "BOOLEAN NOT NULL DEFAULT TRUE"),
         ("error_message", "TEXT"),
@@ -2425,7 +2425,7 @@ async def _widen_varchar(db, table: str, column: str, target_length: int):
 
 
 async def _migrate_provider_config(db):
-    """v1.0.0: LLM 厂商预设 — system_settings 表 +provider_config JSONB"""
+    """v0.2.0: LLM 厂商预设 — system_settings 表 +provider_config JSONB"""
     if not await _column_exists(db, "system_settings", "provider_config"):
         logger.info("  🏭 添加 system_settings.provider_config 列")
         await db.execute(text("ALTER TABLE system_settings ADD COLUMN provider_config JSONB"))
@@ -2435,7 +2435,7 @@ async def _migrate_provider_config(db):
 
 
 async def _migrate_system_user(db):
-    """v0.8.0+: 确保系统通知用户 id=0 存在（硬编码 ID，不依赖 username 查询）"""
+    """v0.1.7+: 确保系统通知用户 id=0 存在（硬编码 ID，不依赖 username 查询）"""
     from app.utils.auth import hash_password
 
     # 检查 id=0 是否已是系统用户
@@ -2470,7 +2470,7 @@ async def _migrate_system_user(db):
 
 
 async def _migrate_others_chat_controls(db):
-    """v0.9.0: AI 对话权限与限额控制"""
+    """v0.1.8: AI 对话权限与限额控制"""
     created_any = False
 
     if not await _column_exists(db, "agents", "allow_others_chat"):
@@ -2514,7 +2514,7 @@ async def _migrate_others_chat_controls(db):
 
 
 async def _migrate_multi_provider(db):
-    """v1.0.2: provider_config 单对象 → 数组 + api_key_pool 加 provider_name（幂等）"""
+    """v0.2.2: provider_config 单对象 → 数组 + api_key_pool 加 provider_name（幂等）"""
     import json
 
     # 1. 转换 provider_config：单对象 → 默认数组
@@ -2601,7 +2601,7 @@ async def _migrate_provider_defaults(db):
 
 async def _migrate_unify_ai_user_id(db):
     """
-    v1.0.2: 全局统一——将所有表中的 AI ID 从 agent.id 转为 agent.user_id。
+    v0.2.2: 全局统一——将所有表中的 AI ID 从 agent.id 转为 agent.user_id。
     涉及: messages, group_members, file_metadata（dm_messages 不转换——天然用 user_id）。
     """
     # 1. messages（安全：有 sender_type='ai' 过滤）
@@ -2652,7 +2652,7 @@ async def _migrate_unify_ai_user_id(db):
 
 
 async def _migrate_agent_status_color(db):
-    """v1.0.2: agents 表加 status_color 列（幂等）"""
+    """v0.2.2: agents 表加 status_color 列（幂等）"""
     if await _column_exists(db, "agents", "status_color"):
         logger.info("  ⏭ agents.status_color 已存在，跳过")
         return
@@ -2663,7 +2663,7 @@ async def _migrate_agent_status_color(db):
 
 
 async def _migrate_opencli_default_enabled(db):
-    """v1.0.2: opencli_command_whitelist 加 default_enabled 列（幂等）"""
+    """v0.2.2: opencli_command_whitelist 加 default_enabled 列（幂等）"""
     if await _column_exists(db, "opencli_command_whitelist", "default_enabled"):
         logger.info("  ⏭ opencli_command_whitelist.default_enabled 已存在，跳过")
         return
@@ -2676,7 +2676,7 @@ async def _migrate_opencli_default_enabled(db):
 
 
 async def _migrate_ai_friend_user_id(db):
-    """v1.0.2: friendships 表中 AI 好友的 friend_id 统一为 agent.user_id（幂等）"""
+    """v0.2.2: friendships 表中 AI 好友的 friend_id 统一为 agent.user_id（幂等）"""
     from app.models.agent import Agent
 
     # 查所有 AI，构建 id→user_id 映射

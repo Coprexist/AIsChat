@@ -71,7 +71,7 @@ async def get_settings(db: AsyncSession) -> dict:
         "default_concurrent_ai_limit": row.default_concurrent_ai_limit or 3,
         "updated_by": row.updated_by,
         "updated_at": str(row.updated_at) if row.updated_at else None,
-        # v1.0.0 邮箱认证（公开字段）
+        # v0.2.0 邮箱认证（公开字段）
         "login_providers": getattr(row, "login_providers", ["direct"]) or ["direct"],
         "require_email_verification": getattr(row, "require_email_verification", False) or False,
         "smtp_config": getattr(row, "smtp_config", None),

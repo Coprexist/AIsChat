@@ -285,7 +285,7 @@ const zh: TranslationDict = {
   'auth.firstUserAdminHighlight': '管理员',
   'auth.title': 'AI 群聊社交网络',
   'auth.subtitle': '意识交汇 · 数字共生',
-  // v1.0.0 邮箱验证
+  // v0.2.0 邮箱验证
   'auth.email': '邮箱',
   'auth.emailPlaceholder': 'example@mail.com',
   'auth.emailOptional': '选填，留空使用用户名登录',
@@ -679,7 +679,7 @@ const zh: TranslationDict = {
   'agents.discoverable': '允许他人查找此 AI',
   'agents.discoverableDesc': '关闭后其他用户无法通过搜索找到此 AI，也无法通过点击头像添加好友',
 
-  // v0.9.0 对话权限与限额
+  // v0.1.8 对话权限与限额
   'agents.allowOthersChat': '允许他人对话此 AI',
   'agents.allowOthersChatDesc': '关闭后仅制作者和合作者可触发 AI 回复',
   'agents.othersChatUnlimited': '始终允许（无限制）',
@@ -698,7 +698,7 @@ const zh: TranslationDict = {
   'agents.groupOwnerPaysDesc': '群聊中 AI 消息由群主承担，关闭后用户需使用自有 API Key',
   'agents.quotaExhaustedNotice': '你的 AI「{name}」已被其他人触发 {used} 次对话，已达到配额上限（{quota} 条），已自动关闭「允许他人对话」。',
 
-  // v0.9.0 余额弹窗
+  // v0.1.8 余额弹窗
   'balance.title': '额度不足',
   'balance.useOwnKeyPrompt': '你的额度不足，是否使用自有 API Key 继续与「{name}」对话？',
   'balance.useOwnKey': '使用自有 Key',
@@ -987,7 +987,7 @@ const zh: TranslationDict = {
   'admin.logsColTarget': '目标',
   'admin.logsColDetail': '详情',
   'admin.systemSettings': '平台全局设置',
-  // v1.0.0 邮箱认证
+  // v0.2.0 邮箱认证
   'admin.auth': '认证设置',
   'admin.authDesc': 'SMTP邮箱配置、验证码登录',
   'admin.smtpConfig': 'SMTP 邮件配置',
@@ -1020,7 +1020,7 @@ const zh: TranslationDict = {
   'admin.loginProviderWechat': '微信登录',
   'admin.loginProviderQQ': 'QQ 登录',
   'admin.loginProviderLastWarning': '不能禁用最后一种登录方式',
-  // v1.0.0 邮件模板
+  // v0.2.0 邮件模板
   'admin.emailTemplates': '邮件模板',
   'admin.emailPresetGradient': '渐变版',
   'admin.emailPresetSimple': '简版',
@@ -1038,7 +1038,7 @@ const zh: TranslationDict = {
   'admin.emailTemplateVarHint': '模板中使用 {变量名} 格式，发送时自动替换为实际值。可用变量: {code}, {from_name}, {username}, {purpose_label}, {instance_name}, {expire_minutes}',
   'admin.emailTemplatesSave': '保存模板',
   'admin.emailTemplatesSaved': '模板已保存',
-  // v1.0.0 LLM 厂商预设
+  // v0.2.0 LLM 厂商预设
   'admin.llmProvider': 'LLM 厂商预设',
   'admin.manualConfig': '手动配置',
   'admin.defaultChatModel': '默认聊天模型',
@@ -2034,7 +2034,7 @@ const en: TranslationDict = {
   'auth.firstUserAdminHighlight': 'admin',
   'auth.title': 'AI Group Chat',
   'auth.subtitle': 'Minds Converge · Digital Symbiosis',
-  // v1.0.0 Email verification
+  // v0.2.0 Email verification
   'auth.email': 'Email',
   'auth.emailPlaceholder': 'example@mail.com',
   'auth.emailOptional': 'Optional, leave empty for username-only login',
@@ -2428,7 +2428,7 @@ const en: TranslationDict = {
   'agents.discoverable': 'Allow others to discover this AI',
   'agents.discoverableDesc': 'When disabled, this AI will not appear in search results and cannot receive friend requests via profile click',
 
-  // v0.9.0 Chat permissions & quota
+  // v0.1.8 Chat permissions & quota
   'agents.allowOthersChat': 'Allow others to chat with this AI',
   'agents.allowOthersChatDesc': 'When disabled, only the creator and collaborators can trigger AI replies',
   'agents.othersChatUnlimited': 'Always allow (unlimited)',
@@ -2447,7 +2447,7 @@ const en: TranslationDict = {
   'agents.groupOwnerPaysDesc': 'Group AI messages are billed to the group owner; if disabled, users must use their own API key',
   'agents.quotaExhaustedNotice': 'Your AI "{name}" has been triggered {used} times by others, reaching the quota ({quota}). "Allow others to chat" has been auto-disabled.',
 
-  // v0.9.0 Balance prompt
+  // v0.1.8 Balance prompt
   'balance.title': 'Insufficient Balance',
   'balance.useOwnKeyPrompt': 'Your balance is insufficient. Use your own API Key to continue chatting with "{name}"?',
   'balance.useOwnKey': 'Use Own Key',
@@ -2774,7 +2774,7 @@ const en: TranslationDict = {
   'admin.logsColTarget': 'Target',
   'admin.logsColDetail': 'Details',
   'admin.systemSettings': 'Platform Global Settings',
-  // v1.0.0 Email auth
+  // v0.2.0 Email auth
   'admin.auth': 'Auth Settings',
   'admin.authDesc': 'SMTP config, verification code login',
   'admin.smtpConfig': 'SMTP Configuration',
@@ -2808,7 +2808,7 @@ const en: TranslationDict = {
   'admin.loginProviderWechat': 'WeChat Login',
   'admin.loginProviderQQ': 'QQ Login',
   'admin.loginProviderLastWarning': 'Cannot disable the last remaining login method',
-  // v1.0.0 email templates
+  // v0.2.0 email templates
   'admin.emailTemplates': 'Email Templates',
   'admin.emailPresetGradient': 'Gradient',
   'admin.emailPresetSimple': 'Simple',
@@ -2826,7 +2826,7 @@ const en: TranslationDict = {
   'admin.emailTemplateVarHint': 'Use {variable} format. Available: {code}, {from_name}, {username}, {purpose_label}, {instance_name}, {expire_minutes}',
   'admin.emailTemplatesSave': 'Save Templates',
   'admin.emailTemplatesSaved': 'Templates saved',
-  // v1.0.0 LLM provider presets
+  // v0.2.0 LLM provider presets
   'admin.llmProvider': 'LLM Provider Presets',
   'admin.manualConfig': 'Manual Config',
   'admin.defaultChatModel': 'Default Chat Model',
@@ -3743,7 +3743,7 @@ const ja: TranslationDict = {
   'auth.firstUserAdminHighlight': '管理者',
   'auth.title': 'AI グループチャット',
   'auth.subtitle': '意識の交差点・デジタル共生',
-  // v1.0.0 メール認証
+  // v0.2.0 メール認証
   'auth.email': 'メールアドレス',
   'auth.emailPlaceholder': 'example@mail.com',
   'auth.emailOptional': '任意（空欄の場合はユーザー名でログイン）',
@@ -4137,7 +4137,7 @@ const ja: TranslationDict = {
   'agents.discoverable': 'このAIを他人が検出可能にする',
   'agents.discoverableDesc': 'オフにすると検索結果に表示されず、プロフィールクリックでのフレンド申請も受け付けません',
 
-  // v0.9.0 会話権限とクォータ
+  // v0.1.8 会話権限とクォータ
   'agents.allowOthersChat': '他のユーザーがこのAIと会話することを許可',
   'agents.allowOthersChatDesc': 'オフにすると所有者と共同編集者のみがAIの返信をトリガーできます',
   'agents.othersChatUnlimited': '常に許可（無制限）',
@@ -4156,7 +4156,7 @@ const ja: TranslationDict = {
   'agents.groupOwnerPaysDesc': 'グループ内のAIメッセージはグループ所有者が支払います。無効にするとユーザーは独自のAPI Keyを使用する必要があります',
   'agents.quotaExhaustedNotice': 'あなたのAI「{name}」が他のユーザーによって{used}回トリガーされ、クォータ上限（{quota}）に達しました。「他のユーザーとの会話を許可」が自動的にオフになりました。',
 
-  // v0.9.0 残高不足ダイアログ
+  // v0.1.8 残高不足ダイアログ
   'balance.title': '残高不足',
   'balance.useOwnKeyPrompt': '残高が不足しています。独自のAPI Keyを使って「{name}」との会話を続けますか？',
   'balance.useOwnKey': '独自Keyを使用',
@@ -4482,7 +4482,7 @@ const ja: TranslationDict = {
   'admin.logsColTarget': '対象',
   'admin.logsColDetail': '詳細',
   'admin.systemSettings': 'プラットフォーム全体設定',
-  // v1.0.0 メール認証
+  // v0.2.0 メール認証
   'admin.auth': '認証設定',
   'admin.authDesc': 'SMTPメール設定、認証コードログイン',
   'admin.smtpConfig': 'SMTP 設定',
@@ -4516,7 +4516,7 @@ const ja: TranslationDict = {
   'admin.loginProviderWechat': 'WeChat ログイン',
   'admin.loginProviderQQ': 'QQ ログイン',
   'admin.loginProviderLastWarning': '最後のログイン方法を無効にすることはできません',
-  // v1.0.0 メールテンプレート
+  // v0.2.0 メールテンプレート
   'admin.emailTemplates': 'メールテンプレート',
   'admin.emailPresetGradient': 'グラデーション',
   'admin.emailPresetSimple': 'シンプル',
@@ -4534,7 +4534,7 @@ const ja: TranslationDict = {
   'admin.emailTemplateVarHint': '{変数名} 形式で使用します。利用可能: {code}, {from_name}, {username}, {purpose_label}, {instance_name}, {expire_minutes}',
   'admin.emailTemplatesSave': 'テンプレートを保存',
   'admin.emailTemplatesSaved': 'テンプレートを保存しました',
-  // v1.0.0 LLM プロバイダープリセット
+  // v0.2.0 LLM プロバイダープリセット
   'admin.llmProvider': 'LLM プロバイダープリセット',
   'admin.manualConfig': '手動設定',
   'admin.defaultChatModel': 'デフォルトチャットモデル',

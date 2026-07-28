@@ -140,9 +140,9 @@ async def _get_api_config(
     Tier 3: 账单人有 api_credit + 无绑定 → 自动选最优池 Key
     Tier 4: 账单人自有 Key
 
-    v0.9.0: chatter_id 决定账单人（通用 AI 扣聊天者，否则扣主人）。
+    v0.1.8: chatter_id 决定账单人（通用 AI 扣聊天者，否则扣主人）。
             force_own_key=True 时跳过 Tier 2/3，直接走账单人自有 Key。
-    v1.0.2: 返回 provider_info 字典，含 thinking_supported / models / base_url。
+    v0.2.2: 返回 provider_info 字典，含 thinking_supported / models / base_url。
     v1.1.0: conversation_type + group_owner_pays 控制群聊账单人。
 
     返回: (api_key, api_base, credit_source, pool_key_id, provider_info)
@@ -202,7 +202,7 @@ async def _get_api_config(
                 api_base = pool_key.api_base_url or settings.deepseek_base_url
                 credit_source = "pool_key"
                 pool_key_id = pool_key.id
-                # v1.0.2: 获取池 Key 的供应商配置
+                # v0.2.2: 获取池 Key 的供应商配置
                 from app.services.infrastructure.system_settings_service import get_provider_for_pool_key
                 pool_provider = await get_provider_for_pool_key(db, pool_key)
                 provider_info = {
@@ -257,10 +257,10 @@ async def _tool_call_loop(
     上下文压缩规则：在调 send_gm/send_dm 发消息之前的所有操作（工具调用、记忆查询等）
     会完整保留。当你调用了 send_gm/send_dm 之后，之前的中间操作链才会被压缩清理。
 
-    v0.4.0: trigger_user_id 传入工具上下文供 store_memory 做 per-user 隔离。
+    v0.1.3: trigger_user_id 传入工具上下文供 store_memory 做 per-user 隔离。
     effective_cfg 为 get_effective_config 的返回值，提供 per-user 定制的 LLM 参数。
-    v0.6.0: credit_source + pool_key_id 用于 LLM 调用后额度扣除。
-    v0.6.0: stream=True 流式调用 + 工具格式校验 + trigger 字段（user/auto）。
+    v0.1.5: credit_source + pool_key_id 用于 LLM 调用后额度扣除。
+    v0.1.5: stream=True 流式调用 + 工具格式校验 + trigger 字段（user/auto）。
     """
     if effective_cfg is None:
         effective_cfg = {}
@@ -295,7 +295,7 @@ async def _tool_call_loop(
 
     loop_idx = 0
     while loop_idx < max_loops + _reminder_extra:
-        # ── v0.6.0: 带分类重试的 LLM 调用 ──
+        # ── v0.1.5: 带分类重试的 LLM 调用 ──
         from app.ai.llm import RateLimitError, ServerError, KeyFatalError
         from app.services.infrastructure.api_key_concurrency import concurrency_mgr
 
@@ -793,7 +793,7 @@ async def _tool_call_loop(
             await save_current_task(db, agent.id, last_task)
         except Exception:
             pass
-    # v0.9.0: LLM 调用后扣除额度
+    # v0.1.8: LLM 调用后扣除额度
     if total_usage["api_calls"] > 0 and total_usage["total_tokens"] > 0:
         try:
             if conversation_type == "dm" and agent.ai_type in ("general", "semi_general") and trigger_user_id:

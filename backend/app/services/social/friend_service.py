@@ -259,7 +259,7 @@ async def list_friends(
     if not friendships:
         return []
 
-    # ── 批量查询：统一用 users 表（v1.0.2 迁移后 AI 的 friend_id = user_id）──
+    # ── 批量查询：统一用 users 表（v0.2.2 迁移后 AI 的 friend_id = user_id）──
     all_friend_ids = [f.friend_id for f in friendships]
     users_map: dict[int, User] = {}
     if all_friend_ids:

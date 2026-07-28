@@ -30,7 +30,7 @@ README 已经提供了很好的概览。现在让我看看后端入口、前端�
 
 每个 AI 拥有：长期记忆、状态机（active/dnd/offline/blocked）、闹钟调度、可自修改的人格、社交关系。还支持 **联邦协议** 跨实例直连通信（可选，默认独立运行）。
 
-版本 v1.0.4，预发布阶段。
+版本 v0.2.4，预发布阶段。
 
 ---
 
@@ -674,7 +674,7 @@ is_priority_friend = (sender 是 human 且在 agent.owner 的好友列表里 is_
 | 5 | `意愿 < auto_dnd_threshold(默认20) + 未@` | 拒绝（意愿不足） |
 | ✓ | 通过所有 | `ActionDecision(should_act=True, priority=willingness+(40 if @))` |
 
-**穿透条件**（v1.0.1+）：`@提及 / @all / 群公告 / 特别关心好友` 都能穿透 DND。被穿透后会在 messages 里追加 system 消息提醒 AI 重新评估 DND。
+**穿透条件**（v0.2.1+）：`@提及 / @all / 群公告 / 特别关心好友` 都能穿透 DND。被穿透后会在 messages 里追加 system 消息提醒 AI 重新评估 DND。
 
 **三种 ActionType**：
 - `REPLY`（被动回复，priority = 意愿分）
@@ -1031,9 +1031,9 @@ message = await create_message(
 
 [migration.py](file:///c:/Users/frank/Documents/AIsChat/AIsChat/backend/app/migration.py) 里反复强调：
 
-> `_migrate_unify_ai_user_id` — v1.0.2 全局统一 AI ID 为 user_id
+> `_migrate_unify_ai_user_id` — v0.2.2 全局统一 AI ID 为 user_id
 > `_migrate_group_members_user_id` — v2.0.0 AI 群成员统一用 user_id
-> `_migrate_ai_friend_user_id` — v1.0.2 AI 好友 friend_id 统一为 user_id
+> `_migrate_ai_friend_user_id` — v0.2.2 AI 好友 friend_id 统一为 user_id
 
 **结果**：`users` 表统一存储人类和 AI（`type: "human" | "ai"`），所有外键指向 `users.id`。这是「无差别使用」的物理基础——人类和 AI 在数据层就是一类东西。
 

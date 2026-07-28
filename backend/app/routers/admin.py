@@ -50,9 +50,9 @@ class GenerateCodeRequest(BaseModel):
     quota_amount: int = Field(..., ge=1, le=100)
     code_type: str = Field(default="ai_quota", pattern="^(ai_quota|api_credit|agent_bundle|file_quota)$")
     expires_in_days: int = Field(..., ge=1, le=365)
-    note: str | None = None              # v0.6.0: 管理员备注（保密）
-    max_usage: int | None = None         # v0.6.0: 单码最大用量
-    is_api_pool: bool = False            # v0.6.0: 是否是 API 池额度
+    note: str | None = None              # v0.1.5: 管理员备注（保密）
+    max_usage: int | None = None         # v0.1.5: 单码最大用量
+    is_api_pool: bool = False            # v0.1.5: 是否是 API 池额度
 
 
 class UpdateUserRoleRequest(BaseModel):
@@ -400,7 +400,7 @@ async def generate_code(
     admin: dict = Depends(require_admin),
     db: AsyncSession = Depends(get_db),
 ):
-    """生成兑换码（v0.6.0: 支持备注/最大用量/API 池标记）"""
+    """生成兑换码（v0.1.5: 支持备注/最大用量/API 池标记）"""
     code_str = "RC-" + secrets.token_hex(8).upper()
 
     code = RedemptionCode(
@@ -1074,7 +1074,7 @@ async def bulk_set_concurrency(
 
 
 # ============================================================
-# v1.0.0 邮箱认证：SMTP 配置 + 认证设置
+# v0.2.0 邮箱认证：SMTP 配置 + 认证设置
 # ============================================================
 
 from app.schemas.system_settings import (
@@ -1263,7 +1263,7 @@ async def test_smtp(
     return {"success": ok, "message": msg}
 
 
-# ── v1.0.0 多 SMTP 配置管理 ──
+# ── v0.2.0 多 SMTP 配置管理 ──
 
 @router.get("/smtp-configs")
 async def get_smtp_configs(
@@ -1395,7 +1395,7 @@ async def test_smtp_by_index(
     return {"success": ok, "message": msg, "index": index}
 
 
-# ── v1.0.0 自定义邮件模板管理（v1.1.0: 预设选择）──
+# ── v0.2.0 自定义邮件模板管理（v1.1.0: 预设选择）──
 
 @router.get("/email-templates")
 async def get_email_templates_endpoint(
@@ -1909,7 +1909,7 @@ async def get_opencli_logs(
 
 
 # ════════════════════════════════════════════════════════════
-# 联邦通信管理（v0.3.0）
+# 联邦通信管理（v0.1.2）
 # ════════════════════════════════════════════════════════════
 
 from app.schemas.federation import (
@@ -2141,7 +2141,7 @@ async def rotate_federation_peer_url(
     return {"message": f"已发起 URL 轮换: {peer.peer_public_id} → {body.new_url}"}
 
 
-# ── 联邦实体管理（v1.0.0: 替代 share_group / share_dm）──
+# ── 联邦实体管理（v0.2.0: 替代 share_group / share_dm）──
 
 @router.get("/federation/entities")
 async def list_federated_entities(
@@ -2359,7 +2359,7 @@ async def get_agent_daily_usage_admin(
 
 
 # ══════════════════════════════════════════════════════════════
-# v0.5.0: 系统监控指标
+# v0.1.4: 系统监控指标
 # ══════════════════════════════════════════════════════════════
 
 @router.get("/admin/metrics")
@@ -2535,7 +2535,7 @@ async def admin_update_agent_skill(
 
 
 # ══════════════════════════════════════════════════════════════
-# v1.0.0 LLM 厂商预设
+# v0.2.0 LLM 厂商预设
 # ══════════════════════════════════════════════════════════════
 
 @router.get("/provider-presets")

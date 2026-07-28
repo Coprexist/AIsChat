@@ -131,7 +131,7 @@ async def lifespan(app: FastAPI):
     from app.services.infrastructure.metrics_collector import metrics_flush_worker
     metrics_flush_task = asyncio.create_task(metrics_flush_worker())
 
-    # 启动联邦通信（v0.3.0 跨实例直连）
+    # 启动联邦通信（v0.1.2 跨实例直连）
     from app.database import async_session
     from app.services.federation.federation_service import initialize_instance
     from app.services.federation.federation_manager import (

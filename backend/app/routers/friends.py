@@ -264,7 +264,7 @@ async def _inject_friend_greeting(
         logger.warning(f"注入好友附言到 DM 失败: {e}")
 
 
-# ⚠️ 旧版 POST /dm/{friend_type}/{friend_id} 已移除（v0.2.0 统一 ID 后不再使用）。
+# ⚠️ 旧版 POST /dm/{friend_type}/{friend_id} 已移除（v0.1.1 统一 ID 后不再使用）。
 # 移除原因：该路由与 dm.py 的 POST /dm/{session_id}/dnd 冲突——
 #   FastAPI 将 "dnd" 当作 friend_id 的 int 参数解析，导致 422 错误。
 # 私信请使用 POST /dm/{target_user_id}（见 dm.py）。

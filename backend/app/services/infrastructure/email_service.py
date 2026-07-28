@@ -1,7 +1,7 @@
 """
 SMTP 邮件发送服务
 使用 aiosmtplib 异步发送验证码邮件
-v1.0.0: 多 SMTP 容灾 + 自定义邮件模板
+v0.2.0: 多 SMTP 容灾 + 自定义邮件模板
 """
 import logging
 from email.mime.text import MIMEText

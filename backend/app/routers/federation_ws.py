@@ -1,5 +1,5 @@
 """
-联邦端点（v1.0.0 ID前缀替代注册表）
+联邦端点（v0.2.0 ID前缀替代注册表）
 
 - GET /federation/identity — 公开端点，实例身份
 - WS /federation/ws   — 实例间 WebSocket 连接

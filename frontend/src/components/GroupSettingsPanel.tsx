@@ -5,7 +5,7 @@ import { getStateDotColor } from '../constants'
 import { X, Bell, Pause, BellOff, LogOut, UserX, Shield, ShieldOff, UserPlus, Volume2, VolumeX, Download, Clock, Globe, Loader2, ArrowLeft, Crown } from 'lucide-react'
 import Toggle from './Toggle'
 
-// ── 联邦共享状态（v1.0.0: 群主/AI制作者按群控制联邦共享） ──
+// ── 联邦共享状态（v0.2.0: 群主/AI制作者按群控制联邦共享） ──
 
 interface FederationPeerStatus {
   peer_id: number

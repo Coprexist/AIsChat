@@ -1,7 +1,7 @@
 """
 认证路由
 POST /auth/register, POST /auth/login, GET /auth/me
-v1.0.0: + 邮箱验证码认证
+v0.2.0: + 邮箱验证码认证
 """
 from fastapi import APIRouter, Depends, HTTPException, status, Request
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -116,7 +116,7 @@ async def update_language(
     return {"status": "ok", "language": req.language}
 
 
-# ── v1.0.0 邮箱认证 ──
+# ── v0.2.0 邮箱认证 ──
 
 @router.get("/login-providers", response_model=LoginProvidersResponse)
 async def get_login_providers(db: AsyncSession = Depends(get_db)):

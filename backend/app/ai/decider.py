@@ -2,7 +2,7 @@
 """
 统一行动决策模块
 
-v0.5.0: 将原有的两套独立决策系统（被动回复 Gate 链 + 闹钟主动唤醒）
+v0.1.4: 将原有的两套独立决策系统（被动回复 Gate 链 + 闹钟主动唤醒）
 合并为统一的 decide_action() 函数，减少逻辑重复。
 
 设计原则：
@@ -52,8 +52,8 @@ class ActionContext:
     sender_type: str = "human"
     sender_id: int | None = None
     is_mentioned: bool = False
-    is_at_all: bool = False        # v1.0.1: @all/@everyone/@全体 穿透 DND
-    is_announcement: bool = False  # v1.0.1: 群公告 穿透 DND
+    is_at_all: bool = False        # v0.2.1: @all/@everyone/@全体 穿透 DND
+    is_announcement: bool = False  # v0.2.1: 群公告 穿透 DND
     is_priority_friend: bool = False  # v2.0.6: 特别关心好友消息穿透 DND
     chain_depth: int = 0
     # 闹钟事件字段
@@ -141,7 +141,7 @@ async def _decide_reply_action(db, agent, context: ActionContext) -> ActionDecis
         return ActionDecision(False, ActionType.NONE, 0,
             f"AI {agent.name} 屏蔽中，不响应任何消息", details={"store_pending": True})
 
-    # Gate 2b: DND（@/公告可穿透）(v1.0.1): @提及 / @all / 群公告 可穿透 DND
+    # Gate 2b: DND（@/公告可穿透）(v0.2.1): @提及 / @all / 群公告 可穿透 DND
     in_dnd = reachability["is_dnd"]
     dnd_penetrate = is_mentioned or context.is_at_all or context.is_announcement or context.is_priority_friend
     dnd_was_penetrated = in_dnd and dnd_penetrate  # DND 被穿透时后续提醒 AI
@@ -168,7 +168,7 @@ async def _decide_reply_action(db, agent, context: ActionContext) -> ActionDecis
     agent.last_willingness_score = w.score
     agent.last_willingness_reason = w.reason
 
-    # v0.5.0: 记录意愿评分分布
+    # v0.1.4: 记录意愿评分分布
     try:
         from app.services.infrastructure.metrics_collector import metrics
         await metrics.record_willingness(w.score)

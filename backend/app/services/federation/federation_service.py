@@ -1,7 +1,7 @@
 """
-联邦通信服务（v1.0.0 ID前缀替代注册表）
+联邦通信服务（v0.2.0 ID前缀替代注册表）
 
-v0.3.0 → v1.0.0 变更：
+v0.1.2 → v0.2.0 变更：
   删除: share_group, unshare_group, share_dm_with_peer, unshare_dm,
         list_group_shares, get_dm_shares_for_session, lookup_local_conversation_by_uuid,
         _handle_conversation_announce, _handle_conversation_ack
@@ -779,7 +779,7 @@ async def get_sync_interval_minutes(db: AsyncSession) -> int:
     return 720
 
 
-# ── 群联邦共享控制（v1.0.0: 群主/AI制作者控制每个群的联邦共享）──
+# ── 群联邦共享控制（v0.2.0: 群主/AI制作者控制每个群的联邦共享）──
 
 async def can_manage_group_federation(db: AsyncSession, group_id: int, user_id: int) -> bool:
     """检查用户是否有权管理群联邦共享设置"""

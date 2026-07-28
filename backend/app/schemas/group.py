@@ -95,7 +95,7 @@ class UnreadSummaryResponse(BaseModel):
     groups: list[UnreadSummaryItem]
 
 
-# ── 联邦共享控制（v1.0.0）──
+# ── 联邦共享控制（v0.2.0）──
 
 class FederationShareRequest(BaseModel):
     """群联邦共享/取消共享请求"""

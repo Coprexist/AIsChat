@@ -1,5 +1,5 @@
 """
-搜索路由（v0.4.0: 独立于好友系统，搜索结果可直接发起 DM）
+搜索路由（v0.1.3: 独立于好友系统，搜索结果可直接发起 DM）
 """
 import logging
 from fastapi import APIRouter, Depends, Query

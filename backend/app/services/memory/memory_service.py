@@ -34,7 +34,7 @@ async def _text_search_memories(
     - "private"：仅检索该 AI 的私有记忆
     - "group"：仅检索群共享记忆
 
-    v0.4.0: user_id 过滤 — 通用/半通用 AI 仅检索该用户的记忆，
+    v0.1.3: user_id 过滤 — 通用/半通用 AI 仅检索该用户的记忆，
     共振 AI 检索 user_id IS NULL（全部记忆）。
     """
     # 提取关键词：全文 + 拆分片段
@@ -58,7 +58,7 @@ async def _text_search_memories(
 
     where_parts = ["(" + " OR ".join(conditions) + ")"]
 
-    # v0.4.0: per-user 记忆隔离
+    # v0.1.3: per-user 记忆隔离
     if ai_type == "resonance":
         where_parts.append("rm.user_id IS NULL")
     elif user_id is not None:
@@ -141,7 +141,7 @@ async def recall_relevant_memories(
     2. 向量搜索失败或无结果时，自动回退到文本 ILIKE 搜索
     3. 文本搜索可以找到 embedding=NULL 的记忆
 
-    v0.4.0: user_id + ai_type 参数支持 per-user 记忆隔离。
+    v0.1.3: user_id + ai_type 参数支持 per-user 记忆隔离。
     共振 AI 检索所有记忆（user_id IS NULL），
     通用/半通用 AI 仅检索该用户的记忆。
 
@@ -156,7 +156,7 @@ async def recall_relevant_memories(
         query_embedding = await get_embedding(query, api_base_url=api_base_url, api_key=api_key)
         embedding_str = f"[{','.join(map(str, query_embedding))}]"
 
-        # v0.4.0: 构建 user_id 过滤条件
+        # v0.1.3: 构建 user_id 过滤条件
         if ai_type == "resonance":
             user_filter = "AND rm.user_id IS NULL"
         elif user_id is not None:

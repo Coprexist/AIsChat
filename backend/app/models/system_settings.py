@@ -23,13 +23,13 @@ class SystemSettings(Base):
     system_prompt_overrides = Column(JSONB, nullable=True, comment="系统提示词覆盖（管理员自定义 core_identity/protocols 等段）")
     system_prompt_order = Column(JSONB, nullable=True, comment="系统提示词段拼接顺序（NULL=使用代码默认 SEGMENT_ORDER）")
 
-    # v1.0.0 邮箱认证
+    # v0.2.0 邮箱认证
     smtp_config = Column(JSONB, nullable=True, comment="SMTP 邮件配置（密码 Fernet 加密）")
 
-    # v1.0.0 自定义邮件模板
+    # v0.2.0 自定义邮件模板
     email_templates = Column(JSONB, nullable=True, comment="自定义邮件模板（含预设选择：gradient/simple/custom）")
 
-    # v1.0.0 LLM 厂商配置
+    # v0.2.0 LLM 厂商配置
     provider_config = Column(JSONB, nullable=True, comment="LLM 厂商预设：{provider, base_url, chat_model, work_model, embedding_model, model_options}")
     require_email_verification = Column(Boolean, default=False, comment="注册是否必须验证邮箱（默认关闭）")
     login_providers = Column(JSONB, default=lambda: ["direct"], comment="可用登录方式: direct/email_code/wechat/qq")

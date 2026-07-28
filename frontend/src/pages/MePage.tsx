@@ -92,7 +92,7 @@ export default function MePage() {
   const [fileListLoading, setFileListLoading] = useState(false)
   const [forwardFile, setForwardFile] = useState<{file_id:number;name:string;size:number;mime_type:string}|null>(null)
 
-  // v1.0.0 邮箱绑定
+  // v0.2.0 邮箱绑定
   const [showBindEmail, setShowBindEmail] = useState(false)
   const [bindEmail, setBindEmail] = useState('')
   const [bindCode, setBindCode] = useState('')
@@ -786,7 +786,7 @@ export default function MePage() {
         />
       )}
 
-      {/* v1.0.0 邮箱绑定弹窗 */}
+      {/* v0.2.0 邮箱绑定弹窗 */}
       {showBindEmail && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4" onClick={() => setShowBindEmail(false)}>
           <div className="bg-surface border border-border rounded-2xl p-6 w-full max-w-sm shadow-2xl" onClick={e => e.stopPropagation()}>

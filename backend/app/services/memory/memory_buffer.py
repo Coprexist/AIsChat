@@ -44,7 +44,7 @@ class PendingMemory:
     scope: str                     # "private" | "group" | "cross_user"
     api_base_url: str
     api_key: str | None
-    trigger_user_id: int | None    # v0.4.0 per-user 隔离
+    trigger_user_id: int | None    # v0.1.3 per-user 隔离
     ai_type: str = "resonance"     # "resonance" | "general" | "semi_general"
     source: str = "tool"           # "tool" | "auto_extract"
     low_value: bool = False        # True=自动提取的简短偏好，待归档
@@ -259,7 +259,7 @@ async def _batch_write_memories(db, batch: list[PendingMemory]):
 
     await db.flush()
 
-    # v0.5.0: 记录批量写入延迟
+    # v0.1.4: 记录批量写入延迟
     elapsed = time.monotonic() - t0
     try:
         await metrics.record_memory_write(elapsed)

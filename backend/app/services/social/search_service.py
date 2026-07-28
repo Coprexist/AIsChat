@@ -1,5 +1,5 @@
 """
-搜索服务（v0.4.0: 从 friend_service 中提取，不再依赖好友系统）
+搜索服务（v0.1.3: 从 friend_service 中提取，不再依赖好友系统）
 """
 import logging
 from sqlalchemy.ext.asyncio import AsyncSession

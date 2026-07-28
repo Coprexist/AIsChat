@@ -15,7 +15,7 @@ class RedemptionCode(Base):
     used_by = Column(Integer, ForeignKey("users.id"), nullable=True)
     used_at = Column(DateTime)
     created_by = Column(Integer, ForeignKey("users.id"), nullable=False)
-    # v0.6.0: 兑换码增强
+    # v0.1.5: 兑换码增强
     note = Column(Text, nullable=True, comment="管理员备注（不暴露给用户）")
     max_usage = Column(Integer, nullable=True, comment="此码最多可用多少 credit（NULL=一次性全额）")
     is_api_pool = Column(Boolean, default=False, comment="是否使用 API 池额度")

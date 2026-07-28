@@ -135,7 +135,7 @@ async def redeem_code(
     }
 
 
-# v0.6.0: 用户额度状态
+# v0.1.5: 用户额度状态
 @router.get("/credit-status")
 async def credit_status(
     current_user: dict = Depends(get_current_user),

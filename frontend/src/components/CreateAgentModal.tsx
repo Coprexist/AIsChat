@@ -287,7 +287,7 @@ export default function CreateAgentModal({
   const [chatModel, setChatModel] = useState('')
   const [workModel, setWorkModel] = useState('')
   const [apiCreditCost, setApiCreditCost] = useState(0)
-  const [aiType, setAiType] = useState('resonance')  // v0.4.0
+  const [aiType, setAiType] = useState('resonance')  // v0.1.3
   const [apiBaseUrl, setApiBaseUrl] = useState('')
   const [apiKey, setApiKey] = useState('')
   const [memoryLoadMode, setMemoryLoadMode] = useState('index_only')

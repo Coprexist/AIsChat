@@ -60,7 +60,7 @@ class User(Base):
     status_text = Column(String(100), nullable=True, comment="自定义状态文本")
     status_color = Column(String(20), nullable=True, comment="状态文字颜色(hex)")
 
-    # 邮箱认证（v1.0.0）
+    # 邮箱认证（v0.2.0）
     email = Column(String(255), nullable=True, comment="用户邮箱，全局唯一（NULL 不受唯一约束）")
     email_verified = Column(Boolean, default=False, comment="邮箱是否已验证")
 
