@@ -935,11 +935,15 @@ async def verify_audit_chain(
 
 @router.post("/logs/cleanup")
 async def cleanup_old_logs(
-    days: int = Query(180, ge=30, le=730),
+    days: int = Query(0, ge=0, le=730),
     admin: dict = Depends(require_admin),
     db: AsyncSession = Depends(get_db),
 ):
-    """清理超过 N 天的审计日志"""
+    """清理审计日志。days=0 时从系统设置读取保留天数。"""
+    if days == 0:
+        from app.services.infrastructure.system_settings_service import get_settings
+        s = await get_settings(db)
+        days = s.get("audit_log_retention_days", 90)
     from app.services.audit_service import cleanup_old_logs
     return await cleanup_old_logs(db, days=days)
 
@@ -1120,6 +1124,7 @@ async def update_system_settings(
             registration_enabled=req.registration_enabled,
             geoip_provider_url=req.geoip_provider_url,
             audit_user_actions=req.audit_user_actions,
+            audit_log_retention_days=req.audit_log_retention_days,
             updated_by=admin["user_id"],
         )
         await _log_admin_action(

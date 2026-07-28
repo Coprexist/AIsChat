@@ -17,7 +17,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 logger = logging.getLogger(__name__)
 
 # 日志保留天数
-LOG_RETENTION_DAYS = 180
+LOG_RETENTION_DAYS = 90
 # 每次清理最大删除条数（分批防锁表）
 CLEANUP_BATCH_SIZE = 5000
 

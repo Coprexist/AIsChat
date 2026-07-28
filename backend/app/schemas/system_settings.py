@@ -18,6 +18,7 @@ class SystemSettingsResponse(BaseModel):
     registration_enabled: bool = True
     geoip_provider_url: str | None = None
     audit_user_actions: bool = False
+    audit_log_retention_days: int = 90
 
 
 class UpdateSystemSettingsRequest(BaseModel):
@@ -29,6 +30,7 @@ class UpdateSystemSettingsRequest(BaseModel):
     registration_enabled: bool | None = Field(None, description="是否开放注册通道")
     geoip_provider_url: str | None = Field(None, description="IP 地理位置查询后端 URL，含 {ip} 占位符")
     audit_user_actions: bool | None = Field(None, description="是否记录用户行为日志（登录、发消息等）")
+    audit_log_retention_days: int | None = Field(None, ge=7, le=730, description="审计日志保留天数（7-730）")
 
 
 class SetupCompleteRequest(BaseModel):

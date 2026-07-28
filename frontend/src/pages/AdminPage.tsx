@@ -1677,6 +1677,7 @@ function SystemSettingsTab() {
   const [registrationEnabled, setRegistrationEnabled] = useState(true)
   const regToggleRef = useRef(false)
   const [auditUserActions, setAuditUserActions] = useState(false)
+  const [auditRetention, setAuditRetention] = useState(90)
   const [geoipUrl, setGeoipUrl] = useState('')
   const [bulkConcurrency, setBulkConcurrency] = useState(3)
   const [bulking, setBulking] = useState(false)
@@ -1699,6 +1700,7 @@ function SystemSettingsTab() {
       setDefaultConcurrentAiLimit(settings.default_concurrent_ai_limit ?? 3)
       setRegistrationEnabled(settings.registration_enabled ?? true)
       setAuditUserActions(settings.audit_user_actions ?? false)
+      setAuditRetention(settings.audit_log_retention_days ?? 90)
       setGeoipUrl(settings.geoip_provider_url || '')
       setHasActiveKeys(keys.some((k: any) => k.is_active))
     }).catch(console.error)
@@ -1715,6 +1717,7 @@ function SystemSettingsTab() {
       else if (field === 'concurrent_ai_limit') payload.default_concurrent_ai_limit = value
       else if (field === 'registration_enabled') payload.registration_enabled = value
       else if (field === 'audit_user_actions') payload.audit_user_actions = value
+      else if (field === 'audit_retention') payload.audit_log_retention_days = value
       else if (field === 'geoip_url') payload.geoip_provider_url = value || null
       const updated = await api.put('/admin/system-settings', payload)
       setConfig(updated)
@@ -1896,6 +1899,21 @@ function SystemSettingsTab() {
               handleSave('audit_user_actions', val)
             }}
           />
+        </div>
+      </div>
+
+      <div>
+        <label className="text-sm font-medium text-textSecondary">审计日志保留天数</label>
+        <p className="text-xs text-textMuted mt-0.5 mb-2">超期日志自动清理（7-730 天）</p>
+        <div className="flex items-center gap-2">
+          <input type="number" value={auditRetention}
+            onChange={e => setAuditRetention(parseInt(e.target.value) || 90)} min={7} max={730}
+            className="w-24 px-3 py-2 rounded-xl border border-border bg-canvas text-sm text-textPrimary focus:outline-none focus:ring-2 focus:ring-primary-500/50" />
+          <span className="text-xs text-textMuted">天</span>
+          <button onClick={() => handleSave('audit_retention', auditRetention)}
+            disabled={saving || auditRetention === (config?.audit_log_retention_days ?? 90)}
+            className="px-3 py-2 bg-primary-500 text-white rounded-xl hover:bg-primary-400 text-sm disabled:opacity-40 transition-colors"
+          >{t('settings.save')}</button>
         </div>
       </div>
 
