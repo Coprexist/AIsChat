@@ -40,7 +40,7 @@ const ChatInputFunc = ({ conversationType, conversationId, t, onSend, onSendFile
   useEffect(() => {
     const ta = textareaRef.current
     if (!ta) return
-    ta.style.height = Math.max(44, (inputHeight || 0) + autoHeight) + 'px'
+    ta.style.height = Math.max(40, (inputHeight || 0) + autoHeight) + 'px'
   }, [inputHeight, autoHeight])
 
   // 草稿恢复 & 离开保存
@@ -104,13 +104,13 @@ const ChatInputFunc = ({ conversationType, conversationId, t, onSend, onSendFile
     // 自动缩放：超出基础高度的部分最多 3 行
     ta.style.height = 'auto'
     const scrollH = ta.scrollHeight
-    const base = inputHeight || 44
+    const base = inputHeight || 40
     const maxAuto = 3 * LINE_H
     const ah = Math.max(0, Math.min(scrollH - base, maxAuto))
     setAutoHeight(ah)
     ta.dataset.autoHeight = String(ah)
     onAutoHeight?.(ah)
-    ta.style.height = Math.max(44, (inputHeight || 0) + ah) + 'px'
+    ta.style.height = Math.max(40, (inputHeight || 0) + ah) + 'px'
   }, [detectMention, inputHeight])
 
   const handleKeyDown = useCallback((e: React.KeyboardEvent) => {
@@ -162,7 +162,7 @@ const ChatInputFunc = ({ conversationType, conversationId, t, onSend, onSendFile
         onKeyDown={handleKeyDown}
         placeholder={conversationType === 'dm' ? t('chat.dmInputPlaceholder') : t('chat.groupInputPlaceholder')}
         rows={1}
-        className="flex-1 min-w-0 resize-none rounded-xl border border-border bg-canvas px-4 py-2.5 text-sm text-textPrimary placeholder:text-textMuted focus:outline-none focus:ring-2 focus:ring-primary-500/50 focus:border-primary-500/30 transition-shadow min-h-[42px]"
+        className="flex-1 min-w-0 resize-none rounded-xl border border-border bg-canvas px-4 py-2.5 text-sm text-textPrimary placeholder:text-textMuted focus:outline-none focus:ring-2 focus:ring-primary-500/50 focus:border-primary-500/30 transition-shadow min-h-[40px]"
       />
       <button
         onClick={doSend}
