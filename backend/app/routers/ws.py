@@ -474,17 +474,33 @@ async def websocket_endpoint(ws: WebSocket, token: str = Query(...)):
         if current_session_id is not None:
             manager.disconnect_dm(current_session_id, user_id)
 
+_last_message_audit: dict[int, float] = {}
+
 async def _log_message_audit(db, user_id: int, conv_type: str, conv_id: int | str, content: str):
-    """审计日志：用户发送消息（异步 fire-and-forget，捕获所有异常）"""
+    """审计日志：用户发送消息（异步 fire-and-forget）
+
+    限频：同一用户最多每 60 秒记一条，避免高频刷表。
+    """
+    import time
+    now = time.time()
+    last = _last_message_audit.get(user_id, 0)
+    if now - last < 60:
+        return
+    _last_message_audit[user_id] = now
+    if len(_last_message_audit) > 5000:
+        _last_message_audit.clear()
+
     try:
+        from app.database import async_session
         from app.services.audit_service import log_user_action
         from app.utils.auth import get_current_request_ip
         truncated = content[:200] if content else ""
-        await log_user_action(
-            db, "send_message", user_id, conv_type,
-            target_id=conv_id if isinstance(conv_id, int) else 0,
-            details={"content_preview": truncated},
-            ip=get_current_request_ip(),
-        )
+        async with async_session() as session:
+            await log_user_action(
+                session, "send_message", user_id, conv_type,
+                target_id=conv_id if isinstance(conv_id, int) else 0,
+                details={"content_preview": truncated},
+                ip=get_current_request_ip(),
+            )
     except Exception:
         pass
