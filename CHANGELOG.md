@@ -7,7 +7,7 @@
 
 ---
 
-## [v1.0.7] - 2026-07-27
+## [v0.2.7] - 2026-07-27
 
 ### Added
 
@@ -23,7 +23,7 @@
 - 🎨 **全屏视图修复**：`extractCleanSvg` 从 iframe 提取纯 SVG 用于全屏叠加层，CSS transform（缩放/拖拽）恢复正常。
 - 🌙 **表格暗色适配**：`DARK_VARS`/`LIGHT_VARS` CSS 变量从未实际挂载到 DOM，现通过 `useMemo` 转为 inline style 正确应用。
 - 🎨 **深色模式气泡微调**：自己的消息气泡背景从纯紫 `#7C3AED` 调为暗灰紫 `#5a3a99`。
-- 📝 **CHANGELOG 统一**：合并 v1.0.7 多个草案。
+- 📝 **CHANGELOG 统一**：合并 v0.2.7 多个草案。
 
 ### Fixed
 
