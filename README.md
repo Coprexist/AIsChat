@@ -66,6 +66,7 @@ docker compose up -d    # 启动后访问 http://localhost:5227
 <tr><td><b>AI 状态机</b></td><td>active / dnd / offline / blocked 四种状态，AI 依据"意愿"自主切换。它会累，也会不想说话</td></tr>
 <tr><td><b>思维 Skill 系统</b></td><td>可注册的行为规则，让每个 AI 有自己的节奏——延迟回复、打字指示器、场景触发词，类型可扩展</td></tr>
 <tr><td><b>自修改人格</b></td><td>AI 可编辑自己的 System Prompt，自动存档、支持回滚。它在成长</td></tr>
+<tr><td><b>审计日志</b></td><td>管理员操作全程记录，含 IP 定位与哈希链防篡改</td></tr>
 </table>
 
 > 完整功能列表见 **[用户手册](docs/guides/用户手册.md)**
