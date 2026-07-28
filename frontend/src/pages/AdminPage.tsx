@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef } from 'react'
+import Modal from '../components/Modal'
 import { Link, useNavigate, useSearchParams, useOutletContext } from 'react-router-dom'
 import { api } from '../api/client'
 import { Users, Bot, MessageCircle, Ticket, FileText, Activity, Terminal, Database, Globe, BookOpen, ScrollText, ArrowLeft, BarChart3, ChevronRight, Key, Settings, Layers, Wrench, Shield, Plug, X } from 'lucide-react'
@@ -335,32 +336,29 @@ function ResetPasswordDialog({ target, onDone, onClose }: {
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50" onClick={onClose}>
-      <div className="bg-surface rounded-xl p-5 max-w-sm w-full mx-4 shadow-xl border border-border/50" onClick={e => e.stopPropagation()}>
-        <h3 className="text-sm font-semibold mb-3">{t('admin.resetPasswordTitle').replace('{username}', target.username)}</h3>
-        <input
-          ref={inputRef}
-          type="password"
-          value={password}
-          onChange={e => setPassword(e.target.value)}
-          placeholder={t('admin.resetPasswordPlaceholder')}
-          className="w-full px-3 py-2 text-sm border border-border bg-canvas rounded-lg focus:outline-none focus:ring-1 focus:ring-primary-500 mb-3"
-          onKeyDown={e => e.key === 'Enter' && reset()}
-        />
-        <div className="flex justify-end gap-2">
-          <button onClick={onClose} className="text-xs px-3 py-1.5 border border-border rounded-lg text-textSecondary hover:bg-elevated">
-            {t('common.cancel')}
-          </button>
-          <button
-            disabled={password.length < 6 || busy}
-            onClick={reset}
-            className="text-xs px-3 py-1.5 bg-primary-500 text-white rounded-lg hover:bg-primary-600 disabled:opacity-40"
-          >
-            {busy ? t('common.loading') : t('admin.resetPassword')}
-          </button>
-        </div>
+    <Modal open title={t('admin.resetPasswordTitle').replace('{username}', target.username)} onClose={onClose}>
+      <input
+        ref={inputRef}
+        type="password"
+        value={password}
+        onChange={e => setPassword(e.target.value)}
+        placeholder={t('admin.resetPasswordPlaceholder')}
+        className="w-full px-3 py-2 text-sm border border-border bg-canvas rounded-lg focus:outline-none focus:ring-1 focus:ring-primary-500 mb-3"
+        onKeyDown={e => e.key === 'Enter' && reset()}
+      />
+      <div className="flex justify-end gap-2">
+        <button onClick={onClose} className="text-xs px-3 py-1.5 border border-border rounded-lg text-textSecondary hover:bg-elevated">
+          {t('common.cancel')}
+        </button>
+        <button
+          disabled={password.length < 6 || busy}
+          onClick={reset}
+          className="text-xs px-3 py-1.5 bg-primary-500 text-white rounded-lg hover:bg-primary-600 disabled:opacity-40"
+        >
+          {busy ? t('common.loading') : t('admin.resetPassword')}
+        </button>
       </div>
-    </div>
+    </Modal>
   )
 }
 
@@ -372,8 +370,11 @@ function CreateUserDialog({ onDone, onClose }: { onDone: () => void; onClose: ()
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState('')
 
+  const usernameOk = username.length >= 2
+  const passwordOk = password.length >= 6
+
   const submit = async () => {
-    if (username.length < 2 || password.length < 6 || busy) return
+    if (!usernameOk || !passwordOk || busy) return
     setBusy(true)
     setError('')
     try {
@@ -387,26 +388,25 @@ function CreateUserDialog({ onDone, onClose }: { onDone: () => void; onClose: ()
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50" onClick={onClose}>
-      <div className="bg-surface rounded-xl p-5 max-w-sm w-full mx-4 shadow-xl border border-border/50" onClick={e => e.stopPropagation()}>
-        <h3 className="text-sm font-semibold mb-3">{t('admin.createUserTitle')}</h3>
-        {error && <p className="text-xs text-rose-400 mb-2">{error}</p>}
-        <input value={username} onChange={e => setUsername(e.target.value)} placeholder={t('admin.createUserUsername')}
-          className="w-full px-3 py-2 text-sm border border-border bg-canvas rounded-lg mb-2 focus:outline-none focus:ring-1 focus:ring-primary-500" />
-        <input type="password" value={password} onChange={e => setPassword(e.target.value)} placeholder={t('admin.createUserPassword')}
-          className="w-full px-3 py-2 text-sm border border-border bg-canvas rounded-lg mb-2 focus:outline-none focus:ring-1 focus:ring-primary-500" />
-        <input value={email} onChange={e => setEmail(e.target.value)} placeholder={t('admin.createUserEmail')}
-          className="w-full px-3 py-2 text-sm border border-border bg-canvas rounded-lg mb-3 focus:outline-none focus:ring-1 focus:ring-primary-500" />
-        <div className="flex justify-end gap-2">
-          <button onClick={onClose} className="text-xs px-3 py-1.5 border border-border rounded-lg text-textSecondary hover:bg-elevated">{t('common.cancel')}</button>
-          <button
-            disabled={username.length < 2 || password.length < 6 || busy}
-            onClick={submit}
-            className="text-xs px-3 py-1.5 bg-primary-500 text-white rounded-lg hover:bg-primary-600 disabled:opacity-40"
-          >{busy ? t('common.loading') : t('admin.createUser')}</button>
-        </div>
+    <Modal open title={t('admin.createUserTitle')} onClose={onClose}>
+      {error && <p className="text-xs text-rose-400 mb-2">{error}</p>}
+      <input value={username} onChange={e => setUsername(e.target.value)} placeholder={t('admin.createUserUsername')}
+        className="w-full px-3 py-2 text-sm border border-border bg-canvas rounded-lg mb-2 focus:outline-none focus:ring-1 focus:ring-primary-500" />
+      <p className="text-[11px] text-textMuted -mt-1.5 mb-2">{username.length > 0 && !usernameOk ? '至少 2 个字符' : '\u00a0'}</p>
+      <input type="password" value={password} onChange={e => setPassword(e.target.value)} placeholder={t('admin.createUserPassword')}
+        className="w-full px-3 py-2 text-sm border border-border bg-canvas rounded-lg mb-2 focus:outline-none focus:ring-1 focus:ring-primary-500" />
+      <p className="text-[11px] text-textMuted -mt-1.5 mb-2">{password.length > 0 && !passwordOk ? '至少 6 位' : '\u00a0'}</p>
+      <input value={email} onChange={e => setEmail(e.target.value)} placeholder={t('admin.createUserEmail')}
+        className="w-full px-3 py-2 text-sm border border-border bg-canvas rounded-lg mb-3 focus:outline-none focus:ring-1 focus:ring-primary-500" />
+      <div className="flex justify-end gap-2">
+        <button onClick={onClose} className="text-xs px-3 py-1.5 border border-border rounded-lg text-textSecondary hover:bg-elevated">{t('common.cancel')}</button>
+        <button
+          disabled={!usernameOk || !passwordOk || busy}
+          onClick={submit}
+          className="text-xs px-3 py-1.5 bg-primary-500 text-white rounded-lg hover:bg-primary-600 disabled:opacity-40"
+        >{busy ? t('common.loading') : t('admin.createUser')}</button>
       </div>
-    </div>
+    </Modal>
   )
 }
 
@@ -422,18 +422,9 @@ function ImportCsvDialog({ onDone, onClose }: { onDone: (count: number) => void;
     setBusy(true)
     setResults(null)
     try {
-      const token = localStorage.getItem('access_token')
       const form = new FormData()
       form.append('file', file)
-      const headers: Record<string, string> = {}
-      if (token) headers['Authorization'] = `Bearer ${token}`
-      const res = await fetch('/api/admin/users/import-csv', {
-        method: 'POST',
-        headers,
-        body: form,
-      })
-      const data = await res.json()
-      if (!res.ok) throw new Error(data.detail || 'Import failed')
+      const data = await api.post('/admin/users/import-csv', form)
       setResults(data)
       if (data.created > 0) onDone(data.created)
     } catch (e: any) {
@@ -443,42 +434,39 @@ function ImportCsvDialog({ onDone, onClose }: { onDone: (count: number) => void;
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50" onClick={onClose}>
-      <div className="bg-surface rounded-xl p-5 max-w-sm w-full mx-4 shadow-xl border border-border/50" onClick={e => e.stopPropagation()}>
-        <h3 className="text-sm font-semibold mb-3">{t('admin.importCsvTitle')}</h3>
-        {results ? (
-          <div className="text-sm space-y-1 mb-3">
-            {results.error ? (
-              <p className="text-rose-400">{results.error}</p>
-            ) : (
-              <>
-                <p className="text-mint-400">{results.message}</p>
-                <div className="max-h-40 overflow-y-auto text-xs text-textMuted space-y-0.5 mt-2">
-                  {results.details?.filter((r: any) => r.status !== 'ok').map((r: any, i: number) => (
-                    <p key={i} className={r.status === 'error' ? 'text-rose-400' : ''}>
-                      第 {r.row} 行: {r.status === 'error' ? r.reason : r.status}
-                    </p>
-                  ))}
-                </div>
-              </>
-            )}
-            <button onClick={onClose} className="text-xs px-3 py-1.5 bg-primary-500 text-white rounded-lg hover:bg-primary-600 mt-2">{t('common.close')}</button>
+    <Modal open title={results ? null : t('admin.importCsvTitle')} onClose={onClose}>
+      {results ? (
+        <div className="text-sm space-y-1">
+          {results.error ? (
+            <p className="text-rose-400">{results.error}</p>
+          ) : (
+            <>
+              <p className="text-mint-400">{results.message}</p>
+              <div className="max-h-40 overflow-y-auto text-xs text-textMuted space-y-0.5 mt-2">
+                {results.details?.filter((r: any) => r.status !== 'ok').map((r: any, i: number) => (
+                  <p key={i} className={r.status === 'error' ? 'text-rose-400' : ''}>
+                    第 {r.row} 行: {r.status === 'error' ? r.reason : r.status}
+                  </p>
+                ))}
+              </div>
+            </>
+          )}
+          <button onClick={onClose} className="text-xs px-3 py-1.5 bg-primary-500 text-white rounded-lg hover:bg-primary-600 mt-2">{t('common.close')}</button>
+        </div>
+      ) : (
+        <>
+          <p className="text-xs text-textMuted mb-3">{t('admin.importCsvHint')}</p>
+          <input ref={fileRef} type="file" accept=".csv"
+            className="w-full text-sm file:mr-3 file:py-1.5 file:px-3 file:rounded-lg file:border-0 file:text-xs file:font-medium file:bg-primary-500 file:text-white hover:file:bg-primary-400 mb-3" />
+          <div className="flex justify-end gap-2">
+            <button onClick={onClose} className="text-xs px-3 py-1.5 border border-border rounded-lg text-textSecondary hover:bg-elevated">{t('common.cancel')}</button>
+            <button disabled={busy} onClick={submit}
+              className="text-xs px-3 py-1.5 bg-primary-500 text-white rounded-lg hover:bg-primary-600 disabled:opacity-40"
+            >{busy ? t('common.loading') : t('admin.importCsv')}</button>
           </div>
-        ) : (
-          <>
-            <p className="text-xs text-textMuted mb-3">{t('admin.importCsvHint')}</p>
-            <input ref={fileRef} type="file" accept=".csv"
-              className="w-full text-sm file:mr-3 file:py-1.5 file:px-3 file:rounded-lg file:border-0 file:text-xs file:font-medium file:bg-primary-500 file:text-white hover:file:bg-primary-400 mb-3" />
-            <div className="flex justify-end gap-2">
-              <button onClick={onClose} className="text-xs px-3 py-1.5 border border-border rounded-lg text-textSecondary hover:bg-elevated">{t('common.cancel')}</button>
-              <button disabled={busy} onClick={submit}
-                className="text-xs px-3 py-1.5 bg-primary-500 text-white rounded-lg hover:bg-primary-600 disabled:opacity-40"
-              >{busy ? t('common.loading') : t('admin.importCsv')}</button>
-            </div>
-          </>
-        )}
-      </div>
-    </div>
+        </>
+      )}
+    </Modal>
   )
 }
 

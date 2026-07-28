@@ -29,9 +29,15 @@ async function request<T = any>(
 ): Promise<T> {
   const token = localStorage.getItem('access_token')
 
+  const body = options.body
+  const isFormData = body instanceof FormData
+
   const headers: Record<string, string> = {
-    'Content-Type': 'application/json',
     ...(options.headers as Record<string, string>),
+  }
+  // FormData 让浏览器自动设置 Content-Type（含 boundary），不要手动盖
+  if (!isFormData) {
+    headers['Content-Type'] = 'application/json'
   }
 
   if (token) {
@@ -152,14 +158,16 @@ async function safeRequest<T = any>(
   }
 }
 
+const jsonBody = (body?: any) => body instanceof FormData ? body : JSON.stringify(body)
+
 export const api = {
   get: <T = any>(path: string) => request<T>(path),
   post: <T = any>(path: string, body?: any) =>
-    request<T>(path, { method: 'POST', body: JSON.stringify(body) }),
+    request<T>(path, { method: 'POST', body: jsonBody(body) }),
   put: <T = any>(path: string, body?: any) =>
-    request<T>(path, { method: 'PUT', body: JSON.stringify(body) }),
+    request<T>(path, { method: 'PUT', body: jsonBody(body) }),
   patch: <T = any>(path: string, body?: any) =>
-    request<T>(path, { method: 'PATCH', body: JSON.stringify(body) }),
+    request<T>(path, { method: 'PATCH', body: jsonBody(body) }),
   delete: <T = any>(path: string) =>
     request<T>(path, { method: 'DELETE' }),
   upload: uploadFile,
@@ -167,11 +175,11 @@ export const api = {
   safe: {
     get: <T = any>(path: string) => safeRequest<T>(path),
     post: <T = any>(path: string, body?: any) =>
-      safeRequest<T>(path, { method: 'POST', body: JSON.stringify(body) }),
+      safeRequest<T>(path, { method: 'POST', body: jsonBody(body) }),
     put: <T = any>(path: string, body?: any) =>
-      safeRequest<T>(path, { method: 'PUT', body: JSON.stringify(body) }),
+      safeRequest<T>(path, { method: 'PUT', body: jsonBody(body) }),
     patch: <T = any>(path: string, body?: any) =>
-      safeRequest<T>(path, { method: 'PATCH', body: JSON.stringify(body) }),
+      safeRequest<T>(path, { method: 'PATCH', body: jsonBody(body) }),
     delete: <T = any>(path: string) =>
       safeRequest<T>(path, { method: 'DELETE' }),
   },
