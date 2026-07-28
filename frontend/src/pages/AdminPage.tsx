@@ -1959,7 +1959,7 @@ function SystemSettingsTab() {
       {/* IP 地理位置查询后端 */}
       <div>
         <label className="text-sm font-medium text-textSecondary">IP 地理位置查询后端</label>
-        <p className="text-xs text-textMuted mt-0.5 mb-2">支持 {{ip}} 占位符，留空默认 ip-api.com</p>
+        <p className="text-xs text-textMuted mt-0.5 mb-2">{'支持 {ip} 占位符，留空默认 ip-api.com'}</p>
         <div className="flex items-center gap-2">
           <input
             type="text"
