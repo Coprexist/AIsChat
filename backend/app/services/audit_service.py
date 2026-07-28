@@ -56,7 +56,6 @@ async def create_audit_log(
         "old_value": old_value,
         "new_value": new_value,
         "details": details or {},
-        "_db": db,
         "_flush": True,
     }
     await get_backend().write(entry, db=db)

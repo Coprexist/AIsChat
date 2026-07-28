@@ -55,7 +55,7 @@ class PostgresAuditBackend(AuditStorageBackend):
         pass
 
     async def write(self, entry: dict, db: AsyncSession | None = None) -> None:
-        session = db or entry.get("_db")
+        session = db
         if session is None:
             raise ValueError("PostgresAuditBackend.write 需要 db 参数")
         prev = (
