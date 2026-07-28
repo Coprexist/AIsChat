@@ -117,6 +117,14 @@ export function useWebSocket(
           return
         }
 
+        // 只对真正的用户消息触发闪烁/通知，忽略静默系统消息
+        const isUserMsg = msg.type === 'message' || msg.type === 'ai_response'
+        if (!isUserMsg) {
+          // 静默消息仍要分发给消费者（ChatView 处理订阅确认等）
+          onMessageRef.current?.(msg)
+          return
+        }
+
         // 窗口闪烁：页面未聚焦时收到消息
         if (document.hidden && !flashLockRef.current && localStorage.getItem('notifications_enabled') !== 'false') {
           flashLockRef.current = true
