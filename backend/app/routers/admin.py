@@ -967,8 +967,8 @@ async def cleanup_messages(
     if days <= 0:
         return {"message": "消息保留天数设为 0（永久保留），未执行清理", "deleted": 0}
 
-    from datetime import datetime, timezone, timedelta
-    cutoff = datetime.now(timezone.utc) - timedelta(days=days)
+    from datetime import datetime, timedelta
+    cutoff = datetime.utcnow() - timedelta(days=days)
     cutoff_str = cutoff.isoformat()
 
     from sqlalchemy import text
@@ -1162,18 +1162,18 @@ async def update_system_settings(
     """更新全局系统设置（含平台赠送额度，修改会影响所有用户）"""
     try:
         result = await update_settings(
-            db,
-            default_language=req.default_language,
-            default_platform_credit=req.default_platform_credit,
-            default_file_quota_mb=req.default_file_quota_mb,
-            default_concurrent_ai_limit=req.default_concurrent_ai_limit,
-            registration_enabled=req.registration_enabled,
-            geoip_provider_url=req.geoip_provider_url,
-            audit_user_actions=req.audit_user_actions,
-            audit_log_retention_days=req.audit_log_retention_days,
-            message_retention_days=req.message_retention_days,
-            updated_by=admin["user_id"],
-        )
+                db,
+                default_language=req.default_language,
+                default_platform_credit=req.default_platform_credit,
+                default_file_quota_mb=req.default_file_quota_mb,
+                default_concurrent_ai_limit=req.default_concurrent_ai_limit,
+                registration_enabled=req.registration_enabled,
+                geoip_provider_url=req.geoip_provider_url,
+                audit_user_actions=req.audit_user_actions,
+                audit_log_retention_days=req.audit_log_retention_days,
+                message_retention_days=req.message_retention_days,
+                updated_by=admin["user_id"],
+            )
         await _log_admin_action(
             db, admin["user_id"], "update_system_settings", "system", 1,
             req.model_dump(exclude_none=True),
@@ -1181,6 +1181,9 @@ async def update_system_settings(
         return result
     except ValueError as e:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
+    except Exception as e:
+        logger.exception(f"update_system_settings 失败: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
 
 
 # ============================================================

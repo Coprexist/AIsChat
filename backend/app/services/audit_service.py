@@ -5,7 +5,7 @@ audit_service — 审计日志服务（外观层）
 新增存储后端只需在 `services/audit/` 下新建实现类，切换由系统设置控制。
 """
 import logging
-from datetime import datetime, timezone, timedelta
+from datetime import datetime, timedelta
 from typing import Any, Optional
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -71,7 +71,7 @@ async def verify_audit_chain(db: AsyncSession, limit: int = 1000) -> dict:
 async def cleanup_old_logs(db: AsyncSession, days: int = LOG_RETENTION_DAYS) -> dict:
     """删除超过保留天数的日志"""
     await _ensure_backend()
-    cutoff = datetime.now(timezone.utc) - timedelta(days=days)
+    cutoff = datetime.utcnow() - timedelta(days=days)
     return await get_backend().cleanup(before=cutoff.isoformat(), db=db)
 
 

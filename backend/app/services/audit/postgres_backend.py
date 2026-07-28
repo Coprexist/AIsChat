@@ -7,7 +7,7 @@ PostgreSQL 审计日志存储后端
 """
 import hashlib
 import logging
-from datetime import datetime, timezone
+from datetime import datetime
 from typing import Any, Optional
 from sqlalchemy import select, delete
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -66,7 +66,7 @@ class PostgresAuditBackend(AuditStorageBackend):
             )
         ).scalar_one_or_none()
 
-        now = datetime.now(timezone.utc)
+        now = datetime.utcnow()
         current_hash = _compute_hash(
             prev_hash=prev,
             created_at=now,
