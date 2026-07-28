@@ -185,6 +185,8 @@ async def websocket_endpoint(ws: WebSocket, token: str = Query(...)):
                             continue
 
                     msg["conversation_type"] = "dm"
+                    # 审计日志：用户发送消息（fire-and-forget）
+                    asyncio.create_task(_log_message_audit(db, user_id, "dm", session_id, content))
                     # 回显给发送者
                     await ws.send_json({"type": "message", "conversation_type": "dm", "data": msg})
                     # 推送给对方（排除发送者）
@@ -256,6 +258,9 @@ async def websocket_endpoint(ws: WebSocket, token: str = Query(...)):
                             logger.error(f"获取头像失败: {e}", exc_info=True)
 
                         msg_data = message_to_dict(message, sender_avatar_url=sender_avatar, sender_state=sender_state)
+
+                        # 审计日志：用户发送消息（fire-and-forget）
+                        asyncio.create_task(_log_message_audit(db, user_id, "group", group_id, content))
 
                         # 先回显给发送者
                         await ws.send_json({"type": "message", "conversation_type": "group", "data": msg_data})
@@ -468,3 +473,18 @@ async def websocket_endpoint(ws: WebSocket, token: str = Query(...)):
             )
         if current_session_id is not None:
             manager.disconnect_dm(current_session_id, user_id)
+
+async def _log_message_audit(db, user_id: int, conv_type: str, conv_id: int | str, content: str):
+    """审计日志：用户发送消息（异步 fire-and-forget，捕获所有异常）"""
+    try:
+        from app.services.audit_service import log_user_action
+        from app.utils.auth import get_current_request_ip
+        truncated = content[:200] if content else ""
+        await log_user_action(
+            db, "send_message", user_id, conv_type,
+            target_id=conv_id if isinstance(conv_id, int) else 0,
+            details={"content_preview": truncated},
+            ip=get_current_request_ip(),
+        )
+    except Exception:
+        pass
