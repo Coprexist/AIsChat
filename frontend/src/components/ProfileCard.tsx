@@ -189,7 +189,7 @@ export default function ProfileCard({ entityType, entityId, entityName, state, a
 
         {/* 简介 */}
         <div className="mb-3">
-          <p className="text-sm text-textMuted leading-relaxed italic">{bio || t('profileCard.bioEmpty')}</p>
+          <p className="text-sm text-textMuted leading-relaxed italic">{isGroup ? t('profileCard.groupBioEmpty') : (bio || t('profileCard.bioEmpty'))}</p>
         </div>
 
         {/* 详细信息 */}
@@ -211,7 +211,6 @@ export default function ProfileCard({ entityType, entityId, entityName, state, a
 
         {/* 操作按钮 */}
         <div className="space-y-2">
-            {/* 发消息（群聊跳过好友操作） */}
           {isGroup ? null : (
             <>
           {isFriend && profile?.friendship_id && (
