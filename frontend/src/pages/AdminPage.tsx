@@ -2,7 +2,7 @@ import { useState, useEffect, useRef } from 'react'
 import Modal from '../components/Modal'
 import { Link, useNavigate, useSearchParams, useOutletContext } from 'react-router-dom'
 import { api } from '../api/client'
-import { Users, Bot, MessageCircle, Ticket, FileText, Activity, Terminal, Database, Globe, BookOpen, ScrollText, ArrowLeft, BarChart3, ChevronRight, Key, Settings, Layers, Wrench, Shield, Plug, X } from 'lucide-react'
+import { Users, Bot, MessageCircle, Ticket, FileText, Activity, Terminal, Database, Globe, BookOpen, ScrollText, ArrowLeft, BarChart3, ChevronRight, Key, Settings, Layers, Wrench, Shield, Plug, X, Eraser } from 'lucide-react'
 import { MANUAL_URL, ADMIN_MANUAL_URL } from '../constants'
 import Toggle from '../components/Toggle'
 import { useT } from '../i18n/I18nContext'
@@ -18,8 +18,9 @@ import ToolsSkillsTab from '../components/ToolsSkillsTab'
 import AuthSettingsTab from '../components/AuthSettingsTab'
 import PluginManager from '../components/PluginManager'
 import MaintenanceMsgEditor from '../components/MaintenanceMsgEditor'
+import CleanupTab from '../components/CleanupTab'
 
-type Tab = 'overview' | 'users' | 'agents' | 'groups' | 'codes' | 'logs' | 'opencli' | 'backup' | 'federation' | 'convlog' | 'usage' | 'metrics' | 'apipool' | 'system' | 'prompt' | 'tools' | 'auth' | 'plugins'
+type Tab = 'overview' | 'users' | 'agents' | 'groups' | 'codes' | 'logs' | 'opencli' | 'backup' | 'federation' | 'convlog' | 'usage' | 'metrics' | 'apipool' | 'system' | 'prompt' | 'tools' | 'auth' | 'plugins' | 'cleanup'
 type TabCategory = string
 
 const renderContent = (activeTab: Tab) => {
@@ -42,6 +43,7 @@ const renderContent = (activeTab: Tab) => {
     case 'tools': return <ToolsSkillsTab />
     case 'auth': return <AuthSettingsTab />
     case 'plugins': return <PluginManager />
+    case 'cleanup': return <CleanupTab />
     default: return <OverviewTab />
   }
 }
@@ -68,6 +70,7 @@ export default function AdminPage() {
     { key: 'tools', label: t('admin.toolsSkills'), icon: Wrench, desc: t('admin.toolsSkills'), category: t('admin.categorySystem') },
     { key: 'auth', label: t('admin.auth'), icon: Shield, desc: t('admin.authDesc'), category: t('admin.categorySystem') },
     { key: 'plugins', label: '插件管理', icon: Plug, desc: '管理浏览器上网等扩展服务', category: t('admin.categorySystem') },
+    { key: 'cleanup', label: t('admin.cleanup'), icon: Eraser, desc: t('admin.cleanupDesc'), category: t('admin.categorySystem') },
   ]
   const initialTab = (searchParams.get('tab') as Tab) || 'overview'
   const [activeTab, setActiveTab] = useState<Tab>(initialTab)

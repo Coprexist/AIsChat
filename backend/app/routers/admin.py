@@ -8,7 +8,7 @@ from datetime import datetime, timedelta, timezone
 from fastapi import APIRouter, Depends, HTTPException, status, Query, UploadFile, File
 from fastapi.responses import Response
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select, func, update
+from sqlalchemy import select, func, update, delete
 from pydantic import BaseModel, Field
 from app.config import settings
 from app.database import get_db
@@ -1668,6 +1668,102 @@ async def reset_email_templates(
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
 
 
+# ════════════════════════════════════════════════════════════
+# 文件清理
+# ════════════════════════════════════════════════════════════
+
+
+@router.post("/cleanup/files")
+async def cleanup_files(
+    current_user: dict = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """扫描并清理：1) 已无引用的头像文件  2) 物理文件已丢失的 metadata 记录"""
+    # 检查管理员权限：current_user 来自 get_current_user，需独立查库确认角色
+    from app.models.user import User as UserCheck
+    r = await db.execute(select(UserCheck).where(UserCheck.id == current_user["user_id"]))
+    admin_user = r.scalar_one()
+    if not admin_user or admin_user.role != "admin":
+        raise HTTPException(403, "仅管理员可操作")
+
+    from app.models.file import FileMetadata as FMD, FileReference as FR, FileCollaborator as FC
+    from app.models.system_settings import SystemSettings as SS
+    from app.services.content.file_service import _get_physical_path
+
+    avatar_dir = "/app/uploads/avatars"
+    cleaned_files = 0
+    cleaned_refs = 0
+    orphan_cleaned = 0
+
+    # 1. 清理无引用的头像文件
+    if os.path.isdir(avatar_dir):
+        active_avatars = set()
+        for model in [User, Agent, Group]:
+            r = await db.execute(select(model.avatar_url).where(model.avatar_url.isnot(None)))
+            for row in r:
+                url = row[0]
+                if url and '/download-avatar/' in url:
+                    active_avatars.add(url.rsplit('/', 1)[-1])
+
+        for f in os.listdir(avatar_dir):
+            filepath = os.path.join(avatar_dir, f)
+            if not os.path.isfile(filepath):
+                continue
+            if f not in active_avatars:
+                try:
+                    os.remove(filepath)
+                    cleaned_files += 1
+                except OSError:
+                    pass
+
+    # 2. 清理物理文件已丢失的 file_metadata 记录
+    fm_result = await db.execute(select(FMD))
+    for fm in fm_result.scalars():
+        if fm.path and '/uploads/avatars/' in fm.path:
+            continue
+        try:
+            phys_path = _get_physical_path(fm.path)
+            if not os.path.isfile(phys_path):
+                raise FileNotFoundError
+        except (FileNotFoundError, ValueError):
+            await db.execute(delete(FR).where(FR.file_id == fm.id))
+            await db.execute(delete(FC).where(FC.file_id == fm.id))
+            await db.delete(fm)
+            orphan_cleaned += 1
+
+    await db.flush()
+
+    stats = {
+        "cleaned_files": cleaned_files,
+        "cleaned_refs": cleaned_refs,
+        "orphan_cleaned": orphan_cleaned,
+        "run_at": datetime.now(timezone.utc).isoformat(),
+    }
+
+    settings_result = await db.execute(select(SS).where(SS.id == 1))
+    settings = settings_result.scalar_one_or_none()
+    if settings:
+        settings.last_cleanup_stats = stats
+    await db.flush()
+
+    return stats
+
+
+@router.get("/cleanup/stats")
+async def get_cleanup_stats(
+    current_user: dict = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """获取上次清理统计"""
+    from app.models.user import User as UserCheck
+    r = await db.execute(select(UserCheck).where(UserCheck.id == current_user["user_id"]))
+    admin_user = r.scalar_one()
+    if not admin_user or admin_user.role != "admin":
+        raise HTTPException(403, "仅管理员可操作")
+    from app.models.system_settings import SystemSettings as SS
+    r = await db.execute(select(SS).where(SS.id == 1))
+    row = r.scalar_one_or_none()
+    return row.last_cleanup_stats or {"cleaned_files": 0, "cleaned_refs": 0, "orphan_cleaned": 0, "run_at": None}
 
 
 async def _get_or_create_settings(db: AsyncSession):

@@ -39,5 +39,7 @@ class SystemSettings(Base):
     audit_log_retention_days = Column(Integer, default=90, comment="审计日志保留天数，超期自动清理（默认 90 天）")
     message_retention_days = Column(Integer, default=0, comment="消息保留天数（0=永久保留）")
 
+    last_cleanup_stats = Column(JSONB, nullable=True, comment="上次清理统计：{cleaned_files, cleaned_refs, orphan_cleaned, run_at}")
+
     updated_by = Column(Integer, ForeignKey("users.id"))
     updated_at = Column(DateTime, server_default=func.now(), onupdate=func.now())

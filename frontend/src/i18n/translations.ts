@@ -1795,6 +1795,16 @@ const zh: TranslationDict = {
   'admin.createUserUsernameHint': '至少 2 个字符',
   'admin.createUserPasswordHint': '至少 6 位',
   'admin.importCsvRowResult': '第 {row} 行',
+
+  // ---- 文件清理 ----
+  'admin.cleanup': '文件清理',
+  'admin.cleanupDesc': '扫描并清理无引用头像文件和失效文件映射',
+  'admin.cleanupRun': '运行清理',
+  'admin.cleanupRunning': '清理中...',
+  'admin.cleanupLastRun': '上次清理',
+  'admin.cleanupFilesDeleted': '清理文件',
+  'admin.cleanupOrphansDeleted': '失效映射',
+  'admin.cleanupNever': '从未运行',
 }
 
 const en: TranslationDict = {
@@ -3151,6 +3161,16 @@ const en: TranslationDict = {
   'admin.cached': 'Cached',
   'admin.noAiDailyData': 'No daily data for this AI',
   'admin.daysSuffix': 'd',
+
+  // ---- File Cleanup ----
+  'admin.cleanup': 'File Cleanup',
+  'admin.cleanupDesc': 'Scan and clean unused avatar files and dead file references',
+  'admin.cleanupRun': 'Run Cleanup',
+  'admin.cleanupRunning': 'Cleaning...',
+  'admin.cleanupLastRun': 'Last Cleanup',
+  'admin.cleanupFilesDeleted': 'Files Cleaned',
+  'admin.cleanupOrphansDeleted': 'Dead References',
+  'admin.cleanupNever': 'Never Run',
 
   // ======================== GroupSettings ========================
   'groupSettings.title': 'Group Settings',
@@ -5240,6 +5260,16 @@ const ja: TranslationDict = {
   'admin.skillsLoadFailed': 'スキルの読み込みに失敗しました',
   'admin.skillsToggleFailed': '切り替えに失敗しました',
   'admin.skillBackpack': 'スキルバックパック',
+
+  // ---- ファイルクリーンアップ ----
+  'admin.cleanup': 'ファイルクリーンアップ',
+  'admin.cleanupDesc': '未使用のアバターファイルと無効なファイル参照をスキャンしてクリーンアップ',
+  'admin.cleanupRun': 'クリーンアップを実行',
+  'admin.cleanupRunning': 'クリーンアップ中...',
+  'admin.cleanupLastRun': '前回のクリーンアップ',
+  'admin.cleanupFilesDeleted': '削除したファイル',
+  'admin.cleanupOrphansDeleted': '無効な参照',
+  'admin.cleanupNever': '未実行',
 
   // ======================== スキルバックパック ========================
   'backpack.title': 'スキルバックパック',
