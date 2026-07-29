@@ -10,10 +10,12 @@ interface AvatarCropModalProps {
   cropShape?: 'round' | 'rect'
 }
 
+// 与后端 AVATAR_MAX_PX 保持一致（image_compress.py）
+const AVATAR_MAX_PX = 4096
+
 function getCroppedImgRaw(image: HTMLImageElement, crop: Area): Promise<Blob> {
-  // 按原始像素坐标裁剪，但限制最大 4096px 防止浏览器崩溃
-  const MAX = 4096
-  const scale = Math.min(1, MAX / Math.max(crop.width, crop.height))
+  // 按原始像素坐标裁剪，超过上限降分辨率防浏览器崩溃
+  const scale = Math.min(1, AVATAR_MAX_PX / Math.max(crop.width, crop.height))
   const canvas = document.createElement('canvas')
   canvas.width = Math.round(crop.width * scale)
   canvas.height = Math.round(crop.height * scale)

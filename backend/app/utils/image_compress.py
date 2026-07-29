@@ -11,7 +11,7 @@ import logging
 
 logger = logging.getLogger(__name__)
 
-AVATAR_MAX_PX = 4096
+AVATAR_MAX_PX = 4096  # 与前端 AvatarCropModal.tsx AVATAR_MAX_PX 保持一致
 AVATAR_MAX_BYTES = 2 * 1024 * 1024  # 2MB
 IMAGE_MAX_WIDTH = 1920
 JPEG_QUALITY = 85
