@@ -13,11 +13,25 @@ from app.models.sender import Sender
 import re
 
 
-def make_preview(content: str | None, attachments: list | None = None, max_len: int = 50) -> str:
+def _normalize_attachments(attachments: list | str | None) -> list | None:
+    """统一归一化 attachments：Text 列（JSON 字符串）转 list。"""
+    if isinstance(attachments, str):
+        try:
+            return json.loads(attachments)
+        except (json.JSONDecodeError, TypeError):
+            return None
+    return attachments
+
+
+def make_preview(content: str | None, attachments: list | str | None = None, max_len: int = 50) -> str:
     """生成消息预览文本。
 
-    纯附件无文字 → 显示 [文件]（超出 1 个则 [N个文件]）；
+    纯附件无文字：
+      - 单个 → 图片显示 [图片]，其余显示文件名或 [文件]
+      - 多个 → [N个文件]
     有文字 → 截取前 max_len 个字符（去除 HTML 标签）。
+
+    attachments 兼容 list（群聊 JSONB）和 str（私信 Text 列存 JSON）。
     """
     if content:
         plain = re.sub(r'<[^>]+>', '', content)
@@ -25,10 +39,23 @@ def make_preview(content: str | None, attachments: list | None = None, max_len: 
         if len(plain) > max_len:
             preview += "..."
         return preview
-    if attachments:
-        count = len(attachments)
-        return "[文件]" if count == 1 else f"[{count}个文件]"
-    return ""
+
+    atts = _normalize_attachments(attachments)
+    if not atts:
+        return ""
+
+    count = len(atts)
+    if count == 1:
+        a = atts[0]
+        if isinstance(a, dict):
+            mime = a.get('mime_type', '') or ''
+            if mime.startswith('image/'):
+                return "[图片]"
+            name = a.get('name', '')
+            if name:
+                return name[:max_len] + ("..." if len(name) > max_len else "")
+        return "[文件]"
+    return f"[{count}个文件]"
 
 
 def serialize_message(message, *,
@@ -63,12 +90,7 @@ def serialize_message(message, *,
     effective_avatar = getattr(message, 'sender_avatar_url', None) or sender_avatar_url or None
 
     # attachments: JSONB 自动反序列化,Text 列需手动 json.loads
-    attachments = getattr(message, 'attachments', None)
-    if isinstance(attachments, str):
-        try:
-            attachments = json.loads(attachments)
-        except (json.JSONDecodeError, TypeError):
-            attachments = None
+    attachments = _normalize_attachments(getattr(message, 'attachments', None))
 
     conversation_value = getattr(message, conversation_key, None)
 
@@ -112,12 +134,7 @@ def serialize_message_with_sender(message, sender: Sender, *,
         conversation_key: 会话 ID 键名,群聊用 'group_id',私信用 'session_id'
         include_read_at: 是否包含 read_at 字段
     """
-    attachments = getattr(message, 'attachments', None)
-    if isinstance(attachments, str):
-        try:
-            attachments = json.loads(attachments)
-        except (json.JSONDecodeError, TypeError):
-            attachments = None
+    attachments = _normalize_attachments(getattr(message, 'attachments', None))
 
     conversation_value = getattr(message, conversation_key, None)
 
