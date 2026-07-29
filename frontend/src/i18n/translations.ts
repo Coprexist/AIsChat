@@ -1436,6 +1436,11 @@ const zh: TranslationDict = {
   'groupSettings.avatarModeCustom': '自定义上传',
   'groupSettings.includeAiInAvatar': '包含 AI 头像',
   'groupSettings.includeAiInAvatarDesc': '关闭后只显示人类成员头像',
+  'groupSettings.transferOwner': '转让群主',
+  'groupSettings.transferOwnerTitle': '选择新群主',
+  'groupSettings.transferOwnerHint': '转让后你将自动成为管理员',
+  'groupSettings.confirmTransfer': '确定将群主转让给',
+  'groupSettings.noTransferTarget': '无可转让的成员',
 
   // ======================== 私信设置 / DMSettings ========================
   'dmSettings.title': '私信设置',
@@ -3223,6 +3228,11 @@ const en: TranslationDict = {
   'groupSettings.avatarModeCustom': 'Custom Upload',
   'groupSettings.includeAiInAvatar': 'Include AI Avatars',
   'groupSettings.includeAiInAvatarDesc': 'When off, only human avatars shown',
+  'groupSettings.transferOwner': 'Transfer Owner',
+  'groupSettings.transferOwnerTitle': 'Select New Owner',
+  'groupSettings.transferOwnerHint': 'You will become admin after transfer',
+  'groupSettings.confirmTransfer': 'Transfer owner to',
+  'groupSettings.noTransferTarget': 'No transferable members'
 
   // ======================== DMSettings ========================
   'dmSettings.title': 'DM Settings',
@@ -4939,6 +4949,11 @@ const ja: TranslationDict = {
   'groupSettings.avatarModeCustom': 'カスタムアップロード',
   'groupSettings.includeAiInAvatar': 'AIアバターを含める',
   'groupSettings.includeAiInAvatarDesc': 'オフ：人間のみ表示',
+  'groupSettings.transferOwner': 'オーナー権限の譲渡',
+  'groupSettings.transferOwnerTitle': '新しいオーナーを選択',
+  'groupSettings.transferOwnerHint': '譲渡後は管理者になります',
+  'groupSettings.confirmTransfer': 'オーナー権限を譲渡します:',
+  'groupSettings.noTransferTarget': '譲渡可能なメンバーがいません',
 
   // ======================== DM設定 / DMSettings ========================
   'dmSettings.title': 'DM設定',

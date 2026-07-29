@@ -202,6 +202,10 @@ export default function GroupSettingsPanel({ group, onClose, onUpdate, onLeave }
   const [uploadingAvatar, setUploadingAvatar] = useState(false)
   const [avatarPreview, setAvatarPreview] = useState<string | null>(group?.avatar_url || null)
 
+  // 转让群主状态
+  const [transferModalOpen, setTransferModalOpen] = useState(false)
+  const [transferring, setTransferring] = useState(false)
+
   // 导出状态
   const [exportFormat, setExportFormat] = useState('json')
   const [dateFrom, setDateFrom] = useState('')
@@ -340,6 +344,24 @@ export default function GroupSettingsPanel({ group, onClose, onUpdate, onLeave }
       onLeave()  // 复用退出逻辑：关闭面板 + 刷新列表
     } catch (e: any) {
       setError(e?.detail || t('error.operationFailed'))
+    }
+  }
+
+  const handleTransferOwner = async (targetType: string, targetId: number) => {
+    if (!group) return
+    setTransferring(true)
+    try {
+      await api.post(`/groups/${group.id}/transfer-owner`, {
+        member_type: targetType,
+        member_id: targetId,
+      })
+      setTransferModalOpen(false)
+      onUpdate({ owner_type: targetType, owner_id: targetId, my_role: 'admin' })
+      loadMembers()
+    } catch (e: any) {
+      setError(e?.detail || '转让失败')
+    } finally {
+      setTransferring(false)
     }
   }
 
@@ -535,12 +557,12 @@ export default function GroupSettingsPanel({ group, onClose, onUpdate, onLeave }
                     onClick={() => { setAvatarMode('default'); saveSettings({ avatar_mode: 'default' }) }}
                     className={`relative p-3 rounded-xl border text-center transition-colors ${
                       avatarMode === 'default'
-                        ? 'border-primary-400 bg-primary-500/10'
+                        ? 'border-primary-400 dark:border-primary-600 bg-primary-500/10 dark:bg-primary-900/40'
                         : 'border-border bg-elevated hover:bg-canvas'
                     }`}
                   >
-                    <div className="w-10 h-10 mx-auto rounded-lg bg-primary-500/10 flex items-center justify-center mb-1.5">
-                      <Users size={18} className="text-primary-400/60" />
+                    <div className="w-10 h-10 mx-auto rounded-lg bg-primary-500/10 dark:bg-primary-900/30 flex items-center justify-center mb-1.5">
+                      <Users size={18} className="text-primary-400/60 dark:text-primary-300/60" />
                     </div>
                     <div className="text-[11px] font-medium">{t('groupSettings.avatarModeDefault')}</div>
                     <div className="text-[10px] text-textMuted">固定图标</div>
@@ -554,7 +576,7 @@ export default function GroupSettingsPanel({ group, onClose, onUpdate, onLeave }
                     onClick={() => { setAvatarMode('members'); saveSettings({ avatar_mode: 'members', include_ai_in_avatar: includeAiAvatar }) }}
                     className={`relative p-3 rounded-xl border text-center transition-colors ${
                       avatarMode === 'members'
-                        ? 'border-primary-400 bg-primary-500/10'
+                        ? 'border-primary-400 dark:border-primary-600 bg-primary-500/10 dark:bg-primary-900/40'
                         : 'border-border bg-elevated hover:bg-canvas'
                     }`}
                   >
@@ -573,7 +595,7 @@ export default function GroupSettingsPanel({ group, onClose, onUpdate, onLeave }
                     onClick={() => setAvatarMode('custom')}
                     className={`relative p-3 rounded-xl border text-center transition-colors ${
                       avatarMode === 'custom'
-                        ? 'border-primary-400 bg-primary-500/10'
+                        ? 'border-primary-400 dark:border-primary-600 bg-primary-500/10 dark:bg-primary-900/40'
                         : 'border-border bg-elevated hover:bg-canvas'
                     }`}
                   >
@@ -751,6 +773,63 @@ export default function GroupSettingsPanel({ group, onClose, onUpdate, onLeave }
               )}
 
               <hr className="border-border" />
+
+              {/* 转让群主（仅群主可见） */}
+              {isOwner && (
+                <>
+                  <button
+                    onClick={() => {
+                      if (members.filter(m => m.role === 'admin' || m.role === 'member').length === 0) {
+                        alert(t('groupSettings.noTransferTarget'))
+                        return
+                      }
+                      setTransferModalOpen(true)
+                    }}
+                    disabled={members.filter(m => m.role === 'admin' || m.role === 'member').length === 0}
+                    className="w-full flex items-center justify-center gap-2 px-4 py-2.5 bg-primary-500/10 text-primary-400 rounded-lg text-sm font-medium hover:bg-primary-500/20 border border-primary-400/20 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+                  >
+                    <Crown size={16} />
+                    {t('groupSettings.transferOwner')}
+                  </button>
+
+                  {/* 转让确认弹窗 */}
+                  {transferModalOpen && (
+                    <div className="fixed inset-0 z-[60] flex items-center justify-center">
+                      <div className="absolute inset-0 bg-black/40" onClick={() => setTransferModalOpen(false)} />
+                      <div className="relative bg-surface border border-border rounded-xl shadow-2xl p-4 w-80 max-w-[90vw]">
+                        <h3 className="text-sm font-semibold text-textPrimary mb-3">{t('groupSettings.transferOwnerTitle')}</h3>
+                        <p className="text-xs text-textMuted mb-3">{t('groupSettings.transferOwnerHint')}</p>
+                        <div className="space-y-1 max-h-48 overflow-y-auto mb-3">
+                          {members.filter(m => m.role !== 'owner').map(m => (
+                            <button
+                              key={`${m.type}:${m.id}`}
+                              onClick={() => {
+                                if (confirm(`${t('groupSettings.confirmTransfer')}「${m.name}」？`)) {
+                                  handleTransferOwner(m.type, m.id)
+                                }
+                              }}
+                              disabled={transferring}
+                              className="w-full flex items-center gap-2.5 px-3 py-2 rounded-lg hover:bg-elevated transition-colors disabled:opacity-50"
+                            >
+                              <span className={`w-2 h-2 rounded-full shrink-0 ${getStateDotColor(m.state)}`} />
+                              <span className="text-sm text-textPrimary truncate">{m.name}</span>
+                              {m.role === 'admin' && (
+                                <span className="text-[10px] text-primary-400 ml-auto shrink-0">{t('groupSettings.roleAdmin')}</span>
+                              )}
+                            </button>
+                          ))}
+                        </div>
+                        <button
+                          onClick={() => setTransferModalOpen(false)}
+                          className="w-full px-3 py-2 text-xs text-textMuted hover:text-textSecondary rounded-lg hover:bg-elevated transition-colors"
+                        >
+                          {t('common.cancel')}
+                        </button>
+                      </div>
+                    </div>
+                  )}
+                </>
+              )}
 
               {/* 退群 */}
               <button
@@ -956,7 +1035,7 @@ export default function GroupSettingsPanel({ group, onClose, onUpdate, onLeave }
                 <div className="flex gap-2 mt-1">
                   {[
                     { key: 'json', labelKey: 'JSON', descKey: 'groupSettings.exportJsonDesc' },
-                    { key: 'txt', labelKey: 'groupSettings.exportTxtDesc', descKey: 'groupSettings.exportTxtDesc' },
+                    { key: 'txt', labelKey: 'TXT', descKey: 'groupSettings.exportTxtDesc' },
                     { key: 'html', labelKey: 'HTML', descKey: 'groupSettings.exportHtmlDesc' },
                   ].map(f => (
                     <button

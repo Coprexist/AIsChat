@@ -688,6 +688,56 @@ async def delete_group(
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
 
 
+@router.post("/groups/{group_id}/transfer-owner")
+async def transfer_owner(
+    group_id: int,
+    body: dict,
+    current_user: dict = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """转让群主权限。仅当前群主可操作。"""
+    from app.models.group import Group, GroupMember
+    from sqlalchemy import select
+
+    # 验证当前用户是群主
+    result = await db.execute(select(Group).where(Group.id == group_id))
+    group = result.scalar_one_or_none()
+    if not group:
+        raise HTTPException(404, "群聊不存在")
+    if not (group.owner_type == "human" and group.owner_id == current_user["user_id"]):
+        raise HTTPException(403, "仅群主可转让")
+
+    target_type = body.get("member_type", "human")
+    target_id = body.get("member_id")
+    if not target_id:
+        raise HTTPException(400, "请指定新群主")
+
+    # 验证目标成员存在
+    mr = await db.execute(select(GroupMember).where(
+        GroupMember.group_id == group_id,
+        GroupMember.member_type == target_type,
+        GroupMember.member_id == target_id,
+    ))
+    target = mr.scalar_one_or_none()
+    if not target:
+        raise HTTPException(404, "目标成员不在群中")
+
+    # 转让：旧 owner → admin，目标 → owner
+    old_mr = await db.execute(select(GroupMember).where(
+        GroupMember.group_id == group_id,
+        GroupMember.member_type == group.owner_type,
+        GroupMember.member_id == group.owner_id,
+    ))
+    old = old_mr.scalar_one_or_none()
+    if old:
+        old.role = "admin"
+    target.role = "owner"
+    group.owner_id = target_id
+    group.owner_type = target_type
+    await db.flush()
+    return {"message": "群主已转让", "new_owner": {"type": target_type, "id": target_id}}
+
+
 @router.get("/groups/{group_id}/unread")
 async def unread_info(
     group_id: int,
