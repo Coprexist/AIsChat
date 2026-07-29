@@ -11,7 +11,8 @@ interface AvatarCropModalProps {
 }
 
 function getCroppedImgRaw(image: HTMLImageElement, crop: Area): Promise<Blob> {
-  const MAX = 1024 // iOS Safari canvas 大图容易崩
+  // 按原始像素坐标裁剪，但限制最大 4096px 防止浏览器崩溃
+  const MAX = 4096
   const scale = Math.min(1, MAX / Math.max(crop.width, crop.height))
   const canvas = document.createElement('canvas')
   canvas.width = Math.round(crop.width * scale)
