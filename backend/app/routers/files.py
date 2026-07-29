@@ -59,23 +59,6 @@ async def list_directory(
                 files.append(f)
                 seen_paths.add(f["path"])
 
-    # 追加用户 AI 的文件（与 /user/storage 对齐）
-    from sqlalchemy import select
-    from app.models.agent import Agent
-    from app.models.file import FileMetadata as FM
-    agent_result = await db.execute(
-        select(Agent.id).where(Agent.owner_id == current_user["user_id"])
-    )
-    agent_ids = [row[0] for row in agent_result.all()]
-    if agent_ids:
-        ai_files = await list_files(db, path, "ai", agent_ids)  # ai_list_files 接受 list
-        # 去重（防止 AI 文件重复）
-        seen_paths = {f["path"] for f in files}
-        for f in ai_files:
-            if f["path"] not in seen_paths:
-                files.append(f)
-                seen_paths.add(f["path"])
-
     # 合并转发来的文件
     if include_forwarded:
         from app.services.content.file_service import get_user_forwarded_file_ids
