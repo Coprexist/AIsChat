@@ -391,6 +391,9 @@ export default function GroupSettingsPanel({ group, onClose, onUpdate, onLeave }
       setAvatarMode('custom')
       onUpdate({ avatar_url: res.avatar_url, avatar_mode: 'custom' })
       window.dispatchEvent(new CustomEvent('groupListRefresh'))
+      window.dispatchEvent(new CustomEvent('groupAvatarChanged', {
+        detail: { groupId: group!.id, avatar_url: res.avatar_url, avatar_mode: 'custom' },
+      }))
     } finally {
       setUploadingAvatar(false)
     }
@@ -666,8 +669,10 @@ export default function GroupSettingsPanel({ group, onClose, onUpdate, onLeave }
                     try {
                       await api.post(`/groups/${group.id}/pin`, { is_pinned: next })
                       setPinned(next)
-                      // 触发全局刷新
                       window.dispatchEvent(new CustomEvent('groupListRefresh'))
+                      window.dispatchEvent(new CustomEvent('groupPinChanged', {
+                        detail: { groupId: group.id, isPinned: next },
+                      }))
                     } catch { /* ignore */ }
                   }}
                 />
@@ -1093,6 +1098,7 @@ export default function GroupSettingsPanel({ group, onClose, onUpdate, onLeave }
         <AvatarPickerModal
           onUpload={handleAvatarPickerUpload}
           onClose={() => setAvatarPickerOpen(false)}
+          cropShape="rect"
         />
       )}
     </div>

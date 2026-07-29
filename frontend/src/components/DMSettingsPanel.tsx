@@ -234,8 +234,10 @@ export default function DMSettingsPanel({ sessionId, partner, myDndUntil, onClos
                   try {
                     await api.post(`/dm/${sessionId}/pin`, { is_pinned: next })
                     setPinned(next)
-                    // 触发全局刷新
                     window.dispatchEvent(new CustomEvent('groupListRefresh'))
+                    window.dispatchEvent(new CustomEvent('groupPinChanged', {
+                      detail: { sessionId, isPinned: next },
+                    }))
                   } catch { /* ignore */ }
                 }}
               />

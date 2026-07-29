@@ -20,6 +20,8 @@ interface AvatarPickerModalProps {
   title?: string
   /** 文件大小上限（MB），默认 10 */
   maxSizeMB?: number
+  /** 裁剪形状，默认 round（圆形） */
+  cropShape?: 'round' | 'rect'
 }
 
 export default function AvatarPickerModal({
@@ -27,6 +29,7 @@ export default function AvatarPickerModal({
   onClose,
   title,
   maxSizeMB = 10,
+  cropShape = 'round',
 }: AvatarPickerModalProps) {
   const t = useT()
   const fileInputRef = useRef<HTMLInputElement>(null)
@@ -303,6 +306,7 @@ export default function AvatarPickerModal({
           file={cropFile}
           onConfirm={handleCropConfirm}
           onCancel={handleCropCancel}
+          cropShape={cropShape}
         />
       )}
     </>

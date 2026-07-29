@@ -7,6 +7,7 @@ interface AvatarCropModalProps {
   file: File
   onConfirm: (blob: Blob) => void
   onCancel: () => void
+  cropShape?: 'round' | 'rect'
 }
 
 function getCroppedImgRaw(image: HTMLImageElement, crop: Area): Promise<Blob> {
@@ -41,7 +42,7 @@ function getCroppedImgRaw(image: HTMLImageElement, crop: Area): Promise<Blob> {
   })
 }
 
-export default function AvatarCropModal({ file, onConfirm, onCancel }: AvatarCropModalProps) {
+export default function AvatarCropModal({ file, onConfirm, onCancel, cropShape }: AvatarCropModalProps) {
   const t = useT()
   const [imageSrc, setImageSrc] = useState<string>('')
   const [crop, setCrop] = useState({ x: 0, y: 0 })
@@ -121,7 +122,7 @@ export default function AvatarCropModal({ file, onConfirm, onCancel }: AvatarCro
           crop={crop}
           zoom={zoom}
           aspect={1}
-          cropShape="round"
+          cropShape={cropShape || 'round'}
           showGrid={false}
           onCropChange={setCrop}
           onCropComplete={onCropComplete}

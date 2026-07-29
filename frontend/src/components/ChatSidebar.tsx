@@ -161,8 +161,32 @@ const ChatSidebar = memo(function ChatSidebar({
       }
     }
     window.addEventListener(CHAT_REFRESH_EVENT, handler as EventListener)
+
+    // 置顶/取消置顶即时更新（不触发全量请求）
+    const pinHandler = (e: Event) => {
+      const d = (e as CustomEvent).detail
+      if (d?.groupId) {
+        setGroups(prev => prev.map(g => g.id === d.groupId ? { ...g, is_pinned: d.isPinned } : g))
+      }
+      if (d?.sessionId) {
+        setDmSessions(prev => prev.map(s => s.session_id === d.sessionId ? { ...s, is_pinned: d.isPinned } : s))
+      }
+    }
+    window.addEventListener('groupPinChanged', pinHandler)
+
+    // 头像更新即时刷新
+    const avatarHandler = (e: Event) => {
+      const d = (e as CustomEvent).detail
+      if (d?.groupId) {
+        setGroups(prev => prev.map(g => g.id === d.groupId ? { ...g, avatar_url: d.avatar_url, avatar_mode: d.avatar_mode || 'custom' } : g))
+      }
+    }
+    window.addEventListener('groupAvatarChanged', avatarHandler)
+
     return () => {
       window.removeEventListener(CHAT_REFRESH_EVENT, handler as EventListener)
+      window.removeEventListener('groupPinChanged', pinHandler)
+      window.removeEventListener('groupAvatarChanged', avatarHandler)
       if (debounceRef.current) clearTimeout(debounceRef.current)
     }
   }, [reloadDebounced])
