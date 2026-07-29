@@ -178,16 +178,16 @@ async def serve_avatar(filename: str, thumb: bool = Query(False)):
         thumb_name = f"thumb_{filename}"
         thumb_path = os.path.join("/app/uploads/avatars", thumb_name)
         if os.path.isfile(thumb_path):
-            return FileResponse(thumb_path, headers={"Cache-Control": "no-cache"})
+            return FileResponse(thumb_path, headers={"Cache-Control": "public, max-age=604800"})
         # 无缩略图时降级到原图
         filepath = os.path.join("/app/uploads/avatars", filename)
         if os.path.isfile(filepath):
-            return FileResponse(filepath, headers={"Cache-Control": "no-cache"})
+            return FileResponse(filepath, headers={"Cache-Control": "public, max-age=604800"})
         raise HTTPException(status_code=404, detail="头像不存在")
     filepath = os.path.join("/app/uploads/avatars", filename)
     if not os.path.isfile(filepath):
         raise HTTPException(status_code=404, detail="头像不存在")
-    return FileResponse(filepath, headers={"Cache-Control": "no-cache"})
+    return FileResponse(filepath, headers={"Cache-Control": "public, max-age=604800"})
 
 
 @router.get("/download/{file_id}")
