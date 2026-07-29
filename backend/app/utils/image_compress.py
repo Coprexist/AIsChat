@@ -32,7 +32,7 @@ def _has_transparency(img) -> bool:
     return False
 
 
-THUMBNAIL_PX = 64
+THUMBNAIL_PX = 128
 
 
 def make_avatar_thumbnail(content: bytes) -> bytes:
