@@ -693,6 +693,13 @@ async def upload_agent_avatar(
     content = compress_avatar(content)
     ext = "png" if content[:4] == b'\x89PNG' else "jpg"
 
+    # 清理旧头像文件
+    if agent.avatar_url:
+        old_name = agent.avatar_url.rsplit('/', 1)[-1]
+        old_path = os.path.join(upload_dir, old_name)
+        if os.path.isfile(old_path):
+            os.remove(old_path)
+
     # 保存到统一头像目录
     filename = f"agent_{agent_id}_{uuid.uuid4().hex[:8]}.{ext}"
     upload_dir = "/app/uploads/avatars"

@@ -233,6 +233,17 @@ async def upload_user_avatar(
     # 自动检测输出格式：JPEG 以 \xFF\xD8 开头，PNG 以 \x89PNG 开头
     ext = "png" if content[:4] == b'\x89PNG' else "jpg"
 
+    # 清理旧头像文件
+    from sqlalchemy import select
+    from app.models.user import User
+    result = await db.execute(select(User).where(User.id == current_user["user_id"]))
+    user = result.scalar_one()
+    if user.avatar_url:
+        old_name = user.avatar_url.rsplit('/', 1)[-1]
+        old_path = os.path.join(upload_dir, old_name)
+        if os.path.isfile(old_path):
+            os.remove(old_path)
+
     # 保存到统一头像目录
     filename = f"user_{current_user['user_id']}_{uuid.uuid4().hex[:8]}.{ext}"
     upload_dir = "/app/uploads/avatars"
@@ -241,11 +252,6 @@ async def upload_user_avatar(
     with open(filepath, "wb") as f:
         f.write(content)
 
-    # 更新用户 avatar_url
-    from sqlalchemy import select
-    from app.models.user import User
-    result = await db.execute(select(User).where(User.id == current_user["user_id"]))
-    user = result.scalar_one()
     avatar_url = f"/api/fs/download-avatar/{filename}"
     user.avatar_url = avatar_url
     await db.flush()

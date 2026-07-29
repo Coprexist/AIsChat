@@ -518,9 +518,13 @@ async def upload_group_avatar(
     filename = f"group_{group_id}_avatar{ext}"
     filepath = os.path.join(upload_dir, filename)
 
-    # 删除旧文件
-    if os.path.isfile(filepath):
-        os.remove(filepath)
+    # 删除旧头像文件（任意扩展名）
+    import glob
+    for old in glob.glob(os.path.join(upload_dir, f"group_{group_id}_avatar.*")):
+        try:
+            os.remove(old)
+        except OSError:
+            pass
 
     with open(filepath, "wb") as f:
         f.write(content)
