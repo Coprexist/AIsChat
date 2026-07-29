@@ -32,6 +32,29 @@ def _has_transparency(img) -> bool:
     return False
 
 
+THUMBNAIL_PX = 64
+
+
+def make_avatar_thumbnail(content: bytes) -> bytes:
+    """生成 64x64 缩略图。GIF 返回原图。"""
+    if _is_gif(content):
+        return content
+    from PIL import Image
+    import io
+    try:
+        img = Image.open(io.BytesIO(content))
+        img.thumbnail((THUMBNAIL_PX, THUMBNAIL_PX), Image.LANCZOS)
+        out = io.BytesIO()
+        if _has_transparency(img):
+            img.save(out, format='PNG', optimize=True)
+        else:
+            if img.mode not in ('RGB',): img = img.convert('RGB')
+            img.save(out, format='JPEG', quality=75, optimize=True)
+        return out.getvalue()
+    except Exception:
+        return content
+
+
 def compress_image(content: bytes, mime_type: str = "", max_px: int = IMAGE_MAX_WIDTH) -> bytes:
     """
     压缩普通图片（最大宽度 max_px，等比缩放）。

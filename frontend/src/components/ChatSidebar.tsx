@@ -5,6 +5,16 @@ import { Plus, BellOff, Menu, UserPlus, Users, Bot, Globe, ShieldAlert, MessageC
 import EmptyState from './EmptyState'
 import { getStateDotColor, CHAT_REFRESH_EVENT } from '../constants'
 import { formatRelativeTime } from '../utils/time'
+
+/** 添加缩略图参数，动图保持原图 */
+function thumbUrl(url: string | null | undefined): string | undefined {
+  if (!url) return undefined
+  // 缩略图文件名以 thumb_ 开头或原图带 ?thumb=1 都跳过动图检测
+  if (url.includes('/download-avatar/') && !url.endsWith('.gif')) {
+    return url + (url.includes('?') ? '&thumb=1' : '?thumb=1')
+  }
+  return url
+}
 import { getStatusTextStyle, BG_SURFACE_LIGHT, BG_SURFACE_DARK } from '../utils/statusColor'
 import { useTheme } from '../context/ThemeContext'
 import { useLang, useT } from '../i18n/I18nContext'
@@ -250,7 +260,7 @@ const ChatSidebar = memo(function ChatSidebar({
       // 自定义头像：key 随 URL 变化强制 React 重建 img 元素，防浏览器缓存
       return (
         <div className="w-9 h-9 rounded-lg overflow-hidden shrink-0 bg-elevated">
-          <img key={g.avatar_url} src={g.avatar_url} alt="" className="w-full h-full object-cover" loading="lazy" />
+          <img key={g.avatar_url} src={thumbUrl(g.avatar_url) || g.avatar_url} alt="" className="w-full h-full object-cover" loading="lazy" />
         </div>
       )
     }
@@ -276,7 +286,7 @@ const ChatSidebar = memo(function ChatSidebar({
       <div className="w-9 h-9 rounded-lg bg-elevated grid grid-cols-2 grid-rows-2 gap-px overflow-hidden shrink-0">
         {avatars.slice(0, 4).map((url, i) => (
           <div key={i} className="bg-canvas flex items-center justify-center">
-            <img src={url} alt="" className="w-full h-full object-cover" loading="lazy" />
+            <img src={thumbUrl(url) || url} alt="" className="w-full h-full object-cover" loading="lazy" />
           </div>
         ))}
         {avatars.length < 4 && Array.from({ length: 4 - avatars.length }).map((_, i) => (
@@ -298,7 +308,7 @@ const ChatSidebar = memo(function ChatSidebar({
             <div className={`absolute inset-px rounded-full bg-gradient-to-bl ${
               p.type === 'system' ? 'from-rose-400 to-rose-600' : 'from-teal-400 to-teal-600'
             }`} />
-            <img src={p.avatar_url} alt="" className="relative w-full h-full rounded-full object-cover" loading="lazy" decoding="async" />
+            <img src={thumbUrl(p.avatar_url) || p.avatar_url} alt="" className="relative w-full h-full rounded-full object-cover" loading="lazy" decoding="async" />
           </>
         ) : (
           <div className={`w-full h-full rounded-full bg-gradient-to-bl flex items-center justify-center ${

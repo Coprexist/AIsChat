@@ -518,15 +518,23 @@ async def upload_group_avatar(
     # 删除旧文件
     if group.avatar_url:
         old_name = group.avatar_url.rsplit('/', 1)[-1]
-        old_path = os.path.join(upload_dir, old_name)
-        if os.path.isfile(old_path):
-            os.remove(old_path)
+        for fname in (old_name, f"thumb_{old_name}"):
+            old_path = os.path.join(upload_dir, fname)
+            if os.path.isfile(old_path):
+                os.remove(old_path)
 
     ext = os.path.splitext(file.filename or ".png")[1] or ".png"
     filename = f"group_{group_id}_{uuid.uuid4().hex[:8]}{ext}"
     filepath = os.path.join(upload_dir, filename)
     with open(filepath, "wb") as f:
         f.write(content)
+
+    # 生成缩略图
+    from app.utils.image_compress import make_avatar_thumbnail
+    thumb = make_avatar_thumbnail(content)
+    thumb_name = f"thumb_{filename}"
+    with open(os.path.join(upload_dir, thumb_name), "wb") as f:
+        f.write(thumb)
 
     avatar_url = f"/api/fs/download-avatar/{filename}"
     group.avatar_url = avatar_url

@@ -240,9 +240,10 @@ async def upload_user_avatar(
     user = result.scalar_one()
     if user.avatar_url:
         old_name = user.avatar_url.rsplit('/', 1)[-1]
-        old_path = os.path.join(upload_dir, old_name)
-        if os.path.isfile(old_path):
-            os.remove(old_path)
+        for fname in (old_name, f"thumb_{old_name}"):
+            old_path = os.path.join(upload_dir, fname)
+            if os.path.isfile(old_path):
+                os.remove(old_path)
 
     # 保存到统一头像目录
     filename = f"user_{current_user['user_id']}_{uuid.uuid4().hex[:8]}.{ext}"
@@ -251,6 +252,13 @@ async def upload_user_avatar(
     filepath = os.path.join(upload_dir, filename)
     with open(filepath, "wb") as f:
         f.write(content)
+
+    # 生成缩略图
+    from app.utils.image_compress import make_avatar_thumbnail
+    thumb = make_avatar_thumbnail(content)
+    thumb_name = f"thumb_{filename}"
+    with open(os.path.join(upload_dir, thumb_name), "wb") as f:
+        f.write(thumb)
 
     avatar_url = f"/api/fs/download-avatar/{filename}"
     user.avatar_url = avatar_url

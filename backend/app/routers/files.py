@@ -169,10 +169,21 @@ async def upload_attachment(
 # ============================================================
 
 @router.get("/download-avatar/{filename}")
-async def serve_avatar(filename: str):
-    """直接返回头像文件（无需鉴权，仅限 avatars 目录）"""
+async def serve_avatar(filename: str, thumb: bool = Query(False)):
+    """直接返回头像文件（无需鉴权，仅限 avatars 目录）。
+    加 ?thumb=1 返回 64x64 缩略图（动图除外）。"""
     import os
     from fastapi.responses import FileResponse
+    if thumb:
+        thumb_name = f"thumb_{filename}"
+        thumb_path = os.path.join("/app/uploads/avatars", thumb_name)
+        if os.path.isfile(thumb_path):
+            return FileResponse(thumb_path)
+        # 无缩略图时降级到原图
+        filepath = os.path.join("/app/uploads/avatars", filename)
+        if os.path.isfile(filepath):
+            return FileResponse(filepath)
+        raise HTTPException(status_code=404, detail="头像不存在")
     filepath = os.path.join("/app/uploads/avatars", filename)
     if not os.path.isfile(filepath):
         raise HTTPException(status_code=404, detail="头像不存在")

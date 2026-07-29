@@ -696,9 +696,10 @@ async def upload_agent_avatar(
     # 清理旧头像文件
     if agent.avatar_url:
         old_name = agent.avatar_url.rsplit('/', 1)[-1]
-        old_path = os.path.join(upload_dir, old_name)
-        if os.path.isfile(old_path):
-            os.remove(old_path)
+        for fname in (old_name, f"thumb_{old_name}"):
+            old_path = os.path.join(upload_dir, fname)
+            if os.path.isfile(old_path):
+                os.remove(old_path)
 
     # 保存到统一头像目录
     filename = f"agent_{agent_id}_{uuid.uuid4().hex[:8]}.{ext}"
@@ -707,6 +708,13 @@ async def upload_agent_avatar(
     filepath = os.path.join(upload_dir, filename)
     with open(filepath, "wb") as f:
         f.write(content)
+
+    # 生成缩略图
+    from app.utils.image_compress import make_avatar_thumbnail
+    thumb = make_avatar_thumbnail(content)
+    thumb_name = f"thumb_{filename}"
+    with open(os.path.join(upload_dir, thumb_name), "wb") as f:
+        f.write(thumb)
 
     avatar_url = f"/api/fs/download-avatar/{filename}"
     agent.avatar_url = avatar_url
