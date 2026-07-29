@@ -148,15 +148,17 @@ async def list_user_groups(db: AsyncSession, user_id: int) -> list[dict]:
 
         member_avatars: list[str] = []
         try:
-            avatar_result = await db.execute(
-                select(GroupMember).where(
-                    GroupMember.group_id == group.id,
-                )
+            # 仅 members 模式需要全部成员头像用于展示，其他模式取前4个做 2×2 网格
+            avatar_mode = getattr(group, 'avatar_mode', 'default') or 'default'
+            avatar_query = select(GroupMember).where(
+                GroupMember.group_id == group.id,
             )
+            if avatar_mode != 'members':
+                avatar_query = avatar_query.limit(4)
+            avatar_result = await db.execute(avatar_query)
             avatar_members = avatar_result.scalars().all()
 
             # members 模式下按 include_ai_in_avatar 过滤
-            avatar_mode = getattr(group, 'avatar_mode', 'default') or 'default'
             include_ai = getattr(group, 'include_ai_in_avatar', True)
             for am in avatar_members:
                 if avatar_mode == 'members' and am.member_type == "ai" and not include_ai:

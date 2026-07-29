@@ -526,7 +526,7 @@ export default function GroupSettingsPanel({ group, onClose, onUpdate, onLeave }
 
               {/* 群头像设置 */}
               <div>
-                <label className="text-xs font-medium text-textSecondary mb-3 block">{t('groupSettings.groupAvatar') || '群头像'}</label>
+                <label className="text-xs font-medium text-textSecondary mb-3 block">{t('groupSettings.groupAvatar')}</label>
                 <div className="grid grid-cols-3 gap-2">
                   {/* default 模式 */}
                   <button
@@ -543,8 +543,8 @@ export default function GroupSettingsPanel({ group, onClose, onUpdate, onLeave }
                       <div className="bg-amber-400/20" />
                       <div className="bg-rose-400/20" />
                     </div>
-                    <div className="text-[11px] font-medium">默认</div>
-                    <div className="text-[10px] text-textMuted">2×2 排列</div>
+                    <div className="text-[11px] font-medium">{t('groupSettings.avatarModeDefault')}</div>
+                    <div className="text-[10px] text-textMuted">2×2</div>
                     {avatarMode === 'default' && (
                       <CheckCircle2 size={14} className="absolute top-1.5 right-1.5 text-primary-400" />
                     )}
@@ -562,8 +562,8 @@ export default function GroupSettingsPanel({ group, onClose, onUpdate, onLeave }
                     <div className="w-10 h-10 mx-auto rounded-lg bg-elevated flex items-center justify-center mb-1.5">
                       <Users size={18} className="text-textSecondary" />
                     </div>
-                    <div className="text-[11px] font-medium">成员头像</div>
-                    <div className="text-[10px] text-textMuted">排列展示</div>
+                    <div className="text-[11px] font-medium">{t('groupSettings.avatarModeMembers')}</div>
+                    <div className="text-[10px] text-textMuted">{t('common.grid') || 'Grid'}</div>
                     {avatarMode === 'members' && (
                       <CheckCircle2 size={14} className="absolute top-1.5 right-1.5 text-primary-400" />
                     )}
@@ -585,8 +585,8 @@ export default function GroupSettingsPanel({ group, onClose, onUpdate, onLeave }
                         <Image size={18} className="text-textMuted" />
                       )}
                     </div>
-                    <div className="text-[11px] font-medium">自定义</div>
-                    <div className="text-[10px] text-textMuted">上传图片</div>
+                    <div className="text-[11px] font-medium">{t('groupSettings.avatarModeCustom')}</div>
+                    <div className="text-[10px] text-textMuted">{t('common.uploadImage') || 'Upload'}</div>
                     {avatarMode === 'custom' && (
                       <CheckCircle2 size={14} className="absolute top-1.5 right-1.5 text-primary-400" />
                     )}
@@ -597,8 +597,8 @@ export default function GroupSettingsPanel({ group, onClose, onUpdate, onLeave }
                 {avatarMode === 'members' && isAdmin && (
                   <div className="flex items-center justify-between mt-3 px-1">
                     <div>
-                      <div className="text-xs text-textPrimary font-medium">包含 AI 头像</div>
-                      <div className="text-[10px] text-textMuted">关闭后只显示人类成员头像</div>
+                      <div className="text-xs text-textPrimary font-medium">{t('groupSettings.includeAiInAvatar')}</div>
+                      <div className="text-[10px] text-textMuted">{t('groupSettings.includeAiInAvatarDesc') || 'Off: human-only'}</div>
                     </div>
                     <Toggle
                       checked={includeAiAvatar}

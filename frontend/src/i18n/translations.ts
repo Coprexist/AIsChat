@@ -1428,6 +1428,12 @@ const zh: TranslationDict = {
   'groupSettings.federationNoPeers': '暂无可用的对等端',
   'groupSettings.federationNoPeersHint': '请先在管理面板中添加对等端。',
   'groupSettings.federationNoDisplayName': '需要先在管理面板设定「实例代号」才能共享。',
+  'groupSettings.groupAvatar': '群头像',
+  'groupSettings.avatarModeDefault': '默认图标',
+  'groupSettings.avatarModeMembers': '成员头像排列',
+  'groupSettings.avatarModeCustom': '自定义上传',
+  'groupSettings.includeAiInAvatar': '包含 AI 头像',
+  'groupSettings.includeAiInAvatarDesc': '关闭后只显示人类成员头像',
 
   // ======================== 私信设置 / DMSettings ========================
   'dmSettings.title': '私信设置',
@@ -3207,6 +3213,12 @@ const en: TranslationDict = {
   'groupSettings.federationNoPeers': 'No peers available',
   'groupSettings.federationNoPeersHint': 'Please add peers in the admin panel first.',
   'groupSettings.federationNoDisplayName': 'Set "Instance Codename" in admin panel first before sharing.',
+  'groupSettings.groupAvatar': 'Group Avatar',
+  'groupSettings.avatarModeDefault': 'Default Icon',
+  'groupSettings.avatarModeMembers': 'Member Avatars',
+  'groupSettings.avatarModeCustom': 'Custom Upload',
+  'groupSettings.includeAiInAvatar': 'Include AI Avatars',
+  'groupSettings.includeAiInAvatarDesc': 'When off, only human avatars shown',
 
   // ======================== DMSettings ========================
   'dmSettings.title': 'DM Settings',
@@ -4915,6 +4927,12 @@ const ja: TranslationDict = {
   'groupSettings.federationNoPeers': '利用可能なピアがありません',
   'groupSettings.federationNoPeersHint': '先に管理パネルでピアを追加してください。',
   'groupSettings.federationNoDisplayName': '共有するには、管理パネルで「インスタンスコードネーム」を設定してください。',
+  'groupSettings.groupAvatar': 'グループアバター',
+  'groupSettings.avatarModeDefault': 'デフォルトアイコン',
+  'groupSettings.avatarModeMembers': 'メンバーアバター',
+  'groupSettings.avatarModeCustom': 'カスタムアップロード',
+  'groupSettings.includeAiInAvatar': 'AIアバターを含める',
+  'groupSettings.includeAiInAvatarDesc': 'オフ：人間のみ表示',
 
   // ======================== DM設定 / DMSettings ========================
   'dmSettings.title': 'DM設定',

@@ -24,7 +24,7 @@ class GroupUpdateRequest(BaseModel):
     speak_limit_per_minute: int | None = Field(default=None, ge=-1, le=60)
     speak_limit_window_seconds: int | None = Field(default=None, ge=30, le=600)
     is_vector_accelerated: bool | None = None
-    avatar_mode: str | None = None
+    avatar_mode: str | None = Field(default=None, pattern=r'^(default|members|custom)$')
     avatar_url: str | None = None
     include_ai_in_avatar: bool | None = None
 
