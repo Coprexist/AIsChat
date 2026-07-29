@@ -12,17 +12,22 @@ interface FileItem {
   created_at: string | null
 }
 
-interface GroupAvatarPickerModalProps {
-  groupId: number
-  onCancel: () => void
-  onUploadComplete: (avatarUrl: string) => void
+interface AvatarPickerModalProps {
+  /** 调用方传入的上传逻辑，接收裁剪后的 Blob */
+  onUpload: (blob: Blob) => Promise<void>
+  onClose: () => void
+  /** 弹窗标题，默认 "设置头像" */
+  title?: string
+  /** 文件大小上限（MB），默认 10 */
+  maxSizeMB?: number
 }
 
-export default function GroupAvatarPickerModal({
-  groupId,
-  onCancel,
-  onUploadComplete,
-}: GroupAvatarPickerModalProps) {
+export default function AvatarPickerModal({
+  onUpload,
+  onClose,
+  title,
+  maxSizeMB = 10,
+}: AvatarPickerModalProps) {
   const t = useT()
   const fileInputRef = useRef<HTMLInputElement>(null)
 
@@ -50,7 +55,7 @@ export default function GroupAvatarPickerModal({
       // 只显示图片
       setFiles(list.filter((f) => f.mime_type?.startsWith('image/')))
     } catch (e: any) {
-      setFileError(e?.detail || '加载文件列表失败')
+      setFileError(e?.detail || t('common.loadFailed'))
     } finally {
       setLoadingFiles(false)
     }
@@ -63,11 +68,44 @@ export default function GroupAvatarPickerModal({
     }
   }, [step, loadFiles])
 
-  // 从文件选择器选择新图片
+  // 从文件选择器选择新图片，检测动图（GIF / WebP）跳过裁剪直接上传
   const handleFileInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]
     if (!file) return
-    setCropFile(file)
+    // 大小校验
+    if (file.size > maxSizeMB * 1024 * 1024) {
+      setFileError(t('error.avatarTooLarge'))
+      e.target.value = ''
+      return
+    }
+    // 读取前 12 字节检测动图（GIF / WebP），跳过裁剪
+    file.slice(0, 12).arrayBuffer().then(buf => {
+      const h = new Uint8Array(buf)
+      const isGif = h[0] === 0x47 && h[1] === 0x49 && h[2] === 0x46
+      const isWebP = h[0] === 0x52 && h[1] === 0x49 && h[2] === 0x46 && h[3] === 0x46
+        && h[8] === 0x57 && h[9] === 0x45 && h[10] === 0x42 && h[11] === 0x50
+      if (isGif || isWebP) {
+        // 直接上传原文件
+        setUploading(true)
+        onUpload(file).then(onClose).catch((err: any) => {
+          setFileError(err?.detail || err?.message || t('error.uploadFailed'))
+          setUploading(false)
+        })
+        return
+      }
+      setCropFile(file)
+    }).catch(() => {
+      // fallback: 通过 MIME 判断
+      if (file.type === 'image/gif') {
+        setUploading(true)
+        onUpload(file).then(onClose).catch((err: any) => {
+          setFileError(err?.detail || err?.message || t('error.uploadFailed'))
+          setUploading(false)
+        })
+        return
+      }
+      setCropFile(file)
+    })
     e.target.value = ''
   }
 
@@ -80,8 +118,8 @@ export default function GroupAvatarPickerModal({
         headers: token ? { Authorization: `Bearer ${token}` } : {},
       })
       if (!res.ok) {
-        const err = await res.json().catch(() => ({ detail: '下载失败' }))
-        throw new Error(err.detail || '下载失败')
+        const err = await res.json().catch(() => ({ detail: t('common.loadFailed') }))
+        throw new Error(err.detail || t('common.loadFailed'))
       }
       const blob = await res.blob()
       // 提取扩展名
@@ -91,33 +129,19 @@ export default function GroupAvatarPickerModal({
       })
       setCropFile(file)
     } catch (e: any) {
-      setFileError(e?.message || '下载文件失败')
+      setFileError(e?.message || t('common.loadFailed'))
     }
   }
 
-  // 裁剪确认后上传
+  // 裁剪确认后调用 onUpload
   const handleCropConfirm = async (blob: Blob) => {
     setCropFile(null)
     setUploading(true)
     try {
-      const ext =
-        blob.type === 'image/gif'
-          ? 'gif'
-          : blob.type === 'image/png'
-            ? 'png'
-            : 'jpg'
-      const file = new File([blob], `avatar.${ext}`, {
-        type: blob.type || 'image/jpeg',
-      })
-      const formData = new FormData()
-      formData.append('file', file)
-      const res = await api.post<{ avatar_url: string; avatar_mode: string }>(
-        `/groups/${groupId}/avatar`,
-        formData,
-      )
-      onUploadComplete(res.avatar_url)
+      await onUpload(blob)
+      onClose()
     } catch (e: any) {
-      setFileError(e?.detail || '头像上传失败')
+      setFileError(e?.detail || e?.message || t('error.uploadFailed'))
       setUploading(false)
     }
   }
@@ -126,12 +150,14 @@ export default function GroupAvatarPickerModal({
     setCropFile(null)
   }
 
+  const modalTitle = title || t('groupSettings.avatarPickerTitle')
+
   return (
     <>
       {/* 遮罩 */}
       <div
         className="fixed inset-0 z-50 flex items-center justify-center bg-black/40"
-        onClick={onCancel}
+        onClick={onClose}
       >
         <div
           className="relative bg-surface border border-border rounded-xl shadow-2xl w-80 max-w-[90vw] p-5"
@@ -140,10 +166,10 @@ export default function GroupAvatarPickerModal({
           {/* 标题栏 */}
           <div className="flex items-center justify-between mb-4">
             <h3 className="text-sm font-semibold text-textPrimary">
-              {t('groupSettings.avatarPickerTitle')}
+              {modalTitle}
             </h3>
             <button
-              onClick={onCancel}
+              onClick={onClose}
               className="p-1 rounded-lg hover:bg-elevated text-textMuted transition-colors"
             >
               <X size={16} />

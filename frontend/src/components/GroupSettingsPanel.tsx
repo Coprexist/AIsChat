@@ -4,7 +4,7 @@ import { useT } from '../i18n/I18nContext'
 import { getStateDotColor } from '../constants'
 import { X, Bell, Pause, BellOff, LogOut, UserX, Shield, ShieldOff, UserPlus, Volume2, VolumeX, Download, Clock, Globe, Loader2, ArrowLeft, Crown, Pin, PinOff, Image, Camera, Users, CheckCircle2 } from 'lucide-react'
 import Toggle from './Toggle'
-import GroupAvatarPickerModal from './GroupAvatarPickerModal'
+import AvatarPickerModal from './AvatarPickerModal'
 
 // ── 联邦共享状态（v0.2.0: 群主/AI制作者按群控制联邦共享） ──
 
@@ -368,14 +368,32 @@ export default function GroupSettingsPanel({ group, onClose, onUpdate, onLeave }
     }
   }
 
-  // 头像上传完成回调（由 GroupAvatarPickerModal 调用）
-  const handleAvatarUploadComplete = (avatarUrl: string) => {
-    setAvatarPreview(avatarUrl)
-    setAvatarMode('custom')
-    onUpdate({ avatar_url: avatarUrl, avatar_mode: 'custom' })
-    setAvatarPickerOpen(false)
-    setUploadingAvatar(false)
-    window.dispatchEvent(new CustomEvent('groupListRefresh'))
+  // 头像上传完成回调（由 AvatarPickerModal 调用）
+  const handleAvatarPickerUpload = async (blob: Blob) => {
+    setUploadingAvatar(true)
+    try {
+      const ext =
+        blob.type === 'image/gif'
+          ? 'gif'
+          : blob.type === 'image/png'
+            ? 'png'
+            : 'jpg'
+      const file = new File([blob], `avatar.${ext}`, {
+        type: blob.type || 'image/jpeg',
+      })
+      const formData = new FormData()
+      formData.append('file', file)
+      const res = await api.post<{ avatar_url: string; avatar_mode: string }>(
+        `/groups/${group!.id}/avatar`,
+        formData,
+      )
+      setAvatarPreview(res.avatar_url)
+      setAvatarMode('custom')
+      onUpdate({ avatar_url: res.avatar_url, avatar_mode: 'custom' })
+      window.dispatchEvent(new CustomEvent('groupListRefresh'))
+    } finally {
+      setUploadingAvatar(false)
+    }
   }
 
   const handleExportChat = async () => {
@@ -549,8 +567,8 @@ export default function GroupSettingsPanel({ group, onClose, onUpdate, onLeave }
                     <div className="w-10 h-10 mx-auto rounded-lg bg-primary-500/10 dark:bg-primary-900/30 flex items-center justify-center mb-1.5">
                       <Users size={18} className="text-primary-400/60 dark:text-primary-300/60" />
                     </div>
-                    <div className="text-[11px] font-medium">{t('groupSettings.avatarModeDefault')}</div>
-                    <div className="text-[10px] text-textMuted">固定图标</div>
+                    <div className={`text-[11px] font-medium ${avatarMode === 'default' ? 'text-textSecondary dark:text-primary-200' : 'text-textSecondary'}`}>{t('groupSettings.avatarModeDefault')}</div>
+                    <div className={`text-[10px] ${avatarMode === 'default' ? 'text-textMuted dark:text-primary-300/80' : 'text-textMuted'}`}>固定图标</div>
                     {avatarMode === 'default' && (
                       <CheckCircle2 size={14} className="absolute top-1.5 right-1.5 text-primary-400" />
                     )}
@@ -568,8 +586,8 @@ export default function GroupSettingsPanel({ group, onClose, onUpdate, onLeave }
                     <div className="w-10 h-10 mx-auto rounded-lg bg-elevated flex items-center justify-center mb-1.5">
                       <Users size={18} className="text-textSecondary" />
                     </div>
-                    <div className="text-[11px] font-medium">{t('groupSettings.avatarModeMembers')}</div>
-                    <div className="text-[10px] text-textMuted">{t('common.grid')}</div>
+                    <div className={`text-[11px] font-medium ${avatarMode === 'members' ? 'text-textSecondary dark:text-primary-200' : 'text-textSecondary'}`}>{t('groupSettings.avatarModeMembers')}</div>
+                    <div className={`text-[10px] ${avatarMode === 'members' ? 'text-textMuted dark:text-primary-300/80' : 'text-textMuted'}`}>{t('common.grid')}</div>
                     {avatarMode === 'members' && (
                       <CheckCircle2 size={14} className="absolute top-1.5 right-1.5 text-primary-400" />
                     )}
@@ -591,8 +609,8 @@ export default function GroupSettingsPanel({ group, onClose, onUpdate, onLeave }
                         <Image size={18} className="text-textMuted" />
                       )}
                     </div>
-                    <div className="text-[11px] font-medium">{t('groupSettings.avatarModeCustom')}</div>
-                    <div className="text-[10px] text-textMuted">{t('common.uploadImage')}</div>
+                    <div className={`text-[11px] font-medium ${avatarMode === 'custom' ? 'text-textSecondary dark:text-primary-200' : 'text-textSecondary'}`}>{t('groupSettings.avatarModeCustom')}</div>
+                    <div className={`text-[10px] ${avatarMode === 'custom' ? 'text-textMuted dark:text-primary-300/80' : 'text-textMuted'}`}>{t('common.uploadImage')}</div>
                     {avatarMode === 'custom' && (
                       <CheckCircle2 size={14} className="absolute top-1.5 right-1.5 text-primary-400" />
                     )}
@@ -1072,10 +1090,9 @@ export default function GroupSettingsPanel({ group, onClose, onUpdate, onLeave }
 
       {/* 头像选择弹窗 */}
       {avatarPickerOpen && group && (
-        <GroupAvatarPickerModal
-          groupId={group.id}
-          onCancel={() => setAvatarPickerOpen(false)}
-          onUploadComplete={handleAvatarUploadComplete}
+        <AvatarPickerModal
+          onUpload={handleAvatarPickerUpload}
+          onClose={() => setAvatarPickerOpen(false)}
         />
       )}
     </div>

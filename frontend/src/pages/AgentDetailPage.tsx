@@ -11,7 +11,7 @@ import {
   Image, HardDrive, Brain, Copy, Check, X, RefreshCw, Bot, Settings, User,
   ScrollText, Loader2, ChevronRight, ChevronDown, Bookmark, Tag, Database,
 } from 'lucide-react'
-import AvatarCropModal from '../components/AvatarCropModal'
+import AvatarPickerModal from '../components/AvatarPickerModal'
 import AgentSettingsModal from '../components/AgentSettingsModal'
 import EmptyState from '../components/EmptyState'
 import FilePreviewModal from '../components/FilePreviewModal'
@@ -307,8 +307,8 @@ export default function AgentDetailPage() {
   const [importing, setImporting] = useState(false)
 
   // Avatar
+  const [avatarPickerOpen, setAvatarPickerOpen] = useState(false)
   const [uploadingAvatar, setUploadingAvatar] = useState(false)
-  const [cropFile, setCropFile] = useState<File | null>(null)
   const [previewFile, setPreviewFile] = useState<{ id: number; name: string; size: number; mime: string } | null>(null)
 
   // Storage
@@ -653,51 +653,8 @@ export default function AgentDetailPage() {
     }
   }
 
-  // Avatar upload
-  const handleAvatarSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0]
-    if (!file) return
-    // 前端头像大小校验
-    let maxAvatarMB = 10
-    try {
-      const cached = sessionStorage.getItem('upload_limits')
-      if (cached) {
-        const parsed = JSON.parse(cached)
-        if (Date.now() - parsed.ts < 300000) {
-          maxAvatarMB = parsed.avatar_max_size_mb || 10
-        }
-      }
-    } catch {}
-    if (file.size > maxAvatarMB * 1024 * 1024) { alert(`头像不能超过 ${maxAvatarMB}MB`); return }
-    // 读取前 12 字节检测动图（GIF / WebP），跳过裁剪
-    file.slice(0, 12).arrayBuffer().then(buf => {
-      const h = new Uint8Array(buf)
-      const isGif = h[0] === 0x47 && h[1] === 0x49 && h[2] === 0x46
-      const isWebP = h[0] === 0x52 && h[1] === 0x49 && h[2] === 0x46 && h[3] === 0x46
-        && h[8] === 0x57 && h[9] === 0x45 && h[10] === 0x42 && h[11] === 0x50
-      if (isGif || isWebP) {
-        uploadAgentAvatarDirectly(file)
-        return
-      }
-      setCropFile(file)
-    }).catch(() => {
-      if (file.type === 'image/gif') { uploadAgentAvatarDirectly(file); return }
-      setCropFile(file)
-    })
-    e.target.value = ''
-  }
-
-  const uploadAgentAvatarDirectly = async (file: File) => {
-    setUploadingAvatar(true)
-    try {
-      await api.upload(`/agents/${agentId}/avatar`, file)
-      loadAgent()
-    } catch { /* ignore */ }
-    finally { setUploadingAvatar(false) }
-  }
-
-  const handleCropConfirm = async (blob: Blob) => {
-    setCropFile(null)
+  // Avatar upload via picker modal
+  const handleAgentAvatarPickerUpload = async (blob: Blob) => {
     setUploadingAvatar(true)
     try {
       const ext = blob.type === 'image/gif' ? 'gif' : blob.type === 'image/png' ? 'png' : 'jpg'
@@ -1116,11 +1073,14 @@ export default function AgentDetailPage() {
                 </label>
 
                 {/* Avatar */}
-                <label className="flex items-center gap-1.5 px-3 py-2 rounded-lg border border-border text-sm text-textSecondary hover:text-textPrimary hover:border-primary-500/30 transition-colors cursor-pointer">
+                <button
+                  onClick={() => setAvatarPickerOpen(true)}
+                  disabled={uploadingAvatar}
+                  className="flex items-center gap-1.5 px-3 py-2 rounded-lg border border-border text-sm text-textSecondary hover:text-textPrimary hover:border-primary-500/30 transition-colors disabled:opacity-50"
+                >
                   <Image size={14} />
                   {uploadingAvatar ? t('me.uploadingAvatar') : t('agentDetail.changeAvatar')}
-                  <input type="file" accept="image/*" onChange={handleAvatarSelect} className="hidden" />
-                </label>
+                </button>
 
                 {/* Token */}
                 <button onClick={handleGenerateToken} disabled={generatingToken} className="flex items-center gap-1.5 px-3 py-2 rounded-lg border border-border text-sm text-textSecondary hover:text-textPrimary hover:border-primary-500/30 transition-colors disabled:opacity-50">
@@ -1630,12 +1590,12 @@ export default function AgentDetailPage() {
         </div>
       )}
 
-      {/* 头像裁剪弹窗 */}
-      {cropFile && (
-        <AvatarCropModal
-          file={cropFile}
-          onConfirm={handleCropConfirm}
-          onCancel={() => setCropFile(null)}
+      {/* 头像选择弹窗 */}
+      {avatarPickerOpen && (
+        <AvatarPickerModal
+          onUpload={handleAgentAvatarPickerUpload}
+          onClose={() => setAvatarPickerOpen(false)}
+          title={t('agentDetail.changeAvatar')}
         />
       )}
 

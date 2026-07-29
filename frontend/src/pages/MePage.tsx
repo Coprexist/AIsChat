@@ -14,7 +14,7 @@ import {
   Loader2, Check, X, ArrowRight, Activity,
   FileText, HardDrive, Camera, Users, MessageSquare, Share2
 } from 'lucide-react'
-import AvatarCropModal from '../components/AvatarCropModal'
+import AvatarPickerModal from '../components/AvatarPickerModal'
 
 interface AgentBrief {
   id: number
@@ -82,9 +82,8 @@ export default function MePage() {
   const [editStatusText, setEditStatusText] = useState('')
   const [editStatusColor, setEditStatusColor] = useState('')
   const [editAvatarUrl, setEditAvatarUrl] = useState('')
-  const [avatarUploading, setAvatarUploading] = useState(false)
   const [editSaving, setEditSaving] = useState(false)
-  const [cropFile, setCropFile] = useState<File | null>(null)
+  const [avatarPickerOpen, setAvatarPickerOpen] = useState(false)
 
   // 文件列表 + 转发
 
@@ -214,60 +213,11 @@ export default function MePage() {
     setEditAvatarUrl(user?.avatar_url || '')
     setShowEditProfile(true)
   }
-  const handleAvatarSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0]
-    if (!file) return
-    // 从缓存读取头像大小限制
-    let maxAvatarMB = 10
-    try {
-      const cached = sessionStorage.getItem('upload_limits')
-      if (cached) {
-        const parsed = JSON.parse(cached)
-        if (Date.now() - parsed.ts < 300000) {
-          maxAvatarMB = parsed.avatar_max_size_mb || 10
-        }
-      }
-    } catch {}
-    if (file.size > maxAvatarMB * 1024 * 1024) { alert(t('error.avatarTooLarge')); return }
-    // 动图（GIF / WebP）无法裁剪，直接上传
-    // 读取前 12 字节检测动图（GIF / WebP），跳过裁剪
-    file.slice(0, 12).arrayBuffer().then(buf => {
-      const h = new Uint8Array(buf)
-      const isGif = h[0] === 0x47 && h[1] === 0x49 && h[2] === 0x46  // GIF
-      const isWebP = h[0] === 0x52 && h[1] === 0x49 && h[2] === 0x46 && h[3] === 0x46
-        && h[8] === 0x57 && h[9] === 0x45 && h[10] === 0x42 && h[11] === 0x50  // RIFF....WEBP
-      if (isGif || isWebP) {
-        uploadAvatarDirectly(file)
-        return
-      }
-      setCropFile(file)
-    }).catch(() => {
-      if (file.type === 'image/gif') { uploadAvatarDirectly(file); return }
-      setCropFile(file)
-    })
-    e.target.value = ''
-  }
-
-  const uploadAvatarDirectly = async (file: File) => {
-    setAvatarUploading(true)
-    try {
-      const res = await api.upload('/user/avatar', file)
-      setEditAvatarUrl(res.avatar_url)
-      refreshUser?.()
-    } catch (err: any) { alert(err?.message || err?.detail || t('error.unknown')) }
-    finally { setAvatarUploading(false) }
-  }
-
-  const handleCropConfirm = async (blob: Blob) => {
-    setCropFile(null)
-    setAvatarUploading(true)
-    try {
-      const ext = blob.type === 'image/gif' ? 'gif' : blob.type === 'image/png' ? 'png' : 'jpg'
-      const res = await api.upload('/user/avatar', new File([blob], `avatar.${ext}`, { type: blob.type || 'image/jpeg' }))
-      setEditAvatarUrl(res.avatar_url)
-    } catch (err: any) {
-      alert(err?.message || err?.detail || (typeof err === 'string' ? err : '上传失败，请检查网络或文件大小'))
-    } finally { setAvatarUploading(false) }
+  const handleAvatarPickerUpload = async (blob: Blob) => {
+    const ext = blob.type === 'image/gif' ? 'gif' : blob.type === 'image/png' ? 'png' : 'jpg'
+    const res = await api.upload('/user/avatar', new File([blob], `avatar.${ext}`, { type: blob.type || 'image/jpeg' }))
+    setEditAvatarUrl(res.avatar_url)
+    refreshUser?.()
   }
   const handleSaveProfile = async () => {
     setEditSaving(true)
@@ -605,11 +555,13 @@ export default function MePage() {
                     <User size={32} className="text-primary-400" />
                   )}
                 </div>
-                <label className="flex items-center gap-1 text-xs text-primary-400 hover:text-primary-500 cursor-pointer transition-colors">
+                <button
+                  onClick={() => setAvatarPickerOpen(true)}
+                  className="flex items-center gap-1 text-xs text-primary-400 hover:text-primary-500 transition-colors"
+                >
                   <Camera size={12} />
-                  {avatarUploading ? t('me.uploadingAvatar') : t('me.changeAvatar')}
-                  <input type="file" accept="image/*" className="hidden" onChange={handleAvatarSelect} disabled={avatarUploading} />
-                </label>
+                  {t('me.changeAvatar')}
+                </button>
               </div>
               <div>
                 <label className="block text-xs font-medium text-textSecondary mb-1">{t('me.usernameField')}</label>
@@ -698,11 +650,11 @@ export default function MePage() {
       )}
 
       {/* 头像裁剪弹窗 */}
-      {cropFile && (
-        <AvatarCropModal
-          file={cropFile}
-          onConfirm={handleCropConfirm}
-          onCancel={() => setCropFile(null)}
+      {avatarPickerOpen && (
+        <AvatarPickerModal
+          onUpload={handleAvatarPickerUpload}
+          onClose={() => setAvatarPickerOpen(false)}
+          title={t('me.changeAvatar')}
         />
       )}
 
