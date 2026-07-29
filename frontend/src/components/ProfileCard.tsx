@@ -286,9 +286,8 @@ export default function ProfileCard({ entityType, entityId, entityName, state, a
             <div className="text-[11px] text-textMuted text-center pt-2">
               {createdAt && <span>{t('profileCard.createdOn') || '创建于'} {new Date(createdAt).toLocaleDateString('zh-CN')}</span>}
             </div>
-          )}
-
-
+          </div>
+        </div>
 
       {/* 查看大图 */}
       {fullImg && (
