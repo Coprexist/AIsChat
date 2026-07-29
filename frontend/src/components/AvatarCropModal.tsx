@@ -27,8 +27,8 @@ function getCroppedImgRaw(image: HTMLImageElement, crop: Area): Promise<Blob> {
     crop.height,
     0,
     0,
-    crop.width,
-    crop.height,
+    canvas.width,
+    canvas.height,
   )
 
   return new Promise((resolve, reject) => {
