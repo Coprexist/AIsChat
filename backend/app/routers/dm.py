@@ -1,7 +1,10 @@
 """
 私信（DM）路由
 """
+import logging
 from fastapi import APIRouter, Depends, HTTPException, status, Query
+
+logger = logging.getLogger(__name__)
 from fastapi.responses import Response
 from pydantic import BaseModel
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -103,6 +106,9 @@ async def send_dm(
         return msg
     except ValueError as e:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
+    except Exception as e:
+        logger.exception(f"send_dm 失败: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
 
 
 @router.get("/dm/{session_id}/my-token-usage")
