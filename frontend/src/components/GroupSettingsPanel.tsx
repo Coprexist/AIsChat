@@ -4,6 +4,7 @@ import { useT } from '../i18n/I18nContext'
 import { getStateDotColor } from '../constants'
 import { X, Bell, Pause, BellOff, LogOut, UserX, Shield, ShieldOff, UserPlus, Volume2, VolumeX, Download, Clock, Globe, Loader2, ArrowLeft, Crown, Pin, PinOff, Image, Camera, Users, CheckCircle2 } from 'lucide-react'
 import Toggle from './Toggle'
+import GroupAvatarPickerModal from './GroupAvatarPickerModal'
 
 // ── 联邦共享状态（v0.2.0: 群主/AI制作者按群控制联邦共享） ──
 
@@ -201,6 +202,7 @@ export default function GroupSettingsPanel({ group, onClose, onUpdate, onLeave }
   const [includeAiAvatar, setIncludeAiAvatar] = useState(group?.include_ai_in_avatar ?? true)
   const [uploadingAvatar, setUploadingAvatar] = useState(false)
   const [avatarPreview, setAvatarPreview] = useState<string | null>(group?.avatar_url || null)
+  const [avatarPickerOpen, setAvatarPickerOpen] = useState(false)
 
   // 转让群主状态
   const [transferModalOpen, setTransferModalOpen] = useState(false)
@@ -366,32 +368,14 @@ export default function GroupSettingsPanel({ group, onClose, onUpdate, onLeave }
     }
   }
 
-  // 头像上传处理
-  const handleAvatarUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0]
-    if (!file) return
-
-    // 本地预览
-    const localUrl = URL.createObjectURL(file)
-    setAvatarPreview(localUrl)
-
-    setUploadingAvatar(true)
-    try {
-      const formData = new FormData()
-      formData.append('file', file)
-      const res = await api.post(`/groups/${group!.id}/avatar`, formData)
-      const data = res as { avatar_url: string; avatar_mode: string }
-      setAvatarPreview(data.avatar_url)
-      setAvatarMode('custom')
-      onUpdate({ avatar_url: data.avatar_url, avatar_mode: 'custom' })
-      // 触发侧边栏刷新
-      window.dispatchEvent(new CustomEvent('groupListRefresh'))
-    } catch (e: any) {
-      setError(e?.detail || '头像上传失败')
-      setAvatarPreview(group?.avatar_url || null)
-    } finally {
-      setUploadingAvatar(false)
-    }
+  // 头像上传完成回调（由 GroupAvatarPickerModal 调用）
+  const handleAvatarUploadComplete = (avatarUrl: string) => {
+    setAvatarPreview(avatarUrl)
+    setAvatarMode('custom')
+    onUpdate({ avatar_url: avatarUrl, avatar_mode: 'custom' })
+    setAvatarPickerOpen(false)
+    setUploadingAvatar(false)
+    window.dispatchEvent(new CustomEvent('groupListRefresh'))
   }
 
   const handleExportChat = async () => {
@@ -635,17 +619,14 @@ export default function GroupSettingsPanel({ group, onClose, onUpdate, onLeave }
                 {/* custom 模式的上传按钮 */}
                 {avatarMode === 'custom' && isAdmin && (
                   <div className="mt-3">
-                    <label className="flex items-center justify-center gap-2 px-4 py-2.5 bg-elevated hover:bg-canvas border border-border border-dashed rounded-lg cursor-pointer text-sm text-textSecondary hover:text-textPrimary transition-colors">
+                    <button
+                      onClick={() => setAvatarPickerOpen(true)}
+                      disabled={uploadingAvatar}
+                      className="flex items-center justify-center gap-2 px-4 py-2.5 bg-elevated hover:bg-canvas border border-border border-dashed rounded-lg w-full text-sm text-textSecondary hover:text-textPrimary transition-colors disabled:opacity-50"
+                    >
                       <Camera size={16} />
-                      {uploadingAvatar ? '上传中...' : '选择图片上传'}
-                      <input
-                        type="file"
-                        accept="image/*"
-                        className="hidden"
-                        onChange={handleAvatarUpload}
-                        disabled={uploadingAvatar}
-                      />
-                    </label>
+                      {uploadingAvatar ? t('common.uploading') : t('groupSettings.customAvatar')}
+                    </button>
                   </div>
                 )}
               </div>
@@ -1088,6 +1069,15 @@ export default function GroupSettingsPanel({ group, onClose, onUpdate, onLeave }
           )}
         </div>
       </div>
+
+      {/* 头像选择弹窗 */}
+      {avatarPickerOpen && group && (
+        <GroupAvatarPickerModal
+          groupId={group.id}
+          onCancel={() => setAvatarPickerOpen(false)}
+          onUploadComplete={handleAvatarUploadComplete}
+        />
+      )}
     </div>
   )
 }
