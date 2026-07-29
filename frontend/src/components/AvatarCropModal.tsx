@@ -123,6 +123,9 @@ export default function AvatarCropModal({ file, onConfirm, onCancel, cropShape }
           zoom={zoom}
           aspect={1}
           cropShape={cropShape || 'round'}
+          classes={{
+            cropAreaClassName: cropShape === 'rect' ? 'rounded-crop-area' : undefined,
+          }}
           showGrid={false}
           onCropChange={setCrop}
           onCropComplete={onCropComplete}

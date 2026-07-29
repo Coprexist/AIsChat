@@ -356,3 +356,8 @@
 :is(.text-white, .dark) .hljs-comment { color: #8b949e; }
 :is(.text-white, .dark) .hljs-type { color: #ffa657; }
 :is(.text-white, .dark) .hljs-built_in { color: #ff7b72; }
+
+/* react-easy-crop 方形裁剪圆角 */
+.rounded-crop-area {
+  border-radius: 1rem !important;
+}
