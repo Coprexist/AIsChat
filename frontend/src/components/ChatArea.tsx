@@ -29,6 +29,9 @@ interface Group {
   created_at: string | null
   member_count: number
   online_count: number
+  avatar_mode?: string
+  avatar_url?: string | null
+  include_ai_in_avatar?: boolean
   is_federated?: boolean
 }
 
@@ -275,6 +278,9 @@ export default function ChatArea({ groupId, dmSessionId }: ChatAreaProps) {
             speak_limit_per_minute: currentGroup.speak_limit_per_minute,
             speak_limit_window_seconds: currentGroup.speak_limit_window_seconds,
             my_role: currentGroup.my_role,
+            avatar_mode: currentGroup.avatar_mode || 'default',
+            avatar_url: currentGroup.avatar_url,
+            include_ai_in_avatar: currentGroup.include_ai_in_avatar ?? true,
           }}
           onClose={() => setShowSettings(false)}
           onUpdate={(updated) => {
