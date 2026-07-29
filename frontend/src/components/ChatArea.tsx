@@ -275,17 +275,18 @@ function GroupAvatarHeader({ group }: { group: Group }) {
         </div>
       )}
 
-      {/* 创建群聊弹窗 */}
-      {showCreateGroup && (
-        {profileGroup && (
+      {profileGroup && (
         <ProfileCard
-          type="group"
-          id={profileGroup.id}
-          name={profileGroup.name}
+          entityType="group"
+          entityId={profileGroup.id}
+          entityName={profileGroup.name}
           avatar_url={profileGroup.avatar_url}
           onClose={() => setProfileGroup(null)}
         />
       )}
+
+      {/* 创建群聊弹窗 */}
+      {showCreateGroup && (
       <CreateGroupModal
           onClose={() => setShowCreateGroup(false)}
           onCreated={(newGroup) => {
