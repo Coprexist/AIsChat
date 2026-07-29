@@ -222,8 +222,8 @@ const ChatSidebar = memo(function ChatSidebar({
     const mode = g.avatar_mode || 'default'
     const avatars = g.member_avatars || []
 
-    // 自定义头像：单张图片
     if (mode === 'custom' && g.avatar_url) {
+      // 自定义头像：单张图片
       return (
         <div className="w-9 h-9 rounded-lg overflow-hidden shrink-0 bg-elevated">
           <img src={g.avatar_url} alt="" className="w-full h-full object-cover" loading="lazy" />
@@ -231,8 +231,8 @@ const ChatSidebar = memo(function ChatSidebar({
       )
     }
 
-    // 无头像时的占位
-    if (avatars.length === 0) {
+    if (mode === 'default') {
+      // 默认图标：固定显示群聊图标
       return (
         <div className="w-9 h-9 rounded-lg bg-primary-500/10 flex items-center justify-center shrink-0">
           <Users size={14} className="text-primary-400/70" />
@@ -240,7 +240,14 @@ const ChatSidebar = memo(function ChatSidebar({
       )
     }
 
-    // default / members 模式：2×2 网格，members 模式已按 include_ai_in_avatar 过滤
+    // members 模式：2×2 成员头像网格（按 include_ai_in_avatar 过滤）
+    if (avatars.length === 0) {
+      return (
+        <div className="w-9 h-9 rounded-lg bg-primary-500/10 flex items-center justify-center shrink-0">
+          <Users size={14} className="text-primary-400/70" />
+        </div>
+      )
+    }
     return (
       <div className="w-9 h-9 rounded-lg bg-elevated grid grid-cols-2 grid-rows-2 gap-px overflow-hidden shrink-0">
         {avatars.slice(0, 4).map((url, i) => (

@@ -537,14 +537,11 @@ export default function GroupSettingsPanel({ group, onClose, onUpdate, onLeave }
                         : 'border-border bg-elevated hover:bg-canvas'
                     }`}
                   >
-                    <div className="w-10 h-10 mx-auto rounded-lg bg-elevated grid grid-cols-2 gap-px overflow-hidden mb-1.5">
-                      <div className="bg-primary-400/20" />
-                      <div className="bg-mint-400/20" />
-                      <div className="bg-amber-400/20" />
-                      <div className="bg-rose-400/20" />
+                    <div className="w-10 h-10 mx-auto rounded-lg bg-primary-500/10 flex items-center justify-center mb-1.5">
+                      <Users size={18} className="text-primary-400/60" />
                     </div>
                     <div className="text-[11px] font-medium">{t('groupSettings.avatarModeDefault')}</div>
-                    <div className="text-[10px] text-textMuted">2×2</div>
+                    <div className="text-[10px] text-textMuted">固定图标</div>
                     {avatarMode === 'default' && (
                       <CheckCircle2 size={14} className="absolute top-1.5 right-1.5 text-primary-400" />
                     )}
