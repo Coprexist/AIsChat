@@ -45,7 +45,7 @@ interface ChatAreaProps {
 export default function ChatArea({ groupId, dmSessionId }: ChatAreaProps) {
   const t = useT()
 /** 群聊头部头像组件 */
-  const [groups, setGroups = useState<Group[]>([])
+  const [groups, setGroups] = useState<Group[]>([])
   const [showCreateGroup, setShowCreateGroup] = useState(false)
   const [showInvite, setShowInvite] = useState(false)
   const [showSettings, setShowSettings] = useState(false)
