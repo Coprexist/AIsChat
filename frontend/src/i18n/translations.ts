@@ -3232,7 +3232,7 @@ const en: TranslationDict = {
   'groupSettings.transferOwnerTitle': 'Select New Owner',
   'groupSettings.transferOwnerHint': 'You will become admin after transfer',
   'groupSettings.confirmTransfer': 'Transfer owner to',
-  'groupSettings.noTransferTarget': 'No transferable members'
+  'groupSettings.noTransferTarget': 'No transferable members',
 
   // ======================== DMSettings ========================
   'dmSettings.title': 'DM Settings',

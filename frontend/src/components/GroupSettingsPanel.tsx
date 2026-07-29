@@ -261,6 +261,7 @@ export default function GroupSettingsPanel({ group, onClose, onUpdate, onLeave }
     try {
       await api.patch(`/groups/${group.id}`, updates)
       onUpdate(updates)
+      window.dispatchEvent(new CustomEvent('groupListRefresh'))
     } catch (e: any) {
       setError(e?.detail || t('error.saveFailed'))
     } finally {
