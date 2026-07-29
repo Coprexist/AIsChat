@@ -510,6 +510,9 @@ async def upload_group_avatar(
     if len(content) > 5 * 1024 * 1024:
         raise HTTPException(400, "头像文件大小不能超过 5MB")
 
+    from app.utils.image_compress import compress_avatar
+    content = compress_avatar(content)
+
     import os
     import uuid
     upload_dir = "/app/uploads/avatars/"
