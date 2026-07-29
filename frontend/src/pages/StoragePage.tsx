@@ -4,9 +4,10 @@
  */
 import { useState, useEffect, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { HardDrive, FileText, Share2, X, Loader2, ArrowLeft, Forward } from 'lucide-react'
+import { HardDrive, FileText, Loader2, ArrowLeft, Forward, Eye } from 'lucide-react'
 import { api } from '../api/client'
 import { useT } from '../i18n/I18nContext'
+import FilePreviewModal from '../components/FilePreviewModal'
 
 interface FileItem {
   id: number
@@ -36,6 +37,7 @@ export default function StoragePage() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
   const [forwardFile, setForwardFile] = useState<FileItem | null>(null)
+  const [previewFile, setPreviewFile] = useState<FileItem | null>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
 
   useEffect(() => {
@@ -147,7 +149,8 @@ export default function StoragePage() {
             {files.map((f) => {
               const name = f.path.split('/').pop() || f.path
               return (
-                <div key={f.id} className="flex items-center gap-2 px-2 py-2 rounded-lg hover:bg-elevated transition-colors group">
+                <div key={f.id} className="flex items-center gap-2 px-2 py-2 rounded-lg hover:bg-elevated transition-colors group cursor-pointer"
+                  onClick={() => setPreviewFile(f)}>
                   <FileText size={14} className={`shrink-0 ${f.is_forwarded ? 'text-accent-400' : 'text-textMuted'}`} />
                   <span className="text-xs text-textPrimary truncate flex-1" title={name}>
                     {name}
@@ -155,7 +158,7 @@ export default function StoragePage() {
                   </span>
                   <span className="text-[10px] text-textMuted shrink-0">{formatSize(f.size)}</span>
                   <button
-                    onClick={() => openForward(f)}
+                    onClick={(e) => { e.stopPropagation(); openForward(f); }}
                     className="p-1 rounded hover:bg-primary-500/10 text-textMuted hover:text-primary-400 transition-colors opacity-0 group-hover:opacity-100"
                     title="转发"
                   >
@@ -167,6 +170,17 @@ export default function StoragePage() {
           </div>
         )}
       </div>
+
+      {/* 文件预览弹窗 */}
+      {previewFile && (
+        <FilePreviewModal
+          fileId={previewFile.id}
+          fileName={previewFile.path.split('/').pop() || previewFile.path}
+          fileSize={previewFile.size}
+          mimeType={previewFile.mime_type}
+          onClose={() => setPreviewFile(null)}
+        />
+      )}
 
       {/* 转发弹窗 */}
       {forwardFile && (
