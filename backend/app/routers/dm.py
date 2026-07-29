@@ -93,6 +93,7 @@ async def send_dm(
     db: AsyncSession = Depends(get_db),
 ):
     """发送私信消息"""
+    print(f"[DEBUG] send_dm called: session={session_id}, content='{body.get('content','')[:30]}', atts={len(body.get('attachments',[]) or [])}", flush=True)
     try:
         msg = await send_dm_message(
             db, session_id,
@@ -101,13 +102,17 @@ async def send_dm(
             reply_to=body.get("reply_to"),
             attachments=body.get("attachments"),
         )
+        print(f"[DEBUG] send_dm OK: msg_id={msg.get('id')}", flush=True)
         # 触发 AI 回复（如果对方是 AI）
         await _maybe_trigger_dm_ai_reply(db, session_id, msg, current_user["user_id"])
         return msg
     except ValueError as e:
+        print(f"[DEBUG] send_dm ValueError: {e}", flush=True)
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
     except Exception as e:
-        logger.exception(f"send_dm 失败: {e}")
+        import traceback
+        traceback.print_exc()
+        print(f"[DEBUG] send_dm Exception: {type(e).__name__}: {e}", flush=True)
         raise HTTPException(status_code=500, detail=str(e))
 
 
