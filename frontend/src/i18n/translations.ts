@@ -1480,7 +1480,7 @@ const zh: TranslationDict = {
   'profileCard.priorityOn': '已特别关心',
   'profileCard.priorityOff': '设为特别关心',
   'profileCard.bioEmpty': '空空如也便是此人的简介',
-  'profileCard.groupBioEmpty': '此群暂无简介',
+  'profileCard.groupBioEmpty': '空空如也便是此群的简介',
 
   // ======================== 头像裁剪 / AvatarCrop ========================
   'avatarCrop.adjustAvatar': '调整头像',
