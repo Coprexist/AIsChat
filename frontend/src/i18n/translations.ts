@@ -1480,6 +1480,7 @@ const zh: TranslationDict = {
   'profileCard.priorityOn': '已特别关心',
   'profileCard.priorityOff': '设为特别关心',
   'profileCard.bioEmpty': '空空如也便是此人的简介',
+  'profileCard.groupBioEmpty': '此群暂无简介',
 
   // ======================== 头像裁剪 / AvatarCrop ========================
   'avatarCrop.adjustAvatar': '调整头像',
@@ -3300,6 +3301,7 @@ const en: TranslationDict = {
   'profileCard.priorityOn': 'Priority',
   'profileCard.priorityOff': 'Set Priority',
   'profileCard.bioEmpty': 'This person has no bio.',
+  'profileCard.groupBioEmpty': 'This group has no description',
 
   // ======================== AvatarCrop ========================
   'avatarCrop.adjustAvatar': 'Adjust Avatar',
@@ -5027,6 +5029,7 @@ const ja: TranslationDict = {
   'profileCard.creator': '制作者',
   'profileCard.registeredOn': '登録日時',
   'profileCard.bioEmpty': 'プロフィールはまだありません。',
+  'profileCard.groupBioEmpty': 'このグループに説明はありません',
 
   // ======================== アバタークロップ / AvatarCrop ========================
   'avatarCrop.adjustAvatar': 'アバターを調整',
