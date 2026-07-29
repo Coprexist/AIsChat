@@ -23,6 +23,9 @@ class Group(Base):
     concurrent_ai_limit = Column(Integer, default=3)  # 同群同时 LLM 调用上限，NULL/0=默认3
     max_msg_display_len = Column(Integer, default=256)  # 群聊消息截断长度，0=不截断
     is_paused = Column(Boolean, default=False)  # 群管理暂停 AI 触发
+    avatar_mode = Column(String(20), nullable=False, default="default")  # 'default' | 'members' | 'custom'
+    avatar_url = Column(String(500), nullable=True)  # 自定义头像 URL
+    include_ai_in_avatar = Column(Boolean, nullable=False, default=True)  # members 模式下是否包含 AI
     created_at = Column(DateTime, server_default=func.now())
 
     __table_args__ = (

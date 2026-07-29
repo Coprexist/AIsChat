@@ -43,6 +43,9 @@ interface Group {
   last_message_at: string | null
   dnd_until: string | null
   member_avatars: string[]
+  avatar_mode?: string
+  avatar_url?: string | null
+  include_ai_in_avatar?: boolean
   is_federated?: boolean
   is_pinned?: boolean
 }
@@ -215,7 +218,20 @@ const ChatSidebar = memo(function ChatSidebar({
   const { theme } = useTheme()
 
   // 群聊头像组
-  const GroupAvatarGroup = ({ avatars }: { avatars: string[] }) => {
+  const GroupAvatarGroup = ({ g }: { g: Group }) => {
+    const mode = g.avatar_mode || 'default'
+    const avatars = g.member_avatars || []
+
+    // 自定义头像：单张图片
+    if (mode === 'custom' && g.avatar_url) {
+      return (
+        <div className="w-9 h-9 rounded-lg overflow-hidden shrink-0 bg-elevated">
+          <img src={g.avatar_url} alt="" className="w-full h-full object-cover" loading="lazy" />
+        </div>
+      )
+    }
+
+    // 无头像时的占位
     if (avatars.length === 0) {
       return (
         <div className="w-9 h-9 rounded-lg bg-primary-500/10 flex items-center justify-center shrink-0">
@@ -223,6 +239,8 @@ const ChatSidebar = memo(function ChatSidebar({
         </div>
       )
     }
+
+    // default / members 模式：2×2 网格，members 模式已按 include_ai_in_avatar 过滤
     return (
       <div className="w-9 h-9 rounded-lg bg-elevated grid grid-cols-2 grid-rows-2 gap-px overflow-hidden shrink-0">
         {avatars.slice(0, 4).map((url, i) => (
@@ -289,7 +307,7 @@ const ChatSidebar = memo(function ChatSidebar({
       }`}
     >
       <div className="flex items-center gap-2.5">
-        <GroupAvatarGroup avatars={g.member_avatars || []} />
+        <GroupAvatarGroup g={g} />
         <div className="flex-1 min-w-0">
           <div className="flex items-center justify-between">
             <div className="font-medium flex items-center gap-1 min-w-0">

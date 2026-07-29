@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react'
 import { api } from '../api/client'
 import { useT } from '../i18n/I18nContext'
 import { getStateDotColor } from '../constants'
-import { X, Bell, Pause, BellOff, LogOut, UserX, Shield, ShieldOff, UserPlus, Volume2, VolumeX, Download, Clock, Globe, Loader2, ArrowLeft, Crown, Pin, PinOff } from 'lucide-react'
+import { X, Bell, Pause, BellOff, LogOut, UserX, Shield, ShieldOff, UserPlus, Volume2, VolumeX, Download, Clock, Globe, Loader2, ArrowLeft, Crown, Pin, PinOff, Image, Camera, Users, CheckCircle2 } from 'lucide-react'
 import Toggle from './Toggle'
 
 // ── 联邦共享状态（v0.2.0: 群主/AI制作者按群控制联邦共享） ──
@@ -161,6 +161,9 @@ interface GroupSettings {
   concurrent_ai_limit: number
   my_role: string
   is_pinned?: boolean
+  avatar_mode?: string
+  avatar_url?: string | null
+  include_ai_in_avatar?: boolean
 }
 
 interface Props {
@@ -193,6 +196,12 @@ export default function GroupSettingsPanel({ group, onClose, onUpdate, onLeave }
   const [saving, setSaving] = useState(false)
   const [pausing, setPausing] = useState(false)
 
+  // 头像设置状态
+  const [avatarMode, setAvatarMode] = useState<'default' | 'members' | 'custom'>(group?.avatar_mode as any || 'default')
+  const [includeAiAvatar, setIncludeAiAvatar] = useState(group?.include_ai_in_avatar ?? true)
+  const [uploadingAvatar, setUploadingAvatar] = useState(false)
+  const [avatarPreview, setAvatarPreview] = useState<string | null>(group?.avatar_url || null)
+
   // 导出状态
   const [exportFormat, setExportFormat] = useState('json')
   const [dateFrom, setDateFrom] = useState('')
@@ -215,6 +224,9 @@ export default function GroupSettingsPanel({ group, onClose, onUpdate, onLeave }
     setSpeakLimit(group.speak_limit_per_minute || 0)
     setSpeakWindow(group.speak_limit_window_seconds || 120)
     setVectorAccel(group.is_vector_accelerated || false)
+    setAvatarMode((group.avatar_mode as any) || 'default')
+    setIncludeAiAvatar(group.include_ai_in_avatar ?? true)
+    setAvatarPreview(group.avatar_url || null)
     loadMembers()
     loadDndStatus()
   }, [group?.id])
@@ -328,6 +340,34 @@ export default function GroupSettingsPanel({ group, onClose, onUpdate, onLeave }
       onLeave()  // 复用退出逻辑：关闭面板 + 刷新列表
     } catch (e: any) {
       setError(e?.detail || t('error.operationFailed'))
+    }
+  }
+
+  // 头像上传处理
+  const handleAvatarUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    if (!file) return
+
+    // 本地预览
+    const localUrl = URL.createObjectURL(file)
+    setAvatarPreview(localUrl)
+
+    setUploadingAvatar(true)
+    try {
+      const formData = new FormData()
+      formData.append('file', file)
+      const res = await api.post(`/groups/${group!.id}/avatar`, formData)
+      const data = res as { avatar_url: string; avatar_mode: string }
+      setAvatarPreview(data.avatar_url)
+      setAvatarMode('custom')
+      onUpdate({ avatar_url: data.avatar_url, avatar_mode: 'custom' })
+      // 触发侧边栏刷新
+      window.dispatchEvent(new CustomEvent('groupListRefresh'))
+    } catch (e: any) {
+      setError(e?.detail || '头像上传失败')
+      setAvatarPreview(group?.avatar_url || null)
+    } finally {
+      setUploadingAvatar(false)
     }
   }
 
@@ -481,6 +521,110 @@ export default function GroupSettingsPanel({ group, onClose, onUpdate, onLeave }
                   <p className="mt-1 text-sm text-textSecondary bg-elevated rounded-lg px-3 py-2">
                     {group.announcement || t('groupSettings.noAnnouncement')}
                   </p>
+                )}
+              </div>
+
+              {/* 群头像设置 */}
+              <div>
+                <label className="text-xs font-medium text-textSecondary mb-3 block">{t('groupSettings.groupAvatar') || '群头像'}</label>
+                <div className="grid grid-cols-3 gap-2">
+                  {/* default 模式 */}
+                  <button
+                    onClick={() => { setAvatarMode('default'); saveSettings({ avatar_mode: 'default' }) }}
+                    className={`relative p-3 rounded-xl border text-center transition-colors ${
+                      avatarMode === 'default'
+                        ? 'border-primary-400 bg-primary-500/10'
+                        : 'border-border bg-elevated hover:bg-canvas'
+                    }`}
+                  >
+                    <div className="w-10 h-10 mx-auto rounded-lg bg-elevated grid grid-cols-2 gap-px overflow-hidden mb-1.5">
+                      <div className="bg-primary-400/20" />
+                      <div className="bg-mint-400/20" />
+                      <div className="bg-amber-400/20" />
+                      <div className="bg-rose-400/20" />
+                    </div>
+                    <div className="text-[11px] font-medium">默认</div>
+                    <div className="text-[10px] text-textMuted">2×2 排列</div>
+                    {avatarMode === 'default' && (
+                      <CheckCircle2 size={14} className="absolute top-1.5 right-1.5 text-primary-400" />
+                    )}
+                  </button>
+
+                  {/* members 模式 */}
+                  <button
+                    onClick={() => { setAvatarMode('members'); saveSettings({ avatar_mode: 'members', include_ai_in_avatar: includeAiAvatar }) }}
+                    className={`relative p-3 rounded-xl border text-center transition-colors ${
+                      avatarMode === 'members'
+                        ? 'border-primary-400 bg-primary-500/10'
+                        : 'border-border bg-elevated hover:bg-canvas'
+                    }`}
+                  >
+                    <div className="w-10 h-10 mx-auto rounded-lg bg-elevated flex items-center justify-center mb-1.5">
+                      <Users size={18} className="text-textSecondary" />
+                    </div>
+                    <div className="text-[11px] font-medium">成员头像</div>
+                    <div className="text-[10px] text-textMuted">排列展示</div>
+                    {avatarMode === 'members' && (
+                      <CheckCircle2 size={14} className="absolute top-1.5 right-1.5 text-primary-400" />
+                    )}
+                  </button>
+
+                  {/* custom 模式 */}
+                  <button
+                    onClick={() => setAvatarMode('custom')}
+                    className={`relative p-3 rounded-xl border text-center transition-colors ${
+                      avatarMode === 'custom'
+                        ? 'border-primary-400 bg-primary-500/10'
+                        : 'border-border bg-elevated hover:bg-canvas'
+                    }`}
+                  >
+                    <div className="w-10 h-10 mx-auto rounded-lg overflow-hidden bg-elevated flex items-center justify-center mb-1.5">
+                      {avatarPreview && avatarMode === 'custom' ? (
+                        <img src={avatarPreview} alt="" className="w-full h-full object-cover" />
+                      ) : (
+                        <Image size={18} className="text-textMuted" />
+                      )}
+                    </div>
+                    <div className="text-[11px] font-medium">自定义</div>
+                    <div className="text-[10px] text-textMuted">上传图片</div>
+                    {avatarMode === 'custom' && (
+                      <CheckCircle2 size={14} className="absolute top-1.5 right-1.5 text-primary-400" />
+                    )}
+                  </button>
+                </div>
+
+                {/* members 模式的额外选项 */}
+                {avatarMode === 'members' && isAdmin && (
+                  <div className="flex items-center justify-between mt-3 px-1">
+                    <div>
+                      <div className="text-xs text-textPrimary font-medium">包含 AI 头像</div>
+                      <div className="text-[10px] text-textMuted">关闭后只显示人类成员头像</div>
+                    </div>
+                    <Toggle
+                      checked={includeAiAvatar}
+                      onChange={(next) => {
+                        setIncludeAiAvatar(next)
+                        saveSettings({ avatar_mode: 'members', include_ai_in_avatar: next })
+                      }}
+                    />
+                  </div>
+                )}
+
+                {/* custom 模式的上传按钮 */}
+                {avatarMode === 'custom' && isAdmin && (
+                  <div className="mt-3">
+                    <label className="flex items-center justify-center gap-2 px-4 py-2.5 bg-elevated hover:bg-canvas border border-border border-dashed rounded-lg cursor-pointer text-sm text-textSecondary hover:text-textPrimary transition-colors">
+                      <Camera size={16} />
+                      {uploadingAvatar ? '上传中...' : '选择图片上传'}
+                      <input
+                        type="file"
+                        accept="image/*"
+                        className="hidden"
+                        onChange={handleAvatarUpload}
+                        disabled={uploadingAvatar}
+                      />
+                    </label>
+                  </div>
                 )}
               </div>
 

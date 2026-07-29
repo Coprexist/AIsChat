@@ -2,7 +2,7 @@
 群聊与消息路由
 """
 from datetime import datetime, timezone
-from fastapi import APIRouter, Depends, HTTPException, status, Query
+from fastapi import APIRouter, Depends, HTTPException, status, Query, UploadFile, File
 from fastapi.responses import Response
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -186,8 +186,11 @@ async def get_group_detail(
         "name": group.name,
         "owner_type": group.owner_type,
         "owner_id": group.owner_id,
-            "is_paused": group.is_paused,
+        "is_paused": group.is_paused,
         "is_vector_accelerated": group.is_vector_accelerated,
+        "avatar_mode": group.avatar_mode or "default",
+        "avatar_url": group.avatar_url,
+        "include_ai_in_avatar": group.include_ai_in_avatar,
         "created_at": str(group.created_at) if group.created_at else None,
         "member_count": member_count,
         "online_count": online_count,
@@ -448,7 +451,7 @@ async def update_group(
     current_user: dict = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
-    """更新群聊设置（名称、公告、发言限制等）。仅群主/管理员可操作。"""
+    """更新群聊设置（名称、公告、发言限制、头像等）。仅群主/管理员可操作。"""
     try:
         updates = req.model_dump(exclude_none=True)
 
@@ -465,10 +468,73 @@ async def update_group(
             "announcement": group.announcement,
             "speak_limit_per_minute": group.speak_limit_per_minute or 0,
             "speak_limit_window_seconds": group.speak_limit_window_seconds or 120,
+            "avatar_mode": group.avatar_mode or "default",
+            "avatar_url": group.avatar_url,
+            "include_ai_in_avatar": group.include_ai_in_avatar,
             "created_at": str(group.created_at) if group.created_at else None,
         }
     except ValueError as e:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
+
+
+@router.post("/groups/{group_id}/avatar", status_code=status.HTTP_200_OK)
+async def upload_group_avatar(
+    group_id: int,
+    file: UploadFile = File(...),
+    current_user: dict = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """上传群聊自定义头像。仅群主/管理员可操作。"""
+    from app.models.group import Group, GroupMember
+    from sqlalchemy import select
+
+    # 鉴权
+    result = await db.execute(select(Group).where(Group.id == group_id))
+    group = result.scalar_one_or_none()
+    if not group:
+        raise HTTPException(status_code=404, detail="群聊不存在")
+
+    member = await db.execute(
+        select(GroupMember).where(
+            GroupMember.group_id == group_id,
+            GroupMember.member_type == "human",
+            GroupMember.member_id == current_user["user_id"],
+        )
+    )
+    gm = member.scalar_one_or_none()
+    if not gm or gm.role not in ("owner", "admin"):
+        raise HTTPException(status_code=403, detail="仅群主或管理员可操作")
+
+    # 读取并校验
+    content = await file.read()
+    if len(content) > 5 * 1024 * 1024:
+        raise HTTPException(400, "头像文件大小不能超过 5MB")
+
+    import os
+    upload_dir = "/app/uploads/avatars/"
+    os.makedirs(upload_dir, exist_ok=True)
+
+    ext = os.path.splitext(file.filename or ".png")[1] or ".png"
+    filename = f"group_{group_id}_avatar{ext}"
+    filepath = os.path.join(upload_dir, filename)
+
+    # 删除旧文件
+    if os.path.isfile(filepath):
+        os.remove(filepath)
+
+    with open(filepath, "wb") as f:
+        f.write(content)
+
+    avatar_url = f"/api/fs/download-avatar/{filename}"
+    group.avatar_url = avatar_url
+    group.avatar_mode = "custom"
+    await db.flush()
+
+    return {
+        "avatar_url": avatar_url,
+        "avatar_mode": "custom",
+        "message": "头像已更新",
+    }
 
 
 @router.post("/groups/{group_id}/announcement")

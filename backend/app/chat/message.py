@@ -151,11 +151,17 @@ async def list_user_groups(db: AsyncSession, user_id: int) -> list[dict]:
             avatar_result = await db.execute(
                 select(GroupMember).where(
                     GroupMember.group_id == group.id,
-                ).limit(4)
+                )
             )
             avatar_members = avatar_result.scalars().all()
+
+            # members 模式下按 include_ai_in_avatar 过滤
+            avatar_mode = getattr(group, 'avatar_mode', 'default') or 'default'
+            include_ai = getattr(group, 'include_ai_in_avatar', True)
             for am in avatar_members:
-                avatar_url = None
+                if avatar_mode == 'members' and am.member_type == "ai" and not include_ai:
+                    continue
+                a_url = None
                 if am.member_type == "ai":
                     a_result = await db.execute(
                         select(AgentModel).where(AgentModel.user_id == am.member_id)
@@ -166,12 +172,12 @@ async def list_user_groups(db: AsyncSession, user_id: int) -> list[dict]:
                             select(AgentModel).where(AgentModel.id == am.member_id)
                         )
                         a = a_result.scalar_one_or_none()
-                    avatar_url = getattr(a, 'avatar_url', None) if a else None
+                    a_url = getattr(a, 'avatar_url', None) if a else None
                 else:
                     u = await db.get(User, am.member_id)
-                    avatar_url = getattr(u, 'avatar_url', None) if u else None
-                if avatar_url:
-                    member_avatars.append(avatar_url)
+                    a_url = getattr(u, 'avatar_url', None) if u else None
+                if a_url:
+                    member_avatars.append(a_url)
         except Exception:
             logger.warning("获取群聊 %d 成员头像失败，跳过", group.id, exc_info=True)
 
@@ -191,6 +197,9 @@ async def list_user_groups(db: AsyncSession, user_id: int) -> list[dict]:
             "last_message_at": last_message_at,
             "dnd_until": dnd_until,
             "member_avatars": member_avatars,
+            "avatar_mode": group.avatar_mode or "default",
+            "avatar_url": group.avatar_url,
+            "include_ai_in_avatar": group.include_ai_in_avatar,
             "is_pinned": False,
             "created_at": str(group.created_at) if group.created_at else None,
         })
@@ -437,6 +446,7 @@ async def update_group_settings(db: AsyncSession, group_id: int, operator_id: in
         "name", "announcement",
         "speak_limit_per_minute", "speak_limit_window_seconds",
         "is_vector_accelerated",
+        "avatar_mode", "avatar_url", "include_ai_in_avatar",
     }
     for key, value in updates.items():
         if key not in allowed_fields:
