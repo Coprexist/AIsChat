@@ -45,8 +45,68 @@ async def list_my_dm_sessions(
     current_user: dict = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
-    """获取当前用户的所有私信会话列表"""
-    return await list_dm_sessions(db, user_id=current_user["user_id"])
+    """获取当前用户的所有私信会话列表（含置顶/特别关心信息）"""
+    from app.models.user_preferences import UserDMPreference
+    from sqlalchemy import select
+
+    sessions = await list_dm_sessions(db, user_id=current_user["user_id"])
+
+    # 查当前用户的置顶偏好
+    pref_result = await db.execute(
+        select(UserDMPreference).where(
+            UserDMPreference.user_id == current_user["user_id"]
+        )
+    )
+    prefs = {p.session_id: p for p in pref_result.scalars().all()}
+
+    for s in sessions:
+        p = prefs.get(s["session_id"])
+        s["is_pinned"] = p.is_pinned if p else False
+        s["is_special_care"] = p.is_special_care if p else False
+
+    # 置顶优先，然后按最后消息时间降序
+    def sort_key(s):
+        t = 0
+        if s.get("last_message_at"):
+            try:
+                t = datetime.fromisoformat(s["last_message_at"]).timestamp()
+            except Exception:
+                t = 0
+        return (0 if s.get("is_pinned") else 1, -t)
+
+    sessions.sort(key=sort_key)
+    return sessions
+
+
+@router.post("/dm/{session_id}/pin")
+async def pin_dm(
+    session_id: str,
+    body: dict,
+    current_user: dict = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """置顶/取消置顶私信会话（含特别关心）"""
+    from app.models.user_preferences import UserDMPreference
+    from sqlalchemy import select
+    result = await db.execute(select(UserDMPreference).where(
+        UserDMPreference.user_id == current_user["user_id"],
+        UserDMPreference.session_id == session_id,
+    ))
+    pref = result.scalar_one_or_none()
+    if pref:
+        pref.is_pinned = body.get("is_pinned", True)
+        if "is_special_care" in body:
+            pref.is_special_care = body["is_special_care"]
+    else:
+        pref = UserDMPreference(
+            user_id=current_user["user_id"],
+            session_id=session_id,
+            is_pinned=body.get("is_pinned", True),
+            is_special_care=body.get("is_special_care", False),
+        )
+        db.add(pref)
+    await db.commit()
+    return {"is_pinned": pref.is_pinned, "is_special_care": pref.is_special_care}
 
 
 @router.get("/dm/{session_id}")

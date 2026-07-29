@@ -158,6 +158,7 @@ async def list_dm_sessions(db: AsyncSession, user_id: int) -> list[dict]:
             "unread_count": unread_count,
             "my_dnd_until": str(my_dnd_until) if my_dnd_until else None,
             "is_federated": is_federated,
+            "is_pinned": False,
         })
 
     return dm_list

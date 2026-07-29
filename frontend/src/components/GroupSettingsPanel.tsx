@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react'
 import { api } from '../api/client'
 import { useT } from '../i18n/I18nContext'
 import { getStateDotColor } from '../constants'
-import { X, Bell, Pause, BellOff, LogOut, UserX, Shield, ShieldOff, UserPlus, Volume2, VolumeX, Download, Clock, Globe, Loader2, ArrowLeft, Crown } from 'lucide-react'
+import { X, Bell, Pause, BellOff, LogOut, UserX, Shield, ShieldOff, UserPlus, Volume2, VolumeX, Download, Clock, Globe, Loader2, ArrowLeft, Crown, Pin, PinOff } from 'lucide-react'
 import Toggle from './Toggle'
 
 // ── 联邦共享状态（v0.2.0: 群主/AI制作者按群控制联邦共享） ──
@@ -160,6 +160,7 @@ interface GroupSettings {
   speak_limit_window_seconds: number
   concurrent_ai_limit: number
   my_role: string
+  is_pinned?: boolean
 }
 
 interface Props {
@@ -181,6 +182,7 @@ export default function GroupSettingsPanel({ group, onClose, onUpdate, onLeave }
   // 表单状态
   const [name, setName] = useState(group?.name || '')
   const [announcement, setAnnouncement] = useState(group?.announcement || '')
+  const [pinned, setPinned] = useState(false)
   const [speakLimit, setSpeakLimit] = useState(group?.speak_limit_per_minute === -1 ? -1 : (group?.speak_limit_per_minute || 0))
   const [speakWindow, setSpeakWindow] = useState(group?.speak_limit_window_seconds || 120)
   const [speakEnabled, setSpeakEnabled] = useState((group?.speak_limit_per_minute ?? 0) >= 0)
@@ -206,6 +208,10 @@ export default function GroupSettingsPanel({ group, onClose, onUpdate, onLeave }
     if (!group) return
     setName(group.name)
     setAnnouncement(group.announcement || '')
+    // 从 group 获取 is_pinned（已经在 GET /groups 中返回）
+    if (group.is_pinned !== undefined) {
+      setPinned(group.is_pinned)
+    }
     setSpeakLimit(group.speak_limit_per_minute || 0)
     setSpeakWindow(group.speak_limit_window_seconds || 120)
     setVectorAccel(group.is_vector_accelerated || false)
@@ -476,6 +482,28 @@ export default function GroupSettingsPanel({ group, onClose, onUpdate, onLeave }
                     {group.announcement || t('groupSettings.noAnnouncement')}
                   </p>
                 )}
+              </div>
+
+              {/* 置顶开关 */}
+              <div className="flex items-center justify-between">
+                <div>
+                  <div className="text-sm text-textPrimary font-medium flex items-center gap-1.5">
+                    <Pin size={14} className="text-textMuted shrink-0" />
+                    置顶聊天
+                  </div>
+                  <div className="text-xs text-textMuted">置顶后出现在侧边栏顶部</div>
+                </div>
+                <Toggle
+                  checked={pinned}
+                  onChange={async (next) => {
+                    try {
+                      await api.post(`/groups/${group.id}/pin`, { is_pinned: next })
+                      setPinned(next)
+                      // 触发全局刷新
+                      window.dispatchEvent(new CustomEvent('groupListRefresh'))
+                    } catch { /* ignore */ }
+                  }}
+                />
               </div>
 
               <hr className="border-border" />

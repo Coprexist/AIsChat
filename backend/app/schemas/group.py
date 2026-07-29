@@ -33,6 +33,7 @@ class GroupResponse(BaseModel):
     owner_type: str
     owner_id: int
     is_vector_accelerated: bool
+    is_paused: bool = False
     announcement: str | None = None
     speak_limit_per_minute: int = 0
     speak_limit_window_seconds: int = 120
@@ -40,10 +41,13 @@ class GroupResponse(BaseModel):
     unread_count: int = 0
     has_mention: bool = False
     last_message_preview: str | None = None
+    last_message_at: str | None = None
     dnd_until: str | None = None
+    is_pinned: bool = False
     created_at: str | None
     member_count: int = 0
     online_count: int = 0
+    member_avatars: list[str] = []
 
 
 class GroupMemberResponse(BaseModel):

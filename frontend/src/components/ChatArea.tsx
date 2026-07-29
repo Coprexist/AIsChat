@@ -269,6 +269,7 @@ export default function ChatArea({ groupId, dmSessionId }: ChatAreaProps) {
             owner_id: currentGroup.owner_id,
             is_vector_accelerated: currentGroup.is_vector_accelerated,
             is_paused: currentGroup.is_paused,
+            is_pinned: currentGroup.is_pinned ?? false,
             concurrent_ai_limit: currentGroup.concurrent_ai_limit,
             announcement: currentGroup.announcement,
             speak_limit_per_minute: currentGroup.speak_limit_per_minute,

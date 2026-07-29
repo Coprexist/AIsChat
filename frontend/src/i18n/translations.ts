@@ -52,6 +52,7 @@ const zh: TranslationDict = {
   'chatlist.createFirstGroup': '创建第一个群聊',
   'chatlist.dndSuffix': '免打扰',
   'chatlist.ai': 'AI',
+  'chatlist.pinned': '置顶',
 
   // ======================== 聊天区域 / ChatArea ========================
   'chat.onlineCount': '在线人数',
@@ -1819,6 +1820,7 @@ const en: TranslationDict = {
   'chatlist.createFirstGroup': 'Create your first group',
   'chatlist.dndSuffix': 'DND',
   'chatlist.ai': 'AI',
+  'chatlist.pinned': 'Pinned',
 
   // ======================== ChatArea ========================
   'chat.onlineCount': 'Online',
@@ -3544,6 +3546,7 @@ const ja: TranslationDict = {
   'chatlist.createFirstGroup': '最初のグループを作成',
   'chatlist.dndSuffix': 'おやすみ',
   'chatlist.ai': 'AI',
+  'chatlist.pinned': 'ピン留め',
 
   // ======================== チャットエリア / ChatArea ========================
   'chat.onlineCount': 'オンライン人数',

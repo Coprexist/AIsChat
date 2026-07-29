@@ -33,6 +33,7 @@ from app.models.agent_config import AgentConfig
 from app.models.agent_trigger import AgentTrigger
 from app.models.agent_attention import AgentAttention
 from app.models.agent_state_stack import AgentStateStack
+from app.models.user_preferences import UserGroupPreference, UserDMPreference
 from app.models.agent_skill_relation import AgentSkillRelation
 
 __all__ = [
@@ -82,4 +83,6 @@ __all__ = [
     "AgentAttention",
     "AgentStateStack",
     "AgentSkillRelation",
+    "UserGroupPreference",
+    "UserDMPreference",
 ]

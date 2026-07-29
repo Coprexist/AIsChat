@@ -1,7 +1,8 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { api } from '../api/client'
 import { useT } from '../i18n/I18nContext'
-import { X, Bell, BellOff, Download, Clock, ArrowLeft } from 'lucide-react'
+import { X, Bell, BellOff, Download, Clock, ArrowLeft, Pin, Heart, PinOff, HeartOff } from 'lucide-react'
+import Toggle from './Toggle'
 
 interface Partner {
   id: number
@@ -32,6 +33,24 @@ export default function DMSettingsPanel({ sessionId, partner, myDndUntil, onClos
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
   const [customMinutes, setCustomMinutes] = useState('')
+  const [pinned, setPinned] = useState(false)
+  const [specialCare, setSpecialCare] = useState(false)
+
+  // 加载时从 localStorage / 缓存查询置顶状态
+  // 更可靠的做法：从 DM sessions API 获取
+  useEffect(() => {
+    const loadPrefs = async () => {
+      try {
+        const sessions = await api.get('/dm/sessions')
+        const s = (sessions as any[]).find((x: any) => x.session_id === sessionId)
+        if (s) {
+          setPinned(s.is_pinned ?? false)
+          setSpecialCare(s.is_special_care ?? false)
+        }
+      } catch { /* ignore */ }
+    }
+    loadPrefs()
+  }, [sessionId])
 
   // 导出状态
   const [exportFormat, setExportFormat] = useState('txt')
@@ -197,6 +216,50 @@ export default function DMSettingsPanel({ sessionId, partner, myDndUntil, onClos
                 </div>
               </div>
             )}
+          </div>
+
+          <hr className="border-border" />
+
+          {/* === 置顶开关 === */}
+          <div>
+            <h3 className="text-sm font-medium text-textPrimary flex items-center gap-2 mb-3">
+              <Pin size={14} className="text-textMuted" />
+              置顶聊天
+            </h3>
+            <div className="flex items-center justify-between">
+              <div className="text-xs text-textMuted">置顶后出现在侧边栏顶部</div>
+              <Toggle
+                checked={pinned}
+                onChange={async (next) => {
+                  try {
+                    await api.post(`/dm/${sessionId}/pin`, { is_pinned: next })
+                    setPinned(next)
+                    // 触发全局刷新
+                    window.dispatchEvent(new CustomEvent('groupListRefresh'))
+                  } catch { /* ignore */ }
+                }}
+              />
+            </div>
+          </div>
+
+          {/* === 特别关心开关 === */}
+          <div>
+            <h3 className="text-sm font-medium text-textPrimary flex items-center gap-2 mb-3">
+              <Heart size={14} className="text-rose-400" />
+              特别关心
+            </h3>
+            <div className="flex items-center justify-between">
+              <div className="text-xs text-textMuted">开启后消息会以特别方式提示</div>
+              <Toggle
+                checked={specialCare}
+                onChange={async (next) => {
+                  try {
+                    await api.post(`/dm/${sessionId}/pin`, { is_pinned: pinned, is_special_care: next })
+                    setSpecialCare(next)
+                  } catch { /* ignore */ }
+                }}
+              />
+            </div>
           </div>
 
           <hr className="border-border" />

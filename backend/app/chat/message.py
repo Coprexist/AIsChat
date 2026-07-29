@@ -191,6 +191,7 @@ async def list_user_groups(db: AsyncSession, user_id: int) -> list[dict]:
             "last_message_at": last_message_at,
             "dnd_until": dnd_until,
             "member_avatars": member_avatars,
+            "is_pinned": False,
             "created_at": str(group.created_at) if group.created_at else None,
         })
     return groups

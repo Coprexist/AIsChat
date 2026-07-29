@@ -101,9 +101,63 @@ async def list_my_groups(
     current_user: dict = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
-    """获取我的群聊列表"""
+    """获取我的群聊列表（含置顶信息）"""
+    from app.models.user_preferences import UserGroupPreference
+    from sqlalchemy import select
+
     groups = await list_user_groups(db, current_user["user_id"])
+
+    # 查当前用户的置顶偏好
+    pref_result = await db.execute(
+        select(UserGroupPreference).where(
+            UserGroupPreference.user_id == current_user["user_id"]
+        )
+    )
+    prefs = {p.group_id: p.is_pinned for p in pref_result.scalars().all()}
+
+    for g in groups:
+        g["is_pinned"] = prefs.get(g["id"], False)
+
+    # 置顶优先，然后按最后消息时间降序
+    def sort_key(g):
+        t = 0
+        if g.get("last_message_at"):
+            try:
+                t = datetime.fromisoformat(g["last_message_at"]).timestamp()
+            except Exception:
+                t = 0
+        return (0 if g.get("is_pinned") else 1, -t)
+
+    groups.sort(key=sort_key)
     return groups
+
+
+@router.post("/groups/{group_id}/pin")
+async def pin_group(
+    group_id: int,
+    body: dict,
+    current_user: dict = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """置顶/取消置顶群聊"""
+    from app.models.user_preferences import UserGroupPreference
+    from sqlalchemy import select
+    result = await db.execute(select(UserGroupPreference).where(
+        UserGroupPreference.user_id == current_user["user_id"],
+        UserGroupPreference.group_id == group_id,
+    ))
+    pref = result.scalar_one_or_none()
+    if pref:
+        pref.is_pinned = body.get("is_pinned", True)
+    else:
+        pref = UserGroupPreference(
+            user_id=current_user["user_id"],
+            group_id=group_id,
+            is_pinned=body.get("is_pinned", True),
+        )
+        db.add(pref)
+    await db.commit()
+    return {"is_pinned": pref.is_pinned}
 
 
 @router.get("/groups/{group_id}", response_model=GroupResponse)
