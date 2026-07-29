@@ -288,66 +288,7 @@ export default function ProfileCard({ entityType, entityId, entityName, state, a
             </div>
           )}
 
-          {/* 用于群聊时隐藏发消息按钮上方的好友相关操作 */}
-          {isGroup ? null : (
-            <>
-              {isFriend && profile?.friendship_id && (
-                <button
-                  onClick={handleTogglePriority}
-                  disabled={togglingPriority}
-                  className={`w-full flex items-center justify-center gap-2 py-2 rounded-xl border text-sm font-medium transition-colors ${
-                    isPriority
-                      ? 'bg-amber-400/10 border-amber-400/30 text-amber-400 hover:bg-amber-400/20'
-                      : 'bg-canvas border-border text-textSecondary hover:bg-elevated'
-                  }`}
-                >
-                  <Star size={16} fill={isPriority ? 'currentColor' : 'none'} />
-                  {isPriority ? t('profileCard.priorityOn') || '已特别关心' : t('profileCard.priorityOff') || '设为特别关心'}
-                </button>
-              )}
-              {!isFriend && (
-                showAddFriend ? (
-                  <div className="space-y-2">
-                    <textarea
-                      value={friendMessage}
-                      onChange={(e) => setFriendMessage(e.target.value)}
-                      placeholder={t('profileCard.friendMessagePlaceholder')}
-                      rows={2}
-                      maxLength={200}
-                      className="w-full px-3 py-2 rounded-xl border border-border bg-canvas text-sm text-textPrimary placeholder:text-textMuted focus:outline-none focus:ring-2 focus:ring-primary-500/50 resize-none"
-                      autoFocus
-                    />
-                    <div className="flex gap-2">
-                      <button
-                        onClick={() => { setShowAddFriend(false); setFriendMessage('') }}
-                        className="flex-1 py-2 text-xs border border-border rounded-lg hover:bg-canvas text-textSecondary transition-colors"
-                      >
-                        {t('common.cancel')}
-                      </button>
-                      <button
-                        onClick={handleAddFriend}
-                        disabled={addingFriend}
-                        className="flex-1 flex items-center justify-center gap-1.5 py-2 text-xs rounded-lg bg-mint-400 text-white hover:bg-mint-500 disabled:opacity-40 transition-colors"
-                      >
-                        <UserPlus size={12} />
-                        {addingFriend ? '...' : t('profileCard.sendRequest')}
-                      </button>
-                    </div>
-                  </div>
-                ) : (
-                  <button
-                    onClick={() => setShowAddFriend(true)}
-                    className="w-full flex items-center justify-center gap-2 py-2.5 rounded-xl bg-mint-400/10 border border-mint-400/20 text-mint-400 hover:bg-mint-400/20 transition-colors text-sm font-medium"
-                  >
-                    <UserPlus size={16} />
-                    {t('profileCard.addFriend')}
-                  </button>
-                )
-              )}
-            </>
-          )}
-        </div>
-      </div>
+
 
       {/* 查看大图 */}
       {fullImg && (

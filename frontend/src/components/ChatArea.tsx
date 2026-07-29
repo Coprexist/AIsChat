@@ -5,6 +5,7 @@ import ChatView from './ChatView'
 import ChatSidebar from './ChatSidebar'
 import DMChatView from './DMChatView'
 import GroupSettingsPanel from './GroupSettingsPanel'
+import { GroupAvatarHeader, thumbUrl } from './GroupAvatar'
 import ProfileCard from './ProfileCard'
 import SearchOverlay from './SearchOverlay'
 import { Bell, BellOff, UserPlus, Settings, ArrowLeft, Bot, User, Globe, X, Check, Users } from 'lucide-react'
@@ -43,33 +44,8 @@ interface ChatAreaProps {
 
 export default function ChatArea({ groupId, dmSessionId }: ChatAreaProps) {
   const t = useT()
-/** 添加缩略图参数 */
-function thumbUrl(url: string | null | undefined): string | undefined {
-  if (!url) return undefined
-  if (url.includes('/download-avatar/') && !url.endsWith('.gif')) {
-    return url + (url.includes('?') ? '&thumb=1' : '?thumb=1')
-  }
-  return url
-}
-
 /** 群聊头部头像组件 */
-function GroupAvatarHeader({ group }: { group: Group }) {
-  const mode = group.avatar_mode || 'default'
-  if (mode === 'custom' && group.avatar_url) {
-    return (
-      <div className="w-8 h-8 rounded-lg overflow-hidden shrink-0 bg-elevated cursor-pointer hover:opacity-80 transition-opacity">
-        <img key={group.avatar_url} src={thumbUrl(group.avatar_url) || group.avatar_url} alt="" className="w-full h-full object-cover" loading="lazy" />
-      </div>
-    )
-  }
-  return (
-    <div className="w-8 h-8 rounded-lg bg-primary-500/10 flex items-center justify-center shrink-0 cursor-pointer hover:opacity-80 transition-opacity">
-      <Users size={14} className="text-primary-400/70" />
-    </div>
-  )
-}
-
-  const [groups, setGroups] = useState<Group[]>([])
+  const [groups, setGroups = useState<Group[]>([])
   const [showCreateGroup, setShowCreateGroup] = useState(false)
   const [showInvite, setShowInvite] = useState(false)
   const [showSettings, setShowSettings] = useState(false)
@@ -193,7 +169,7 @@ function GroupAvatarHeader({ group }: { group: Group }) {
             </button>
             {currentGroup && (
               <button onClick={() => setProfileGroup(currentGroup)} className="shrink-0">
-                <GroupAvatarHeader group={currentGroup} />
+                <GroupAvatarHeader g={currentGroup} />
               </button>
             )}
             <h2 className="font-semibold text-textPrimary text-sm truncate">
