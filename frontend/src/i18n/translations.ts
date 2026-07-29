@@ -248,6 +248,8 @@ const zh: TranslationDict = {
   'common.menu': '菜单',
   'common.redeemSuccess': '兑换成功',
   'common.redeemFailed': '兑换失败',
+  'common.grid': '排列',
+  'common.uploadImage': '上传图片',
 
   // ======================== 文件转发 / Forward ========================
   'forward.searchPlaceholder': '搜索群聊或联系人...',
@@ -2022,6 +2024,8 @@ const en: TranslationDict = {
   'common.menu': 'Menu',
   'common.redeemSuccess': 'Redeem successful',
   'common.redeemFailed': 'Redeem failed',
+  'common.grid': 'Grid',
+  'common.uploadImage': 'Upload Image',
 
   // ======================== Forward ========================
   'forward.searchPlaceholder': 'Search groups or contacts...',
@@ -3754,6 +3758,8 @@ const ja: TranslationDict = {
   'common.menu': 'メニュー',
   'common.redeemSuccess': '交換に成功しました',
   'common.redeemFailed': '交換に失敗しました',
+  'common.grid': 'グリッド',
+  'common.uploadImage': '画像をアップロード',
   'common.apply': '適用',
   'common.saved': '保存しました',
 

@@ -524,6 +524,8 @@ export default function GroupSettingsPanel({ group, onClose, onUpdate, onLeave }
                 )}
               </div>
 
+              {isAdmin && (
+              <>
               {/* 群头像设置 */}
               <div>
                 <label className="text-xs font-medium text-textSecondary mb-3 block">{t('groupSettings.groupAvatar')}</label>
@@ -560,7 +562,7 @@ export default function GroupSettingsPanel({ group, onClose, onUpdate, onLeave }
                       <Users size={18} className="text-textSecondary" />
                     </div>
                     <div className="text-[11px] font-medium">{t('groupSettings.avatarModeMembers')}</div>
-                    <div className="text-[10px] text-textMuted">{t('common.grid') || 'Grid'}</div>
+                    <div className="text-[10px] text-textMuted">{t('common.grid')}</div>
                     {avatarMode === 'members' && (
                       <CheckCircle2 size={14} className="absolute top-1.5 right-1.5 text-primary-400" />
                     )}
@@ -583,7 +585,7 @@ export default function GroupSettingsPanel({ group, onClose, onUpdate, onLeave }
                       )}
                     </div>
                     <div className="text-[11px] font-medium">{t('groupSettings.avatarModeCustom')}</div>
-                    <div className="text-[10px] text-textMuted">{t('common.uploadImage') || 'Upload'}</div>
+                    <div className="text-[10px] text-textMuted">{t('common.uploadImage')}</div>
                     {avatarMode === 'custom' && (
                       <CheckCircle2 size={14} className="absolute top-1.5 right-1.5 text-primary-400" />
                     )}
@@ -625,6 +627,8 @@ export default function GroupSettingsPanel({ group, onClose, onUpdate, onLeave }
                 )}
               </div>
 
+              </>
+              )}
               {/* 置顶开关 */}
               <div className="flex items-center justify-between">
                 <div>

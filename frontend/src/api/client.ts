@@ -17,9 +17,11 @@ function getApiBaseUrl(): string {
 
 class ApiError extends Error {
   status: number
+  detail: string
   constructor(message: string, status: number) {
     super(message)
     this.status = status
+    this.detail = message
   }
 }
 
