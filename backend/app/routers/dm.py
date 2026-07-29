@@ -98,6 +98,13 @@ async def send_dm(
             reply_to=body.get("reply_to"),
             attachments=body.get("attachments"),
         )
+        # WebSocket 广播
+        try:
+            from app.routers.ws import manager
+            msg["conversation_type"] = "dm"
+            await manager.broadcast_to_dm(session_id, {"type": "message", "conversation_type": "dm", "data": msg})
+        except Exception:
+            pass
         # 触发 AI 回复（如果对方是 AI）
         await _maybe_trigger_dm_ai_reply(db, session_id, msg, current_user["user_id"])
         return msg

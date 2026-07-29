@@ -2,6 +2,7 @@ import { useState, useEffect, useMemo } from 'react'
 import { Search, Send, X, FileIcon, Loader2, Check, Users, MessageSquare } from 'lucide-react'
 import { api } from '../api/client'
 import { useT } from '../i18n/I18nContext'
+import { CHAT_REFRESH_EVENT } from '../constants'
 
 interface ForwardTarget {
   type: 'group' | 'dm'
@@ -107,6 +108,9 @@ export default function ForwardFileModal({ file, onClose }: ForwardFileModalProp
 
     setSending(false)
     setDone(true)
+
+    // 通知聊天界面刷新
+    window.dispatchEvent(new CustomEvent(CHAT_REFRESH_EVENT))
 
     // 短暂显示结果后关闭
     if (failed === 0) {

@@ -284,17 +284,22 @@ async def list_files(
     requester_type: str,
     requester_id: int,
 ) -> list[dict]:
-    """列出目录内容（过滤无权条目）"""
+    """列出目录内容（过滤无权条目）
+
+    只查询请求者自身或有权限的文件，不加载全表。
+    """
     if not _check_path_safe(path):
         raise ValueError("路径不合法：仅支持相对路径")
 
-    # . 和 / 都视为根目录，不加路径过滤
-    if path in (".", "/"):
-        result = await db.execute(select(FileMetadata))
-    else:
-        result = await db.execute(
-            select(FileMetadata).where(FileMetadata.path.like(f"{path}%"))
-        )
+    # 只查询属于请求者的文件（owner 匹配），避免加载全表
+    query = select(FileMetadata).where(
+        FileMetadata.owner_type == requester_type,
+        FileMetadata.owner_id == requester_id,
+    )
+    if path not in (".", "/"):
+        query = query.where(FileMetadata.path.like(f"{path}%"))
+
+    result = await db.execute(query)
     files = result.scalars().all()
 
     filtered = []

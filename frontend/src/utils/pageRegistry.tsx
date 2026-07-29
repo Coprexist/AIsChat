@@ -23,6 +23,7 @@ const AgentsPage = lazy(() => import('../pages/AgentsPage'))
 const AgentDetailPage = lazy(() => import('../pages/AgentDetailPage'))
 const SettingsPage = lazy(() => import('../pages/SettingsPage'))
 const MePage = lazy(() => import('../pages/MePage'))
+const StoragePage = lazy(() => import('../pages/StoragePage'))
 const UsagePage = lazy(() => import('../pages/UsagePage'))
 const AdminPage = lazy(() => import('../pages/AdminPage'))
 const FriendsPage = lazy(() => import('../pages/FriendsPage'))
@@ -85,6 +86,7 @@ export function getProtectedRoutes(AdminGuardComponent: ComponentType<{ children
     { path: 'agents/:id', element: <AgentDetailPage /> },
     { path: 'me', element: <MePage /> },
     { path: 'me/usage', element: <UsagePage /> },
+    { path: 'me/storage', element: <StoragePage /> },
     { path: 'settings', element: <SettingsPage /> },
     { path: 'setup', element: <SetupPage /> },
     { path: 'instance-setup', element: <InstanceSetupPage /> },
