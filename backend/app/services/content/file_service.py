@@ -21,6 +21,8 @@ logger = logging.getLogger(__name__)
 
 def _check_path_safe(path: str) -> bool:
     """检查路径是否安全（防目录穿越）"""
+    if path in (".", "/"):
+        return True
     normalized = os.path.normpath(path)
     if normalized.startswith("..") or normalized.startswith("/"):
         return False

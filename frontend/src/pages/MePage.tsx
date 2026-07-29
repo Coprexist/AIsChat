@@ -109,7 +109,7 @@ export default function MePage() {
 
   const loadFileList = () => {
     setFileListLoading(true)
-    api.get<FileItem[]>('/fs/list?path=/&include_forwarded=true')
+    api.get<FileItem[]>('/fs/list?path=.&include_forwarded=true')
       .then(r => setFileList(Array.isArray(r) ? r : []))
       .catch(() => {})
       .finally(() => setFileListLoading(false))
