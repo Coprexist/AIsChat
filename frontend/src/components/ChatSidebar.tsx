@@ -247,10 +247,10 @@ const ChatSidebar = memo(function ChatSidebar({
     const avatars = g.member_avatars || []
 
     if (mode === 'custom' && g.avatar_url) {
-      // 自定义头像：单张图片
+      // 自定义头像：key 随 URL 变化强制 React 重建 img 元素，防浏览器缓存
       return (
         <div className="w-9 h-9 rounded-lg overflow-hidden shrink-0 bg-elevated">
-          <img src={g.avatar_url} alt="" className="w-full h-full object-cover" loading="lazy" />
+          <img key={g.avatar_url} src={g.avatar_url} alt="" className="w-full h-full object-cover" loading="lazy" />
         </div>
       )
     }

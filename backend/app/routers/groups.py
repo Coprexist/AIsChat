@@ -511,21 +511,20 @@ async def upload_group_avatar(
         raise HTTPException(400, "头像文件大小不能超过 5MB")
 
     import os
+    import uuid
     upload_dir = "/app/uploads/avatars/"
     os.makedirs(upload_dir, exist_ok=True)
 
+    # 删除旧文件
+    if group.avatar_url:
+        old_name = group.avatar_url.rsplit('/', 1)[-1]
+        old_path = os.path.join(upload_dir, old_name)
+        if os.path.isfile(old_path):
+            os.remove(old_path)
+
     ext = os.path.splitext(file.filename or ".png")[1] or ".png"
-    filename = f"group_{group_id}_avatar{ext}"
+    filename = f"group_{group_id}_{uuid.uuid4().hex[:8]}{ext}"
     filepath = os.path.join(upload_dir, filename)
-
-    # 删除旧头像文件（任意扩展名）
-    import glob
-    for old in glob.glob(os.path.join(upload_dir, f"group_{group_id}_avatar.*")):
-        try:
-            os.remove(old)
-        except OSError:
-            pass
-
     with open(filepath, "wb") as f:
         f.write(content)
 
