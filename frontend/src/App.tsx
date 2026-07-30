@@ -1,17 +1,10 @@
-import { createBrowserRouter, createHashRouter, Navigate, Outlet, useLocation } from 'react-router-dom'
+import { createBrowserRouter, Navigate, Outlet, useLocation } from 'react-router-dom'
 import { lazy } from 'react'
 import { useAuth } from './context/AuthContext'
 import Layout from './components/Layout'
 import { getPublicRoutes, getProtectedRoutes } from './utils/pageRegistry'
 
 const NotFoundPage = lazy(() => import('./pages/NotFoundPage'))
-const DemoChat = lazy(() => import('./pages/DemoChat'))
-
-const isDemo = window.location.pathname.includes('/AIsChat/') || window.location.hostname === 'coprexist.github.io'
-
-function DemoLayout() {
-  return <DemoChat />
-}
 
 function ProtectedLayout() {
   const { user, loading } = useAuth()
@@ -50,10 +43,7 @@ function AdminGuard({ children }: { children: React.ReactNode }) {
   return <>{children}</>
 }
 
-const createRouter = isDemo ? createHashRouter : createBrowserRouter
-
-export const router = createRouter([
-  ...(isDemo ? [{ path: '*', element: <DemoLayout /> }] : []),
+export const router = createBrowserRouter([
   ...getPublicRoutes(),
   {
     path: '/',
