@@ -65,7 +65,7 @@
 清零规则中包含 `[style*="background-image"]` 来匹配内联样式设置的背景图，以及 `[class*="avatar"]` / `[class*="Avatar"]` 等常见 class 模式。
 
 **局限性**：`[style*="background-image"]` 仅匹配 HTML `style` 属性中包含该字符串的元素。通过 CSS 类定义的背景图（如 `.card { background-image: url(...) }`）无法用属性选择器检测。若需要完整覆盖此场景，可以考虑：
-- 在组件层面对背景图容器约定 `data-mv-clean` 标记
+- 在组件层面对背景图容器约定 `data-mv-clean` 属性标记（如 `<div data-mv-clean className="avatar" />`），再在清零规则中增加 `[data-mv-clean] { filter: none !important; }`，这是 React 项目中最干净的解法
 - 在 apply 时结合 JS `getComputedStyle` 遍历检查
 - 当前方案对于现代 React 应用（内联 style 是主流）已覆盖绝大多数情况
 
@@ -76,7 +76,7 @@
 | blur | 模糊 | `blur(v px)` | 0–20 | 0 |
 | brightness | 亮度 | `brightness(v %)` | 0–300 | 100 |
 | contrast | 对比度 | `contrast(v %)` | 0–300 | 100 |
-| drop-shadow | 投影 | `drop-shadow(v v v*.5 rgba(0,0,0,.5))` | 0–30 | 0 |
+| drop-shadow | 投影 | `drop-shadow(v v v×0.5 rgba(0,0,0,.5))`（依次为 offset-x, offset-y, blur-radius, color） | 0–30 | 0 |
 | grayscale | 灰度 | `grayscale(v %)` | 0–100 | 0 |
 | hue-rotate | 色相旋转 | `hue-rotate(v deg)` | 0–360 | 0 |
 | invert | 反色 | `invert(v %)` | 0–100 | 0 |

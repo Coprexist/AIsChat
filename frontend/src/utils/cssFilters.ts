@@ -109,7 +109,7 @@ function applyUI(css: string): void {
   el.textContent = [
     `*:not(:has(img)):not(:has(video)):not(:has(canvas)):not(:has(picture)) { filter: ${css} !important; }`,
     `${HIGH} img, ${HIGH} video, ${HIGH} canvas, ${HIGH} picture,`,
-    `${HIGH} [style*="background-image"], ${HIGH} [class*="avatar"], ${HIGH} [class*="Avatar"]`,
+    `${HIGH} [style*="background-image"], ${HIGH} [class*="avatar"], ${HIGH} [class*="Avatar"], ${HIGH} [data-mv-clean]`,
     `{ filter: none !important; }`,
   ].join(' ')
   document.head.appendChild(el)
