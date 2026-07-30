@@ -17,9 +17,9 @@ const ICON_MAP: Record<string, any> = {
 }
 
 const SCOPE_OPTS: { value: MagicVisionScope; label: string; icon: any }[] = [
-  { value: 'all',    label: '全部生效', icon: Globe },
   { value: 'ui',     label: '仅对 UI',  icon: Monitor },
   { value: 'images', label: '仅对图片', icon: Image },
+  { value: 'all',    label: '全部生效', icon: Globe },
 ]
 
 interface Props {

@@ -55,7 +55,7 @@ function defaultFilters(): Record<string, FilterState> {
 }
 
 export function defaultPrefs(): MagicVisionPrefs {
-  return { enabled: false, scope: 'all', filters: defaultFilters() }
+  return { enabled: false, scope: 'ui', filters: defaultFilters() }
 }
 
 // ── 标准化 ──
@@ -66,7 +66,7 @@ export function normalizePrefs(raw: unknown): MagicVisionPrefs {
   const r = raw as Record<string, unknown>
   const out: MagicVisionPrefs = {
     enabled: r.enabled === true,
-    scope: ['all', 'ui', 'images'].includes(r.scope as string) ? (r.scope as MagicVisionScope) : 'all',
+    scope: ['all', 'ui', 'images'].includes(r.scope as string) ? (r.scope as MagicVisionScope) : 'ui',
     filters: { ...base.filters },
   }
   if (r.filters && typeof r.filters === 'object') {

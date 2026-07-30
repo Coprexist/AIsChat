@@ -375,7 +375,9 @@ async def update_user_settings(
     if language is not None:
         user.language = language
     if ui_prefs is not None:
-        user.ui_prefs = ui_prefs
+        existing = user.ui_prefs or {}
+        existing.update(ui_prefs)
+        user.ui_prefs = existing
     if avatar_url is not None:
         user.avatar_url = avatar_url
     if bio is not None:
