@@ -7,34 +7,34 @@ export default defineConfig(({ mode }) => {
   return {
     base: env.BASE_URL || '/',
     plugins: [react()],
-  resolve: {
-    alias: {
-      '@': path.resolve(__dirname, './src'),
-    },
-  },
-  server: {
-    port: 3000,
-    host: true,
-    allowedHosts: true,
-    watch: {
-      // Docker volume 上 fs 事件不可靠，回退到 polling
-      usePolling: true,
-    },
-    proxy: {
-      '/api': {
-        target: 'http://backend:8000',
-        changeOrigin: true,
-        rewrite: (path) => path.replace(/^\/api/, ''),
-      },
-      '/ws': {
-        target: 'ws://backend:8000',
-        ws: true,
-      },
-      '/federation': {
-        target: 'http://backend:8000',
-        changeOrigin: true,
-        ws: true,
+    resolve: {
+      alias: {
+        '@': path.resolve(__dirname, './src'),
       },
     },
-  },
+    server: {
+      port: 3000,
+      host: true,
+      allowedHosts: true,
+      watch: {
+        usePolling: true,
+      },
+      proxy: {
+        '/api': {
+          target: 'http://backend:8000',
+          changeOrigin: true,
+          rewrite: (path) => path.replace(/^\/api/, ''),
+        },
+        '/ws': {
+          target: 'ws://backend:8000',
+          ws: true,
+        },
+        '/federation': {
+          target: 'http://backend:8000',
+          changeOrigin: true,
+          ws: true,
+        },
+      },
+    },
+  }
 })
