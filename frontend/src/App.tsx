@@ -7,7 +7,7 @@ import { getPublicRoutes, getProtectedRoutes } from './utils/pageRegistry'
 const NotFoundPage = lazy(() => import('./pages/NotFoundPage'))
 const DemoChat = lazy(() => import('./pages/DemoChat'))
 
-const isDemo = typeof __IS_DEMO__ !== 'undefined' ? __IS_DEMO__ : false
+const isDemo = window.location.pathname.includes('/AIsChat/')
 
 function DemoLayout() {
   return <DemoChat />
