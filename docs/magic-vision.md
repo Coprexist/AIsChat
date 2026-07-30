@@ -73,6 +73,7 @@
 - `filter` 会改变元素的包含块（containing block），可能影响内部 `position: fixed` 元素的定位
 - 每个接受 `filter` 的元素创建堆叠上下文，大量元素时可能增加 GPU 合成层内存
 - 浏览器打印模式下通常禁用 CSS 滤镜
+- React portal 若渲染到 `#root` 之外且容器无 `id` 属性，`[id]` 清零规则可能不覆盖。建议 portal 挂载点添加 `id` 属性
 
 ## 10 种滤镜函数
 
