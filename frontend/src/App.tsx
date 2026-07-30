@@ -1,10 +1,17 @@
-import { createBrowserRouter, Navigate, Outlet, useLocation } from 'react-router-dom'
+import { createBrowserRouter, createHashRouter, Navigate, Outlet, useLocation } from 'react-router-dom'
 import { lazy } from 'react'
 import { useAuth } from './context/AuthContext'
 import Layout from './components/Layout'
 import { getPublicRoutes, getProtectedRoutes } from './utils/pageRegistry'
 
 const NotFoundPage = lazy(() => import('./pages/NotFoundPage'))
+const DemoChat = lazy(() => import('./pages/DemoChat'))
+
+const isDemo = import.meta.env.VITE_APP_MODE === 'demo'
+
+function DemoLayout() {
+  return <DemoChat />
+}
 
 function ProtectedLayout() {
   const { user, loading } = useAuth()
@@ -43,7 +50,10 @@ function AdminGuard({ children }: { children: React.ReactNode }) {
   return <>{children}</>
 }
 
-export const router = createBrowserRouter([
+const createRouter = isDemo ? createHashRouter : createBrowserRouter
+
+export const router = createRouter([
+  ...(isDemo ? [{ path: '/', element: <DemoLayout /> }] : []),
   ...getPublicRoutes(),
   {
     path: '/',
