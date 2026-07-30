@@ -5,7 +5,7 @@ import { useTheme } from '../context/ThemeContext'
 import { useT } from '../i18n/I18nContext'
 import Toggle from '../components/Toggle'
 import MagicVisionFilter from '../components/MagicVisionFilter.tsx'
-import { normalizePrefs, defaultPrefs } from '../utils/cssFilters'
+import { normalizePrefs, defaultPrefs, saveToStorage, apply } from '../utils/cssFilters'
 import type { MagicVisionPrefs } from '../utils/cssFilters'
 import { useResizableSidebar } from '../hooks/useResizableSidebar'
 import VerificationCodeInput from '../components/VerificationCodeInput'
@@ -379,7 +379,9 @@ export default function SettingsPage() {
         chatStyle,
         uiScale,
       })
+      saveToStorage(magicVision)
       refreshUser()
+      apply(magicVision)
       api.get<any[]>('/agents').then(list => setAgents(list || [])).catch(() => {})
     } catch (err: any) {
       setMessage(err.message || t('error.saveFailed'))
