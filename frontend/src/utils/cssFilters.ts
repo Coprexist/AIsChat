@@ -95,7 +95,7 @@ export function buildCSS(filters: Record<string, FilterState>): string {
 // ── DOM 注入 ──
 
 const STYLE_ID = 'magic-vision-style'
-/** 高特异性前缀，匹配 :has() 四个伪类的权重 (0,4,0) */
+/** 高特异性前缀：:not(.a) ×4 各贡献 (0,1,0)，合计 (0,4,0) + img = (0,4,1)，压过 :not(:has(img)) ×4 的 (0,0,4) */
 const HIGH = ':not(.a):not(.b):not(.c):not(.d)'
 
 function clearAll(): void {

@@ -8,7 +8,7 @@
 
 | 模式 | 实现方式 | 原理 |
 |------|---------|------|
-| `all` 全部生效 | `html.style.filter` | 直接挂 `<html>`，所有子孙继承 |
+| `all` 全部生效 | `html.style.filter` | 直接挂 `<html>`，整页作为其渲染内容被滤镜处理（`filter` 非继承属性） |
 | `images` 仅对图片 | `<style>* { filter: none !important } img, video... { filter: css !important }</style>` | 先通配清零所有元素，再对媒体元素单独激活滤镜 |
 | `ui` 仅对 UI | `<style>*:not(:has(img)):not(:has(video)):not(:has(canvas)):not(:has(picture)) { filter: css !important } img, video... { filter: none !important }</style>` | CSS `:has()` 父选择器跳过含媒体子树的容器；高特异性清理规则保护媒体元素不被优先级压过 |
 
@@ -22,7 +22,7 @@
 }
 ```
 
-每个不含媒体的元素独自分层渲染，图片所在的祖先容器不挂滤镜，图片本身也被清零规则拦截。
+图片所在的祖先容器不挂滤镜，图片本身也被清零规则拦截。接受 `filter` 的元素浏览器会创建堆叠上下文。
 
 ### 为什么不用 JS 遍历（TreeWalker）
 
@@ -47,18 +47,18 @@
 这是实现中最容易踩的坑。清零规则必须压过通配符选择器：
 
 ```css
-/* 通配符：4 个 :not(:has(...)) → 优先级 (0,4,0) */
+/* 通配符：4 个 :not(:has(...)) → 每个 :not(:has(img)) 的优先级为 (0,0,1)，合计 (0,0,4) */
 *:not(:has(img)):not(:has(video)):not(:has(canvas)):not(:has(picture)) {
   filter: hue-rotate(90deg) !important;
 }
 
-/* 清零规则：4 个 :not(.x) + img → 优先级 (0,4,1) > (0,4,0) */
+/* 清零规则：4 个 :not(.x)（各 (0,1,0)）+ img → 优先级 (0,4,1) > (0,0,4) */
 :not(.a):not(.b):not(.c):not(.d) img {
   filter: none !important;
 }
 ```
 
-`!important` 同时存在时优先比较特异性（specificity），`:not(.a):not(.b):not(.c):not(.d) img` 的特异性为 (0,4,1)，略高于 `*:not(:has(img)):not(:has(video)):not(:has(canvas)):not(:has(picture))` 的 (0,4,0)，所以清零规则胜出。
+`!important` 同时存在时优先比较特异性（specificity），`:not(.a):not(.b):not(.c):not(.d) img` 的特异性为 (0,4,1)，高于 `*:not(:has(img)):not(:has(video)):not(:has(canvas)):not(:has(picture))` 的 (0,0,4)，清零规则胜出。
 
 ## 背景图清零说明
 
