@@ -7,7 +7,7 @@ import { getPublicRoutes, getProtectedRoutes } from './utils/pageRegistry'
 const NotFoundPage = lazy(() => import('./pages/NotFoundPage'))
 const DemoChat = lazy(() => import('./pages/DemoChat'))
 
-const isDemo = import.meta.env.VITE_APP_MODE === 'demo' || window.location.hostname === 'coprexist.github.io'
+const isDemo = typeof __IS_DEMO__ !== 'undefined' ? __IS_DEMO__ : false
 
 function DemoLayout() {
   return <DemoChat />
