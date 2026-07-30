@@ -5,7 +5,7 @@ import path from 'path'
 export default defineConfig({
   base: process.env.BASE_URL || '/',
   define: {
-    __IS_DEMO__: process.env.BASE_URL ? 'true' : 'false',
+    __IS_DEMO__: process.env.BASE_URL ? true : false,
   },
   plugins: [react()],
   resolve: {
