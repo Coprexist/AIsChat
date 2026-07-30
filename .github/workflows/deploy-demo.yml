@@ -3,9 +3,6 @@ name: Deploy Demo Site
 on:
   push:
     branches: [main]
-    paths:
-      - 'frontend/**'
-      - '.github/workflows/deploy-demo.yml'
 
 permissions:
   contents: read
