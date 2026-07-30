@@ -262,6 +262,7 @@ async def get_user_info(db: AsyncSession, user_id: int) -> dict:
         "ui_prefs": user.ui_prefs or {},
         "setup_completed": getattr(user, "setup_completed", True),
         "created_at": str(user.created_at) if user.created_at else None,
+        "prefer_own_key": getattr(user, 'prefer_own_key', False),
         "assigned_pool_key_name": assigned_pool_key_name,
         "email": getattr(user, "email", None),
         "email_verified": getattr(user, "email_verified", False),
@@ -345,6 +346,7 @@ async def update_user_settings(
     bio: str | None = None,
     status_text: str | None = None,
     status_color: str | None = None,
+    prefer_own_key: bool | None = None,
 ) -> dict:
     """更新用户设置（含用户名和密码修改）"""
     result = await db.execute(select(User).where(User.id == user_id))
@@ -382,6 +384,8 @@ async def update_user_settings(
         user.status_text = status_text
     if status_color is not None:
         user.status_color = status_color
+    if prefer_own_key is not None:
+        user.prefer_own_key = prefer_own_key
 
     await db.flush()
     await db.refresh(user)

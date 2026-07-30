@@ -5,6 +5,7 @@ import MobileNav from './MobileNav'
 import BalancePromptModal from './BalancePromptModal'
 import { useDesktopNotification } from '../hooks/useDesktopNotification'
 import { Wrench } from 'lucide-react'
+import { loadFromStorage, apply } from '../utils/cssFilters'
 
 export default function Layout() {
   const [drawerOpen, setDrawerOpen] = useState(false)
@@ -18,6 +19,12 @@ export default function Layout() {
   const [softOnce, setSoftOnce] = useState(false)
   const [imgError, setImgError] = useState(false)
   const location = useLocation()
+
+  // 魔视界：首屏渲染完成后恢复 CSS 滤镜
+  useEffect(() => {
+    const p = loadFromStorage()
+    if (p) apply(p)
+  }, [])
 
   useEffect(() => {
     const fetchMsg = async () => {

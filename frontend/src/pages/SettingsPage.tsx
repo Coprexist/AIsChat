@@ -4,6 +4,9 @@ import { useAuth } from '../context/AuthContext'
 import { useTheme } from '../context/ThemeContext'
 import { useT } from '../i18n/I18nContext'
 import Toggle from '../components/Toggle'
+import MagicVisionFilter from '../components/MagicVisionFilter.tsx'
+import { normalizePrefs, defaultPrefs } from '../utils/cssFilters'
+import type { MagicVisionPrefs } from '../utils/cssFilters'
 import { useResizableSidebar } from '../hooks/useResizableSidebar'
 import VerificationCodeInput from '../components/VerificationCodeInput'
 import { LANGUAGES } from '../i18n/languages'
@@ -82,10 +85,12 @@ export default function SettingsPage() {
   const [showApiKey, setShowApiKey] = useState(false)
   const [testing, setTesting] = useState(false)
   const [testResult, setTestResult] = useState<'success' | 'fail' | null>(null)
+  const [preferOwnKey, setPreferOwnKey] = useState(false)
   const [autoTimeout, setAutoTimeout] = useState(60)
   const [autoDefault, setAutoDefault] = useState(false)
   const [timezone, setTimezone] = useState('Asia/Shanghai')
   const [language, setLanguage] = useState('zh')
+  const [magicVision, setMagicVision] = useState<MagicVisionPrefs>(defaultPrefs())
   const [chatStyle, setChatStyle] = useState('cozy')
   const [uiScale, setUiScale] = useState(() => {
     try { return parseFloat(localStorage.getItem('ui_scale') || '1') } catch { return 1 }
@@ -289,14 +294,17 @@ export default function SettingsPage() {
         setApiBaseUrl(apiUrl)
         setAutoTimeout(to)
         setAutoDefault(ad)
+        setPreferOwnKey(data.prefer_own_key ?? false)
         if (data.timezone) setTimezone(tz)
         if (data.language) setLanguage(lang)
+        setMagicVision(normalizePrefs(data.ui_prefs?.magic_vision))
         if (data.ui_prefs?.chat_style) { setChatStyle(style); try { localStorage.setItem('chat_style', style) } catch {} }
         if (data.ui_prefs?.ui_scale) {
           const s = parseFloat(data.ui_prefs.ui_scale)
           if (s >= 0.7 && s <= 1.5) { setUiScale(s); try { localStorage.setItem('ui_scale', String(s)) } catch {} }
         }
         setSavedValues({
+          preferOwnKey: data.prefer_own_key ?? false,
           apiBaseUrl: apiUrl,
           autoTimeout: to,
           autoDefault: ad,
@@ -350,6 +358,7 @@ export default function SettingsPage() {
     setMessage('')
     try {
       await api.put('/user/settings', {
+        prefer_own_key: preferOwnKey,
         api_base_url: apiBaseUrl || null,
         api_key: apiKey || null,
         auto_approve_vector_timeout: autoTimeout,
@@ -629,6 +638,18 @@ export default function SettingsPage() {
               </button>
             </div>
           </div>
+
+          {/* 优先使用本人 API Key 开关 */}
+          <div className="flex items-center justify-between py-3 border-t border-border mt-3">
+            <div className="flex-1">
+              <span className="text-sm font-medium text-textPrimary">优先使用本人 API Key</span>
+              <p className="text-xs text-textMuted mt-0.5">开启后优先使用自己的 API Key，再尝试系统额度</p>
+            </div>
+            <Toggle
+              enabled={preferOwnKey}
+              onChange={setPreferOwnKey}
+            />
+          </div>
         </div>
 
         {/* 单 AI API 配置 */}
@@ -897,6 +918,12 @@ export default function SettingsPage() {
           </div>
           <Toggle checked={theme === 'dark'} onChange={() => toggleTheme()} />
         </div>
+
+        {/* 魔视界 - CSS 滤镜 */}
+        <MagicVisionFilter
+          value={magicVision}
+          onChange={(v) => setMagicVision(v)}
+        />
       </div>
 
       {/* 桌面通知 */}

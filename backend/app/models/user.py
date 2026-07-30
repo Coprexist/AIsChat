@@ -39,6 +39,9 @@ class User(Base):
     # 平台赠送额度（独立于兑换码额度，管理员全局调控）
     platform_gifted_credit = Column(Integer, default=0, comment="平台赠送额度（独立于兑换码额度）")
 
+    # 优先使用本人 API Key（跳过池 Key，先用自己的）
+    prefer_own_key = Column(Boolean, default=False, comment="优先使用本人API Key")
+
     # AI 包断额度（创建 AI 时一次性支付 api_credit_cost，该 AI 后续调用全免）
     agent_bundle_credit = Column(Integer, default=0)
 

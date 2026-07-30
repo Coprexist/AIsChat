@@ -27,6 +27,7 @@ class UpdateSettingsRequest(BaseModel):
     timezone: str | None = None
     language: str | None = None
     ui_prefs: dict | None = None
+    prefer_own_key: bool | None = None
     avatar_url: str | None = None
     bio: str | None = None
     status_text: str | None = None
@@ -67,6 +68,7 @@ async def update_settings(
             bio=req.bio,
             status_text=req.status_text,
             status_color=req.status_color,
+            prefer_own_key=req.prefer_own_key,
         )
     except ValueError as e:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))

@@ -26,7 +26,7 @@ from app.config import settings
 from app.chat import chat_api
 from app.services.memory.context_compression_service import should_compress, inline_compress, get_compression_threshold
 from app.utils.text import extract_mentions as _extract_mentions, check_mention as _check_mention
-from app.ai.executor import _tool_call_loop, _active_run_agent_ids, _get_api_config, _check_rate_limit, _send_system_error
+from app.ai.executor import _tool_call_loop, _active_run_agent_ids, _get_api_config, _check_rate_limit, _send_system_error, _send_system_error_notification
 from app.ai.alarm import _process_alarm_event
 
 logger = logging.getLogger(__name__)
@@ -423,7 +423,9 @@ async def _maybe_trigger_ai_reply(
         return
 
     # 5. 获取 API 配置（v0.1.4: 公共辅助函数；v0.1.5: 四层优先链含池 Key）
-    api_key, api_base, credit_source, pool_key_id, provider_info = await _get_api_config(db, agent)
+    api_key, api_base, credit_source, pool_key_id, provider_info = await _get_api_config(
+        db, agent, chatter_id=sender_id
+    )
     logger.info(f"🔍 AI {agent.name}: api_base={api_base}, has_api_key={api_key is not None}, "
                 f"credit_source={credit_source}")
 

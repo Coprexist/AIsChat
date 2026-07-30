@@ -121,6 +121,45 @@ async def _send_system_error(
         logger.error(f"  发送系统通知失败: {e}")
 
 
+async def _send_system_error_notification(db, agent, content: str):
+    """发送自定义系统通知（降级/余额不足等），走 DM 发给 AI 的 owner"""
+    from app.models.dm import DMMessage, DMSession
+    SYSTEM_USER_ID = 0
+    try:
+        owner_id = agent.owner_id
+        if not owner_id:
+            return
+        dm_session = await chat_api.get_or_create_dm_session(db, SYSTEM_USER_ID, owner_id)
+        dm_sid = dm_session.session_id
+        dm_msg = DMMessage(
+            session_id=dm_sid,
+            sender_id=SYSTEM_USER_ID,
+            content=content,
+        )
+        db.add(dm_msg)
+        await db.commit()
+        await db.refresh(dm_msg)
+        try:
+            await chat_api.broadcast_to_dm(dm_sid, {
+                "type": "new_dm_message",
+                "message": {
+                    "id": dm_msg.id,
+                    "session_id": dm_sid,
+                    "sender_id": SYSTEM_USER_ID,
+                    "sender_name": "系统通知",
+                    "sender_avatar_url": None,
+                    "content": content,
+                    "created_at": dm_msg.created_at.isoformat() if dm_msg.created_at else None,
+                    "is_system": True,
+                },
+            })
+        except Exception:
+            pass
+        logger.info(f"📬 自定义通知已发送给 AI {agent.name}({agent.id}) 的 Owner({owner_id})")
+    except Exception as e:
+        logger.error(f"  发送自定义通知失败: {e}")
+
+
 # ============================================================
 # API 配置获取
 # ============================================================
@@ -131,17 +170,21 @@ async def _get_api_config(
     chatter_id: int | None = None,
     force_own_key: bool = False,
     conversation_type: str | None = None,
+    excluded_sources: set[str] | None = None,
 ) -> tuple[str | None, str, str, int | None, dict]:
     """
     获取 API Key 和 Base URL（四层优先链 + 平台赠送额度）。
 
     Tier 1: Agent 自有 Key
     Tier 2: 账单人有可用额度 → API Key 池
-    Tier 3: 账单人有 api_credit + 无绑定 → 自动选最优池 Key
-    Tier 4: 账单人自有 Key
+    Tier 3: 账单人自有 Key (api_credit/自配)
+
+    excluded_sources: 已尝试失败的来源，跳过（"agent_key", "pool_key", "user_key"）
+
+    prefer_own_key=True 时，账单人自有 Key 优先于池 Key。
 
     v0.1.8: chatter_id 决定账单人（通用 AI 扣聊天者，否则扣主人）。
-            force_own_key=True 时跳过 Tier 2/3，直接走账单人自有 Key。
+            force_own_key=True 时跳过池 Key，直接走账单人自有 Key。
     v0.2.2: 返回 provider_info 字典，含 thinking_supported / models / base_url。
     v1.1.0: conversation_type + group_owner_pays 控制群聊账单人。
 
@@ -156,53 +199,65 @@ async def _get_api_config(
     pool_key_id = None
     provider_info = {"thinking_supported": settings.is_deepseek_api, "base_url": api_base}
 
+    if excluded_sources is None:
+        excluded_sources = set()
+
     # 确定账单人
-    # v1.1.0: 群聊 + group_owner_pays → 主人付（即使 AI 是通用/半通用）
     if conversation_type and conversation_type != "dm" and getattr(agent, 'group_owner_pays', True):
         bill_user_id = agent.owner_id
     elif chatter_id and agent.ai_type in ("general", "semi_general"):
-        bill_user_id = chatter_id  # DM + 通用/半通用 → 聊天者付
+        bill_user_id = chatter_id
     else:
-        bill_user_id = agent.owner_id  # 其余 → 主人付
+        bill_user_id = agent.owner_id
+
+    # 查账单用户
+    user_result = await db.execute(select(UserModel).where(UserModel.id == bill_user_id))
+    user = user_result.scalar_one_or_none()
 
     # Tier 1: Agent 自有 Key
-    if agent.api_key_encrypted:
+    if "agent_key" not in excluded_sources and agent.api_key_encrypted:
         api_key = decrypt_api_key(agent.api_key_encrypted)
         api_base = agent.api_base_url or settings.deepseek_base_url
         credit_source = "agent_key"
         provider_info = {"thinking_supported": "deepseek.com" in api_base, "base_url": api_base}
         return api_key, api_base, credit_source, pool_key_id, provider_info
 
-    # 查账单用户
-    user_result = await db.execute(select(UserModel).where(UserModel.id == bill_user_id))
-    user = user_result.scalar_one_or_none()
-
     if user is None:
         return api_key, api_base, credit_source, pool_key_id, provider_info
 
-    # force_own_key: 跳过池 Key，直接走用户自有 Key
+    prefer_own = getattr(user, 'prefer_own_key', False)
+
+    # force_own_key: 跳过池 Key
     if force_own_key:
-        if user.api_key_encrypted:
+        if "user_key" not in excluded_sources and user.api_key_encrypted:
             api_key = decrypt_api_key(user.api_key_encrypted)
             api_base = user.api_base_url or settings.deepseek_base_url
             credit_source = "user_key"
             provider_info = {"thinking_supported": "deepseek.com" in api_base, "base_url": api_base}
         return api_key, api_base, credit_source, pool_key_id, provider_info
 
-    # 有效可用额度 = 平台赠送（截断>=0） + api_credit
     effective_credit = max(0, (user.platform_gifted_credit or 0)) + (user.api_credit or 0)
 
-    # Tier 2 & 3: 用户有可用额度 → 使用 API Key 池
-    if effective_credit > 0:
-        from app.services.infrastructure.quota_service import find_best_pool_key
-        pool_key = await find_best_pool_key(db, user.id, exclude_pool_key_id=exclude_pool_key_id)
-        if pool_key:
+    # 定义 tier 顺序（prefer_own 交换 pool_key 和 user_key 的优先级）
+    if prefer_own:
+        tier_order = [("user_key", user.api_key_encrypted), ("pool_key", effective_credit > 0)]
+    else:
+        tier_order = [("pool_key", effective_credit > 0), ("user_key", user.api_key_encrypted)]
+
+    for source_name, available in tier_order:
+        if source_name in excluded_sources or not available:
+            continue
+
+        if source_name == "pool_key":
+            from app.services.infrastructure.quota_service import find_best_pool_key
+            pool_key = await find_best_pool_key(db, user.id, exclude_pool_key_id=exclude_pool_key_id)
+            if not pool_key:
+                continue
             try:
                 api_key = decrypt_api_key(pool_key.api_key_encrypted)
                 api_base = pool_key.api_base_url or settings.deepseek_base_url
                 credit_source = "pool_key"
                 pool_key_id = pool_key.id
-                # v0.2.2: 获取池 Key 的供应商配置
                 from app.services.infrastructure.system_settings_service import get_provider_for_pool_key
                 pool_provider = await get_provider_for_pool_key(db, pool_key)
                 provider_info = {
@@ -212,15 +267,18 @@ async def _get_api_config(
                 }
                 return api_key, api_base, credit_source, pool_key_id, provider_info
             except Exception as e:
-                logger.warning(f"  ⚠️ 池 Key {pool_key.id} 解密失败: {e}，回退到用户自有 Key")
+                logger.warning(f"  ⚠️ 池 Key {pool_key.id} 解密失败: {e}")
+                continue
 
-    # Tier 4: 用户自有 Key
-    if user.api_key_encrypted:
-        api_key = decrypt_api_key(user.api_key_encrypted)
-        api_base = user.api_base_url or settings.deepseek_base_url
-        credit_source = "user_key"
-        provider_info = {"thinking_supported": "deepseek.com" in api_base, "base_url": api_base}
+        elif source_name == "user_key":
+            if user.api_key_encrypted:
+                api_key = decrypt_api_key(user.api_key_encrypted)
+                api_base = user.api_base_url or settings.deepseek_base_url
+                credit_source = "user_key"
+                provider_info = {"thinking_supported": "deepseek.com" in api_base, "base_url": api_base}
+                return api_key, api_base, credit_source, pool_key_id, provider_info
 
+    # 以上都不可用 → 返回空
     return api_key, api_base, credit_source, pool_key_id, provider_info
 
 
@@ -299,9 +357,9 @@ async def _tool_call_loop(
         from app.ai.llm import RateLimitError, ServerError, KeyFatalError
         from app.services.infrastructure.api_key_concurrency import concurrency_mgr
 
-        MAX_KEY_SWITCHES = 3
         MAX_SERVER_RETRIES = 2
-        last_limited_key_id = pool_key_id  # 初始值，429 后更新
+        excluded_sources: set[str] = set()  # 已尝试失败的来源（tier 级别）
+        _excluded_pool_key_id: int | None = None  # 429 限流时排除特定池 Key
         last_error_type = None  # 追踪最后一个错误类型，用于系统通知
         last_error_detail = ""
         current_api_key = api_key
@@ -310,12 +368,21 @@ async def _tool_call_loop(
         current_pool_key_id = pool_key_id
 
         response = None
-        for key_attempt in range(MAX_KEY_SWITCHES):
-            # 切换 Key 时重新获取配置
-            if key_attempt > 0 and last_limited_key_id:
-                exclude_id = last_limited_key_id
+        # 降级重试循环：逐 tier 尝试，KeyFatal → 排除来源 → 下一级
+        for key_attempt in range(3):
+            # 切换 Key 或 tier 时重新获取配置
+            if key_attempt > 0:
+                _prev_source = current_credit_source
                 current_api_key, current_api_base, current_credit_source, current_pool_key_id, _ = \
-                    await _get_api_config(db, agent, exclude_pool_key_id=exclude_id)
+                    await _get_api_config(db, agent, excluded_sources=excluded_sources,
+                                          exclude_pool_key_id=_excluded_pool_key_id,
+                                          chatter_id=trigger_user_id)
+                # 没有新 tier 可用 → 跳出
+                if not current_api_key:
+                    break
+                # 同 tier 但没换到新 Key（非 pool_key 场景）→ 跳出
+                if current_credit_source == _prev_source and current_credit_source != "pool_key":
+                    break
 
             # 获取并发槽位
             acquired = False
@@ -550,21 +617,61 @@ async def _tool_call_loop(
                 last_error_detail = e.message
                 if current_pool_key_id:
                     await concurrency_mgr.mark_rate_limited(current_pool_key_id)
-                last_limited_key_id = current_pool_key_id
+                    _excluded_pool_key_id = current_pool_key_id
                 logger.warning(
                     f"AI {agent.name}({agent.id}) Key #{current_pool_key_id} 429，"
-                    f"冷却 60s，换 Key ({key_attempt + 1}/{MAX_KEY_SWITCHES})"
+                    f"冷却 60s，换池 Key ({key_attempt + 1}/3)"
                 )
                 continue
 
             except KeyFatalError as e:
-                last_error_type = "auth_error" if e.status_code == 401 else "insufficient_balance" if e.status_code == 402 else "key_fatal"
+                fatal_type = "auth_error" if e.status_code == 401 else "insufficient_balance" if e.status_code == 402 else "key_fatal"
+                last_error_type = fatal_type
                 last_error_detail = e.message
                 await _log_key_fatal(db, current_pool_key_id, e.status_code, e.message)
-                last_limited_key_id = current_pool_key_id
+                excluded_sources.add(current_credit_source)
+
+                # ── 降级通知：当前 tier 不可用，尝试下一级 ──
+                tier_name = {
+                    "agent_key": "AI 自有",
+                    "user_key": "你的 API",
+                    "pool_key": "系统额度",
+                }.get(current_credit_source, current_credit_source)
+
+                # 检查是否还有下一级可尝试
+                _next_check = await _get_api_config(
+                    db, agent, excluded_sources=excluded_sources,
+                    chatter_id=trigger_user_id
+                )
+                has_fallback = _next_check[0] is not None
+
+                if has_fallback:
+                    msg_text = (
+                        f"⚠️ **{tier_name} Key 不可用**"
+                        f"（{'余额不足' if e.status_code == 402 else 'API Key 无效' if e.status_code == 401 else '未知错误'}）。\n"
+                        f"正在自动切换至下一优先级额度…"
+                    )
+                elif current_credit_source == "pool_key":
+                    msg_text = (
+                        f"⚠️ **系统额度暂不可用**（{'余额不足' if e.status_code == 402 else 'API Key 无效' if e.status_code == 401 else '未知错误'}）。\n"
+                        f"此次不记入你的额度使用情况。请稍后重试或联系管理员。"
+                    )
+                elif current_credit_source == "user_key":
+                    msg_text = (
+                        f"⚠️ **你的 API 余额不足**，且无可用系统额度。\n"
+                        f"请前往 [个人设置](/settings) 更新 API Key 或联系管理员补充额度。"
+                    )
+                else:
+                    msg_text = (
+                        f"⚠️ AI「{agent.name}」的 API 调用失败"
+                        f"（{'余额不足' if e.status_code == 402 else 'API Key 无效' if e.status_code == 401 else '未知错误'}）。\n"
+                        f"请检查 API 配置。"
+                    )
+
+                await _send_system_error_notification(db, agent, msg_text)
                 logger.error(
-                    f"AI {agent.name}({agent.id}) Key #{current_pool_key_id} "
-                    f"{e.status_code} 不可用，跳过换下一个 ({key_attempt + 1}/{MAX_KEY_SWITCHES})"
+                    f"AI {agent.name}({agent.id}) {current_credit_source} "
+                    f"{e.status_code} 不可用，尝试降级 ({key_attempt + 1}/3)"
                 )
                 continue
 

@@ -74,6 +74,7 @@ async def run_migrations():
             await _migrate_friendship_priority(db)    # v2.0.6 特别关心
             await _migrate_concurrent_ai_limit_default(db)  # v2.0.7 全局默认AI并发数
             await _migrate_drop_skill_type_constraint(db)  # v2.1.0 Skill 类型约束 → 注册表
+            await _migrate_prefer_own_key(db)          # v2.1.0 优先使用本人API Key
             await _migrate_others_chat_controls(db)  # v0.1.8 对话权限 + 限额控制（必须在 select(Agent) 之前）
             await _migrate_email_verification(db)  # v0.2.0 邮箱认证（必须在 select(Agent) 之前）
             await _migrate_provider_config(db)      # v0.2.0 LLM 厂商预设
@@ -2812,3 +2813,14 @@ async def _migrate_drop_skill_type_constraint(db):
         logger.info("  ✅ 已删除 ck_agent_skills_type 约束（Skill 类型现由注册表管理）")
     except Exception as e:
         logger.warning(f"  ⚠️ 删除约束 ck_agent_skills_type 时出错（可能不存在）: {e}")
+
+
+async def _migrate_prefer_own_key(db):
+    """v2.1.0: users 表添加 prefer_own_key 列（优先使用本人 API Key）"""
+    if await _column_exists(db, "users", "prefer_own_key"):
+        logger.info("  ⏭ users.prefer_own_key 已存在，跳过")
+    else:
+        logger.info("  ⚙️ 添加 users.prefer_own_key 列")
+        await db.execute(text("ALTER TABLE users ADD COLUMN prefer_own_key BOOLEAN NOT NULL DEFAULT FALSE"))
+        await db.flush()
+        logger.info("  ✅ users.prefer_own_key 添加完成（默认 FALSE）")
