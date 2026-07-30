@@ -34,7 +34,7 @@
 
 ## CSS 优先级处理
 
-清零规则必须压过通配符选择器。使用**隐藏锚点元素** `#mv` 提供确定性的高特异性：
+清零规则必须压过通配符选择器。使用 `[id]` 属性选择器提供确定性的高特异性：
 
 ```css
 /* :has() 规则：4 个 not(:has(...)) → 优先级 (0,0,4) */
@@ -42,14 +42,14 @@
   filter: hue-rotate(90deg) !important;
 }
 
-/* 清零规则：#mv img → 优先级 (1,0,1) > (0,0,4) */
-#mv img, #mv video, #mv canvas, #mv picture,
-#mv [style*="background-image"], #mv [class*="avatar"], #mv [class*="Avatar"], #mv [data-mv-clean] {
+/* 清零规则：[id] 属性选择器特异性 (0,1,0) + img = (0,1,1) > (0,0,4) */
+[id] img, [id] video, [id] canvas, [id] picture,
+[id] [style*="background-image"], [id] [class*="avatar"], [id] [class*="Avatar"], [id] [data-mv-clean] {
   filter: none !important;
 }
 ```
 
-`#mv` 是一个 `display:none` 的 `<div>`，不影响页面布局。`#mv img` 的选择器特异性为 (1,0,1)，确定性地压过 `:has()` 的 (0,0,4)。
+`[id]` 匹配所有带 `id` 属性的元素（React 的 `<div id="root">` 天然存在），无需注入额外 DOM。特异性 (0,1,1) 确定性地压过 `:has()` 的 (0,0,4)。
 
 ### 为什么不用 JS 遍历（TreeWalker）
 

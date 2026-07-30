@@ -95,27 +95,22 @@ export function buildCSS(filters: Record<string, FilterState>): string {
 // ── DOM 注入 ──
 
 const STYLE_ID = 'magic-vision-style'
-const MV_ID = 'mv'  /** 隐藏锚点，用于 #mv img 特异性 (1,0,1)，碾压 :has() 的 (0,0,4) */
+/** [id] 属性选择器特异性 (0,1,0) + img = (0,1,1) 压过 :has() 的 (0,0,4)，无需额外 DOM */
+const HIGH = '[id]'
 
 function clearAll(): void {
   document.getElementById(STYLE_ID)?.remove()
-  document.getElementById(MV_ID)?.remove()
   document.documentElement.style.filter = ''
 }
 
 function applyUI(css: string): void {
-  // 隐藏锚点：提供 #mv 选择器确保清零规则优先级 (1,0,1) > (0,0,4)
-  const anchor = document.createElement('div')
-  anchor.id = MV_ID
-  anchor.style.display = 'none'
-  document.body.appendChild(anchor)
-
   const el = document.createElement('style')
   el.id = STYLE_ID
+  // [id] 属性选择器特异性 (0,1,0) + img = (0,1,1)，压过 :has() 的 (0,0,4)
   el.textContent = [
     `*:not(:has(img)):not(:has(video)):not(:has(canvas)):not(:has(picture)) { filter: ${css} !important; }`,
-    `#${MV_ID} img, #${MV_ID} video, #${MV_ID} canvas, #${MV_ID} picture,`,
-    `#${MV_ID} [style*="background-image"], #${MV_ID} [class*="avatar"], #${MV_ID} [class*="Avatar"], #${MV_ID} [data-mv-clean]`,
+    `${HIGH} img, ${HIGH} video, ${HIGH} canvas, ${HIGH} picture,`,
+    `${HIGH} [style*="background-image"], ${HIGH} [class*="avatar"], ${HIGH} [class*="Avatar"], ${HIGH} [data-mv-clean]`,
     `{ filter: none !important; }`,
   ].join(' ')
   document.head.appendChild(el)
