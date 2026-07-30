@@ -5,7 +5,7 @@ import { useTheme } from '../context/ThemeContext'
 import { useT } from '../i18n/I18nContext'
 import Toggle from '../components/Toggle'
 import MagicVisionFilter from '../components/MagicVisionFilter.tsx'
-import { normalizePrefs, defaultPrefs, saveToStorage, apply } from '../utils/cssFilters'
+import { normalizePrefs, defaultPrefs, loadFromStorage, saveToStorage, apply } from '../utils/cssFilters'
 import type { MagicVisionPrefs } from '../utils/cssFilters'
 import { useResizableSidebar } from '../hooks/useResizableSidebar'
 import VerificationCodeInput from '../components/VerificationCodeInput'
@@ -90,7 +90,7 @@ export default function SettingsPage() {
   const [autoDefault, setAutoDefault] = useState(false)
   const [timezone, setTimezone] = useState('Asia/Shanghai')
   const [language, setLanguage] = useState('zh')
-  const [magicVision, setMagicVision] = useState<MagicVisionPrefs>(defaultPrefs())
+  const [magicVision, setMagicVision] = useState<MagicVisionPrefs>(() => loadFromStorage() || defaultPrefs())
   const [chatStyle, setChatStyle] = useState('cozy')
   const [uiScale, setUiScale] = useState(() => {
     try { return parseFloat(localStorage.getItem('ui_scale') || '1') } catch { return 1 }
@@ -297,7 +297,6 @@ export default function SettingsPage() {
         setPreferOwnKey(data.prefer_own_key ?? false)
         if (data.timezone) setTimezone(tz)
         if (data.language) setLanguage(lang)
-        setMagicVision(normalizePrefs(data.ui_prefs?.magic_vision))
         if (data.ui_prefs?.chat_style) { setChatStyle(style); try { localStorage.setItem('chat_style', style) } catch {} }
         if (data.ui_prefs?.ui_scale) {
           const s = parseFloat(data.ui_prefs.ui_scale)

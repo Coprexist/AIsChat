@@ -235,6 +235,10 @@ async def upload_user_avatar(
     # 自动检测输出格式：JPEG 以 \xFF\xD8 开头，PNG 以 \x89PNG 开头
     ext = "png" if content[:4] == b'\x89PNG' else "jpg"
 
+    # 头像存储目录
+    upload_dir = "/app/uploads/avatars"
+    os.makedirs(upload_dir, exist_ok=True)
+
     # 清理旧头像文件
     from sqlalchemy import select
     from app.models.user import User
@@ -249,8 +253,6 @@ async def upload_user_avatar(
 
     # 保存到统一头像目录
     filename = f"user_{current_user['user_id']}_{uuid.uuid4().hex[:8]}.{ext}"
-    upload_dir = "/app/uploads/avatars"
-    os.makedirs(upload_dir, exist_ok=True)
     filepath = os.path.join(upload_dir, filename)
     with open(filepath, "wb") as f:
         f.write(content)
