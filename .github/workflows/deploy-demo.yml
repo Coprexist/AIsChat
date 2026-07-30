@@ -44,6 +44,7 @@ jobs:
         run: npm run build:demo
         env:
           BASE_URL: /${{ github.event.repository.name }}/
+          VITE_APP_MODE: demo
 
       - name: Upload Pages artifact
         uses: actions/upload-pages-artifact@v3
