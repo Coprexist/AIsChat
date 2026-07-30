@@ -7,7 +7,7 @@ import { getPublicRoutes, getProtectedRoutes } from './utils/pageRegistry'
 const NotFoundPage = lazy(() => import('./pages/NotFoundPage'))
 const DemoChat = lazy(() => import('./pages/DemoChat'))
 
-const isDemo = window.location.pathname.includes('/AIsChat/')
+const isDemo = window.location.pathname.includes('/AIsChat/') || window.location.hostname === 'coprexist.github.io'
 
 function DemoLayout() {
   return <DemoChat />
@@ -53,7 +53,7 @@ function AdminGuard({ children }: { children: React.ReactNode }) {
 const createRouter = isDemo ? createHashRouter : createBrowserRouter
 
 export const router = createRouter([
-  ...(isDemo ? [{ path: '/', element: <DemoLayout /> }] : []),
+  ...(isDemo ? [{ path: '*', element: <DemoLayout /> }] : []),
   ...getPublicRoutes(),
   {
     path: '/',
