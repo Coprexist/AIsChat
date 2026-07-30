@@ -9,8 +9,8 @@
 | 模式 | 实现方式 | 原理 |
 |------|---------|------|
 | `all` 全部生效 | `html.style.filter` | 直接挂 `<html>`，整页作为其渲染内容被滤镜处理（`filter` 非继承属性） |
-| `images` 仅对图片 | `<style>* { none !important } img { css !important }</style>` | 先通配清零，再对媒体元素单独激活 |
-| `ui` 仅对 UI | `<style>*:not(:has(img)) { css }</style>` + 隐藏 `#mv` 锚点 | `:has()` 跳过含媒体子树的容器 + `#mv img` 高特异性清零 |
+| `images` 仅对图片 | `<style>* { filter: none !important } img { filter: css !important }</style>` | 先通配清零，再对媒体元素单独激活 |
+| `ui` 仅对 UI | `<style>*:not(:has(img)) { css }</style>` | `:has()` 跳过含媒体子树的容器 + `[id] img` 高特异性清零 |
 
 ## 核心技术：`:has()` 选择器
 
