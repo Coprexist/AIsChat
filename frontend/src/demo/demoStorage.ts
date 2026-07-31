@@ -15,13 +15,20 @@ const DEMO_USER = {
   assigned_pool_key_name: null, email: null, email_verified: false,
 }
 
-const DEMO_GROUPS = [
-  { id: 1, name: 'AI 演示群', type: 'group', avatar_url: null, member_count: 2, is_vector_accelerated: false, owner_type: 'system', created_at: '2026-01-01' },
-]
+const DEMO_GROUPS = [{
+  id: 1, name: 'AI 演示群', type: 'group', owner_type: 'system', owner_id: 0,
+  is_vector_accelerated: false, is_paused: false, is_pinned: false,
+  avatar_url: null, avatar_mode: 'default', include_ai_in_avatar: true,
+  member_count: 2, online_count: 1, member_avatars: [],
+  unread_count: 0, has_mention: false, my_role: 'member',
+  last_message_preview: null, last_message_at: null, dnd_until: null,
+  announcement: null, speak_limit_per_minute: 0, speak_limit_window_seconds: 120,
+  created_at: new Date().toISOString(),
+}]
 
 const DEMO_MEMBERS = [
-  { id: 1, type: 'human', name: 'Demo', role: 'owner', avatar_url: null },
-  { id: 2, type: 'agent', name: 'AI 助手', role: 'member', avatar_url: null },
+  { group_id: 1, id: 1, type: 'human', name: 'Demo', role: 'owner', avatar_url: null, state: 'online' },
+  { group_id: 1, id: 2, type: 'agent', name: 'AI 助手', role: 'member', avatar_url: null, state: 'online' },
 ]
 
 const DEMO_AGENTS = [
@@ -30,7 +37,9 @@ const DEMO_AGENTS = [
 
 const DEMO_WELCOME = {
   id: 1, group_id: 1, sender_type: 'system', sender_id: 0,
-  sender_name: '系统', content: '欢迎来到 AIsChat 演示版。\n\n⚙️ 进入「设置 → API 配置」填入你的 DeepSeek API Key 即可与 AI 对话。\n💾 所有数据存储在浏览器本地。',
+  sender_name: '系统', sender_avatar_url: null,
+  content: '欢迎来到 AIsChat 演示版。\n\n⚙️ 进入「设置 → API 配置」填入你的 DeepSeek API Key 即可与 AI 对话。\n💾 所有数据存储在浏览器本地。',
+  reply_to: null, attachments: null, source_public_id: null,
   created_at: new Date().toISOString(),
 }
 
