@@ -64,22 +64,25 @@ export function setupDemo() {
     if (path === `${API}/system/settings`) return jsonRes({ registration_enabled: false })
     if (path.match(/maintenance-msg/)) return jsonRes({})
 
-    // 头像上传 → 存 base64
-    if (path === `${API}/user/avatar` && method === 'POST') {
-      // 文件通过 FormData 上传，init.body 是 FormData
+    // 头像上传（用户/AI/群聊）→ 存 base64
+    if (path.indexOf('/avatar') > 0 && method === 'POST') {
       try {
         const fd = init?.body as FormData
         const file = fd?.get('file') as File
         if (file) {
           const base64 = await blobToBase64(file)
-          write('demo_avatar', base64)
+          const segs = path.split('/').filter(Boolean)
+          write('demo_avatar_' + segs.slice(1).join('_'), base64)
         }
       } catch {}
-      return jsonRes({ avatar_url: '/demo/avatar' })
+      return jsonRes({ avatar_url: path.replace('/api', '/demo/avatar') })
     }
     // 头像下载
-    if (path === '/demo/avatar') {
-      const data = read('demo_avatar', '')
+    if (path.indexOf('/demo/avatar') === 0 || path.indexOf('/api/fs/download-avatar') === 0) {
+      const key = 'demo_avatar_' + path.replace('/demo/avatar/', '').replace('/api/fs/download-avatar/', '')
+      const data = read(key, '')
+    if (avatarDL) {
+      const data = read(`demo_avatar_${avatarDL[1]}`, '')
       if (data) return new Response(atob(data.split(',')[1] || ''), { status: 200, headers: { 'Content-Type': 'image/jpeg' } })
       return jsonRes({}, 404)
     }
