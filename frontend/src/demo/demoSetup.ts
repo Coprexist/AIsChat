@@ -122,16 +122,34 @@ export function setupDemo() {
       return jsonRes({ url: '' })
     }
 
-    // WebSocket (无法拦截, 跳过)
     // 其他未匹配路径 → 返回空
     if (url.includes(API) || url.includes('/user/') || url.includes('/groups/') || url.includes('/agents/')) {
       console.log(`[Demo] Mock: ${path}`)
       return jsonRes({})
     }
 
-    // 非 API 请求（如 DeepSeek API、静态资源）→ 走原始 fetch
+    // 非 API 请求 → 走原始 fetch
     return original(input, init)
   }
+
+  // 拦截 WebSocket，防止无限重连
+  const OrigWS = window.WebSocket
+  class DemoWS {
+    url: string
+    onopen: ((e: Event) => void) | null = null
+    onclose: ((e: CloseEvent) => void) | null = null
+    onerror: ((e: Event) => void) | null = null
+    onmessage: ((e: MessageEvent) => void) | null = null
+    readyState = 3
+    constructor(url: string) {
+      this.url = url
+      console.log('[Demo] WS 已拦截:', url)
+      queueMicrotask(() => this.onclose?.(new CloseEvent('close')))
+    }
+    close() {}
+    send() {}
+  }
+  window.WebSocket = DemoWS as any
 }
 
 function jsonRes(data: any, status = 200): Response {
