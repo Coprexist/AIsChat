@@ -81,8 +81,6 @@ export function setupDemo() {
     if (path.indexOf('/demo/avatar') === 0 || path.indexOf('/api/fs/download-avatar') === 0) {
       const key = 'demo_avatar_' + path.replace('/demo/avatar/', '').replace('/api/fs/download-avatar/', '')
       const data = read(key, '')
-    if (avatarDL) {
-      const data = read(`demo_avatar_${avatarDL[1]}`, '')
       if (data) return new Response(atob(data.split(',')[1] || ''), { status: 200, headers: { 'Content-Type': 'image/jpeg' } })
       return jsonRes({}, 404)
     }
