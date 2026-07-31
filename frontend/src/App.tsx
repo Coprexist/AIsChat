@@ -43,7 +43,7 @@ function AdminGuard({ children }: { children: React.ReactNode }) {
   return <>{children}</>
 }
 
-export const router = createBrowserRouter([
+export const routes = [
   ...getPublicRoutes(),
   {
     path: '/',
@@ -51,4 +51,6 @@ export const router = createBrowserRouter([
     children: getProtectedRoutes(AdminGuard),
   },
   { path: '*', element: <NotFoundPage /> },
-])
+]
+
+export const router = createBrowserRouter(routes)
