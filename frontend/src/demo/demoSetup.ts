@@ -97,9 +97,13 @@ export function setupDemo() {
     const path = url.replace(/^https?:\/\/[^\/]+/, '').replace(/\?.*$/, '')
     const r = await serve(path, init)
     if (r) return r
-    // null → 根据路径返回安全默认值
-    const isList = /groups|members|messages|dm|session|friends|files|agents|device/.test(path)
-    return jsonRes(isList ? [] : {})
+    // API 路径未 mock → 返回安全默认值
+    if (path.startsWith(API)) {
+      const isList = /(groups|members|messages|dm|session|friends|files|agents|device)/.test(path)
+      return jsonRes(isList ? [] : {})
+    }
+    // 非 API 路径（懒加载 JS、字体等）→ 走原始 fetch
+    return original(input, init)
   }
 
   // ── WebSocket 拦截 ──
