@@ -18,7 +18,7 @@ export function setupDemo() {
   // ── fetch 拦截 ──
   const original = window.fetch.bind(window)
 
-  function serve(reqPath: string, init?: RequestInit): Response | null {
+  async function serve(reqPath: string, init?: RequestInit): Promise<Response | null> {
     const path = reqPath.replace(/\/$/, '')
     const method = (init?.method || 'GET').toUpperCase()
 
@@ -94,7 +94,8 @@ export function setupDemo() {
   window.fetch = async (input: RequestInfo | URL, init?: RequestInit) => {
     const url = typeof input === 'string' ? input : input instanceof URL ? input.href : input.url
     const path = url.replace(/^https?:\/\/[^\/]+/, '').replace(/\?.*$/, '')
-    return serve(path, init) || original(input, init)
+    const r = await serve(path, init)
+    return r || original(input, init)
   }
 
   // ── WebSocket 拦截 ──
