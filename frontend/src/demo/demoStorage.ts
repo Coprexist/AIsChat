@@ -36,10 +36,19 @@ const DEMO_WELCOME = {
 
 // ── 读写辅助 ──
 
-function read<T>(key: string, fallback: T): T {
+export function read<T>(key: string, fallback: T): T {
   try { const v = localStorage.getItem(key); return v ? JSON.parse(v) : fallback } catch { return fallback }
 }
-function write(key: string, val: any) { try { localStorage.setItem(key, JSON.stringify(val)) } catch {} }
+export function write(key: string, val: any) { try { localStorage.setItem(key, JSON.stringify(val)) } catch {} }
+
+export function blobToBase64(blob: Blob): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const r = new FileReader()
+    r.onload = () => resolve(r.result as string)
+    r.onerror = reject
+    r.readAsDataURL(blob)
+  })
+}
 
 // ── 初始化（首次访问时创建默认数据） ──
 

@@ -5,7 +5,7 @@
 
 import { initDemoData, getDemoUser, updateDemoUser, getApiKey, setApiKey,
   getGroups, getGroup, getMembers, getAgents,
-  getMessages, addMessage } from './demoStorage'
+  getMessages, addMessage, read, write } from './demoStorage'
 
 const API = '/api'
 
@@ -64,6 +64,25 @@ export function setupDemo() {
     if (path === `${API}/system/settings`) return jsonRes({ registration_enabled: false })
     if (path.match(/maintenance-msg/)) return jsonRes({})
 
+    // 头像上传 → 存 base64
+    if (path === `${API}/user/avatar` && method === 'POST') {
+      // 文件通过 FormData 上传，init.body 是 FormData
+      try {
+        const fd = init?.body as FormData
+        const file = fd?.get('file') as File
+        if (file) {
+          const base64 = await blobToBase64(file)
+          write('demo_avatar', base64)
+        }
+      } catch {}
+      return jsonRes({ avatar_url: '/demo/avatar' })
+    }
+    // 头像下载
+    if (path === '/demo/avatar') {
+      const data = read('demo_avatar', '')
+      if (data) return new Response(atob(data.split(',')[1] || ''), { status: 200, headers: { 'Content-Type': 'image/jpeg' } })
+      return jsonRes({}, 404)
+    }
     // 其他 API → 空数据
     if (path.startsWith(API)) { console.log('[Demo]', method, path); return jsonRes({}) }
     return null
