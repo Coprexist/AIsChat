@@ -84,7 +84,13 @@ export function setupDemo() {
       if (data) return new Response(atob(data.split(',')[1] || ''), { status: 200, headers: { 'Content-Type': 'image/jpeg' } })
       return jsonRes({}, 404)
     }
-    // 其他 API → 空数据
+    // 已知应返回数组的端点
+    if (path.includes('/dm/') || path.includes('/friends') || path.includes('/friendship') ||
+        path.includes('/notifications') || path.includes('/unread') ||
+        path.includes('/user/files') || path === `${API}/devices`)
+      return jsonRes([])
+
+    // 未匹配 API → 空对象
     if (path.startsWith(API)) { console.log('[Demo]', method, path); return jsonRes({}) }
     return null
   }
