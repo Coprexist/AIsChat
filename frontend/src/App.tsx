@@ -43,7 +43,7 @@ function AdminGuard({ children }: { children: React.ReactNode }) {
   return <>{children}</>
 }
 
-export const routes = [
+const _routes = [
   ...getPublicRoutes(),
   {
     path: '/',
@@ -53,4 +53,10 @@ export const routes = [
   { path: '*', element: <NotFoundPage /> },
 ]
 
-export const router = createBrowserRouter(routes)
+export const routes = _routes
+export const router = createBrowserRouter(_routes)
+
+/** 给 demo 模式用：创建带 basename 的 BrowserRouter */
+export function createDemoRouter(basename: string) {
+  return createBrowserRouter(_routes, { basename })
+}

@@ -1,7 +1,7 @@
 import React from 'react'
 import ReactDOM from 'react-dom/client'
-import { RouterProvider, createHashRouter } from 'react-router-dom'
-import { router, routes } from './App'
+import { RouterProvider } from 'react-router-dom'
+import { router, createDemoRouter } from './App'
 import { AuthProvider } from './context/AuthContext'
 import { ThemeProvider } from './context/ThemeContext'
 import { I18nProvider } from './i18n/I18nContext'
@@ -14,8 +14,9 @@ const isDemo = window.location.pathname.includes('/AIsChat/') || window.location
 
 if (isDemo) {
   setupDemo()
-  // 演示模式：HashRouter（不依赖 Vite base 路径）
-  const demoRouter = createHashRouter(routes)
+  // 演示模式：BrowserRouter 带 basename，匹配 /AIsChat/ 路径
+  const base = window.location.pathname.startsWith('/AIsChat') ? '/AIsChat' : '/'
+  const demoRouter = createDemoRouter(base)
   ReactDOM.createRoot(document.getElementById('root')!).render(
     <React.StrictMode>
       <ErrorBoundary>
