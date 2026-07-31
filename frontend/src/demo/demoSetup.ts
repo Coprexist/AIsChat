@@ -150,6 +150,13 @@ export function setupDemo() {
     send() {}
   }
   window.WebSocket = DemoWS as any
+
+  // 修正动态加载的 logo 路径
+  new MutationObserver(() => {
+    document.querySelectorAll('img[src="/logo.png"]').forEach(el => {
+      if (el instanceof HTMLImageElement) el.src = '/AIsChat/logo.png'
+    })
+  }).observe(document.body || document.documentElement, { childList: true, subtree: true })
 }
 
 function jsonRes(data: any, status = 200): Response {
