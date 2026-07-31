@@ -62,9 +62,10 @@ export function setupDemo() {
     const url = typeof input === 'string' ? input : input instanceof URL ? input.href : input.url
     const path = url.replace(/^https?:\/\/[^\/]+/, '').replace(/\?.*$/, '')
 
-    // 认证相关
+    // 认证相关（支持 localStorage 缓存修改）
     if (path === `${API}/auth/me` || path === `${API}/user/me`) {
-      return jsonRes({ ...MOCK_USER })
+      const cached = localStorage.getItem('demo_user')
+      return jsonRes(cached ? { ...MOCK_USER, ...JSON.parse(cached) } : { ...MOCK_USER })
     }
     if (path === `${API}/auth/login` || path === `${API}/auth/register`) {
       return jsonRes({ access_token: FAKE_TOKEN, user_id: 1, username: 'Demo' })
@@ -97,8 +98,15 @@ export function setupDemo() {
       return jsonRes(MOCK_AGENTS)
     }
 
-    // 用户设置
+    // 用户设置（缓存到 localStorage）
     if (path === `${API}/user/settings` || path === `${API}/settings`) {
+      if (init?.method === 'PUT' || init?.method === 'POST') {
+        try {
+          const body = JSON.parse(init.body as string || '{}')
+          const old = JSON.parse(localStorage.getItem('demo_user') || '{}')
+          localStorage.setItem('demo_user', JSON.stringify({ ...old, ...body }))
+        } catch {}
+      }
       return jsonRes({ status: 'ok' })
     }
 
