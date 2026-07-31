@@ -1,165 +1,129 @@
 /**
- * Demo 模式初始化：拦截 fetch 请求，返回 mock 数据
- * 直发消息到 DeepSeek API，不走后端
+ * Demo 模式初始化
+ * 所有数据存 localStorage + 发消息直调 DeepSeek API
  */
 
+import { initDemoData, getDemoUser, updateDemoUser, getApiKey, setApiKey,
+  getGroups, getGroup, getMembers, getAgents,
+  getMessages, addMessage } from './demoStorage'
+
 const API = '/api'
-const FAKE_TOKEN = 'demo_token_abc123'
 
-const MOCK_USER = {
-  id: 1,
-  username: 'Demo',
-  role: 'user',
-  is_active: true,
-  ai_quota: 99,
-  api_credit: 9999,
-  platform_gifted_credit: 0,
-  total_effective: 9999,
-  agent_bundle_credit: 0,
-  file_quota_mb: 500,
-  has_api_key: false,
-  api_key_last4: '',
-  timezone: 'Asia/Shanghai',
-  language: 'zh',
-  ui_prefs: {},
-  avatar_url: null,
-  bio: null,
-  status_text: '⚡ Demo 体验用户',
-  status_color: '#f59e0b',
-  setup_completed: true,
-  created_at: '2026-01-01',
-  assigned_pool_key_name: null,
-  email: null,
-  email_verified: false,
-}
-
-const MOCK_GROUPS = [
-  { id: 1, name: 'AIsChat 演示群', type: 'group', avatar_url: null, member_count: 3, is_vector_accelerated: false, owner_type: 'system' },
-  { id: 2, name: 'AI 闲聊室',      type: 'group', avatar_url: null, member_count: 5, is_vector_accelerated: false, owner_type: 'system' },
-  { id: 3, name: '技术交流',       type: 'group', avatar_url: null, member_count: 2, is_vector_accelerated: false, owner_type: 'system' },
-]
-
-const MOCK_AGENTS = [
-  { id: 1, name: 'AI 助手', avatar_url: null, owner_id: 1, ai_type: 'general', is_active: true },
-]
-
-const MOCK_MESSAGES = [
-  { id: 1, group_id: 1, sender_type: 'system', sender_id: 0, sender_name: '系统', content: '欢迎来到 AIsChat 演示版。发送消息与 AI 对话。', created_at: new Date().toISOString() },
-]
-
-const MOCK_MEMBERS = [
-  { id: 1, type: 'human', name: 'Demo', role: 'owner', avatar_url: null },
-  { id: 2, type: 'agent', name: 'AI 助手', role: 'member', avatar_url: null },
-]
+let _processing = false
 
 export function setupDemo() {
-  localStorage.setItem('access_token', FAKE_TOKEN)
-  localStorage.setItem('instance_url', 'https://coprexist.github.io')
+  initDemoData()
+  localStorage.setItem('access_token', 'demo_token')
 
+  // ── fetch 拦截 ──
   const original = window.fetch.bind(window)
 
-  window.fetch = async (input: RequestInfo | URL, init?: RequestInit): Promise<Response> => {
-    const url = typeof input === 'string' ? input : input instanceof URL ? input.href : input.url
-    const path = url.replace(/^https?:\/\/[^\/]+/, '').replace(/\?.*$/, '')
+  function serve(reqPath: string, init?: RequestInit): Response | null {
+    const path = reqPath.replace(/\/$/, '')
+    const method = (init?.method || 'GET').toUpperCase()
 
-    // 认证相关（支持 localStorage 缓存修改）
-    if (path === `${API}/auth/me` || path === `${API}/user/me`) {
-      const cached = localStorage.getItem('demo_user')
-      return jsonRes(cached ? { ...MOCK_USER, ...JSON.parse(cached) } : { ...MOCK_USER })
-    }
-    if (path === `${API}/auth/login` || path === `${API}/auth/register`) {
-      return jsonRes({ access_token: FAKE_TOKEN, user_id: 1, username: 'Demo' })
-    }
-    if (path === `${API}/auth/has-users`) {
-      return jsonRes({ has_users: true })
+    // 用户认证
+    if (path === `${API}/auth/me` || path === `${API}/user/me`) return jsonRes(getDemoUser())
+    if (path === `${API}/auth/login` || path === `${API}/auth/register` || path === `${API}/auth/has-users`) {
+      return path.endsWith('has-users') ? jsonRes({ has_users: true }) : jsonRes({ access_token: 'demo_token', user_id: 1, username: 'Demo' })
     }
 
-    // 群组列表
-    if (path === `${API}/groups`) {
-      return jsonRes(MOCK_GROUPS)
-    }
-    if (path.match(/^\/api\/groups\/\d+$/)) {
-      const g = MOCK_GROUPS.find(g => g.id === parseInt(path.split('/')[3]))
-      return jsonRes(g || MOCK_GROUPS[0])
-    }
-
-    // 群成员
-    if (path.match(/^\/api\/groups\/\d+\/members$/)) {
-      return jsonRes(MOCK_MEMBERS)
-    }
-
-    // 消息列表
-    if (path.match(/^\/api\/groups\/\d+\/messages$/)) {
-      return jsonRes(MOCK_MESSAGES)
-    }
-
-    // AI agent 列表
-    if (path === `${API}/agents` || path === `${API}/agents/available`) {
-      return jsonRes(MOCK_AGENTS)
-    }
-
-    // 用户设置（缓存到 localStorage）
-    if (path === `${API}/user/settings` || path === `${API}/settings`) {
-      if (init?.method === 'PUT' || init?.method === 'POST') {
+    // 用户设置（提取 api_key 单独存）
+    if (path === `${API}/user/settings`) {
+      if (method === 'PUT' && init?.body) {
         try {
-          const body = JSON.parse(init.body as string || '{}')
-          const old = JSON.parse(localStorage.getItem('demo_user') || '{}')
-          localStorage.setItem('demo_user', JSON.stringify({ ...old, ...body }))
+          const b = JSON.parse(init.body as string)
+          if (b.api_key) { setApiKey(b.api_key); delete b.api_key }
+          if (b.api_base_url) delete b.api_base_url
+          updateDemoUser(b)
         } catch {}
       }
       return jsonRes({ status: 'ok' })
     }
 
+    // 群组
+    if (path === `${API}/groups`) return jsonRes(getGroups())
+    const gm = path.match(/^\/api\/groups\/(\d+)$/)
+    if (gm) return jsonRes(getGroup(parseInt(gm[1])))
+
+    // 群成员
+    const mm = path.match(/^\/api\/groups\/(\d+)\/members$/)
+    if (mm) return jsonRes(getMembers(parseInt(mm[1])))
+
+    // 群活动/已读（静默返回）
+    if (path.match(/\/groups\/\d+\/(activity|read)$/)) return jsonRes({})
+
+    // 消息列表
+    const ms = path.match(/^\/api\/groups\/(\d+)\/messages$/)
+    if (ms) return jsonRes(getMessages(parseInt(ms[1])))
+
+    // AI Agent
+    if (path === `${API}/agents` || path === `${API}/agents/available`) return jsonRes(getAgents())
+
     // 系统设置
-    if (path === `${API}/system/settings`) {
-      return jsonRes({ registration_enabled: false })
-    }
+    if (path === `${API}/system/settings`) return jsonRes({ registration_enabled: false })
+    if (path.match(/maintenance-msg/)) return jsonRes({})
 
-    // 维护信息
-    if (path.match(/maintenance-msg/)) {
-      return jsonRes({})
-    }
-
-    // DM / 好友
-    if (path.includes('/friends') || path.includes('/dm') || path.includes('/friendship')) {
-      return jsonRes([])
-    }
-
-    // 文件上传
-    if (path.includes('/upload') || path.includes('/avatar') || path.includes('/file')) {
-      return jsonRes({ url: '' })
-    }
-
-    // 其他未匹配路径 → 返回空
-    if (url.includes(API) || url.includes('/user/') || url.includes('/groups/') || url.includes('/agents/')) {
-      console.log(`[Demo] Mock: ${path}`)
-      return jsonRes({})
-    }
-
-    // 非 API 请求 → 走原始 fetch
-    return original(input, init)
+    // 其他 API → 空数据
+    if (path.startsWith(API)) { console.log('[Demo]', method, path); return jsonRes({}) }
+    return null
   }
 
-  // 拦截 WebSocket，防止无限重连
-  const OrigWS = window.WebSocket
+  window.fetch = async (input: RequestInfo | URL, init?: RequestInit) => {
+    const url = typeof input === 'string' ? input : input instanceof URL ? input.href : input.url
+    const path = url.replace(/^https?:\/\/[^\/]+/, '').replace(/\?.*$/, '')
+    return serve(path, init) || original(input, init)
+  }
+
+  // ── WebSocket 拦截 ──
   class DemoWS {
     url: string
     onopen: ((e: Event) => void) | null = null
     onclose: ((e: CloseEvent) => void) | null = null
     onerror: ((e: Event) => void) | null = null
     onmessage: ((e: MessageEvent) => void) | null = null
-    readyState = 3
+    readyState = 1
+    private gid = 1
     constructor(url: string) {
       this.url = url
-      console.log('[Demo] WS 已拦截:', url)
-      queueMicrotask(() => this.onclose?.(new CloseEvent('close')))
+      this.gid = parseInt(url.match(/\/(\d+)\b/)?.[1] || '0') || 1
+      queueMicrotask(() => this.onopen?.(new Event('open')))
     }
-    close() {}
-    send() {}
+    close() { this.readyState = 3 }
+    send(data: string) {
+      try {
+        const p = JSON.parse(data)
+        const gid = p.group_id || this.gid
+        const content = p.content || p.text || ''
+        if (!content) return
+        addMessage(gid, { sender_type: 'human', sender_id: 1, sender_name: 'Demo', content })
+        // 监听 demo_msg_update 让 ChatView 刷新
+        if (document.visibilityState === 'visible') {
+          window.dispatchEvent(new CustomEvent('CHAT_REFRESH_EVENT', { detail: { type: 'message_sent' } }))
+        }
+        // AI 回复
+        const key = getApiKey()
+        if (key && !_processing) {
+          _processing = true
+          fetch('https://api.deepseek.com/v1/chat/completions', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${key}` },
+            body: JSON.stringify({ model: 'deepseek-chat', messages: [{ role: 'user', content }] }),
+          }).then(r => r.json()).then(d => {
+            const reply = d?.choices?.[0]?.message?.content || '（无回复）'
+            addMessage(gid, { sender_type: 'agent', sender_id: 2, sender_name: 'AI 助手', content: reply })
+            window.dispatchEvent(new CustomEvent('CHAT_REFRESH_EVENT', { detail: { type: 'message_sent' } }))
+          }).catch(e => {
+            addMessage(gid, { sender_type: 'system', sender_id: 0, sender_name: '系统', content: `❌ API 请求失败: ${e.message}` })
+            window.dispatchEvent(new CustomEvent('CHAT_REFRESH_EVENT', { detail: { type: 'message_sent' } }))
+          }).finally(() => { _processing = false })
+        }
+      } catch {}
+    }
   }
   window.WebSocket = DemoWS as any
 
-  // 修正动态加载的 logo 路径
+  // ── Logo 修正 ──
   new MutationObserver(() => {
     document.querySelectorAll('img[src="/logo.png"]').forEach(el => {
       if (el instanceof HTMLImageElement) el.src = '/AIsChat/logo.png'
@@ -168,8 +132,5 @@ export function setupDemo() {
 }
 
 function jsonRes(data: any, status = 200): Response {
-  return new Response(JSON.stringify(data), {
-    status,
-    headers: { 'Content-Type': 'application/json' },
-  })
+  return new Response(JSON.stringify(data), { status, headers: { 'Content-Type': 'application/json' } })
 }
