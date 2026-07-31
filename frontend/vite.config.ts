@@ -4,6 +4,7 @@ import path from 'path'
 
 export default defineConfig({
   base: process.env.BASE_URL || '/',
+  build: { sourcemap: process.env.BASE_URL ? true : false },
   plugins: [react()],
   resolve: {
     alias: {
