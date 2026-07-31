@@ -84,14 +84,11 @@ export function setupDemo() {
       if (data) return new Response(atob(data.split(',')[1] || ''), { status: 200, headers: { 'Content-Type': 'image/jpeg' } })
       return jsonRes({}, 404)
     }
-    // 已知应返回数组的端点
-    if (path.includes('/dm/') || path.includes('/friends') || path.includes('/friendship') ||
-        path.includes('/notifications') || path.includes('/unread') ||
-        path.includes('/user/files') || path === `${API}/devices`)
-      return jsonRes([])
-
-    // 未匹配 API → 空对象
-    if (path.startsWith(API)) { console.log('[Demo]', method, path); return jsonRes({}) }
+    // 未匹配 API → 控制台警告 + 返回 null（由上层转安全默认值）
+    if (path.startsWith(API)) {
+      console.warn('[Demo] 未 mock:', method, path)
+      return null
+    }
     return null
   }
 
@@ -99,7 +96,10 @@ export function setupDemo() {
     const url = typeof input === 'string' ? input : input instanceof URL ? input.href : input.url
     const path = url.replace(/^https?:\/\/[^\/]+/, '').replace(/\?.*$/, '')
     const r = await serve(path, init)
-    return r || original(input, init)
+    if (r) return r
+    // null → 根据路径返回安全默认值
+    const isList = /groups|members|messages|dm|session|friends|files|agents|device/.test(path)
+    return jsonRes(isList ? [] : {})
   }
 
   // ── WebSocket 拦截 ──
