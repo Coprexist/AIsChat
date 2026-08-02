@@ -828,6 +828,40 @@ async def switch_agent_state(
         f"AI '{agent.name}' (id={agent.id}) 状态切换: {old_state} → {target_state}"
         + (f", 原因: {reason}" if reason else "")
     )
+
+    # 状态变更 → 广播 state_change 给该 AI 相关的 DM 会话对方（前端实时更新状态点）
+    if old_state != target_state:
+        try:
+            from app.chat import chat_api
+            from app.models.dm import DMSession
+            from sqlalchemy import select as sa_select, or_
+
+            agent_user_id = agent.user_id
+            if agent_user_id is not None:
+                dm_result = await db.execute(
+                    sa_select(DMSession.session_id).where(
+                        or_(
+                            DMSession.user1_id == agent_user_id,
+                            DMSession.user2_id == agent_user_id,
+                        )
+                    )
+                )
+                dm_session_ids = [row[0] for row in dm_result.all()]
+                event = {
+                    "type": "state_change",
+                    "data": {
+                        "user_id": agent_user_id,
+                        "state": target_state,
+                        "last_active_at": None,
+                    },
+                }
+                for sid in dm_session_ids:
+                    await chat_api.broadcast_to_dm(
+                        sid, event, exclude_user_id=agent_user_id
+                    )
+        except Exception as e:
+            logger.warning(f"广播 state_change 失败: {e}")
+
     return agent
 
 

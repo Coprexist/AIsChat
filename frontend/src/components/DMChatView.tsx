@@ -39,6 +39,20 @@ export default function DMChatView({ sessionId, onMobileBack }: DMChatViewProps)
     api.get(`/dm/${sessionId}/my-token-usage`).then(setTokenUsage).catch(() => {})
   }, [sessionId])
 
+  // 监听 DM 对方状态变化（后端 state_change 广播）→ 实时更新头部状态点
+  useEffect(() => {
+    const handler = (e: Event) => {
+      const d = (e as CustomEvent).detail
+      if (!d || typeof d.user_id !== 'number') return
+      setPartner((prev) => {
+        if (!prev || prev.id !== d.user_id) return prev
+        return { ...prev, state: d.state, last_active_at: d.last_active_at ?? prev.last_active_at }
+      })
+    }
+    window.addEventListener('dm-partner-state-change', handler)
+    return () => window.removeEventListener('dm-partner-state-change', handler)
+  }, [])
+
   // 监听到新消息时刷新 token 用量
   const refreshTokenUsage = () => {
     api.get(`/dm/${sessionId}/my-token-usage`).then(setTokenUsage).catch(() => {})

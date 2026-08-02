@@ -1,5 +1,12 @@
 # 魔视界 — CSS 滤镜系统
 
+> 当前版本：**v1.1**
+>
+> **v1.1 变更**：
+> - 新增 `data-mv-force` 强制补偿标记：UI 模式下 hue-rotate 嵌套叠加导致的颜色不一致（如有头像/无头像的在线状态点）通过补偿算法统一，保证标记元素无论嵌套深度都正好旋转一次
+> - 关闭主开关时立即持久化（onChange + localStorage + 后端），不再依赖“应用”按钮（此前关闭后面板隐藏、保存入口消失，刷新后旧效果复活）
+> - 新增「魔视界关闭立即持久化」行为说明，见下方「持久化」章节
+
 ## 概述
 
 魔视界为用户提供 10 种 CSS 标准滤镜函数的可视化调节面板，可实时预览并持久化保存。配置存储在 `ui_prefs.magic_vision` JSONB 字段。
@@ -51,6 +58,32 @@
 
 `[id]` 匹配所有带 `id` 属性的元素（React 的 `<div id="root">` 天然存在），无需注入额外 DOM。特异性 (0,1,1) 确定性地压过 `:has()` 的 (0,0,4)。
 
+### ⚠️ 嵌套叠加（v1.1 已知行为 + 补偿）
+
+`*:not(:has(img))...` 对每个匹配元素单独挂 `filter`，嵌套元素会被“祖先 + 自身”叠加多次。叠加对程度型滤镜（blur、brightness 等）表现为“更深”，人眼不易察觉；但对 hue-rotate 会表现为颜色突变，可能造成同一语义元素（如在线状态点）在不同嵌套结构下颜色不一致。
+
+**示例**：侧边栏在线状态点（`<span>`）叠在头像容器内。
+- 有头像：容器含 `<img>` → `:has(img)` 豁免 → 状态点只被自身转 **1 次**
+- 无头像：容器不含 img → 容器也被转 → 状态点被转 **2 次**
+
+同一颜色 `#34D399` 在两种情况下 hue-rotate 后不同 → 用户观察到“两种绿点”。
+
+**补偿机制**：给需要保持一致的元素添加 `data-mv-force` 属性。`apply()` 在 UI 模式下会调用 `compensateHueRotate()`：
+
+1. 从 CSS 中解析出 `hue-rotate(X)` 角度
+2. 遍历所有 `[data-mv-force]` 元素，向上数祖先链中实际挂有 filter 的元素数 `k`（通过 `getComputedStyle` 判断）
+3. 将元素自身的 hue-rotate 改为 `(1-k)*X`，使最终总旋转 = `(1-k)*X + k*X = X`
+
+```ts
+// cssFilters.ts — compensateHueRotate 核心逻辑
+const compensated = (1 - k) * X
+el.style.setProperty('filter', `${otherParts} hue-rotate(${compensated}deg)`, 'important')
+```
+
+**动态渲染兜底**：`apply()` 仅在 Layout 挂载时调用一次，而侧边栏 DM 列表等是异步加载的——首次补偿执行时 `[data-mv-force]` 元素可能尚未渲染。为此 `compensateHueRotate()` 会注册一个 `MutationObserver`（childList + subtree），监听 DOM 变化：一旦出现新的 `[data-mv-force]` 元素，自动用上次的 CSS 重新补偿。关闭魔视界时 `clearAll()` 会断开 observer 并清除所有补偿内联样式。
+
+**限制**：补偿只针对可逆的 hue-rotate。blur/sepia/grayscale/invert 等不可逆滤镜不补偿（叠加是魔视界一贯行为，与整体 UI 保持一致）；若 CSS 中无 hue-rotate，补偿函数直接跳过。关闭魔视界时 `clearAll()` 会清除补偿产生的内联样式，不留残留。
+
 ### 为什么不用 JS 遍历（TreeWalker）
 
 | 维度 | `:has()` CSS | TreeWalker + MutationObserver |
@@ -98,6 +131,14 @@
 - **云端**：`PUT /user/settings` → `ui_prefs.magic_vision` — "应用"按钮独立保存，与主保存按钮解耦
 - **主保存保护**：主"保存设置"按钮同步写 localStorage + 重新 `apply()`，防止 `refreshUser()` 覆盖
 - **恢复时机**：Layout 组件的 `useEffect([], [])`。空依赖数组意味着仅在挂载时执行一次。
+- **关闭立即持久化（v1.1）**：关闭主开关时 `handleToggleEnabled(false)` 立即调用 `persist({...value, enabled: false})`（onChange + localStorage + apply + 后端同步）。此前关闭开关只改组件内 state，而面板（含"应用"按钮）随即隐藏，导致关闭状态从未被保存——刷新后 Layout 从 localStorage 读到旧的 `enabled: true`，效果复活。
+
+## 标记速查
+
+| 属性 | 作用 | 典型使用位置 |
+|------|------|-------------|
+| `data-mv-clean` | 完全豁免滤镜（不参与魔视界） | 头像容器、图片类内容 |
+| `data-mv-force` | 强制补偿 hue-rotate，使旋转次数恒定（v1.1） | 在线状态点等需要颜色一致的语义元素 |
 
 ## 文件结构
 

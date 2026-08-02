@@ -251,6 +251,12 @@ class ToolRegistry:
         whitelist = cls._build_whitelist()
         allowed_names = set(whitelist.get(state, []))
 
+        # 防御：未知/遗留状态（如 offline）不在白名单时，兜底为 inactive 工具集，
+        # 避免 AI 被触发后无工具可用（只能输出文字）导致 system_reminder 死循环。
+        # blocked 是合法状态（白名单为空=彻底禁言），不在此兜底范围内。
+        if not allowed_names and state not in whitelist:
+            allowed_names = set(whitelist.get("inactive", []))
+
         allowed = [
             t for t in cls.get_all_definitions()
             if t["function"]["name"] in allowed_names

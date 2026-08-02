@@ -307,6 +307,9 @@ export default function ChatView({ conversationType, conversationId }: ChatViewP
     } else if (msg.type === 'user_online' || msg.type === 'user_offline') {
       // 在线状态变化 → 通知 ChatArea 更新在线人数
       window.dispatchEvent(new CustomEvent('online-count-change', { detail: msg }))
+    } else if (msg.type === 'state_change') {
+      // DM 对方状态变化 → 通知 DMChatView 更新头部状态点
+      window.dispatchEvent(new CustomEvent('dm-partner-state-change', { detail: msg.data }))
     } else if (msg.type === 'dm_notification' || msg.type === 'unread_update') {
       window.dispatchEvent(new CustomEvent(CHAT_REFRESH_EVENT, { detail: msg }))
     } else if (msg.type === 'maintenance_update') {

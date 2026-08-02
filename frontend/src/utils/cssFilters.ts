@@ -95,12 +95,24 @@ export function buildCSS(filters: Record<string, FilterState>): string {
 // ── DOM 注入 ──
 
 const STYLE_ID = 'magic-vision-style'
+/** 强制补偿标记：带此标记的元素会被补偿 hue-rotate，保证有/无头像时绿点旋转次数一致 */
+const FORCE_ATTR = 'data-mv-force'
 /** [id] 属性选择器特异性 (0,1,0) + img = (0,1,1) 压过 :has() 的 (0,0,4)，无需额外 DOM */
 const HIGH = '[id]'
 
 function clearAll(): void {
   document.getElementById(STYLE_ID)?.remove()
   document.documentElement.style.filter = ''
+  // 清除强制补偿的内联样式，避免关闭魔视界后残留
+  document.querySelectorAll(`[${FORCE_ATTR}]`).forEach((el) => {
+    ;(el as HTMLElement).style.removeProperty('filter')
+  })
+  // 断开动态补偿监听
+  if (_forceObserver) {
+    _forceObserver.disconnect()
+    _forceObserver = null
+  }
+  _lastCompensateCSS = null
 }
 
 function applyUI(css: string): void {
@@ -114,6 +126,42 @@ function applyUI(css: string): void {
     `{ filter: none !important; }`,
   ].join(' ')
   document.head.appendChild(el)
+}
+
+// ── 强制补偿（hue-rotate）──
+// 背景：UI 模式用 `*:not(:has(img))...` 给每个元素单独挂滤镜，嵌套元素会被祖先+自身叠加多次。
+// 对绿点来说：有头像时父容器含 img 被豁免（转 1 次），无头像时父容器也转（转 2 次）→ 颜色不一致。
+// 补偿：数祖先链上实际挂了 filter 的元素数 k，把绿点自身的 hue-rotate 改成 (1-k)*X，
+// 最终总旋转 = (1-k)*X + k*X = X，无论 k 是几都正好转一次。
+// 其他滤镜（blur 等）不补偿——叠加是魔视界一贯行为，保持与其他元素一致。
+let _forceObserver: MutationObserver | null = null
+let _lastCompensateCSS: string | null = null
+
+function compensateHueRotate(css: string): void {
+  _lastCompensateCSS = css
+  const m = css.match(/hue-rotate\((-?[\d.]+)deg\)/)
+  if (!m) return
+  const X = parseFloat(m[1])
+  const otherParts = css.replace(/hue-rotate\(-?[\d.]+deg\)/, '').trim()
+
+  document.querySelectorAll(`[${FORCE_ATTR}]`).forEach((el) => {
+    let k = 0
+    for (let p = el.parentElement; p; p = p.parentElement) {
+      const f = getComputedStyle(p).filter
+      if (f && f !== 'none') k++
+    }
+    const compensated = (1 - k) * X
+    const filter = `${otherParts} hue-rotate(${compensated}deg)`.trim()
+    ;(el as HTMLElement).style.setProperty('filter', filter, 'important')
+  })
+
+  // 监听后续动态渲染的 data-mv-force 元素（如侧边栏异步加载完列表后才出现），自动补补偿
+  if (!_forceObserver) {
+    _forceObserver = new MutationObserver(() => {
+      if (_lastCompensateCSS) compensateHueRotate(_lastCompensateCSS)
+    })
+    _forceObserver.observe(document.body, { childList: true, subtree: true })
+  }
 }
 
 // ── 主入口 ──
@@ -133,6 +181,7 @@ export function apply(prefs: MagicVisionPrefs): void {
     document.head.appendChild(el)
   } else {
     applyUI(css)
+    compensateHueRotate(css)
   }
 }
 

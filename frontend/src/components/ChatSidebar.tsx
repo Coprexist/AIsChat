@@ -266,7 +266,7 @@ const ChatSidebar = memo(function ChatSidebar({
           </div>
         )}
         {p.type !== 'system' && (
-          <span className={`absolute -bottom-0.5 -right-0.5 w-3 h-3 rounded-full border-2 border-surface ${getStateDotColor(p.state)}`} />
+          <span data-mv-force className={`absolute -bottom-0.5 -right-0.5 w-3 h-3 rounded-full border-2 border-surface ${getStateDotColor(p.state)}`} />
         )}
       </div>
     )

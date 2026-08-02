@@ -44,7 +44,7 @@ class ListAvailableSkills(ToolPlugin):
         segments = []
         for seg_key, seg_info in ToolRegistry.get_segments().items():
             seg_tools = seg_info["tools"]
-            loaded_tools = [t for t in seg_tools if t in current_tool_names]
+            loaded_tools = [t for t in seg_tools if t["name"] in current_tool_names]
             segments.append({
                 "key": seg_key,
                 "name": seg_info["name"],
@@ -54,7 +54,7 @@ class ListAvailableSkills(ToolPlugin):
                 "is_fully_loaded": len(loaded_tools) == len(seg_tools),
                 "is_partially_loaded": 0 < len(loaded_tools) < len(seg_tools),
                 "available_tools": loaded_tools,
-                "unavailable_tools": [t for t in seg_tools if t not in current_tool_names],
+                "unavailable_tools": [t for t in seg_tools if t["name"] not in current_tool_names],
             })
 
         return {

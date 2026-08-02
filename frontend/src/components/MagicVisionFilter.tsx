@@ -54,9 +54,8 @@ export default function MagicVisionFilter({ value, onChange }: Props) {
     setWarn(false)
   }, [])
 
-  const handleApply = useCallback(async () => {
-    setSaving(true)
-    const prefs: MagicVisionPrefs = { enabled, scope, filters }
+  // 持久化：onChange + localStorage + 应用 + 同步后端 ui_prefs
+  const persist = useCallback(async (prefs: MagicVisionPrefs) => {
     onChange(prefs)
     saveToStorage(prefs)
     apply(prefs)
@@ -66,8 +65,24 @@ export default function MagicVisionFilter({ value, onChange }: Props) {
       p.magic_vision = prefs
       await api.put('/user/settings', { ui_prefs: p })
     } catch {}
+  }, [onChange])
+
+  const handleApply = useCallback(async () => {
+    setSaving(true)
+    const prefs: MagicVisionPrefs = { enabled, scope, filters }
+    await persist(prefs)
     setSaving(false)
-  }, [enabled, scope, filters, onChange])
+  }, [enabled, scope, filters, persist])
+
+  // 关闭主开关 → 立即保存关闭状态（面板会隐藏，不能依赖“应用”按钮）
+  const handleToggleEnabled = useCallback(async (v: boolean) => {
+    setEnabled(v)
+    if (!v) {
+      setWarn(false)
+      const prefs: MagicVisionPrefs = { ...value, enabled: false }
+      await persist(prefs)
+    }
+  }, [value, persist])
 
   const anyActive = FILTER_DEFS.some(d => filters[d.id]?.enabled && filters[d.id].value !== d.defaultVal)
 
@@ -79,7 +94,7 @@ export default function MagicVisionFilter({ value, onChange }: Props) {
           <span className="text-sm font-semibold text-textPrimary">魔视界</span>
           <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-accent-500/10 text-accent-500 border border-accent-500/20">BETA</span>
         </div>
-        <Toggle checked={enabled} onChange={(v) => { setEnabled(v); if (!v) setWarn(false) }} />
+        <Toggle checked={enabled} onChange={handleToggleEnabled} />
       </div>
 
       {!enabled && <p className="text-xs text-textMuted px-1">开启后可为页面叠加 CSS 滤镜效果</p>}

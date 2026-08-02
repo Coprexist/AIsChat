@@ -150,6 +150,16 @@ async def websocket_endpoint(ws: WebSocket, token: str = Query(...)):
                         "conversation_type": "dm",
                         "data": {"session_id": session_id},
                     })
+                    # 真人上线 → 通知 DM 对方更新状态点
+                    await manager.broadcast_to_dm(
+                        session_id,
+                        {"type": "state_change", "data": {
+                            "user_id": user_id,
+                            "state": "active",
+                            "last_active_at": None,
+                        }},
+                        exclude_user_id=user_id,
+                    )
 
             # ---- 发送消息（群聊或私信） ----
             elif msg_type == "send":
@@ -472,6 +482,16 @@ async def websocket_endpoint(ws: WebSocket, token: str = Query(...)):
                 {"type": "user_offline", "conversation_type": "group", "data": {"user_id": user_id, "username": username}},
             )
         if current_session_id is not None:
+            # 真人下线 → 通知 DM 对方更新状态点
+            await manager.broadcast_to_dm(
+                current_session_id,
+                {"type": "state_change", "data": {
+                    "user_id": user_id,
+                    "state": "inactive",
+                    "last_active_at": None,
+                }},
+                exclude_user_id=user_id,
+            )
             manager.disconnect_dm(current_session_id, user_id)
 
 async def _log_message_audit(user_id: int, conv_type: str, conv_id: int | str, message_id: int):
