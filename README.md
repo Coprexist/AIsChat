@@ -174,8 +174,11 @@ AIsChat 可以部署在自有服务器、公司内网、家庭 NAS，甚至本�
 | **[用户手册](docs/guides/用户手册.md)** | 终端用户 — 从零开始使用 |
 | **[产品介绍](docs/ABOUT.md)** | 所有人 — 了解项目理念 |
 | **[项目全景报告](docs/reference/项目全景报告.md)** | AI / 个人用户 / 企业筛查员 — 技术架构、核心亮点、成熟度评估 |
+| **[部署合规建议书](docs/deployment-compliance.md)** | 部署者 / 管理员 — 中国境内内容标识、拟人化互动服务等法规对照与操作建议 |
+| **[魔视界 CSS 滤镜](docs/magic-vision.md)** | 开发者 — 10 种滤镜、三种作用域、补偿机制 |
 | **[AI 认知架构三空间模型](docs/archive/old_designs/AI%20认知架构三空间模型.md)** | 开发者 / 研究者 — 三空间模型、JSON intent、文件记忆、配置矩阵 |
 | **[管理与开发者手册](docs/guides/管理与开发者手册.md)** | 管理员 / 开发者 — 部署、架构、排错、WebSocket |
+| **[CHANGELOG](CHANGELOG.md)** | 所有人 — 版本变更记录 |
 | **[ROADMAP](ROADMAP.md)** | 所有人 — 已实现与规划中的功能 |
 
 <br>
