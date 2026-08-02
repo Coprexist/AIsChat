@@ -80,7 +80,27 @@ const compensated = (1 - k) * X
 el.style.setProperty('filter', `${otherParts} hue-rotate(${compensated}deg)`, 'important')
 ```
 
-**动态渲染兜底**：`apply()` 仅在 Layout 挂载时调用一次，而侧边栏 DM 列表等是异步加载的——首次补偿执行时 `[data-mv-force]` 元素可能尚未渲染。为此 `compensateHueRotate()` 会注册一个 `MutationObserver`（childList + subtree），监听 DOM 变化：一旦出现新的 `[data-mv-force]` 元素，自动用上次的 CSS 重新补偿。关闭魔视界时 `clearAll()` 会断开 observer 并清除所有补偿内联样式。
+**动态渲染兜底**：`apply()` 仅在 Layout 挂载时调用一次，而侧边栏 DM 列表等是异步加载的——首次补偿执行时 `[data-mv-force]` 元素可能尚未渲染。为此 `compensateHueRotate()` 会注册一个 `MutationObserver`（childList + subtree），**只在新增节点（含后代）中出现 `[data-mv-force]` 时才触发补偿，并做 120ms 防抖合并**——聊天打字/滚动等无关 DOM 变化不会引发全量重扫。关闭魔视界时 `clearAll()` 会断开 observer、清除防抖定时器与所有补偿内联样式。
+
+### 优雅案例：气泡背景拆分（优先于补偿）
+
+**问题**：图片消息的气泡同时包含文字与 `<img>`，整个气泡因 `:has(img)` 被豁免 → 气泡背景不随魔视界旋转，与文字消息气泡视觉不一致。
+
+**优雅解**：与其对整块气泡做补偿（图片会被带着转），不如**把气泡拆成两层 DOM**——背景层独立、不含图片，天然被 `*:not(:has(img))` 选中参与旋转：
+
+```jsx
+<div className={`relative ${opacity}`}>              {/* 外层：撑尺寸 */}
+  <div data-mv-force className={`absolute inset-0 ${bg}`} />  {/* 背景层：上色/圆角/边框/阴影，不含图片 */}
+  <div className={`bubble-content relative ... ${text}`}>    {/* 内容层：文字/图片，图片保持清晰 */}
+</div>
+```
+
+**要点**：
+- 背景层 `absolute inset-0` 不参与布局，尺寸完全由内容层（父容器）撑起 → 无论内容多高，圆角边框天然对齐，无需同步尺寸
+- 背景层因含 `data-mv-force` 补偿为正好旋转一次；图片在内容层，保持原样清晰
+- 拆层优先于补偿：**先问“能否用 DOM 结构表达意图”，再考虑 JS 补偿**——结构级解法零运行时开销
+
+**原则**：`data-mv-force` 是兜底手段，不是首选。能用 DOM 拆分让元素天然符合滤镜选择器语义时，优先拆结构。
 
 **限制**：补偿只针对可逆的 hue-rotate。blur/sepia/grayscale/invert 等不可逆滤镜不补偿（叠加是魔视界一贯行为，与整体 UI 保持一致）；若 CSS 中无 hue-rotate，补偿函数直接跳过。关闭魔视界时 `clearAll()` 会清除补偿产生的内联样式，不留残留。
 

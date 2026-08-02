@@ -134,11 +134,18 @@ const MessageBubble = memo(function MessageBubble({
     } catch (_) { /* ignore */ }
   }
 
+  // 气泡样式拆两层：背景层（上色+圆角边框+阴影，参与魔视界旋转）与内容层（文字颜色+布局）
+  // 背景层 absolute inset-0 铺满外层，尺寸由内容层撑起，圆角边框天然对齐
   const bubbleBg = isMine
-    ? 'bg-primary-500 dark:bg-[#5a3a99] text-white rounded-2xl rounded-tr-md shadow-lg shadow-primary-500/15'
+    ? 'bg-primary-500 dark:bg-[#5a3a99] rounded-2xl rounded-tr-md shadow-lg shadow-primary-500/15'
     : senderType === 'system'
-      ? 'bg-rose-50 dark:bg-rose-900/20 text-rose-900 dark:text-rose-300 rounded-2xl rounded-tl-md border border-rose-200 dark:border-rose-800'
-      : 'bg-surface text-textPrimary rounded-2xl rounded-tl-md border border-border'
+      ? 'bg-rose-50 dark:bg-rose-900/20 rounded-2xl rounded-tl-md border border-rose-200 dark:border-rose-800'
+      : 'bg-surface rounded-2xl rounded-tl-md border border-border'
+  const bubbleText = isMine
+    ? 'text-white'
+    : senderType === 'system'
+      ? 'text-rose-900 dark:text-rose-300'
+      : 'text-textPrimary'
 
   const avatarGradientCls = avatarGradient(senderType, isMine, !!senderAvatarUrl)
   const avatarGradientShadow = isMine ? 'shadow-primary-500/15' : senderType === 'system' ? 'shadow-rose-400/15' : 'shadow-teal-400/10'
@@ -207,7 +214,11 @@ const MessageBubble = memo(function MessageBubble({
           {thinking && <span className="text-[10px] text-primary-400 animate-pulse font-medium">{t('chat.thinking')}</span>}
           {isTyping && <span className="text-[10px] text-mint-400 animate-pulse font-medium">{t('chat.typing')}</span>}
         </div>
-        <div className={`bubble-content relative px-4 py-2.5 text-sm leading-relaxed break-words ${bubbleBg} ${thinking || isTyping ? 'opacity-70' : ''} ${layoutCls}`} style={tableVars}>
+        <div className={`relative ${thinking || isTyping ? 'opacity-70' : ''}`}>
+          {/* 背景层：只上色/圆角/边框/阴影，不含图片 → 天然被魔视界选中旋转；尺寸由外层决定 */}
+          <div data-mv-force className={`absolute inset-0 ${bubbleBg}`} aria-hidden="true" />
+          {/* 内容层：文字/图片/布局，不参与旋转（图片保持清晰） */}
+          <div className={`bubble-content relative px-4 py-2.5 text-sm leading-relaxed break-words ${bubbleText} ${layoutCls}`} style={tableVars}>
           {replyTo != null && (
             <div className={`flex items-start gap-1.5 mb-1.5 pb-1.5 border-b ${isMine ? 'border-white/20' : 'border-border'} cursor-pointer hover:opacity-80 transition-opacity`}
               onClick={() => {
@@ -309,6 +320,7 @@ const MessageBubble = memo(function MessageBubble({
               <Reply size={12} />
             </button>
           )}
+        </div>
         </div>
       </div>
     </div>

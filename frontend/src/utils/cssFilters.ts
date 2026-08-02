@@ -112,6 +112,10 @@ function clearAll(): void {
     _forceObserver.disconnect()
     _forceObserver = null
   }
+  if (_forceDebounce) {
+    clearTimeout(_forceDebounce)
+    _forceDebounce = null
+  }
   _lastCompensateCSS = null
 }
 
@@ -136,6 +140,27 @@ function applyUI(css: string): void {
 // 其他滤镜（blur 等）不补偿——叠加是魔视界一贯行为，保持与其他元素一致。
 let _forceObserver: MutationObserver | null = null
 let _lastCompensateCSS: string | null = null
+let _forceDebounce: ReturnType<typeof setTimeout> | null = null
+
+function scheduleCompensate(): void {
+  if (_forceDebounce) clearTimeout(_forceDebounce)
+  _forceDebounce = setTimeout(() => {
+    _forceDebounce = null
+    if (_lastCompensateCSS) compensateHueRotate(_lastCompensateCSS)
+  }, 120)
+}
+
+// 检查新增节点（含其后代）是否含 data-mv-force，避免无关 DOM 变化触发全量重扫
+function hasForceNode(nodes: NodeList): boolean {
+  for (let i = 0; i < nodes.length; i++) {
+    const n = nodes[i]
+    if (n.nodeType !== 1) continue
+    const el = n as Element
+    if (el.hasAttribute(FORCE_ATTR)) return true
+    if (el.querySelector(`[${FORCE_ATTR}]`)) return true
+  }
+  return false
+}
 
 function compensateHueRotate(css: string): void {
   _lastCompensateCSS = css
@@ -155,10 +180,16 @@ function compensateHueRotate(css: string): void {
     ;(el as HTMLElement).style.setProperty('filter', filter, 'important')
   })
 
-  // 监听后续动态渲染的 data-mv-force 元素（如侧边栏异步加载完列表后才出现），自动补补偿
+  // 监听后续动态渲染的 data-mv-force 元素（如侧边栏异步加载完列表、新消息气泡才出现），
+  // 只在新增节点含标记时触发，并防抖合并，避免聊天时全量重扫
   if (!_forceObserver) {
-    _forceObserver = new MutationObserver(() => {
-      if (_lastCompensateCSS) compensateHueRotate(_lastCompensateCSS)
+    _forceObserver = new MutationObserver((mutations) => {
+      for (const m of mutations) {
+        if (m.type === 'childList' && hasForceNode(m.addedNodes)) {
+          scheduleCompensate()
+          return
+        }
+      }
     })
     _forceObserver.observe(document.body, { childList: true, subtree: true })
   }
