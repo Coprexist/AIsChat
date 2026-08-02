@@ -7,6 +7,44 @@
 
 ---
 
+## [v0.2.8] - 2026-07-28 ~ 08-02
+
+### Added
+
+- 🎨 **魔视界（Magic Vision）CSS 滤镜系统**：10 种 CSS 滤镜可视化调节面板（blur/brightness/contrast/drop-shadow/grayscale/hue-rotate/invert/opacity/saturate/sepia），三种作用域（全部/仅图片/仅 UI），`ui_prefs.magic_vision` JSONB 持久化。v1.1 新增 `data-mv-force` 补偿标记：hue-rotate 嵌套叠加导致的状态点颜色不一致通过补偿算法统一；关闭开关立即持久化，不再依赖“应用”按钮。详见 `docs/magic-vision.md`。
+- 🖼️ **群聊头像设置**：默认图标 / 成员头像排列（2×2 网格）/ 自定义上传（方形裁剪 + 压缩 + 缩略图），`avatar_mode` 字段持久化，头像缩略图 128×128，跨扩展名清理旧头像。
+- 👑 **转让群主**：群设置支持将群主身份转让给其他成员。
+- 🎛️ **群聊侧边栏大改**：置顶/折叠/优化，`user_group_preferences` + `user_dm_preferences` 表。
+- 🛡️ **注册通道开关**：管理员可关闭公开注册，仅后台手动创建 / CSV 批量导入用户。
+- 📝 **审计日志系统升级**：用户行为审计（登录/注册/发消息）+ IP 记录 + IP 地理位置（geoip，可切换后端）+ 保留天数可配置（默认 90 天）+ 消息审计只存 message_id（默认永久）。
+- 🧹 **管理后台文件清理**：无引用头像 + 失效映射清理，`last_cleanup_stats` 记录。
+- 🖱️ **存储页文件预览**：独立存储页面，文件支持点击预览。
+- 🌐 **纯前端演示站**：GitHub Pages 部署（HashRouter + fetch mock + localStorage 数据层），DemoChat 复用主应用完整 UI，支持 API Key 设置 + 消息发 DeepSeek。
+- 🏷️ **群名片/大图查看**：群聊头部头像、群名片、头像大图查看。
+
+### Changed
+
+- 🔄 **魔视界 v1.1**：`data-mv-force` 补偿标记 + 关闭立即持久化 + MutationObserver 动态补偿（防抖 120ms，只在新增标记元素时触发）。
+- 📡 **在线状态实时推送**：`state_change` 事件广播——AI `switch_state` 后向相关 DM 对方推送，真人上下线（WS 订阅/断开）同样推送，前端 DMChatView 实时更新状态点。
+- 🛡️ **工具状态兜底**：`get_allowed_tools()` 对未知/遗留状态（如 offline）兜底到 inactive 工具集（17 个），blocked 保持 0 工具，修复 AI“裸奔”死循环。
+- 🔧 **`list_available_skills` 修复**：`seg_tools` 为 dict 列表却与字符串集合比较导致 `unhashable type: 'dict'`。
+- 🐞 **滚动系统修复**：`scrollIntoView` 会连带滚动外层 overflow-hidden 容器（main/Layout），把标题栏滚出视口。新增 `utils/scroll.ts`（`scrollToInContainer` 只滚容器本身）+ 聊天页 main 改 `overflow-hidden`，三处调用点统一修复。
+- 🧩 **按钮嵌套修复**：ChatArea 群聊标题栏 button 套 button（GroupAvatarHeader 自带 button），改为直接传 onClick。
+- 🖌️ **气泡背景拆分**：`bubble-content` 拆为背景层（上色/圆角/边框/阴影，参与魔视界旋转）+ 内容层（文字/图片，图片保持清晰），尺寸由父容器决定。
+
+### Fixed
+
+- 🐛 **AI 不回消息死循环**：agent state 残留 `offline`（7-27 状态归一化迁移未生效）→ 0 工具 → 只能输出文字 → 被 system_reminder 反复弹。数据修复 + 工具兜底 + 重启。
+- 🐛 **DM 500 系列**：`_maybe_trigger_dm_ai_reply` 缺 select 导入、`_normalize_attachments` 统一处理 Text/JSONB 列、撤回 DM 广播改动（导致 500）。
+- 🐛 **/fs/list 500**：重复代码 copy-paste 导致 `list_files` 收到 list → 500；路径过滤导致文件列表为空。
+- 🐛 **审计日志时区 500**：`datetime.now(timezone.utc)` 写入无时区列，改用 `datetime.utcnow()`。
+- 🐛 **头像上传 NameError**：`upload_dir` 使用前定义（两处：上传端点 + agents.py）。
+- 🐛 **群头像设置丢失**：读取 `avatar_mode` 字段，刷新后不丢失；保存后同步刷新侧边栏。
+- 🐛 **ProfileCard/JSX 结构错误**：标签平衡修复（多处）。
+- 🐛 **设置页保存按钮错位**、**消息时间跨日判定**（改用日历日比较）、**输入框最小高度 40px 对齐**。
+
+---
+
 ## [v0.2.7] - 2026-07-27
 
 ### Added

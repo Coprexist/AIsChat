@@ -168,9 +168,7 @@ export default function ChatArea({ groupId, dmSessionId }: ChatAreaProps) {
               <ArrowLeft size={20} />
             </button>
             {currentGroup && (
-              <button onClick={() => setProfileGroup(currentGroup)} className="shrink-0">
-                <GroupAvatarHeader g={currentGroup} />
-              </button>
+              <GroupAvatarHeader g={currentGroup} onClick={() => setProfileGroup(currentGroup)} />
             )}
             <h2 className="font-semibold text-textPrimary text-sm truncate">
               # {currentGroup?.name || t('chat.loading')}

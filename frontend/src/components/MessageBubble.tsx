@@ -12,6 +12,7 @@ import { formatMessageTime } from '../utils/time'
 import { formatFileSize } from '../utils/format'
 import { avatarGradient } from '../utils/avatar'
 import { getChatStyle, chatStyleClasses } from '../utils/providers.tsx'
+import { scrollToInContainer } from '../utils/scroll'
 import { useLang, useT } from '../i18n/I18nContext'
 import { api } from '../api/client'
 import CodeRenderer from './shared/CodeRenderer'
@@ -222,7 +223,12 @@ const MessageBubble = memo(function MessageBubble({
           {replyTo != null && (
             <div className={`flex items-start gap-1.5 mb-1.5 pb-1.5 border-b ${isMine ? 'border-white/20' : 'border-border'} cursor-pointer hover:opacity-80 transition-opacity`}
               onClick={() => {
-                document.getElementById(`msg-${replyTo.id}`)?.scrollIntoView({ behavior: 'smooth', block: 'center' })
+                // 只滚动消息列表容器本身（scrollIntoView 会连带滚动外层 main/Layout，把标题栏滚出视口）
+                const target = document.getElementById(`msg-${replyTo.id}`)
+                const list = target?.closest('.overflow-y-auto') as HTMLElement | null
+                if (target && list) {
+                  scrollToInContainer(list, target, { smooth: true, offset: -list.clientHeight / 2 })
+                }
               }}>
               <div className="w-0.5 h-full min-h-[1.5em] bg-primary-400 rounded-full shrink-0" />
               <div className="text-[11px] leading-relaxed line-clamp-2">

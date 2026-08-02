@@ -11,6 +11,7 @@ import { Send, Loader2, AlertTriangle, X, ArrowDown, ArrowUp, Paperclip, FileIco
 import { getStateDotColor, CHAT_REFRESH_EVENT } from '../constants'
 import { useT } from '../i18n/I18nContext'
 import { isTauri, onKeyboardChange } from '../utils/tauri'
+import { scrollToInContainer } from '../utils/scroll'
 
 interface Message {
   id: number
@@ -514,7 +515,8 @@ export default function ChatView({ conversationType, conversationId }: ChatViewP
     const msgEl = el.querySelector(`[data-message-id="${messageId}"]`)
     if (msgEl) {
       isAutoScrolling.current = true
-      msgEl.scrollIntoView({ block: 'start', behavior: 'smooth' })
+      // 只滚动消息容器本身（scrollIntoView 会连带滚动外层 main/Layout，把标题栏滚出视口）
+      scrollToInContainer(el, msgEl, { smooth: true })
       setTimeout(() => { isAutoScrolling.current = false }, 500)
     }
   }, [])
@@ -594,7 +596,8 @@ export default function ChatView({ conversationType, conversationId }: ChatViewP
         const msgEl = container.querySelector(`[data-message-id="${firstUnreadId}"]`)
         if (msgEl) {
           isAutoScrolling.current = true
-          msgEl.scrollIntoView({ block: 'start', behavior: 'instant' })
+          // 只滚动消息容器本身，避免 scrollIntoView 连带滚动外层 main/Layout
+          scrollToInContainer(container, msgEl)
           setTimeout(() => { isAutoScrolling.current = false }, 500)
         }
       } else if (container.scrollHeight > container.clientHeight) {

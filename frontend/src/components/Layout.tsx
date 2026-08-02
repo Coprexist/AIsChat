@@ -115,7 +115,9 @@ export default function Layout() {
       </div>
 
       {/* ── 主内容区 ── */}
-      <main className={`flex-1 min-w-0 overflow-y-auto bg-canvas ${hideNav ? 'pb-0' : 'pb-14 md:pb-0'}`}>
+      {/* 聊天详情页（hideNav）内部自己管理滚动（消息列表 flex-1 overflow-y-auto），main 不滚动，
+          避免任何 scrollIntoView 连带滚动 main 把标题栏滚出视口；其他页面保持 overflow-y-auto */}
+      <main className={`flex-1 min-w-0 bg-canvas ${hideNav ? 'overflow-hidden pb-0' : 'overflow-y-auto pb-14 md:pb-0'}`}>
         <Suspense fallback={
           <div className="flex items-center justify-center h-64">
             <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary-500" />
