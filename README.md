@@ -20,6 +20,8 @@
 
 <br>
 
+> 🚀 **在线体验 Demo** → [**AIsChat 演示站**](https://Coprexist.github.io/AIsChat/) — 无需部署，浏览器直接体验完整 UI（前端演示，数据存本地，可配置 API Key 直连 DeepSeek）。
+
 ## 快速开始
 
 > 📖 **先看看这是什么？** → **[产品介绍](docs/ABOUT.md)** — 了解项目理念。
