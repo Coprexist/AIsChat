@@ -174,6 +174,42 @@ export default function WorldDesignPage() {
     }
   }
 
+  // ── 上传（先选择目标位置，再选文件） ──
+  const fileInputRef = useRef<HTMLInputElement>(null)
+  const handleUploadPick = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const f = e.target.files?.[0]
+    e.target.value = ''  // 允许重复选同一文件
+    if (!f) return
+    // 先选择位置：默认当前选中文件所在目录
+    const dir = currentFile?.includes('/') ? currentFile.slice(0, currentFile.lastIndexOf('/') + 1) : ''
+    const target = prompt(`上传到哪个路径？（当前目录：${dir || '/'}）`, dir + f.name)
+    if (!target) return
+    try {
+      const fd = new FormData()
+      fd.append('file', f)
+      fd.append('path', target.replace(/^\/+/, ''))
+      await api.post(`/worlds/${wid}/files/upload`, fd)
+      await load()
+      selectFile(target.replace(/^\/+/, ''))
+      setMsg('✅ 已上传')
+    } catch (err: any) {
+      setMsg(`上传失败: ${err?.message || err}`)
+    }
+  }
+
+  // ── 删除（AI 侧已有 file_delete 工具，这里补前端入口） ──
+  const deleteFile = async (path: string) => {
+    if (!confirm(`删除 ${path}？`)) return
+    try {
+      await api.delete(`/worlds/${wid}/files?path=${encodeURIComponent(path)}`)
+      if (currentFile === path) setCurrentFile('')
+      await load()
+      setMsg(`✅ 已删除 ${path}`)
+    } catch (e: any) {
+      setMsg(`删除失败: ${e?.message || e}`)
+    }
+  }
+
   // ── 文件树（按目录层级构建，文件夹可折叠） ──
   interface TreeNode {
     name: string
@@ -235,15 +271,24 @@ export default function WorldDesignPage() {
             {!collapsedDirs.has(n.path) && renderTree(n.children, depth + 1)}
           </>
         ) : (
-          <button
-            onClick={() => selectFile(n.path)}
-            style={{ paddingLeft: 24 + depth * 14 }}
-            className={`flex items-center gap-1 w-full text-left text-xs py-1 pr-2 rounded truncate transition-colors ${currentFile === n.path ? 'bg-primary-500/20 text-primary-300' : 'hover:bg-elevated text-textSecondary'}`}
-            title={n.path}
-          >
-            <span className="shrink-0">📄</span>
-            <span className="truncate">{n.name}</span>
-          </button>
+          <div key={n.path} className="group flex items-center">
+            <button
+              onClick={() => selectFile(n.path)}
+              style={{ paddingLeft: 24 + depth * 14 }}
+              className={`flex items-center gap-1 flex-1 min-w-0 text-left text-xs py-1 pr-1 rounded truncate transition-colors ${currentFile === n.path ? 'bg-primary-500/20 text-primary-300' : 'hover:bg-elevated text-textSecondary'}`}
+              title={n.path}
+            >
+              <span className="shrink-0">📄</span>
+              <span className="truncate">{n.name}</span>
+            </button>
+            <button
+              onClick={(ev) => { ev.stopPropagation(); deleteFile(n.path) }}
+              className="hidden group-hover:block shrink-0 px-1 py-1 text-textMuted hover:text-rose-400 transition-colors"
+              title="删除此文件"
+            >
+              🗑
+            </button>
+          </div>
         )}
       </div>
     ))
@@ -480,8 +525,12 @@ export default function WorldDesignPage() {
           <div ref={fileTreeRef} style={{ width: fileWidth }} className="shrink-0 bg-surface border-r border-border overflow-y-auto p-2">
             <div className="flex items-center justify-between mb-2 px-1">
               <span className="text-xs font-medium text-textSecondary">文件</span>
-              <button onClick={createFile} className="text-xs text-primary-400 hover:text-primary-300 transition-colors">+ 新建</button>
+              <span className="flex items-center gap-2">
+                <button onClick={() => fileInputRef.current?.click()} className="text-xs text-primary-400 hover:text-primary-300 transition-colors" title="上传文件（先选位置）">⬆️ 上传</button>
+                <button onClick={createFile} className="text-xs text-primary-400 hover:text-primary-300 transition-colors" title="新建文件">+ 新建</button>
+              </span>
             </div>
+            <input ref={fileInputRef} type="file" className="hidden" onChange={handleUploadPick} />
             {files.length === 0 && <div className="text-xs text-textMuted p-2">空世界，点 + 新建或让机器人生成</div>}
             {renderTree(fileTree.children, 0)}
           </div>

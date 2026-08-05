@@ -97,6 +97,18 @@ def write_file(world_id: int, rel_path: str, content: str) -> dict:
     return {"path": rel_path, "size": len(content.encode("utf-8"))}
 
 
+def write_file_bytes(world_id: int, rel_path: str, data: bytes) -> dict:
+    """写二进制文件（图片/音频等上传用；校验与 write_file 同一套：白名单/越界/大小）"""
+    if len(data) > MAX_FILE_SIZE:
+        raise ValueError("文件超过 5MB 限制")
+    target = _safe_path(world_id, rel_path)
+    _check_ext(target)
+    target.parent.mkdir(parents=True, exist_ok=True)
+    target.write_bytes(data)
+    logger.info(f"🌐 世界 #{world_id} 写入二进制文件: {rel_path} ({len(data)}B)")
+    return {"path": rel_path, "size": len(data)}
+
+
 def delete_file(world_id: int, rel_path: str) -> None:
     """删除文件"""
     target = _safe_path(world_id, rel_path)

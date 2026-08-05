@@ -464,7 +464,6 @@ export default function FilePreviewModal({ fileId, fileName, fileSize, mimeType,
                     dangerouslySetInnerHTML={{ __html: content || '' }}
                   />
                 ) : isMd || codeLang ? (
-                  {/* 与主界面聊天/世界渲染同一份实现（共享 MarkdownContent：GFM/公式/代码高亮/彩色文字） */}
                   <div className="w-full max-w-none text-sm leading-relaxed break-words text-textPrimary">
                     <MarkdownContent
                       content={codeLang ? '```' + codeLang + '\n' + (content || '') + '\n```' : (content || '')}

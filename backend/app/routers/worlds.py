@@ -5,7 +5,7 @@
 """
 import logging
 
-from fastapi import APIRouter, Depends, HTTPException, UploadFile
+from fastapi import APIRouter, Depends, HTTPException, UploadFile, Form
 from pydantic import BaseModel, Field
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -592,6 +592,28 @@ async def import_zip(
     try:
         data = await file.read()
         result = fs_import(world_id, data)
+        return result
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+
+@router.post("/{world_id}/files/upload")
+async def upload_file(
+    world_id: int,
+    file: UploadFile,
+    path: str = Form(..., description="目标相对路径（含文件名，如 img/logo.png）"),
+    current_user: dict = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """单文件上传（图片/音频/字体等二进制，仅创建者；先选目标位置再上传）"""
+    await _require_owner(db, world_id, current_user["user_id"])
+    from app.services.world.world_file_service import write_file_bytes
+    path = path.strip().lstrip("/")
+    if not path:
+        raise HTTPException(status_code=400, detail="目标路径不能为空")
+    try:
+        data = await file.read()
+        result = write_file_bytes(world_id, path, data)
         return result
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
