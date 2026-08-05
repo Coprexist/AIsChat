@@ -3,6 +3,13 @@
 .env.local
 .env.*.local
 
+# 敏感 token（JWT 等）
+token.txt
+
+# 备份文件
+*.bak-*
+backup_backend/
+
 # ── Docker 数据卷（数据库、上传文件） ──
 data/
 
