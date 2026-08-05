@@ -23,6 +23,7 @@ from pathlib import Path
 logger = logging.getLogger(__name__)
 
 DEFAULT_MEMORY_MB = 24          # 无人/后台内存配额（sleep_memory_mb 可覆盖）——珑哥定义：没人在时最多给世界配多少
+DEFAULT_RUNTIME_MEMORY_MB = 128  # 有人在线内存配额（runtime_memory_mb 可覆盖）——珑哥 2026-08-05 定
 DEFAULT_TIMEOUT_SECONDS = 10.0  # 默认墙钟超时
 DEFAULT_CPU_SECONDS = 5.0       # 默认 CPU 时间上限
 MAX_FSIZE_BYTES = 4 * 1024 * 1024   # 单文件写入上限 4MB（防写爆磁盘）
@@ -34,17 +35,17 @@ MAX_OUTPUT_CHARS = 20000        # stdout/stderr 各截断长度
 class Policy:
     """沙箱配额（集中配置，参考 sandtrap Policy 模式）
 
-    memory_mb=None 表示不设内存上限（MVP：有人在线时，珑哥定义"暂时不给有人在的时候设置上限"）
+    memory_mb=None 表示不设内存上限（保留能力，当前默认有人在线 128MB）
     """
     timeout_seconds: float = DEFAULT_TIMEOUT_SECONDS
-    memory_mb: int | None = None
+    memory_mb: int | None = DEFAULT_RUNTIME_MEMORY_MB
     cpu_seconds: float = DEFAULT_CPU_SECONDS
 
 
 def policy_for_world(world, background: bool = False) -> Policy:
     """世界配额（worlds.config 可配）：
     - 无人/后台（background=True）：内存 = sleep_memory_mb（默认 24MB）
-    - 有人/前台（background=False）：MVP 不设内存上限，runtime_memory_mb 可覆盖
+    - 有人/前台（background=False）：内存 = runtime_memory_mb（默认 128MB，珑哥 2026-08-05 定）
     超时/CPU 恒生效（保护宿主不受死循环拖累）。
     """
     cfg = world.config or {}
@@ -64,13 +65,11 @@ def policy_for_world(world, background: bool = False) -> Policy:
             memory = DEFAULT_MEMORY_MB
         memory = max(8, min(memory, 512))
     else:
-        # 有人在线：MVP 不设上限；配置了 runtime_memory_mb 才收口
-        memory = None
         try:
-            if cfg.get("runtime_memory_mb"):
-                memory = max(8, min(int(cfg["runtime_memory_mb"]), 2048))
+            memory = int(cfg.get("runtime_memory_mb") or DEFAULT_RUNTIME_MEMORY_MB)
         except (TypeError, ValueError):
-            memory = None
+            memory = DEFAULT_RUNTIME_MEMORY_MB
+        memory = max(16, min(memory, 2048))
 
     return Policy(
         timeout_seconds=max(1.0, min(timeout, 120.0)),

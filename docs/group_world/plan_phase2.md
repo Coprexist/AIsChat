@@ -21,7 +21,7 @@
 
 | # | 交付 | 说明 | 依赖 |
 |---|------|------|------|
-| 2.1 | **py 沙箱** | ✅ **MVP 已实现**（2026-08-05）：`world_sandbox.py` subprocess + rlimit + 超时 killpg 强杀 + env 白名单；`POST /worlds/{id}/run`（仅创建者）。**配额语义（珑哥定义）**：24MB = 无人/后台配额（sleep_memory_mb 可覆盖）；**有人在线 MVP 不设内存上限**（runtime_memory_mb 可配）；超时/CPU 恒生效；RLIMIT_AS 是虚拟内存口径（实际可用堆 = 配额 - 解释器开销） | 无（最先） |
+| 2.1 | **py 沙箱** | ✅ **MVP 已实现**（2026-08-05）：`world_sandbox.py` subprocess + rlimit + 超时 killpg 强杀 + env 白名单；`POST /worlds/{id}/run`（仅创建者）。**配额语义（珑哥定义）**：无人/后台 = `sleep_memory_mb`（默认 24MB）；**有人在线 = `runtime_memory_mb`（默认 128MB，2026-08-05 定）**；超时/CPU/文件大小/进程数恒生效；RLIMIT_AS 是虚拟内存口径（实际可用堆 = 配额 - 解释器开销） | 无（最先） |
 | 2.2 | **触发文件** | 世界后端入口约定（如 `main.py` 暴露 handle(event)）；事件/请求触发执行 | 2.1 |
 | 2.3 | **受控数据 API** | 世界代码经代理访问世界数据/对话状态（不暴露后端真实结构）；JWT 校验 | 2.1 |
 | 2.4 | **群聊写 API** | 世界代码可发消息/管理（身份/作用域/限流三件套；管理操作仅群主/管理员） | 2.3 |
