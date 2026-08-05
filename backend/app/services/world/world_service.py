@@ -12,7 +12,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 logger = logging.getLogger(__name__)
 
 VALID_BIND_TYPES = {"group", "dm", "user"}
-DEFAULT_SLEEP_MEMORY_MB = 24  # 休眠配额（无人时默认 24MB/世界）
+DEFAULT_SLEEP_MEMORY_MB = 48  # 休眠配额（无人时默认 48MB/世界；24MB 连解释器都起不来，2026-08-05 实测）
 
 # 群视界机器人（世界 AI）默认配置 —— 建世界时自动初始化，就是世界的一份配置（非 agent、无账号）
 CREATOR_DEFAULT_CONFIG = {

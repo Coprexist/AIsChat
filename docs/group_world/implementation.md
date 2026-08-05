@@ -176,8 +176,11 @@ window.WorldUI = {              // UI 桥（postMessage → 宿主 Layout）
 5. ✅ **2.3 受控数据 API + 2.4 群聊写 API**（2026-08-05 已完成，见下）
 6. ✅ 受控 API token 机制（每世界一个，懒生成存 worlds.config.api_token；沙箱 env 注入 WORLD_API_TOKEN/WORLD_API_BASE）
 7. ✅ 动态限流（10 秒窗口 = 基础 + 每人加成 × 活跃人数；worlds.config 可配 4 个字段）
-8. 后台常驻任务（世界自主演化）
-9. 世界线一致性（阶段 3）
+8. ✅ **群消息钩子**（2026-08-05 已完成：群消息→世界入口 handle(event) 异步感知；2s 节流合并可配；source=world 防死循环）
+9. ✅ **唤醒改手动模式**（2026-08-05：AUTO_MANAGE=False，状态只由手动 wake/sleep 控制，唤醒后保持活跃）
+10. ✅ **后台配额修复**（2026-08-05：sleep_memory_mb 默认 24→48MB，policy 硬下限 32MB——24MB 下解释器连 import 都跑不动）
+11. 后台常驻任务（世界自主演化）
+12. 世界线一致性（阶段 3）
 
 **2.3+2.4 详情**（2026-08-05）：
 - 数据面：GET /world/{id}/api/{world,chat,memories,usage,groups} + POST /api/memories（复用 get_chat_history / world_tools._do_execute 同一份逻辑）

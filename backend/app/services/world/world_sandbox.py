@@ -23,7 +23,9 @@ from pathlib import Path
 
 logger = logging.getLogger(__name__)
 
-DEFAULT_MEMORY_MB = 24          # 无人/后台内存配额（sleep_memory_mb 可覆盖）——珑哥定义：没人在时最多给世界配多少
+DEFAULT_MEMORY_MB = 48          # 无人/后台内存配额（sleep_memory_mb 可覆盖）
+# ⚠️ 2026-08-05 钩子测试发现：24MB 下 python -I 连标准库 import 都跑不动（RLIMIT_AS 是虚拟内存口径，
+# 解释器+importlib/asyncio 等约需 ≥32MB）；默认提到 48，policy 另有 32MB 硬下限兜底已有世界。
 DEFAULT_RUNTIME_MEMORY_MB = 128  # 有人在线内存配额（runtime_memory_mb 可覆盖）——珑哥 2026-08-05 定
 DEFAULT_TIMEOUT_SECONDS = 10.0  # 默认墙钟超时
 DEFAULT_CPU_SECONDS = 5.0       # 默认 CPU 时间上限
@@ -64,7 +66,8 @@ def policy_for_world(world, background: bool = False) -> Policy:
             memory = int(cfg.get("sleep_memory_mb") or DEFAULT_MEMORY_MB)
         except (TypeError, ValueError):
             memory = DEFAULT_MEMORY_MB
-        memory = max(8, min(memory, 512))
+        # 解释器硬下限：python -I + 标准库 import 约需 32MB 虚拟内存，低于则直接启动失败（2026-08-05）
+        memory = max(32, min(memory, 512))
     else:
         try:
             memory = int(cfg.get("runtime_memory_mb") or DEFAULT_RUNTIME_MEMORY_MB)

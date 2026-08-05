@@ -31,7 +31,7 @@ SECTIONS: list[dict] = [
     {"id": "06", "title": "页面与资源", "file": "06-pages-assets.md",
      "intro": "沉浸界面入口、静态资源路由与相对路径规则"},
     {"id": "07", "title": "懒通知与世界时间", "file": "07-notices-time.md",
-     "intro": "用户改代码的通知机制、世界时间与运行模式"},
+     "intro": "用户改代码的通知机制、世界时间流速、运行模式（手动唤醒/群消息钩子感知）"},
     {"id": "08", "title": "错误与安全", "file": "08-errors-security.md",
      "intro": "错误体格式、状态码、认证与安全约定"},
     {"id": "09", "title": "受控数据 API（世界代码）", "file": "09-world-api.md",

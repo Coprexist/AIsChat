@@ -276,8 +276,13 @@ async def create_message(
     content: str,
     reply_to: int | None = None,
     attachments: list[dict] | None = None,
+    source: str = "user",
 ) -> Message:
-    """创建消息（支持附件，非 owner 发送含附件消息时自动创建转发引用）"""
+    """创建消息（支持附件，非 owner 发送含附件消息时自动创建转发引用）
+
+    source："user"=人/工具发起（会触发群消息钩子→世界程序感知）；
+           "world"=世界程序/世界 AI 自己发的（不触发，防死循环）
+    """
     message = Message(
         group_id=group_id,
         sender_type=sender_type,
@@ -297,6 +302,14 @@ async def create_message(
                 await track_forward_reference(db, fid, sender_type, sender_id)
 
     await db.refresh(message)
+
+    # 群消息钩子：群里有消息 → 异步喂给绑定世界的入口（世界程序感知）
+    try:
+        from app.services.world.world_event_hook import notify_group_message
+        await notify_group_message(db, group_id, message, source)
+    except Exception as e:
+        logger.warning(f"🌐 群消息钩子异常（group #{group_id}）: {e}")
+
     return message
 
 
