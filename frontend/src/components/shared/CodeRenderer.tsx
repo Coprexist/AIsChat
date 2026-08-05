@@ -1,7 +1,6 @@
 import MermaidBlock from '../MermaidBlock'
 import hljs from 'highlight.js'
-// 基础用日间主题（github）；夜间由全局 index.css 的 .dark .hljs-* 覆盖（日夜适配）
-import 'highlight.js/styles/github.css'
+// 高亮配色由全局 index.css 自定义（日/夜两套，取主题色系）——不再引 highlight.js 内置主题 CSS
 
 /**
  * 共享代码块渲染器——消息气泡和文件预览共用。
