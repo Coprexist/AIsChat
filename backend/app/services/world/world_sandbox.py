@@ -23,15 +23,37 @@ from pathlib import Path
 
 logger = logging.getLogger(__name__)
 
-DEFAULT_MEMORY_MB = 48          # 无人/后台内存配额（sleep_memory_mb 可覆盖）
-# ⚠️ 2026-08-05 钩子测试发现：24MB 下 python -I 连标准库 import 都跑不动（RLIMIT_AS 是虚拟内存口径，
-# 解释器+importlib/asyncio 等约需 ≥32MB）；默认提到 48，policy 另有 32MB 硬下限兜底已有世界。
+DEFAULT_MEMORY_MB = 64          # 无人/后台内存配额（sleep_memory_mb 可覆盖）
+# ⚠️ 2026-08-05 实测：24MB 下 python -I 连标准库 import 都跑不动（RLIMIT_AS 虚拟内存口径，解释器约需 ≥32MB）。
+# 珑哥拍板：多群多解释器（默认形态）→ 上限 64MB；单解释器共享场景 → 32MB（policy 硬下限）。
 DEFAULT_RUNTIME_MEMORY_MB = 128  # 有人在线内存配额（runtime_memory_mb 可覆盖）——珑哥 2026-08-05 定
 DEFAULT_TIMEOUT_SECONDS = 10.0  # 默认墙钟超时
 DEFAULT_CPU_SECONDS = 5.0       # 默认 CPU 时间上限
 MAX_FSIZE_BYTES = 4 * 1024 * 1024   # 单文件写入上限 4MB（防写爆磁盘）
 MAX_NPROC = 16                  # 子进程数上限（防 fork 炸弹）
 MAX_OUTPUT_CHARS = 20000        # stdout/stderr 各截断长度
+
+# 全局沙箱并发上限（珑哥 2026-08-05 拍板方案 1：各用各的解释器 + 排队）
+# - 排队的是「一次代码执行任务」（短任务，有超时兜底），不是人/群
+# - 在线不占位：只有执行中的那几秒占一个槽位，跑完释放
+# - 管理员可配：环境变量 SANDBOX_MAX_CONCURRENT（默认 4，范围 1-32）
+DEFAULT_MAX_CONCURRENT = 4
+_sandbox_sem: asyncio.Semaphore | None = None
+
+
+def _max_concurrent() -> int:
+    try:
+        return max(1, min(int(os.environ.get("SANDBOX_MAX_CONCURRENT", DEFAULT_MAX_CONCURRENT)), 32))
+    except (TypeError, ValueError):
+        return DEFAULT_MAX_CONCURRENT
+
+
+def _get_semaphore() -> asyncio.Semaphore:
+    """全局沙箱信号量（单 worker 进程内生效）：并发执行上限，超出排队等待"""
+    global _sandbox_sem
+    if _sandbox_sem is None:
+        _sandbox_sem = asyncio.Semaphore(_max_concurrent())
+    return _sandbox_sem
 
 
 @dataclass
@@ -138,15 +160,29 @@ async def run_world_code(
     background: bool = False,
 ) -> dict:
     """
-    在沙箱中运行世界 Python 代码。
+    在沙箱中运行世界 Python 代码（全局并发上限内排队执行）。
 
     - code：直接执行的脚本（自动写入世界目录临时文件再跑，世界内相对导入可用）
     - entry：世界文件夹内的入口文件（相对路径，如 main.py）
-    - background：True=无人/后台执行（内存按 sleep_memory_mb，默认 24MB）；False=有人在线（MVP 不设内存上限）
+    - background：True=无人/后台执行（内存按 sleep_memory_mb，默认 64MB）；False=有人在线
     二者必给其一（entry 优先）。
 
     返回：{success, stdout, stderr, exit_code, duration_ms, timed_out, reason}
+    （duration_ms = 执行耗时；queued_ms = 全局并发排队等待耗时，两者相加 = 请求总耗时）
     """
+    _t0 = asyncio.get_event_loop().time()
+    async with _get_semaphore():
+        _result = await _run_world_code(world, code=code, entry=entry, background=background)
+    _result["queued_ms"] = max(0, int((asyncio.get_event_loop().time() - _t0) * 1000) - int(_result.get("duration_ms") or 0))
+    return _result
+
+
+async def _run_world_code(
+    world,
+    code: str | None = None,
+    entry: str | None = None,
+    background: bool = False,
+) -> dict:
     policy = policy_for_world(world, background=background)
     workdir = _world_dir(world.id)
     workdir.mkdir(parents=True, exist_ok=True)
@@ -270,13 +306,28 @@ async def run_world_trigger(
 ) -> dict:
     """
     2.2 触发文件：执行世界入口的 handle(event)，返回其结果（JSON 序列化）。
+    全局并发上限内排队执行（同 run_world_code）。
 
     - entry：世界文件夹内入口（默认 main.py），需暴露 handle(event) -> dict（可 async）
     - event：触发事件 dict（经 stdin 注入 harness）
-    - background：配额语义同 run_world_code（无人/后台 24MB，有人 128MB）
+    - background：配额语义同 run_world_code（无人/后台 64MB，有人 128MB）
 
     返回：{success, result, stdout, error, exit_code, duration_ms, timed_out, reason}
+    （duration_ms = 执行耗时；queued_ms = 全局并发排队等待耗时）
     """
+    _t0 = asyncio.get_event_loop().time()
+    async with _get_semaphore():
+        _result = await _run_world_trigger(world, event=event, entry=entry, background=background)
+    _result["queued_ms"] = max(0, int((asyncio.get_event_loop().time() - _t0) * 1000) - int(_result.get("duration_ms") or 0))
+    return _result
+
+
+async def _run_world_trigger(
+    world,
+    event: dict | None = None,
+    entry: str = "main.py",
+    background: bool = False,
+) -> dict:
     policy = policy_for_world(world, background=background)
     workdir = _world_dir(world.id)
     workdir.mkdir(parents=True, exist_ok=True)

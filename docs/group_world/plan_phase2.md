@@ -25,7 +25,7 @@
 | 2.2 | **触发文件** | ✅ **已实现**（2026-08-05）：世界入口 `main.py` 实现 `handle(event) -> dict`（可 async）；平台 harness 导入调用（世界代码零框架依赖，print 重定向不污染结果）；`POST /worlds/{id}/trigger` + 世界 AI 工具 `run_world_code`（code 脚本或 event 触发模式）；6 项测试全过（同步/async/异常/缺handle/缺文件/超时） | 2.1 |
 | 2.3 | **受控数据 API** | ✅ **已实现**（2026-08-05，与 2.4 一起）：`/world/{id}/api/*` 数据面（world/chat/memories/usage/groups）；每世界专属 token（懒生成存 worlds.config.api_token，沙箱 env 注入 WORLD_API_TOKEN/WORLD_API_BASE）；动态限流（基础+每人加成×活跃人数，4 个 config 字段可配）；复用 get_chat_history / world_tools._do_execute 同一份逻辑；12 项测试通过 | 2.1 |
 | 2.4 | **群聊写 API** | ✅ **已实现**（2026-08-05，与 2.3 一起）：`/world/{id}/api/group/*`（读消息/发消息/成员/改角色/踢人）；身份=世界自身（底层借世界主人权限+群角色检查）；作用域=仅绑定群；写操作独立限流 | 2.3 |
-| 2.5 | **后台常驻任务** | 世界挂后台持续演化；**配额修复**（2026-08-05）：sleep_memory_mb 默认 24→**48MB**，policy 硬下限 **32MB**（24MB 下 python -I 连标准库 import 都失败）；与手动唤醒模式互补 | 2.1 |
+| 2.5 | **后台常驻任务** | 世界挂后台持续演化；**配额修复**（2026-08-05）：sleep_memory_mb 默认 24→**64MB**（珑哥拍板：多解释器 64/单解释器 32），policy 硬下限 **32MB**（24MB 下 python -I 连标准库 import 都失败）；与手动唤醒模式互补 | 2.1 |
 | 2.6 | **世界 AI 记忆表** | ✅ **已实现**（2026-08-05）：`world_ai_memories` 专属表（title/content/embedding Vector(1536)）+ 工具 store_memory/recall_memory（向量检索 + 文本回退）；迁移 `b3c4d5e6f7a8` **待珑哥跑** | 无 |
 | 2.7 | **缓存命中统计** | ✅ **已实现**（2026-08-05）：`world_llm_usage` 专属表，首轮（stream_options.include_usage）/工具轮/收尾轮全部落库；`GET /worlds/{id}/usage` 返回调用次数/token/命中率；设计页配置表单展示命中率；迁移 `c4d5e6f7a8b9` | 无 |
 | 2.9 | **群消息钩子** | ✅ **已实现**（2026-08-05）：群消息 → 世界入口 `handle(event)` 异步感知（2s 节流合并，`group_trigger_interval` 可配；`source="world"` 防死循环）；唤醒改手动模式（AUTO_MANAGE=False，唤醒后保持活跃） | 2.2 |
