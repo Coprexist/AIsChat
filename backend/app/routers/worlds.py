@@ -36,6 +36,12 @@ class WorldUpdateRequest(BaseModel):
     config: dict | None = None
 
 
+class WorldRunRequest(BaseModel):
+    """2.1 沙箱：运行世界 Python 代码（code 或 entry 二选一）"""
+    code: str | None = Field(default=None, description="直接执行的脚本")
+    entry: str | None = Field(default=None, description="世界文件夹内入口文件（相对路径）")
+
+
 class BindRequest(BaseModel):
     entity_type: str = Field(..., description="group | dm | user")
     entity_id: int
@@ -368,6 +374,25 @@ async def get_world_usage(
         "cached_tokens": cached,
         "cache_hit_rate_pct": hit_rate,
     }
+
+
+@router.post("/{world_id}/run")
+async def run_world_code(
+    world_id: int,
+    req: WorldRunRequest,
+    current_user: dict = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """在沙箱中运行世界 Python 代码（阶段 2.1，仅创建者；配额：默认 24MB/10s，worlds.config 可配）"""
+    await _require_owner(db, world_id, current_user["user_id"])
+    from app.services.world.world_service import get_world
+    from app.services.world.world_sandbox import run_world_code as _run
+    world = await get_world(db, world_id)
+    if world is None:
+        raise HTTPException(status_code=404, detail="世界不存在")
+    result = await _run(world, code=req.code, entry=req.entry)
+    result["world_id"] = world_id
+    return result
 
 
 # ═══════════════════════════════════════════════════════════════
