@@ -345,17 +345,50 @@
   text-align: right;
 }
 
-/* ── 代码高亮颜色适配 ─────────────────────── */
+/* ── 代码高亮颜色适配（自定义，取主题色系：主紫/绿/琥珀/蓝；日夜两套） ── */
+.hljs { color: rgb(var(--tw-text-primary)); }
+.hljs-comment, .hljs-quote { color: #94a3b8; font-style: italic; }
+.hljs-keyword, .hljs-selector-tag, .hljs-subst { color: #7c3aed; }
+.hljs-string, .hljs-regexp, .hljs-addition { color: #059669; }
+.hljs-number, .hljs-literal, .hljs-symbol, .hljs-bullet { color: #d97706; }
+.hljs-title, .hljs-section { color: #2563eb; }
+.hljs-type, .hljs-class .hljs-title, .hljs-built_in, .hljs-builtin-name { color: #0d9488; }
+.hljs-attr, .hljs-attribute, .hljs-variable, .hljs-template-variable { color: #0891b2; }
+.hljs-meta, .hljs-selector-id, .hljs-selector-class { color: #6d28d9; }
+.hljs-deletion { color: #dc2626; }
+.hljs-link { color: #2563eb; text-decoration: underline; }
+.hljs-emphasis { font-style: italic; }
+.hljs-strong { font-weight: 700; }
+
+/* 夜间（.dark）与我的气泡（.text-white 深色底）：用主题亮色系 */
+:is(.text-white, .dark) .hljs { color: #e2e8f0; }
+:is(.text-white, .dark) .hljs-comment,
+:is(.text-white, .dark) .hljs-quote { color: #7d8590; font-style: italic; }
 :is(.text-white, .dark) .hljs-keyword,
-:is(.text-white, .dark) .hljs-title { color: #d2a8ff; }
+:is(.text-white, .dark) .hljs-selector-tag,
+:is(.text-white, .dark) .hljs-subst { color: #a78bfa; }
 :is(.text-white, .dark) .hljs-string,
-:is(.text-white, .dark) .hljs-regexp { color: #a5d6ff; }
+:is(.text-white, .dark) .hljs-regexp,
+:is(.text-white, .dark) .hljs-addition { color: #34d399; }
 :is(.text-white, .dark) .hljs-number,
 :is(.text-white, .dark) .hljs-literal,
-:is(.text-white, .dark) .hljs-attr { color: #79c0ff; }
-:is(.text-white, .dark) .hljs-comment { color: #8b949e; }
-:is(.text-white, .dark) .hljs-type { color: #ffa657; }
-:is(.text-white, .dark) .hljs-built_in { color: #ff7b72; }
+:is(.text-white, .dark) .hljs-symbol,
+:is(.text-white, .dark) .hljs-bullet { color: #fbbf24; }
+:is(.text-white, .dark) .hljs-title,
+:is(.text-white, .dark) .hljs-section { color: #818cf8; }
+:is(.text-white, .dark) .hljs-type,
+:is(.text-white, .dark) .hljs-class .hljs-title,
+:is(.text-white, .dark) .hljs-built_in,
+:is(.text-white, .dark) .hljs-builtin-name { color: #2dd4bf; }
+:is(.text-white, .dark) .hljs-attr,
+:is(.text-white, .dark) .hljs-attribute,
+:is(.text-white, .dark) .hljs-variable,
+:is(.text-white, .dark) .hljs-template-variable { color: #22d3ee; }
+:is(.text-white, .dark) .hljs-meta,
+:is(.text-white, .dark) .hljs-selector-id,
+:is(.text-white, .dark) .hljs-selector-class { color: #c4b5fd; }
+:is(.text-white, .dark) .hljs-deletion { color: #f87171; }
+:is(.text-white, .dark) .hljs-link { color: #818cf8; text-decoration: underline; }
 
 /* react-easy-crop 方形裁剪圆角 */
 .rounded-crop-area {
