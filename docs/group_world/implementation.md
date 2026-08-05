@@ -276,6 +276,43 @@ window.WorldUI = {              // UI 桥（postMessage → 宿主 Layout）
 
 ---
 
+## 十三、2D 冒险游戏落地与后期修复记录（2026-08-05）
+
+> 第一个“活的世界”示例：星野镇（世界 21）。游戏页面 + 常驻世界程序 + 群消息驱动 + SSE 实时状态，完整闭环。
+
+### 13.1 2D 冒险积木（data/world_blocks/2d-adventure/）
+
+- **实现要点**：完整可玩页面（Canvas 像素风：瓦片地图/移动碰撞/NPC 对话/宝箱/传送门/本地存档/触屏虚拟键），零外部依赖纯程序化绘制；世界程序 main.py 用**关键词语法提取**把群消息翻译成即时游戏指令（`旅人说 xx` / `旅人移动到 x,y` / `公告 xx` / 兜底村长回应）+ `on_tick` 推演。
+- **这么做的原因**：先有页面不叫落地——NPC 要接入群消息转命令才算“活”。游戏页面 `EventSource /world/{id}/events` 实时应用世界程序发布的状态（npc_say/npc_move/banner），命令输入框（页面底部）直接发到绑定群，全链路复用（钩子→常驻→语法提取→SSE）。
+- **提示**：① 说话规则正则必须“动词或冒号至少一个”（`(?:说|讲|喊|曰)[:：]?|[:：]`），否则“旅人移动到 2,3”会被误吞成说话；② 钩子节流窗口内多条消息合并进 `event.messages`，handle 要**遍历处理**（只处理 messages[0] 会吞指令）；③ 走格取格用 `Math.floor(p+0.5)`（`round` 会把整数格进位，方向错位）；④ 命令输入框聚焦时要屏蔽游戏按键（E/WASD 留给打字）。
+- **移动手感**（珑哥定）：**按一下走一格**（经典 RPG 滑步，stepDuration 0.16s），按住不连续跑；触屏点一下走一格。
+
+### 13.2 群消息成员校验（安全修复，珑哥发现）
+
+- **实现要点**：`create_message` 加 `_is_group_member` 校验（human/ai 成员表），非成员 raise ValueError → 各调用方转 400；世界 AI 给绑定群发消息 `allow_non_member=True`（world_tools 层已有绑定校验兜底）。
+- **这么做的原因**：实测任意登录用户可往任意群发消息（POST /groups/{id}/messages 无成员校验）——灌水/骚扰漏洞。
+- **提示**：`create_message` 是所有群消息入口（REST/WS/AI/工具），校验放这里一处生效；校验失败不 500（各调用方都有 except）。
+
+### 13.3 reload 死锁事故（SSE 长连接）
+
+- **实现要点**：SSE 心跳时检测 `request.is_disconnected()` 主动断开；compose 加 `--timeout-graceful-shutdown 5`。
+- **这么做的原因**：页面开着 SSE 长连接 → 改代码触发 `--reload` → uvicorn 优雅退出等旧 worker 的 SSE 请求结束 → 无限流不结束 → reload 卡在 Reloading，backend 起不来（两次事故）。
+- **提示**：① 改代码前先关掉开着的世界页面；② compose command 变更要 `up -d` 重建容器（`restart` 不读新参数）；③ 世界代码在 `data/`（`--reload-exclude 'data/*'` 排除，世界代码变化不该重启 backend）。
+
+### 13.4 世界静态文件缓存策略（ETag）
+
+- **实现要点**：`serve_world_file` 按 `mtime+size` 生成 ETag，`If-None-Match` 命中返回 304；不设 Cache-Control。
+- **这么做的原因**：世界代码频繁变化——no-cache 每次重拉（浪费），长缓存又看不到新版（珑哥反馈刷新没效果）；ETag 条件缓存两者兼顾：更新自动拿新版（免强刷），未更新走 304 零下载。
+- **提示**：ETag 用 `st_mtime_ns`（纳秒）避免同秒修改漏判；记得给端点加 `request: Request` 参数（漏了会 NameError 500）。
+
+### 13.5 世界文件路径：沙盒测试与生产是两套
+
+- **实现要点**：生产容器 `data/worlds/` = 宿主 `./data/worlds`（compose 挂载 `./data:/app/data`）；沙盒手动 uvicorn（cwd=backend）写 `backend/data/worlds`。
+- **这么做的原因**：沙盒测试自洽（自己读写同路径），但宿主 backend 看不到沙盒测试世界的文件——世界 21 曾因此“找不到 index.html”。
+- **提示**：① 沙盒测试后要让宿主可见需复制到生产路径（或直接用宿主 backend API + 宿主签发 token 上传——沙盒 JWT 因 compose 覆盖 secret 签名失败）；② 世界转 owner 后，旧 owner token 立刻 403（权限正常工作的体现）。
+
+---
+
 ## 附：模块清单
 
 ```

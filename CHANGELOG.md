@@ -20,7 +20,7 @@
 - 🏠 **常驻推演（2.5）**：`resident: true` + `tick_interval`——世界程序常驻后台：`handle(event)` 事件处理 + `on_tick()` 定时推演 + `on_stop()` 优雅退出存状态；手动唤醒启动/休眠停止/后端重启自动恢复；默认不限常驻个数。
 - 📡 **实时状态通道（2.5）**：世界代码 `POST /world/{id}/api/state` 发布状态 → 页面 `EventSource /world/{id}/events`（SSE）实时接收——零轮询、连接发快照、15s 心跳。
 - 🎨 **设计页 + 沉浸界面**：世界文件树/代码编辑/预览/上传/删除/代码高亮日夜适配；沉浸界面 iframe + 世界变量注入（`WORLD_ID`/`WORLD_NAME`/`WORLD_AI_ID`/`GROUP_ID`，零硬编码哲学）。
-- 🧩 **积木体系**：`data/world_blocks/` 预制组件（群聊对话窗 v1.1.0；2D 冒险游戏草稿）；世界 AI 可查/看/应用。
+- 🧩 **积木体系**：`data/world_blocks/` 预制组件（群聊对话窗 v1.1.0；**2D 冒险游戏 v1.0.0 已落地**——示例世界「星野镇」：游戏页面 + 命令输入框 + 群消息关键词语法提取驱动 NPC + SSE 实时状态）；世界 AI 可查/看/应用。
 - 🗂️ **API 文档分区**：`data/world_api_docs/` 9 个分区（变量/WorldUI/文件/积木/群聊/页面/通知时间/错误安全/受控 API），AI 按需打开。
 
 ### Changed
