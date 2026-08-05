@@ -76,7 +76,8 @@ GET /worlds/{id}/chat/stream?turn_id= ──订阅直播（30s 心跳；断开�
 | `store_memory` / `recall_memory` | **世界 AI 长期记忆（2.6）**：store 存 title+content（向量化失败降级无向量）；recall 语义检索（embedding <=> 余弦距离）→ 失败文本包含回退；世界按 world_id 隔离 |
 | `get_bound_groups` / `get_group_messages` / `list_group_members` / `send_group_message` / `set_group_member_role` / `kick_group_member` | **群聊 API（以世界创建者身份）**：默认作用本世界绑定群，无需传群号；管理操作仅群主/管理员（§十一） |
 | `web_search` / `web_fetch` | **上网（2026-08-05）**：**复用主系统同一份实现**（WebSearch/WebFetch 类，无 opencli 依赖）；web_fetch 支持 `delay_ms` 延迟抓取（AI 可设定等待后再取，应对慢速/动态加载页面） |
-| `POST /worlds/{id}/run`（端点） | **py 沙箱（2.1 MVP）**：subprocess + rlimit（24MB/CPU/文件大小/进程数）+ 超时 killpg 强杀 + env 白名单（不泄漏 DATABASE_URL/JWT 等）；配额 worlds.config 可配；生产加固后置（seccomp/Landlock） |
+| `POST /worlds/{id}/run`（端点） | **py 沙箱（2.1 MVP）**：subprocess + rlimit（有人在线 128MB / 无人后台 24MB）+ 超时 killpg 强杀 + env 白名单（不泄漏 DATABASE_URL/JWT 等）；配额 worlds.config 可配；生产加固后置（seccomp/Landlock） |
+| `POST /worlds/{id}/trigger` + 工具 `run_world_code` | **触发文件（2.2）**：世界 `main.py` 实现 `handle(event)`（可 async），平台 harness 导入调用（世界代码零框架依赖）；世界 AI 可自测代码（code 脚本 / event 触发模式） |
 
 **温和去重**（`_execute_world_tool` 包装）：
 - 同工具同参数、**5 分钟内**重复且**结果完全一致** → 提示「⏭ 已跳过…」不硬拦

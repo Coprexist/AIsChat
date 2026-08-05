@@ -11,6 +11,7 @@
 - 超时：killpg 强杀整个进程组（含子进程/孙进程）
 """
 import asyncio
+import json
 import logging
 import os
 import resource
@@ -202,3 +203,126 @@ async def run_world_code(
                 tmp_file.unlink(missing_ok=True)
             except Exception:
                 pass
+
+
+# ── 2.2 触发文件约定 ──
+# 世界目录 main.py 实现 handle(event) -> dict（可 async），平台 harness 导入并调用。
+# 世界代码零框架依赖；print 重定向到 stdout 字段，不污染结果 JSON。
+_TRIGGER_HARNESS_TEMPLATE = '''
+import importlib, json, sys, asyncio, io, contextlib, os
+
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+ENTRY = "__ENTRY__"
+
+def _main():
+    try:
+        mod = importlib.import_module(ENTRY)
+    except Exception as e:
+        print(json.dumps({"ok": False, "error": "入口导入失败: %s" % e}, ensure_ascii=False))
+        return
+    if not hasattr(mod, "handle"):
+        print(json.dumps({"ok": False, "error": "入口缺少 handle(event) 函数"}, ensure_ascii=False))
+        return
+    try:
+        event = json.loads(sys.stdin.read() or "{}")
+        if not isinstance(event, dict):
+            event = {}
+    except Exception:
+        event = {}
+    buf = io.StringIO()
+    try:
+        with contextlib.redirect_stdout(buf):
+            result = mod.handle(event)
+            if asyncio.iscoroutine(result):
+                result = asyncio.run(result)
+        print(json.dumps({"ok": True, "result": result, "stdout": buf.getvalue()}, ensure_ascii=False, default=str))
+    except Exception as e:
+        print(json.dumps({"ok": False, "error": "%s: %s" % (type(e).__name__, e), "stdout": buf.getvalue()}, ensure_ascii=False))
+
+_main()
+'''
+
+
+def _fail(reason: str, *, exit_code: int = -1, duration_ms: int = 0, timed_out: bool = False, stdout: str = "") -> dict:
+    return {"success": False, "result": None, "stdout": stdout, "error": reason,
+            "exit_code": exit_code, "duration_ms": duration_ms, "timed_out": timed_out, "reason": reason}
+
+
+async def run_world_trigger(
+    world,
+    event: dict | None = None,
+    entry: str = "main.py",
+    background: bool = False,
+) -> dict:
+    """
+    2.2 触发文件：执行世界入口的 handle(event)，返回其结果（JSON 序列化）。
+
+    - entry：世界文件夹内入口（默认 main.py），需暴露 handle(event) -> dict（可 async）
+    - event：触发事件 dict（经 stdin 注入 harness）
+    - background：配额语义同 run_world_code（无人/后台 24MB，有人 128MB）
+
+    返回：{success, result, stdout, error, exit_code, duration_ms, timed_out, reason}
+    """
+    policy = policy_for_world(world, background=background)
+    workdir = _world_dir(world.id)
+    workdir.mkdir(parents=True, exist_ok=True)
+
+    target = (workdir / entry).resolve()
+    if not str(target).startswith(str(workdir)):
+        return _fail(f"入口文件越界: {entry}")
+    if not target.exists():
+        return _fail(f"入口文件不存在: {entry}")
+
+    harness = _TRIGGER_HARNESS_TEMPLATE.replace("__ENTRY__", target.stem)
+    tmp_file = workdir / f".sandbox_trigger_{uuid.uuid4().hex[:8]}.py"
+    try:
+        tmp_file.write_text(harness, encoding="utf-8")
+        cmd = [sys.executable, "-I", str(tmp_file)]
+        proc = await asyncio.create_subprocess_exec(
+            *cmd,
+            cwd=str(workdir),
+            env=_sanitized_env(world.id),
+            stdin=asyncio.subprocess.PIPE,
+            stdout=asyncio.subprocess.PIPE,
+            stderr=asyncio.subprocess.PIPE,
+            start_new_session=True,
+            preexec_fn=lambda: _apply_rlimits(policy),
+        )
+        event_json = json.dumps(event or {}, ensure_ascii=False).encode("utf-8")
+        t0 = asyncio.get_event_loop().time()
+        timed_out = False
+        try:
+            stdout_b, stderr_b = await asyncio.wait_for(proc.communicate(event_json), timeout=policy.timeout_seconds)
+        except asyncio.TimeoutError:
+            timed_out = True
+            try:
+                os.killpg(proc.pid, signal.SIGKILL)
+            except ProcessLookupError:
+                pass
+            stdout_b, stderr_b = await proc.communicate()
+        duration_ms = int((asyncio.get_event_loop().time() - t0) * 1000)
+        stdout = stdout_b.decode("utf-8", errors="replace").strip()
+        stderr = _truncate(stderr_b.decode("utf-8", errors="replace"))
+        if timed_out:
+            return _fail("执行超时，已强制终止进程组", exit_code=proc.returncode, duration_ms=duration_ms, timed_out=True)
+        if proc.returncode != 0:
+            return _fail(stderr.strip()[:200] or f"进程退出码 {proc.returncode}", exit_code=proc.returncode,
+                         duration_ms=duration_ms, stdout=stdout)
+        try:
+            payload = json.loads(stdout)
+        except json.JSONDecodeError:
+            return _fail("入口无有效 JSON 结果", exit_code=proc.returncode, duration_ms=duration_ms, stdout=stdout)
+        if not payload.get("ok"):
+            err = payload.get("error", "未知错误")
+            return {"success": False, "result": None, "stdout": payload.get("stdout", ""), "error": err,
+                    "exit_code": proc.returncode, "duration_ms": duration_ms, "timed_out": False, "reason": err}
+        return {"success": True, "result": payload.get("result"), "stdout": payload.get("stdout", ""),
+                "error": "", "exit_code": 0, "duration_ms": duration_ms, "timed_out": False, "reason": ""}
+    except Exception as e:
+        logger.warning(f"🌐 世界 #{world.id} 触发执行异常: {e}")
+        return _fail(f"沙箱异常: {str(e)[:200]}")
+    finally:
+        try:
+            tmp_file.unlink(missing_ok=True)
+        except Exception:
+            pass

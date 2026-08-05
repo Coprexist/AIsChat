@@ -42,6 +42,12 @@ class WorldRunRequest(BaseModel):
     entry: str | None = Field(default=None, description="世界文件夹内入口文件（相对路径）")
 
 
+class WorldTriggerRequest(BaseModel):
+    """2.2 触发文件：执行世界入口的 handle(event)"""
+    event: dict = Field(default_factory=dict, description="触发事件")
+    entry: str = Field(default="main.py", description="世界入口文件（默认 main.py）")
+
+
 class BindRequest(BaseModel):
     entity_type: str = Field(..., description="group | dm | user")
     entity_id: int
@@ -391,6 +397,25 @@ async def run_world_code(
     if world is None:
         raise HTTPException(status_code=404, detail="世界不存在")
     result = await _run(world, code=req.code, entry=req.entry)
+    result["world_id"] = world_id
+    return result
+
+
+@router.post("/{world_id}/trigger")
+async def trigger_world_code(
+    world_id: int,
+    req: WorldTriggerRequest,
+    current_user: dict = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """2.2 触发文件：执行世界入口的 handle(event)，返回结果（仅创建者）"""
+    await _require_owner(db, world_id, current_user["user_id"])
+    from app.services.world.world_service import get_world
+    from app.services.world.world_sandbox import run_world_trigger as _trigger
+    world = await get_world(db, world_id)
+    if world is None:
+        raise HTTPException(status_code=404, detail="世界不存在")
+    result = await _trigger(world, event=req.event, entry=req.entry)
     result["world_id"] = world_id
     return result
 
