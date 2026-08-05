@@ -391,9 +391,9 @@ async def run_world_code(
 ):
     """在沙箱中运行世界 Python 代码（阶段 2.1，仅创建者；配额：默认 24MB/10s，worlds.config 可配）"""
     await _require_owner(db, world_id, current_user["user_id"])
-    from app.services.world.world_service import get_world
+    from app.models.world import World
     from app.services.world.world_sandbox import run_world_code as _run
-    world = await get_world(db, world_id)
+    world = await db.get(World, world_id)
     if world is None:
         raise HTTPException(status_code=404, detail="世界不存在")
     result = await _run(world, code=req.code, entry=req.entry)
@@ -410,9 +410,9 @@ async def trigger_world_code(
 ):
     """2.2 触发文件：执行世界入口的 handle(event)，返回结果（仅创建者）"""
     await _require_owner(db, world_id, current_user["user_id"])
-    from app.services.world.world_service import get_world
+    from app.models.world import World
     from app.services.world.world_sandbox import run_world_trigger as _trigger
-    world = await get_world(db, world_id)
+    world = await db.get(World, world_id)
     if world is None:
         raise HTTPException(status_code=404, detail="世界不存在")
     result = await _trigger(world, event=req.event, entry=req.entry)
