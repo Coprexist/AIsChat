@@ -2,13 +2,41 @@
 web_fetch 工具 — AI 通过 HTTP 请求获取网页内容（轻量，不依赖 Chromium）
 """
 import asyncio
+import ipaddress
 import re
 import logging
+import socket
 import httpx
+from urllib.parse import urlparse
 from sqlalchemy.ext.asyncio import AsyncSession
 from app.tools.base import ToolPlugin, ToolRegistry, ToolErrorCode
 
 logger = logging.getLogger(__name__)
+
+
+def _is_private_url(url: str) -> str | None:
+    """SSRF 防护：URL 是否指向内网/本机地址。返回错误信息或 None（安全）"""
+    try:
+        host = (urlparse(url).hostname or "").strip().lower()
+    except ValueError:
+        return "URL 解析失败"
+    if not host:
+        return "URL 缺少主机名"
+    if host in ("localhost", "localhost.localdomain") or host.endswith(".local"):
+        return f"禁止访问本机/内网地址: {host}"
+    try:
+        infos = socket.getaddrinfo(host, None)
+    except socket.gaierror:
+        return None  # DNS 解析失败交给请求阶段报错
+    for info in infos:
+        ip = info[4][0].split("%")[0]
+        try:
+            addr = ipaddress.ip_address(ip)
+        except ValueError:
+            continue
+        if addr.is_private or addr.is_loopback or addr.is_link_local or addr.is_reserved or addr.is_multicast:
+            return f"禁止访问内网地址: {host} ({ip})"
+    return None
 
 # 常用 User-Agent 伪装
 UA = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/125.0.0.0 Safari/537.36"
@@ -65,6 +93,12 @@ class WebFetch(ToolPlugin):
         # 基本 URL 校验
         if not url.startswith(("http://", "https://")):
             return build_tool_error(ToolErrorCode.TOOL_EXEC_FAILED, "URL 必须以 http:// 或 https:// 开头")
+
+        # SSRF 防护：禁止访问内网/本机地址（localhost/私有网段/云元数据 169.254.169.254 等）
+        # DNS 解析是同步阻塞的，丢线程池避免卡事件循环
+        block_reason = await asyncio.to_thread(_is_private_url, url)
+        if block_reason:
+            return build_tool_error(ToolErrorCode.TOOL_EXEC_FAILED, block_reason)
 
         try:
             async with httpx.AsyncClient(timeout=TIMEOUT, follow_redirects=True) as client:
