@@ -583,7 +583,6 @@ export default function ChatView({ conversationType, conversationId }: ChatViewP
       return
     }
     // 网页端：命名窗口（同名复用+聚焦）；WebView/被弹窗拦截（返回 null）→ 回退应用内
-    const url = `/world-view/${boundWorldId}?group_id=${conversationId}`
     if (!tryOpenWorldWindow(boundWorldId, conversationId)) window.location.href = url
   }, [boundWorldId, conversationId])
 
