@@ -8,7 +8,7 @@ import { useEffect, useState, useCallback, useRef, useMemo } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { api } from '../api/client'
 import MarkdownContent from '../components/shared/MarkdownContent'
-import FilePreviewModal from '../components/FilePreviewModal'
+import { getCodeLang, isMarkdownFile } from '../utils/mime'
 import { useResizableSidebar } from '../hooks/useResizableSidebar'
 
 // ── 打字机效果：文本逐字显示（参考大同互动逐 token 渲染，简化版） ──
@@ -68,8 +68,6 @@ export default function WorldDesignPage() {
   const [content, setContent] = useState('')
   const [mode, setMode] = useState<'files' | 'preview'>('files')
   const [previewKey, setPreviewKey] = useState(0)
-  // 文件格式预览（复用主界面 FilePreviewModal：图片/PDF/docx/文本高亮/Markdown/HTML）
-  const [previewFile, setPreviewFile] = useState<{ name: string; src: string } | null>(null)
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
   const [msg, setMsg] = useState('')
@@ -91,6 +89,14 @@ export default function WorldDesignPage() {
   const [creatorSaving, setCreatorSaving] = useState(false)
   // 2.7：LLM 用量/缓存命中率
   const [usageStats, setUsageStats] = useState<{ total_calls: number; prompt_tokens: number; completion_tokens: number; cached_tokens: number; cache_hit_rate_pct: number } | null>(null)
+
+  // 当前文件内联渲染：md 渲染 + 查看原文；html/代码高亮渲染；图片直接显示（不用弹窗）
+  const [viewMode, setViewMode] = useState<'edit' | 'render'>('edit')
+  const fileExt = currentFile?.split('.').pop()?.toLowerCase() ?? ''
+  const isMdFile = isMarkdownFile(currentFile ?? '', '')
+  const fileCodeLang = currentFile ? getCodeLang(currentFile, '') : ''
+  const isImgFile = ['png', 'jpg', 'jpeg', 'gif', 'webp', 'svg', 'ico', 'bmp'].includes(fileExt)
+  const canRender = !!(isMdFile || fileCodeLang || isImgFile)
 
   // ── 加载世界 + 文件树 ──
   const load = useCallback(async () => {
@@ -128,6 +134,10 @@ export default function WorldDesignPage() {
   // ── 文件操作 ──
   const selectFile = async (path: string) => {
     setCurrentFile(path)
+    // 能内联渲染的文件默认渲染视图（md/html/代码/图片），其余默认编辑
+    const ext = path.split('.').pop()?.toLowerCase() ?? ''
+    const imgLike = ['png', 'jpg', 'jpeg', 'gif', 'webp', 'svg', 'ico', 'bmp'].includes(ext)
+    setViewMode((isMarkdownFile(path, '') || getCodeLang(path, '') || imgLike) ? 'render' : 'edit')
     try {
       const r = await api.get<{ content: string | null; binary: boolean }>(
         `/worlds/${wid}/files/content?path=${encodeURIComponent(path)}`,
@@ -502,7 +512,6 @@ export default function WorldDesignPage() {
   if (!world) return <div className="p-8 text-textMuted">世界不存在</div>
 
   return (
-    <>
     <div className="flex h-screen bg-canvas text-textPrimary">
       {/* ═══ 左栏：文件 / 预览 ═══ */}
       <div className="flex-1 flex flex-col min-w-0 border-r border-border">
@@ -544,20 +553,49 @@ export default function WorldDesignPage() {
                   <span className="truncate">{currentFile || '未选择文件'}</span>
                   {currentFile && (
                     <span className="flex items-center gap-3 shrink-0 ml-3">
-                      <button onClick={() => setPreviewFile({ name: currentFile, src: `/world/${wid}/files/${currentFile.split('/').map(encodeURIComponent).join('/')}` })} className="text-primary-400 hover:text-primary-300 transition-colors" title="预览此文件">👁 预览</button>
-                      <button onClick={saveFile} disabled={saving} className="text-primary-400 hover:text-primary-300 transition-colors">
-                        {saving ? '保存中...' : '💾 保存'}
-                      </button>
+                      {canRender && (
+                        <button
+                          onClick={() => setViewMode((v) => (v === 'render' ? 'edit' : 'render'))}
+                          className="text-primary-400 hover:text-primary-300 transition-colors"
+                          title={viewMode === 'render' ? '切到原文/编辑' : '切到渲染视图'}
+                        >
+                          {viewMode === 'render' ? (isMdFile ? '📄 查看原文' : '✏️ 编辑') : '✨ 渲染'}
+                        </button>
+                      )}
+                      {viewMode !== 'render' && (
+                        <button onClick={saveFile} disabled={saving} className="text-primary-400 hover:text-primary-300 transition-colors">
+                          {saving ? '保存中...' : '💾 保存'}
+                        </button>
+                      )}
                     </span>
                   )}
                 </div>
-                <textarea
-                  value={content}
-                  onChange={(e) => setContent(e.target.value)}
-                  spellCheck={false}
-                  className="flex-1 bg-canvas text-sm text-textPrimary p-3 font-mono outline-none resize-none"
-                  placeholder="在这里编辑代码…"
-                />
+                {viewMode === 'render' && canRender ? (
+                  <div className="flex-1 overflow-y-auto p-3 md:p-4 bg-canvas">
+                    {isImgFile ? (
+                      <img
+                        src={`/world/${wid}/files/${currentFile.split('/').map(encodeURIComponent).join('/')}`}
+                        alt={currentFile}
+                        className="max-w-full rounded-lg"
+                      />
+                    ) : (
+                      <div className="w-full max-w-none text-sm leading-relaxed break-words text-textPrimary">
+                        <MarkdownContent
+                          content={isMdFile ? content : '```' + fileCodeLang + '\n' + content + '\n```'}
+                          isMine={false}
+                        />
+                      </div>
+                    )}
+                  </div>
+                ) : (
+                  <textarea
+                    value={content}
+                    onChange={(e) => setContent(e.target.value)}
+                    spellCheck={false}
+                    className="flex-1 bg-canvas text-sm text-textPrimary p-3 font-mono outline-none resize-none"
+                    placeholder="在这里编辑代码…"
+                  />
+                )}
               </div>
             ) : (
               <div className="h-full flex flex-col">
@@ -748,18 +786,5 @@ export default function WorldDesignPage() {
         </div>
       </div>
     </div>
-
-    {/* 文件格式预览（复用主界面同一份实现；内容直接复用编辑器已加载的，免二次请求） */}
-    {previewFile && (
-      <FilePreviewModal
-        fileName={previewFile.name}
-        fileSize={0}
-        mimeType=""
-        src={previewFile.src}
-        initialContent={content}
-        onClose={() => setPreviewFile(null)}
-      />
-    )}
-    </>
   )
 }
