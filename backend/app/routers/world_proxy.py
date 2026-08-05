@@ -468,11 +468,12 @@ async def _get_creator_name(db: AsyncSession, world_id: int) -> str:
     return cfg.get("name") or "群视界机器人"
 
 
-def _inject_world_vars(html: str, world_id: int, creator_name: str, group_id: int | None) -> str:
+def _inject_world_vars(html: str, world_id: int, creator_name: str, group_id: int | None, world_name: str = "") -> str:
     """向世界 HTML 注入环境变量（世界代码零硬编码，打包/换实例即插即用）。
 
     变量（world code 直接读 window.*）：
       WORLD_ID     世界编号
+      WORLD_NAME   世界名
       WORLD_AI_ID  群视界 AI 身份（world-{id}）
       WORLD_AI_NAME 群视界 AI 名字
       GROUP_ID     入口群聊编号（无 = null）
@@ -481,6 +482,7 @@ def _inject_world_vars(html: str, world_id: int, creator_name: str, group_id: in
     script = (
         "<script>\n"
         f"window.WORLD_ID = {world_id};\n"
+        f"window.WORLD_NAME = {json.dumps(world_name, ensure_ascii=False)};\n"
         f"window.WORLD_AI_ID = 'world-{world_id}';\n"
         f"window.WORLD_AI_NAME = {json.dumps(creator_name, ensure_ascii=False)};\n"
         f"window.GROUP_ID = {group_id if group_id is not None else 'null'};\n"
@@ -519,6 +521,14 @@ async def serve_world_file(
     target, mime = _resolve_world_file(world_id, path)
     if mime.startswith("text/html"):
         creator_name = await _get_creator_name(db, world_id)
+        world_name = ""
+        try:
+            from app.models.world import World as _World
+            _w = await db.get(_World, world_id)
+            if _w is not None:
+                world_name = _w.name or ""
+        except Exception:
+            pass
         # 变量注入：URL 没带 group_id 时，自动补世界绑定的第一个群（保持「编号一律变量」哲学）
         if group_id is None:
             try:
@@ -534,7 +544,7 @@ async def serve_world_file(
             except Exception:
                 pass
         html = target.read_text(encoding="utf-8", errors="replace")
-        return HTMLResponse(_inject_world_vars(html, world_id, creator_name, group_id))
+        return HTMLResponse(_inject_world_vars(html, world_id, creator_name, group_id, world_name))
     return FileResponse(target, media_type=mime)
 
 
