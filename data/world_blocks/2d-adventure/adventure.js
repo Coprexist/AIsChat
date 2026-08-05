@@ -338,8 +338,7 @@
    * ════════════════════════════════════════════════════════════ */
 
   function nearestInteractable() {
-    var p = state.player;
-    var pg = { c: Math.round(p.x), r: Math.round(p.y) };
+    var pg = playerGrid();
     var result = null;
     NPCS.forEach(function (n) {
       if (Math.abs(n.x - pg.c) <= 1 && Math.abs(n.y - pg.r) <= 1) result = { kind: 'npc', npc: n };
@@ -505,7 +504,9 @@
    * ════════════════════════════════════════════════════════════ */
 
   function playerGrid() {
-    return { c: Math.round(state.player.x + 0.5), r: Math.round(state.player.y + 0.5) };
+    // 角色左上角 p（浮点格坐标），中心 = p + 0.5；floor 取所在格（round 会把
+    // 整数格 +0.5 进位到下一格，导致方向错位——2026-08-05 珑哥反馈）
+    return { c: Math.floor(state.player.x + 0.5), r: Math.floor(state.player.y + 0.5) };
   }
 
   /* ── 走格移动（按一下走一格，平滑滑步） ── */
