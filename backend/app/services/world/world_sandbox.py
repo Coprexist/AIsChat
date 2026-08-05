@@ -22,7 +22,7 @@ from pathlib import Path
 
 logger = logging.getLogger(__name__)
 
-DEFAULT_MEMORY_MB = 24          # 默认内存配额（worlds.config.runtime_memory_mb 可覆盖）
+DEFAULT_MEMORY_MB = 24          # 无人/后台内存配额（sleep_memory_mb 可覆盖）——珑哥定义：没人在时最多给世界配多少
 DEFAULT_TIMEOUT_SECONDS = 10.0  # 默认墙钟超时
 DEFAULT_CPU_SECONDS = 5.0       # 默认 CPU 时间上限
 MAX_FSIZE_BYTES = 4 * 1024 * 1024   # 单文件写入上限 4MB（防写爆磁盘）
@@ -32,19 +32,22 @@ MAX_OUTPUT_CHARS = 20000        # stdout/stderr 各截断长度
 
 @dataclass
 class Policy:
-    """沙箱配额（集中配置，参考 sandtrap Policy 模式）"""
+    """沙箱配额（集中配置，参考 sandtrap Policy 模式）
+
+    memory_mb=None 表示不设内存上限（MVP：有人在线时，珑哥定义"暂时不给有人在的时候设置上限"）
+    """
     timeout_seconds: float = DEFAULT_TIMEOUT_SECONDS
-    memory_mb: int = DEFAULT_MEMORY_MB
+    memory_mb: int | None = None
     cpu_seconds: float = DEFAULT_CPU_SECONDS
 
 
-def policy_for_world(world) -> Policy:
-    """世界配额：worlds.config 覆盖默认值（config 键：runtime_memory_mb / sandbox_timeout_seconds / cpu_quota）"""
+def policy_for_world(world, background: bool = False) -> Policy:
+    """世界配额（worlds.config 可配）：
+    - 无人/后台（background=True）：内存 = sleep_memory_mb（默认 24MB）
+    - 有人/前台（background=False）：MVP 不设内存上限，runtime_memory_mb 可覆盖
+    超时/CPU 恒生效（保护宿主不受死循环拖累）。
+    """
     cfg = world.config or {}
-    try:
-        memory = int(cfg.get("runtime_memory_mb") or cfg.get("sleep_memory_mb") or DEFAULT_MEMORY_MB)
-    except (TypeError, ValueError):
-        memory = DEFAULT_MEMORY_MB
     try:
         timeout = float(cfg.get("sandbox_timeout_seconds") or DEFAULT_TIMEOUT_SECONDS)
     except (TypeError, ValueError):
@@ -53,9 +56,25 @@ def policy_for_world(world) -> Policy:
         cpu = float(cfg.get("cpu_quota") or DEFAULT_CPU_SECONDS)
     except (TypeError, ValueError):
         cpu = DEFAULT_CPU_SECONDS
+
+    if background:
+        try:
+            memory = int(cfg.get("sleep_memory_mb") or DEFAULT_MEMORY_MB)
+        except (TypeError, ValueError):
+            memory = DEFAULT_MEMORY_MB
+        memory = max(8, min(memory, 512))
+    else:
+        # 有人在线：MVP 不设上限；配置了 runtime_memory_mb 才收口
+        memory = None
+        try:
+            if cfg.get("runtime_memory_mb"):
+                memory = max(8, min(int(cfg["runtime_memory_mb"]), 2048))
+        except (TypeError, ValueError):
+            memory = None
+
     return Policy(
         timeout_seconds=max(1.0, min(timeout, 120.0)),
-        memory_mb=max(8, min(memory, 512)),
+        memory_mb=memory,
         cpu_seconds=max(1.0, min(cpu, 60.0)),
     )
 
@@ -67,8 +86,9 @@ def _world_dir(world_id: int) -> Path:
 
 def _apply_rlimits(policy: Policy) -> None:
     """子进程内设置资源限制（preexec_fn 中执行，必须在 exec 之前）"""
-    mem_bytes = policy.memory_mb * 1024 * 1024
-    resource.setrlimit(resource.RLIMIT_AS, (mem_bytes, mem_bytes))
+    if policy.memory_mb is not None:
+        mem_bytes = policy.memory_mb * 1024 * 1024
+        resource.setrlimit(resource.RLIMIT_AS, (mem_bytes, mem_bytes))
     cpu = int(policy.cpu_seconds)
     resource.setrlimit(resource.RLIMIT_CPU, (cpu, cpu + 1))
     resource.setrlimit(resource.RLIMIT_FSIZE, (MAX_FSIZE_BYTES, MAX_FSIZE_BYTES))
@@ -101,17 +121,19 @@ async def run_world_code(
     world,
     code: str | None = None,
     entry: str | None = None,
+    background: bool = False,
 ) -> dict:
     """
     在沙箱中运行世界 Python 代码。
 
     - code：直接执行的脚本（自动写入世界目录临时文件再跑，世界内相对导入可用）
     - entry：世界文件夹内的入口文件（相对路径，如 main.py）
+    - background：True=无人/后台执行（内存按 sleep_memory_mb，默认 24MB）；False=有人在线（MVP 不设内存上限）
     二者必给其一（entry 优先）。
 
     返回：{success, stdout, stderr, exit_code, duration_ms, timed_out, reason}
     """
-    policy = policy_for_world(world)
+    policy = policy_for_world(world, background=background)
     workdir = _world_dir(world.id)
     workdir.mkdir(parents=True, exist_ok=True)
 
