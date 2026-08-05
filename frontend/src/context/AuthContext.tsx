@@ -87,6 +87,17 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<User | null>(null)
   const [loading, setLoading] = useState(true)
 
+  // 同步一份到 localStorage（user_info）：世界块/沉浸界面等非 React 环境读取当前用户
+  useEffect(() => {
+    try {
+      if (user) {
+        localStorage.setItem('user_info', JSON.stringify(user))
+      } else {
+        localStorage.removeItem('user_info')
+      }
+    } catch { /* 存储不可用时忽略 */ }
+  }, [user])
+
   const refreshUser = useCallback(async () => {
     try {
       const data = await api.get('/auth/me')

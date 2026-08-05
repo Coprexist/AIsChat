@@ -31,6 +31,9 @@ const SetupPage = lazy(() => import('../pages/SetupPage'))
 const ManualPage = lazy(() => import('../pages/ManualPage'))
 const InstanceSetupPage = lazy(() => import('../pages/InstanceSetupPage'))
 const LocalModelPage = lazy(() => import('../pages/LocalModelPage'))
+const WorldsPage = lazy(() => import('../pages/WorldsPage'))
+const WorldDesignPage = lazy(() => import('../pages/WorldDesignPage'))
+const WorldViewPage = lazy(() => import('../pages/WorldViewPage'))
 const NotFoundPage = lazy(() => import('../pages/NotFoundPage'))
 
 // ── 路由定义类型 ──
@@ -91,6 +94,10 @@ export function getProtectedRoutes(AdminGuardComponent: ComponentType<{ children
     { path: 'setup', element: <SetupPage /> },
     { path: 'instance-setup', element: <InstanceSetupPage /> },
     { path: 'local-models', element: <LocalModelPage /> },
+    // 群视界
+    { path: 'worlds', element: <WorldsPage /> },
+    { path: 'worlds/:worldId/design', element: <WorldDesignPage /> },
+    { path: 'world-view/:worldId', element: <WorldViewPage /> },
     { path: 'manual', element: <ManualPage /> },
     { path: 'manual/admin', element: <ManualPage /> },
     { path: 'admin', element: <A><AdminPage /></A> },

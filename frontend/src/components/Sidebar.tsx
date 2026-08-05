@@ -8,7 +8,7 @@ import { useT } from '../i18n/I18nContext'
 import { mainNavItems, navLinkClass, navIconClass } from '../utils/navRegistry.tsx'
 import { usePendingFriendRequests } from '../hooks/usePendingFriendRequests'
 
-export default function Sidebar({ mobile, onClose }: { mobile?: boolean; onClose?: () => void }) {
+export default function Sidebar({ mobile, onClose, translucent }: { mobile?: boolean; onClose?: () => void; translucent?: boolean }) {
   const { user, logout } = useAuth()
   const navigate = useNavigate()
   const [collapsed, setCollapsed] = useState(false)
@@ -24,7 +24,7 @@ export default function Sidebar({ mobile, onClose }: { mobile?: boolean; onClose
     <aside
       className={`${
         collapsed ? 'w-16 h-full' : mobile ? 'w-full h-full' : 'w-60 h-full'
-      } bg-surface border-r border-border flex flex-col transition-all duration-200 shrink-0`}
+      } ${translucent ? 'bg-surface/70' : 'bg-surface'} border-r border-border flex flex-col transition-all duration-200 shrink-0`}
     >
       {/* 头部 */}
       <div className="h-14 px-4 border-b border-border flex items-center justify-between shrink-0">
@@ -85,7 +85,7 @@ export default function Sidebar({ mobile, onClose }: { mobile?: boolean; onClose
               key={item.path}
               to={item.path}
               end={!item.matchSubPaths}
-              onClick={() => { if (mobile) onClose?.() }}
+              onClick={() => { onClose?.() }}
               className={navLinkClass}
             >
               <item.icon size={18} />
@@ -96,13 +96,13 @@ export default function Sidebar({ mobile, onClose }: { mobile?: boolean; onClose
             </NavLink>
           ))}
 
-          <NavLink to="/settings" onClick={() => { if (mobile) onClose?.() }} className={navLinkClass}>
+          <NavLink to="/settings" onClick={() => { onClose?.() }} className={navLinkClass}>
             <Settings size={18} />
             <span>{t('nav.settings')}</span>
           </NavLink>
 
           {user?.role === 'admin' && (
-            <NavLink to="/admin" onClick={() => { if (mobile) onClose?.() }} className={navLinkClass}>
+            <NavLink to="/admin" onClick={() => { onClose?.() }} className={navLinkClass}>
               <Shield size={18} />
               <span>{t('nav.admin')}</span>
             </NavLink>
@@ -110,7 +110,7 @@ export default function Sidebar({ mobile, onClose }: { mobile?: boolean; onClose
 
           <NavLink
             to={MANUAL_URL}
-            onClick={() => { if (mobile) onClose?.() }}
+            onClick={() => { onClose?.() }}
             className={navLinkClass}
           >
             <BookOpen size={18} />
@@ -127,7 +127,7 @@ export default function Sidebar({ mobile, onClose }: { mobile?: boolean; onClose
               key={item.path}
               to={item.path}
               end={!item.matchSubPaths}
-              onClick={() => { if (mobile) onClose?.() }}
+              onClick={() => { onClose?.() }}
               className={navIconClass}
               title={t(item.i18nKey)}
             >
@@ -142,7 +142,7 @@ export default function Sidebar({ mobile, onClose }: { mobile?: boolean; onClose
           {user?.role === 'admin' && (
             <NavLink
               to="/admin"
-              onClick={() => { if (mobile) onClose?.() }}
+              onClick={() => { onClose?.() }}
               className={navIconClass}
               title={t('sidebar.adminPanel')}
             >
@@ -151,7 +151,7 @@ export default function Sidebar({ mobile, onClose }: { mobile?: boolean; onClose
           )}
           <NavLink
             to={MANUAL_URL}
-            onClick={() => { if (mobile) onClose?.() }}
+            onClick={() => { onClose?.() }}
             className={navIconClass}
             title={t('sidebar.usageManual')}
           >

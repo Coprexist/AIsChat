@@ -35,6 +35,10 @@ from app.models.agent_attention import AgentAttention
 from app.models.agent_state_stack import AgentStateStack
 from app.models.user_preferences import UserGroupPreference, UserDMPreference
 from app.models.agent_skill_relation import AgentSkillRelation
+from app.models.alarm import AgentAlarm
+from app.models.structured_record import StructuredRecord
+from app.models.workspace import AgentWorkspace
+from app.models.world import World, WorldBinding, WorldAgent, WorldChatMessage, WorldAI, WorldAIMemory, WorldLLMUsage
 
 __all__ = [
     "User",
@@ -83,6 +87,16 @@ __all__ = [
     "AgentAttention",
     "AgentStateStack",
     "AgentSkillRelation",
+    "AgentAlarm",
+    "StructuredRecord",
+    "AgentWorkspace",
+    "World",
+    "WorldBinding",
+    "WorldAgent",
+    "WorldChatMessage",
+    "WorldAI",
+    "WorldAIMemory",
+    "WorldLLMUsage",
     "UserGroupPreference",
     "UserDMPreference",
 ]

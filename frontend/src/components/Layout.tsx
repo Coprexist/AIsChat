@@ -90,12 +90,70 @@ export default function Layout() {
   const hideNav = /^\/chat\/(dm\/[^/]+|\d+)/.test(location.pathname)
                    || /^\/dm\/[^/]+/.test(location.pathname)
 
+  // 沉浸界面（世界视界）：隐藏侧边栏，全屏沉浸
+  const hideSidebar = /^\/world-view\//.test(location.pathname)
+
+  // 沉浸界面：悬浮图标切换侧边栏（覆盖式，不挤压世界画面）
+  const [sidebarOverlay, setSidebarOverlay] = useState(false)
+  const [floatingIconHidden, setFloatingIconHidden] = useState(false)
+  useEffect(() => { setSidebarOverlay(false); setFloatingIconHidden(false) }, [location.pathname])
+
+  // 世界代码 → 宿主 UI 桥（window.WorldUI，postMessage）：控制侧边栏/悬浮图标
+  useEffect(() => {
+    const onMsg = (e: MessageEvent) => {
+      const d = e.data
+      if (!d || d.type !== 'world_ui' || !d.action) return
+      switch (d.action) {
+        case 'toggle_sidebar': setSidebarOverlay((v) => !v); break
+        case 'show_sidebar': setSidebarOverlay(true); break
+        case 'hide_sidebar': setSidebarOverlay(false); break
+        case 'hide_floating_icon': setFloatingIconHidden(true); break
+        case 'show_floating_icon': setFloatingIconHidden(false); break
+      }
+    }
+    window.addEventListener('message', onMsg)
+    return () => window.removeEventListener('message', onMsg)
+  }, [])
+
   return (
     <div className="flex h-dvh overflow-hidden bg-canvas">
-      {/* ── 桌面端侧栏（始终可见） ── */}
-      <div className="hidden md:block shrink-0">
-        <Sidebar />
-      </div>
+      {/* ── 桌面端侧栏（沉浸界面默认收起） ── */}
+      {!hideSidebar && (
+        <div className="hidden md:block shrink-0">
+          <Sidebar />
+        </div>
+      )}
+
+      {/* ── 沉浸界面：侧边栏悬浮开关（世界代码可经 WorldUI 隐藏） ── */}
+      {hideSidebar && !floatingIconHidden && (
+        sidebarOverlay ? (
+          <>
+            {/* 点击外部关闭 */}
+            <div className="fixed inset-0 z-30" onClick={() => setSidebarOverlay(false)} />
+            {/* 覆盖式侧边栏：flex 容器宽度跟随侧边栏（含其内部折叠），收起标签固定在右缘 */}
+            <div className="fixed inset-y-0 left-0 z-40 flex">
+              <div className="h-full shadow-2xl border-r border-border">
+                <Sidebar translucent onClose={() => setSidebarOverlay(false)} />
+              </div>
+              <button
+                onClick={() => setSidebarOverlay(false)}
+                className="h-full w-5 flex items-center justify-center bg-surface/70 border-r border-border text-textMuted hover:text-textPrimary transition-colors"
+                title="收起侧边栏"
+              >
+                «
+              </button>
+            </div>
+          </>
+        ) : (
+          <button
+            onClick={() => setSidebarOverlay(true)}
+            className="fixed left-0 top-1/2 -translate-y-1/2 z-50 flex items-center px-1 py-6 rounded-r-xl bg-surface border border-l-0 border-border text-textMuted hover:text-textPrimary hover:bg-elevated shadow-lg transition-colors"
+            title="显示侧边栏"
+          >
+            »
+          </button>
+        )
+      )}
 
       {/* ── 移动端抽屉遮罩 ── */}
       {drawerOpen && (

@@ -77,62 +77,11 @@ class FileEdit(ToolPlugin):
             logger.error(f"file_edit 读取失败: {e}", exc_info=True)
             return {"error": True, "message": f"读取失败：{e}"}
 
-        lines = old_content.split("\n")
+        from app.utils.pure.file_edit import apply_file_edit
 
-        if operation == "str_replace":
-            old_string = arguments.get("old_string", "")
-            if not old_string:
-                return {"error": True, "message": "str_replace 操作需要提供 old_string 参数"}
-
-            count = old_content.count(old_string)
-            if count == 0:
-                return {
-                    "error": True,
-                    "message": f"未在文件中找到匹配的原文。请检查 old_string 是否完全一致（含缩进和换行）。",
-                }
-            if count > 1:
-                return {
-                    "error": True,
-                    "message": f"在文件中找到 {count} 处匹配，无法确定替换哪一处。请提供更长的上下文确保唯一。",
-                }
-
-            new_content = old_content.replace(old_string, new_string, 1)
-
-        elif operation == "insert":
-            insert_line = arguments.get("insert_line", 0)
-            if insert_line < 0:
-                return {"error": True, "message": "insert_line 不能小于 0（行号从 0 开始）"}
-            if insert_line > len(lines):
-                return {
-                    "error": True,
-                    "message": f"行号 {insert_line} 超出文件范围（共 {len(lines)} 行）",
-                }
-
-            new_lines = lines.copy()
-            # insert_line 是 1-indexed，list.insert 是 0-indexed 在 index 前插入
-            # insert_line=N → 在第 N 行之后插入 = 在第 N+1 行之前插入
-            new_lines.insert(insert_line, new_string)
-            new_content = "\n".join(new_lines)
-
-        elif operation == "delete_lines":
-            start_line = arguments.get("start_line", 1)
-            end_line = arguments.get("end_line", 1)
-            if start_line < 1 or end_line < 1:
-                return {"error": True, "message": "start_line 和 end_line 从 1 开始"}
-            if start_line > end_line:
-                return {"error": True, "message": "start_line 不能大于 end_line"}
-            if start_line > len(lines):
-                return {"error": True, "message": f"start_line {start_line} 超出文件范围（共 {len(lines)} 行）"}
-            # 1-indexed → 0-indexed
-            s = max(0, start_line - 1)
-            e = min(len(lines), end_line)  # end_line 是包含的，所以 slice 用 e（不包含 e）
-            if s >= len(lines):
-                return {"error": True, "message": "起始行超出文件范围"}
-            del lines[s:e]
-            new_content = "\n".join(lines)
-
-        else:
-            return {"error": True, "message": f"不支持的操作: {operation}"}
+        new_content, err = apply_file_edit(old_content, operation, arguments)
+        if err:
+            return {"error": True, "message": err}
 
         # 3. 写回文件
         try:

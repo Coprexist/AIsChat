@@ -119,6 +119,30 @@ async def lifespan(app: FastAPI):
                 pass
     audit_cleanup_task = asyncio.create_task(audit_cleanup_loop())
 
+    # 启动每日数据库备份（管理员开关 daily_backup_enabled；保留份数 daily_backup_keep）
+    async def daily_backup_loop():
+        from app.services.infrastructure.backup_service import create_backup, save_backup, prune_backups
+        from app.services.infrastructure.system_settings_service import get_settings
+        from app.database import async_session
+        while True:
+            await asyncio.sleep(86400)  # 24h
+            try:
+                async with async_session() as backup_db:
+                    s = await get_settings(backup_db)
+                if not s.get("daily_backup_enabled"):
+                    continue
+                sql_bytes = await create_backup()
+                await save_backup(sql_bytes)
+                deleted = prune_backups(int(s.get("daily_backup_keep", 7) or 7))
+                logger.info(f"💾 每日备份完成（清理 {deleted} 份过期）")
+            except Exception as e:
+                logger.warning(f"⚠️ 每日备份失败: {e}")
+    daily_backup_task = asyncio.create_task(daily_backup_loop())
+
+    # 启动世界懒加载调度器（休眠/唤醒 + 离线时间补偿）
+    from app.services.world.world_scheduler import world_scheduler
+    world_scheduler_task = asyncio.create_task(world_scheduler())
+
     # 启动记忆批量写入 worker
     from app.services.memory.memory_buffer import memory_flush_worker
     memory_flush_task = asyncio.create_task(memory_flush_worker())
@@ -150,6 +174,18 @@ async def lifespan(app: FastAPI):
 
     # 启动共享 Chromium 服务（所有 AI 共用的浏览器 CDP）
     asyncio.create_task(_start_browser_service())
+
+    # 启动薄大脑控制系统（心跳）
+    from app.services.brain.brain_controller import brain_controller
+    asyncio.create_task(brain_controller.initialize())
+
+    # 技能运行时：注册为 Skill 事件总线的派发器（自治 Skill 执行引擎）
+    from app.services.skill.skill_runtime import skill_runtime
+    await skill_runtime.init_dispatcher()
+
+    # 启动时间触发器周期扫描（time 维度的执行引擎）
+    from app.services.skill.trigger_sweep import trigger_sweep_worker
+    trigger_sweep_task = asyncio.create_task(trigger_sweep_worker())
 
     logger.info("✅ 后台 worker 已全部启动（含联邦通信）")
 
@@ -189,7 +225,7 @@ async def lifespan(app: FastAPI):
         pass
     for task in [ai_worker_task, vector_worker_task, alarm_scheduler_task, audit_cleanup_task,
                   memory_flush_task, metrics_flush_task, orphan_cleanup_task,
-                  fed_heartbeat_task, fed_reconnect_task]:
+                  fed_heartbeat_task, fed_reconnect_task, trigger_sweep_task]:
         task.cancel()
         try:
             await task

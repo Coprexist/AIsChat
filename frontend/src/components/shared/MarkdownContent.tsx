@@ -1,0 +1,75 @@
+/**
+ * 共享 Markdown 渲染器 — 消息气泡 / 群视界设计页对话 共用（单一实现，勿各自手写）。
+ * 从 MessageBubble 抽出：GFM + 数学公式 + 换行 + 代码高亮 + 彩色文字标签 + XSS 过滤。
+ */
+import Markdown from 'react-markdown'
+import remarkGfm from 'remark-gfm'
+import remarkMath from 'remark-math'
+import remarkBreaks from 'remark-breaks'
+import rehypeKatex from 'rehype-katex'
+import rehypeRaw from 'rehype-raw'
+import rehypeSanitize, { defaultSchema } from 'rehype-sanitize'
+import { visit } from 'unist-util-visit'
+import CodeRenderer from './CodeRenderer'
+
+// 将行内代码重定向到独立组件，避免和代码块共用同一个 code 组件
+function remarkInlineCode() {
+  return (tree) => { visit(tree, 'inlineCode', (node) => {
+    node.data = { hName: 'inlinecode' }
+  }) }
+}
+
+const COLOR_VARS: Record<string, [string, string]> = {
+  red: ['255 100 100', '220 50 50'],
+  orange: ['255 180 50', '220 130 0'],
+  gold: ['255 215 0', '180 140 0'],
+  green: ['80 220 120', '20 150 60'],
+  blue: ['100 150 255', '50 100 220'],
+  purple: ['180 130 255', '130 80 200'],
+  pink: ['255 130 200', '220 80 150'],
+  gray: ['180 180 180', '100 100 100'],
+}
+
+/** 彩色文字标签（<span class="text-red"> / [red]...[/red]）→ 行内颜色；深/浅色底两套 */
+function colorize(content: string, isMine: boolean) {
+  const rgb = (k: string) => `rgb(${COLOR_VARS[k][isMine ? 0 : 1]})`
+  let out = content
+  for (const k of Object.keys(COLOR_VARS)) {
+    out = out
+      .replace(new RegExp(`<span\\s+class=['"]text-${k}['"][^>]*>([\\s\\S]*?)<\\/span>`, 'gi'), `<span style="color:${rgb(k)}">$1</span>`)
+      .replace(new RegExp(`\\[${k}\\]([\\s\\S]*?)\\[\\/${k}\\]`, 'g'), `<span style="color:${rgb(k)}">$1</span>`)
+  }
+  return out
+    .replace(/\\\[([\s\S]*?)\\\]/g, '$$$$$1$$$$')
+    .replace(/\\\(([\s\S]*?)\\\)/g, '$$$1$$')
+}
+
+export default function MarkdownContent({ content, isMine = false }: { content: string; isMine?: boolean }) {
+  return (
+    <Markdown
+      children={colorize(content, isMine)}
+      remarkPlugins={[remarkGfm, remarkMath, remarkBreaks, remarkInlineCode]}
+      rehypePlugins={[rehypeRaw, [rehypeSanitize, {
+        ...defaultSchema,
+        tagNames: [...(defaultSchema.tagNames || []), 'inlinecode'],
+        attributes: {
+          ...defaultSchema.attributes,
+          a: [...(defaultSchema.attributes?.a || ['href']), 'class', 'target', 'rel'],
+          code: [...(defaultSchema.attributes?.code || []), 'class'],
+          span: [...(defaultSchema.attributes?.span || []), 'style'],
+          img: [...(defaultSchema.attributes?.img || ['src', 'alt']), 'class'],
+          div: [...(defaultSchema.attributes?.div || []), 'class'],
+        },
+      }], rehypeKatex]}
+      components={{
+        code: CodeRenderer,
+        inlinecode: ({ children }) => (
+          <code className="bg-black/5 dark:bg-white/10 rounded px-1 py-0.5 text-[0.85em] inline-block max-w-full break-words">{children}</code>
+        ),
+        table: ({ node, ...props }) => <div className="markdown-table-wrapper"><table {...props} /></div>,
+        th: ({ node, ...props }) => <th {...props} />,
+        td: ({ node, ...props }) => <td {...props} />,
+      }}
+    />
+  )
+}

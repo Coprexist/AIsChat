@@ -76,6 +76,9 @@ function addToMap<K, V>(
 }
 
 export default function ChatView({ conversationType, conversationId }: ChatViewProps) {
+  // ── 群视界：群聊绑定的世界（全屏入口弹窗，先不加载消息） ──
+  const [boundWorldId, setBoundWorldId] = useState<number | null>(null)
+  const [worldModalOpen, setWorldModalOpen] = useState(false)
   const t = useT()
   const { user } = useAuth()
   const [messages, setMessages] = useState<Message[]>([])
@@ -533,6 +536,56 @@ export default function ChatView({ conversationType, conversationId }: ChatViewP
   // 初始加载
   // ============================================================
 
+  const loadInitialMessages = useCallback(async () => {
+    if (!conversationId) return
+    if (conversationType === 'group') {
+      api.post(`/groups/${conversationId}/read`)
+        .then(() => {
+          window.dispatchEvent(new CustomEvent(CHAT_REFRESH_EVENT, { detail: { type: 'unread_update' } }))
+        })
+        .catch(() => {})
+      const membersData = await api.get(`/groups/${conversationId}/members`)
+      setGroupMembers(membersData)
+    }
+    await loadMessages({ mode: 'initial' })
+    // DM 消息加载同时标记已读，触发 sidebar 刷新未读计数
+    if (conversationType === 'dm') {
+      window.dispatchEvent(new CustomEvent(CHAT_REFRESH_EVENT, { detail: { type: 'unread_update' } }))
+    }
+  }, [conversationId, conversationType, loadMessages])
+
+  // 全屏弹窗：选择「在此标准界面打开」→ 关弹窗 + 加载消息
+  const closeWorldModal = useCallback(() => {
+    setWorldModalOpen(false)
+    loadInitialMessages()
+  }, [loadInitialMessages])
+
+  // 沉浸界面：独立窗口打开（按世界复用）——桌面 Tauri 用 WebviewWindow，网页用 window.open 新窗口
+  // 失败/被拦截 → 回退应用内全屏
+  const openImmersive = useCallback(() => {
+    const url = `/world-view/${boundWorldId}?group_id=${conversationId}`
+    if ('__TAURI_INTERNALS__' in window) {
+      ;(async () => {
+        try {
+          const { WebviewWindow } = await import('@tauri-apps/api/webviewWindow')
+          const label = `world-immersive-${boundWorldId}`
+          const existing = WebviewWindow.getByLabel(label)
+          if (existing) { existing.setFocus(); return }
+          const win = new WebviewWindow(label, { url })
+          const failTimer = setTimeout(() => { window.location.href = url }, 3000)
+          win.once('tauri://created', () => clearTimeout(failTimer))
+          win.once('tauri://error', () => { clearTimeout(failTimer); window.location.href = url })
+        } catch {
+          window.location.href = url  // 无权限/失败 → 回退应用内
+        }
+      })()
+      return
+    }
+    // 网页端：命名窗口（同名复用+聚焦）；被弹窗拦截（返回 null）→ 回退应用内
+    const win = window.open(url, `world-immersive-${boundWorldId}`)
+    if (!win) window.location.href = url
+  }, [boundWorldId, conversationId])
+
   useEffect(() => {
     if (!conversationId) return
     setThinkingAgents(new Map())
@@ -557,28 +610,30 @@ export default function ChatView({ conversationType, conversationId }: ChatViewP
       if (thinking.size > 0) setThinkingAgents(thinking)
     }).catch(() => {})
 
+    let cancelled = false
     const init = async () => {
       try {
+        // 群视界门：群聊绑定世界 → 全屏弹窗（先不加载消息），选「标准界面」再加载
         if (conversationType === 'group') {
-          api.post(`/groups/${conversationId}/read`)
-            .then(() => {
-              window.dispatchEvent(new CustomEvent(CHAT_REFRESH_EVENT, { detail: { type: 'unread_update' } }))
-            })
-            .catch(() => {})
-          const membersData = await api.get(`/groups/${conversationId}/members`)
-          setGroupMembers(membersData)
+          try {
+            const wr = await api.get<{ world_id: number }>(`/worlds/by-entity?entity_type=group&entity_id=${conversationId}`)
+            if (wr.world_id) {
+              if (cancelled) return
+              setBoundWorldId(wr.world_id)
+              setWorldModalOpen(true)
+              return
+            }
+          } catch { /* 未绑定世界 */ }
+          if (cancelled) return
         }
-        await loadMessages({ mode: 'initial' })
-        // DM 消息加载同时标记已读，触发 sidebar 刷新未读计数
-        if (conversationType === 'dm') {
-          window.dispatchEvent(new CustomEvent(CHAT_REFRESH_EVENT, { detail: { type: 'unread_update' } }))
-        }
+        await loadInitialMessages()
       } catch (err) {
         console.error('初始化失败:', err)
       }
     }
     init()
-  }, [conversationId, conversationType])
+    return () => { cancelled = true }
+  }, [conversationId, conversationType, loadInitialMessages])
 
   // 初始加载后定位 + 立即保存已读位置（不等卸载，防止刷新时红线残留）
   useLayoutEffect(() => {
@@ -905,6 +960,31 @@ export default function ChatView({ conversationType, conversationId }: ChatViewP
           <ArrowUp size={14} />
           {t('chat.jumpToFirstUnread')}
         </button>
+      )}
+
+      {/* 群视界全屏入口：群聊绑定世界时先弹窗、不加载消息；选「标准界面」才关并加载 */}
+      {worldModalOpen && boundWorldId && conversationType === 'group' && (
+        <div className="absolute inset-0 z-[60] flex items-center justify-center bg-black/70 backdrop-blur-sm">
+          <div className="w-full max-w-md mx-4 bg-surface rounded-2xl border border-primary-500/30 shadow-2xl p-8 text-center">
+            <div className="text-5xl mb-4">🌐</div>
+            <h2 className="text-lg font-semibold text-textPrimary">这个群聊绑定了群视界</h2>
+            <p className="text-sm text-textMuted mt-2 mb-7">世界已就绪，选择一种方式进入</p>
+            <div className="space-y-2.5">
+              <button
+                onClick={openImmersive}
+                className="w-full py-3 bg-primary-500 hover:bg-primary-400 text-white rounded-xl font-medium transition-colors"
+              >
+                🎮 在沉浸界面打开
+              </button>
+              <button
+                onClick={closeWorldModal}
+                className="w-full py-3 bg-elevated hover:bg-border text-textPrimary rounded-xl font-medium transition-colors"
+              >
+                ⚙️ 在此标准界面打开
+              </button>
+            </div>
+          </div>
+        </div>
       )}
 
       {/* 消息列表 */}
