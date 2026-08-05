@@ -14,14 +14,16 @@ import ForwardFileModal from './ForwardFileModal'
 // FileCodeRenderer ——已迁移到 components/shared/CodeRenderer.tsx
 
 interface FilePreviewModalProps {
-  fileId: number
+  fileId?: number
   fileName: string
   fileSize: number
   mimeType: string
   onClose: () => void
+  /** 可选：直接内容 URL（世界文件等非附件场景）；缺省用 fileId 走附件下载接口 */
+  src?: string
 }
 
-export default function FilePreviewModal({ fileId, fileName, fileSize, mimeType, onClose }: FilePreviewModalProps) {
+export default function FilePreviewModal({ fileId, fileName, fileSize, mimeType, onClose, src }: FilePreviewModalProps) {
   const t = useT()
   const [content, setContent] = useState<string | null>(null)
   const [loading, setLoading] = useState(true)
@@ -32,7 +34,7 @@ export default function FilePreviewModal({ fileId, fileName, fileSize, mimeType,
   const [forwardFile, setForwardFile] = useState<{file_id:number;name:string;size:number;mime_type:string}|null>(null)
 
   const token = localStorage.getItem('access_token')
-  const dlUrl = `/api/fs/download/${fileId}?token=${token || ''}`
+  const dlUrl = src ?? (fileId != null ? `/api/fs/download/${fileId}?token=${token || ''}` : '')
 
   // 模态框尺寸状态
   const [modalWidth, setModalWidth] = useState<number | null>(null)

@@ -8,6 +8,7 @@ import { useEffect, useState, useCallback, useRef, useMemo } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { api } from '../api/client'
 import MarkdownContent from '../components/shared/MarkdownContent'
+import FilePreviewModal from '../components/FilePreviewModal'
 import { useResizableSidebar } from '../hooks/useResizableSidebar'
 
 // ── 打字机效果：文本逐字显示（参考大同互动逐 token 渲染，简化版） ──
@@ -67,6 +68,8 @@ export default function WorldDesignPage() {
   const [content, setContent] = useState('')
   const [mode, setMode] = useState<'files' | 'preview'>('files')
   const [previewKey, setPreviewKey] = useState(0)
+  // 文件格式预览（复用主界面 FilePreviewModal：图片/PDF/docx/文本高亮/Markdown/HTML）
+  const [previewFile, setPreviewFile] = useState<{ name: string; src: string } | null>(null)
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
   const [msg, setMsg] = useState('')
@@ -490,9 +493,12 @@ export default function WorldDesignPage() {
                 <div className="px-3 py-1.5 text-xs text-textSecondary bg-surface/60 border-b border-border flex justify-between">
                   <span className="truncate">{currentFile || '未选择文件'}</span>
                   {currentFile && (
-                    <button onClick={saveFile} disabled={saving} className="text-primary-400 hover:text-primary-300 transition-colors shrink-0 ml-3">
-                      {saving ? '保存中...' : '💾 保存'}
-                    </button>
+                    <span className="flex items-center gap-3 shrink-0 ml-3">
+                      <button onClick={() => setPreviewFile({ name: currentFile, src: `/world/${wid}/files/${encodeURIComponent(currentFile)}` })} className="text-primary-400 hover:text-primary-300 transition-colors" title="预览此文件">👁 预览</button>
+                      <button onClick={saveFile} disabled={saving} className="text-primary-400 hover:text-primary-300 transition-colors">
+                        {saving ? '保存中...' : '💾 保存'}
+                      </button>
+                    </span>
                   )}
                 </div>
                 <textarea
@@ -692,5 +698,16 @@ export default function WorldDesignPage() {
         </div>
       </div>
     </div>
+
+    {/* 文件格式预览（复用主界面同一份实现） */}
+    {previewFile && (
+      <FilePreviewModal
+        fileName={previewFile.name}
+        fileSize={0}
+        mimeType=""
+        src={previewFile.src}
+        onClose={() => setPreviewFile(null)}
+      />
+    )}
   )
 }
