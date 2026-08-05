@@ -32,6 +32,7 @@ export default function FilePreviewModal({ fileId, fileName, fileSize, mimeType,
   const [scale, setScale] = useState(1)
   const imgContainerRef = useRef<HTMLDivElement>(null)
   const [forwardFile, setForwardFile] = useState<{file_id:number;name:string;size:number;mime_type:string}|null>(null)
+  // 富文本（md/html/代码）渲染 ↔ 原文切换：看渲染效果或源码
 
   const token = localStorage.getItem('access_token')
   const dlUrl = src ?? (fileId != null ? `/api/fs/download/${fileId}?token=${token || ''}` : '')
@@ -123,6 +124,8 @@ export default function FilePreviewModal({ fileId, fileName, fileSize, mimeType,
   const previewable = isImage || isPDF || isDocx || isText || isHtml
   const isMd = isMarkdownFile(fileName, resolvedMime)
   const codeLang = isHtml ? '' : getCodeLang(fileName, resolvedMime)  // HTML 用 iframe 渲染
+  const isRichText = isMd || isHtml || !!codeLang
+  const [showSource, setShowSource] = useState(false)
 
   // 重试：新文件可能后台还没处理完，点开失败就重试
   const RETRY_MAX = 3
@@ -311,6 +314,17 @@ export default function FilePreviewModal({ fileId, fileName, fileSize, mimeType,
         <p className="text-[10px] text-textMuted">{formatFileSize(fileSize)}</p>
       </div>
 
+      {/* 富文本：渲染 ↔ 原文 切换（看源码用） */}
+      {isRichText && content !== null && (
+        <button
+          onClick={() => setShowSource((v) => !v)}
+          className="px-2 py-1 rounded-lg text-xs border border-border bg-elevated hover:bg-border text-textSecondary transition-colors shrink-0"
+          title={showSource ? '查看渲染效果' : '查看原文源码'}
+        >
+          {showSource ? '👁 渲染' : '📄 原文'}
+        </button>
+      )}
+
       {/* 图片缩放 — 滑块 + 按钮 */}
       {isImage && (
         <div className="flex items-center gap-2">
@@ -427,7 +441,7 @@ export default function FilePreviewModal({ fileId, fileName, fileSize, mimeType,
                   onError={() => { if (retry < RETRY_MAX) setTimeout(() => setRetry(r => r + 1), 1000) }}
                 />
               </div>
-            ) : isPDF || (isHtml && content) ? (
+            ) : isPDF || (isHtml && content && !showSource) ? (
               <iframe
                 src={isPDF ? dlUrl : undefined}
                 srcDoc={isHtml ? (content ?? undefined) : undefined}
@@ -435,6 +449,10 @@ export default function FilePreviewModal({ fileId, fileName, fileSize, mimeType,
                 title={fileName}
                 sandbox={isHtml ? 'allow-scripts' : undefined}
               />
+            ) : isRichText && showSource ? (
+              <pre className="w-full h-full p-4 md:p-5 m-0 text-xs leading-relaxed font-mono text-textPrimary whitespace-pre-wrap break-words overflow-auto bg-canvas">
+                {content}
+              </pre>
             ) : (
               <div className="w-full p-4 md:p-5 self-start">
                 {isDocx ? (
