@@ -581,7 +581,7 @@ export default function WorldDesignPage() {
                       />
                     </div>
                   ) : (
-                    <div className="flex-1 overflow-auto bg-canvas [&_code]:!overflow-x-visible [&_code]:!rounded-none [&_code]:!border-0 [&_code]:!p-0">
+                    <div className="flex-1 overflow-auto bg-canvas [&_code]:!overflow-x-visible [&_code]:!rounded-none [&_code]:!border-0 [&_code]:!p-0 [&_code]:!bg-transparent">
                       <div className="w-full max-w-none text-sm leading-relaxed break-words text-textPrimary p-3 md:p-4">
                         {isMdFile ? (
                           <MarkdownContent content={content} isMine={false} />
