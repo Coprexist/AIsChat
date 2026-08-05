@@ -277,12 +277,19 @@ async def create_message(
     reply_to: int | None = None,
     attachments: list[dict] | None = None,
     source: str = "user",
+    allow_non_member: bool = False,
 ) -> Message:
     """创建消息（支持附件，非 owner 发送含附件消息时自动创建转发引用）
 
     source："user"=人/工具发起（会触发群消息钩子→世界程序感知）；
            "world"=世界程序/世界 AI 自己发的（不触发，防死循环）
+
+    安全（2026-08-05 珑哥发现）：非群成员默认禁止发消息——
+    任意登录用户不能给任意群灌水；allow_non_member=True 供
+    世界 AI 给绑定群发消息（群绑定校验在 world_tools 层已有）。
     """
+    if not allow_non_member and not await _is_group_member(db, group_id, sender_type, sender_id):
+        raise ValueError("你不是该群成员，无法发送消息")
     message = Message(
         group_id=group_id,
         sender_type=sender_type,
@@ -311,6 +318,19 @@ async def create_message(
         logger.warning(f"🌐 群消息钩子异常（group #{group_id}）: {e}")
 
     return message
+
+
+async def _is_group_member(db: AsyncSession, group_id: int, sender_type: str, sender_id: int) -> bool:
+    """发送者是否为群成员（human/ai 两种成员类型）"""
+    from app.models.group import GroupMember
+    row = (await db.execute(
+        select(GroupMember).where(
+            GroupMember.group_id == group_id,
+            GroupMember.member_type == sender_type,
+            GroupMember.member_id == sender_id,
+        )
+    )).scalar_one_or_none()
+    return row is not None
 
 
 async def get_recent_messages(

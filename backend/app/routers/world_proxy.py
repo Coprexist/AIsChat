@@ -332,6 +332,9 @@ async def world_events(
                 try:
                     state = await asyncio.wait_for(q.get(), timeout=15.0)
                 except asyncio.TimeoutError:
+                    # 断连检测：客户端断开后及时结束连接（不占 worker，避免 reload 优雅退出死锁）
+                    if await request.is_disconnected():
+                        break
                     yield ": ping\n\n"  # 心跳
                     continue
                 yield f"data: {json.dumps(state, ensure_ascii=False)}\n\n"

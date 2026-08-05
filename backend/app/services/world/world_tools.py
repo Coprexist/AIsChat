@@ -596,7 +596,7 @@ async def _do_execute(db: AsyncSession, world, name: str, arguments: str) -> dic
             content = str(args.get("content") or "").strip()
             if not content:
                 return {"success": False, "error": "消息内容不能为空"}
-            msg = await _create_message(db, gid, "human", world.owner_id, content, source="world")
+            msg = await _create_message(db, gid, "human", world.owner_id, content, source="world", allow_non_member=True)
             try:
                 from app.routers.ws import manager
                 await manager.broadcast_to_group(gid, {"type": "message", "data": {"id": msg.id, "content": content}})

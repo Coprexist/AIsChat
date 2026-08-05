@@ -43,7 +43,7 @@ services:
       timeout: 5s
       retries: 5
       start_period: 6s
-    command: sh -c "python prestart.py && uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload --reload-exclude 'data/*'"
+    command: sh -c "python prestart.py && uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload --reload-exclude 'data/*' --timeout-graceful-shutdown 5"
 
   frontend:
     build: ./frontend
