@@ -580,7 +580,7 @@ export default function WorldDesignPage() {
                       />
                     </div>
                   ) : (
-                    <div className="flex-1 overflow-y-auto p-3 md:p-4 bg-canvas">
+                    <div className="flex-1 overflow-auto p-3 md:p-4 bg-canvas [&_code]:!overflow-x-visible">
                       <div className="w-full max-w-none text-sm leading-relaxed break-words text-textPrimary">
                         <MarkdownContent
                           content={isMdFile ? content : '```' + fileCodeLang + '\n' + content + '\n```'}
