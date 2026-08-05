@@ -347,7 +347,7 @@
 
 /* ── 代码高亮颜色适配（自定义，取主题色系：主紫/绿/琥珀/蓝；日夜两套） ── */
 .hljs { color: rgb(var(--tw-text-primary)); }
-.hljs-comment, .hljs-quote { color: #64748b; font-style: italic; }
+.hljs-comment, .hljs-quote { color: #475569; font-style: italic; }
 .hljs-keyword, .hljs-selector-tag, .hljs-subst { color: #6d28d9; }
 .hljs-string, .hljs-regexp, .hljs-addition { color: #047857; }
 .hljs-number, .hljs-literal, .hljs-symbol, .hljs-bullet { color: #b45309; }
