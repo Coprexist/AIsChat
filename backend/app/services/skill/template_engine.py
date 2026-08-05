@@ -58,6 +58,13 @@ class TemplateEngine:
             return self._generate_workflow_skill(config)
         return ""
 
+    def list_templates(self) -> list[dict]:
+        """列出所有可用模板"""
+        return [
+            {"type": t, **meta}
+            for t, meta in self.TEMPLATE_TYPES.items()
+        ]
+
     def _generate_trigger_action_skill(self, config: Dict) -> str:
         """生成触发-动作型 Skill 代码"""
         code = f"""from app.skills.base import AppSkill

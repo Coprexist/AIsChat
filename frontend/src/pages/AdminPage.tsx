@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect, useRef, useCallback } from 'react'
 import Modal from '../components/Modal'
 import { Link, useNavigate, useSearchParams, useOutletContext } from 'react-router-dom'
 import { api } from '../api/client'
@@ -895,6 +895,55 @@ function BackupTab() {
   const fileInputRef = useRef<HTMLInputElement>(null)
   const fullFileInputRef = useRef<HTMLInputElement>(null)
 
+  // ── 本地自动备份（每日备份功能产生，可选回档）──
+  const [localBackups, setLocalBackups] = useState<{ name: string; size_bytes: number; mtime: string }[]>([])
+  const [restoringLocal, setRestoringLocal] = useState('')
+
+  const loadLocalBackups = useCallback(async () => {
+    try {
+      const token = localStorage.getItem('access_token')
+      const res = await fetch('/api/admin/backups', {
+        headers: { 'Authorization': `Bearer ${token}` },
+      })
+      if (res.ok) {
+        const data = await res.json()
+        setLocalBackups(data.backups || [])
+      }
+    } catch { /* 列表拉不到不阻塞 */ }
+  }, [])
+
+  useEffect(() => { loadLocalBackups() }, [loadLocalBackups])
+
+  const formatBytes = (n: number) => {
+    if (n >= 1024 * 1024) return `${(n / 1024 / 1024).toFixed(1)} MB`
+    if (n >= 1024) return `${(n / 1024).toFixed(1)} KB`
+    return `${n} B`
+  }
+
+  const handleRestoreLocal = async (filename: string) => {
+    if (!confirm(t('admin.restoreWarning'))) return
+    setRestoringLocal(filename)
+    setError('')
+    setMessage('')
+    try {
+      const token = localStorage.getItem('access_token')
+      const res = await fetch('/api/admin/backup/restore-local', {
+        method: 'POST',
+        headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ filename }),
+      })
+      if (!res.ok) {
+        const err = await res.json()
+        throw new Error(err.detail || t('admin.restoreFailed'))
+      }
+      setMessage(t('admin.dbRestoreSuccess'))
+    } catch (e: any) {
+      setError(e.message)
+    } finally {
+      setRestoringLocal('')
+    }
+  }
+
   const downloadFile = (blob: Blob, filename: string) => {
     const url = URL.createObjectURL(blob)
     const a = document.createElement('a')
@@ -1054,6 +1103,39 @@ function BackupTab() {
             </button>
           </div>
         </div>
+      </div>
+
+      {/* ========== 本地自动备份（每日备份 + 回档） ========== */}
+      <div className="bg-surface rounded-xl border border-border p-5">
+        <div className="flex items-center justify-between mb-1">
+          <h3 className="font-semibold text-textPrimary">本地自动备份</h3>
+          <button onClick={loadLocalBackups} className="text-xs text-textSecondary hover:text-textPrimary">🔄 刷新</button>
+        </div>
+        <p className="text-sm text-textMuted mb-4">每日备份功能产生的文件（服务器 data/backups/），可选择一个回档（⚠️ 覆盖当前所有数据）</p>
+        {localBackups.length === 0 ? (
+          <div className="text-sm text-textMuted bg-canvas border border-border rounded-xl p-4">
+            暂无本地备份——在「系统设置」里开启每日备份后，每天会自动生成
+          </div>
+        ) : (
+          <div className="space-y-2">
+            {localBackups.map((b) => (
+              <div key={b.name} className="flex items-center gap-3 bg-canvas border border-border rounded-xl px-4 py-2.5">
+                <Database size={16} className="text-textSecondary shrink-0" />
+                <div className="flex-1 min-w-0">
+                  <div className="text-sm text-textPrimary truncate">{b.name}</div>
+                  <div className="text-xs text-textMuted">{formatBytes(b.size_bytes)} · {new Date(b.mtime).toLocaleString()}</div>
+                </div>
+                <button
+                  onClick={() => handleRestoreLocal(b.name)}
+                  disabled={restoringLocal === b.name}
+                  className="shrink-0 px-3 py-1.5 text-sm bg-rose-500/80 text-white rounded-lg hover:bg-rose-500 disabled:opacity-40 transition-colors"
+                >
+                  {restoringLocal === b.name ? '回档中...' : '⏪ 回档'}
+                </button>
+              </div>
+            ))}
+          </div>
+        )}
       </div>
 
       {/* ========== 导入区 ========== */}
@@ -1682,6 +1764,8 @@ function SystemSettingsTab() {
   const [auditUserActions, setAuditUserActions] = useState(false)
   const [auditRetention, setAuditRetention] = useState(90)
   const [messageRetention, setMessageRetention] = useState(0)
+  const [dailyBackupEnabled, setDailyBackupEnabled] = useState(false)
+  const [dailyBackupKeep, setDailyBackupKeep] = useState(7)
   const [geoipUrl, setGeoipUrl] = useState('')
   const [bulkConcurrency, setBulkConcurrency] = useState(3)
   const [bulking, setBulking] = useState(false)
@@ -1706,6 +1790,8 @@ function SystemSettingsTab() {
       setAuditUserActions(settings.audit_user_actions ?? false)
       setAuditRetention(settings.audit_log_retention_days ?? 90)
       setMessageRetention(settings.message_retention_days ?? 0)
+      setDailyBackupEnabled(settings.daily_backup_enabled ?? false)
+      setDailyBackupKeep(settings.daily_backup_keep ?? 7)
       setGeoipUrl(settings.geoip_provider_url || '')
       setHasActiveKeys(keys.some((k: any) => k.is_active))
     }).catch(console.error)
@@ -1724,6 +1810,8 @@ function SystemSettingsTab() {
       else if (field === 'audit_user_actions') payload.audit_user_actions = value
       else if (field === 'audit_retention') payload.audit_log_retention_days = value
       else if (field === 'message_retention') payload.message_retention_days = value
+      else if (field === 'daily_backup_enabled') payload.daily_backup_enabled = value
+      else if (field === 'daily_backup_keep') payload.daily_backup_keep = value
       else if (field === 'geoip_url') payload.geoip_provider_url = value || null
       const updated = await api.put('/admin/system-settings', payload)
       setConfig(updated)
@@ -1933,6 +2021,33 @@ function SystemSettingsTab() {
           <span className="text-xs text-textMuted">天{messageRetention === 0 ? '（永久）' : ''}</span>
           <button onClick={() => handleSave('message_retention', messageRetention)}
             disabled={saving || messageRetention === (config?.message_retention_days ?? 0)}
+            className="px-3 py-2 bg-primary-500 text-white rounded-xl hover:bg-primary-400 text-sm disabled:opacity-40 transition-colors"
+          >{t('settings.save')}</button>
+        </div>
+      </div>
+
+      {/* 每日数据库备份（管理员开关 + 保留份数） */}
+      <div>
+        <div className="flex items-center justify-between">
+          <div>
+            <label className="text-sm font-medium text-textSecondary">每日数据库备份</label>
+            <p className="text-xs text-textMuted mt-0.5">开启后每天自动 pg_dump，备份文件保存在服务器 data/backups/</p>
+          </div>
+          <button onClick={() => handleSave('daily_backup_enabled', !dailyBackupEnabled)}
+            disabled={saving}
+            className={`relative w-11 h-6 rounded-full transition-colors ${dailyBackupEnabled ? 'bg-primary-500' : 'bg-gray-600'}`}
+            title={t('settings.enable')}
+          >
+            <span className={`absolute top-0.5 w-5 h-5 bg-white rounded-full shadow transition-all ${dailyBackupEnabled ? 'left-[22px]' : 'left-0.5'}`} />
+          </button>
+        </div>
+        <div className="flex items-center gap-2 mt-2">
+          <input type="number" value={dailyBackupKeep}
+            onChange={e => setDailyBackupKeep(parseInt(e.target.value) || 7)} min={1} max={365}
+            className="w-24 px-3 py-2 rounded-xl border border-border bg-canvas text-sm text-textPrimary focus:outline-none focus:ring-2 focus:ring-primary-500/50" />
+          <span className="text-xs text-textMuted">份（超出自动清除最旧备份）</span>
+          <button onClick={() => handleSave('daily_backup_keep', dailyBackupKeep)}
+            disabled={saving || dailyBackupKeep === (config?.daily_backup_keep ?? 7)}
             className="px-3 py-2 bg-primary-500 text-white rounded-xl hover:bg-primary-400 text-sm disabled:opacity-40 transition-colors"
           >{t('settings.save')}</button>
         </div>

@@ -125,6 +125,8 @@ async def run_migrations():
             await _migrate_fix_duplicate_owners(db)     # v2.0.2 修复错误的多群主记录
             await _migrate_fix_human_members_changed_to_ai(db)  # v0.2.2 修被误改为AI的人类成员
             await _migrate_agent_state_stack(db)       # v0.2.1 状态栈（AI 跨任务上下文追踪）
+            await _migrate_personality_anchor_coefficient(db)  # v0.3.0 人格锚点一致性系数
+            await _migrate_world_tables(db)                     # v0.3.0 群视界世界表
             await _migrate_multi_provider(db)          # v0.2.2 多供应商 + api_key_pool.provider_name
             await _migrate_provider_defaults(db)       # v2.0.8 provider_config为空时填入内置预设
             await _migrate_ai_friend_user_id(db)       # v0.2.2 AI好友friend_id统一为user_id
@@ -2380,6 +2382,85 @@ async def _migrate_group_muted_until(db):
     await db.execute(text("ALTER TABLE group_members ADD COLUMN muted_until TIMESTAMP"))
     await db.flush()
     logger.info("  ✅ group_members.muted_until 添加完成")
+
+
+async def _migrate_personality_anchor_coefficient(db):
+    """v0.3.0: personality_anchors 新增 consistency_coefficient 列（幂等）
+
+    一致性系数：0.3=高度情境化，0.7=正常人，1.0=完全一致。
+    控制人格锚点注入系统提示词的完整度。
+    """
+    if await _column_exists(db, "personality_anchors", "consistency_coefficient"):
+        logger.info("  ⏭ personality_anchors.consistency_coefficient 已存在，跳过")
+        return
+    logger.info("  🧷 添加 personality_anchors.consistency_coefficient 列")
+    await db.execute(text("ALTER TABLE personality_anchors ADD COLUMN consistency_coefficient FLOAT DEFAULT 0.7"))
+    await db.flush()
+    logger.info("  ✅ personality_anchors.consistency_coefficient 添加完成")
+
+
+async def _migrate_world_tables(db):
+    """v0.3.0: 群视界三张表 worlds / world_bindings / world_agents（幂等）"""
+    # 1. worlds
+    if not await _table_exists(db, "worlds"):
+        logger.info("  🌐 创建 worlds 表")
+        await db.execute(text("""
+            CREATE TABLE worlds (
+                id SERIAL PRIMARY KEY,
+                name VARCHAR(100) NOT NULL,
+                description TEXT DEFAULT '',
+                owner_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+                status VARCHAR(20) DEFAULT 'sleeping',
+                time_flow_rate FLOAT DEFAULT 1.0,
+                world_time TIMESTAMP,
+                last_active_at TIMESTAMP,
+                config JSONB DEFAULT '{}',
+                created_at TIMESTAMP DEFAULT NOW(),
+                updated_at TIMESTAMP DEFAULT NOW()
+            )
+        """))
+        await db.flush()
+    else:
+        logger.info("  ⏭ worlds 已存在，跳过")
+
+    # 2. world_bindings
+    if not await _table_exists(db, "world_bindings"):
+        logger.info("  🌐 创建 world_bindings 表")
+        await db.execute(text("""
+            CREATE TABLE world_bindings (
+                id SERIAL PRIMARY KEY,
+                world_id INTEGER NOT NULL REFERENCES worlds(id) ON DELETE CASCADE,
+                entity_type VARCHAR(20) NOT NULL,
+                entity_id INTEGER NOT NULL,
+                created_at TIMESTAMP DEFAULT NOW(),
+                CONSTRAINT uq_world_binding UNIQUE (world_id, entity_type, entity_id)
+            )
+        """))
+        await db.flush()
+    else:
+        logger.info("  ⏭ world_bindings 已存在，跳过")
+
+    # 3. world_agents
+    if not await _table_exists(db, "world_agents"):
+        logger.info("  🌐 创建 world_agents 表")
+        await db.execute(text("""
+            CREATE TABLE world_agents (
+                id SERIAL PRIMARY KEY,
+                world_id INTEGER NOT NULL REFERENCES worlds(id) ON DELETE CASCADE,
+                agent_id INTEGER NOT NULL REFERENCES agents(id) ON DELETE CASCADE,
+                role VARCHAR(20) DEFAULT 'resident',
+                pending_notices JSONB DEFAULT '[]',
+                config JSONB DEFAULT '{}',
+                created_at TIMESTAMP DEFAULT NOW(),
+                CONSTRAINT uq_world_agent UNIQUE (world_id, agent_id)
+            )
+        """))
+        await db.flush()
+    else:
+        logger.info("  ⏭ world_agents 已存在，跳过")
+
+    logger.info("  ✅ 群视界表检查完成")
+
 
 async def _migrate_audit_logs(db):
     """v0.2.6 审计日志企业级字段（幂等）"""

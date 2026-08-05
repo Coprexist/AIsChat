@@ -183,6 +183,18 @@ class StateStackManager:
     async def resume_state(self, agent_id: int) -> StateFrame | None: ...
 ```
 
+### 4.5 状态帧缓存 ID（待设计，2026-08-04 提出）
+
+**背景**：状态栈每个帧 = 一种任务上下文。帧间切换会让 system prompt 变化（状态栈摘要不同），
+影响 provider 侧 prompt 缓存命中（DeepSeek cached_tokens 按前缀匹配）。
+
+**设想**：
+- 每个状态帧**第一次**动态申请一个稳定帧 id
+- 之后该帧的所有调用都带这个帧 id 触发缓存
+- 保证**同一帧上下文内**的缓存命中（帧内 prompt 前缀稳定）
+
+**状态**：仅记录，未设计未实现。
+
 ---
 
 ## 五、冲突仲裁

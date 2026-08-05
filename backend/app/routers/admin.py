@@ -1078,6 +1078,67 @@ async def upload_restore(
     return result
 
 
+class RestoreLocalRequest(BaseModel):
+    """从服务器本地备份回档"""
+    filename: str = Field(..., description="备份文件名（data/backups/ 下）")
+
+
+@router.get("/backups")
+async def list_local_backups(
+    admin: dict = Depends(require_admin),
+):
+    """列出服务器上的本地自动备份（data/backups/，每日备份功能产生）"""
+    from app.services.infrastructure.backup_service import list_backup_files
+
+    files = list_backup_files()
+    return {"backups": [
+        {
+            "name": f.name,
+            "size_bytes": f.stat().st_size,
+            "mtime": datetime.fromtimestamp(f.stat().st_mtime, timezone.utc).isoformat(),
+        }
+        for f in files
+    ]}
+
+
+@router.post("/backup/restore-local")
+async def restore_local_backup(
+    req: RestoreLocalRequest,
+    admin: dict = Depends(require_admin),
+    db: AsyncSession = Depends(get_db),
+):
+    """从服务器本地备份回档（⚠️ 覆盖当前所有数据）"""
+    import gzip
+    from app.services.infrastructure.backup_service import restore_backup, BACKUP_DIR
+
+    # 防路径穿越：只允许备份目录内的 aischat_*.sql.gz
+    name = req.filename
+    if (
+        not name
+        or "/" in name or "\\" in name or ".." in name
+        or not name.startswith("aischat_")
+        or not name.endswith(".sql.gz")
+    ):
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="非法备份文件名")
+
+    path = BACKUP_DIR / name
+    if not path.exists():
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="备份文件不存在")
+
+    try:
+        with gzip.open(path, "rb") as f:
+            sql_bytes = f.read()
+        result = await restore_backup(sql_bytes)
+    except RuntimeError as e:
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=str(e))
+
+    await _log_admin_action(
+        db, admin["user_id"], "db_restore_local", "system", 0,
+        {"filename": name, "size_bytes": len(sql_bytes)},
+    )
+    return result
+
+
 @router.get("/backup/full/download")
 async def download_full_backup(
     admin: dict = Depends(require_admin),
@@ -1172,6 +1233,8 @@ async def update_system_settings(
                 audit_user_actions=req.audit_user_actions,
                 audit_log_retention_days=req.audit_log_retention_days,
                 message_retention_days=req.message_retention_days,
+                daily_backup_enabled=req.daily_backup_enabled,
+                daily_backup_keep=req.daily_backup_keep,
                 updated_by=admin["user_id"],
             )
         await _log_admin_action(

@@ -3,7 +3,7 @@
 """
 from sqlalchemy import (
     Column, Integer, String, Boolean, DateTime, CheckConstraint, func, Text,
-    ForeignKey, PrimaryKeyConstraint,
+    ForeignKey, PrimaryKeyConstraint, Index,
 )
 from app.database import Base
 
@@ -77,4 +77,7 @@ class GroupInvitation(Base):
             "status IN ('pending', 'accepted', 'rejected')",
             name="ck_group_invitation_status",
         ),
+        # 与线上库对齐：邀请检索索引（历史迁移创建，模型补声明）
+        Index("idx_group_invitations_group", "group_id"),
+        Index("idx_group_invitations_invitee", "invitee_id", "status"),
     )

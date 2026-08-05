@@ -39,6 +39,10 @@ class SystemSettings(Base):
     audit_log_retention_days = Column(Integer, default=90, comment="审计日志保留天数，超期自动清理（默认 90 天）")
     message_retention_days = Column(Integer, default=0, comment="消息保留天数（0=永久保留）")
 
+    # 每日数据库备份（管理员开关 + 保留份数，超出自动清除）
+    daily_backup_enabled = Column(Boolean, default=False, comment="每日自动备份开关（管理员控制，默认关）")
+    daily_backup_keep = Column(Integer, default=7, comment="备份保留份数，超出自动清除（默认 7）")
+
     last_cleanup_stats = Column(JSONB, nullable=True, comment="上次清理统计：{cleaned_files, cleaned_refs, orphan_cleaned, run_at}")
 
     updated_by = Column(Integer, ForeignKey("users.id"))

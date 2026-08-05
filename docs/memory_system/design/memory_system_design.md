@@ -405,3 +405,35 @@ flowchart TB
 | POST | `/memory/records` | 管理结构记录 |
 | GET | `/memory/index/{agent_id}` | 获取记忆索引 |
 | DELETE | `/memory/cleanup/{agent_id}` | 清理过期记忆 |
+
+---
+
+## 十二、注意点（2026-08-04 实战结论）
+
+### 12.1 工具 ≠ Skill：区别在决策权
+
+把 `store_memory` / `recall_memory` 包一层就叫 MemorySkill **是误解**：
+
+| 维度 | 工具（Tool） | 自治 Skill |
+|------|-------------|-----------|
+| 触发 | 被动，等 LLM 在对话中调用 | 主动，事件到达自己决定 |
+| 决策者 | LLM | `should_act`（自身规则/状态） |
+| 闭环 | 单点执行 | 感知 → 决策 → 执行 |
+| 状态 | 无 | State Skill 可维护 |
+
+**教训**：曾实现过一个"MemorySkill"（订阅消息事件 + 信号词硬规则 + 调 auto_store_memory），
+但 recall 仍是工具形态——只是把 store 的触发权从 LLM 挪到规则，工具与 Skill 并存，
+**没有形成真正自治的记忆单元，不构成质变**（已删除，2026-08-04）。
+
+真正的 MemorySkill 化标准：**记忆的存取都成为 AI 自身能力**，不依赖 LLM 召唤。
+
+### 12.2 记忆归属：群聊消息也是外部感知（设计决策）
+
+**决策**：AI 记忆应统一记在 AI 自己名下（scope=private），
+群聊消息与私信消息一样属于 AI 的外部感知，**不应区分"群共享/私信私有"**。
+
+现状差异（待统一）：
+- 平台现有 `store_memory` 工具：群聊存 scope='group'（群共享，群内任何 AI 可回忆），私信存 scope='private'
+- 目标：统一为 AI 私有（owner=agent, scope='private'），群共享模式需重新评估
+
+影响面：`auto_store_memory` 的 scope 逻辑、`recall_relevant_memories` 的检索范围（群聊回忆时的 group 过滤）。

@@ -7,10 +7,12 @@ from datetime import datetime, timedelta
 from typing import Optional
 
 from fastapi import APIRouter, Depends, HTTPException
+from pydantic import BaseModel
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.chat import chat_api
 from app.database import get_db
+from app.utils.auth import get_current_user
 from app.schemas.group import (
     SetDndRequest,
     GroupResponse,
@@ -152,3 +154,78 @@ async def get_friend_list(
         return {"friends": friends}
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
+
+
+# ═══════════════════════════════════════════════════════════════
+# 统一入口别名 — 设计文档 chat_service_design.md 10.1
+# （转发到现有 /groups/*、/friends/* 实现，保持单一路径来源）
+# ═══════════════════════════════════════════════════════════════
+
+class GroupJoinRequest(BaseModel):
+    """加入群请求"""
+    group_id: int
+    member_type: str = "ai"
+    member_id: int
+    role: str = "member"
+
+
+class GroupLeaveRequest(BaseModel):
+    """离开群请求"""
+    group_id: int
+    member_type: str = "ai"
+    member_id: int
+
+
+class FriendRequestSend(BaseModel):
+    """发送好友请求"""
+    target_type: str
+    target_id: int
+    message: str | None = None
+
+
+@router.post("/group/join")
+async def chat_group_join(req: GroupJoinRequest, db: AsyncSession = Depends(get_db)):
+    """加入群（统一入口）"""
+    try:
+        result = await chat_api.add_member(
+            db, req.group_id, req.member_type, req.member_id, role=req.role
+        )
+        return result
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.post("/group/leave")
+async def chat_group_leave(req: GroupLeaveRequest, db: AsyncSession = Depends(get_db)):
+    """离开群（统一入口）"""
+    try:
+        await chat_api.remove_member(
+            db, req.group_id, req.member_id, req.member_type, req.member_id
+        )
+        return {"success": True}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.post("/friend/request")
+async def chat_friend_request(
+    req: FriendRequestSend,
+    current_user: dict = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """发送好友请求（统一入口）"""
+    from app.services.social.friend_service import send_friend_request
+
+    try:
+        result = await send_friend_request(
+            db,
+            requester_id=current_user["user_id"],
+            target_type=req.target_type,
+            target_id=req.target_id,
+            message=req.message,
+        )
+        return result
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))

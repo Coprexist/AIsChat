@@ -1,11 +1,4 @@
 import { memo, useState, useMemo } from 'react'
-import Markdown from 'react-markdown'
-import remarkGfm from 'remark-gfm'
-import remarkMath from 'remark-math'
-import remarkBreaks from 'remark-breaks'
-import rehypeKatex from 'rehype-katex'
-import rehypeRaw from 'rehype-raw'
-import rehypeSanitize, { defaultSchema } from 'rehype-sanitize'
 import { useAuth } from '../context/AuthContext'
 import { FileIcon, Download, Globe, ShieldAlert, Reply } from 'lucide-react'
 import { formatMessageTime } from '../utils/time'
@@ -15,7 +8,6 @@ import { getChatStyle, chatStyleClasses } from '../utils/providers.tsx'
 import { scrollToInContainer } from '../utils/scroll'
 import { useLang, useT } from '../i18n/I18nContext'
 import { api } from '../api/client'
-import CodeRenderer from './shared/CodeRenderer'
 import FilePreviewModal from './FilePreviewModal'
 import InvitationCard from './InvitationCard'
 import { useTimeTick } from '../hooks/useTimeTick'
@@ -82,13 +74,8 @@ function fileIconColor(mimeType: string): string {
   return 'text-primary-400'
 }
 
-// 将行内代码重定向到独立组件，避免和代码块共用同一个 code 组件
-import { visit } from 'unist-util-visit'
-function remarkInlineCode() {
-  return (tree) => { visit(tree, 'inlineCode', (node) => {
-    node.data = { hName: 'inlinecode' }
-  }) }
-}
+// 共享 Markdown 渲染（GFM/公式/代码高亮/彩色文字），见 shared/MarkdownContent
+import MarkdownContent from './shared/MarkdownContent'
 
 const MessageBubble = memo(function MessageBubble({
   senderName, senderAvatarUrl, content, isMine, createdAt, state,
@@ -242,51 +229,7 @@ const MessageBubble = memo(function MessageBubble({
           ) : isTyping ? (
             <BouncingDots className="text-primary-400 align-middle" />
           ) : (
-            <Markdown
-              children={content
-                .replace(/<span\s+class=['"]text-red['"][^>]*>([\s\S]*?)<\/span>/gi, '<span style="color:rgb(' + (isMine ? '255 100 100' : '220 50 50') + ')">$1</span>')
-                .replace(/<span\s+class=['"]text-orange['"][^>]*>([\s\S]*?)<\/span>/gi, '<span style="color:rgb(' + (isMine ? '255 180 50' : '220 130 0') + ')">$1</span>')
-                .replace(/<span\s+class=['"]text-gold['"][^>]*>([\s\S]*?)<\/span>/gi, '<span style="color:rgb(' + (isMine ? '255 215 0' : '180 140 0') + ')">$1</span>')
-                .replace(/<span\s+class=['"]text-green['"][^>]*>([\s\S]*?)<\/span>/gi, '<span style="color:rgb(' + (isMine ? '80 220 120' : '20 150 60') + ')">$1</span>')
-                .replace(/<span\s+class=['"]text-blue['"][^>]*>([\s\S]*?)<\/span>/gi, '<span style="color:rgb(' + (isMine ? '100 150 255' : '50 100 220') + ')">$1</span>')
-                .replace(/<span\s+class=['"]text-purple['"][^>]*>([\s\S]*?)<\/span>/gi, '<span style="color:rgb(' + (isMine ? '180 130 255' : '130 80 200') + ')">$1</span>')
-                .replace(/<span\s+class=['"]text-pink['"][^>]*>([\s\S]*?)<\/span>/gi, '<span style="color:rgb(' + (isMine ? '255 130 200' : '220 80 150') + ')">$1</span>')
-                .replace(/<span\s+class=['"]text-gray['"][^>]*>([\s\S]*?)<\/span>/gi, '<span style="color:rgb(' + (isMine ? '180 180 180' : '100 100 100') + ')">$1</span>')
-                .replace(/\[red\]([\s\S]*?)\[\/red\]/g, '<span style="color:rgb(' + (isMine ? '255 100 100' : '220 50 50') + ')">$1</span>')
-                .replace(/\[orange\]([\s\S]*?)\[\/orange\]/g, '<span style="color:rgb(' + (isMine ? '255 180 50' : '220 130 0') + ')">$1</span>')
-                .replace(/\[gold\]([\s\S]*?)\[\/gold\]/g, '<span style="color:rgb(' + (isMine ? '255 215 0' : '180 140 0') + ')">$1</span>')
-                .replace(/\[green\]([\s\S]*?)\[\/green\]/g, '<span style="color:rgb(' + (isMine ? '80 220 120' : '20 150 60') + ')">$1</span>')
-                .replace(/\[blue\]([\s\S]*?)\[\/blue\]/g, '<span style="color:rgb(' + (isMine ? '100 150 255' : '50 100 220') + ')">$1</span>')
-                .replace(/\[purple\]([\s\S]*?)\[\/purple\]/g, '<span style="color:rgb(' + (isMine ? '180 130 255' : '130 80 200') + ')">$1</span>')
-                .replace(/\[pink\]([\s\S]*?)\[\/pink\]/g, '<span style="color:rgb(' + (isMine ? '255 130 200' : '220 80 150') + ')">$1</span>')
-                .replace(/\[gray\]([\s\S]*?)\[\/gray\]/g, '<span style="color:rgb(' + (isMine ? '180 180 180' : '100 100 100') + ')">$1</span>')
-                .replace(/\\\[([\s\S]*?)\\\]/g, '$$$$$1$$$$')
-                .replace(/\\\(([\s\S]*?)\\\)/g, '$$$1$$')}
-              remarkPlugins={[remarkGfm, remarkMath, remarkBreaks,
-                // 标记行内代码，让 CodeRenderer 能区分 inline vs block
-                remarkInlineCode]}
-              rehypePlugins={[rehypeRaw, [rehypeSanitize, {
-                ...defaultSchema,
-                tagNames: [...(defaultSchema.tagNames || []), 'inlinecode'],
-                attributes: {
-                  ...defaultSchema.attributes,
-                  a: [...(defaultSchema.attributes?.a || ['href']), 'class', 'target', 'rel'],
-                  code: [...(defaultSchema.attributes?.code || []), 'class'],
-                  span: [...(defaultSchema.attributes?.span || []), 'style'],
-                  img: [...(defaultSchema.attributes?.img || ['src', 'alt']), 'class'],
-                  div: [...(defaultSchema.attributes?.div || []), 'class'],
-                },
-              }], rehypeKatex]}
-              components={{
-                code: CodeRenderer,
-                inlinecode: ({ children }) => (
-                  <code className="bg-black/5 dark:bg-white/10 rounded px-1 py-0.5 text-[0.85em] inline-block max-w-full break-words">{children}</code>
-                ),
-                table: ({ node, ...props }) => <div className="markdown-table-wrapper"><table {...props} /></div>,
-                th: ({ node, ...props }) => <th {...props} />,
-                td: ({ node, ...props }) => <td {...props} />,
-              }}
-            />
+            <MarkdownContent content={content} isMine={isMine} />
           )}
           {fileAtts.length > 0 && (
             <div className={`${content ? 'mt-2 pt-2 border-t' : ''} flex flex-wrap gap-1.5 ${isMine ? 'border-white/20' : 'border-border'}`}>

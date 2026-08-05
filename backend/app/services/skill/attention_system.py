@@ -87,5 +87,29 @@ class AttentionSystem:
             ))
         await db.flush()
 
+    async def get_attention(self, db: AsyncSession, agent_id: int, group_id: int | None = None) -> list[dict]:
+        """获取注意力设置列表（group_id 缺省时返回该 AI 全部）"""
+        from app.models.agent_attention import AgentAttention
+        from sqlalchemy import select
+
+        query = select(AgentAttention).where(AgentAttention.agent_id == agent_id)
+        if group_id is not None:
+            query = query.where(AgentAttention.group_id == group_id)
+        result = await db.execute(query)
+        rows = result.scalars().all()
+        return [
+            {
+                "agent_id": r.agent_id,
+                "group_id": r.group_id,
+                "interested_topics": r.interested_topics or [],
+                "interested_users": r.interested_users or [],
+                "interested_patterns": r.interested_patterns or [],
+                "ignored_topics": r.ignored_topics or [],
+                "ignored_patterns": r.ignored_patterns or [],
+                "match_action": r.match_action,
+            }
+            for r in rows
+        ]
+
 
 attention_system = AttentionSystem()

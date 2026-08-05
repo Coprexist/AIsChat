@@ -82,6 +82,8 @@ async def get_settings(db: AsyncSession) -> dict:
         "audit_user_actions": getattr(row, "audit_user_actions", False) or False,
         "audit_log_retention_days": getattr(row, "audit_log_retention_days", 90) or 90,
         "message_retention_days": getattr(row, "message_retention_days", 0) or 0,
+        "daily_backup_enabled": bool(getattr(row, "daily_backup_enabled", False)),
+        "daily_backup_keep": getattr(row, "daily_backup_keep", 7) or 7,
     }
 
 
@@ -96,6 +98,8 @@ async def update_settings(
     audit_user_actions: bool | None = None,
     audit_log_retention_days: int | None = None,
     message_retention_days: int | None = None,
+    daily_backup_enabled: bool | None = None,
+    daily_backup_keep: int | None = None,
     updated_by: int | None = None,
 ) -> dict:
     """
@@ -185,6 +189,14 @@ async def update_settings(
     if message_retention_days is not None:
         row.message_retention_days = message_retention_days
         logger.info(f"  消息保留天数: {message_retention_days}（0=永久）")
+
+    if daily_backup_enabled is not None:
+        row.daily_backup_enabled = daily_backup_enabled
+        logger.info(f"  每日备份: {'开启' if daily_backup_enabled else '关闭'}")
+
+    if daily_backup_keep is not None:
+        row.daily_backup_keep = daily_backup_keep
+        logger.info(f"  备份保留份数: {daily_backup_keep}")
 
     if updated_by is not None:
         row.updated_by = updated_by

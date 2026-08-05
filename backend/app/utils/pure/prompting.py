@@ -22,6 +22,52 @@ def resolve_model(agent, default_model: str = "deepseek-v4-flash") -> str:
 
 
 # ═══════════════════════════════════════════════════════════════
+# 人格锚点
+# ═══════════════════════════════════════════════════════════════
+
+def format_personality_anchor(anchor: dict, language: str = "zh") -> str:
+    """
+    人格锚点格式化（纯函数）。
+
+    锚点是 AI 的核心身份（只读，不可被 Skill 修改），按一致性系数缩放注入量：
+      - 1.0：完整锚点（身份 + 人格 + 核心价值观）
+      - 0.7：标准（身份 + 人格）
+      - 0.3：极简（仅名字 + 身份第一行）
+    """
+    name = anchor.get("name") or ""
+    identity = (anchor.get("identity") or "").strip()
+    personality = (anchor.get("personality") or "").strip()
+    core_values = anchor.get("core_values") or []
+    coefficient = float(anchor.get("consistency_coefficient", 0.7) or 0.7)
+
+    if not identity and not personality:
+        return ""
+
+    if language == "en":
+        header = f"[Personality Anchor] {name}" if name else "[Personality Anchor]"
+    else:
+        header = f"【人格锚点】{name}" if name else "【人格锚点】"
+
+    if coefficient >= 0.9:
+        blocks = [identity]
+        if personality:
+            blocks.append(personality)
+        if core_values:
+            values = "、".join(str(v) for v in core_values)
+            blocks.append(("核心价值观：" + values) if language != "en" else ("Core values: " + values))
+        return f"{header}\n" + "\n\n".join(b for b in blocks if b)
+
+    if coefficient <= 0.4:
+        first_line = identity.splitlines()[0] if identity else identity
+        return f"{header}\n{first_line}"
+
+    blocks = [identity]
+    if personality:
+        blocks.append(personality)
+    return f"{header}\n" + "\n\n".join(b for b in blocks if b)
+
+
+# ═══════════════════════════════════════════════════════════════
 # 个性段
 # ═══════════════════════════════════════════════════════════════
 

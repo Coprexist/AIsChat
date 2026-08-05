@@ -6,6 +6,8 @@ import asyncio
 import os
 import tempfile
 import logging
+from datetime import datetime
+from pathlib import Path
 from app.config import settings
 
 logger = logging.getLogger(__name__)
@@ -298,3 +300,53 @@ async def restore_full_backup(tar_bytes: bytes) -> dict:
     except Exception as e:
         logger.error(f"完整备份恢复失败: {e}", exc_info=True)
         raise RuntimeError(f"恢复失败: {str(e)}")
+
+
+# ═══════════════════════════════════════════════════════════════
+# 每日自动备份（管理员开关 + 保留份数，超出自动清除）
+# ═══════════════════════════════════════════════════════════════
+
+BACKUP_DIR = Path(settings.data_dir) / "backups"
+
+
+def _ensure_backup_dir() -> Path:
+    BACKUP_DIR.mkdir(parents=True, exist_ok=True)
+    return BACKUP_DIR
+
+
+def list_backup_files() -> list[Path]:
+    """列出本机备份文件（按时间倒序）"""
+    if not BACKUP_DIR.exists():
+        return []
+    return sorted(BACKUP_DIR.glob("aischat_*.sql.gz"), reverse=True)
+
+
+async def save_backup(sql_bytes: bytes) -> str:
+    """将备份落盘（gzip 压缩），返回文件名。"""
+    _ensure_backup_dir()
+    filename = f"aischat_{datetime.now().strftime('%Y%m%d_%H%M%S_%f')}.sql.gz"
+    path = BACKUP_DIR / filename
+    # 流式压缩写入，避免大备份占内存
+    import gzip
+    with gzip.open(path, "wb") as f:
+        f.write(sql_bytes)
+    logger.info(f"💾 备份已落盘: {path} ({len(sql_bytes)} bytes)")
+    return filename
+
+
+def prune_backups(keep: int) -> int:
+    """保留最近 keep 份，删除更早的备份。返回删除数量。"""
+    if keep < 1:
+        keep = 1
+    files = list_backup_files()
+    if len(files) <= keep:
+        return 0
+    deleted = 0
+    for old in files[keep:]:  # 已按时间倒序，末尾 = 最旧
+        try:
+            old.unlink()
+            deleted += 1
+            logger.info(f"🗑️ 清理过期备份: {old.name}")
+        except OSError as e:
+            logger.warning(f"  ⚠️ 清理备份失败 {old.name}: {e}")
+    return deleted

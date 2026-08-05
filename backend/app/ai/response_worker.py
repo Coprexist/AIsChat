@@ -117,6 +117,9 @@ async def _process_event(db, event: dict):
     if event_type == "alarm":
         await _process_alarm_event(db, event)
         return
+    if event_type == "trigger":
+        await _process_trigger_event(db, event)
+        return
 
     conversation_type = event.get("conversation_type", "group")
 
@@ -124,6 +127,31 @@ async def _process_event(db, event: dict):
         await _process_dm_event(db, event)
     else:
         await _process_group_event(db, event)
+
+
+async def _process_trigger_event(db, event: dict):
+    """处理触发器事件：唤醒 AI 执行预设任务（与闹钟同机制）"""
+    agent_id = event["agent_id"]
+    trigger_id = event["trigger_id"]
+    task = event["task"]
+
+    from app.models.agent import Agent as AgentModel
+    from app.ai.alarm import _process_alarm_event
+
+    agent_result = await db.execute(select(AgentModel).where(AgentModel.id == agent_id))
+    agent = agent_result.scalar_one_or_none()
+    if agent is None:
+        logger.warning(f"⏰ 触发器 #{trigger_id}: agent {agent_id} 不存在")
+        return
+
+    logger.info(f"⏰ 触发器 #{trigger_id}: AI {agent.name}({agent_id}) 执行任务 — 「{task[:60]}」")
+
+    # 复用闹钟的唤醒执行链路（decide_action → LLM 工具循环）
+    await _process_alarm_event(db, {
+        "agent_id": agent_id,
+        "alarm_id": trigger_id,
+        "task": task,
+    })
 
 
 # ============================================================
@@ -177,6 +205,19 @@ async def _process_dm_event(db, event: dict):
         logger.info(f"DM {session_id} 对话链深度 {chain_depth} > 10，停止")
         return
 
+    # 技能层：发布 message_received 事件（自治 Skill 感知）
+    asyncio.create_task(_publish_skill_event({
+        "type": "message_received",
+        "data": {
+            "conversation_type": "dm",
+            "session_id": session_id,
+            "content": content,
+            "sender_type": "human",
+            "sender_id": sender_id,
+            "message_id": message_id,
+        },
+    }))
+
     # 简化的 DM 回复触发（不需要群聊那样的 DND/意愿检查）
     await _trigger_dm_ai_reply(
         db, agent, session_id, content, message_id,
@@ -184,6 +225,15 @@ async def _process_dm_event(db, event: dict):
         sender_id=sender_id,
         force_own_key=force_own_key,
     )
+
+
+async def _publish_skill_event(event: dict) -> None:
+    """发布事件到 Skill 事件总线（技能层感知入口，失败不影响消息链路）"""
+    try:
+        from app.services.brain.skill_event_bus import skill_event_bus
+        await skill_event_bus.publish(event)
+    except Exception as e:
+        logger.warning(f"技能事件发布失败（非致命）: {e}")
 
 
 # ============================================================
@@ -317,6 +367,19 @@ async def _process_group_event(db, event: dict):
                     chat_chain_manager.release_claim(aid, group_id)
 
         asyncio.create_task(_trigger_one(ai_id, sem))
+
+    # 技能层：发布 message_received 事件（自治 Skill 感知，fire-and-forget）
+    asyncio.create_task(_publish_skill_event({
+        "type": "message_received",
+        "data": {
+            "conversation_type": "group",
+            "group_id": group_id,
+            "content": content,
+            "sender_type": sender_type,
+            "sender_id": sender_id,
+            "message_id": message_id,
+        },
+    }))
 
 
 # ============================================================

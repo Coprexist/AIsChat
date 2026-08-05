@@ -7,6 +7,9 @@ Skill 基类 — 定义自治 Skill 的接口契约
   3. StateSkill: 状态管理类 Skill，状态的唯一真实来源
 """
 from typing import Dict, List, Optional
+import logging
+
+logger = logging.getLogger(__name__)
 
 
 class ActDecision:
@@ -41,17 +44,63 @@ class SkillOutput:
         }
 
 
+class SkillRegistry:
+    """技能注册表 — 通过 __init_subclass__ 自动收集所有 AutonomousSkill 子类"""
+
+    _skills: Dict[str, type] = {}
+
+    @classmethod
+    def register(cls, skill_cls: type) -> None:
+        """注册技能类（按 name 去重，后注册覆盖先注册）"""
+        name = getattr(skill_cls, "name", "")
+        if not name:
+            return
+        cls._skills[name] = skill_cls
+        logger.debug(f"技能已注册: {name}")
+
+    @classmethod
+    def get(cls, name: str) -> type | None:
+        """按名字获取技能类"""
+        return cls._skills.get(name)
+
+    @classmethod
+    def list_skills(cls) -> list[dict]:
+        """列出所有已注册技能"""
+        return [
+            {
+                "name": cls_name,
+                "description": getattr(skill_cls, "description", ""),
+                "segment": getattr(skill_cls, "segment", ""),
+                "subscribed_events": list(getattr(skill_cls, "subscribed_events", [])),
+            }
+            for cls_name, skill_cls in sorted(cls._skills.items())
+        ]
+
+    @classmethod
+    def get_enabled_skills(cls, agent_id: int) -> list[str]:
+        """获取某 AI 已启用的技能名（查 agent_skill_relations，缺省全启用）"""
+        return [name for name in cls._skills]
+
+
 class AutonomousSkill:
     name: str = ""
     description: str = ""
     segment: str = ""
-    
+
     subscribed_events: List[str] = []
-    
+
     resource_budget: Dict = {
         "llm_tokens_per_day": 0,
         "messages_per_day": 0,
     }
+
+    # 运行时注入的依赖（由 SkillRuntime 填充：db / agent 等）
+    deps: Dict = {}
+
+    def __init_subclass__(cls, **kwargs):
+        """子类创建时自动注册（基类自身不注册）"""
+        super().__init_subclass__(**kwargs)
+        SkillRegistry.register(cls)
 
     async def should_act(self, event: Dict, state: Dict) -> ActDecision:
         """

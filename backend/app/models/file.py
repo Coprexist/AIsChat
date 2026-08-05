@@ -3,7 +3,7 @@
 """
 from sqlalchemy import (
     Column, Integer, String, BigInteger, DateTime, ForeignKey, func, CheckConstraint,
-    UniqueConstraint,
+    UniqueConstraint, Index,
 )
 from sqlalchemy.dialects.postgresql import JSONB
 from app.database import Base
@@ -35,6 +35,8 @@ class FileMetadata(Base):
             "collaboration_mode IN ('solo', 'shared', 'open')",
             name="ck_file_collaboration_mode",
         ),
+        # 与线上库对齐：owner 检索索引（历史迁移创建，模型补声明）
+        Index("idx_file_metadata_owner", "owner_type", "owner_id"),
     )
 
 

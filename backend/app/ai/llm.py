@@ -456,6 +456,29 @@ async def _get_segment_order(db) -> list[str]:
     return list(SEGMENT_ORDER)
 
 
+async def _inject_personality_anchor(db, agent, system_prompt: str, language: str = "zh") -> str:
+    """
+    人格锚点注入 — 设计文档 6.2：只读、始终在最前面、随一致性系数缩放。
+
+    锚点存在于 personality_anchors 表时注入，不存在则原样返回。
+    注入发生在所有段落拼接之后、工作区/状态栈追加之前，保证锚点位于最前。
+    """
+    try:
+        from app.services.brain.brain_controller import brain_controller
+        from app.utils.pure.prompting import format_personality_anchor
+
+        anchor = await brain_controller.get_personality_anchor(db, agent.id)
+        if not anchor:
+            return system_prompt
+        anchor_text = format_personality_anchor(anchor, language)
+        if not anchor_text:
+            return system_prompt
+        return f"{anchor_text}\n\n{system_prompt}"
+    except Exception as e:
+        logger.warning(f"人格锚点注入失败（非致命）: {e}")
+        return system_prompt
+
+
 # _build_personality ——已迁移到 utils/pure/prompting.py，导入为 build_personality_segment
 
 
@@ -957,6 +980,9 @@ async def build_messages(
     order = context_config_parser.parse_segment_order(context_config)
     system_prompt = assemble_system_prompt(segments, order)
 
+    # ✨ 人格锚点注入（只读，始终在最前面 — 设计文档 6.2）
+    system_prompt = await _inject_personality_anchor(db, agent, system_prompt, language)
+
     # ✨ 工作区任务（配置驱动）
     if context_config_parser.should_inject_workspace(context_config):
         try:
@@ -1200,6 +1226,9 @@ async def build_dm_messages(
 
     order = await _get_segment_order(db)
     system_prompt = assemble_system_prompt(segments, order)
+
+    # ✨ 人格锚点注入（只读，始终在最前面 — 设计文档 6.2）
+    system_prompt = await _inject_personality_anchor(db, agent, system_prompt, language)
 
     # ✨ 工作区任务
     try:

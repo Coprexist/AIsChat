@@ -11,6 +11,7 @@ export type TranslationDict = Record<string, string | Record<string, unknown>>
 const zh: TranslationDict = {
   // ======================== 导航 / Navigation ========================
   'nav.chat': '聊天',
+  'nav.worlds': '群视界',
   'nav.friends': '好友',
   'nav.ai': 'AI',
   'nav.me': '我的',
@@ -1811,6 +1812,7 @@ const zh: TranslationDict = {
 const en: TranslationDict = {
   // ======================== Navigation ========================
   'nav.chat': 'Chat',
+  'nav.worlds': 'Worlds',
   'nav.friends': 'Friends',
   'nav.ai': 'AI',
   'nav.me': 'Me',
@@ -3569,6 +3571,7 @@ const en: TranslationDict = {
 const ja: TranslationDict = {
   // ======================== ナビゲーション / Navigation ========================
   'nav.chat': 'チャット',
+  'nav.worlds': 'ワールド',
   'nav.friends': 'フレンド',
   'nav.ai': 'AI',
   'nav.me': 'マイ',

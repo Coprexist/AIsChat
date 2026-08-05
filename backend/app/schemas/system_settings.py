@@ -19,6 +19,8 @@ class SystemSettingsResponse(BaseModel):
     geoip_provider_url: str | None = None
     audit_user_actions: bool = False
     audit_log_retention_days: int = 90
+    daily_backup_enabled: bool = False
+    daily_backup_keep: int = 7
 
 
 class UpdateSystemSettingsRequest(BaseModel):
@@ -32,6 +34,8 @@ class UpdateSystemSettingsRequest(BaseModel):
     audit_user_actions: bool | None = Field(None, description="是否记录用户行为日志（登录、发消息等）")
     audit_log_retention_days: int | None = Field(None, ge=7, le=730, description="审计日志保留天数（7-730）")
     message_retention_days: int | None = Field(None, ge=0, le=3650, description="消息保留天数（0=永久保留）")
+    daily_backup_enabled: bool | None = Field(None, description="每日自动备份开关（默认关）")
+    daily_backup_keep: int | None = Field(None, ge=1, le=365, description="备份保留份数，超出自动清除（1-365）")
 
 
 class SetupCompleteRequest(BaseModel):
