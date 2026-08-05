@@ -15,7 +15,7 @@ from collections import deque
 from datetime import datetime, timezone
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Request
-from fastapi.responses import FileResponse, HTMLResponse, RedirectResponse, StreamingResponse
+from fastapi.responses import FileResponse, HTMLResponse, RedirectResponse, Response, StreamingResponse
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -597,6 +597,7 @@ def _inject_world_vars(html: str, world_id: int, creator_name: str, group_id: in
 async def serve_world_file(
     world_id: int,
     path: str,
+    request: Request,
     group_id: int | None = Query(default=None, description="入口群聊编号"),
     db: AsyncSession = Depends(get_db),
 ):
@@ -628,8 +629,13 @@ async def serve_world_file(
                 pass
         html = target.read_text(encoding="utf-8", errors="replace")
         return HTMLResponse(_inject_world_vars(html, world_id, creator_name, group_id, world_name))
-    # 世界代码频繁变化：禁缓存，避免用户看到旧版（2026-08-05 珑哥反馈刷新没效果）
-    return FileResponse(target, media_type=mime, headers={"Cache-Control": "no-cache"})
+    # 世界代码频繁变化：ETag 条件缓存——更新后自动拿新版（免强刷），
+    # 未更新时浏览器 304 走缓存（不重复下载）（2026-08-05 珑哥）
+    etag = f'"{target.stat().st_mtime_ns:x}-{target.stat().st_size:x}"'
+    headers = {"ETag": etag}
+    if request.headers.get("If-None-Match") == etag:
+        return Response(status_code=304)
+    return FileResponse(target, media_type=mime, headers=headers)
 
 
 @router.get("/{world_id}/preview")
