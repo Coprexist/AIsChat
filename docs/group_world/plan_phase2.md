@@ -1,7 +1,7 @@
 # 群视界阶段 2 规划：世界代码运行沙箱
 
-> 状态：规划稿｜更新：2026-08-05（compact 接力文档）
-> 前置阅读：`implementation.md`（阶段 1 现状）、`design/group_world_design.md`（总设计）、`api/world_api_docs.md`（接口）
+> 状态：**2.1-2.5 全部完成**（2026-08-05：沙箱/触发/受控API/群聊写/常驻+SSE）｜更新：2026-08-05
+> 前置阅读：`implementation.md`（实现现状与踩坑）、`design/group_world_design.md`（总设计）、`api/world_api_docs.md`（接口）
 > 红线：**py 沙箱不解决，阶段 2 一切免谈**（世界代码 = 任意代码执行）
 
 ---

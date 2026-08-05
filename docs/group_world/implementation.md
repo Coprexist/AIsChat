@@ -1,7 +1,7 @@
 # 群视界（Group World）实现文档
 
-> 状态：阶段 1 完成（MVP 闭环）｜更新：2026-08-05
-> 定位：**实现现状与架构**（设计见 `design/group_world_design.md`，接口见 `api/world_api_docs.md`）
+> 状态：阶段 2 核心完成（2.1-2.5：沙箱/触发/受控API/群聊写/常驻+SSE）｜更新：2026-08-05
+> 定位：**实现现状与架构**（设计见 `design/group_world_design.md`，接口见 `api/world_api_docs.md`，决策与踩坑见 §十二）
 
 ---
 
@@ -204,21 +204,96 @@ window.WorldUI = {              // UI 桥（postMessage → 宿主 Layout）
 
 ---
 
+## 十二、阶段 2 架构决策与踩坑记录（2026-08-05）
+
+> 格式：每个决策含「实现要点 / 这么做的原因 / 提示」——原因回答“为什么这样”，提示是给后来人的注意事项。
+
+### 12.1 沙箱配额：为什么默认 64MB、硬下限 32MB
+
+- **实现要点**：后台/无人配额 `sleep_memory_mb` 默认 64MB，`policy_for_world` 对后台内存做 `max(32, min(v, 512))` 钳制；有人在线 `runtime_memory_mb` 默认 128MB（16-2048 可配）。
+- **这么做的原因**：RLIMIT_AS 是**虚拟内存**口径，`python -I` 解释器启动 + 标准库 import（importlib/asyncio 等）实测就需 **≥32MB**。初始默认 24MB 导致后台触发**从未真正跑通过**——解释器连 import 都失败（exit 非 0），而 2.2 的 6 项测试全过是因为全走前台 128MB 路径，掩盖了问题。24→48→64 是逐步实测校准的结果。
+- **提示**：① 配额低于 32MB 无意义（解释器起不来）；② 虚拟内存 ≠ 常驻内存，64MB 配额下世界代码实际可用堆约 30-40MB；③ 调整配额后先跑一次最小脚本验证（`print("ok")` 都失败就是配额问题）。
+
+### 12.2 沙箱为什么用 `python -I -X utf8`
+
+- **实现要点**：所有沙箱执行（临时/触发/常驻）统一 `[python, "-I", "-X", "utf8", 目标文件]`。
+- **这么做的原因**：`-I` 隔离模式隐含 `-E`（忽略全部 PYTHON* 环境变量），所以 `PYTHONIOENCODING=utf-8` 无效；而 stdout 是 pipe 时 Python 用 locale 编码，世界代码 `print("中文")` 直接 `UnicodeEncodeError: ascii`。`-X utf8` 强制 UTF-8 mode，一行解决。
+- **提示**：沙箱内**不要**用 `-E` 之外的 PYTHON* 环境变量方案；世界代码侧中文 query 参数必须 `urllib.parse.quote`（urllib 只接受 ascii URL，见 09 分区文档）。
+
+### 12.3 受控 API：为什么 token 存 worlds.config 而非新列
+
+- **实现要点**：每世界一个 API token，懒生成存 `worlds.config.api_token`；`update_world` 的 config 是 merge（`{**旧, **新}`），不会被用户改配置覆盖；沙箱 env 注入 `WORLD_API_TOKEN` / `WORLD_API_BASE`。
+- **这么做的原因**：零迁移（config 是 JSONB 不用改表）；token 只对本世界数据有效，不是后端密钥（env 白名单原则不破坏：不泄漏 DATABASE_URL/JWT）。
+- **提示**：受控 API 端点用 `secrets.compare_digest` 常量时间比较；token 经 `POST /run`、`/trigger`、常驻 start 时 ensure 生成（**常驻 start 前必须 ensure**，否则 env 无 WORLD_API_BASE，世界代码顶层 `os.environ["WORLD_API_BASE"]` 直接 KeyError 崩溃）。
+
+### 12.4 动态限流：为什么“基础 + 每人加成 × 活跃人数”
+
+- **实现要点**：10 秒窗口，`实际 = 基础 + 每人加成 × 活跃人数`；4 个 config 字段可配（读 120+60/人，写 20+10/人）；活跃 = 最近 10 分钟对话/开设计页的不同用户（worlds.py 端点 `record_world_activity` 埋点）。
+- **这么做的原因**（珑哥定）：固定配额对“群里人多”和“没人”的世界不公平——人越多世界代码被调用越频，配额应随之放大；写操作（发群消息/管理）比读更敏感，独立更严的配额。
+- **提示**：世界代码死循环打爆代理的最后防线是限流 + 沙箱超时双层；429 响应体带当前配额值方便世界代码自适应退避。
+
+### 12.5 群消息钩子：为什么 `source="world"` 不触发
+
+- **实现要点**：`create_message` 加 `source` 参数（默认 `"user"`）；世界程序/世界 AI 发消息传 `source="world"` → 钩子跳过；同世界 2 秒窗口内消息合并成一条 event（`group_trigger_interval` 可配，0=每条）。
+- **这么做的原因**：防**自触发死循环**（世界程序 handle 里发群消息 → 又触发自己 → 无限递归）；节流合并是防群消息爆发把沙箱跑死，同时不丢信息（合并进 `event.messages` 数组）。
+- **提示**：event 的 messages 带 `sender_name`（批量查 User 一次）；世界入口缺失/异常时静默跳过，不影响群聊主流程；钩子触发不改世界 status（沉睡世界也可感知，唤醒保持手动）。
+
+### 12.6 唤醒为什么改手动模式
+
+- **实现要点**：`world_scheduler.AUTO_MANAGE = False`——调度器不再自动休眠（active 超时→sleeping）/自动唤醒，状态只由手动 `wake`/`sleep` 端点控制；保留开关可恢复。
+- **这么做的原因**（珑哥）：手动唤醒后 10 分钟无活动又被自动转回休眠，“唤醒了不应该就继续了吗”——自动休眠机制与“手动唤醒=长期活跃”语义冲突。对话仍会唤醒（`apply_time_compensation`，人主动互动）。
+- **提示**：世界时间靠唤醒时离线补偿（`world_time += 真实差 × 流速`），不依赖调度器；常驻世界（resident）的推演时间由世界代码自己管理。
+
+### 12.7 全局并发排队：queued_ms 与 duration_ms 的区别
+
+- **实现要点**：`asyncio.Semaphore`（`SANDBOX_MAX_CONCURRENT` 默认 4，1-32）包住全部沙箱执行；返回值含 `queued_ms`（排队等待）与 `duration_ms`（执行）两个字段。
+- **这么做的原因**（珑哥拍板“各用各的解释器 + 排队”）：共享解释器（多群一进程）隔离是硬伤（一个世界死循环卡死全部、全局变量互踩），放弃；排队的是**短任务**不是人——在线不占位，只有执行中的几秒占槽位。
+- **提示**：`duration_ms` 只统计信号量内执行耗时——首次测试三个任务都 3000ms 是误判（第三个实际排了 3 秒，只是没统计）；看总耗时用 `queued_ms + duration_ms`。
+
+### 12.8 常驻进程：为什么 harness 放 /tmp 且不删除
+
+- **实现要点**：常驻 harness（`/tmp/resident_{id}.py`）由 `python -I -X utf8` 运行，世界目录经 env `WORLD_DIR` 注入；harness 写完**不 unlink**。
+- **这么做的原因**：踩了两个坑——① harness 写世界目录后在 finally 删除，与子进程 exec 存在**竞争**（exec 时文件已删 → exit 2）；② 世界目录内写 harness 同样有该问题，且污染世界文件。放 /tmp 不删（下次启动覆盖写），子进程启动瞬间文件必然存在。
+- **提示**：进程生命周期——wake 启动、sleep 发 `{"type":"stop"}` 优雅停止（超时 5s killpg）、后端重启 `restore_all` 恢复；常驻进程 stdout 全部转发后端日志（`🌐 世界 #N 常驻: ...`），崩溃排查先看这个。
+
+### 12.9 状态推送为什么选 SSE 不选 WS
+
+- **实现要点**：世界代码 `POST /world/{id}/api/state` 发布状态（受控 API 鉴权+写限流+100KB）→ 后端内存快照 + 广播 + 落 state.json；页面 `EventSource GET /world/{id}/events` 订阅（连接即发快照，15s 心跳，慢消费者只留最新）。
+- **这么做的原因**（珑哥：界面要及时，但别为延迟写一大坨）：页面只“收”状态、不“发”（发走受控 API/HTTP），SSE 单向正好；EventSource 内置断线自动重连，比 WS 少一半连接管理代码；主程序已有 SSE 先例（世界对话流 chat/stream）。
+- **提示**：SSE 端点公开（与静态资源同理），只推世界自身发布的状态，不含敏感数据；慢消费者用 `Queue(maxsize=1)` 覆盖式投递保证永远最新；状态同时落 `state.json`（刷新/调试可查，世界代码也可自己读）。
+
+### 12.10 开发期验证限制（前端）
+
+- **实现要点**：前端验证靠宿主 vite HMR + 人工复查 + 括号配平粗检。
+- **这么做的原因**：沙盒内 `node_modules` 残缺，`npx tsc` 是占位符（输出“This is not the tsc command you are looking for”）——之前多次“tsc 通过”是误报。
+- **提示**：前端改动后让宿主 HMR 生效再确认；后端 Python 验证用 `PYTHONPYCACHEPREFIX=/tmp python3 -m py_compile`（沙盒 __pycache__ 无写权限）。
+
+### 12.11 迁移是动态执行的
+
+- **实现要点**：后端启动自动 `alembic upgrade head` + uvicorn `--reload` → 迁移文件写好几分钟内**自动应用**，不等手动跑。
+- **这么做的原因**（珑哥拍板保留自动）：迁移本身正确就不必关，其他人改了能马上用；防护放在生成端。
+- **提示**：生成后立即人工审，只留目标改动；模型改了先注册 `app/models/__init__.py`（未注册会被 autogenerate 当成“该删的表”）；验证 `docker compose exec backend alembic current`。
+
+---
+
 ## 附：模块清单
 
 ```
 backend/app/
 ├── models/world.py              # worlds / world_bindings / world_agents / world_ais / world_chat_messages
 ├── routers/worlds.py            # 世界 CRUD/绑定/唤醒/creator 配置/对话/文件（owner 校验）
-├── routers/world_proxy.py       # /world/{id}/files/* + /preview（307）+ 变量/WorldUI 注入 + 受控 API（2.3/2.4：token 鉴权/动态限流/数据与群聊代理）
+├── routers/world_proxy.py       # /world/{id}/files/* + /preview（307）+ 变量/WorldUI 注入 + 受控 API（2.3/2.4/2.5：token 鉴权/动态限流/数据与群聊代理/state 发布）+ SSE events
 ├── services/world/
 │   ├── world_service.py         # CRUD/绑定/唤醒/懒通知/世界 AI 实体（再导出拆分模块）
 │   ├── world_chat_service.py    # 世界档案/历史/凭证/流式对话/多轮工具/收尾/工作流记忆/请求日志
 │   ├── world_tools.py           # 工具定义 + 执行 + 温和去重（5min 窗口）+ 摘要
 │   ├── world_turn.py            # 轮次 worker（队列 + 直播广播 pub/sub）
-│   ├── world_scheduler.py       # 懒加载调度（休眠/唤醒/时间补偿）
+│   ├── world_scheduler.py       # 懒加载调度（手动模式 AUTO_MANAGE=False）
 │   ├── world_blocks.py          # 积木注册表（查/看/应用）
-│   └── world_file_service.py    # 世界文件隔离读写（安全）
+│   ├── world_file_service.py    # 世界文件隔离读写（安全）
+│   ├── world_sandbox.py         # py 沙箱（rlimit+超时强杀+全局并发排队+env 白名单）
+│   ├── world_event_hook.py      # 群消息钩子（节流合并→常驻/临时触发）
+│   └── world_resident.py        # 常驻进程管理（handle/on_tick/on_stop + stdin 行协议）
 ├── utils/pure/file_edit.py      # 增量编辑核心（主站 file_edit 与世界共用）
 frontend/src/
 ├── pages/WorldsPage.tsx / WorldDesignPage.tsx / WorldViewPage.tsx
