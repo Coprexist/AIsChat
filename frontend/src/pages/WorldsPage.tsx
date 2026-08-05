@@ -3,7 +3,7 @@
  */
 import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { ArrowRight } from 'lucide-react'
+import { ChevronRight } from 'lucide-react'
 import { api } from '../api/client'
 
 interface World {
@@ -145,7 +145,7 @@ export default function WorldsPage() {
                 onClick={() => navigate(`/worlds/${w.id}/design`)}
                 className="text-xs px-3 py-1.5 bg-primary-500 text-white rounded hover:bg-primary-400"
               >
-                设计页 <ArrowRight size={13} className="inline" />
+                设计页 <ChevronRight size={13} className="inline" />
               </button>
             </div>
           </div>

@@ -6,7 +6,7 @@
  */
 import { useEffect, useState, useCallback, useRef, useMemo } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
-import { ArrowLeft, ArrowRight, Folder, FolderOpen, FileText, FileCode, FileJson, FileImage, FileAudio, FileVideo, File, Trash2 } from 'lucide-react'
+import { ChevronLeft, ChevronRight, Folder, FolderOpen, FileText, FileCode, FileJson, FileImage, FileAudio, FileVideo, File, Trash2 } from 'lucide-react'
 import { api } from '../api/client'
 import MarkdownContent from '../components/shared/MarkdownContent'
 import CodeRenderer from '../components/shared/CodeRenderer'
@@ -532,7 +532,7 @@ export default function WorldDesignPage() {
         {/* 顶部工具栏 */}
         <div className="flex items-center gap-3 px-4 py-2 bg-surface border-b border-border">
           <button onClick={() => navigate('/worlds')} className="inline-flex items-center gap-1 text-sm text-textMuted hover:text-textPrimary transition-colors">
-            <ArrowLeft size={14} />
+            <ChevronLeft size={14} />
             世界列表
           </button>
           <span className="font-semibold">{world.name}</span>
