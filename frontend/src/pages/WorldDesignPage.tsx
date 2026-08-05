@@ -6,7 +6,7 @@
  */
 import { useEffect, useState, useCallback, useRef, useMemo } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
-import { ChevronLeft, ChevronRight, ChevronDown, Folder, FolderOpen, FileText, FileCode, FileJson, FileImage, FileAudio, FileVideo, File, Trash2, Upload, Plus, Pencil, Eye } from 'lucide-react'
+import { ChevronLeft, ChevronRight, ChevronDown, Folder, FolderOpen, FileText, FileCode, FileJson, FileImage, FileAudio, FileVideo, File, Trash2, Upload, Plus, Pencil, Eye, Brain } from 'lucide-react'
 import { api } from '../api/client'
 import MarkdownContent from '../components/shared/MarkdownContent'
 import CodeRenderer from '../components/shared/CodeRenderer'
@@ -782,7 +782,8 @@ export default function WorldDesignPage() {
                 <details className="group/details mb-1.5">
                   <summary className="flex items-center gap-1 text-[10px] text-textMuted cursor-pointer select-none hover:text-textSecondary list-none [&::-webkit-details-marker]:hidden">
                     <ChevronRight size={11} className="transition-transform group-open/details:rotate-90" />
-                    🤔 思考过程
+                    <Brain size={11} className="text-textMuted" />
+                    思考过程
                   </summary>
                   <div className="text-xs text-textMuted mt-1 whitespace-pre-wrap bg-elevated/70 rounded p-2">{m.reasoning}</div>
                 </details>
