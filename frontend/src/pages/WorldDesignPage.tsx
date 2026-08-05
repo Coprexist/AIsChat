@@ -6,7 +6,7 @@
  */
 import { useEffect, useState, useCallback, useRef, useMemo } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
-import { ChevronLeft, ChevronRight, Folder, FolderOpen, FileText, FileCode, FileJson, FileImage, FileAudio, FileVideo, File, Trash2 } from 'lucide-react'
+import { ChevronLeft, ChevronRight, ChevronDown, Folder, FolderOpen, FileText, FileCode, FileJson, FileImage, FileAudio, FileVideo, File, Trash2, Upload, Plus, Pencil, Eye } from 'lucide-react'
 import { api } from '../api/client'
 import MarkdownContent from '../components/shared/MarkdownContent'
 import CodeRenderer from '../components/shared/CodeRenderer'
@@ -289,7 +289,7 @@ export default function WorldDesignPage() {
               className="flex items-center gap-1 w-full text-left text-xs py-1 pr-2 rounded transition-colors hover:bg-elevated text-textSecondary"
               title={n.path}
             >
-              <span className="text-[10px] w-3 shrink-0">{collapsedDirs.has(n.path) ? '▶' : '▼'}</span>
+              <ChevronRight size={12} className={`shrink-0 transition-transform ${collapsedDirs.has(n.path) ? '' : 'rotate-90'}`} />
               {collapsedDirs.has(n.path) ? <Folder size={13} className="text-textMuted shrink-0" /> : <FolderOpen size={13} className="text-primary-400 shrink-0" />}
               <span className="truncate">{n.name}</span>
             </button>
@@ -553,8 +553,14 @@ export default function WorldDesignPage() {
             <div className="flex items-center justify-between mb-2 px-1">
               <span className="text-xs font-medium text-textSecondary">文件</span>
               <span className="flex items-center gap-2">
-                <button onClick={() => fileInputRef.current?.click()} className="text-xs text-primary-400 hover:text-primary-300 transition-colors" title="上传文件（先选位置）">⬆️ 上传</button>
-                <button onClick={createFile} className="text-xs text-primary-400 hover:text-primary-300 transition-colors" title="新建文件">+ 新建</button>
+                <button onClick={() => fileInputRef.current?.click()} className="inline-flex items-center gap-0.5 text-xs text-primary-400 hover:text-primary-300 transition-colors" title="上传文件（先选位置）">
+                  <Upload size={12} />
+                  上传
+                </button>
+                <button onClick={createFile} className="inline-flex items-center gap-0.5 text-xs text-primary-400 hover:text-primary-300 transition-colors" title="新建文件">
+                  <Plus size={12} />
+                  新建
+                </button>
               </span>
             </div>
             <input ref={fileInputRef} type="file" className="hidden" onChange={handleUploadPick} />
@@ -577,7 +583,13 @@ export default function WorldDesignPage() {
                           className="text-primary-400 hover:text-primary-300 transition-colors"
                           title={viewMode === 'render' ? '切到原文/编辑' : '切到渲染视图'}
                         >
-                          {viewMode === 'render' ? (isMdFile ? '📄 查看原文' : '✏️ 编辑') : '✨ 渲染'}
+                          {viewMode === 'render' ? (isMdFile ? (
+                            <span className="inline-flex items-center gap-0.5"><FileText size={12} /> 查看原文</span>
+                          ) : (
+                            <span className="inline-flex items-center gap-0.5"><Pencil size={12} /> 编辑</span>
+                          )) : (
+                            <span className="inline-flex items-center gap-0.5"><Eye size={12} /> 渲染</span>
+                          )}
                         </button>
                       )}
                       {viewMode !== 'render' && (
