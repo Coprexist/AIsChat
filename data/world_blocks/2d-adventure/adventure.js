@@ -16,8 +16,7 @@
     tileSize: 48,        // 瓦片像素
     cols: 16,
     rows: 12,
-    moveSpeed: 115,      // 像素/秒（珑哥反馈 170 太快）
-    walkFps: 6,          // 走路动画帧率
+    stepDuration: 0.16,  // 走一格耗时（秒）——按一下只移动一格（珑哥 2026-08-05）
     saveKeyPrefix: 'world-adventure-v1-',
   };
 
@@ -68,13 +67,13 @@
   /* ── 游戏状态 ── */
   var state = {
     player: { x: 7, y: 6, dir: 'down', moving: false, frame: 0, walkTimer: 0 },
+    step: null,          // 走格动画 {fromX, fromY, toX, toY, t}
     coins: 0,
     dialog: null,        // { name, lines[], index, text, charIdx, timer }
     banner: null,        // { text, timer }
     hint: null,          // 可交互对象（'npc' | 'chest' | 'portal'）
   };
 
-  var keys = { up: false, down: false, left: false, right: false };
   var canvas, ctx, lastTime = 0;
 
   /* ── 世界变量 ── */
@@ -112,35 +111,24 @@
     ArrowRight: 'right', KeyD: 'right',
   };
 
-  function setKey(code, on) {
-    var d = DIR_KEYMAP[code];
-    if (d) { keys[d] = on; return true; }
-    return false;
-  }
-
   function onKeyDown(e) {
     // 命令输入框聚焦时：不触发游戏按键（E/WASD 留给打字）
     if (e.target && e.target.tagName === 'INPUT') return;
     if (e.repeat) return;
-    if (setKey(e.code, true)) { e.preventDefault(); return; }
+    var d = DIR_KEYMAP[e.code];
+    if (d) { e.preventDefault(); startStep(d); return; }
     if (e.code === 'KeyE' || e.code === 'Space') { e.preventDefault(); interact(); }
   }
 
-  function onKeyUp(e) { setKey(e.code, false); }
+  function onKeyUp() { /* 按一下走一格：松开无需处理 */ }
 
   function bindTouchKeys() {
     document.querySelectorAll('.tk').forEach(function (btn) {
       var dir = btn.dataset.dir;
       var act = btn.dataset.act;
-      var set = function (on) {
-        return function (e) { e.preventDefault(); if (dir) keys[dir] = on; };
-      };
-      btn.addEventListener('touchstart', set(true), { passive: false });
-      btn.addEventListener('touchend', set(false), { passive: false });
-      btn.addEventListener('touchcancel', set(false), { passive: false });
-      btn.addEventListener('mousedown', set(true));
-      btn.addEventListener('mouseup', set(false));
-      btn.addEventListener('mouseleave', set(false));
+      var tap = function (e) { e.preventDefault(); if (dir) startStep(dir); };
+      btn.addEventListener('touchstart', tap, { passive: false });
+      btn.addEventListener('mousedown', tap);
       if (act) btn.addEventListener('click', interact);
     });
   }
@@ -516,52 +504,53 @@
    * 更新（移动 + 碰撞）
    * ════════════════════════════════════════════════════════════ */
 
-  function moveAxis(axis, delta) {
-    var p = state.player;
-    var sign = delta > 0 ? 1 : -1;
-    var step = Math.min(Math.abs(delta), CONFIG.tileSize / 2);
-    var next = (axis === 'x' ? p.x : p.y) + sign * step;
-
-    // 角色占 1 格（p 为左上角，中心 = p + 0.5）；探测移动方向前沿所在的格
-    var probeC = axis === 'x'
-      ? (sign > 0 ? Math.floor(next + 1 - 0.02) : Math.floor(next + 0.02))
-      : Math.floor(p.x + 0.5);
-    var probeR = axis === 'y'
-      ? (sign > 0 ? Math.floor(next + 1 - 0.02) : Math.floor(next + 0.02))
-      : Math.floor(p.y + 0.5);
-
-    if (isWalkable(probeC, probeR)) {
-      if (axis === 'x') p.x = next; else p.y = next;
-    }
-  }
-
   function playerGrid() {
     return { c: Math.round(state.player.x + 0.5), r: Math.round(state.player.y + 0.5) };
   }
 
+  /* ── 走格移动（按一下走一格，平滑滑步） ── */
+
+  var DIR_OFFSET = {
+    up: { dx: 0, dy: -1 }, down: { dx: 0, dy: 1 },
+    left: { dx: -1, dy: 0 }, right: { dx: 1, dy: 0 },
+  };
+
+  function startStep(dir) {
+    var p = state.player;
+    if (state.step || state.dialog || state.banner) return;
+    var g = playerGrid();
+    var off = DIR_OFFSET[dir];
+    var toC = g.c + off.dx, toR = g.r + off.dy;
+    if (!isWalkable(toC, toR)) { p.dir = dir; return; }  // 撞墙：转个方向但不走
+    p.dir = dir;
+    state.step = { fromX: p.x, fromY: p.y, toX: toC, toY: toR, t: 0 };
+  }
+
   function update(dt) {
     var p = state.player;
-    var dx = (keys.right ? 1 : 0) - (keys.left ? 1 : 0);
-    var dy = (keys.down ? 1 : 0) - (keys.up ? 1 : 0);
-    p.moving = dx !== 0 || dy !== 0;
 
-    if (state.dialog || state.banner) { p.moving = false; }
-
-    if (p.moving) {
-      p.dir = dx !== 0 ? (dx > 0 ? 'right' : 'left') : (dy > 0 ? 'down' : 'up');
-      var dist = CONFIG.moveSpeed * dt;
-      if (dx !== 0) moveAxis('x', dx * dist);
-      if (dy !== 0) moveAxis('y', dy * dist);
-      // 走路动画
+    // 走格动画推进
+    if (state.step) {
+      var s = state.step;
+      s.t = Math.min(s.t + dt / CONFIG.stepDuration, 1);
+      p.x = s.fromX + (s.toX - s.fromX) * s.t;
+      p.y = s.fromY + (s.toY - s.fromY) * s.t;
+      p.moving = true;
       p.walkTimer += dt;
-      if (p.walkTimer > 1 / CONFIG.walkFps) { p.walkTimer = 0; p.frame = 1 - p.frame; }
-      save(); // 移动即存档（死亡/关闭不丢进度）
-    }
-
-    // 传送门触发：角色中心踩到传送门格
-    var g = playerGrid();
-    if (g.c === PORTAL.x && g.r === PORTAL.y && !state.banner && !state.dialog) {
-      interact();
+      if (p.walkTimer > 1 / 6) { p.walkTimer = 0; p.frame = 1 - p.frame; }
+      if (s.t >= 1) {
+        p.x = s.toX; p.y = s.toY;
+        state.step = null;
+        p.moving = false;
+        save();  // 落格后存档
+        // 传送门触发：角色中心踩到传送门格
+        var g = playerGrid();
+        if (g.c === PORTAL.x && g.r === PORTAL.y && !state.banner && !state.dialog) {
+          interact();
+        }
+      }
+    } else {
+      p.moving = false;
     }
 
     // 交互提示
