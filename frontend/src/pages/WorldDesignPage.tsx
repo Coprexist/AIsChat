@@ -6,11 +6,24 @@
  */
 import { useEffect, useState, useCallback, useRef, useMemo } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
+import { ArrowLeft, ArrowRight, Folder, FolderOpen, FileText, FileCode, FileJson, FileImage, FileAudio, FileVideo, File, Trash2 } from 'lucide-react'
 import { api } from '../api/client'
 import MarkdownContent from '../components/shared/MarkdownContent'
 import CodeRenderer from '../components/shared/CodeRenderer'
 import { getCodeLang, isMarkdownFile } from '../utils/mime'
 import { useResizableSidebar } from '../hooks/useResizableSidebar'
+
+// 文件类型图标（与主界面风格一致）
+function fileTypeIcon(name: string) {
+  const ext = name.split('.').pop()?.toLowerCase() ?? ''
+  if (['png', 'jpg', 'jpeg', 'gif', 'webp', 'svg', 'ico', 'bmp'].includes(ext)) return <FileImage size={13} className="text-mint-400 shrink-0" />
+  if (['mp3', 'wav', 'ogg'].includes(ext)) return <FileAudio size={13} className="text-primary-400 shrink-0" />
+  if (['mp4', 'webm'].includes(ext)) return <FileVideo size={13} className="text-rose-400 shrink-0" />
+  if (['json'].includes(ext)) return <FileJson size={13} className="text-amber-400 shrink-0" />
+  if (['md', 'txt'].includes(ext)) return <FileText size={13} className="text-textSecondary shrink-0" />
+  if (['html', 'htm', 'css', 'js', 'ts', 'jsx', 'tsx', 'py', 'xml', 'yaml', 'yml', 'sh'].includes(ext)) return <FileCode size={13} className="text-primary-400 shrink-0" />
+  return <File size={13} className="text-textMuted shrink-0" />
+}
 
 // ── 打字机效果：文本逐字显示（参考大同互动逐 token 渲染，简化版） ──
 
@@ -276,7 +289,7 @@ export default function WorldDesignPage() {
               title={n.path}
             >
               <span className="text-[10px] w-3 shrink-0">{collapsedDirs.has(n.path) ? '▶' : '▼'}</span>
-              <span className="shrink-0">📁</span>
+              {collapsedDirs.has(n.path) ? <Folder size={13} className="text-textMuted shrink-0" /> : <FolderOpen size={13} className="text-primary-400 shrink-0" />}
               <span className="truncate">{n.name}</span>
             </button>
             {!collapsedDirs.has(n.path) && renderTree(n.children, depth + 1)}
@@ -289,15 +302,15 @@ export default function WorldDesignPage() {
               className={`flex items-center gap-1 flex-1 min-w-0 text-left text-xs py-1 pr-1 rounded truncate transition-colors ${currentFile === n.path ? 'bg-primary-500/20 text-primary-300' : 'hover:bg-elevated text-textSecondary'}`}
               title={n.path}
             >
-              <span className="shrink-0">📄</span>
+              <span className="shrink-0">{fileTypeIcon(n.name)}</span>
               <span className="truncate">{n.name}</span>
             </button>
             <button
               onClick={(ev) => { ev.stopPropagation(); deleteFile(n.path) }}
-              className="hidden group-hover:block shrink-0 px-1 py-1 text-textMuted hover:text-rose-400 transition-colors"
+              className="hidden group-hover:flex shrink-0 items-center justify-center w-6 h-6 text-textMuted hover:text-rose-400 transition-colors"
               title="删除此文件"
             >
-              🗑
+              <Trash2 size={13} />
             </button>
           </div>
         )}
@@ -518,7 +531,10 @@ export default function WorldDesignPage() {
       <div className="flex-1 flex flex-col min-w-0 border-r border-border">
         {/* 顶部工具栏 */}
         <div className="flex items-center gap-3 px-4 py-2 bg-surface border-b border-border">
-          <button onClick={() => navigate('/worlds')} className="text-sm text-textMuted hover:text-textPrimary transition-colors">← 世界列表</button>
+          <button onClick={() => navigate('/worlds')} className="inline-flex items-center gap-1 text-sm text-textMuted hover:text-textPrimary transition-colors">
+            <ArrowLeft size={14} />
+            世界列表
+          </button>
           <span className="font-semibold">{world.name}</span>
           <span className={`text-xs px-2 py-0.5 rounded-full ${world.status === 'active' ? 'bg-green-500/20 text-green-400' : 'bg-elevated text-textMuted'}`}>
             {world.status === 'active' ? '活跃' : '休眠'}
