@@ -152,6 +152,38 @@ WORLD_TOOLS = [
             },
         },
     },
+    # ── 上网（复用主系统同一份实现：web_search/web_fetch，无 opencli 依赖）──
+    {
+        "type": "function",
+        "function": {
+            "name": "web_search",
+            "description": "搜索引擎：通过 Bing 搜索网络上的最新信息，返回标题、链接和摘要。使用场景：搜索新闻、查找资料、获取实时信息、验证事实。与 web_fetch 配合使用：先用 web_search 找链接，再用 web_fetch 看具体内容。",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "query": {"type": "string", "description": "搜索关键词，支持中文"},
+                    "count": {"type": "integer", "description": "返回结果数量（1-10，默认 5）"},
+                },
+                "required": ["query"],
+            },
+        },
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "web_fetch",
+            "description": "上网查资料：获取指定 URL 的网页内容（纯文本）。比 browser 命令更轻量快速，适合获取网页正文、API 响应、文档等。不支持需要 JavaScript 渲染的页面（如 SPA 应用）。页面加载慢/内容延迟出现时，可设置 delay_ms 先等待再抓取。",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "url": {"type": "string", "description": "要访问的完整 URL（含 https://）"},
+                    "selector": {"type": "string", "description": "可选：只提取指定标签的内容（如 'article'、'div'、'p'）。注意：只支持 HTML 标签名，不支持 CSS 类/ID 选择器"},
+                    "delay_ms": {"type": "integer", "description": "可选：发起请求前先等待的毫秒数（0-30000，默认 0）。目标网页加载慢/内容延迟出现时设置，给服务器和页面数据生成留出时间"},
+                },
+                "required": ["url"],
+            },
+        },
+    },
     # ── 记忆（世界专属表 world_ai_memories，工具名与主站统一）──
     {
         "type": "function",
@@ -346,6 +378,14 @@ def _tool_result_summary(name: str, result: dict) -> str:
                 return "🧠 没找到相关记忆"
             return f"🧠 检索到 {len(mems)} 条记忆：" + "、".join(m.get('title', '') for m in mems[:5])
         return f"记忆检索失败：{result.get('error', '未知错误')}"
+    if name == "web_search":
+        if ok:
+            return f"🔍 搜索结果 {result.get('count', 0)} 条：" + "、".join(r.get('title', '')[:20] for r in (result.get('results') or [])[:5])
+        return f"搜索失败：{result.get('error', '未知错误')}"
+    if name == "web_fetch":
+        if ok:
+            return f"🌐 已获取 {result.get('url', '')[:60]}"
+        return f"抓取失败：{result.get('error', '未知错误')}"
     if name == "get_bound_groups":
         if ok:
             groups = result.get("groups") or []
@@ -710,6 +750,24 @@ async def _do_execute(db: AsyncSession, world, name: str, arguments: str) -> dic
                     for m in rows if q in (m.title or "").lower() or q in (m.content or "").lower()
                 ][:top_k]
             return {"success": True, "query": query, "memories": memories}
+        except (ValueError, TypeError, json.JSONDecodeError) as e:
+            return {"success": False, "error": str(e)}
+
+    if name == "web_search":
+        # 复用主系统同一份实现（同一份代码，无 opencli 依赖）
+        try:
+            args = json.loads(arguments or "{}")
+            from app.tools.file_operations.web_search import WebSearch
+            return await WebSearch().execute(db, 0, None, args, {})
+        except (ValueError, TypeError, json.JSONDecodeError) as e:
+            return {"success": False, "error": str(e)}
+
+    if name == "web_fetch":
+        # 复用主系统同一份实现（含 delay_ms 延迟抓取）
+        try:
+            args = json.loads(arguments or "{}")
+            from app.tools.file_operations.web_fetch import WebFetch
+            return await WebFetch().execute(db, 0, None, args, {})
         except (ValueError, TypeError, json.JSONDecodeError) as e:
             return {"success": False, "error": str(e)}
 

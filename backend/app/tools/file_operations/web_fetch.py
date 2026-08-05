@@ -1,6 +1,7 @@
 """
 web_fetch 工具 — AI 通过 HTTP 请求获取网页内容（轻量，不依赖 Chromium）
 """
+import asyncio
 import re
 import logging
 import httpx
@@ -23,6 +24,7 @@ class WebFetch(ToolPlugin):
         "上网查资料：获取指定 URL 的网页内容（纯文本）。"
         "比 browser 命令更轻量快速，适合获取网页正文、API 响应、文档等。"
         "不支持需要 JavaScript 渲染的页面（如 SPA 应用）。"
+        "页面加载慢/内容延迟出现时，可设置 delay_ms 先等待再抓取。"
     )
     segment = "file_operations"
     parameters = {
@@ -35,10 +37,15 @@ class WebFetch(ToolPlugin):
             "description": "可选：只提取指定标签的内容（如 'article'、'div'、'p'）。注意：只支持 HTML 标签名，不支持 CSS 类/ID 选择器",
             "nullable": True,
         },
+        "delay_ms": {
+            "type": "integer",
+            "description": "可选：发起请求前先等待的毫秒数（0-30000，默认 0）。目标网页加载慢/内容延迟出现时设置，给服务器和页面数据生成留出时间",
+            "nullable": True,
+        },
     }
     required = ["url"]
     states = ["active", "dnd"]
-    admin_description = "AI 通过 HTTP 获取网页内容，无需 Chromium 浏览器。无法渲染 JavaScript 页面。"
+    admin_description = "AI 通过 HTTP 获取网页内容，无需 Chromium 浏览器。无法渲染 JavaScript 页面。支持 delay_ms 等待后再抓取。"
     trigger_condition = "AI 需要查阅网络资料时"
 
     async def execute(self, db: AsyncSession, agent_id: int, group_id: int | None,
@@ -47,6 +54,13 @@ class WebFetch(ToolPlugin):
 
         url = arguments["url"].strip()
         selector = arguments.get("selector", "").strip() or None
+        # AI 可设定延迟：等待指定毫秒后再发起请求（慢速/动态加载页面用）
+        try:
+            delay_ms = min(max(int(arguments.get("delay_ms") or 0), 0), 30000)
+        except (TypeError, ValueError):
+            delay_ms = 0
+        if delay_ms > 0:
+            await asyncio.sleep(delay_ms / 1000)
 
         # 基本 URL 校验
         if not url.startswith(("http://", "https://")):

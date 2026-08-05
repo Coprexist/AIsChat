@@ -75,6 +75,7 @@ GET /worlds/{id}/chat/stream?turn_id= ──订阅直播（30s 心跳；断开�
 | `view_api_doc` | **接口文档分区查看（2026-08-05）**：工具描述只列区名+区介绍，AI 按需传区号（01~08）取详细 API（读 `data/world_api_docs/sections/`，注册表白名单防穿越） |
 | `store_memory` / `recall_memory` | **世界 AI 长期记忆（2.6）**：store 存 title+content（向量化失败降级无向量）；recall 语义检索（embedding <=> 余弦距离）→ 失败文本包含回退；世界按 world_id 隔离 |
 | `get_bound_groups` / `get_group_messages` / `list_group_members` / `send_group_message` / `set_group_member_role` / `kick_group_member` | **群聊 API（以世界创建者身份）**：默认作用本世界绑定群，无需传群号；管理操作仅群主/管理员（§十一） |
+| `web_search` / `web_fetch` | **上网（2026-08-05）**：**复用主系统同一份实现**（WebSearch/WebFetch 类，无 opencli 依赖）；web_fetch 支持 `delay_ms` 延迟抓取（AI 可设定等待后再取，应对慢速/动态加载页面） |
 
 **温和去重**（`_execute_world_tool` 包装）：
 - 同工具同参数、**5 分钟内**重复且**结果完全一致** → 提示「⏭ 已跳过…」不硬拦
