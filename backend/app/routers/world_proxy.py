@@ -8,9 +8,12 @@
 """
 import json
 import logging
+import secrets
+import time
+from collections import deque
 from datetime import datetime, timezone
 
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import APIRouter, Depends, HTTPException, Query, Request
 from fastapi.responses import FileResponse, HTMLResponse, RedirectResponse
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -21,6 +24,400 @@ from app.utils.auth import get_current_user
 logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/world", tags=["群视界入口"])
+
+
+# ═══════════════════════════════════════════════════════════════
+# 2.3 受控数据 API + 2.4 群聊写 API — 世界代码经代理访问世界数据/对话/群聊
+#
+#   读：
+#     GET    /world/{id}/api/world      世界信息（不含敏感配置）
+#     GET    /world/{id}/api/chat       对话历史（复用世界 AI 会话）
+#     GET    /world/{id}/api/memories   记忆检索（向量 → 文本回退）
+#     POST   /world/{id}/api/memories   存记忆
+#     GET    /world/{id}/api/usage      LLM 用量与缓存命中率
+#     GET    /world/{id}/api/groups     绑定群列表
+#     GET    /world/{id}/api/group/messages   读群消息（仅绑定群）
+#     GET    /world/{id}/api/group/members    群成员列表（仅绑定群）
+#   写（身份=世界自身；作用域=仅本世界绑定群；独立写限流）：
+#     POST   /world/{id}/api/group/messages   发群消息
+#     POST   /world/{id}/api/group/roles      改成员角色（群主/管理员）
+#     POST   /world/{id}/api/group/kick       移出成员（群主/管理员）
+#
+# 鉴权：每个世界一个 API token（懒生成存 worlds.config.api_token，update_world
+# 是 merge 不会被覆盖）。沙箱启动时经 env 注入 WORLD_API_TOKEN / WORLD_API_BASE，
+# 世界代码请求带 `Authorization: Bearer <token>` 或 `X-World-Token: <token>`。
+# token 只对本世界数据有效——不暴露后端真实结构/JWT/密钥。
+# 限流（10 秒窗口，worlds.config 可配，见 09 分区文档）：
+#   读/总配额  = api_rate_limit（默认 120） + api_rate_limit_per_user（默认 60）× 活跃人数
+#   写配额     = api_group_msg_limit（默认 20） + api_group_msg_limit_per_user（默认 10）× 活跃人数
+# 活跃人数 = 最近 10 分钟内在该世界有操作（对话/打开设计页）的不同用户数。
+# ═══════════════════════════════════════════════════════════════
+
+RATE_LIMIT_WINDOW = 10.0        # 秒
+RATE_LIMIT_MAX = 120            # 读/总配额基础值（10 秒）
+RATE_LIMIT_PER_USER = 60        # 每人加成（10 秒）
+GROUP_MSG_LIMIT = 20            # 写操作基础配额（10 秒）
+GROUP_MSG_LIMIT_PER_USER = 10   # 写操作每人加成（10 秒）
+ACTIVE_WINDOW = 600.0           # 活跃判定窗口（10 分钟）
+_rate_buckets: dict[int, deque] = {}
+# 世界活跃用户（world_id → {user_id: 最近活跃时刻}），供动态限流按人数加成
+_ACTIVE_USERS: dict[int, dict[int, float]] = {}
+
+
+def _cfg_int(cfg: dict, key: str, default: int, lo: int, hi: int) -> int:
+    """worlds.config 配额读取（非法值回退默认，钳制在 [lo, hi]）"""
+    try:
+        v = int(cfg.get(key) or default)
+    except (TypeError, ValueError):
+        v = default
+    return max(lo, min(v, hi))
+
+
+def _prune_active(world_id: int, now: float) -> None:
+    users = _ACTIVE_USERS.get(world_id)
+    if not users:
+        return
+    stale = [u for u, ts in users.items() if now - ts > ACTIVE_WINDOW]
+    for u in stale:
+        del users[u]
+
+
+def record_world_activity(world_id: int, user_id: int | None) -> None:
+    """世界活跃埋点：带身份的入口（世界 AI 对话/设计页）调用，供动态限流按人数加成"""
+    if not user_id:
+        return
+    now = time.monotonic()
+    _prune_active(world_id, now)
+    _ACTIVE_USERS.setdefault(world_id, {})[user_id] = now
+
+
+def _active_user_count(world_id: int) -> int:
+    _prune_active(world_id, time.monotonic())
+    return len(_ACTIVE_USERS.get(world_id, {}))
+
+
+def _consume(world_id: int, quota: int, what: str) -> None:
+    """内存滑动窗口限流（世界代码死循环打爆代理的最后防线）"""
+    now = time.monotonic()
+    dq = _rate_buckets.setdefault(world_id, deque())
+    while dq and now - dq[0] > RATE_LIMIT_WINDOW:
+        dq.popleft()
+    if len(dq) >= quota:
+        raise HTTPException(status_code=429, detail=f"请求过于频繁（{what}：{quota} 次/10 秒）")
+    dq.append(now)
+
+
+def _rate_limit(world) -> None:
+    """读/总配额：基础 + 每人加成 × 活跃人数（worlds.config 可配）"""
+    cfg = world.config or {}
+    base = _cfg_int(cfg, "api_rate_limit", RATE_LIMIT_MAX, 10, 10000)
+    per_user = _cfg_int(cfg, "api_rate_limit_per_user", RATE_LIMIT_PER_USER, 0, 1000)
+    _consume(world.id, base + per_user * _active_user_count(world.id), "受控 API 限流")
+
+
+def _rate_limit_write(world) -> None:
+    """写操作（发群消息/管理）独立配额：基础 + 每人加成（worlds.config 可配）"""
+    cfg = world.config or {}
+    base = _cfg_int(cfg, "api_group_msg_limit", GROUP_MSG_LIMIT, 1, 1000)
+    per_user = _cfg_int(cfg, "api_group_msg_limit_per_user", GROUP_MSG_LIMIT_PER_USER, 0, 100)
+    _consume(world.id, base + per_user * _active_user_count(world.id), "群消息写限流")
+
+
+async def ensure_world_api_token(db: AsyncSession, world) -> str:
+    """懒生成世界 API token（存 worlds.config.api_token）。
+
+    调用方负责 commit（沙箱端点进入前调一次，确保 env 注入时 token 已落库）。
+    """
+    cfg = dict(world.config or {})
+    token = cfg.get("api_token")
+    if not token or not isinstance(token, str) or len(token) < 16:
+        token = secrets.token_urlsafe(32)
+        cfg["api_token"] = token
+        world.config = cfg
+    return token
+
+
+async def _authorize_world_api(db: AsyncSession, world_id: int, request: Request):
+    """校验世界 API token（Bearer 或 X-World-Token），返回世界 ORM（未授权抛 401/404）"""
+    from app.models.world import World
+
+    auth = request.headers.get("Authorization", "")
+    token = auth[7:].strip() if auth.startswith("Bearer ") else request.headers.get("X-World-Token", "")
+    if not token:
+        raise HTTPException(status_code=401, detail="缺少世界 API token（沙箱环境变量 WORLD_API_TOKEN）")
+    world = await db.get(World, world_id)
+    if world is None:
+        raise HTTPException(status_code=404, detail="世界不存在")
+    expected = (world.config or {}).get("api_token")
+    if not expected or not secrets.compare_digest(str(expected), token):
+        raise HTTPException(status_code=401, detail="世界 API token 无效")
+    _rate_limit(world)
+    return world
+
+
+@router.get("/{world_id}/api/world")
+async def world_api_info(
+    world_id: int,
+    request: Request,
+    db: AsyncSession = Depends(get_db),
+):
+    """受控 API：世界信息（不含 api_token 等敏感配置）"""
+    world = await _authorize_world_api(db, world_id, request)
+    from app.models.world import WorldBinding
+
+    bindings = (await db.execute(
+        select(WorldBinding).where(WorldBinding.world_id == world_id)
+    )).scalars().all()
+    cfg = world.config or {}
+    return {
+        "id": world.id,
+        "name": world.name,
+        "description": world.description,
+        "status": world.status,
+        "time_flow_rate": world.time_flow_rate,
+        "world_time": world.world_time.isoformat() if world.world_time else None,
+        "last_active_at": world.last_active_at.isoformat() if world.last_active_at else None,
+        "bindings": [{"entity_type": b.entity_type, "entity_id": b.entity_id} for b in bindings],
+        "creator_name": (world.creator_config or {}).get("name") or "群视界机器人",
+        "quota": {k: cfg[k] for k in ("sandbox_timeout_seconds", "cpu_quota", "runtime_memory_mb", "sleep_memory_mb") if k in cfg},
+    }
+
+
+@router.get("/{world_id}/api/chat")
+async def world_api_chat(
+    world_id: int,
+    request: Request,
+    limit: int = Query(default=30, ge=1, le=100),
+    before_id: int | None = Query(default=None, description="翻更早：传最旧消息 id"),
+    db: AsyncSession = Depends(get_db),
+):
+    """受控 API：世界 AI 对话历史（与设计页同一份查询）"""
+    await _authorize_world_api(db, world_id, request)
+    from app.services.world.world_chat_service import get_chat_history
+    return {"messages": await get_chat_history(db, world_id, limit=limit, before_id=before_id)}
+
+
+@router.get("/{world_id}/api/memories")
+async def world_api_recall_memory(
+    world_id: int,
+    request: Request,
+    query: str = Query(..., description="检索关键词"),
+    top_k: int = Query(default=5, ge=1, le=20),
+    db: AsyncSession = Depends(get_db),
+):
+    """受控 API：记忆检索（复用世界 AI 的 recall_memory 同一份逻辑）"""
+    world = await _authorize_world_api(db, world_id, request)
+    from app.services.world.world_tools import _do_execute
+    result = await _do_execute(db, world, "recall_memory", json.dumps({"query": query, "top_k": top_k}))
+    if not result.get("success"):
+        raise HTTPException(status_code=400, detail=result.get("error", "记忆检索失败"))
+    return {"memories": result.get("memories", [])}
+
+
+@router.post("/{world_id}/api/memories")
+async def world_api_store_memory(
+    world_id: int,
+    request: Request,
+    body: dict,
+    db: AsyncSession = Depends(get_db),
+):
+    """受控 API：存记忆（复用世界 AI 的 store_memory 同一份逻辑）"""
+    world = await _authorize_world_api(db, world_id, request)
+    title = str(body.get("title", "")).strip()
+    content = str(body.get("content", "")).strip()
+    if not title or not content:
+        raise HTTPException(status_code=422, detail="title 和 content 不能为空")
+    from app.services.world.world_tools import _do_execute
+    result = await _do_execute(db, world, "store_memory", json.dumps({"title": title, "content": content}))
+    if not result.get("success"):
+        raise HTTPException(status_code=400, detail=result.get("error", "记忆存储失败"))
+    await db.commit()
+    return {"ok": True, "title": title, "embedded": result.get("embedded", False)}
+
+
+@router.get("/{world_id}/api/usage")
+async def world_api_usage(
+    world_id: int,
+    request: Request,
+    db: AsyncSession = Depends(get_db),
+):
+    """受控 API：LLM 用量与缓存命中率（与设计页 /worlds/{id}/usage 同一口径）"""
+    await _authorize_world_api(db, world_id, request)
+    from sqlalchemy import func as _func
+    from app.models.world import WorldLLMUsage
+    row = (await db.execute(
+        select(
+            _func.count(WorldLLMUsage.id),
+            _func.coalesce(_func.sum(WorldLLMUsage.prompt_tokens), 0),
+            _func.coalesce(_func.sum(WorldLLMUsage.completion_tokens), 0),
+            _func.coalesce(_func.sum(WorldLLMUsage.cached_tokens), 0),
+        ).where(WorldLLMUsage.world_id == world_id)
+    )).one()
+    calls, prompt, completion, cached = row
+    hit_rate = round(cached / prompt * 100, 1) if prompt else 0.0
+    return {
+        "world_id": world_id,
+        "total_calls": calls,
+        "prompt_tokens": prompt,
+        "completion_tokens": completion,
+        "cached_tokens": cached,
+        "cache_hit_rate_pct": hit_rate,
+    }
+
+
+# ── 2.4 群聊写 API：身份 = 世界自身（与 AI 工具同身份，底层借世界主人权限并做群角色检查）；
+#    作用域 = 仅本世界绑定群；限流 = 写操作独立配额 ──
+
+async def _check_bound_group(db: AsyncSession, world, group_id: int | None) -> int:
+    """群作用域校验：返回群 id（缺省取绑定第一个群；显式传的必须属于本世界绑定）"""
+    from app.models.world import WorldBinding
+
+    rows = (await db.execute(
+        select(WorldBinding).where(
+            WorldBinding.world_id == world.id,
+            WorldBinding.entity_type == "group",
+        ).order_by(WorldBinding.id)
+    )).scalars().all()
+    bound = [r.entity_id for r in rows]
+    if not bound:
+        raise HTTPException(status_code=403, detail="本世界未绑定任何群聊")
+    if group_id is None:
+        return bound[0]
+    if group_id not in bound:
+        raise HTTPException(status_code=403, detail=f"群 #{group_id} 不在本世界绑定范围（可操作：{bound}）")
+    return group_id
+
+
+def _tool_ok(result: dict, what: str) -> None:
+    """工具结果统一错误提升（复用 world_tools 同一份实现）"""
+    if not result.get("success"):
+        raise HTTPException(status_code=400, detail=result.get("error", what))
+
+
+@router.get("/{world_id}/api/groups")
+async def world_api_groups(
+    world_id: int,
+    request: Request,
+    db: AsyncSession = Depends(get_db),
+):
+    """受控 API：绑定群列表（复用 get_bound_groups 同一份逻辑）"""
+    world = await _authorize_world_api(db, world_id, request)
+    from app.services.world.world_tools import _do_execute
+    result = await _do_execute(db, world, "get_bound_groups", "{}")
+    _tool_ok(result, "查绑定群失败")
+    return {"groups": result.get("groups", [])}
+
+
+@router.get("/{world_id}/api/group/messages")
+async def world_api_group_messages(
+    world_id: int,
+    request: Request,
+    group_id: int | None = Query(default=None, description="群 id（缺省 = 世界绑定的第一个群）"),
+    limit: int = Query(default=20, ge=1, le=50),
+    db: AsyncSession = Depends(get_db),
+):
+    """受控 API：读群消息（仅绑定群；复用 get_group_messages 同一份逻辑）"""
+    world = await _authorize_world_api(db, world_id, request)
+    gid = await _check_bound_group(db, world, group_id)
+    from app.services.world.world_tools import _do_execute
+    result = await _do_execute(db, world, "get_group_messages", json.dumps({"group_id": gid, "limit": limit}))
+    _tool_ok(result, "读群消息失败")
+    return {"group_id": gid, "messages": result.get("messages", [])}
+
+
+@router.get("/{world_id}/api/group/members")
+async def world_api_group_members(
+    world_id: int,
+    request: Request,
+    group_id: int | None = Query(default=None, description="群 id（缺省 = 世界绑定的第一个群）"),
+    db: AsyncSession = Depends(get_db),
+):
+    """受控 API：群成员列表（仅绑定群；复用 list_group_members 同一份逻辑）"""
+    world = await _authorize_world_api(db, world_id, request)
+    gid = await _check_bound_group(db, world, group_id)
+    from app.services.world.world_tools import _do_execute
+    result = await _do_execute(db, world, "list_group_members", json.dumps({"group_id": gid}))
+    _tool_ok(result, "查成员失败")
+    return {"group_id": gid, "members": result.get("members", [])}
+
+
+@router.post("/{world_id}/api/group/messages")
+async def world_api_group_send(
+    world_id: int,
+    request: Request,
+    body: dict,
+    db: AsyncSession = Depends(get_db),
+):
+    """受控 API：发群消息（世界自身身份；仅绑定群；写限流）"""
+    world = await _authorize_world_api(db, world_id, request)
+    try:
+        gid = await _check_bound_group(db, world, body.get("group_id"))
+    except (TypeError, ValueError):
+        raise HTTPException(status_code=422, detail="group_id 不合法")
+    _rate_limit_write(world)
+    content = str(body.get("content", "")).strip()
+    if not content:
+        raise HTTPException(status_code=422, detail="消息内容不能为空")
+    if len(content) > 2000:
+        raise HTTPException(status_code=422, detail="消息内容过长（上限 2000 字）")
+    from app.services.world.world_tools import _do_execute
+    result = await _do_execute(db, world, "send_group_message", json.dumps({"group_id": gid, "content": content}))
+    _tool_ok(result, "发送失败")
+    await db.commit()
+    return {"ok": True, "group_id": gid, "message_id": result.get("message_id")}
+
+
+@router.post("/{world_id}/api/group/roles")
+async def world_api_group_role(
+    world_id: int,
+    request: Request,
+    body: dict,
+    db: AsyncSession = Depends(get_db),
+):
+    """受控 API：改成员角色（群主/管理员；仅绑定群；写限流）"""
+    world = await _authorize_world_api(db, world_id, request)
+    try:
+        gid = await _check_bound_group(db, world, body.get("group_id"))
+        mid = int(body.get("member_id") or 0)
+    except (TypeError, ValueError):
+        raise HTTPException(status_code=422, detail="group_id/member_id 不合法")
+    mtype = str(body.get("member_type") or "")
+    role = str(body.get("role") or "")
+    if mtype not in ("human", "ai") or not mid or role not in ("owner", "admin", "member"):
+        raise HTTPException(status_code=422, detail="参数不合法：member_type(human|ai) / member_id / role(owner|admin|member)")
+    _rate_limit_write(world)
+    from app.services.world.world_tools import _do_execute
+    result = await _do_execute(db, world, "set_group_member_role",
+                               json.dumps({"group_id": gid, "member_type": mtype, "member_id": mid, "role": role}))
+    _tool_ok(result, "改角色失败")
+    await db.commit()
+    return {"ok": True, "group_id": gid, "member_id": mid, "role": role}
+
+
+@router.post("/{world_id}/api/group/kick")
+async def world_api_group_kick(
+    world_id: int,
+    request: Request,
+    body: dict,
+    db: AsyncSession = Depends(get_db),
+):
+    """受控 API：移出成员（群主/管理员；仅绑定群；写限流）"""
+    world = await _authorize_world_api(db, world_id, request)
+    try:
+        gid = await _check_bound_group(db, world, body.get("group_id"))
+        mid = int(body.get("member_id") or 0)
+    except (TypeError, ValueError):
+        raise HTTPException(status_code=422, detail="group_id/member_id 不合法")
+    mtype = str(body.get("member_type") or "")
+    if mtype not in ("human", "ai") or not mid:
+        raise HTTPException(status_code=422, detail="参数不合法：member_type(human|ai) / member_id")
+    _rate_limit_write(world)
+    from app.services.world.world_tools import _do_execute
+    result = await _do_execute(db, world, "kick_group_member",
+                               json.dumps({"group_id": gid, "member_type": mtype, "member_id": mid}))
+    _tool_ok(result, "移出失败")
+    await db.commit()
+    return {"ok": True, "group_id": gid, "member_id": mid}
 
 MIME_TYPES = {
     ".html": "text/html; charset=utf-8",

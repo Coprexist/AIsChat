@@ -99,15 +99,26 @@ def _apply_rlimits(policy: Policy) -> None:
         pass  # 部分系统不可用（如非 root 调整 hard limit），尽力而为
 
 
-def _sanitized_env(world_id: int) -> dict:
-    """env 白名单：不继承后端密钥（DATABASE_URL/JWT_SECRET/API Key 等），只给运行必需项"""
+def _sanitized_env(world) -> dict:
+    """env 白名单：不继承后端密钥（DATABASE_URL/JWT_SECRET/API Key 等），只给运行必需项。
+
+    2.3 受控数据 API：注入 WORLD_API_TOKEN / WORLD_API_BASE（世界代码经代理访问
+    世界数据/对话状态；token 每世界一个、只对本世界数据有效，不是后端密钥）。
+    """
     env = {
         "PATH": os.environ.get("PATH", "/usr/local/bin:/usr/bin:/bin"),
         "LANG": os.environ.get("LANG", "C.UTF-8"),
         "TZ": os.environ.get("TZ", "Asia/Shanghai"),
         "HOME": "/tmp",
-        "WORLD_ID": str(world_id),
+        "WORLD_ID": str(world.id),
     }
+    cfg = world.config or {}
+    token = cfg.get("api_token")
+    if isinstance(token, str) and token:
+        env["WORLD_API_TOKEN"] = token
+        env["WORLD_API_BASE"] = os.environ.get(
+            "WORLD_API_BASE", f"http://127.0.0.1:8000/world/{world.id}/api"
+        )
     return env
 
 
@@ -157,11 +168,11 @@ async def run_world_code(
             return {"success": False, "stdout": "", "stderr": "", "exit_code": -1,
                     "duration_ms": 0, "timed_out": False, "reason": "code 和 entry 至少给一个"}
 
-        cmd = [sys.executable, "-I", str(target)]  # -I：隔离模式（不吃用户 site、忽略 PYTHON* 环境）
+        cmd = [sys.executable, "-I", "-X", "utf8", str(target)]  # -I 隔离（不吃 site/忽略 PYTHON* 环境）；-X utf8 强制 UTF-8（世界代码 print 中文必需）
         proc = await asyncio.create_subprocess_exec(
             *cmd,
             cwd=str(workdir),
-            env=_sanitized_env(world.id),
+            env=_sanitized_env(world),
             stdout=asyncio.subprocess.PIPE,
             stderr=asyncio.subprocess.PIPE,
             start_new_session=True,          # 独立进程组 → 超时可 killpg 连子进程一起杀
@@ -277,11 +288,11 @@ async def run_world_trigger(
     tmp_file = workdir / f".sandbox_trigger_{uuid.uuid4().hex[:8]}.py"
     try:
         tmp_file.write_text(harness, encoding="utf-8")
-        cmd = [sys.executable, "-I", str(tmp_file)]
+        cmd = [sys.executable, "-I", "-X", "utf8", str(tmp_file)]
         proc = await asyncio.create_subprocess_exec(
             *cmd,
             cwd=str(workdir),
-            env=_sanitized_env(world.id),
+            env=_sanitized_env(world),
             stdin=asyncio.subprocess.PIPE,
             stdout=asyncio.subprocess.PIPE,
             stderr=asyncio.subprocess.PIPE,

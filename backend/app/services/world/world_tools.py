@@ -704,7 +704,9 @@ async def _do_execute(db: AsyncSession, world, name: str, arguments: str) -> dic
             args = json.loads(arguments or "{}")
             section = str(args.get("section", "")).strip()
             if not section:
-                return {"success": False, "error": "缺少 section 参数（01~08）"}
+                from app.services.world.world_api_docs import SECTIONS
+                ids = " / ".join(s["id"] for s in SECTIONS)
+                return {"success": False, "error": f"缺少 section 参数（可选：{ids}）"}
             from app.services.world.world_api_docs import view_section
             return {"success": True, **view_section(section)}
         except (ValueError, FileNotFoundError, json.JSONDecodeError) as e:

@@ -171,12 +171,23 @@ window.WorldUI = {              // UI 桥（postMessage → 宿主 Layout）
 **阶段 2（沙箱先行，红线）**：
 1. ✅ **2.6 世界 AI 记忆表**（2026-08-05 已完成：world_ai_memories + store_memory/recall_memory）
 2. ✅ **2.7 缓存命中统计**（2026-08-05 已完成：world_llm_usage 三处落库 + GET /worlds/{id}/usage + 设计页命中率展示）
-3. **2.1 py 沙箱**（决策已定：MVP=subprocess + resource.rlimit + 超时强制杀；生产加固=加严配额或 seccomp+Landlock（参考 evalbox）或容器）——世界代码真正能跑
-4. 触发文件（世界后端入口）
-5. 受控数据 API（世界代码访问世界数据）
-6. 群聊写 API（身份/作用域/限流三件套）
-7. 后台常驻任务（世界自主演化）
-8. 世界线一致性（阶段 3）
+3. ✅ **2.1 py 沙箱**（2026-08-05 已完成：subprocess + resource.rlimit + 超时强杀进程组；env 白名单；有人 128MB/无人 24MB）
+4. ✅ **2.2 触发文件**（2026-08-05 已完成：main.py handle(event)，harness 零框架依赖；-X utf8 强制 UTF-8）
+5. ✅ **2.3 受控数据 API + 2.4 群聊写 API**（2026-08-05 已完成，见下）
+6. ✅ 受控 API token 机制（每世界一个，懒生成存 worlds.config.api_token；沙箱 env 注入 WORLD_API_TOKEN/WORLD_API_BASE）
+7. ✅ 动态限流（10 秒窗口 = 基础 + 每人加成 × 活跃人数；worlds.config 可配 4 个字段）
+8. 后台常驻任务（世界自主演化）
+9. 世界线一致性（阶段 3）
+
+**2.3+2.4 详情**（2026-08-05）：
+- 数据面：GET /world/{id}/api/{world,chat,memories,usage,groups} + POST /api/memories（复用 get_chat_history / world_tools._do_execute 同一份逻辑）
+- 群聊写面：GET /api/group/{messages,members} + POST /api/group/{messages,roles,kick}（身份=世界自身，底层借世界主人权限并做群角色检查；作用域=仅绑定群 _check_bound_group；写操作独立限流）
+- 鉴权：Authorization: Bearer <WORLD_API_TOKEN> 或 X-World-Token；secrets.compare_digest 常量时间比较
+- 活跃埋点：对话/设计页端点 record_world_activity（worlds.py），动态限流按活跃人数加成
+- 沙箱 env：WORLD_API_TOKEN / WORLD_API_BASE（默认 http://127.0.0.1:8000/world/{id}/api）；`python -I -X utf8` 修中文 print
+- 文档：world_api_docs 分区 09（世界代码接口手册，含 urllib 示例与 URL 编码警告）
+- 测试（沙盒手动 uvicorn + 临时世界 16，已删）：全链路 12 项通过（含 401/403/404、触发文件内调用）
+- ⚠️ 已知：世界代码带中文 query 必须 urllib.parse.quote 编码（urllib 只收 ascii URL）
 
 ---
 
@@ -186,7 +197,7 @@ window.WorldUI = {              // UI 桥（postMessage → 宿主 Layout）
 backend/app/
 ├── models/world.py              # worlds / world_bindings / world_agents / world_ais / world_chat_messages
 ├── routers/worlds.py            # 世界 CRUD/绑定/唤醒/creator 配置/对话/文件（owner 校验）
-├── routers/world_proxy.py       # /world/{id}/files/* + /preview（307）+ 变量/WorldUI 注入
+├── routers/world_proxy.py       # /world/{id}/files/* + /preview（307）+ 变量/WorldUI 注入 + 受控 API（2.3/2.4：token 鉴权/动态限流/数据与群聊代理）
 ├── services/world/
 │   ├── world_service.py         # CRUD/绑定/唤醒/懒通知/世界 AI 实体（再导出拆分模块）
 │   ├── world_chat_service.py    # 世界档案/历史/凭证/流式对话/多轮工具/收尾/工作流记忆/请求日志

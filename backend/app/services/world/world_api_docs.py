@@ -34,6 +34,8 @@ SECTIONS: list[dict] = [
      "intro": "用户改代码的通知机制、世界时间与运行模式"},
     {"id": "08", "title": "错误与安全", "file": "08-errors-security.md",
      "intro": "错误体格式、状态码、认证与安全约定"},
+    {"id": "09", "title": "受控数据 API（世界代码）", "file": "09-world-api.md",
+     "intro": "沙箱/世界代码访问世界数据与对话状态的代理接口：WORLD_API_TOKEN 鉴权、端点、限流"},
 ]
 
 

@@ -23,8 +23,8 @@
 |---|------|------|------|
 | 2.1 | **py 沙箱** | ✅ **MVP 已实现**（2026-08-05）：`world_sandbox.py` subprocess + rlimit + 超时 killpg 强杀 + env 白名单；`POST /worlds/{id}/run`（仅创建者）。**配额语义（珑哥定义）**：无人/后台 = `sleep_memory_mb`（默认 24MB）；**有人在线 = `runtime_memory_mb`（默认 128MB，2026-08-05 定）**；超时/CPU/文件大小/进程数恒生效；RLIMIT_AS 是虚拟内存口径（实际可用堆 = 配额 - 解释器开销） | 无（最先） |
 | 2.2 | **触发文件** | ✅ **已实现**（2026-08-05）：世界入口 `main.py` 实现 `handle(event) -> dict`（可 async）；平台 harness 导入调用（世界代码零框架依赖，print 重定向不污染结果）；`POST /worlds/{id}/trigger` + 世界 AI 工具 `run_world_code`（code 脚本或 event 触发模式）；6 项测试全过（同步/async/异常/缺handle/缺文件/超时） | 2.1 |
-| 2.3 | **受控数据 API** | 世界代码经代理访问世界数据/对话状态（不暴露后端真实结构）；JWT 校验 | 2.1 |
-| 2.4 | **群聊写 API** | 世界代码可发消息/管理（身份/作用域/限流三件套；管理操作仅群主/管理员） | 2.3 |
+| 2.3 | **受控数据 API** | ✅ **已实现**（2026-08-05，与 2.4 一起）：`/world/{id}/api/*` 数据面（world/chat/memories/usage/groups）；每世界专属 token（懒生成存 worlds.config.api_token，沙箱 env 注入 WORLD_API_TOKEN/WORLD_API_BASE）；动态限流（基础+每人加成×活跃人数，4 个 config 字段可配）；复用 get_chat_history / world_tools._do_execute 同一份逻辑；12 项测试通过 | 2.1 |
+| 2.4 | **群聊写 API** | ✅ **已实现**（2026-08-05，与 2.3 一起）：`/world/{id}/api/group/*`（读消息/发消息/成员/改角色/踢人）；身份=世界自身（底层借世界主人权限+群角色检查）；作用域=仅绑定群；写操作独立限流 | 2.3 |
 | 2.5 | **后台常驻任务** | 世界挂后台持续演化（24MB 配额内）；与懒加载模式互补 | 2.1 |
 | 2.6 | **世界 AI 记忆表** | ✅ **已实现**（2026-08-05）：`world_ai_memories` 专属表（title/content/embedding Vector(1536)）+ 工具 store_memory/recall_memory（向量检索 + 文本回退）；迁移 `b3c4d5e6f7a8` **待珑哥跑** | 无 |
 | 2.7 | **缓存命中统计** | ✅ **已实现**（2026-08-05）：`world_llm_usage` 专属表，首轮（stream_options.include_usage）/工具轮/收尾轮全部落库；`GET /worlds/{id}/usage` 返回调用次数/token/命中率；设计页配置表单展示命中率；迁移 `c4d5e6f7a8b9` **待珑哥跑** | 无 |

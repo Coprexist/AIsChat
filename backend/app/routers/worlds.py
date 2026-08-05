@@ -141,6 +141,9 @@ async def get_world(
     """世界详情（仅创建者；沉浸界面走静态路由不依赖此接口）"""
     from app.services.world.world_service import get_world as _get_world
     await _require_owner(db, world_id, current_user["user_id"])
+    # 2.3：活跃埋点（动态限流按人数加成）
+    from app.routers.world_proxy import record_world_activity
+    record_world_activity(world_id, current_user["user_id"])
     world = await _get_world(db, world_id)
     if world is None:
         raise HTTPException(status_code=404, detail="世界不存在")
@@ -396,6 +399,10 @@ async def run_world_code(
     world = await db.get(World, world_id)
     if world is None:
         raise HTTPException(status_code=404, detail="世界不存在")
+    # 2.3：确保受控 API token 已生成（沙箱 env 注入 WORLD_API_TOKEN 用）
+    from app.routers.world_proxy import ensure_world_api_token
+    await ensure_world_api_token(db, world)
+    await db.commit()
     result = await _run(world, code=req.code, entry=req.entry)
     result["world_id"] = world_id
     return result
@@ -415,6 +422,10 @@ async def trigger_world_code(
     world = await db.get(World, world_id)
     if world is None:
         raise HTTPException(status_code=404, detail="世界不存在")
+    # 2.3：确保受控 API token 已生成（沙箱 env 注入 WORLD_API_TOKEN 用）
+    from app.routers.world_proxy import ensure_world_api_token
+    await ensure_world_api_token(db, world)
+    await db.commit()
     result = await _trigger(world, event=req.event, entry=req.entry)
     result["world_id"] = world_id
     return result
@@ -434,6 +445,9 @@ async def get_chat(
 ):
     """世界 AI 对话历史（仅创建者；before_id 翻更早，has_more 判断是否还有）"""
     await _require_owner(db, world_id, current_user["user_id"])
+    # 2.3：活跃埋点（动态限流按人数加成）
+    from app.routers.world_proxy import record_world_activity
+    record_world_activity(world_id, current_user["user_id"])
     from app.services.world.world_service import get_chat_history
     limit = max(1, min(limit, 100))
     # 多取一条判断是否还有更早
@@ -451,6 +465,9 @@ async def post_chat(
 ):
     """世界 AI 对话：入队（服务器端全程执行，不依赖连接），返回 turn_id 用于订阅直播"""
     await _require_owner(db, world_id, current_user["user_id"])
+    # 2.3：活跃埋点（动态限流按人数加成）
+    from app.routers.world_proxy import record_world_activity
+    record_world_activity(world_id, current_user["user_id"])
     from app.services.world.world_turn import get_world_worker
     worker = get_world_worker(world_id)
     turn_id = worker.enqueue(current_user["user_id"], req.message)
