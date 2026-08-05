@@ -571,22 +571,24 @@ export default function WorldDesignPage() {
                   )}
                 </div>
                 {viewMode === 'render' && canRender ? (
-                  <div className="flex-1 overflow-y-auto p-3 md:p-4 bg-canvas">
-                    {isImgFile ? (
+                  isImgFile ? (
+                    <div className="flex-1 overflow-hidden bg-canvas flex items-center justify-center">
                       <img
                         src={`/world/${wid}/files/${currentFile.split('/').map(encodeURIComponent).join('/')}`}
                         alt={currentFile}
-                        className="max-w-full rounded-lg"
+                        className="w-full h-full object-contain"
                       />
-                    ) : (
+                    </div>
+                  ) : (
+                    <div className="flex-1 overflow-y-auto p-3 md:p-4 bg-canvas">
                       <div className="w-full max-w-none text-sm leading-relaxed break-words text-textPrimary">
                         <MarkdownContent
                           content={isMdFile ? content : '```' + fileCodeLang + '\n' + content + '\n```'}
                           isMine={false}
                         />
                       </div>
-                    )}
-                  </div>
+                    </div>
+                  )
                 ) : (
                   <textarea
                     value={content}
