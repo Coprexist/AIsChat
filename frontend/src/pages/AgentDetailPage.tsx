@@ -1313,8 +1313,11 @@ export default function AgentDetailPage() {
                       }`}>
                         <span className="font-medium">{msg.role}</span>
                         {msg.reasoning_content && (
-                          <details className="mt-1">
-                            <summary className="text-textMuted cursor-pointer">{t('agentDetail.logReasoning')}</summary>
+                          <details className="group/details mt-1">
+                            <summary className="flex items-center gap-1 text-textMuted cursor-pointer list-none [&::-webkit-details-marker]:hidden">
+                              <ChevronRight size={12} className="transition-transform group-open/details:rotate-90" />
+                              {t('agentDetail.logReasoning')}
+                            </summary>
                             <pre className="mt-1 whitespace-pre-wrap text-textMuted">{msg.reasoning_content}</pre>
                           </details>
                         )}

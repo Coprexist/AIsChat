@@ -779,8 +779,11 @@ export default function WorldDesignPage() {
             <div key={m.id} className={`text-sm max-w-[90%] p-2 rounded-lg ${m.error ? 'bg-rose-500/10 border border-rose-500/30 text-rose-400' : m.role === 'user' ? 'bg-primary-500/20 ml-auto' : 'bg-elevated/80'}`}>
               <div className="text-[10px] text-textMuted mb-0.5">{m.error ? '⚠️ 错误' : m.role === 'user' ? '我' : '世界 AI'}</div>
               {!m.error && (m.role === 'ai' || m.role === 'note') && !!m.reasoning && (
-                <details className="mb-1.5">
-                  <summary className="text-[10px] text-textMuted cursor-pointer select-none hover:text-textSecondary">🤔 思考过程</summary>
+                <details className="group/details mb-1.5">
+                  <summary className="flex items-center gap-1 text-[10px] text-textMuted cursor-pointer select-none hover:text-textSecondary list-none [&::-webkit-details-marker]:hidden">
+                    <ChevronRight size={11} className="transition-transform group-open/details:rotate-90" />
+                    🤔 思考过程
+                  </summary>
                   <div className="text-xs text-textMuted mt-1 whitespace-pre-wrap bg-elevated/70 rounded p-2">{m.reasoning}</div>
                 </details>
               )}
