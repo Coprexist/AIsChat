@@ -7,6 +7,36 @@
 
 ---
 
+## [v0.3.0] - 2026-08-05
+
+### Added — ✨ 群视界（Group World）：群聊即世界（阶段 2 全部完成）
+
+- 🌍 **世界实体体系**：`worlds` / `world_bindings`（群聊/私信/用户绑定入口）/ `world_ais`（世界 AI 专属表）/ `world_chat_messages`（世界级会话）/ `world_ai_memories`（向量记忆）/ `world_llm_usage`（缓存命中统计）。
+- 🤖 **群视界机器人**：每世界一个专属世界 AI（独立表，非 agent）；22 个工具（文件/积木/记忆/上网/沙箱/群聊/接口文档分区）；设计页右侧对话，服务器端 worker 全程执行。
+- 🧱 **世界代码沙箱（2.1）**：subprocess + resource.rlimit（内存/CPU/FSIZE/CORE/NPROC）+ 超时 killpg 强杀进程组 + env 白名单（不泄漏后端密钥）；配额语义：有人在线 128MB / 无人 64MB（32MB 解释器硬下限）；`POST /worlds/{id}/run`。
+- ⚡ **触发文件（2.2）**：世界入口 `main.py` 实现 `handle(event) -> dict`，harness 零框架依赖，`python -I -X utf8` 隔离执行；`POST /worlds/{id}/trigger` + `run_world_code` 工具。
+- 🔐 **受控数据 API + 群聊写 API（2.3 + 2.4）**：每世界专属 token（懒生成存 config，零迁移）；数据面（世界/对话/记忆/用量/绑定群）+ 群聊写面（发消息/改角色/踢人，仅绑定群、管理仅群主/管理员）；动态限流（基础 + 每人加成 × 活跃人数，4 字段可配）；复用 world_tools 同一份执行逻辑。
+- 🔄 **群消息钩子**：群消息 → 世界程序 `handle(event)` 异步感知（2s 节流合并可配；`source="world"` 防自触发死循环；不影响世界 status）。
+- 🏠 **常驻推演（2.5）**：`resident: true` + `tick_interval`——世界程序常驻后台：`handle(event)` 事件处理 + `on_tick()` 定时推演 + `on_stop()` 优雅退出存状态；手动唤醒启动/休眠停止/后端重启自动恢复；默认不限常驻个数。
+- 📡 **实时状态通道（2.5）**：世界代码 `POST /world/{id}/api/state` 发布状态 → 页面 `EventSource /world/{id}/events`（SSE）实时接收——零轮询、连接发快照、15s 心跳。
+- 🎨 **设计页 + 沉浸界面**：世界文件树/代码编辑/预览/上传/删除/代码高亮日夜适配；沉浸界面 iframe + 世界变量注入（`WORLD_ID`/`WORLD_NAME`/`WORLD_AI_ID`/`GROUP_ID`，零硬编码哲学）。
+- 🧩 **积木体系**：`data/world_blocks/` 预制组件（群聊对话窗 v1.1.0；2D 冒险游戏草稿）；世界 AI 可查/看/应用。
+- 🗂️ **API 文档分区**：`data/world_api_docs/` 9 个分区（变量/WorldUI/文件/积木/群聊/页面/通知时间/错误安全/受控 API），AI 按需打开。
+
+### Changed
+
+- **唤醒改手动模式**：世界状态只由手动 wake/sleep 控制（唤醒后保持活跃，不再 10 分钟自动转休眠）；调度器保留开关可恢复。
+- **沙箱全局并发排队**：`SANDBOX_MAX_CONCURRENT`（默认 4）信号量限并发，返回 `queued_ms` 可观测排队耗时。
+- **世界变量注入增加 `WORLD_NAME`**（页面可显示世界名）。
+
+### Fixed
+
+- **后台配额 24MB 失效 bug**：RLIMIT_AS 虚拟内存口径下解释器 import 需 ≥32MB，24MB 导致后台触发从未真正跑通过 → 默认 64MB + 32MB 硬下限。
+- **沙箱中文输出 ascii 崩溃**：`python -I` 忽略 PYTHON* 环境变量 → 统一 `-X utf8` 强制 UTF-8。
+- **常驻 harness exec 竞争**：harness 文件删除与子进程 exec 竞争导致 exit 2 → 放 /tmp 不删除。
+
+---
+
 ## [v0.2.8] - 2026-07-28 ~ 08-02
 
 ### Added
