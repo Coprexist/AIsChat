@@ -1,14 +1,9 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
-import Markdown from 'react-markdown'
-import remarkGfm from 'remark-gfm'
-import remarkMath from 'remark-math'
-import remarkBreaks from 'remark-breaks'
-import rehypeKatex from 'rehype-katex'
 import { Download, X, ArrowLeft, FileIcon, Loader2, AlertTriangle, ZoomIn, ZoomOut, RotateCcw, Share2, Maximize2, Minimize2 } from 'lucide-react'
 import { useT } from '../i18n/I18nContext'
 import { formatFileSize } from '../utils/format'
 import { isTextPreviewable, getCodeLang, isMarkdownFile, resolveMimeType, EXT_LANG_MAP } from '../utils/mime'
-import CodeRenderer from './shared/CodeRenderer'
+import MarkdownContent from './shared/MarkdownContent'
 import ForwardFileModal from './ForwardFileModal'
 
 // FileCodeRenderer ——已迁移到 components/shared/CodeRenderer.tsx
@@ -469,20 +464,11 @@ export default function FilePreviewModal({ fileId, fileName, fileSize, mimeType,
                     dangerouslySetInnerHTML={{ __html: content || '' }}
                   />
                 ) : isMd || codeLang ? (
-                  <div className="prose prose-sm dark:prose-invert max-w-none text-textPrimary
-                    [&_.katex-display]:overflow-x-auto [&_.katex-display]:-mx-1 [&_.katex-display]:px-1
-                    [&_.katex]:text-inherit [&_.katex]:max-w-full [&_.katex]:overflow-x-auto [&_.katex]:inline-block
-                    [&_pre]:overflow-x-auto [&_pre]:-mx-1 [&_pre]:px-1
-                    [&_table]:overflow-x-auto [&_table]:block
-                    [&_img]:max-w-full [&_img]:rounded-lg
-                    [&_a]:break-all [&_a]:text-primary-500 dark:[&_a]:text-primary-400 [&_a]:underline">
-                    <Markdown
-                      children={(content || '')
-                        .replace(/\\\[([\s\S]*?)\\\]/g, '$$$$$1$$$$')
-                        .replace(/\\\(([\s\S]*?)\\\)/g, '$$$1$$')}
-                      remarkPlugins={[remarkGfm, remarkMath, remarkBreaks]}
-                      rehypePlugins={[rehypeKatex]}
-                      components={{ code: CodeRenderer }}
+                  {/* 与主界面聊天/世界渲染同一份实现（共享 MarkdownContent：GFM/公式/代码高亮/彩色文字） */}
+                  <div className="w-full max-w-none text-sm leading-relaxed break-words text-textPrimary">
+                    <MarkdownContent
+                      content={codeLang ? '```' + codeLang + '\n' + (content || '') + '\n```' : (content || '')}
+                      isMine={false}
                     />
                   </div>
                 ) : (
