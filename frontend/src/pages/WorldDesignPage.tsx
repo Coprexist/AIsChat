@@ -4,7 +4,7 @@
  * 布局参考 TRAE/Cursor：左（文件树/预览）右（对话窗口）
  * 普通用户可直接用；专业用户可编辑代码（专业模式）。
  */
-import { useEffect, useState, useCallback, useRef } from 'react'
+import { useEffect, useState, useCallback, useRef, useMemo } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { api } from '../api/client'
 import MarkdownContent from '../components/shared/MarkdownContent'
@@ -170,6 +170,80 @@ export default function WorldDesignPage() {
       setMsg(`创建失败: ${e?.message || e}`)
     }
   }
+
+  // ── 文件树（按目录层级构建，文件夹可折叠） ──
+  interface TreeNode {
+    name: string
+    path: string
+    children: TreeNode[]
+    isDir: boolean
+  }
+  const [collapsedDirs, setCollapsedDirs] = useState<Set<string>>(new Set())
+
+  const fileTree = useMemo(() => {
+    const root: TreeNode = { name: '', path: '', children: [], isDir: true }
+    for (const f of files) {
+      const parts = f.path.split('/')
+      let node = root
+      let acc = ''
+      for (let i = 0; i < parts.length; i++) {
+        acc = acc ? `${acc}/${parts[i]}` : parts[i]
+        const isLast = i === parts.length - 1
+        let child = node.children.find((c) => c.name === parts[i] && c.isDir === !isLast)
+        if (!child) {
+          child = { name: parts[i], path: acc, children: [], isDir: !isLast }
+          node.children.push(child)
+        }
+        node = child
+      }
+    }
+    const sortNodes = (nodes: TreeNode[]) => {
+      nodes.sort((a, b) => (a.isDir === b.isDir ? a.name.localeCompare(b.name) : a.isDir ? -1 : 1))
+      nodes.forEach((n) => sortNodes(n.children))
+    }
+    sortNodes(root.children)
+    return root
+  }, [files])
+
+  const toggleDir = (path: string) => {
+    setCollapsedDirs((prev) => {
+      const next = new Set(prev)
+      if (next.has(path)) next.delete(path)
+      else next.add(path)
+      return next
+    })
+  }
+
+  const renderTree = (nodes: TreeNode[], depth: number): JSX.Element[] =>
+    nodes.map((n) => (
+      <div key={n.path}>
+        {n.isDir ? (
+          <>
+            <button
+              onClick={() => toggleDir(n.path)}
+              style={{ paddingLeft: 6 + depth * 14 }}
+              className="flex items-center gap-1 w-full text-left text-xs py-1 pr-2 rounded transition-colors hover:bg-elevated text-textSecondary"
+              title={n.path}
+            >
+              <span className="text-[10px] w-3 shrink-0">{collapsedDirs.has(n.path) ? '▶' : '▼'}</span>
+              <span className="shrink-0">📁</span>
+              <span className="truncate">{n.name}</span>
+            </button>
+            {!collapsedDirs.has(n.path) && renderTree(n.children, depth + 1)}
+          </>
+        ) : (
+          <button
+            onClick={() => selectFile(n.path)}
+            style={{ paddingLeft: 24 + depth * 14 }}
+            className={`flex items-center gap-1 w-full text-left text-xs py-1 pr-2 rounded truncate transition-colors ${currentFile === n.path ? 'bg-primary-500/20 text-primary-300' : 'hover:bg-elevated text-textSecondary'}`}
+            title={n.path}
+          >
+            <span className="shrink-0">📄</span>
+            <span className="truncate">{n.name}</span>
+          </button>
+        )}
+      </div>
+    ))
 
   // ── 世界 AI 对话（世界级会话，非 DM；账单人 = 世界主人） ──
   const loadChat = useCallback(async (opts?: { before_id?: number; append?: boolean }) => {
@@ -405,15 +479,7 @@ export default function WorldDesignPage() {
               <button onClick={createFile} className="text-xs text-primary-400 hover:text-primary-300 transition-colors">+ 新建</button>
             </div>
             {files.length === 0 && <div className="text-xs text-textMuted p-2">空世界，点 + 新建或让机器人生成</div>}
-            {files.map((f) => (
-              <button
-                key={f.path}
-                onClick={() => selectFile(f.path)}
-                className={`block w-full text-left text-xs px-2 py-1.5 rounded truncate transition-colors ${currentFile === f.path ? 'bg-primary-500/20 text-primary-300' : 'hover:bg-elevated text-textSecondary'}`}
-              >
-                📄 {f.path}
-              </button>
-            ))}
+            {renderTree(fileTree.children, 0)}
           </div>
           <div onMouseDown={fileResizeStart} className="w-1 shrink-0 cursor-col-resize hover:bg-primary-500/40 transition-colors" />
 
@@ -438,12 +504,25 @@ export default function WorldDesignPage() {
                 />
               </div>
             ) : (
-              <iframe
-                key={previewKey}
-                src={`/world/${wid}/preview`}
-                className="w-full h-full bg-white dark:bg-gray-900"
-                title="世界预览"
-              />
+              <div className="h-full flex flex-col">
+                <div className="px-3 py-1.5 text-xs text-textSecondary bg-surface/60 border-b border-border flex items-center gap-2">
+                  <span className="truncate flex-1">世界预览（/world/{wid}/preview）</span>
+                  <button onClick={() => setPreviewKey((k) => k + 1)} className="text-primary-400 hover:text-primary-300 transition-colors shrink-0" title="刷新预览">↻ 刷新</button>
+                  <button
+                    onClick={() => window.open(`/world-view/${wid}`, '_blank', 'noopener')}
+                    className="text-primary-400 hover:text-primary-300 transition-colors shrink-0"
+                    title="在沉浸界面新窗口打开"
+                  >
+                    ↗ 沉浸窗口
+                  </button>
+                </div>
+                <iframe
+                  key={previewKey}
+                  src={`/world/${wid}/preview`}
+                  className="w-full flex-1 bg-white dark:bg-gray-900"
+                  title="世界预览"
+                />
+              </div>
             )}
           </div>
         </div>
