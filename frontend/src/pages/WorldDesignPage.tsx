@@ -457,6 +457,7 @@ export default function WorldDesignPage() {
   if (!world) return <div className="p-8 text-textMuted">世界不存在</div>
 
   return (
+    <>
     <div className="flex h-screen bg-canvas text-textPrimary">
       {/* ═══ 左栏：文件 / 预览 ═══ */}
       <div className="flex-1 flex flex-col min-w-0 border-r border-border">
@@ -709,5 +710,6 @@ export default function WorldDesignPage() {
         onClose={() => setPreviewFile(null)}
       />
     )}
+    </>
   )
 }
