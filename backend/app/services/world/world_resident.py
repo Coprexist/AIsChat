@@ -25,7 +25,15 @@ logger = logging.getLogger(__name__)
 DEFAULT_TICK_INTERVAL = 30.0   # 秒
 
 _RESIDENT_HARNESS = r'''
-import asyncio, importlib, json, os, sys
+import asyncio, importlib, json, os, signal, sys
+
+# 防孤儿：父进程（backend）退出时自动收 SIGTERM 自杀（PR_SET_PDEATHSIG）
+# backend --reload 重启/停止时，常驻进程不再残留
+import ctypes
+try:
+    ctypes.CDLL(None).prctl(1, signal.SIGTERM, 0, 0, 0)  # PR_SET_PDEATHSIG = 1
+except Exception:
+    pass
 
 sys.path.insert(0, os.environ.get("WORLD_DIR", os.path.dirname(os.path.abspath(__file__))))
 ENTRY = "__ENTRY__"
