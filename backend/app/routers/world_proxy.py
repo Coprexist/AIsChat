@@ -628,7 +628,8 @@ async def serve_world_file(
                 pass
         html = target.read_text(encoding="utf-8", errors="replace")
         return HTMLResponse(_inject_world_vars(html, world_id, creator_name, group_id, world_name))
-    return FileResponse(target, media_type=mime)
+    # 世界代码频繁变化：禁缓存，避免用户看到旧版（2026-08-05 珑哥反馈刷新没效果）
+    return FileResponse(target, media_type=mime, headers={"Cache-Control": "no-cache"})
 
 
 @router.get("/{world_id}/preview")
