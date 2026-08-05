@@ -359,6 +359,9 @@
 .hljs-link { color: #1e3a8a; text-decoration: underline; }
 .hljs-emphasis { font-style: italic; }
 .hljs-strong { font-weight: 700; }
+/* 其余可能出现的类：一律深色，杜绝浅灰漏网 */
+.hljs-operator, .hljs-punctuation, .hljs-property, .hljs-params,
+.hljs-function, .hljs-variable, .hljs-selector-pseudo, .hljs-name { color: #0f172a; }
 
 /* 夜间（.dark）与我的气泡（.text-white 深色底）：用主题亮色系 */
 :is(.text-white, .dark) .hljs { color: #e2e8f0; }
