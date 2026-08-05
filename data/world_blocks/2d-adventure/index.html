@@ -1,0 +1,53 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  <title>2D 冒险</title>
+  <link rel="stylesheet" href="blocks/2d-adventure/adventure.css" />
+</head>
+<body>
+  <div id="game-wrap">
+    <canvas id="game" width="768" height="576"></canvas>
+
+    <!-- HUD：世界名 + 金币 -->
+    <div id="hud">
+      <div id="hud-world">
+        <span id="hud-world-name">未知世界</span>
+        <span id="hud-world-id"></span>
+      </div>
+      <div id="hud-coins">🪙 <span id="hud-coin-count">0</span></div>
+    </div>
+
+    <!-- 交互提示（靠近可互动物体时显示） -->
+    <div id="interact-hint" class="hidden">按 <b>E</b> 互动</div>
+
+    <!-- 对话/消息框 -->
+    <div id="dialog" class="hidden">
+      <div id="dialog-name"></div>
+      <div id="dialog-text"></div>
+      <div id="dialog-next">按 E 继续 ▸</div>
+    </div>
+
+    <!-- 传送门横幅 -->
+    <div id="banner" class="hidden"></div>
+
+    <!-- 命令输入框：直接在这里输入群消息命令（如：旅人说 你好）→ 发到绑定群 → 世界程序响应经 SSE 实时回来 -->
+    <div id="cmd-bar">
+      <input id="cmd-input" type="text" placeholder="输入命令：旅人说 你好 / 旅人移动到 2,3 / 公告 xxx…" autocomplete="off" maxlength="200" />
+      <button id="cmd-send">发送</button>
+    </div>
+
+    <!-- 移动端虚拟按键 -->
+    <div id="touch-keys">
+      <button class="tk" data-dir="up">▲</button>
+      <button class="tk" data-dir="left">◀</button>
+      <button class="tk" data-dir="down">▼</button>
+      <button class="tk" data-dir="right">▶</button>
+      <button class="tk tk-act" data-act="interact">E</button>
+    </div>
+  </div>
+
+  <script src="blocks/2d-adventure/adventure.js"></script>
+</body>
+</html>

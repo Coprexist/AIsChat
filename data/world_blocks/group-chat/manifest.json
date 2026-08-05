@@ -1,0 +1,12 @@
+{
+  "id": "group-chat",
+  "name": "群聊对话窗",
+  "description": "沉浸界面内嵌群聊对话窗口：消息列表 + 输入发送 + 新消息轮询。样式与主界面聊天一致（渐变头像/左右布局/Markdown/相对时间）。世界网页放一个挂载点 div，配置 GROUP_CHAT_CONFIG 后引入 chat-panel.js 即可。群聊编号自动取 window.GROUP_ID（沉浸入口注入），也可在配置里覆盖。",
+  "version": "1.1.0",
+  "files": [
+    "chat-panel.css",
+    "chat-panel.js"
+  ],
+  "entry": "chat-panel.js",
+  "usage": "在页面放置 <div id=\"group-chat\"></div>；可选 window.GROUP_CHAT_CONFIG = { mountId: 'group-chat', groupId: null, height: '420px', title: '群聊' }；然后引入 blocks/group-chat/chat-panel.css 与 blocks/group-chat/chat-panel.js。groupId 默认取 window.GROUP_ID（沉浸入口自动注入，无入口群聊时为 null，此时需显式配置 groupId）。消息通过现有群聊 API 收发（GET/POST /api/groups/{groupId}/messages），沿用登录用户身份与权限。"
+}

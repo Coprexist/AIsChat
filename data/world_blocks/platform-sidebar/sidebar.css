@@ -1,0 +1,94 @@
+/* 平台侧边栏积木 — 明暗主题自适应（跟随宿主 .dark 或 prefers-color-scheme） */
+.sidebar-block {
+  --sb-bg: 21 18 35;        /* 深色底 */
+  --sb-text: 237 233 246;
+  --sb-muted: 107 114 128;
+  --sb-hover: 42 37 64;
+  --sb-active: 167 139 250;
+  position: fixed;
+  top: 0; left: 0; bottom: 0;
+  width: 240px;
+  background: rgb(var(--sb-bg) / 0.96);
+  backdrop-filter: blur(8px);
+  border-right: 1px solid rgb(var(--sb-hover));
+  color: rgb(var(--sb-text));
+  display: flex;
+  flex-direction: column;
+  z-index: 1000;
+  transition: transform 0.25s ease;
+  font-family: system-ui, -apple-system, "Segoe UI", sans-serif;
+}
+.sidebar-block.collapsed { transform: translateX(-100%); }
+
+.sidebar-block .sb-brand {
+  padding: 18px 16px 12px;
+  font-weight: 700;
+  font-size: 15px;
+  border-bottom: 1px solid rgb(var(--sb-hover));
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.sidebar-block .sb-items { flex: 1; overflow-y: auto; padding: 8px; }
+.sidebar-block .sb-item {
+  display: flex; align-items: center; gap: 10px;
+  padding: 9px 12px; margin-bottom: 2px;
+  border-radius: 10px;
+  color: rgb(var(--sb-text) / 0.85);
+  font-size: 14px;
+  text-decoration: none;
+  cursor: pointer;
+  transition: background 0.15s ease;
+}
+.sidebar-block .sb-item:hover { background: rgb(var(--sb-hover)); }
+.sidebar-block .sb-item.active { background: rgb(var(--sb-active) / 0.18); color: rgb(var(--sb-active)); }
+
+.sidebar-block .sb-footer { padding: 10px 16px; border-top: 1px solid rgb(var(--sb-hover)); font-size: 11px; color: rgb(var(--sb-muted)); }
+
+/* 折叠开关（悬浮小把手，挂在左侧边缘） */
+.sb-toggle {
+  position: fixed;
+  top: 50%; left: 0;
+  transform: translateY(-50%);
+  z-index: 1001;
+  display: flex; align-items: center;
+  padding: 14px 5px;
+  border-radius: 0 10px 10px 0;
+  background: rgb(var(--sb-bg) / 0.9);
+  border: 1px solid rgb(var(--sb-hover));
+  border-left: none;
+  color: rgb(var(--sb-muted));
+  cursor: pointer;
+  font-size: 12px;
+  transition: color 0.15s ease, background 0.15s ease;
+}
+.sb-toggle:hover { color: rgb(var(--sb-text)); background: rgb(var(--sb-hover)); }
+.sb-toggle.hidden { display: none; }
+
+@media (prefers-color-scheme: light) {
+  .sidebar-block, .sb-toggle {
+    --sb-bg: 255 255 255;
+    --sb-text: 17 24 39;
+    --sb-muted: 107 114 128;
+    --sb-hover: 226 232 240;
+  }
+}
+
+/* 平台基础组（可折叠） */
+.sidebar-block .sb-group { margin-bottom: 6px; }
+.sidebar-block .sb-group-title {
+  padding: 6px 12px;
+  font-size: 11px;
+  font-weight: 600;
+  color: rgb(var(--sb-muted));
+  cursor: pointer;
+  user-select: none;
+  border-radius: 8px;
+  list-style: none;
+}
+.sidebar-block .sb-group-title::-webkit-details-marker { display: none; }
+.sidebar-block .sb-group-title::before { content: "▸ "; }
+.sidebar-block .sb-group[open] .sb-group-title::before { content: "▾ "; }
+.sidebar-block .sb-group-title:hover { color: rgb(var(--sb-text)); }
+.sidebar-block .sb-item-platform { padding-left: 20px; }
+.sidebar-block .sb-group-custom { margin-top: 6px; border-top: 1px solid rgb(var(--sb-hover)); padding-top: 6px; }

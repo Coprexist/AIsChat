@@ -1,0 +1,278 @@
+/* 群聊对话窗 — 沉浸界面内嵌群聊（明暗自适应）
+ * 样式对齐主界面聊天（MessageBubble）：自己右/别人左、渐变头像、名字+相对时间头、主色/表面色气泡、Markdown 内容
+ */
+#group-chat {
+  --gc-bg: rgba(18, 18, 24, 0.82);
+  --gc-border: rgba(255, 255, 255, 0.12);
+  --gc-text: #e8e8ee;
+  --gc-text-dim: #9a9aa8;
+  --gc-mine: rgba(94, 129, 244, 0.85);
+  --gc-mine-text: #fff;
+  --gc-theirs: rgba(255, 255, 255, 0.09);
+  --gc-input-bg: rgba(255, 255, 255, 0.07);
+  --gc-code-bg: rgba(255, 255, 255, 0.14);
+  --gc-pre-bg: rgba(0, 0, 0, 0.35);
+  --gc-accent: #5e81f4;
+}
+
+@media (prefers-color-scheme: light) {
+  #group-chat {
+    --gc-bg: rgba(250, 250, 252, 0.94);
+    --gc-border: rgba(0, 0, 0, 0.1);
+    --gc-text: #1c1c22;
+    --gc-text-dim: #6f6f7d;
+    --gc-mine: #5e81f4;
+    --gc-mine-text: #fff;
+    --gc-theirs: rgba(0, 0, 0, 0.06);
+    --gc-input-bg: rgba(0, 0, 0, 0.05);
+    --gc-code-bg: rgba(0, 0, 0, 0.08);
+    --gc-pre-bg: rgba(0, 0, 0, 0.05);
+  }
+}
+
+#group-chat, #group-chat * { box-sizing: border-box; }
+
+#group-chat {
+  display: flex;
+  flex-direction: column;
+  background: var(--gc-bg);
+  border: 1px solid var(--gc-border);
+  border-radius: 12px;
+  overflow: hidden;
+  font-family: system-ui, -apple-system, "PingFang SC", "Microsoft YaHei", sans-serif;
+  color: var(--gc-text);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+}
+
+#group-chat .gc-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 14px;
+  border-bottom: 1px solid var(--gc-border);
+  font-size: 14px;
+  font-weight: 600;
+  flex: none;
+}
+
+#group-chat .gc-header .gc-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: #4ade80;
+  box-shadow: 0 0 6px rgba(74, 222, 128, 0.7);
+}
+
+#group-chat .gc-header .gc-title { flex: 1; }
+
+#group-chat .gc-header .gc-refresh {
+  background: none;
+  border: none;
+  color: var(--gc-text-dim);
+  cursor: pointer;
+  font-size: 14px;
+  padding: 2px 6px;
+  border-radius: 6px;
+}
+#group-chat .gc-header .gc-refresh:hover { color: var(--gc-text); background: var(--gc-input-bg); }
+
+#group-chat .gc-msgs {
+  flex: 1;
+  overflow-y: auto;
+  padding: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  min-height: 120px;
+  scroll-behavior: smooth;
+}
+
+/* ── 消息行：自己右 / 别人左（主界面 MessageBubble 同款结构）── */
+#group-chat .gc-msg { display: flex; gap: 8px; max-width: 72%; }
+#group-chat .gc-msg.gc-mine { align-self: flex-end; flex-direction: row-reverse; }
+#group-chat .gc-msg.gc-theirs { align-self: flex-start; }
+
+#group-chat .gc-avatar {
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  flex: none;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #fff;
+  font-size: 14px;
+  font-weight: 700;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.2);
+  overflow: hidden;
+}
+#group-chat .gc-avatar img { width: 100%; height: 100%; object-fit: cover; }
+
+#group-chat .gc-main { min-width: 0; display: flex; flex-direction: column; }
+#group-chat .gc-msg.gc-mine .gc-main { align-items: flex-end; }
+#group-chat .gc-msg.gc-theirs .gc-main { align-items: flex-start; }
+
+/* 名字 + 相对时间（主界面格式：name text-xs / time text-[10px]） */
+#group-chat .gc-head {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  margin-bottom: 3px;
+  max-width: 100%;
+}
+#group-chat .gc-msg.gc-mine .gc-head { flex-direction: row-reverse; }
+#group-chat .gc-name {
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--gc-text-dim);
+  max-width: 140px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+#group-chat .gc-msg.gc-system .gc-name { color: #fb7185; }
+#group-chat .gc-time { font-size: 10px; color: var(--gc-text-dim); opacity: 0.8; flex: none; }
+
+/* 气泡：自己主色（右上小圆角），别人表面色（左上小圆角），系统红色系 */
+#group-chat .gc-bubble {
+  padding: 10px 14px;
+  border-radius: 16px;
+  font-size: 14px;
+  line-height: 1.6;
+  word-break: break-word;
+}
+#group-chat .gc-msg.gc-mine .gc-bubble {
+  background: var(--gc-mine);
+  color: var(--gc-mine-text);
+  border-top-right-radius: 6px;
+  box-shadow: 0 4px 12px rgba(94, 129, 244, 0.15);
+}
+#group-chat .gc-msg.gc-theirs .gc-bubble {
+  background: var(--gc-theirs);
+  color: var(--gc-text);
+  border-top-left-radius: 6px;
+  border: 1px solid var(--gc-border);
+}
+#group-chat .gc-msg.gc-system .gc-bubble {
+  background: rgba(225, 29, 72, 0.08);
+  border-color: rgba(225, 29, 72, 0.25);
+  color: var(--gc-text);
+}
+
+/* ── 气泡内 Markdown 排版 ── */
+#group-chat .gc-bubble p { margin: 0 0 6px; }
+#group-chat .gc-bubble > :last-child { margin-bottom: 0; }
+#group-chat .gc-bubble h1, #group-chat .gc-bubble h2,
+#group-chat .gc-bubble h3, #group-chat .gc-bubble h4 {
+  margin: 8px 0 4px;
+  font-weight: 700;
+  line-height: 1.3;
+}
+#group-chat .gc-bubble h1 { font-size: 17px; }
+#group-chat .gc-bubble h2 { font-size: 16px; }
+#group-chat .gc-bubble h3 { font-size: 15px; }
+#group-chat .gc-bubble h4 { font-size: 14px; }
+#group-chat .gc-bubble ul, #group-chat .gc-bubble ol { margin: 4px 0 6px; padding-left: 20px; }
+#group-chat .gc-bubble li { margin: 2px 0; }
+#group-chat .gc-bubble code {
+  background: var(--gc-code-bg);
+  padding: 1px 5px;
+  border-radius: 5px;
+  font-size: 0.9em;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+}
+#group-chat .gc-bubble pre {
+  background: var(--gc-pre-bg);
+  padding: 8px 10px;
+  border-radius: 8px;
+  overflow-x: auto;
+  margin: 6px 0;
+}
+#group-chat .gc-bubble pre code { background: none; padding: 0; font-size: 0.85em; }
+#group-chat .gc-bubble blockquote {
+  border-left: 3px solid var(--gc-accent);
+  margin: 4px 0 6px;
+  padding: 2px 10px;
+  opacity: 0.9;
+}
+#group-chat .gc-bubble blockquote p { margin: 2px 0; }
+#group-chat .gc-bubble hr { border: none; border-top: 1px solid var(--gc-border); margin: 8px 0; }
+#group-chat .gc-bubble a { color: var(--gc-accent); text-decoration: underline; }
+#group-chat .gc-msg.gc-mine .gc-bubble a { color: #fff; }
+
+/* ── 附件：图片内联缩略图 / 文件芯片 ── */
+#group-chat .gc-att { display: flex; flex-direction: column; gap: 6px; margin-top: 8px; }
+#group-chat .gc-att-img {
+  max-width: 200px;
+  max-height: 150px;
+  border-radius: 8px;
+  object-fit: cover;
+  border: 1px solid var(--gc-border);
+}
+#group-chat .gc-att-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  align-self: flex-start;
+  padding: 4px 10px;
+  border-radius: 8px;
+  font-size: 12px;
+  background: var(--gc-input-bg);
+  border: 1px solid var(--gc-border);
+}
+#group-chat .gc-att-chip i { font-style: normal; opacity: 0.6; font-size: 11px; }
+
+#group-chat .gc-empty {
+  margin: auto;
+  color: var(--gc-text-dim);
+  font-size: 13px;
+  text-align: center;
+  padding: 20px;
+}
+
+#group-chat .gc-input-row {
+  display: flex;
+  gap: 8px;
+  padding: 10px 12px;
+  border-top: 1px solid var(--gc-border);
+  flex: none;
+}
+
+#group-chat .gc-input-row textarea {
+  flex: 1;
+  resize: none;
+  background: var(--gc-input-bg);
+  border: 1px solid var(--gc-border);
+  border-radius: 8px;
+  color: var(--gc-text);
+  font: inherit;
+  font-size: 13.5px;
+  padding: 8px 10px;
+  min-height: 38px;
+  max-height: 96px;
+  outline: none;
+}
+
+#group-chat .gc-input-row textarea:focus { border-color: var(--gc-accent); }
+
+#group-chat .gc-input-row .gc-send {
+  background: var(--gc-accent);
+  border: none;
+  color: #fff;
+  font-size: 13.5px;
+  font-weight: 600;
+  padding: 0 16px;
+  border-radius: 8px;
+  cursor: pointer;
+  flex: none;
+}
+#group-chat .gc-input-row .gc-send:disabled { opacity: 0.5; cursor: not-allowed; }
+
+#group-chat .gc-hint {
+  padding: 8px 14px;
+  font-size: 12px;
+  color: var(--gc-text-dim);
+  text-align: center;
+  border-top: 1px dashed var(--gc-border);
+}

@@ -11,7 +11,8 @@ token.txt
 backup_backend/
 
 # ── Docker 数据卷（数据库、上传文件） ──
-data/
+data/*
+!data/world_blocks/
 
 # ── Python ──
 __pycache__/

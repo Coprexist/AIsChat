@@ -1,0 +1,14 @@
+{
+  "id": "2d-adventure",
+  "name": "2D 冒险游戏",
+  "description": "完整可玩的 2D 俯视角冒险世界：像素风 Canvas、瓦片地图（村庄/湖泊/树林）、WASD/方向键移动、NPC 对话、宝箱收集、传送门、本地存档。零外部依赖（纯程序化绘制，无图片资源）。世界程序（main.py）常驻后台：群消息经关键词语法提取转即时游戏指令（NPC 说话/移动/横幅），经 SSE 实时驱动页面——NPC 会真的活过来。",
+  "version": "1.0.0",
+  "files": [
+    "index.html",
+    "adventure.css",
+    "adventure.js",
+    "main.py"
+  ],
+  "entry": "index.html",
+  "usage": "1) apply 本积木；2) 用 file_read 读 blocks/2d-adventure/index.html 和 blocks/2d-adventure/main.py，file_write 到世界根目录（index.html 为主页、main.py 为世界程序）；3) 设置世界常驻：PUT /worlds/{id} config 加 {resident: true, tick_interval: 30}；4) 用户打开沉浸界面游玩：页面底部命令框可直接发群消息命令（发到绑定群，需登录态；未绑定群时提示），也可在绑定群里发。命令示例：『旅人说 你好』『旅人移动到 2,3』『公告 冒险开始』。定制：改 adventure.js 顶部 MAP/NPCS/CHESTS 数据，改 main.py 的 NPC_NAMES 与语法规则。世界名自动取 window.WORLD_NAME，存档按 WORLD_ID 隔离。"
+}
