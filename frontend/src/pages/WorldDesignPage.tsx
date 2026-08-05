@@ -11,6 +11,7 @@ import { api } from '../api/client'
 import MarkdownContent from '../components/shared/MarkdownContent'
 import CodeRenderer from '../components/shared/CodeRenderer'
 import { getCodeLang, isMarkdownFile } from '../utils/mime'
+import { tryOpenWorldWindow } from '../utils/worldView'
 import { useResizableSidebar } from '../hooks/useResizableSidebar'
 
 // 文件类型图标（与主界面风格一致）
@@ -623,9 +624,9 @@ export default function WorldDesignPage() {
                   <span className="truncate flex-1">世界预览（/world/{wid}/preview）</span>
                   <button onClick={() => setPreviewKey((k) => k + 1)} className="text-primary-400 hover:text-primary-300 transition-colors shrink-0" title="刷新预览">↻ 刷新</button>
                   <button
-                    onClick={() => window.open(`/world-view/${wid}`, '_blank', 'noopener')}
+                    onClick={() => { if (!tryOpenWorldWindow(wid)) navigate(`/world-view/${wid}`) }}
                     className="text-primary-400 hover:text-primary-300 transition-colors shrink-0"
-                    title="在沉浸界面新窗口打开"
+                    title="在沉浸界面新窗口打开（WebView 下自动应用内跳转）"
                   >
                     ↗ 沉浸窗口
                   </button>

@@ -10,6 +10,7 @@ import EmptyState from './EmptyState'
 import { Send, Loader2, AlertTriangle, X, ArrowDown, ArrowUp, Paperclip, FileIcon, Bot, User, MessageSquare, Inbox } from 'lucide-react'
 import { getStateDotColor, CHAT_REFRESH_EVENT } from '../constants'
 import { useT } from '../i18n/I18nContext'
+import { tryOpenWorldWindow } from '../utils/worldView'
 import { isTauri, onKeyboardChange } from '../utils/tauri'
 import { scrollToInContainer } from '../utils/scroll'
 
@@ -581,9 +582,9 @@ export default function ChatView({ conversationType, conversationId }: ChatViewP
       })()
       return
     }
-    // 网页端：命名窗口（同名复用+聚焦）；被弹窗拦截（返回 null）→ 回退应用内
-    const win = window.open(url, `world-immersive-${boundWorldId}`)
-    if (!win) window.location.href = url
+    // 网页端：命名窗口（同名复用+聚焦）；WebView/被弹窗拦截（返回 null）→ 回退应用内
+    const url = `/world-view/${boundWorldId}?group_id=${conversationId}`
+    if (!tryOpenWorldWindow(boundWorldId, conversationId)) window.location.href = url
   }, [boundWorldId, conversationId])
 
   useEffect(() => {

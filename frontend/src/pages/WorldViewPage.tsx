@@ -17,7 +17,7 @@ export default function WorldViewPage() {
 
   const wid = Number(worldId)
 
-  // 独立窗口（Tauri / window.open 弹窗）时：关窗口；应用内：返回上一页（无历史则回世界列表）
+  // 返回：Tauri 关窗口；其他一律切回「标准界面」（群聊优先，其次世界列表），不依赖关窗
   const handleBack = () => {
     if ('__TAURI_INTERNALS__' in window) {
       ;(async () => {
@@ -28,13 +28,14 @@ export default function WorldViewPage() {
       })()
       return
     }
-    // window.open 弹出的独立窗口：直接关窗
-    if (window.opener) {
-      window.close()
-      return
+    if (window.history.length > 1) {
+      navigate(-1)
+    } else if (groupId) {
+      // 标准界面 = 该世界绑定的群聊
+      navigate(`/chat/gm/${groupId}`)
+    } else {
+      navigate('/worlds')
     }
-    if (window.history.length > 1) navigate(-1)
-    else navigate('/worlds')
   }
 
   useEffect(() => {
