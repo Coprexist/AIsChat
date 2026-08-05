@@ -21,12 +21,14 @@ interface FilePreviewModalProps {
   onClose: () => void
   /** 可选：直接内容 URL（世界文件等非附件场景）；缺省用 fileId 走附件下载接口 */
   src?: string
+  /** 可选：已加载的文本内容（设计页编辑器已有内容时直接复用，免二次请求） */
+  initialContent?: string | null
 }
 
-export default function FilePreviewModal({ fileId, fileName, fileSize, mimeType, onClose, src }: FilePreviewModalProps) {
+export default function FilePreviewModal({ fileId, fileName, fileSize, mimeType, onClose, src, initialContent }: FilePreviewModalProps) {
   const t = useT()
-  const [content, setContent] = useState<string | null>(null)
-  const [loading, setLoading] = useState(true)
+  const [content, setContent] = useState<string | null>(initialContent ?? null)
+  const [loading, setLoading] = useState(initialContent == null)
   const [error, setError] = useState('')
   // 图片缩放
   const [scale, setScale] = useState(1)
@@ -132,6 +134,12 @@ export default function FilePreviewModal({ fileId, fileName, fileSize, mimeType,
   const [retry, setRetry] = useState(0)
 
   useEffect(() => {
+    if (initialContent != null) {
+      // 内容已由调用方提供（如设计页编辑器）：直接渲染，不再请求
+      setLoading(false)
+      return
+    }
+
     if (!previewable) {
       // 不可预览 → 直接触发下载
       const a = document.createElement('a')

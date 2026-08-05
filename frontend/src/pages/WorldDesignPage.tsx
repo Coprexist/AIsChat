@@ -495,7 +495,7 @@ export default function WorldDesignPage() {
                   <span className="truncate">{currentFile || '未选择文件'}</span>
                   {currentFile && (
                     <span className="flex items-center gap-3 shrink-0 ml-3">
-                      <button onClick={() => setPreviewFile({ name: currentFile, src: `/world/${wid}/files/${encodeURIComponent(currentFile)}` })} className="text-primary-400 hover:text-primary-300 transition-colors" title="预览此文件">👁 预览</button>
+                      <button onClick={() => setPreviewFile({ name: currentFile, src: `/world/${wid}/files/${currentFile.split('/').map(encodeURIComponent).join('/')}` })} className="text-primary-400 hover:text-primary-300 transition-colors" title="预览此文件">👁 预览</button>
                       <button onClick={saveFile} disabled={saving} className="text-primary-400 hover:text-primary-300 transition-colors">
                         {saving ? '保存中...' : '💾 保存'}
                       </button>
@@ -700,13 +700,14 @@ export default function WorldDesignPage() {
       </div>
     </div>
 
-    {/* 文件格式预览（复用主界面同一份实现） */}
+    {/* 文件格式预览（复用主界面同一份实现；内容直接复用编辑器已加载的，免二次请求） */}
     {previewFile && (
       <FilePreviewModal
         fileName={previewFile.name}
         fileSize={0}
         mimeType=""
         src={previewFile.src}
+        initialContent={content}
         onClose={() => setPreviewFile(null)}
       />
     )}
