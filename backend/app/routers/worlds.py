@@ -235,11 +235,17 @@ async def wake_world(
     current_user: dict = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
-    """手动唤醒世界（应用离线时间补偿）"""
+    """手动唤醒世界（应用离线时间补偿；resident 世界同时启动常驻进程）"""
     from app.services.world.world_service import wake_world
     try:
         world = await wake_world(db, world_id)
         await db.commit()
+        # 2.5：常驻世界随唤醒启动（config.resident=true 且 main.py 存在）
+        from app.models.world import World as _World
+        w = await db.get(_World, world_id)
+        if w is not None:
+            from app.services.world.world_resident import manager
+            await manager.start(db, w)
         return world
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
@@ -251,11 +257,13 @@ async def sleep_world(
     current_user: dict = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
-    """手动休眠世界"""
+    """手动休眠世界（resident 世界同时优雅停止常驻进程）"""
     from app.services.world.world_service import sleep_world
     try:
         world = await sleep_world(db, world_id)
         await db.commit()
+        from app.services.world.world_resident import manager
+        await manager.stop(world_id)
         return world
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))

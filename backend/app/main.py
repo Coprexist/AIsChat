@@ -139,9 +139,18 @@ async def lifespan(app: FastAPI):
                 logger.warning(f"⚠️ 每日备份失败: {e}")
     daily_backup_task = asyncio.create_task(daily_backup_loop())
 
-    # 启动世界懒加载调度器（休眠/唤醒 + 离线时间补偿）
+    # 启动世界懒加载调度器（休眠/唤醒 + 离线时间补偿；手动模式下 no-op）
     from app.services.world.world_scheduler import world_scheduler
     world_scheduler_task = asyncio.create_task(world_scheduler())
+
+    # 2.5：恢复常驻世界（config.resident=true）——后端重启后常驻进程继续跑
+    try:
+        from app.database import async_session as _as
+        async with _as() as restore_db:
+            from app.services.world.world_resident import manager
+            await manager.restore_all(restore_db)
+    except Exception as e:
+        logger.warning(f"🌐 常驻世界恢复异常: {e}")
 
     # 启动记忆批量写入 worker
     from app.services.memory.memory_buffer import memory_flush_worker

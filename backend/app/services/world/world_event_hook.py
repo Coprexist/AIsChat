@@ -130,6 +130,10 @@ async def _flush(world_id: int) -> None:
                 "source": "group",
                 "messages": p.msgs,
             }
+            # 2.5：常驻世界 → 投递常驻进程（进程内队列）；非常驻/未在跑 → 临时触发
+            from app.services.world.world_resident import manager
+            if manager.is_resident(world) and await manager.dispatch(world.id, event):
+                return
             from app.services.world.world_sandbox import run_world_trigger
             result = await run_world_trigger(world, event=event, background=True)
             if not result.get("success"):

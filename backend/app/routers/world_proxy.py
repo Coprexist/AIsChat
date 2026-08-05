@@ -6,6 +6,7 @@
 
 世界编号由前端注入为变量（window.WORLD_ID），AI/人类代码只管写变量名。
 """
+import asyncio
 import json
 import logging
 import secrets
@@ -14,7 +15,7 @@ from collections import deque
 from datetime import datetime, timezone
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Request
-from fastapi.responses import FileResponse, HTMLResponse, RedirectResponse
+from fastapi.responses import FileResponse, HTMLResponse, RedirectResponse, StreamingResponse
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -62,6 +63,25 @@ ACTIVE_WINDOW = 600.0           # 活跃判定窗口（10 分钟）
 _rate_buckets: dict[int, deque] = {}
 # 世界活跃用户（world_id → {user_id: 最近活跃时刻}），供动态限流按人数加成
 _ACTIVE_USERS: dict[int, dict[int, float]] = {}
+
+# ── 世界状态实时推送（2.5：世界代码发布 → 页面 SSE 订阅，零轮询） ──
+# 世界代码经受控 API POST /api/state 发布状态快照：后端存最新 + 广播给 SSE 订阅者
+_state_latest: dict[int, dict] = {}
+_state_subs: dict[int, set] = {}
+
+
+def _publish_state(world_id: int, state: dict) -> None:
+    """发布世界状态：更新最新快照 + 广播所有 SSE 订阅者（慢消费者只保留最新）"""
+    _state_latest[world_id] = state
+    for q in list(_state_subs.get(world_id, ())):
+        try:
+            q.get_nowait()
+        except asyncio.QueueEmpty:
+            pass
+        try:
+            q.put_nowait(state)
+        except asyncio.QueueFull:
+            pass
 
 
 def _cfg_int(cfg: dict, key: str, default: int, lo: int, hi: int) -> int:
@@ -263,6 +283,66 @@ async def world_api_usage(
         "cached_tokens": cached,
         "cache_hit_rate_pct": hit_rate,
     }
+
+
+@router.post("/{world_id}/api/state")
+async def world_api_publish_state(
+    world_id: int,
+    request: Request,
+    body: dict,
+    db: AsyncSession = Depends(get_db),
+):
+    """受控 API：世界代码发布状态快照（NPC 对话/移动/事件 → 页面 SSE 实时收到）
+
+    状态由世界代码全权定义（任意 JSON）；后端负责：内存最新快照 + 广播订阅者 + 落 state.json。
+    """
+    world = await _authorize_world_api(db, world_id, request)
+    _rate_limit_write(world)
+    if len(json.dumps(body, ensure_ascii=False)) > 100 * 1024:
+        raise HTTPException(status_code=422, detail="状态过大（上限 100KB）")
+    _publish_state(world_id, body)
+    try:
+        from app.services.world.world_file_service import write_file
+        write_file(world_id, "state.json", json.dumps(body, ensure_ascii=False, indent=1))
+    except Exception:
+        pass  # 落盘失败不影响实时推送
+    return {"ok": True}
+
+
+@router.get("/{world_id}/events")
+async def world_events(
+    world_id: int,
+    request: Request,
+    db: AsyncSession = Depends(get_db),
+):
+    """世界状态 SSE 订阅（页面 EventSource 用）：实时收到世界代码发布的状态
+
+    - 公开端点（与静态资源同理）：只推世界自身发布的状态，不含敏感数据
+    - 连接即发当前快照（刷新/新用户能拿到最新状态）；15s 心跳防代理超时
+    """
+    q: asyncio.Queue = asyncio.Queue(maxsize=1)
+    _state_subs.setdefault(world_id, set()).add(q)
+
+    async def gen():
+        try:
+            latest = _state_latest.get(world_id)
+            if latest is not None:
+                yield f"data: {json.dumps(latest, ensure_ascii=False)}\n\n"
+            while True:
+                try:
+                    state = await asyncio.wait_for(q.get(), timeout=15.0)
+                except asyncio.TimeoutError:
+                    yield ": ping\n\n"  # 心跳
+                    continue
+                yield f"data: {json.dumps(state, ensure_ascii=False)}\n\n"
+        finally:
+            _state_subs.get(world_id, set()).discard(q)
+
+    return StreamingResponse(
+        gen(),
+        media_type="text/event-stream",
+        headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"},
+    )
 
 
 # ── 2.4 群聊写 API：身份 = 世界自身（与 AI 工具同身份，底层借世界主人权限并做群角色检查）；

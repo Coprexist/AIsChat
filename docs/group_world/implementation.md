@@ -178,9 +178,19 @@ window.WorldUI = {              // UI 桥（postMessage → 宿主 Layout）
 7. ✅ 动态限流（10 秒窗口 = 基础 + 每人加成 × 活跃人数；worlds.config 可配 4 个字段）
 8. ✅ **群消息钩子**（2026-08-05 已完成：群消息→世界入口 handle(event) 异步感知；2s 节流合并可配；source=world 防死循环）
 9. ✅ **唤醒改手动模式**（2026-08-05：AUTO_MANAGE=False，状态只由手动 wake/sleep 控制，唤醒后保持活跃）
-10. ✅ **后台配额修复**（2026-08-05：sleep_memory_mb 默认 24→48MB，policy 硬下限 32MB——24MB 下解释器连 import 都跑不动）
-11. 后台常驻任务（世界自主演化）
-12. 世界线一致性（阶段 3）
+10. ✅ **后台配额修复**（2026-08-05：sleep_memory_mb 默认 24→64MB，policy 硬下限 32MB——24MB 下解释器连 import 都跑不动）
+11. ✅ **全局并发排队**（2026-08-05：asyncio.Semaphore，SANDBOX_MAX_CONCURRENT 默认 4 可配；返回 queued_ms）
+12. ✅ **2.5 常驻世界程序 + 实时状态通道**（2026-08-05，见下）
+13. 世界线一致性（阶段 3）
+
+**2.5 常驻 + 状态通道详情**（2026-08-05）：
+- world_resident.py：ResidentManager（单例）+ harness。世界 config `resident: true` + `tick_interval`（默认 30s）开启常驻
+- 常驻进程 = python -I -X utf8 + harness：handle(event) 处理事件（进程内 asyncio 队列）+ on_tick() 定时推演 + on_stop() 优雅退出存状态；stdin/stdout 行协议（JSON）；stdout 转发后端日志
+- 生命周期：手动唤醒→启动常驻；手动休眠→发 stop 优雅停止（超时 5s killpg）；后端启动 restore_all 恢复常驻世界；默认不限常驻个数（预留可配）
+- ⚠️ harness 必须放 /tmp 且不 unlink（世界目录/删除都有 exec 竞争 → exit 2）；世界目录经 env WORLD_DIR 注入；start 前 ensure api_token
+- 实时状态通道（零轮询）：世界代码 POST /world/{id}/api/state 发布状态（受控 API 鉴权+写限流+100KB 上限）→ 后端内存快照+广播+落 state.json；页面 EventSource GET /world/{id}/events（公开，连接发快照，15s 心跳，慢消费者只留最新）
+- 群消息钩子路由：常驻世界→dispatch 常驻进程；否则临时触发 fallback
+- 测试（临时世界 20，已删）：常驻进程启动✅、tick 2s 推演推送✅、群消息→handle→状态 SSE 实时✅、sleep 优雅停止 code=0✅
 
 **2.3+2.4 详情**（2026-08-05）：
 - 数据面：GET /world/{id}/api/{world,chat,memories,usage,groups} + POST /api/memories（复用 get_chat_history / world_tools._do_execute 同一份逻辑）
