@@ -17,18 +17,24 @@ export default function WorldViewPage() {
 
   const wid = Number(worldId)
 
-  // 独立窗口（Tauri）时：关闭窗口；应用内：返回
+  // 独立窗口（Tauri / window.open 弹窗）时：关窗口；应用内：返回上一页（无历史则回世界列表）
   const handleBack = () => {
     if ('__TAURI_INTERNALS__' in window) {
       ;(async () => {
         try {
           const { getCurrentWindow } = await import('@tauri-apps/api/window')
           await getCurrentWindow().close()
-        } catch { navigate(-1) }
+        } catch { navigate('/worlds') }
       })()
       return
     }
-    navigate(-1)
+    // window.open 弹出的独立窗口：直接关窗
+    if (window.opener) {
+      window.close()
+      return
+    }
+    if (window.history.length > 1) navigate(-1)
+    else navigate('/worlds')
   }
 
   useEffect(() => {
