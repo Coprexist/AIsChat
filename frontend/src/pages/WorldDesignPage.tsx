@@ -150,6 +150,7 @@ export default function WorldDesignPage() {
   , [cmdQuery])
   const [chatSending, setChatSending] = useState(false)
   const [chatProcessing, setChatProcessing] = useState(false)  // 刷新后恢复：后台轮次仍在执行
+  const [pendingMsgs, setPendingMsgs] = useState<string[]>([])  // AI 处理中排队消息（流结束后一起发送）
   const chatProcessingRef = useRef(false)
   const [chatHasMore, setChatHasMore] = useState(false)
   const [chatLoadingOlder, setChatLoadingOlder] = useState(false)
@@ -514,8 +515,30 @@ export default function WorldDesignPage() {
     if (el.scrollTop < 30) loadOlder()
   }, [loadOlder])
 
+  // 流结束后（chatSending/chatProcessing 都结束）自动发送排队消息（一起发给 AI）
+  useEffect(() => {
+    if (!chatSending && !chatProcessing && pendingMsgs.length > 0) {
+      const batch = pendingMsgs
+      setPendingMsgs([])
+      sendChat(batch.join('\n'))
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [chatSending, chatProcessing, pendingMsgs])
+
   const sendChat = async (overrideText?: string) => {
     const text = (overrideText ?? chatInput).trim()
+    if (!text) return
+    // AI 忙（本条发送中 / 后台轮次执行中）：普通消息排队等流结束后一起发；/ 命令必须等工作流结束
+    if (chatSending || chatProcessing) {
+      if (text.startsWith('/')) {
+        setMsg('⏳ 命令需等待当前处理完成后再发送')
+        return
+      }
+      setPendingMsgs((msgs) => [...msgs, text])
+      setChatInput('')
+      setCmdActive(false)
+      return
+    }
     if (!text || chatSending) return
     setChatSending(true)
     setChatInput('')
@@ -808,15 +831,33 @@ export default function WorldDesignPage() {
             ))}
           </div>
         )}
+        {/* 排队消息（AI 处理中，输入框上方弹窗展示，流结束后一起发送） */}
+        {pendingMsgs.length > 0 && (
+          <div className="absolute bottom-full left-3 right-3 mb-1 max-h-32 overflow-y-auto rounded-xl bg-elevated border border-border shadow-xl z-50">
+            <div className="px-3 py-1.5 text-[10px] text-textMuted border-b border-border">
+              ⏳ AI 处理中，以下 {pendingMsgs.length} 条消息将在本次完成后自动发送
+            </div>
+            {pendingMsgs.map((m, i) => (
+              <div key={i} className="flex items-center gap-2 px-3 py-1.5 text-xs text-textPrimary border-b border-border/40 last:border-b-0">
+                <span className="truncate flex-1">{m}</span>
+                <button
+                  onClick={() => setPendingMsgs((msgs) => msgs.filter((_, j) => j !== i))}
+                  className="shrink-0 text-textMuted hover:text-rose-400 transition-colors"
+                  title="移除这条"
+                >✕</button>
+              </div>
+            ))}
+          </div>
+        )}
         <textarea
           value={chatInput}
           onChange={(e) => {
             const ta = e.target
             setChatInput(ta.value)
-            // / 检测：光标前只有 / + 字母（命令整行输入）
+            // / 检测：光标前只有 / + 字母（命令整行输入）；AI 忙时命令需等待，不弹列表
             const before = ta.value.slice(0, ta.selectionStart)
             const m = before.match(/^\/\w*$/)
-            if (m) { setCmdQuery(before.slice(1)); setCmdActive(true); setCmdIdx(0) }
+            if (m && !chatSending && !chatProcessing) { setCmdQuery(before.slice(1)); setCmdActive(true); setCmdIdx(0) }
             else setCmdActive(false)
           }}
           onKeyDown={(e) => {
@@ -829,16 +870,15 @@ export default function WorldDesignPage() {
             if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendChat() }
           }}
           rows={2}
-          placeholder="和世界 AI 对话…（输入 / 查看命令）"
-          disabled={chatSending || chatProcessing}
-          className="w-full bg-elevated text-sm p-2 rounded border border-border outline-none resize-none disabled:opacity-50 focus:border-primary-500/50"
+          placeholder={(chatSending || chatProcessing) ? "AI 处理中，消息将排队…" : "和世界 AI 对话…（输入 / 查看命令）"}
+          className="w-full bg-elevated text-sm p-2 rounded border border-border outline-none resize-none focus:border-primary-500/50"
         />
         <button
-          onClick={sendChat}
-          disabled={chatSending || chatProcessing || !chatInput.trim()}
+          onClick={() => sendChat()}
+          disabled={!chatInput.trim()}
           className="w-full mt-2 py-1.5 text-sm bg-primary-500 hover:bg-primary-400 text-white rounded transition-colors disabled:opacity-40"
         >
-          {chatSending || chatProcessing ? '思考中...' : '发送'}
+          {(chatSending || chatProcessing) ? '排队发送' : (chatSending ? '思考中...' : '发送')}
         </button>
         {chatProcessing && (
           <div className="text-[10px] text-textMuted mt-2 text-center">
