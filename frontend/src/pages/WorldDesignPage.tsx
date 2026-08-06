@@ -605,9 +605,9 @@ export default function WorldDesignPage() {
           <div className="text-center mt-8 space-y-3">
             <div className="text-xs text-textMuted">暂无消息，从下面开始探索：</div>
             {chat.suggestions.length > 0 && !chat.chatSending && !chat.chatProcessing && (
-              <div className="flex flex-col items-center gap-1.5">
+              <div className="flex flex-col items-center gap-1.5 w-full max-w-[420px]">
                 {chat.suggestions.map((q, i) => (
-                  <div key={i} className="flex items-stretch rounded-lg bg-elevated border border-border overflow-hidden max-w-[85%]">
+                  <div key={i} className="flex items-stretch rounded-lg bg-elevated border border-border overflow-hidden w-full">
                     <button
                       onClick={() => chat.submitText(q)}
                       className="flex-1 min-w-0 px-2.5 py-1.5 text-left text-xs text-textSecondary hover:bg-primary-500/20 hover:text-primary-300 transition-colors truncate"
@@ -658,10 +658,10 @@ export default function WorldDesignPage() {
               )}
               {/* "你可以"建议：插在最后一条 AI 回复下面（无对话时显示在列表底部），一个建议一行（文字 | 发送 | 插入） */}
               {(isLastAi || chat.chatMsgs.length === 0) && chat.suggestions.length > 0 && !chat.chatSending && !chat.chatProcessing && (
-                <div className="space-y-1.5 pl-1">
+                <div className="space-y-1.5 pl-1 w-full max-w-[420px]">
                   <div className="text-[10px] text-textMuted">你可以：</div>
                   {chat.suggestions.map((q, i) => (
-                    <div key={i} className="flex items-stretch rounded-lg bg-elevated border border-border overflow-hidden max-w-[85%]">
+                    <div key={i} className="flex items-stretch rounded-lg bg-elevated border border-border overflow-hidden w-full">
                       <button
                         onClick={() => chat.submitText(q)}
                         className="flex-1 min-w-0 px-2.5 py-1.5 text-left text-xs text-textSecondary hover:bg-primary-500/20 hover:text-primary-300 transition-colors truncate"
