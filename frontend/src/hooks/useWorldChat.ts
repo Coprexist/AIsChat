@@ -317,10 +317,12 @@ export function useWorldChat({ wid, onRefresh, onMsg }: UseWorldChatOptions) {
       setPendingItems((items) => [...items, { kind: t.startsWith('/') ? 'cmd' : 'msg', text: t }])
       setChatInput('')
       setCmdActive(false)
+      setSuggestions([])  // 开始新工作流 → 旧建议隐藏，等新回复生成新的
       return
     }
     // 直接发送：也先画用户气泡，再由 sendMessages 发送
     setChatMsgs((msgs) => [...msgs, { id: -(++msgSeqRef.current), role: 'user', content: t }])
+    setSuggestions([])  // 用户发送（点了预设等）→ 建议收起
     sendMessages([t])
   }
 
