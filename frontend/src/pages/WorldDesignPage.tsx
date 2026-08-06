@@ -6,7 +6,7 @@
  */
 import { useEffect, useState, useCallback, useRef, useMemo } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
-import { ChevronLeft, ChevronRight, ChevronDown, Folder, FolderOpen, FileText, FileCode, FileJson, FileImage, FileAudio, FileVideo, File, Trash2, Upload, Plus, Pencil, Eye, Brain, MessageCircle, Save, Send, CornerDownLeft } from 'lucide-react'
+import { ChevronLeft, ChevronRight, ChevronDown, Folder, FolderOpen, FileText, FileCode, FileJson, FileImage, FileAudio, FileVideo, File, Trash2, Upload, Plus, Pencil, Eye, Brain, MessageCircle, Save, Send, CornerDownLeft, ArrowDown } from 'lucide-react'
 import { api } from '../api/client'
 import MarkdownContent from '../components/shared/MarkdownContent'
 import CodeRenderer from '../components/shared/CodeRenderer'
