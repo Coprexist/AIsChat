@@ -1235,6 +1235,7 @@ async def update_system_settings(
                 message_retention_days=req.message_retention_days,
                 daily_backup_enabled=req.daily_backup_enabled,
                 daily_backup_keep=req.daily_backup_keep,
+                world_preset_suggestions=req.world_preset_suggestions,
                 updated_by=admin["user_id"],
             )
         await _log_admin_action(

@@ -127,13 +127,27 @@ DEFAULT_MAX_TOOL_ROUNDS = 50       # 工具循环默认上限（可在设计页�
 
 CHAT_HISTORY_LIMIT = 30  # 每次对话携带的最近消息数
 
-# "你可以问"预设问题（首次进入编辑页 / clear 后无对话历史时展示）
-PRESET_SUGGESTIONS = [
-    "把页面标题改成红色",
-    "给这个世界生成一个欢迎页",
+# "你可以问"默认预设问题（首次进入编辑页 / clear 后无对话历史时展示）
+# 优先级：管理员后台 system_settings.world_preset_suggestions（统一维护）> 此处默认
+DEFAULT_PRESET_SUGGESTIONS = [
     "这个世界能做什么？",
-    "讲讲这个世界的设定",
+    "给我讲讲这个世界的设定",
+    "有什么好玩的地方或任务？",
+    "你能帮我做什么？",
 ]
+
+
+async def _load_preset_suggestions(db) -> list[str]:
+    """统一读取预设：后台 system_settings.world_preset_suggestions（无则用默认）"""
+    try:
+        from app.services.infrastructure.system_settings_service import get_settings
+        s = await get_settings(db)
+        presets = s.get("world_preset_suggestions")
+        if isinstance(presets, list) and presets:
+            return [str(q).strip()[:40] for q in presets if str(q).strip()][:10]
+    except Exception:
+        pass
+    return list(DEFAULT_PRESET_SUGGESTIONS)
 
 
 async def get_chat_history(db: AsyncSession, world_id: int, limit: int = 30, before_id: int | None = None) -> list[dict]:
@@ -650,7 +664,7 @@ async def _suggest_fallback(db, world) -> list[str]:
             .order_by(WorldChatMessage.id.desc()).limit(6)
         )).scalars().all()
         if not rows:
-            return list(PRESET_SUGGESTIONS)
+            return await _load_preset_suggestions(db)
         recent = "\n".join(
             f"{'用户' if r.role == 'user' else 'AI'}: {r.content[:120]}" for r in reversed(rows)
         )
@@ -673,10 +687,10 @@ async def _suggest_fallback(db, world) -> list[str]:
         arr = json.loads(text.strip().strip("`").lstrip("json").strip())
         if isinstance(arr, list):
             return [str(q).strip()[:40] for q in arr if str(q).strip()][:5]
-        return list(PRESET_SUGGESTIONS)
+        return await _load_preset_suggestions(db)
     except Exception as e:
         logger.warning(f"🌐 世界 #{world.id} 建议兜底失败（用预设）: {e}")
-        return list(PRESET_SUGGESTIONS)
+        return await _load_preset_suggestions(db)
 
 
 # ═══════════════════════════════════════════════════════════════

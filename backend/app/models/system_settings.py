@@ -38,6 +38,7 @@ class SystemSettings(Base):
     audit_user_actions = Column(Boolean, default=False, comment="是否记录用户行为日志（登录、发消息等），默认关闭")
     audit_log_retention_days = Column(Integer, default=90, comment="审计日志保留天数，超期自动清理（默认 90 天）")
     message_retention_days = Column(Integer, default=0, comment="消息保留天数（0=永久保留）")
+    world_preset_suggestions = Column(JSONB, nullable=True, comment="世界 AI 建议问题预设（「你可以问」按钮，无对话历史/兜底时展示）")
 
     # 每日数据库备份（管理员开关 + 保留份数，超出自动清除）
     daily_backup_enabled = Column(Boolean, default=False, comment="每日自动备份开关（管理员控制，默认关）")

@@ -36,6 +36,7 @@ class UpdateSystemSettingsRequest(BaseModel):
     message_retention_days: int | None = Field(None, ge=0, le=3650, description="消息保留天数（0=永久保留）")
     daily_backup_enabled: bool | None = Field(None, description="每日自动备份开关（默认关）")
     daily_backup_keep: int | None = Field(None, ge=1, le=365, description="备份保留份数，超出自动清除（1-365）")
+    world_preset_suggestions: list[str] | None = Field(None, description="世界 AI 建议问题预设（你可以问按钮）")
 
 
 class SetupCompleteRequest(BaseModel):

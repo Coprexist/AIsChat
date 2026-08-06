@@ -84,6 +84,7 @@ async def get_settings(db: AsyncSession) -> dict:
         "message_retention_days": getattr(row, "message_retention_days", 0) or 0,
         "daily_backup_enabled": bool(getattr(row, "daily_backup_enabled", False)),
         "daily_backup_keep": getattr(row, "daily_backup_keep", 7) or 7,
+        "world_preset_suggestions": getattr(row, "world_preset_suggestions", None),
     }
 
 
@@ -100,6 +101,7 @@ async def update_settings(
     message_retention_days: int | None = None,
     daily_backup_enabled: bool | None = None,
     daily_backup_keep: int | None = None,
+    world_preset_suggestions: list[str] | None = None,
     updated_by: int | None = None,
 ) -> dict:
     """
@@ -196,6 +198,9 @@ async def update_settings(
 
     if daily_backup_keep is not None:
         row.daily_backup_keep = daily_backup_keep
+
+    if world_preset_suggestions is not None:
+        row.world_preset_suggestions = [str(q).strip()[:40] for q in world_preset_suggestions if str(q).strip()][:10]
         logger.info(f"  备份保留份数: {daily_backup_keep}")
 
     if updated_by is not None:
