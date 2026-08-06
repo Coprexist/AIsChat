@@ -222,9 +222,9 @@ export function useWorldChat({ wid, onRefresh, onMsg }: UseWorldChatOptions) {
         setChatMsgs((msgs) => [...msgs, { id: -(++msgSeqRef.current), role: 'tool', content: `⏳ 已排队（前面还有 ${r.position} 条在跑）` }])
       }
 
-      // 2. 订阅直播（SSE）；断开自动重连加入直播，最多 5 次
+      // 2. 订阅直播（SSE）；断开自动重连（最多 2 次，服务重启中断场景快速收尾拉历史）
       let gotDone = false
-      for (let attempt = 0; attempt < 5 && !gotDone; attempt++) {
+      for (let attempt = 0; attempt < 2 && !gotDone; attempt++) {
         const streamResp = await fetch(`${base}/worlds/${wid}/chat/stream?turn_id=${r.turn_id}`, { headers: authHeaders })
         if (!streamResp.ok || !streamResp.body) throw new Error(`直播连接失败(${streamResp.status})`)
         const reader = streamResp.body.getReader()
@@ -290,8 +290,8 @@ export function useWorldChat({ wid, onRefresh, onMsg }: UseWorldChatOptions) {
           if (gotDone) break
         }
         if (gotDone) break
-        // 连接断开且未完成：稍等重连（重新订阅直播）
-        await new Promise((res) => setTimeout(res, 1500 * (attempt + 1)))
+        // 连接断开且未完成：稍等重连（间隔 1s/2s）
+        await new Promise((res) => setTimeout(res, 1000 * (attempt + 1)))
       }
       // 用权威历史收尾（含断开期间漏掉的工具气泡/最终回复）；世界信息可能被工具改过，一并刷新
       await loadChat()
