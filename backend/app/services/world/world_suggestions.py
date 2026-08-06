@@ -68,7 +68,7 @@ async def suggest_fallback(db: AsyncSession, world) -> list[str]:
         model = (wai.model if wai else None) or settings.default_chat_model
         resp = await chat_completion(
             messages=[
-                {"role": "system", "content": '你是对话引导助手。基于以下对话，生成 3-4 个建议给用户（每个 ≤20 字）：可以是问题、陈述性要求或下一步选项，具体、好玩、引导探索。只输出 JSON 数组，如 ["建议1","建议2","建议3"]，不要其它文字。'},
+                {"role": "system", "content": '你是对话引导助手。基于以下对话，生成 3-4 个建议给用户（每个 ≤20 字）：可以是问题、陈述性要求或下一步选项，具体、好玩、引导探索；避免琐碎的外观修改（如改颜色/换字体）和已经做过的事。只输出 JSON 数组，如 ["建议1","建议2","建议3"]，不要其它文字。'},
                 {"role": "user", "content": recent},
             ],
             model=model, api_base_url=api_base, api_key=api_key,
