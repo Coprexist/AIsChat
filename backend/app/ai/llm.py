@@ -1101,7 +1101,7 @@ async def build_messages(
         from app.models.conversation_log import ConversationLog as ConvLog
         import json as _json
         last_log = await db.execute(
-            sa_select(ConvLog)
+            select(ConvLog)
             .where(ConvLog.agent_id == agent.id, ConvLog.group_id == group_id, ConvLog.conversation_type == "group")
             .order_by(ConvLog.created_at.desc())
             .limit(1)
@@ -1142,6 +1142,27 @@ async def build_messages(
             await db.commit()
     except Exception:
         pass
+
+    # 本群绑定世界 → world_command 能力清单（动态尾部，缓存友好；群 AI 可操作世界）
+    if group_id:
+        try:
+            from app.models.world import WorldBinding, World
+            wrows = (await db.execute(
+                select(WorldBinding).where(
+                    WorldBinding.entity_type == "group",
+                    WorldBinding.entity_id == group_id,
+                )
+            )).scalars().all()
+            if wrows:
+                w = await db.get(World, wrows[0].world_id)
+                if w:
+                    messages.append({"role": "system", "content":
+                        f"【本群世界】本群绑定世界「{w.name}」（#{w.id}）。"
+                        "你可用 world_command 工具发送命令操作它，命令由世界程序解析"
+                        "（如：旅人移动到 2,3 / 我去 2,3 / 公告 xxx / 身份 签到；以世界实际支持为准）。"
+                        "命令会以你的名义出现在群里，可见可审计。"})
+        except Exception:
+            pass
     return messages
 
 
