@@ -74,9 +74,12 @@ export function useWorldChat({ wid, onRefresh, onMsg }: UseWorldChatOptions) {
         setChatMsgs(r.messages || [])
         // 在底部（跟随模式）才滚到消息末尾；用户往上翻时不打扰
         if (isAtBottomRef.current) {
+          // 双重 rAF：等内容渲染/布局稳定后再滚，瞬时到位（避免停在中间）
           requestAnimationFrame(() => {
-            const el = chatListRef.current
-            if (el) el.scrollTo({ top: el.scrollHeight, behavior: 'smooth' })
+            requestAnimationFrame(() => {
+              const el = chatListRef.current
+              if (el) el.scrollTop = el.scrollHeight
+            })
           })
         }
       }
@@ -148,15 +151,27 @@ export function useWorldChat({ wid, onRefresh, onMsg }: UseWorldChatOptions) {
     setIsAtBottom(atBottom)
   }, [loadOlder])
 
-  // 新消息到达：跟随模式（在底部）自动滚到最新——新消息平滑滚动，流式内容更新瞬时
+  // 新消息到达：跟随模式（在底部）自动滚到最新——首次瞬时（等布局稳定），后续新消息平滑，流式内容更新瞬时
   const prevLenRef = useRef(0)
+  const loadedOnceRef = useRef(false)
   useEffect(() => {
     if (!isAtBottomRef.current || chatMsgs.length === 0) return
     const el = chatListRef.current
     if (!el) return
+    const first = !loadedOnceRef.current
+    loadedOnceRef.current = true
     const lenChanged = chatMsgs.length !== prevLenRef.current
     prevLenRef.current = chatMsgs.length
-    el.scrollTo({ top: el.scrollHeight, behavior: lenChanged ? 'smooth' : 'auto' })
+    if (first) {
+      requestAnimationFrame(() => {
+        requestAnimationFrame(() => {
+          const el2 = chatListRef.current
+          if (el2) el2.scrollTop = el2.scrollHeight
+        })
+      })
+    } else if (lenChanged) {
+      el.scrollTo({ top: el.scrollHeight, behavior: 'smooth' })
+    }
   }, [chatMsgs])
 
   const scrollToBottom = useCallback((smooth = true) => {
