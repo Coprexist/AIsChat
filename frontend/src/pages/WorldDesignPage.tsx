@@ -6,7 +6,7 @@
  */
 import { useEffect, useState, useCallback, useRef, useMemo } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
-import { ChevronLeft, ChevronRight, ChevronDown, Folder, FolderOpen, FileText, FileCode, FileJson, FileImage, FileAudio, FileVideo, File, Trash2, Upload, Plus, Pencil, Eye, Brain } from 'lucide-react'
+import { ChevronLeft, ChevronRight, ChevronDown, Folder, FolderOpen, FileText, FileCode, FileJson, FileImage, FileAudio, FileVideo, File, Trash2, Upload, Plus, Pencil, Eye, Brain, MessageCircle, Save } from 'lucide-react'
 import { api } from '../api/client'
 import MarkdownContent from '../components/shared/MarkdownContent'
 import CodeRenderer from '../components/shared/CodeRenderer'
@@ -24,6 +24,53 @@ function fileTypeIcon(name: string) {
   if (['md', 'txt'].includes(ext)) return <FileText size={13} className="text-textSecondary shrink-0" />
   if (['html', 'htm', 'css', 'js', 'ts', 'jsx', 'tsx', 'py', 'xml', 'yaml', 'yml', 'sh'].includes(ext)) return <FileCode size={13} className="text-primary-400 shrink-0" />
   return <File size={13} className="text-textMuted shrink-0" />
+}
+
+// 文件内容区：md/html/代码渲染、图片显示、纯文本编辑（桌面右栏 / 移动端编辑器共用）
+function FileContentPane({ wid, currentFile, content, setContent, viewMode, canRender, isMdFile, fileCodeLang, isImgFile }: {
+  wid: number
+  currentFile: string
+  content: string
+  setContent: (v: string) => void
+  viewMode: 'edit' | 'render'
+  canRender: boolean
+  isMdFile: boolean
+  fileCodeLang: string
+  isImgFile: boolean
+}) {
+  if (viewMode === 'render' && canRender) {
+    if (isImgFile) {
+      return (
+        <div className="flex-1 overflow-hidden bg-canvas flex items-center justify-center">
+          <img
+            src={`/world/${wid}/files/${currentFile.split('/').map(encodeURIComponent).join('/')}`}
+            alt={currentFile}
+            className="w-full h-full object-contain"
+          />
+        </div>
+      )
+    }
+    return (
+      <div className="flex-1 overflow-auto bg-canvas [&_code]:!overflow-x-visible [&_code]:!rounded-none [&_code]:!border-0 [&_code]:!p-0 [&_code]:!bg-transparent">
+        <div className="w-full max-w-none text-sm leading-relaxed break-words text-textPrimary p-3 md:p-4">
+          {isMdFile ? (
+            <MarkdownContent content={content} isMine={false} />
+          ) : (
+            <CodeRenderer className={'language-' + fileCodeLang}>{content}</CodeRenderer>
+          )}
+        </div>
+      </div>
+    )
+  }
+  return (
+    <textarea
+      value={content}
+      onChange={(e) => setContent(e.target.value)}
+      spellCheck={false}
+      className="flex-1 bg-canvas text-sm text-textPrimary p-3 font-mono outline-none resize-none"
+      placeholder="在这里编辑代码…"
+    />
+  )
 }
 
 // ── 打字机效果：文本逐字显示（参考大同互动逐 token 渲染，简化版） ──
@@ -107,6 +154,16 @@ export default function WorldDesignPage() {
 
   // 当前文件内联渲染：md 渲染 + 查看原文；html/代码高亮渲染；图片直接显示（不用弹窗）
   const [viewMode, setViewMode] = useState<'edit' | 'render'>('edit')
+
+  // ── 移动端（<lg）：tab 切换（文件/对话，对话默认打开）+ 目录逐层导航 ──
+  const [mobileTab, setMobileTab] = useState<'files' | 'chat'>('chat')
+  const [mobileView, setMobileView] = useState<'dirs' | 'file'>('dirs')
+  const [mobileDir, setMobileDir] = useState('')  // 当前浏览目录（'' = 根）
+  // 上传：顶部菜单（上传到此位置 / 选择其它位置）+ 目录选择弹层
+  const [uploadMenuOpen, setUploadMenuOpen] = useState(false)
+  const [uploadDirPickerOpen, setUploadDirPickerOpen] = useState(false)
+  const [uploadNavDir, setUploadNavDir] = useState('')
+  const mobileUploadDirRef = useRef<string | null>(null)  // 非 null = 移动端上传，目标目录由此指定
   const fileExt = currentFile?.split('.').pop()?.toLowerCase() ?? ''
   const isMdFile = isMarkdownFile(currentFile ?? '', '')
   const fileCodeLang = currentFile ? getCodeLang(currentFile, '') : ''
@@ -201,25 +258,52 @@ export default function WorldDesignPage() {
 
   // ── 上传（先选择目标位置，再选文件） ──
   const fileInputRef = useRef<HTMLInputElement>(null)
-  const handleUploadPick = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const f = e.target.files?.[0]
-    e.target.value = ''  // 允许重复选同一文件
-    if (!f) return
-    // 先选择位置：默认当前选中文件所在目录
-    const dir = currentFile?.includes('/') ? currentFile.slice(0, currentFile.lastIndexOf('/') + 1) : ''
-    const target = prompt(`上传到哪个路径？（当前目录：${dir || '/'}）`, dir + f.name)
-    if (!target) return
+  const uploadFile = async (f: File, targetPath: string) => {
     try {
       const fd = new FormData()
       fd.append('file', f)
-      fd.append('path', target.replace(/^\/+/, ''))
+      fd.append('path', targetPath.replace(/^\/+/, ''))
       await api.post(`/worlds/${wid}/files/upload`, fd)
       await load()
-      selectFile(target.replace(/^\/+/, ''))
+      selectFile(targetPath.replace(/^\/+/, ''))
       setMsg('✅ 已上传')
     } catch (err: any) {
       setMsg(`上传失败: ${err?.message || err}`)
     }
+  }
+  const handleUploadPick = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const f = e.target.files?.[0]
+    e.target.value = ''  // 允许重复选同一文件
+    if (!f) return
+    // 移动端：目标目录由 mobileUploadDirRef 指定（上传菜单/目录选择器设置）
+    const mobileOverride = mobileUploadDirRef.current
+    mobileUploadDirRef.current = null
+    if (mobileOverride !== null) {
+      await uploadFile(f, mobileOverride ? `${mobileOverride}/${f.name}` : f.name)
+      setMobileView('file')  // 上传完自动打开文件（移动端）
+      return
+    }
+    // 桌面端：prompt 输入目标路径（默认当前选中文件所在目录）
+    const dir = currentFile?.includes('/') ? currentFile.slice(0, currentFile.lastIndexOf('/') + 1) : ''
+    const target = prompt(`上传到哪个路径？（当前目录：${dir || '/'}）`, dir + f.name)
+    if (!target) return
+    await uploadFile(f, target)
+  }
+  // 移动端上传：菜单（上传到此位置 / 选择其它位置）
+  const mobileUploadHere = () => {
+    setUploadMenuOpen(false)
+    mobileUploadDirRef.current = mobileDir
+    fileInputRef.current?.click()
+  }
+  const mobileUploadElsewhere = () => {
+    setUploadMenuOpen(false)
+    setUploadNavDir('')
+    setUploadDirPickerOpen(true)
+  }
+  const mobileUploadToNavDir = () => {
+    setUploadDirPickerOpen(false)
+    mobileUploadDirRef.current = uploadNavDir
+    fileInputRef.current?.click()
   }
 
   // ── 删除（AI 侧已有 file_delete 工具，这里补前端入口） ──
@@ -268,6 +352,31 @@ export default function WorldDesignPage() {
     sortNodes(root.children)
     return root
   }, [files])
+
+  // 移动端：当前浏览目录节点 / 上传目录选择器节点（从 fileTree 定位）
+  const mobileDirNode = useMemo(() => {
+    if (!mobileDir) return fileTree
+    const parts = mobileDir.split('/')
+    let node = fileTree
+    for (const p of parts) {
+      const next = node.children.find((c) => c.isDir && c.name === p)
+      if (!next) break
+      node = next
+    }
+    return node
+  }, [fileTree, mobileDir])
+
+  const uploadDirNode = useMemo(() => {
+    if (!uploadNavDir) return fileTree
+    const parts = uploadNavDir.split('/')
+    let node = fileTree
+    for (const p of parts) {
+      const next = node.children.find((c) => c.isDir && c.name === p)
+      if (!next) break
+      node = next
+    }
+    return node
+  }, [fileTree, uploadNavDir])
 
   const toggleDir = (path: string) => {
     setCollapsedDirs((prev) => {
@@ -523,11 +632,387 @@ export default function WorldDesignPage() {
     }
   }
 
+  // ── 聊天面板内容（桌面右栏 / 移动端对话 tab 共用） ──
+  const renderChatInner = () => (
+    <>
+      <div className="px-4 py-3 border-b border-border">
+        <div className="flex items-center gap-2">
+          <span className="text-sm font-semibold">{world.creator?.name || '群视界机器人'}</span>
+          <span className="text-[10px] px-1.5 py-0.5 rounded bg-elevated text-textMuted">{world.creator?.id}</span>
+          <div className="flex-1" />
+          <button
+            onClick={() => setShowCreatorForm((v) => !v)}
+            className="text-xs px-2 py-1 rounded bg-elevated hover:bg-border text-textSecondary transition-colors"
+            title="世界 AI 配置（单独表单，不属于 agent）"
+          >
+            ⚙️ 配置
+          </button>
+        </div>
+        <div className="text-xs text-textMuted mt-0.5">世界 AI 是世界的配置：让它改界面、加功能</div>
+      </div>
+
+      {showCreatorForm && (
+        <div className="px-3 py-3 border-b border-border bg-elevated/50 space-y-2">
+          <div className="text-xs font-semibold text-textSecondary">群视界机器人配置（世界的，非 agent）</div>
+          <div>
+            <div className="text-[10px] text-textMuted mb-0.5">名字</div>
+            <input
+              value={creatorForm.name}
+              onChange={(e) => setCreatorForm((f) => ({ ...f, name: e.target.value }))}
+              className="w-full bg-elevated text-sm p-1.5 rounded border border-border outline-none focus:border-primary-500/50"
+            />
+          </div>
+          <div>
+            <div className="text-[10px] text-textMuted mb-0.5">系统提示词</div>
+            <textarea
+              value={creatorForm.system_prompt}
+              onChange={(e) => setCreatorForm((f) => ({ ...f, system_prompt: e.target.value }))}
+              rows={6}
+              className="w-full bg-elevated text-xs p-1.5 rounded border border-border outline-none resize-none font-mono focus:border-primary-500/50"
+            />
+          </div>
+          <div className="flex gap-2">
+            <div className="flex-1">
+              <div className="text-[10px] text-textMuted mb-0.5">模型（留空 = 全局默认）</div>
+              <input
+                value={creatorForm.model}
+                onChange={(e) => setCreatorForm((f) => ({ ...f, model: e.target.value }))}
+                placeholder="如 deepseek-v4-flash"
+                className="w-full bg-elevated text-sm p-1.5 rounded border border-border outline-none focus:border-primary-500/50"
+              />
+            </div>
+            <div className="w-20">
+              <div className="text-[10px] text-textMuted mb-0.5">温度</div>
+              <input
+                type="number"
+                min={0}
+                max={2}
+                step={0.1}
+                value={creatorForm.temperature}
+                onChange={(e) => setCreatorForm((f) => ({ ...f, temperature: Number(e.target.value) }))}
+                className="w-full bg-elevated text-sm p-1.5 rounded border border-border outline-none focus:border-primary-500/50"
+              />
+            </div>
+          </div>
+          <div className="flex items-center justify-between bg-elevated/60 rounded p-2">
+            <div>
+              <div className="text-[10px] text-textSecondary">深度思考（推理模式）</div>
+              <div className="text-[10px] text-amber-400/90">⚠️ 开启后推理 token 单独计费，费用显著增加</div>
+            </div>
+            <input
+              type="checkbox"
+              checked={creatorForm.thinking}
+              onChange={(e) => setCreatorForm((f) => ({ ...f, thinking: e.target.checked }))}
+              className="w-4 h-4 accent-primary-500"
+            />
+          </div>
+          <div className="flex items-center justify-between bg-elevated/60 rounded p-2">
+            <div>
+              <div className="text-[10px] text-textSecondary">工具循环上限</div>
+              <div className="text-[10px] text-textMuted">单次对话最多连续调几轮工具（1-200，默认 50）</div>
+            </div>
+            <input
+              type="number"
+              min={1}
+              max={200}
+              value={creatorForm.max_tool_rounds}
+              onChange={(e) => setCreatorForm((f) => ({ ...f, max_tool_rounds: Number(e.target.value) || 50 }))}
+              className="w-20 bg-elevated text-sm p-1.5 rounded border border-border outline-none text-right"
+            />
+          </div>
+          {usageStats && (
+            <div className="flex items-center justify-between bg-elevated/60 rounded p-2">
+              <div>
+                <div className="text-[10px] text-textSecondary">LLM 缓存命中率</div>
+                <div className="text-[10px] text-textMuted">{usageStats.total_calls} 次调用 · prompt {usageStats.prompt_tokens} / 缓存 {usageStats.cached_tokens} tok</div>
+              </div>
+              <div className="text-sm font-bold text-mint-400">{usageStats.cache_hit_rate_pct}%</div>
+            </div>
+          )}
+          <button
+            onClick={saveCreator}
+            disabled={creatorSaving}
+            className="w-full py-1.5 text-sm bg-primary-500 hover:bg-primary-400 text-white rounded transition-colors disabled:opacity-40"
+          >
+            {creatorSaving ? '保存中...' : (<span className="inline-flex items-center gap-1"><Save size={12} /> 保存配置</span>)}
+          </button>
+        </div>
+      )}
+
+      {/* 消息列表（滚到顶加载更早） */}
+      <div ref={chatListRef} onScroll={handleChatScroll} className="flex-1 overflow-y-auto p-3 space-y-2">
+        {chatLoadingOlder && <div className="text-[10px] text-textMuted text-center py-1">加载更早消息…</div>}
+        {chatMsgs.length === 0 && (
+          <div className="text-xs text-textMuted text-center mt-8">
+            暂无消息<br/>试试发送：「把页面标题改成红色」
+          </div>
+        )}
+        {chatMsgs.map((m) => (
+          m.role === 'tool' ? (
+            <div key={m.id} className={`text-[11px] text-center py-1 px-2 rounded-lg max-w-[90%] mx-auto ${m.error ? 'text-rose-400 bg-rose-500/10 border border-rose-500/20' : 'text-mint-400 bg-mint-400/10 border border-mint-400/20'}`}>
+              🔧 {m.content}
+            </div>
+          ) : (
+          <div key={m.id} className={`text-sm max-w-[90%] p-2 rounded-lg ${m.error ? 'bg-rose-500/10 border border-rose-500/30 text-rose-400' : m.role === 'user' ? 'bg-primary-500/20 ml-auto' : 'bg-elevated/80'}`}>
+            <div className="text-[10px] text-textMuted mb-0.5">{m.error ? '⚠️ 错误' : m.role === 'user' ? '我' : '世界 AI'}</div>
+            {!m.error && (m.role === 'ai' || m.role === 'note') && !!m.reasoning && (
+              <details className="group/details mb-1.5">
+                <summary className="flex items-center gap-1 text-[10px] text-textMuted cursor-pointer select-none hover:text-textSecondary list-none [&::-webkit-details-marker]:hidden">
+                  <ChevronRight size={11} className="transition-transform group-open/details:rotate-90" />
+                  <Brain size={11} className="text-textMuted" />
+                  思考过程
+                </summary>
+                <div className="text-xs text-textMuted mt-1 whitespace-pre-wrap bg-elevated/70 rounded p-2">{m.reasoning}</div>
+              </details>
+            )}
+            {m.content ? <MarkdownContent content={m.content} /> : (m.role === 'ai' ? <span className="opacity-40">…</span> : null)}
+          </div>
+          )
+        ))}
+      </div>
+
+      {/* 输入 */}
+      <div className="p-3 border-t border-border">
+        <textarea
+          value={chatInput}
+          onChange={(e) => setChatInput(e.target.value)}
+          onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendChat() } }}
+          rows={2}
+          placeholder="和世界 AI 对话…（无需 @）"
+          disabled={chatSending || chatProcessing}
+          className="w-full bg-elevated text-sm p-2 rounded border border-border outline-none resize-none disabled:opacity-50 focus:border-primary-500/50"
+        />
+        <button
+          onClick={sendChat}
+          disabled={chatSending || chatProcessing || !chatInput.trim()}
+          className="w-full mt-2 py-1.5 text-sm bg-primary-500 hover:bg-primary-400 text-white rounded transition-colors disabled:opacity-40"
+        >
+          {chatSending || chatProcessing ? '思考中...' : '发送'}
+        </button>
+        {chatProcessing && (
+          <div className="text-[10px] text-textMuted mt-2 text-center">
+            ⏳ 上一轮还在执行（刷新不影响），完成后自动显示
+          </div>
+        )}
+        <div className="text-[10px] text-textMuted mt-2 text-center">
+          世界级会话（非 DM）：账单走世界主人，让它改界面、加功能
+        </div>
+      </div>
+    </>
+  )
+
   if (loading) return <div className="flex items-center justify-center h-screen text-textMuted">加载中...</div>
   if (!world) return <div className="p-8 text-textMuted">世界不存在</div>
 
   return (
-    <div className="flex h-screen bg-canvas text-textPrimary">
+    <div className="h-screen bg-canvas text-textPrimary">
+      {/* ═══ 移动端（<lg）：tab 切换 ── 文件（目录导航/编辑器）+ 对话（默认打开） ═══ */}
+      <div className="lg:hidden flex flex-col h-full relative">
+        {/* 顶栏：返回 + 世界信息 + 上传（文件 tab 时显示） */}
+        <div className="flex items-center gap-2 px-3 py-2 bg-surface border-b border-border">
+          <button onClick={() => navigate('/worlds')} className="inline-flex items-center gap-1 text-sm text-textMuted hover:text-textPrimary transition-colors shrink-0">
+            <ChevronLeft size={14} />
+            世界
+          </button>
+          <span className="font-semibold truncate">{world.name}</span>
+          <span className={`text-xs px-2 py-0.5 rounded-full shrink-0 ${world.status === 'active' ? 'bg-green-500/20 text-green-400' : 'bg-elevated text-textMuted'}`}>
+            {world.status === 'active' ? '活跃' : '休眠'}
+          </span>
+          <div className="flex-1" />
+          {mobileTab === 'files' && (
+            <div className="relative shrink-0">
+              <button onClick={() => setUploadMenuOpen((v) => !v)} className="inline-flex items-center gap-1 text-xs text-primary-400 hover:text-primary-300 transition-colors px-2 py-1" title="上传文件">
+                <Upload size={14} />
+                上传
+              </button>
+              {uploadMenuOpen && (
+                <div className="absolute right-0 top-full mt-1 w-56 bg-surface border border-border rounded-lg shadow-lg p-1 z-50">
+                  <button onClick={mobileUploadHere} className="w-full inline-flex items-center gap-1.5 text-left text-xs px-3 py-2 rounded hover:bg-elevated text-textPrimary">
+                    <Upload size={13} /> 上传到此位置（{mobileDir || '/'}）
+                  </button>
+                  <button onClick={mobileUploadElsewhere} className="w-full inline-flex items-center gap-1.5 text-left text-xs px-3 py-2 rounded hover:bg-elevated text-textPrimary">
+                    <FolderOpen size={13} /> 选择其它位置…
+                  </button>
+                </div>
+              )}
+            </div>
+          )}
+        </div>
+
+        {/* tab：文件 / 对话（对话默认打开） */}
+        <div className="flex items-stretch bg-surface border-b border-border">
+          <button
+            onClick={() => setMobileTab('files')}
+            className={`flex-1 inline-flex items-center justify-center gap-1.5 py-2 text-sm transition-colors ${mobileTab === 'files' ? 'text-primary-400 border-b-2 border-primary-500 font-medium' : 'text-textMuted'}`}
+          >
+            <Folder size={14} /> 文件
+          </button>
+          <button
+            onClick={() => setMobileTab('chat')}
+            className={`flex-1 inline-flex items-center justify-center gap-1.5 py-2 text-sm transition-colors ${mobileTab === 'chat' ? 'text-primary-400 border-b-2 border-primary-500 font-medium' : 'text-textMuted'}`}
+          >
+            <MessageCircle size={14} /> 对话
+          </button>
+        </div>
+
+        {/* 内容区：对话 tab（默认）/ 文件 tab（目录导航 → 编辑器） */}
+        {mobileTab === 'chat' ? (
+          <div className="flex-1 flex flex-col min-h-0 bg-surface">
+            {renderChatInner()}
+          </div>
+        ) : mobileView === 'file' ? (
+          <div className="flex-1 flex flex-col min-h-0">
+            <div className="px-3 py-1.5 text-xs text-textSecondary bg-surface/60 border-b border-border flex items-center gap-2">
+              <button onClick={() => setMobileView('dirs')} className="inline-flex items-center gap-0.5 text-primary-400 hover:text-primary-300 transition-colors shrink-0">
+                <ChevronLeft size={13} />
+                返回
+              </button>
+              <span className="truncate flex-1">{currentFile || '未选择文件'}</span>
+              {canRender && (
+                <button
+                  onClick={() => setViewMode((v) => (v === 'render' ? 'edit' : 'render'))}
+                  className="text-primary-400 hover:text-primary-300 transition-colors shrink-0"
+                  title={viewMode === 'render' ? '切到原文/编辑' : '切到渲染视图'}
+                >
+                  {viewMode === 'render' ? (isMdFile ? '查看原文' : '编辑') : '渲染'}
+                </button>
+              )}
+              {viewMode !== 'render' && (
+                <button onClick={saveFile} disabled={saving} className="text-primary-400 hover:text-primary-300 transition-colors shrink-0">
+                  {saving ? '保存中...' : (<span className="inline-flex items-center gap-1"><Save size={12} /> 保存</span>)}
+                </button>
+              )}
+            </div>
+            <FileContentPane wid={wid} currentFile={currentFile} content={content} setContent={setContent} viewMode={viewMode} canRender={canRender} isMdFile={isMdFile} fileCodeLang={fileCodeLang} isImgFile={isImgFile} />
+          </div>
+        ) : (
+          <div className="flex-1 flex flex-col min-h-0">
+            {/* 面包屑（路径可逐级返回） */}
+            <div className="flex items-center gap-0.5 px-3 py-2 bg-surface/60 border-b border-border overflow-x-auto text-xs">
+              <button onClick={() => setMobileDir('')} className="text-primary-400 hover:underline shrink-0">/</button>
+              {mobileDir.split('/').filter(Boolean).map((seg, i, arr) => {
+                const path = mobileDir.split('/').slice(0, i + 1).join('/')
+                const isLast = i === arr.length - 1
+                return isLast ? (
+                  <span key={path} className="flex items-center gap-0.5 min-w-0">
+                    <ChevronRight size={11} className="text-textMuted shrink-0" />
+                    <span className="text-textSecondary truncate">{seg}</span>
+                  </span>
+                ) : (
+                  <span key={path} className="flex items-center gap-0.5 shrink-0">
+                    <ChevronRight size={11} className="text-textMuted" />
+                    <button onClick={() => setMobileDir(path)} className="text-primary-400 hover:underline">{seg}</button>
+                  </span>
+                )
+              })}
+            </div>
+            {/* 目录内容：文件夹在前，点文件夹进入；点文件打开编辑器 */}
+            <div className="flex-1 overflow-y-auto p-2">
+              {mobileDirNode.children.length === 0 && (
+                <div className="text-xs text-textMuted text-center mt-10 px-4">
+                  空目录<br />点右上角「上传」放文件，或去「对话」让机器人生成
+                </div>
+              )}
+              {mobileDirNode.children.map((n) => n.isDir ? (
+                <button
+                  key={n.path}
+                  onClick={() => setMobileDir(n.path)}
+                  className="w-full flex items-center gap-2 px-2 py-2.5 rounded-lg hover:bg-elevated text-textSecondary text-sm transition-colors"
+                >
+                  <Folder size={16} className="text-primary-400 shrink-0" />
+                  <span className="truncate flex-1 text-left">{n.name}</span>
+                  <ChevronRight size={14} className="text-textMuted shrink-0" />
+                </button>
+              ) : (
+                <div key={n.path} className="flex items-center">
+                  <button
+                    onClick={() => { selectFile(n.path); setMobileView('file') }}
+                    className={`flex items-center gap-2 flex-1 min-w-0 text-left px-2 py-2.5 rounded-lg text-sm transition-colors ${currentFile === n.path ? 'bg-primary-500/20 text-primary-300' : 'hover:bg-elevated text-textSecondary'}`}
+                  >
+                    <span className="shrink-0">{fileTypeIcon(n.name)}</span>
+                    <span className="truncate flex-1">{n.name}</span>
+                  </button>
+                  <button
+                    onClick={() => deleteFile(n.path)}
+                    className="shrink-0 w-8 h-8 flex items-center justify-center text-textMuted hover:text-rose-400 transition-colors"
+                    title="删除此文件"
+                  >
+                    <Trash2 size={14} />
+                  </button>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* 目录选择弹层（上传 → 选择其它位置） */}
+        {uploadDirPickerOpen && (
+          <div className="absolute inset-0 z-50 bg-black/50 flex items-end">
+            <div className="w-full bg-surface rounded-t-2xl border-t border-border flex flex-col max-h-[75%]">
+              <div className="flex items-center gap-2 px-4 py-3 border-b border-border">
+                <span className="text-sm font-semibold flex-1">选择上传位置</span>
+                <button onClick={() => setUploadDirPickerOpen(false)} className="text-xs text-textMuted hover:text-textPrimary px-2 py-1">取消</button>
+              </div>
+              <div className="flex items-center gap-0.5 px-4 py-2 overflow-x-auto text-xs border-b border-border/60">
+                <button onClick={() => setUploadNavDir('')} className="text-primary-400 hover:underline shrink-0">/</button>
+                {uploadNavDir.split('/').filter(Boolean).map((seg, i, arr) => {
+                  const path = uploadNavDir.split('/').slice(0, i + 1).join('/')
+                  const isLast = i === arr.length - 1
+                  return isLast ? (
+                    <span key={path} className="flex items-center gap-0.5 min-w-0">
+                      <ChevronRight size={11} className="text-textMuted shrink-0" />
+                      <span className="text-textSecondary truncate">{seg}</span>
+                    </span>
+                  ) : (
+                    <span key={path} className="flex items-center gap-0.5 shrink-0">
+                      <ChevronRight size={11} className="text-textMuted" />
+                      <button onClick={() => setUploadNavDir(path)} className="text-primary-400 hover:underline">{seg}</button>
+                    </span>
+                  )
+                })}
+              </div>
+              <div className="flex-1 overflow-y-auto p-2">
+                {uploadDirNode.children.filter((n) => n.isDir).length === 0 && (
+                  <div className="text-xs text-textMuted text-center mt-8">当前目录没有子文件夹</div>
+                )}
+                {uploadDirNode.children.filter((n) => n.isDir).map((n) => (
+                  <button
+                    key={n.path}
+                    onClick={() => setUploadNavDir(n.path)}
+                    className="w-full flex items-center gap-2 px-3 py-2.5 rounded-lg hover:bg-elevated text-textSecondary text-sm transition-colors"
+                  >
+                    <Folder size={16} className="text-primary-400 shrink-0" />
+                    <span className="truncate flex-1 text-left">{n.name}</span>
+                    <ChevronRight size={14} className="text-textMuted shrink-0" />
+                  </button>
+                ))}
+              </div>
+              <div className="p-3 border-t border-border">
+                <button onClick={mobileUploadToNavDir} className="w-full py-2.5 text-sm bg-primary-500 hover:bg-primary-400 text-white rounded-lg transition-colors">
+                  上传到此位置（{uploadNavDir || '/'}）
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+      </div>
+
+      {/* ═══ 桌面端（≥lg）：三栏布局 ═══ */}
+      <div className="hidden lg:flex flex-col h-full">
+      {/* ═══ 标题栏（纯展示不切换；与移动端 tab 同款，窗口缩到 <lg 时原位变可切换 tab，过渡自然） ═══ */}
+      <div className="flex items-stretch bg-surface border-b border-border text-xs">
+        <div style={{ width: fileWidth }} className="shrink-0 flex items-center gap-1.5 px-4 py-2 font-medium text-textSecondary border-r border-border">
+          <Folder size={14} className="text-textMuted" />
+          文件
+        </div>
+        <div className="flex-1" />
+        <div style={{ width: chatWidth }} className="shrink-0 flex items-center gap-1.5 px-4 py-2 font-medium text-textSecondary border-l border-border">
+          <MessageCircle size={14} className="text-textMuted" />
+          对话
+        </div>
+      </div>
+      {/* 内容行：左栏（文件树 + 编辑/预览） + 右栏（对话） */}
+      <div className="flex flex-1 min-h-0">
       {/* ═══ 左栏：文件 / 预览 ═══ */}
       <div className="flex-1 flex flex-col min-w-0 border-r border-border">
         {/* 顶部工具栏 */}
@@ -594,41 +1079,13 @@ export default function WorldDesignPage() {
                       )}
                       {viewMode !== 'render' && (
                         <button onClick={saveFile} disabled={saving} className="text-primary-400 hover:text-primary-300 transition-colors">
-                          {saving ? '保存中...' : '💾 保存'}
+                          {saving ? '保存中...' : (<span className="inline-flex items-center gap-1"><Save size={12} /> 保存</span>)}
                         </button>
                       )}
                     </span>
                   )}
                 </div>
-                {viewMode === 'render' && canRender ? (
-                  isImgFile ? (
-                    <div className="flex-1 overflow-hidden bg-canvas flex items-center justify-center">
-                      <img
-                        src={`/world/${wid}/files/${currentFile.split('/').map(encodeURIComponent).join('/')}`}
-                        alt={currentFile}
-                        className="w-full h-full object-contain"
-                      />
-                    </div>
-                  ) : (
-                    <div className="flex-1 overflow-auto bg-canvas [&_code]:!overflow-x-visible [&_code]:!rounded-none [&_code]:!border-0 [&_code]:!p-0 [&_code]:!bg-transparent">
-                      <div className="w-full max-w-none text-sm leading-relaxed break-words text-textPrimary p-3 md:p-4">
-                        {isMdFile ? (
-                          <MarkdownContent content={content} isMine={false} />
-                        ) : (
-                          <CodeRenderer className={'language-' + fileCodeLang}>{content}</CodeRenderer>
-                        )}
-                      </div>
-                    </div>
-                  )
-                ) : (
-                  <textarea
-                    value={content}
-                    onChange={(e) => setContent(e.target.value)}
-                    spellCheck={false}
-                    className="flex-1 bg-canvas text-sm text-textPrimary p-3 font-mono outline-none resize-none"
-                    placeholder="在这里编辑代码…"
-                  />
-                )}
+                <FileContentPane wid={wid} currentFile={currentFile} content={content} setContent={setContent} viewMode={viewMode} canRender={canRender} isMdFile={isMdFile} fileCodeLang={fileCodeLang} isImgFile={isImgFile} />
               </div>
             ) : (
               <div className="h-full flex flex-col">
@@ -655,171 +1112,11 @@ export default function WorldDesignPage() {
         </div>
       </div>
 
-      {/* ═══ 右栏：世界 AI（配置表单 + 对话窗口，可拖拽调宽） ═══ */}
-      <div onMouseDown={chatResizeStart} className="w-1 shrink-0 cursor-col-resize hover:bg-primary-500/40 transition-colors" />
-      <div ref={chatPanelRef} style={{ width: chatWidth }} className="shrink-0 flex flex-col bg-surface min-w-0">
-        <div className="px-4 py-3 border-b border-border">
-          <div className="flex items-center gap-2">
-            <span className="text-sm font-semibold">{world.creator?.name || '群视界机器人'}</span>
-            <span className="text-[10px] px-1.5 py-0.5 rounded bg-elevated text-textMuted">{world.creator?.id}</span>
-            <div className="flex-1" />
-            <button
-              onClick={() => setShowCreatorForm((v) => !v)}
-              className="text-xs px-2 py-1 rounded bg-elevated hover:bg-border text-textSecondary transition-colors"
-              title="世界 AI 配置（单独表单，不属于 agent）"
-            >
-              ⚙️ 配置
-            </button>
-          </div>
-          <div className="text-xs text-textMuted mt-0.5">世界 AI 是世界的配置：让它改界面、加功能</div>
+        {/* ═══ 右栏：世界 AI（配置表单 + 对话窗口，可拖拽调宽） ═══ */}
+        <div onMouseDown={chatResizeStart} className="w-1 shrink-0 cursor-col-resize hover:bg-primary-500/40 transition-colors" />
+        <div ref={chatPanelRef} style={{ width: chatWidth }} className="shrink-0 flex flex-col bg-surface min-w-0">
+          {renderChatInner()}
         </div>
-
-        {showCreatorForm && (
-          <div className="px-3 py-3 border-b border-border bg-elevated/50 space-y-2">
-            <div className="text-xs font-semibold text-textSecondary">群视界机器人配置（世界的，非 agent）</div>
-            <div>
-              <div className="text-[10px] text-textMuted mb-0.5">名字</div>
-              <input
-                value={creatorForm.name}
-                onChange={(e) => setCreatorForm((f) => ({ ...f, name: e.target.value }))}
-                className="w-full bg-elevated text-sm p-1.5 rounded border border-border outline-none focus:border-primary-500/50"
-              />
-            </div>
-            <div>
-              <div className="text-[10px] text-textMuted mb-0.5">系统提示词</div>
-              <textarea
-                value={creatorForm.system_prompt}
-                onChange={(e) => setCreatorForm((f) => ({ ...f, system_prompt: e.target.value }))}
-                rows={6}
-                className="w-full bg-elevated text-xs p-1.5 rounded border border-border outline-none resize-none font-mono focus:border-primary-500/50"
-              />
-            </div>
-            <div className="flex gap-2">
-              <div className="flex-1">
-                <div className="text-[10px] text-textMuted mb-0.5">模型（留空 = 全局默认）</div>
-                <input
-                  value={creatorForm.model}
-                  onChange={(e) => setCreatorForm((f) => ({ ...f, model: e.target.value }))}
-                  placeholder="如 deepseek-v4-flash"
-                  className="w-full bg-elevated text-sm p-1.5 rounded border border-border outline-none focus:border-primary-500/50"
-                />
-              </div>
-              <div className="w-20">
-                <div className="text-[10px] text-textMuted mb-0.5">温度</div>
-                <input
-                  type="number"
-                  min={0}
-                  max={2}
-                  step={0.1}
-                  value={creatorForm.temperature}
-                  onChange={(e) => setCreatorForm((f) => ({ ...f, temperature: Number(e.target.value) }))}
-                  className="w-full bg-elevated text-sm p-1.5 rounded border border-border outline-none focus:border-primary-500/50"
-                />
-              </div>
-            </div>
-            <div className="flex items-center justify-between bg-elevated/60 rounded p-2">
-              <div>
-                <div className="text-[10px] text-textSecondary">深度思考（推理模式）</div>
-                <div className="text-[10px] text-amber-400/90">⚠️ 开启后推理 token 单独计费，费用显著增加</div>
-              </div>
-              <input
-                type="checkbox"
-                checked={creatorForm.thinking}
-                onChange={(e) => setCreatorForm((f) => ({ ...f, thinking: e.target.checked }))}
-                className="w-4 h-4 accent-primary-500"
-              />
-            </div>
-            <div className="flex items-center justify-between bg-elevated/60 rounded p-2">
-              <div>
-                <div className="text-[10px] text-textSecondary">工具循环上限</div>
-                <div className="text-[10px] text-textMuted">单次对话最多连续调几轮工具（1-200，默认 50）</div>
-              </div>
-              <input
-                type="number"
-                min={1}
-                max={200}
-                value={creatorForm.max_tool_rounds}
-                onChange={(e) => setCreatorForm((f) => ({ ...f, max_tool_rounds: Number(e.target.value) || 50 }))}
-                className="w-20 bg-elevated text-sm p-1.5 rounded border border-border outline-none text-right"
-              />
-            </div>
-            {usageStats && (
-              <div className="flex items-center justify-between bg-elevated/60 rounded p-2">
-                <div>
-                  <div className="text-[10px] text-textSecondary">LLM 缓存命中率</div>
-                  <div className="text-[10px] text-textMuted">{usageStats.total_calls} 次调用 · prompt {usageStats.prompt_tokens} / 缓存 {usageStats.cached_tokens} tok</div>
-                </div>
-                <div className="text-sm font-bold text-mint-400">{usageStats.cache_hit_rate_pct}%</div>
-              </div>
-            )}
-            <button
-              onClick={saveCreator}
-              disabled={creatorSaving}
-              className="w-full py-1.5 text-sm bg-primary-500 hover:bg-primary-400 text-white rounded transition-colors disabled:opacity-40"
-            >
-              {creatorSaving ? '保存中...' : '💾 保存配置'}
-            </button>
-          </div>
-        )}
-
-        {/* 消息列表（滚到顶加载更早） */}
-        <div ref={chatListRef} onScroll={handleChatScroll} className="flex-1 overflow-y-auto p-3 space-y-2">
-          {chatLoadingOlder && <div className="text-[10px] text-textMuted text-center py-1">加载更早消息…</div>}
-          {chatMsgs.length === 0 && (
-            <div className="text-xs text-textMuted text-center mt-8">
-              暂无消息<br/>试试发送：「把页面标题改成红色」
-            </div>
-          )}
-          {chatMsgs.map((m) => (
-            m.role === 'tool' ? (
-              <div key={m.id} className={`text-[11px] text-center py-1 px-2 rounded-lg max-w-[90%] mx-auto ${m.error ? 'text-rose-400 bg-rose-500/10 border border-rose-500/20' : 'text-mint-400 bg-mint-400/10 border border-mint-400/20'}`}>
-                🔧 {m.content}
-              </div>
-            ) : (
-            <div key={m.id} className={`text-sm max-w-[90%] p-2 rounded-lg ${m.error ? 'bg-rose-500/10 border border-rose-500/30 text-rose-400' : m.role === 'user' ? 'bg-primary-500/20 ml-auto' : 'bg-elevated/80'}`}>
-              <div className="text-[10px] text-textMuted mb-0.5">{m.error ? '⚠️ 错误' : m.role === 'user' ? '我' : '世界 AI'}</div>
-              {!m.error && (m.role === 'ai' || m.role === 'note') && !!m.reasoning && (
-                <details className="group/details mb-1.5">
-                  <summary className="flex items-center gap-1 text-[10px] text-textMuted cursor-pointer select-none hover:text-textSecondary list-none [&::-webkit-details-marker]:hidden">
-                    <ChevronRight size={11} className="transition-transform group-open/details:rotate-90" />
-                    <Brain size={11} className="text-textMuted" />
-                    思考过程
-                  </summary>
-                  <div className="text-xs text-textMuted mt-1 whitespace-pre-wrap bg-elevated/70 rounded p-2">{m.reasoning}</div>
-                </details>
-              )}
-              {m.content ? <MarkdownContent content={m.content} /> : (m.role === 'ai' ? <span className="opacity-40">…</span> : null)}
-            </div>
-            )
-          ))}
-        </div>
-
-        {/* 输入 */}
-        <div className="p-3 border-t border-border">
-          <textarea
-            value={chatInput}
-            onChange={(e) => setChatInput(e.target.value)}
-            onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendChat() } }}
-            rows={2}
-            placeholder="和世界 AI 对话…（无需 @）"
-            disabled={chatSending || chatProcessing}
-            className="w-full bg-elevated text-sm p-2 rounded border border-border outline-none resize-none disabled:opacity-50 focus:border-primary-500/50"
-          />
-          <button
-            onClick={sendChat}
-            disabled={chatSending || chatProcessing || !chatInput.trim()}
-            className="w-full mt-2 py-1.5 text-sm bg-primary-500 hover:bg-primary-400 text-white rounded transition-colors disabled:opacity-40"
-          >
-            {chatSending || chatProcessing ? '思考中...' : '发送'}
-          </button>
-          {chatProcessing && (
-            <div className="text-[10px] text-textMuted mt-2 text-center">
-              ⏳ 上一轮还在执行（刷新不影响），完成后自动显示
-            </div>
-          )}
-          <div className="text-[10px] text-textMuted mt-2 text-center">
-            世界级会话（非 DM）：账单走世界主人，让它改世界、加功能
-          </div>
         </div>
       </div>
     </div>
