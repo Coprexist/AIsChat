@@ -6,7 +6,7 @@
  */
 import { useEffect, useState, useCallback, useRef, useMemo } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
-import { ChevronLeft, ChevronRight, ChevronDown, Folder, FolderOpen, FileText, FileCode, FileJson, FileImage, FileAudio, FileVideo, File, Trash2, Upload, Plus, Pencil, Eye, Brain, MessageCircle, Save, Send, CornerDownLeft, ArrowDown, Search, Globe, Terminal, Package, Clock, Wrench, Eraser } from 'lucide-react'
+import { ChevronLeft, ChevronRight, ChevronDown, Folder, FolderOpen, FileText, FileCode, FileJson, FileImage, FileAudio, FileVideo, File, Trash2, Upload, Plus, Pencil, Eye, Brain, MessageCircle, Save, Send, ArrowDown, Search, Globe, Terminal, Package, Clock, Wrench, Eraser } from 'lucide-react'
 import { api } from '../api/client'
 import MarkdownContent from '../components/shared/MarkdownContent'
 import CodeRenderer from '../components/shared/CodeRenderer'
@@ -645,7 +645,7 @@ export default function WorldDesignPage() {
                         onClick={(e) => { e.stopPropagation(); chat.insertSuggestion(q) }}
                         className="px-2 flex items-center text-textMuted hover:text-primary-300 hover:bg-primary-500/20 transition-colors shrink-0"
                         title="插入到输入框（追加，不覆盖）"
-                      ><CornerDownLeft size={11} /></button>
+                      ><Plus size={12} /></button>
                     </div>
                   ))}
                 </div>
