@@ -12,34 +12,6 @@ from app.models.conversation_log import ConversationLogConfig, ConversationLog
 logger = logging.getLogger(__name__)
 
 
-# ── 群视界 agent 占位（世界 AI 的 LLM 调用归入个人 API 用量） ──
-
-async def ensure_user_world_agent(db, user_id: int):
-    """确保用户有「群视界 agent」占位 agent（世界 AI 的 conversation_log 记到它名下）。
-
-    懒建一次：name 固定、inactive + paused（纯记账占位，不会被调度回复）。
-    """
-    from sqlalchemy import select
-    from app.models.agent import Agent
-
-    ag = (await db.execute(
-        select(Agent).where(Agent.owner_id == user_id, Agent.name == "群视界 agent")
-    )).scalar_one_or_none()
-    if ag:
-        return ag
-    ag = Agent(
-        owner_id=user_id,
-        name="群视界 agent",
-        state="inactive",
-        is_paused=True,
-        is_ai_editable=False,
-        conversation_logs_limit=2000,
-    )
-    db.add(ag)
-    await db.flush()
-    return ag
-
-
 # ── 保存 ──
 
 async def save_conversation_log(
@@ -53,11 +25,16 @@ async def save_conversation_log(
     has_output: bool = False,
     model: str | None = None,
     thinking_enabled: bool = False,
+    user_id: int | None = None,
 ) -> int | None:
-    """保存一次完整对话，自动清理超出限制的旧记录"""
+    """保存一次完整对话，自动清理超出限制的旧记录
+
+    user_id：记账人（世界 AI 用量传世界主人；普通 AI 记录留空按 agent.owner_id 归属）。
+    """
     try:
         log = ConversationLog(
             agent_id=agent_id,
+            user_id=user_id,
             group_id=group_id,
             session_id=session_id,
             conversation_type=conversation_type,
@@ -332,6 +309,23 @@ async def get_user_agents_token_summary(
         JOIN agents ag ON ag.id = cl.agent_id
         WHERE {where_sql}
         GROUP BY cl.agent_id, ag.name, cl.model
+
+        UNION ALL
+
+        -- 世界 AI 用量：记账人 = user_id（世界 AI 表单的世界主人），agent_id 为空 → 虚拟「群视界 agent」
+        SELECT
+            -1 AS agent_id,
+            '群视界 agent' AS agent_name,
+            cl.model,
+            SUM(COALESCE((cl.token_usage->>'total_tokens')::int, 0)) AS total_tokens,
+            SUM(COALESCE((cl.token_usage->>'prompt_tokens')::int, 0)) AS prompt_tokens,
+            SUM(COALESCE((cl.token_usage->>'completion_tokens')::int, 0)) AS completion_tokens,
+            SUM(COALESCE((cl.token_usage->>'reasoning_tokens')::int, 0)) AS reasoning_tokens,
+            SUM(COALESCE((cl.token_usage->>'cached_tokens')::int, 0)) AS cached_tokens,
+            SUM(COALESCE((cl.token_usage->>'api_calls')::int, 0)) AS total_calls
+        FROM ai_conversation_logs cl
+        WHERE cl.user_id = :user_id AND cl.agent_id IS NULL
+        GROUP BY cl.model
         ORDER BY total_tokens DESC
     """)
     result = await db.execute(stmt, params)
@@ -344,10 +338,15 @@ async def get_agent_token_daily(
     agent_id: int,
     start_date: datetime | None = None,
     end_date: datetime | None = None,
+    user_id: int | None = None,
 ) -> list[dict]:
-    """获取单个 AI 每日 token 消耗分布"""
-    where_clauses = ["agent_id = :agent_id"]
-    params: dict = {"agent_id": agent_id}
+    """获取单个 AI 每日 token 消耗分布（agent_id=-1 = 群视界 agent 虚拟条目：按记账人 + agent_id 空）"""
+    if agent_id == -1:
+        where_clauses = ["user_id = :user_id", "agent_id IS NULL"]
+        params: dict = {"user_id": user_id}
+    else:
+        where_clauses = ["agent_id = :agent_id"]
+        params: dict = {"agent_id": agent_id}
     if start_date:
         where_clauses.append("created_at >= :start_date")
         params["start_date"] = start_date

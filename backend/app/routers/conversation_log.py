@@ -163,12 +163,13 @@ async def get_agent_daily_usage(
 ):
     """获取单个 AI 每日 token 消耗分布"""
     from app.services.content.conversation_log_service import get_agent_token_daily
-    # 权限：用户只能看自己拥有的 AI
-    from app.models.agent import Agent
-    agent_result = await db.execute(select(Agent).where(Agent.id == agent_id))
-    agent = agent_result.scalar()
-    if not agent or agent.owner_id != current_user["user_id"]:
-        raise HTTPException(status_code=403, detail="无权查看此 AI 的用量数据")
+    # 权限：用户只能看自己拥有的 AI（-1 = 群视界 agent 虚拟条目，跳过 agent 校验）
+    if agent_id != -1:
+        from app.models.agent import Agent
+        agent_result = await db.execute(select(Agent).where(Agent.id == agent_id))
+        agent = agent_result.scalar()
+        if not agent or agent.owner_id != current_user["user_id"]:
+            raise HTTPException(status_code=403, detail="无权查看此 AI 的用量数据")
     end_date = datetime.now(tz.utc).replace(tzinfo=None)
     start_date = end_date - timedelta(days=days)
-    return await get_agent_token_daily(db, agent_id, start_date, end_date)
+    return await get_agent_token_daily(db, agent_id, start_date, end_date, user_id=current_user["user_id"])

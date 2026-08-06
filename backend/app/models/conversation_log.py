@@ -34,7 +34,9 @@ class ConversationLog(Base):
     __tablename__ = "ai_conversation_logs"
 
     id = Column(Integer, primary_key=True, autoincrement=True)
-    agent_id = Column(Integer, ForeignKey("agents.id"), nullable=False, index=True)
+    agent_id = Column(Integer, ForeignKey("agents.id"), nullable=True, index=True, comment="普通 AI 记录；世界 AI 用量为空（记账走 user_id）")
+    # 世界 AI 用量记账：不建占位 agent，直接记 user_id（世界主人）；普通 AI 记录此列为空
+    user_id = Column(Integer, ForeignKey("users.id"), nullable=True, index=True, comment="记账人（世界 AI 用量 = 世界主人）")
     # 对话发生的上下文：群聊或私信
     group_id = Column(Integer, ForeignKey("groups.id"), nullable=True)
     session_id = Column(String(50), nullable=True)  # DM session_id

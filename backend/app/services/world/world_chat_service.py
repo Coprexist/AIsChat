@@ -104,18 +104,16 @@ async def _record_usage(db, world_id: int, turn_id: str, round_no, model: str, u
             cached_tokens=int(usage.get("cached_tokens") or 0),
         ))
         await db.flush()
-        # 个人 API 用量：世界 AI 调用 → 用户「群视界 agent」占位（懒建）
+        # 个人 API 用量：记账人 = 世界 AI 表单的世界主人（user_id 直记，查询时虚拟聚合「群视界 agent」）
         if messages:
-            from app.services.content.conversation_log_service import (
-                ensure_user_world_agent, save_conversation_log,
-            )
+            from app.services.content.conversation_log_service import save_conversation_log
             from app.models.world import World
             world = await db.get(World, world_id)
             if world is not None:
-                holder = await ensure_user_world_agent(db, world.owner_id)
                 await save_conversation_log(
-                    db, holder.id, messages, conversation_type="world",
+                    db, None, messages, conversation_type="world",
                     token_usage=usage, model=model, thinking_enabled=False,
+                    user_id=world.owner_id,
                 )
     except Exception as e:
         logger.warning(f"🌐 世界 #{world_id} 用量记录失败: {e}")
