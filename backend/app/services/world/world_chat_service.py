@@ -306,6 +306,38 @@ async def stream_world_chat(
     except Exception as e:
         logger.warning(f"🌐 世界 #{world_id} 用户消息落库失败: {e}")
 
+    # ── 用户斜杠命令（不走 LLM）：/clear 清空上下文（保留记忆） /compact 压缩上下文 ──
+    cmd_text = (message or "").strip()
+    if cmd_text.startswith("/clear") or cmd_text.startswith("/compact"):
+        try:
+            if cmd_text.startswith("/clear"):
+                from sqlalchemy import delete as sa_delete
+                await db.execute(sa_delete(WorldChatMessage).where(WorldChatMessage.world_id == world_id))
+                world.config = {
+                    **(world.config or {}),
+                    "chat_summary": None,
+                    "workflow_memory": None,
+                }
+                await db.commit()
+                note = "🧹 已清空对话上下文（历史消息+摘要+工作流记忆），长期记忆保留——AI 将从记忆恢复工作状态。"
+            else:
+                from app.services.world.world_tools import _do_execute
+                result = await _do_execute(db, world, "compact_context", "{}")
+                if result.get("success"):
+                    note = (f"📦 上下文已压缩：{result.get('before_tokens')} → "
+                            f"{result.get('after_tokens')} tokens"
+                            f"（压缩率 {result.get('compression_ratio_pct')}%）")
+                else:
+                    note = f"⚠️ 压缩未执行：{result.get('error', '未知原因')}"
+            db.add(WorldChatMessage(world_id=world_id, user_id=None, role="tool", content=note))
+            await db.commit()
+            yield f"data: [TOOL]{json.dumps({'name': cmd_text.split()[0], 'success': True, 'summary': note}, ensure_ascii=False)}\n\n"
+        except Exception as e:
+            logger.warning(f"🌐 世界 #{world_id} 命令执行失败: {e}")
+            yield f"data: [ERROR]命令执行失败: {e}\n\n"
+        yield "data: [DONE]\n\n"
+        return
+
     from app.services.world.world_tools import WORLD_TOOLS
     from app.services.world.world_skill_runtime import build_skill_tools
     from app.services.capability_versioning import ensure_world_version, get_effective_definitions

@@ -79,14 +79,6 @@ WORLD_TOOLS = [
     {
         "type": "function",
         "function": {
-            "name": "clear_context",
-            "description": "清空对话上下文（历史消息全部删除，工作流记忆一并清除），但长期记忆保留。用户要求重来/重新开始时调用；清空后从 store_memory 记忆恢复工作状态。",
-            "parameters": {"type": "object", "properties": {}},
-        },
-    },
-    {
-        "type": "function",
-        "function": {
             "name": "file_read",
             "description": "读取世界文件内容（编辑前确认内容用；长文件截断显示）。",
             "parameters": {
