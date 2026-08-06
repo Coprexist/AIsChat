@@ -12,6 +12,34 @@ from app.models.conversation_log import ConversationLogConfig, ConversationLog
 logger = logging.getLogger(__name__)
 
 
+# ── 群视界 agent 占位（世界 AI 的 LLM 调用归入个人 API 用量） ──
+
+async def ensure_user_world_agent(db, user_id: int):
+    """确保用户有「群视界 agent」占位 agent（世界 AI 的 conversation_log 记到它名下）。
+
+    懒建一次：name 固定、inactive + paused（纯记账占位，不会被调度回复）。
+    """
+    from sqlalchemy import select
+    from app.models.agent import Agent
+
+    ag = (await db.execute(
+        select(Agent).where(Agent.owner_id == user_id, Agent.name == "群视界 agent")
+    )).scalar_one_or_none()
+    if ag:
+        return ag
+    ag = Agent(
+        owner_id=user_id,
+        name="群视界 agent",
+        state="inactive",
+        is_paused=True,
+        is_ai_editable=False,
+        conversation_logs_limit=2000,
+    )
+    db.add(ag)
+    await db.flush()
+    return ag
+
+
 # ── 保存 ──
 
 async def save_conversation_log(

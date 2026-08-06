@@ -84,8 +84,11 @@ def _log_llm_request(world_id: int, turn_id: str, round_no: int, model: str, thi
         logger.warning(f"🌐 世界 #{world_id} 请求日志保存失败: {e}")
 
 
-async def _record_usage(db, world_id: int, turn_id: str, round_no, model: str, usage: dict | None) -> None:
-    """2.7：LLM 用量落库（world_llm_usage，缓存命中统计）"""
+async def _record_usage(db, world_id: int, turn_id: str, round_no, model: str, usage: dict | None, messages: list | None = None) -> None:
+    """LLM 用量落库：
+    - world_llm_usage：每世界缓存命中统计（2.7）
+    - conversation_log：归入用户「群视界 agent」（个人 API 用量页可见）
+    """
     if not usage:
         return
     try:
@@ -101,6 +104,19 @@ async def _record_usage(db, world_id: int, turn_id: str, round_no, model: str, u
             cached_tokens=int(usage.get("cached_tokens") or 0),
         ))
         await db.flush()
+        # 个人 API 用量：世界 AI 调用 → 用户「群视界 agent」占位（懒建）
+        if messages:
+            from app.services.content.conversation_log_service import (
+                ensure_user_world_agent, save_conversation_log,
+            )
+            from app.models.world import World
+            world = await db.get(World, world_id)
+            if world is not None:
+                holder = await ensure_user_world_agent(db, world.owner_id)
+                await save_conversation_log(
+                    db, holder.id, messages, conversation_type="world",
+                    token_usage=usage, model=model, thinking_enabled=False,
+                )
     except Exception as e:
         logger.warning(f"🌐 世界 #{world_id} 用量记录失败: {e}")
 
@@ -472,7 +488,7 @@ async def stream_world_chat(
         yield f"data: [ERROR]{str(e)[:200]}\n\n"
 
     # 2.7：首轮用量落库（缓存命中统计）
-    await _record_usage(db, world_id, turn_id, "0", model, first_usage)
+    await _record_usage(db, world_id, turn_id, "0", model, first_usage, messages)
 
     # ── 工具调用：多轮循环（list → write → …，最多 5 轮防死循环）──
     # 每轮：执行工具 → [TOOL] 事件显示 + 注入 AI → 继续带 tools 调 LLM，直到模型不再调工具
@@ -532,7 +548,7 @@ async def stream_world_chat(
                     if remaining <= 3:
                         messages.append({"role": "system", "content": f"⚠️ 你还有最后 {remaining} 轮工具调用机会，请尽快结束当前工作并给出总结！"})
                     resp = await _llm(messages, tools_for_world, _r + 1)
-                    await _record_usage(db, world_id, turn_id, str(_r + 1), model, (resp or {}).get("usage"))
+                    await _record_usage(db, world_id, turn_id, str(_r + 1), model, (resp or {}).get("usage"), messages)
                     content = (resp or {}).get("content") or ""
                     reasoning = (resp or {}).get("reasoning_content") or ""
                     tcs = (resp or {}).get("tool_calls")
@@ -558,7 +574,7 @@ async def stream_world_chat(
                 if not final:
                     _log_llm_request(world_id, turn_id, "final", model, thinking, messages)
                     resp_final = await _llm(messages, None, "final")
-                    await _record_usage(db, world_id, turn_id, "final", model, (resp_final or {}).get("usage"))
+                    await _record_usage(db, world_id, turn_id, "final", model, (resp_final or {}).get("usage"), messages)
                     final = (resp_final or {}).get("content") or "（工具执行完成）"
                     fr = (resp_final or {}).get("reasoning_content") or ""
                     if fr:
