@@ -440,6 +440,14 @@ export default function WorldDesignPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [world])
 
+  // 最后一条 AI 回复的 id（建议按钮插在它下面）
+  const lastAiMsgId = useMemo(() => {
+    for (let i = chat.chatMsgs.length - 1; i >= 0; i--) {
+      if (chat.chatMsgs[i].role === 'ai') return chat.chatMsgs[i].id
+    }
+    return null
+  }, [chat.chatMsgs])
+
   // ── 世界 AI 配置表单（单独表单，不属于 agent） ──
   const saveCreator = async () => {
     if (!world?.creator) return
@@ -623,42 +631,36 @@ export default function WorldDesignPage() {
                   {m.content ? <MarkdownContent content={m.content} /> : (m.role === 'ai' ? <span className="opacity-40">…</span> : null)}
                 </div>
               )}
-
+              {/* "你可以"建议：插在最后一条 AI 回复下面（无对话时显示在列表底部），一个建议一行（文字 | 发送 | 插入） */}
+              {(isLastAi || chat.chatMsgs.length === 0) && chat.suggestions.length > 0 && !chat.chatSending && !chat.chatProcessing && (
+                <div className="space-y-1.5 pl-1">
+                  <div className="text-[10px] text-textMuted">你可以：</div>
+                  {chat.suggestions.map((q, i) => (
+                    <div key={i} className="flex items-stretch rounded-lg bg-elevated border border-border overflow-hidden max-w-[85%]">
+                      <button
+                        onClick={() => chat.submitText(q)}
+                        className="flex-1 min-w-0 px-2.5 py-1.5 text-left text-xs text-textSecondary hover:bg-primary-500/20 hover:text-primary-300 transition-colors truncate"
+                        title={q}
+                      >{q}</button>
+                      <div className="w-px bg-border shrink-0" />
+                      <button
+                        onClick={(e) => { e.stopPropagation(); chat.submitText(q) }}
+                        className="px-2 flex items-center text-textMuted hover:text-primary-300 hover:bg-primary-500/20 transition-colors shrink-0"
+                        title="发送这条"
+                      ><Send size={11} /></button>
+                      <div className="w-px bg-border shrink-0" />
+                      <button
+                        onClick={(e) => { e.stopPropagation(); chat.insertSuggestion(q) }}
+                        className="px-2 flex items-center text-textMuted hover:text-primary-300 hover:bg-primary-500/20 transition-colors shrink-0"
+                        title="插入到输入框（追加，不覆盖）"
+                      ><Plus size={12} /></button>
+                    </div>
+                  ))}
+                </div>
+              )}
             </div>
           )
         })}
-      {/* "你可以"建议块（有对话 = 显示在最后一条 AI 回复下；空列表 = 显示在底部引导） */}
-      {(() => {
-        const show = chat.suggestions.length > 0 && !chat.chatSending && !chat.chatProcessing
-        if (!show) return null
-        return (
-          <div className="px-1 pb-1 space-y-1.5">
-            <div className="text-[10px] text-textMuted">你可以：</div>
-            {chat.suggestions.map((q, i) => (
-              <div key={i} className="flex items-stretch rounded-lg bg-elevated border border-border overflow-hidden max-w-[85%]">
-                <button
-                  onClick={() => chat.submitText(q)}
-                  className="flex-1 min-w-0 px-2.5 py-1.5 text-left text-xs text-textSecondary hover:bg-primary-500/20 hover:text-primary-300 transition-colors truncate"
-                  title={q}
-                >{q}</button>
-                <div className="w-px bg-border shrink-0" />
-                <button
-                  onClick={(e) => { e.stopPropagation(); chat.submitText(q) }}
-                  className="px-2 flex items-center text-textMuted hover:text-primary-300 hover:bg-primary-500/20 transition-colors shrink-0"
-                  title="发送这条"
-                ><Send size={11} /></button>
-                <div className="w-px bg-border shrink-0" />
-                <button
-                  onClick={(e) => { e.stopPropagation(); chat.insertSuggestion(q) }}
-                  className="px-2 flex items-center text-textMuted hover:text-primary-300 hover:bg-primary-500/20 transition-colors shrink-0"
-                  title="插入到输入框（追加，不覆盖）"
-                ><Plus size={12} /></button>
-              </div>
-            ))}
-          </div>
-        )
-      })()}
-
         {/* ↓ 回到底部（不在最下方时显示；显示即未跟随） */}
         {!chat.isAtBottom && chat.chatMsgs.length > 0 && (
           <button
