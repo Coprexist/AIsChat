@@ -16,6 +16,7 @@ from datetime import datetime, timezone
 from sqlalchemy import select
 
 from app.database import async_session
+from app.models.world import World
 
 logger = logging.getLogger(__name__)
 
@@ -41,13 +42,17 @@ async def recover_orphaned_turn(world_id: int) -> None:
             rows = list(reversed(rows))
             if rows[-1].role == "ai":
                 return  # 已闭合
+            # 精确判断：只有存在「进行中轮次」标记才算真中断；
+            # 用户发消息等 AI 回复（排队/AI 思考中）最后一条也是 user，但 active_turn 为空 → 正常状态，不动
+            world = await db.get(World, world_id)
+            if world is None or not (world.config or {}).get("active_turn"):
+                return
             # 该轮已执行的工具摘要（role=tool 的消息）
             tools_done = [m.content for m in rows if m.role == "tool"][-10:]
             db.add(WorldChatMessage(
                 world_id=world_id, user_id=None, role="ai",
                 content="（对话中断：服务重启或连接中断，已记录工作流——说「继续」即可接着做）",
             ))
-            world = await db.get(World, world_id)
             if world is not None:
                 cfg = dict(world.config or {})
                 cfg["workflow_memory"] = {
@@ -103,6 +108,18 @@ class WorldTurnWorker:
         while True:
             item = await self.msg_queue.get()
             tb = self.turns.get(item["turn_id"])
+            # 标记进行中的轮次（DB）：recover_orphaned_turn 据此判断真中断 vs 正常等待（排队消息/AI 思考中）
+            try:
+                async with async_session() as _db:
+                    _w = await _db.get(World, self.world_id)
+                    if _w is not None:
+                        _w.config = {**(dict(_w.config or {})), "active_turn": {
+                            "turn_id": item["turn_id"],
+                            "started_at": datetime.now(timezone.utc).replace(tzinfo=None).isoformat(),
+                        }}
+                        await _db.commit()
+            except Exception:
+                pass
             try:
                 from app.services.world.world_chat_service import stream_world_chat
                 async with async_session() as db:
@@ -116,6 +133,17 @@ class WorldTurnWorker:
                 if tb:
                     await tb.broadcast(f"data: [ERROR]{str(e)[:150]}\n\n")
             finally:
+                # 清除 active_turn（轮次结束；无论正常/异常/中断收尾都跑）
+                try:
+                    async with async_session() as _db:
+                        _w = await _db.get(World, self.world_id)
+                        if _w is not None and (_w.config or {}).get("active_turn", {}).get("turn_id") == item["turn_id"]:
+                            _cfg = dict(_w.config or {})
+                            _cfg.pop("active_turn", None)
+                            _w.config = _cfg
+                            await _db.commit()
+                except Exception:
+                    pass
                 if tb:
                     tb.end()
                     self.turns.pop(item["turn_id"], None)
