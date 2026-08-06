@@ -137,6 +137,17 @@ export default function WorldDesignPage() {
   // 世界 AI 对话状态（世界级会话）
   const [chatMsgs, setChatMsgs] = useState<ChatMsg[]>([])
   const [chatInput, setChatInput] = useState('')
+  // 斜杠命令列表（输入 / 弹出，像 @ 提及；仅世界设计页——主站保持人性化不加）
+  const WORLD_COMMANDS = [
+    { cmd: '/clear', desc: '清空对话上下文（保留长期记忆）' },
+    { cmd: '/compact', desc: '压缩对话上下文为摘要' },
+  ]
+  const [cmdActive, setCmdActive] = useState(false)
+  const [cmdQuery, setCmdQuery] = useState('')
+  const [cmdIdx, setCmdIdx] = useState(0)
+  const cmdFiltered = useMemo(() =>
+    cmdQuery ? WORLD_COMMANDS.filter((c) => c.cmd.startsWith('/' + cmdQuery)) : WORLD_COMMANDS
+  , [cmdQuery])
   const [chatSending, setChatSending] = useState(false)
   const [chatProcessing, setChatProcessing] = useState(false)  // 刷新后恢复：后台轮次仍在执行
   const chatProcessingRef = useRef(false)
@@ -503,11 +514,12 @@ export default function WorldDesignPage() {
     if (el.scrollTop < 30) loadOlder()
   }, [loadOlder])
 
-  const sendChat = async () => {
-    const text = chatInput.trim()
+  const sendChat = async (overrideText?: string) => {
+    const text = (overrideText ?? chatInput).trim()
     if (!text || chatSending) return
     setChatSending(true)
     setChatInput('')
+    setCmdActive(false)
     const userMsgId = -(++msgSeqRef.current)
     setChatMsgs((msgs) => [...msgs, { id: userMsgId, role: 'user', content: text }])
 
@@ -772,13 +784,44 @@ export default function WorldDesignPage() {
       </div>
 
       {/* 输入 */}
-      <div className="p-3 border-t border-border">
+      <div className="p-3 border-t border-border relative">
+        {/* 斜杠命令列表（输入 / 弹出；选中即发送） */}
+        {cmdActive && cmdFiltered.length > 0 && (
+          <div className="absolute bottom-full left-3 mb-1 w-64 max-h-40 overflow-y-auto rounded-xl bg-elevated border border-border shadow-xl z-50">
+            {cmdFiltered.map((c, i) => (
+              <button
+                key={c.cmd}
+                className={`w-full text-left px-3 py-2 transition-colors ${i === cmdIdx ? 'bg-primary-500/20 text-primary-400' : 'text-textPrimary hover:bg-hover'}`}
+                onMouseDown={(e) => { e.preventDefault(); sendChat(c.cmd) }}
+              >
+                <span className="font-mono text-xs">{c.cmd}</span>
+                <span className="block text-[10px] text-textMuted">{c.desc}</span>
+              </button>
+            ))}
+          </div>
+        )}
         <textarea
           value={chatInput}
-          onChange={(e) => setChatInput(e.target.value)}
-          onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendChat() } }}
+          onChange={(e) => {
+            const ta = e.target
+            setChatInput(ta.value)
+            // / 检测：光标前只有 / + 字母（命令整行输入）
+            const before = ta.value.slice(0, ta.selectionStart)
+            const m = before.match(/^\/\w*$/)
+            if (m) { setCmdQuery(before.slice(1)); setCmdActive(true); setCmdIdx(0) }
+            else setCmdActive(false)
+          }}
+          onKeyDown={(e) => {
+            if (cmdActive && cmdFiltered.length > 0) {
+              if (e.key === 'ArrowDown') { e.preventDefault(); setCmdIdx((i) => (i + 1) % cmdFiltered.length); return }
+              if (e.key === 'ArrowUp') { e.preventDefault(); setCmdIdx((i) => (i - 1 + cmdFiltered.length) % cmdFiltered.length); return }
+              if (e.key === 'Enter' || e.key === 'Tab') { e.preventDefault(); sendChat(cmdFiltered[cmdIdx].cmd); return }
+              if (e.key === 'Escape') { e.preventDefault(); setCmdActive(false); return }
+            }
+            if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendChat() }
+          }}
           rows={2}
-          placeholder="和世界 AI 对话…（无需 @）"
+          placeholder="和世界 AI 对话…（输入 / 查看命令）"
           disabled={chatSending || chatProcessing}
           className="w-full bg-elevated text-sm p-2 rounded border border-border outline-none resize-none disabled:opacity-50 focus:border-primary-500/50"
         />
