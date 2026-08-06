@@ -397,3 +397,10 @@
 .rounded-crop-area {
   border-radius: 1rem !important;
 }
+
+/* 世界设计页消息气泡淡入（新消息出现时；DOM 复用不重触发） */
+@keyframes world-msg-in {
+  from { opacity: 0; transform: translateY(6px); }
+  to { opacity: 1; transform: none; }
+}
+.world-msg { animation: world-msg-in 0.25s ease-out; }

@@ -568,8 +568,8 @@ export default function WorldDesignPage() {
                   🔧 {m.content}
                 </div>
               ) : (
-                <div className={`text-sm max-w-[90%] p-2 rounded-lg ${m.error ? 'bg-rose-500/10 border border-rose-500/30 text-rose-400' : m.role === 'user' ? 'bg-primary-500/20 ml-auto' : 'bg-elevated/80'}`}>
-                  <div className="text-[10px] text-textMuted mb-0.5">{m.error ? '⚠️ 错误' : m.role === 'user' ? '我' : '世界 AI'}</div>
+                <div className={`world-msg text-sm max-w-[90%] p-2 rounded-lg ${m.error ? 'bg-rose-500/10 border border-rose-500/30 text-rose-400' : m.role === 'user' ? 'bg-primary-500/20 ml-auto' : 'bg-elevated/80'}`}>
+                  <div className="text-[10px] text-textMuted mb-0.5">{m.error ? '⚠️ 错误' : m.role === 'user' ? (m.pending ? '我（排队中，发送后生效）' : '我') : '世界 AI'}</div>
                   {!m.error && (m.role === 'ai' || m.role === 'note') && !!m.reasoning && (
                     <details className="group/details mb-1.5">
                       <summary className="flex items-center gap-1 text-[10px] text-textMuted cursor-pointer select-none hover:text-textSecondary list-none [&::-webkit-details-marker]:hidden">
@@ -665,25 +665,6 @@ export default function WorldDesignPage() {
                   className="px-1.5 flex items-center text-textMuted hover:text-primary-300 hover:bg-primary-500/20 transition-colors shrink-0"
                   title="插入到输入框（追加，不覆盖）"
                 ><CornerDownLeft size={11} /></button>
-              </div>
-            ))}
-          </div>
-        )}
-      {/* 排队消息（AI 处理中，输入框上方弹窗展示：普通消息一起发，命令逐个执行） */}
-        {chat.pendingItems.length > 0 && (
-          <div className="absolute bottom-full left-3 right-3 mb-1 max-h-32 overflow-y-auto rounded-xl bg-elevated border border-border shadow-xl z-50">
-            <div className="px-3 py-1.5 text-[10px] text-textMuted border-b border-border">
-              ⏳ AI 处理中，以下 {chat.pendingItems.length} 条将按顺序执行（普通消息一起发，命令逐个执行）
-            </div>
-            {chat.pendingItems.map((it, i) => (
-              <div key={i} className="flex items-center gap-2 px-3 py-1.5 text-xs border-b border-border/40 last:border-b-0">
-                <span className={`truncate flex-1 ${it.kind === 'cmd' ? 'font-mono text-primary-400' : 'text-textPrimary'}`}>{it.text}</span>
-                <span className="shrink-0 text-[10px] text-textMuted">{it.kind === 'cmd' ? '命令' : '消息'}</span>
-                <button
-                  onClick={() => chat.setPendingItems((items) => items.filter((_, j) => j !== i))}
-                  className="shrink-0 text-textMuted hover:text-rose-400 transition-colors"
-                  title="移除这条"
-                >✕</button>
               </div>
             ))}
           </div>

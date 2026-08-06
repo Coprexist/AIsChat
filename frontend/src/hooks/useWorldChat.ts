@@ -12,6 +12,8 @@ export interface ChatMsg {
   content: string
   reasoning?: string
   error?: boolean
+  /** 排队中（AI 处理时发送，尚未真正发出；流结束后自动发送并刷新为正式消息） */
+  pending?: boolean
   created_at?: string
 }
 
@@ -74,7 +76,7 @@ export function useWorldChat({ wid, onRefresh, onMsg }: UseWorldChatOptions) {
         if (isAtBottomRef.current) {
           requestAnimationFrame(() => {
             const el = chatListRef.current
-            if (el) el.scrollTop = el.scrollHeight
+            if (el) el.scrollTo({ top: el.scrollHeight, behavior: 'smooth' })
           })
         }
       }
@@ -146,12 +148,15 @@ export function useWorldChat({ wid, onRefresh, onMsg }: UseWorldChatOptions) {
     setIsAtBottom(atBottom)
   }, [loadOlder])
 
-  // 新消息到达：跟随模式（在底部）自动滚到最新
+  // 新消息到达：跟随模式（在底部）自动滚到最新——新消息平滑滚动，流式内容更新瞬时
+  const prevLenRef = useRef(0)
   useEffect(() => {
-    if (isAtBottomRef.current && chatMsgs.length > 0) {
-      const el = chatListRef.current
-      if (el) el.scrollTop = el.scrollHeight
-    }
+    if (!isAtBottomRef.current || chatMsgs.length === 0) return
+    const el = chatListRef.current
+    if (!el) return
+    const lenChanged = chatMsgs.length !== prevLenRef.current
+    prevLenRef.current = chatMsgs.length
+    el.scrollTo({ top: el.scrollHeight, behavior: lenChanged ? 'smooth' : 'auto' })
   }, [chatMsgs])
 
   const scrollToBottom = useCallback((smooth = true) => {
@@ -169,10 +174,6 @@ export function useWorldChat({ wid, onRefresh, onMsg }: UseWorldChatOptions) {
     setChatSending(true)
     setChatInput('')
     setCmdActive(false)
-    // 用户消息逐条气泡（排队消息一起发时也是多条独立气泡）
-    for (const t of list) {
-      setChatMsgs((msgs) => [...msgs, { id: -(++msgSeqRef.current), role: 'user', content: t }])
-    }
     // 斜杠命令：立即给执行中反馈（后端压缩/清空需要时间，等 [TOOL] 正式结果到达后 loadChat 会清掉这个临时气泡）
     const singleCmd = list.length === 1 ? list[0] : ''
     if (singleCmd.startsWith('/compact') || singleCmd.startsWith('/clear')) {
@@ -288,11 +289,15 @@ export function useWorldChat({ wid, onRefresh, onMsg }: UseWorldChatOptions) {
     if (!t) return
     // AI 忙（本条发送中 / 后台轮次执行中）：进队列——普通消息等流结束一起发；/ 命令等流结束按顺序逐个执行
     if (chatSending || chatProcessing) {
+      // 排队：消息直接画进对话流（用户气泡 + 排队中标记），流结束后一起发送——输入框上方不再弹列表
+      setChatMsgs((msgs) => [...msgs, { id: -(++msgSeqRef.current), role: 'user', content: t, pending: true }])
       setPendingItems((items) => [...items, { kind: t.startsWith('/') ? 'cmd' : 'msg', text: t }])
       setChatInput('')
       setCmdActive(false)
       return
     }
+    // 直接发送：也先画用户气泡，再由 sendMessages 发送
+    setChatMsgs((msgs) => [...msgs, { id: -(++msgSeqRef.current), role: 'user', content: t }])
     sendMessages([t])
   }
 
