@@ -476,7 +476,26 @@ export default function WorldDesignPage() {
           </div>
           <div>
             <div className="text-[10px] text-textMuted mb-0.5">系统提示词</div>
-            <textarea
+            {/* 排队消息（AI 处理中，输入框上方弹窗展示：普通消息一起发，命令逐个执行） */}
+        {chat.pendingItems.length > 0 && (
+          <div className="absolute bottom-full left-3 right-3 mb-1 max-h-32 overflow-y-auto rounded-xl bg-elevated border border-border shadow-xl z-50">
+            <div className="px-3 py-1.5 text-[10px] text-textMuted border-b border-border">
+              ⏳ AI 处理中，以下 {chat.pendingItems.length} 条将按顺序执行（普通消息一起发，命令逐个执行）
+            </div>
+            {chat.pendingItems.map((it, i) => (
+              <div key={i} className="flex items-center gap-2 px-3 py-1.5 text-xs border-b border-border/40 last:border-b-0">
+                <span className={`truncate flex-1 ${it.kind === 'cmd' ? 'font-mono text-primary-400' : 'text-textPrimary'}`}>{it.text}</span>
+                <span className="shrink-0 text-[10px] text-textMuted">{it.kind === 'cmd' ? '命令' : '消息'}</span>
+                <button
+                  onClick={() => chat.setPendingItems((items) => items.filter((_, j) => j !== i))}
+                  className="shrink-0 text-textMuted hover:text-rose-400 transition-colors"
+                  title="移除这条"
+                >✕</button>
+              </div>
+            ))}
+          </div>
+        )}
+        <textarea
               value={creatorForm.system_prompt}
               onChange={(e) => setCreatorForm((f) => ({ ...f, system_prompt: e.target.value }))}
               rows={6}
@@ -639,33 +658,6 @@ export default function WorldDesignPage() {
                 <span className="font-mono text-xs">{c.cmd}</span>
                 <span className="block text-[10px] text-textMuted">{c.desc}</span>
               </button>
-            ))}
-          </div>
-        )}
-        {/* "你可以问"建议按钮（常驻；每块 = 文字 | 发送 | 插入，插入=追加到输入框不覆盖） */}
-        {chat.suggestions.length > 0 && (
-          <div className="px-3 pb-1 flex flex-wrap items-center gap-1.5">
-            <span className="text-[10px] text-textMuted shrink-0">你可以：</span>
-            {chat.suggestions.map((q, i) => (
-              <div key={i} className="flex items-stretch rounded-full bg-elevated border border-border overflow-hidden shrink-0 max-w-[260px]">
-                <button
-                  onClick={() => chat.submitText(q)}
-                  className="px-2.5 py-1 text-xs text-textSecondary hover:bg-primary-500/20 hover:text-primary-300 transition-colors truncate min-w-0"
-                  title={q}
-                >{q}</button>
-                <div className="w-px bg-border shrink-0" />
-                <button
-                  onClick={(e) => { e.stopPropagation(); chat.submitText(q) }}
-                  className="px-1.5 flex items-center text-textMuted hover:text-primary-300 hover:bg-primary-500/20 transition-colors shrink-0"
-                  title="发送这条"
-                ><Send size={11} /></button>
-                <div className="w-px bg-border shrink-0" />
-                <button
-                  onClick={(e) => { e.stopPropagation(); chat.insertSuggestion(q) }}
-                  className="px-1.5 flex items-center text-textMuted hover:text-primary-300 hover:bg-primary-500/20 transition-colors shrink-0"
-                  title="插入到输入框（追加，不覆盖）"
-                ><CornerDownLeft size={11} /></button>
-              </div>
             ))}
           </div>
         )}
