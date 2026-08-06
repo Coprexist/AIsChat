@@ -940,14 +940,22 @@ export default function WorldDesignPage() {
           <button onClick={() => setMode('preview')} className={`text-xs px-3 py-1 rounded transition-colors ${mode === 'preview' ? 'bg-primary-500 text-white' : 'bg-elevated hover:bg-border'}`}>预览</button>
           {msg && <span className="text-xs text-amber-400">{msg}</span>}
         </div>
-        {/* 内容行：标题栏与内容同列，拖拽手柄贯穿（拖动 = 整列宽度同步） */}
-        <div className="flex flex-1 min-h-0">
-        {/* 左列：文件标题 + 文件树 */}
-        <div ref={fileTreeRef} className="flex flex-col shrink-0 bg-surface border-r border-border" style={{ width: fileWidth }}>
-          <div className="flex items-center justify-center gap-1.5 h-9 font-medium text-textSecondary border-b border-border">
+        {/* 标题栏：文件（横跨文件树+编辑区） | 对话（右列上方）；内容行手柄贯穿 */}
+        <div className="flex items-stretch bg-surface border-b border-border">
+          <div style={{ width: fileWidth }} className="shrink-0" />
+          <div className="flex-1 flex items-center justify-center gap-1.5 h-9 font-medium text-textSecondary">
             <Folder size={14} className="text-textMuted" />
             文件
           </div>
+          <div style={{ width: chatWidth }} className="shrink-0 flex items-center justify-center gap-1.5 h-9 font-medium text-textSecondary border-l border-border">
+            <MessageCircle size={14} className="text-textMuted" />
+            对话
+          </div>
+        </div>
+        {/* 内容行：拖拽手柄贯穿（拖动 = 整列宽度同步） */}
+        <div className="flex flex-1 min-h-0">
+        {/* 左列：文件树 */}
+        <div ref={fileTreeRef} className="flex flex-col shrink-0 bg-surface border-r border-border" style={{ width: fileWidth }}>
           <div className="flex-1 overflow-y-auto p-2">
             <div className="flex items-center justify-between mb-2 px-1">
               <span className="text-xs font-medium text-textSecondary">文件</span>
@@ -968,9 +976,8 @@ export default function WorldDesignPage() {
           </div>
         </div>
         <div onMouseDown={fileResizeStart} className="w-1 shrink-0 cursor-col-resize hover:bg-primary-500/40 transition-colors" />
-        {/* 中列：标题（空）+ 编辑 / 预览 */}
+        {/* 中列：编辑 / 预览 */}
         <div className="flex-1 flex flex-col min-w-0">
-          <div className="h-9 border-b border-border" />
           <div className="flex-1 min-h-0">
             {mode === 'files' ? (
               <div className="h-full flex flex-col">
@@ -1027,12 +1034,8 @@ export default function WorldDesignPage() {
           </div>
         </div>
         <div onMouseDown={chatResizeStart} className="w-1 shrink-0 cursor-col-resize hover:bg-primary-500/40 transition-colors" />
-        {/* 右列：对话标题 + 对话面板 */}
+        {/* 右列：对话面板（标题已在顶部标题栏） */}
         <div ref={chatPanelRef} className="flex flex-col shrink-0 bg-surface" style={{ width: chatWidth }}>
-          <div className="flex items-center justify-center gap-1.5 h-9 font-medium text-textSecondary border-b border-border">
-            <MessageCircle size={14} className="text-textMuted" />
-            对话
-          </div>
           <div className="flex-1 min-h-0 flex flex-col">
             {renderChatInner()}
           </div>
