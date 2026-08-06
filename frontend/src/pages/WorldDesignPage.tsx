@@ -409,6 +409,9 @@ export default function WorldDesignPage() {
       </div>
     ))
 
+  // ── 世界 AI 对话（状态/发送/排队/建议/命令 全部在 useWorldChat） ──
+  const chat = useWorldChat({ wid, onRefresh: load, onMsg: setMsg })
+
   // 最后一条 AI 回复的 id（建议按钮插在它下面）
   const lastAiMsgId = useMemo(() => {
     for (let i = chat.chatMsgs.length - 1; i >= 0; i--) {
@@ -416,9 +419,6 @@ export default function WorldDesignPage() {
     }
     return null
   }, [chat.chatMsgs])
-
-  // ── 世界 AI 对话（状态/发送/排队/建议/命令 全部在 useWorldChat） ──
-  const chat = useWorldChat({ wid, onRefresh: load, onMsg: setMsg })
 
   // ── 世界 AI 配置表单（单独表单，不属于 agent） ──
   const saveCreator = async () => {
