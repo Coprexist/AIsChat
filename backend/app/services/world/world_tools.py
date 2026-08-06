@@ -79,6 +79,14 @@ WORLD_TOOLS = [
     {
         "type": "function",
         "function": {
+            "name": "clear_context",
+            "description": "清空对话上下文（历史消息全部删除，工作流记忆一并清除），但长期记忆保留。用户要求重来/重新开始时调用；清空后从 store_memory 记忆恢复工作状态。",
+            "parameters": {"type": "object", "properties": {}},
+        },
+    },
+    {
+        "type": "function",
+        "function": {
             "name": "file_read",
             "description": "读取世界文件内容（编辑前确认内容用；长文件截断显示）。",
             "parameters": {
@@ -728,9 +736,20 @@ async def _do_execute(db: AsyncSession, world, name: str, arguments: str) -> dic
                 embedding = await get_embedding(title + "\n" + content, api_base_url=api_base, api_key=api_key)
             except Exception as e:
                 logger.warning(f"🌐 世界 #{world.id} 记忆向量化失败（将无向量存储）: {e}")
-            db.add(WorldAIMemory(world_id=world.id, title=title, content=content, embedding=embedding))
+            # 同名 title 覆盖更新（记忆更新语义：执行改动/计划后用固定 title 刷新）
+            from sqlalchemy import select as sa_select
+            existing = (await db.execute(
+                sa_select(WorldAIMemory).where(
+                    WorldAIMemory.world_id == world.id, WorldAIMemory.title == title
+                )
+            )).scalars().first()
+            if existing is not None:
+                existing.content = content
+                existing.embedding = embedding
+            else:
+                db.add(WorldAIMemory(world_id=world.id, title=title, content=content, embedding=embedding))
             await db.flush()
-            return {"success": True, "title": title, "embedded": embedding is not None}
+            return {"success": True, "title": title, "embedded": embedding is not None, "updated": existing is not None}
         except (ValueError, TypeError, json.JSONDecodeError) as e:
             return {"success": False, "error": str(e)}
 
@@ -903,6 +922,25 @@ async def _do_execute(db: AsyncSession, world, name: str, arguments: str) -> dic
         except Exception as e:
             logger.warning(f"🌐 世界 #{world.id} 压缩失败: {e}")
             return {"success": False, "error": str(e)}
+
+    if name == "clear_context":
+        # 清空对话上下文（历史消息 + 工作流记忆），长期记忆（world_ai_memories）保留——
+        # 清空后 AI 从 store_memory 的记忆恢复工作状态
+        try:
+            from app.models.world import WorldChatMessage
+            from sqlalchemy import delete as sa_delete
+            await db.execute(sa_delete(WorldChatMessage).where(WorldChatMessage.world_id == world.id))
+            world.config = {
+                **(world.config or {}),
+                "chat_summary": None,
+                "workflow_memory": None,
+            }
+            await db.commit()
+            return {"success": True, "note": "对话上下文已清空（历史消息+摘要+工作流记忆）；长期记忆保留，请从记忆恢复工作状态。"}
+        except Exception as e:
+            logger.warning(f"🌐 世界 #{world.id} 清空上下文失败: {e}")
+            return {"success": False, "error": str(e)}
+
     # ── 文件式 skill（设计侧造物主工具 / 世界侧居民能力）──
     from app.services.world.world_skill_runtime import execute_skill
     skill_result = await execute_skill(db, world, name, arguments)

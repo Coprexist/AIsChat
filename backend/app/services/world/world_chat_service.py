@@ -238,7 +238,7 @@ async def stream_world_chat(
     )
     system_prompt += "\n【工具约定】你的工具与平台 AI 同名同义（文件类：file_read/file_write/file_edit/file_list/file_delete，作用于世界文件夹）；另有 update_world_info / compact_context / list_world_blocks / view_world_block / apply_world_block / view_api_doc / store_memory / recall_memory / web_search / web_fetch。调用工具时不要把工具调用的原始内容写进回复文本，直接说你要做什么/做了什么；创建文件后告知用户文件路径。"
     system_prompt += "\n【接口文档】平台接口文档按区分区（01 世界编号变量 / 02 WorldUI 桥 / 03 文件操作 / 04 积木体系 / 05 群聊 API / 06 页面与资源 / 07 懒通知与世界时间 / 08 错误与安全）。需要接口细节时用 view_api_doc 打开对应分区（工具描述里有各区介绍，先看介绍再决定开哪个，不要一次全读）。"
-    system_prompt += "\n【记忆约定】你有本世界的长期记忆（store_memory 存 / recall_memory 取，按世界隔离）：\n- 重要的世界设定、用户偏好、关键事件、进行到一半的事，用 store_memory 记下来（title 简短概括，content 写详细）\n- 用户提到以前说过的事、或你觉得\"这个之前聊过\"时，先 recall_memory 检索再回答，别凭感觉编\n- 记忆是这个世界的资产，跨世界不共享"
+    system_prompt += "\n【记忆约定】你有本世界的长期记忆（store_memory 存 / recall_memory 取，按世界隔离），它是你跨上下文、跨会话的工作资产（clear_context 清空对话后靠它恢复）：\n- 每次执行完文件改动、配置修改、发布状态等实际改动后，用 store_memory 更新记忆——title 用固定名（如「工作状态」「当前计划」）即可覆盖刷新，content 写当前进度与结论\n- 每次写完计划/方案后也 store_memory 存一份（title 固定为「当前计划」）\n- 被 clear_context 清空上下文或新会话开始时：先 recall_memory 检索再继续工作，别从零开始\n- 重要的世界设定、用户偏好、关键事件、进行到一半的事都记下来；用户提到以前的事先 recall_memory 再答，别凭感觉编\n- 记忆是这个世界的资产，跨世界不共享"
     system_prompt += "\n【UI 约定】若你的页面实现了自己的侧边栏/菜单/导航，请调用 WorldUI.hideFloatingIcon() 隐藏平台悬浮图标（见接口文档），避免重复；未实现时不要调用。"
     system_prompt += "\n【侧边栏约定】世界侧边栏/菜单必须保留平台基础菜单（首页/聊天/世界列表/设置四个目的地，可折叠成可展开的「平台」项但绝不能缺失，否则用户无法回到主应用）；平台项跳主应用（window.parent），世界自定义项跳世界内页面。组名/项名/样式可自行调整，推荐直接应用 platform-sidebar 积木。"
     system_prompt += "\n【路径约定】页面内资源（css/js/图片）一律用相对路径引用（支持跨文件夹 ../），不要用 / 开头的绝对路径（会 404）；数据请求用 /world/${WORLD_ID}/ 变量路径。"
