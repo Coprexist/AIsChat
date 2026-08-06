@@ -523,6 +523,14 @@ export default function WorldDesignPage() {
     const userMsgId = -(++msgSeqRef.current)
     setChatMsgs((msgs) => [...msgs, { id: userMsgId, role: 'user', content: text }])
 
+    // 斜杠命令：立即给执行中反馈（后端压缩/清空需要时间，等 [TOOL] 正式结果到达后 loadChat 会清掉这个临时气泡）
+    if (text.startsWith('/compact') || text.startsWith('/clear')) {
+      setChatMsgs((msgs) => [...msgs, {
+        id: -(++msgSeqRef.current), role: 'tool',
+        content: text.startsWith('/compact') ? '⏳ 正在压缩上下文（可能需要一点时间）…' : '⏳ 正在清空上下文…',
+      }])
+    }
+
     // 服务器端轮次（不依赖本页面）：入队 → 订阅直播（断开自动重连）
     let full = ''
     let reasoning = ''
