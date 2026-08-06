@@ -440,6 +440,13 @@ export default function WorldDesignPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [world])
 
+  // 上次对话是否中断（最后一条 ai 消息含「对话中断」→ 引导用户说「继续」）
+  const isInterrupted = useMemo(() => {
+    if (chat.chatMsgs.length === 0) return false
+    const last = chat.chatMsgs[chat.chatMsgs.length - 1]
+    return last.role === 'ai' && String(last.content || '').includes('对话中断')
+  }, [chat.chatMsgs])
+
   // 最后一条 AI 回复的 id（建议按钮插在它下面）
   const lastAiMsgId = useMemo(() => {
     for (let i = chat.chatMsgs.length - 1; i >= 0; i--) {
@@ -656,8 +663,17 @@ export default function WorldDesignPage() {
                   {m.content ? <MarkdownContent content={m.content} /> : (m.role === 'ai' ? <span className="opacity-40">…</span> : null)}
                 </div>
               )}
-              {/* "你可以"建议：插在最后一条 AI 回复下面（无对话时显示在列表底部），一个建议一行（文字 | 发送 | 插入） */}
-              {(isLastAi || chat.chatMsgs.length === 0) && chat.suggestions.length > 0 && !chat.chatSending && !chat.chatProcessing && (
+              {/* 中断 → 【继续】；正常 → "你可以"建议（最后一条 AI 回复下面） */}
+              {isLastAi && isInterrupted && !chat.chatSending && !chat.chatProcessing && (
+                <div className="space-y-1.5 pl-1">
+                  <div className="text-[10px] text-textMuted">上次对话中断了：</div>
+                  <button
+                    onClick={() => chat.submitText('继续')}
+                    className="px-4 py-1.5 text-xs rounded-lg bg-primary-500 text-white hover:bg-primary-400 transition-colors"
+                  >继续之前的工作</button>
+                </div>
+              )}
+              {(isLastAi || chat.chatMsgs.length === 0) && !isInterrupted && chat.suggestions.length > 0 && !chat.chatSending && !chat.chatProcessing && (
                 <div className="space-y-1.5 pl-1 w-full max-w-[420px]">
                   <div className="text-[10px] text-textMuted">你可以：</div>
                   {chat.suggestions.map((q, i) => (
