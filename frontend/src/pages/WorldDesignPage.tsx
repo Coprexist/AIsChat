@@ -440,11 +440,14 @@ export default function WorldDesignPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [world])
 
-  // 上次对话是否中断（最后一条 ai 消息含「对话中断」→ 引导用户说「继续」）
+  // 上次对话是否中断：找最后一条 ai 消息（忽略后面可能卡住的 user 消息），若是中断 → 引导「继续」
   const isInterrupted = useMemo(() => {
-    if (chat.chatMsgs.length === 0) return false
-    const last = chat.chatMsgs[chat.chatMsgs.length - 1]
-    return last.role === 'ai' && String(last.content || '').includes('对话中断')
+    for (let i = chat.chatMsgs.length - 1; i >= 0; i--) {
+      const m = chat.chatMsgs[i]
+      if (m.role === 'ai') return String(m.content || '').includes('对话中断')
+      if (m.role === 'user') continue  // 卡住的排队消息不打断判断
+    }
+    return false
   }, [chat.chatMsgs])
 
   // 最后一条 AI 回复的 id（建议按钮插在它下面）
