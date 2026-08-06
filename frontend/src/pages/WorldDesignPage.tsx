@@ -583,8 +583,8 @@ export default function WorldDesignPage() {
                   {m.content ? <MarkdownContent content={m.content} /> : (m.role === 'ai' ? <span className="opacity-40">…</span> : null)}
                 </div>
               )}
-              {/* "你可以"建议：插在最后一条 AI 回复下面，一个建议一行（文字 | 发送 | 插入） */}
-              {isLastAi && chat.suggestions.length > 0 && (
+              {/* "你可以"建议：插在最后一条 AI 回复下面（无对话时显示在列表底部），一个建议一行（文字 | 发送 | 插入） */}
+              {(isLastAi || chat.chatMsgs.length === 0) && chat.suggestions.length > 0 && (
                 <div className="space-y-1.5 pl-1">
                   <div className="text-[10px] text-textMuted">你可以：</div>
                   {chat.suggestions.map((q, i) => (
