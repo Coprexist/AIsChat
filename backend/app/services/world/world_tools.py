@@ -893,6 +893,12 @@ async def _do_execute(db: AsyncSession, world, name: str, arguments: str) -> dic
         except Exception as e:
             logger.warning(f"🌐 世界 #{world.id} 压缩失败: {e}")
             return {"success": False, "error": str(e)}
+    # ── 文件式 skill（设计侧造物主工具 / 世界侧居民能力）──
+    from app.services.world.world_skill_runtime import execute_skill
+    skill_result = await execute_skill(db, world, name, arguments)
+    if skill_result is not None:
+        return skill_result
+
     return {"success": False, "error": f"未知工具: {name}"}
 
 

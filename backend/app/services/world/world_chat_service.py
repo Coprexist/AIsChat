@@ -295,11 +295,15 @@ async def stream_world_chat(
         logger.warning(f"🌐 世界 #{world_id} 用户消息落库失败: {e}")
 
     from app.services.world.world_tools import WORLD_TOOLS
+    from app.services.world.world_skill_runtime import build_skill_tools
 
     # ── 请求 DeepSeek（stream=true，透传 SSE）──
     api_key, api_base = await _resolve_world_credentials(db, world)
     model = cfg.get("model") or settings.default_chat_model
     thinking = bool(cfg.get("thinking", False))
+
+    # 工具列表 = 平台内置 + 文件式 skill（设计侧造物主工具 / 世界侧居民能力，动态加载）
+    tools_for_world = [*WORLD_TOOLS, *build_skill_tools(world_id)]
 
     payload: dict = {
         "model": model,
@@ -308,7 +312,7 @@ async def stream_world_chat(
         "top_p": cfg.get("top_p", 0.9),
         "max_tokens": 64000,
         "stream": True,
-        "tools": WORLD_TOOLS,
+        "tools": tools_for_world,
         "stream_options": {"include_usage": True},
     }
     # v4 思考默认开启（正常行为）；显式开启时走 thinking 参数
@@ -473,7 +477,7 @@ async def stream_world_chat(
                     remaining = max_rounds - _r
                     if remaining <= 3:
                         messages.append({"role": "system", "content": f"⚠️ 你还有最后 {remaining} 轮工具调用机会，请尽快结束当前工作并给出总结！"})
-                    resp = await _llm(messages, WORLD_TOOLS, _r + 1)
+                    resp = await _llm(messages, tools_for_world, _r + 1)
                     await _record_usage(db, world_id, turn_id, str(_r + 1), model, (resp or {}).get("usage"))
                     content = (resp or {}).get("content") or ""
                     reasoning = (resp or {}).get("reasoning_content") or ""
