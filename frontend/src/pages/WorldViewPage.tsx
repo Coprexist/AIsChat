@@ -46,10 +46,15 @@ export default function WorldViewPage() {
         if (win) {
           win.WORLD_ID = wid
           win.GROUP_ID = groupId ? Number(groupId) : null
-          // USER_ID 由主框架 localStorage 提供
+          // USER_ID/USER_NAME/USER_AVATAR 由主框架 localStorage 提供（身份块/世界代码用）
           const me = localStorage.getItem('user_info')
           if (me) {
-            try { win.USER_ID = JSON.parse(me).id } catch { /* ignore */ }
+            try {
+              const u = JSON.parse(me)
+              win.USER_ID = u.id
+              win.USER_NAME = u.username || ''
+              win.USER_AVATAR = u.avatar_url || ''
+            } catch { /* ignore */ }
           }
         }
       } catch { /* 跨域时忽略 */ }

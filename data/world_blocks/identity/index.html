@@ -1,0 +1,63 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>身份系统</title>
+  <style>
+    body { margin: 0; font-family: system-ui, sans-serif; background: #1a1d24; color: #e8eaf0; }
+    #identity-app { max-width: 560px; margin: 0 auto; padding: 24px 16px; }
+    .card { background: #232833; border: 1px solid #333a4a; border-radius: 12px; padding: 16px; margin-bottom: 12px; }
+    .card h3 { margin: 0 0 10px; font-size: 14px; color: #9aa4b8; font-weight: 600; }
+    .me { display: flex; align-items: center; gap: 12px; }
+    .avatar { width: 44px; height: 44px; border-radius: 50%; background: #3a4256; display: flex; align-items: center; justify-content: center; font-size: 18px; overflow: hidden; flex-shrink: 0; }
+    .avatar img { width: 100%; height: 100%; object-fit: cover; }
+    .me-name { font-size: 15px; font-weight: 600; }
+    .me-id { font-size: 11px; color: #6b7589; margin-top: 2px; }
+    .me-role { font-size: 12px; color: #8b9bd6; margin-top: 4px; }
+    .row { display: flex; gap: 8px; margin-top: 12px; }
+    button { background: #3b82f6; color: #fff; border: 0; border-radius: 8px; padding: 8px 14px; font-size: 13px; cursor: pointer; }
+    button:hover { background: #2563eb; }
+    button.ghost { background: #2a3140; color: #c3cbe0; }
+    button.ghost:hover { background: #333b4e; }
+    input { flex: 1; background: #1e232e; border: 1px solid #333a4a; border-radius: 8px; padding: 8px 10px; color: #e8eaf0; font-size: 13px; outline: none; }
+    input:focus { border-color: #3b82f6; }
+    .users { display: flex; flex-direction: column; gap: 8px; }
+    .user-item { display: flex; align-items: center; gap: 10px; font-size: 13px; padding: 6px 0; border-bottom: 1px solid #2a3140; }
+    .user-item:last-child { border-bottom: 0; }
+    .dot { width: 8px; height: 8px; border-radius: 50%; background: #22c55e; flex-shrink: 0; }
+    .tag { font-size: 11px; background: #2a3140; color: #9aa4b8; border-radius: 6px; padding: 2px 8px; }
+    .empty { color: #6b7589; font-size: 12px; text-align: center; padding: 16px 0; }
+    .hint { font-size: 11px; color: #6b7589; margin-top: 10px; line-height: 1.6; }
+  </style>
+</head>
+<body>
+  <div id="identity-app">
+    <div class="card">
+      <h3>当前访客</h3>
+      <div class="me">
+        <div class="avatar" id="my-avatar">?</div>
+        <div>
+          <div class="me-name" id="my-name">未登录</div>
+          <div class="me-id" id="my-id"></div>
+          <div class="me-role" id="my-role">尚未绑定世界角色</div>
+        </div>
+      </div>
+      <div class="row">
+        <button id="btn-checkin" class="ghost">签到</button>
+      </div>
+      <div class="row">
+        <input id="role-input" placeholder="绑定世界角色，如：旅人" maxlength="20" />
+        <button id="btn-role">绑定</button>
+      </div>
+      <div class="hint" id="cmd-hint"></div>
+    </div>
+    <div class="card">
+      <h3>世界里的访客（实时）</h3>
+      <div class="users" id="user-list"></div>
+      <div class="empty" id="user-empty">还没人签到</div>
+    </div>
+  </div>
+  <script src="identity.js"></script>
+</body>
+</html>

@@ -322,6 +322,21 @@ async def stream_world_chat(
     tz = ZoneInfo(settings.display_timezone)
     messages.append({"role": "system", "content": f"## 当前时间\n{datetime.now(tz).strftime(f'%Y-%m-%d %H:%M {tz.key}')}\n"})
 
+    # 世界内访客（身份系统 identity_index 快照）→ AI 知道谁在玩这个世界
+    try:
+        from app.services.world.world_service import get_world_data
+        idx_row = await get_world_data(db, world_id, "identity_index")
+        idx = (idx_row or {}).get("value")
+        if isinstance(idx, dict) and idx:
+            parts = []
+            for v in idx.values():
+                if isinstance(v, dict):
+                    parts.append(f"{v.get('name', '?')}" + (f"（{v.get('role', '未绑定角色')}）" if v.get('role') else ""))
+            if parts:
+                messages.append({"role": "system", "content": "## 世界内访客\n" + "、".join(parts[:20])})
+    except Exception:
+        pass
+
     # 能力变更通知（世界源懒加载：增量 changelog 追加尾部，known 更新与注入同轮）
     try:
         from app.services.capability_versioning import build_change_notice

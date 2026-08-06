@@ -1,0 +1,13 @@
+{
+  "id": "identity",
+  "name": "身份系统（登录）",
+  "description": "把访问界面的用户与世界里的人物对应起来：页面显示当前访问者（头像/用户名，由平台注入 USER_ID/USER_NAME/USER_AVATAR）；访客可签到、绑定世界内角色（发命令『身份 签到』『身份 我叫 旅人』）；世界程序把身份/在线状态发布为 SSE 实时状态，所有页面看到谁在场；身份存世界数据库 world_data（identity.{user_id}），世界代码和世界 AI 都能读——同一页面不同用户看到自己的身份与进度。",
+  "version": "1.0.0",
+  "files": [
+    "index.html",
+    "identity.js",
+    "main.py"
+  ],
+  "entry": "index.html",
+  "usage": "1) apply 本积木；2) 用 file_read 读 blocks/identity/index.html 和 blocks/identity/main.py，file_write 到世界根目录（index.html 为主页、main.py 为世界程序）；3) 设置世界常驻：PUT /worlds/{id} config 加 {resident: true}；4) 页面顶部出现身份卡片（需登录态），点「签到」或发『身份 签到』登记，『身份 我叫 旅人』绑定角色；5) 世界 AI 对话时会看到世界内活跃用户列表。可与 2d-adventure 等玩法块组合：身份角色 = 游戏角色。定制：改 identity.js 的 UI 文案，改 main.py 的 IDENTITY_CMD 语法。"
+}
