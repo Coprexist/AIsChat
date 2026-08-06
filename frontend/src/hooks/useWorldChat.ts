@@ -84,6 +84,16 @@ export function useWorldChat({ wid, onRefresh, onMsg }: UseWorldChatOptions) {
 
   useEffect(() => { loadChat() }, [loadChat])
 
+  // 挂载时拉取建议（持久化的 AI 建议；无历史 → 预设随机 4；有历史无存储 → 空等 AI 回复）
+  useEffect(() => {
+    if (!wid) return
+    let cancelled = false
+    api.get<{ suggestions: string[] }>(`/worlds/${wid}/chat/suggest`)
+      .then((r) => { if (!cancelled && Array.isArray(r?.suggestions)) setSuggestions(r.suggestions) })
+      .catch(() => { /* 失败静默 */ })
+    return () => { cancelled = true }
+  }, [wid])
+
   // 刷新后恢复「思考中」状态：world_turn 在服务器端继续执行，前端状态丢失后轮询恢复
   useEffect(() => {
     if (!wid) return

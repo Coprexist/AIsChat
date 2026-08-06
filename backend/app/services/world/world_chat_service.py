@@ -625,6 +625,11 @@ async def stream_world_chat(
             from app.services.world.world_suggestions import suggest_fallback
             suggestions = await suggest_fallback(db, world)
         if suggestions:
+            try:
+                from app.services.world.world_service import set_world_data
+                await set_world_data(db, world_id, "ui.suggestions", suggestions[:5])
+            except Exception:
+                pass
             yield f"data: [SUGGEST]{json.dumps(suggestions[:5], ensure_ascii=False)}\n\n"
     except Exception as e:
         logger.warning(f"🌐 世界 #{world_id} 建议问题生成失败: {e}")

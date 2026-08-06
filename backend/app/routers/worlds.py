@@ -502,6 +502,30 @@ async def chat_stream(
     return StreamingResponse(subscribe_turn(world_id, turn_id), media_type="text/event-stream")
 
 
+@router.get("/{world_id}/chat/suggest")
+async def chat_suggest(
+    world_id: int,
+    current_user: dict = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """"你可以"建议：读取持久化的建议（AI 上次生成）；无存储且无对话历史 → 预设随机 4 个（首次进入/clear 后引导）"""
+    await _require_owner(db, world_id, current_user["user_id"])
+    from app.services.world.world_service import get_world_data
+    row = await get_world_data(db, world_id, "ui.suggestions")
+    if row and row.get("value"):
+        return {"suggestions": row["value"]}
+    # 无存储：无对话历史 → 预设引导；有历史 → 空（等 AI 下次回复生成）
+    from app.models.world import WorldChatMessage
+    from sqlalchemy import func as _f
+    cnt = (await db.execute(
+        select(_f.count()).select_from(WorldChatMessage).where(WorldChatMessage.world_id == world_id)
+    )).scalar() or 0
+    if cnt == 0:
+        from app.services.world.world_suggestions import load_preset_suggestions
+        return {"suggestions": await load_preset_suggestions(db)}
+    return {"suggestions": []}
+
+
 @router.get("/{world_id}/chat/status")
 async def chat_status(
     world_id: int,
