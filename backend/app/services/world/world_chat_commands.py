@@ -26,6 +26,12 @@ async def run_slash_command(db: AsyncSession, world, cmd_text: str) -> str | Non
             "chat_summary": None,
             "workflow_memory": None,
         }
+        # 清持久化建议（clear 后应回到预设引导，而不是旧建议）
+        try:
+            from app.services.world.world_service import delete_world_data
+            await delete_world_data(db, world.id, "ui.suggestions")
+        except Exception:
+            pass
         await db.commit()
         return "🧹 已清空对话上下文（历史消息+摘要+工作流记忆），长期记忆保留——AI 将从记忆恢复工作状态。"
 
