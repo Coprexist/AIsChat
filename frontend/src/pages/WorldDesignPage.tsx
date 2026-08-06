@@ -13,6 +13,7 @@ import CodeRenderer from '../components/shared/CodeRenderer'
 import { getCodeLang, isMarkdownFile } from '../utils/mime'
 import { tryOpenWorldWindow } from '../utils/worldView'
 import { useResizableSidebar } from '../hooks/useResizableSidebar'
+import { useWorldChat } from '../hooks/useWorldChat'
 
 // 文件类型图标（与主界面风格一致）
 function fileTypeIcon(name: string) {
@@ -103,16 +104,6 @@ interface WorldFile {
   size: number
 }
 
-// 世界 AI 对话消息（世界级会话，非 DM；reasoning = 思考过程；tool = 工具执行结果；note = 中间叙述）
-interface ChatMsg {
-  id: number
-  role: 'user' | 'ai' | 'tool' | 'note'
-  content: string
-  reasoning?: string
-  error?: boolean
-  created_at?: string
-}
-
 export default function WorldDesignPage() {
   const { worldId } = useParams()
   const navigate = useNavigate()
@@ -135,28 +126,6 @@ export default function WorldDesignPage() {
   const [msg, setMsg] = useState('')
 
   // 世界 AI 对话状态（世界级会话）
-  const [chatMsgs, setChatMsgs] = useState<ChatMsg[]>([])
-  const [chatInput, setChatInput] = useState('')
-  // 斜杠命令列表（输入 / 弹出，像 @ 提及；仅世界设计页——主站保持人性化不加）
-  const WORLD_COMMANDS = [
-    { cmd: '/clear', desc: '清空对话上下文（保留长期记忆）' },
-    { cmd: '/compact', desc: '压缩对话上下文为摘要' },
-  ]
-  const [cmdActive, setCmdActive] = useState(false)
-  const [cmdQuery, setCmdQuery] = useState('')
-  const [cmdIdx, setCmdIdx] = useState(0)
-  const cmdFiltered = useMemo(() =>
-    cmdQuery ? WORLD_COMMANDS.filter((c) => c.cmd.startsWith('/' + cmdQuery)) : WORLD_COMMANDS
-  , [cmdQuery])
-  const [chatSending, setChatSending] = useState(false)
-  const [chatProcessing, setChatProcessing] = useState(false)  // 刷新后恢复：后台轮次仍在执行
-  const [pendingItems, setPendingItems] = useState<{ kind: 'msg' | 'cmd'; text: string }[]>([])  // AI 处理中排队消息（msg 一起发；cmd 串行执行）
-  const [suggestions, setSuggestions] = useState<string[]>([])  // "你可以问"建议（AI 生成 / 兜底 / 预设）
-  const chatProcessingRef = useRef(false)
-  const [chatHasMore, setChatHasMore] = useState(false)
-  const [chatLoadingOlder, setChatLoadingOlder] = useState(false)
-  const chatListRef = useRef<HTMLDivElement>(null)
-  const msgSeqRef = useRef(0)  // 本地临时消息 id（负数，避免与 DB id 碰撞）
 
   // 世界 AI 配置表单（单独表单，不属于 agent）
   const [showCreatorForm, setShowCreatorForm] = useState(false)
@@ -440,244 +409,8 @@ export default function WorldDesignPage() {
       </div>
     ))
 
-  // ── 世界 AI 对话（世界级会话，非 DM；账单人 = 世界主人） ──
-  const loadChat = useCallback(async (opts?: { before_id?: number; append?: boolean }) => {
-    try {
-      const q = opts?.before_id ? `?before_id=${opts.before_id}&limit=30` : '?limit=30'
-      // 翻页时记录原滚动位置（prepend 后补回）
-      const listEl = chatListRef.current
-      const prevScrollHeight = listEl?.scrollHeight ?? 0
-      const r = await api.get<{ messages: ChatMsg[]; has_more: boolean }>(`/worlds/${wid}/chat${q}`)
-      if (opts?.append && opts.before_id) {
-        setChatMsgs((msgs) => [...(r.messages || []), ...msgs])
-        requestAnimationFrame(() => {
-          const el = chatListRef.current
-          if (el) el.scrollTop = el.scrollHeight - prevScrollHeight
-        })
-      } else {
-        setChatMsgs(r.messages || [])
-        // 默认滚到消息末尾
-        requestAnimationFrame(() => {
-          const el = chatListRef.current
-          if (el) el.scrollTop = el.scrollHeight
-        })
-      }
-      setChatHasMore(!!r.has_more)
-    } catch { /* 历史拉不到不阻塞 */ }
-  }, [wid])
-
-  useEffect(() => { loadChat() }, [loadChat])
-
-  // 刷新后恢复「思考中」状态：world_turn 在服务器端继续执行，前端状态丢失后轮询恢复
-  useEffect(() => {
-    if (!wid) return
-    let timer: number | undefined
-    const check = async () => {
-      try {
-        const base = (localStorage.getItem('instance_url') || '').replace(/\/+$/, '') + '/api'
-        const r = await fetch(`${base}/worlds/${wid}/chat/status`, {
-          headers: { 'Authorization': `Bearer ${localStorage.getItem('access_token')}` },
-        })
-        const s = await r.json()
-        if (s && s.processing) {
-          chatProcessingRef.current = true
-          setChatProcessing(true)
-          timer = window.setTimeout(check, 4000)
-        } else {
-          if (chatProcessingRef.current) {
-            chatProcessingRef.current = false
-            setChatProcessing(false)
-            loadChat()  // 处理完成：拉最新历史（含 AI 回复）
-          }
-        }
-      } catch { /* 失败静默重试 */ timer = window.setTimeout(check, 8000) }
-    }
-    chatProcessingRef.current = false
-    check()
-    return () => { if (timer) clearTimeout(timer) }
-  }, [wid])
-
-  // 滚到顶 → 加载更早消息（主聊天同款无限滚动）
-  const loadOlder = useCallback(async () => {
-    if (chatLoadingOlder || !chatHasMore || chatMsgs.length === 0) return
-    const oldest = chatMsgs[0].id
-    // 历史消息来自 DB，id 为正数；本地临时负数消息跳过
-    if (!oldest || oldest < 0) return
-    setChatLoadingOlder(true)
-    try {
-      await loadChat({ before_id: oldest, append: true })
-    } finally {
-      setChatLoadingOlder(false)
-    }
-  }, [chatLoadingOlder, chatHasMore, chatMsgs, loadChat])
-
-  const handleChatScroll = useCallback((e: React.UIEvent<HTMLDivElement>) => {
-    const el = e.currentTarget
-    if (el.scrollTop < 30) loadOlder()
-  }, [loadOlder])
-
-  // 流结束后按队列顺序自动处理：连续普通消息一批（一次 API 一起发，逐条气泡）；命令单独（等前一个完成再下一个）
-  useEffect(() => {
-    if (chatSending || chatProcessing || pendingItems.length === 0) return
-    const items = pendingItems
-    const firstCmd = items.findIndex((i) => i.kind === 'cmd')
-    if (firstCmd === 0) {
-      setPendingItems(items.slice(1))
-      sendMessages([items[0].text])
-    } else {
-      const n = firstCmd === -1 ? items.length : firstCmd
-      setPendingItems(items.slice(n))
-      sendMessages(items.slice(0, n).map((i) => i.text))
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [chatSending, chatProcessing, pendingItems])
-
-  const submitText = (text: string) => {
-    const t = text.trim()
-    if (!t) return
-    // AI 忙（本条发送中 / 后台轮次执行中）：进队列——普通消息等流结束一起发；/ 命令等流结束按顺序逐个执行
-    if (chatSending || chatProcessing) {
-      setPendingItems((items) => [...items, { kind: t.startsWith('/') ? 'cmd' : 'msg', text: t }])
-      setChatInput('')
-      setCmdActive(false)
-      return
-    }
-    sendMessages([t])
-  }
-
-  // 插入建议到输入框（追加不覆盖）；输入框 ref 在 renderChatInner 的 textarea 上
-  const chatInputRef = useRef<HTMLTextAreaElement>(null)
-  const insertSuggestion = (q: string) => {
-    setChatInput((prev) => (prev ? prev + ' ' + q : q))
-    requestAnimationFrame(() => {
-      chatInputRef.current?.focus()
-      const ta = chatInputRef.current
-      if (ta) {
-        const pos = ta.value.length
-        ta.setSelectionRange(pos, pos)
-      }
-    })
-  }
-
-  const sendMessages = async (texts: string[]) => {
-    const list = texts.map((t) => t.trim()).filter(Boolean)
-    if (!list.length) return
-    setChatSending(true)
-    setChatInput('')
-    setCmdActive(false)
-    // 用户消息逐条气泡（排队消息一起发时也是多条独立气泡）
-    for (const t of list) {
-      setChatMsgs((msgs) => [...msgs, { id: -(++msgSeqRef.current), role: 'user', content: t }])
-    }
-    // 斜杠命令：立即给执行中反馈（后端压缩/清空需要时间，等 [TOOL] 正式结果到达后 loadChat 会清掉这个临时气泡）
-    const singleCmd = list.length === 1 ? list[0] : ''
-    if (singleCmd.startsWith('/compact') || singleCmd.startsWith('/clear')) {
-      setChatMsgs((msgs) => [...msgs, {
-        id: -(++msgSeqRef.current), role: 'tool',
-        content: singleCmd.startsWith('/compact') ? '⏳ 正在压缩上下文（可能需要一点时间）…' : '⏳ 正在清空上下文…',
-      }])
-    }
-
-    // 服务器端轮次（不依赖本页面）：入队 → 订阅直播（断开自动重连）
-    let full = ''
-    let reasoning = ''
-    let streamTargetId: number | null = null  // 当前流式气泡（[TOOL] 后封存、开新气泡）
-    const base = (localStorage.getItem('instance_url') || '').replace(/\/+$/, '') + '/api'
-    const authHeaders = {
-      'Authorization': `Bearer ${localStorage.getItem('access_token')}`,
-      'Content-Type': 'application/json',
-    }
-    try {
-      // 1. 入队（返回 turn_id；若前面有消息在跑会排队）
-      const r = await api.post<{ turn_id: string; queued: boolean; position: number }>(`/worlds/${wid}/chat`, { messages: list })
-      if (r.queued) {
-        setChatMsgs((msgs) => [...msgs, { id: -(++msgSeqRef.current), role: 'tool', content: `⏳ 已排队（前面还有 ${r.position} 条在跑）` }])
-      }
-
-      // 2. 订阅直播（SSE）；断开自动重连加入直播，最多 5 次
-      let gotDone = false
-      for (let attempt = 0; attempt < 5 && !gotDone; attempt++) {
-        const streamResp = await fetch(`${base}/worlds/${wid}/chat/stream?turn_id=${r.turn_id}`, { headers: authHeaders })
-        if (!streamResp.ok || !streamResp.body) throw new Error(`直播连接失败(${streamResp.status})`)
-        const reader = streamResp.body.getReader()
-        const decoder = new TextDecoder()
-        let buffer = ''
-        // 首次内容/思考到达时开气泡（不在发消息时预建，避免空气泡）
-        const ensureBubble = () => {
-          if (streamTargetId !== null) return
-          const id = -(++msgSeqRef.current)
-          streamTargetId = id
-          setChatMsgs((msgs) => [...msgs, { id, role: 'ai', content: '', reasoning: '' }])
-        }
-        // rAF 节流渲染（只更新当前流式气泡）
-        let renderPending = false
-        const scheduleRender = () => {
-          if (renderPending) return
-          renderPending = true
-          requestAnimationFrame(() => {
-            renderPending = false
-            if (streamTargetId === null) return
-            setChatMsgs((msgs) => msgs.map((m) => m.id === streamTargetId ? { ...m, content: full, reasoning } : m))
-          })
-        }
-        while (true) {
-          const { done, value } = await reader.read()
-          if (done) break
-          buffer += decoder.decode(value, { stream: true })
-          const lines = buffer.split('\n')
-          buffer = lines.pop()!
-          for (const line of lines) {
-            if (!line.startsWith('data: ')) continue
-            const payload = line.slice(6)
-            if (payload === '[DONE]') { gotDone = true; break }
-            if (payload.startsWith('[SUGGEST]')) {
-              try { setSuggestions(JSON.parse(payload.slice(9))) } catch { /* ignore */ }
-              continue
-            }
-            if (payload.startsWith('[ERROR]')) throw new Error(payload.slice(7))
-            if (payload.startsWith('[TOOL]')) {
-              try {
-                const t = JSON.parse(payload.slice(6))
-                // 封存当前叙述气泡（内容已渲染），后续内容开新气泡；full/reasoning 重置避免拼接
-                streamTargetId = null
-                full = ''
-                reasoning = ''
-                setChatMsgs((msgs) => [...msgs, {
-                  id: -(++msgSeqRef.current),
-                  role: 'tool',
-                  content: t.summary || `${t.name} ${t.success ? '执行成功' : '执行失败'}`,
-                  error: !t.success,
-                }])
-              } catch { /* 解析失败忽略 */ }
-              continue
-            }
-            if (payload.startsWith('[REASONING]')) {
-              reasoning += payload.slice(11).replace(/\{NL\}/g, '\n')
-            } else {
-              full += payload.replace(/\{NL\}/g, '\n')
-            }
-            ensureBubble()
-            scheduleRender()
-          }
-          if (gotDone) break
-        }
-        if (gotDone) break
-        // 连接断开且未完成：稍等重连（重新订阅直播）
-        await new Promise((res) => setTimeout(res, 1500 * (attempt + 1)))
-      }
-      // 用权威历史收尾（含断开期间漏掉的工具气泡/最终回复）；世界信息可能被工具改过，一并刷新
-      await loadChat()
-      load()
-    } catch (e: any) {
-      // 出错：独立错误气泡
-      const errText = e?.message || '未知错误'
-      setChatMsgs((msgs) => streamTargetId === null ? msgs : msgs.map((m) => m.id === streamTargetId ? { ...m, content: '', reasoning: '' } : m))
-      setChatMsgs((msgs) => [...msgs, { id: -(++msgSeqRef.current), role: 'ai', content: errText, error: true }])
-      setMsg(`发送失败: ${errText}`)
-    } finally {
-      setChatSending(false)
-    }
-  }
+  // ── 世界 AI 对话（状态/发送/排队/建议/命令 全部在 useWorldChat） ──
+  const chat = useWorldChat({ wid, onRefresh: load, onMsg: setMsg })
 
   // ── 世界 AI 配置表单（单独表单，不属于 agent） ──
   const saveCreator = async () => {
@@ -811,14 +544,14 @@ export default function WorldDesignPage() {
       )}
 
       {/* 消息列表（滚到顶加载更早） */}
-      <div ref={chatListRef} onScroll={handleChatScroll} className="flex-1 overflow-y-auto p-3 space-y-2">
-        {chatLoadingOlder && <div className="text-[10px] text-textMuted text-center py-1">加载更早消息…</div>}
-        {chatMsgs.length === 0 && (
+      <div ref={chat.chatListRef} onScroll={chat.handleChatScroll} className="flex-1 overflow-y-auto p-3 space-y-2">
+        {chat.chatLoadingOlder && <div className="text-[10px] text-textMuted text-center py-1">加载更早消息…</div>}
+        {chat.chatMsgs.length === 0 && (
           <div className="text-xs text-textMuted text-center mt-8">
             暂无消息<br/>试试发送：「把页面标题改成红色」
           </div>
         )}
-        {chatMsgs.map((m) => (
+        {chat.chatMsgs.map((m) => (
           m.role === 'tool' ? (
             <div key={m.id} className={`text-[11px] text-center py-1 px-2 rounded-lg max-w-[90%] mx-auto ${m.error ? 'text-rose-400 bg-rose-500/10 border border-rose-500/20' : 'text-mint-400 bg-mint-400/10 border border-mint-400/20'}`}>
               🔧 {m.content}
@@ -845,13 +578,13 @@ export default function WorldDesignPage() {
       {/* 输入 */}
       <div className="p-3 border-t border-border relative">
         {/* 斜杠命令列表（输入 / 弹出；选中即发送） */}
-        {cmdActive && cmdFiltered.length > 0 && (
+        {chat.cmdActive && chat.cmdFiltered.length > 0 && (
           <div className="absolute bottom-full left-3 mb-1 w-64 max-h-40 overflow-y-auto rounded-xl bg-elevated border border-border shadow-xl z-50">
-            {cmdFiltered.map((c, i) => (
+            {chat.cmdFiltered.map((c, i) => (
               <button
                 key={c.cmd}
-                className={`w-full text-left px-3 py-2 transition-colors ${i === cmdIdx ? 'bg-primary-500/20 text-primary-400' : 'text-textPrimary hover:bg-hover'}`}
-                onMouseDown={(e) => { e.preventDefault(); submitText(c.cmd) }}
+                className={`w-full text-left px-3 py-2 transition-colors ${i === chat.cmdIdx ? 'bg-primary-500/20 text-primary-400' : 'text-textPrimary hover:bg-hover'}`}
+                onMouseDown={(e) => { e.preventDefault(); chat.submitText(c.cmd) }}
               >
                 <span className="font-mono text-xs">{c.cmd}</span>
                 <span className="block text-[10px] text-textMuted">{c.desc}</span>
@@ -860,25 +593,25 @@ export default function WorldDesignPage() {
           </div>
         )}
         {/* "你可以问"建议按钮（常驻；每块 = 文字 | 发送 | 插入，插入=追加到输入框不覆盖） */}
-        {suggestions.length > 0 && (
+        {chat.suggestions.length > 0 && (
           <div className="px-3 pb-1 flex flex-wrap items-center gap-1.5">
             <span className="text-[10px] text-textMuted shrink-0">你可以：</span>
-            {suggestions.map((q, i) => (
+            {chat.suggestions.map((q, i) => (
               <div key={i} className="flex items-stretch rounded-full bg-elevated border border-border overflow-hidden shrink-0 max-w-[260px]">
                 <button
-                  onClick={() => submitText(q)}
+                  onClick={() => chat.submitText(q)}
                   className="px-2.5 py-1 text-xs text-textSecondary hover:bg-primary-500/20 hover:text-primary-300 transition-colors truncate min-w-0"
                   title={q}
                 >{q}</button>
                 <div className="w-px bg-border shrink-0" />
                 <button
-                  onClick={(e) => { e.stopPropagation(); submitText(q) }}
+                  onClick={(e) => { e.stopPropagation(); chat.submitText(q) }}
                   className="px-1.5 flex items-center text-textMuted hover:text-primary-300 hover:bg-primary-500/20 transition-colors shrink-0"
                   title="发送这条"
                 ><Send size={11} /></button>
                 <div className="w-px bg-border shrink-0" />
                 <button
-                  onClick={(e) => { e.stopPropagation(); insertSuggestion(q) }}
+                  onClick={(e) => { e.stopPropagation(); chat.insertSuggestion(q) }}
                   className="px-1.5 flex items-center text-textMuted hover:text-primary-300 hover:bg-primary-500/20 transition-colors shrink-0"
                   title="插入到输入框（追加，不覆盖）"
                 ><CornerDownLeft size={11} /></button>
@@ -887,17 +620,17 @@ export default function WorldDesignPage() {
           </div>
         )}
       {/* 排队消息（AI 处理中，输入框上方弹窗展示：普通消息一起发，命令逐个执行） */}
-        {pendingItems.length > 0 && (
+        {chat.pendingItems.length > 0 && (
           <div className="absolute bottom-full left-3 right-3 mb-1 max-h-32 overflow-y-auto rounded-xl bg-elevated border border-border shadow-xl z-50">
             <div className="px-3 py-1.5 text-[10px] text-textMuted border-b border-border">
-              ⏳ AI 处理中，以下 {pendingItems.length} 条将按顺序执行（普通消息一起发，命令逐个执行）
+              ⏳ AI 处理中，以下 {chat.pendingItems.length} 条将按顺序执行（普通消息一起发，命令逐个执行）
             </div>
-            {pendingItems.map((it, i) => (
+            {chat.pendingItems.map((it, i) => (
               <div key={i} className="flex items-center gap-2 px-3 py-1.5 text-xs border-b border-border/40 last:border-b-0">
                 <span className={`truncate flex-1 ${it.kind === 'cmd' ? 'font-mono text-primary-400' : 'text-textPrimary'}`}>{it.text}</span>
                 <span className="shrink-0 text-[10px] text-textMuted">{it.kind === 'cmd' ? '命令' : '消息'}</span>
                 <button
-                  onClick={() => setPendingItems((items) => items.filter((_, j) => j !== i))}
+                  onClick={() => chat.setPendingItems((items) => items.filter((_, j) => j !== i))}
                   className="shrink-0 text-textMuted hover:text-rose-400 transition-colors"
                   title="移除这条"
                 >✕</button>
@@ -906,38 +639,38 @@ export default function WorldDesignPage() {
           </div>
         )}
         <textarea
-          ref={chatInputRef}
-          value={chatInput}
+          ref={chat.chatInputRef}
+          value={chat.chatInput}
           onChange={(e) => {
             const ta = e.target
-            setChatInput(ta.value)
+            chat.setChatInput(ta.value)
             // / 检测：光标前只有 / + 字母（命令整行输入）；AI 忙时命令需等待，不弹列表
             const before = ta.value.slice(0, ta.selectionStart)
             const m = before.match(/^\/\w*$/)
-            if (m) { setCmdQuery(before.slice(1)); setCmdActive(true); setCmdIdx(0) }
-            else setCmdActive(false)
+            if (m) { chat.setCmdQuery(before.slice(1)); chat.setCmdActive(true); chat.setCmdIdx(0) }
+            else chat.setCmdActive(false)
           }}
           onKeyDown={(e) => {
-            if (cmdActive && cmdFiltered.length > 0) {
-              if (e.key === 'ArrowDown') { e.preventDefault(); setCmdIdx((i) => (i + 1) % cmdFiltered.length); return }
-              if (e.key === 'ArrowUp') { e.preventDefault(); setCmdIdx((i) => (i - 1 + cmdFiltered.length) % cmdFiltered.length); return }
-              if (e.key === 'Enter' || e.key === 'Tab') { e.preventDefault(); submitText(cmdFiltered[cmdIdx].cmd); return }
-              if (e.key === 'Escape') { e.preventDefault(); setCmdActive(false); return }
+            if (chat.cmdActive && chat.cmdFiltered.length > 0) {
+              if (e.key === 'ArrowDown') { e.preventDefault(); chat.setCmdIdx((i) => (i + 1) % chat.cmdFiltered.length); return }
+              if (e.key === 'ArrowUp') { e.preventDefault(); chat.setCmdIdx((i) => (i - 1 + chat.cmdFiltered.length) % chat.cmdFiltered.length); return }
+              if (e.key === 'Enter' || e.key === 'Tab') { e.preventDefault(); chat.submitText(chat.cmdFiltered[chat.cmdIdx].cmd); return }
+              if (e.key === 'Escape') { e.preventDefault(); chat.setCmdActive(false); return }
             }
-            if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); submitText(chatInput) }
+            if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); chat.submitText(chat.chatInput) }
           }}
           rows={2}
-          placeholder={(chatSending || chatProcessing) ? "AI 处理中，消息将排队…" : "和世界 AI 对话…（输入 / 查看命令）"}
+          placeholder={(chat.chatSending || chat.chatProcessing) ? "AI 处理中，消息将排队…" : "和世界 AI 对话…（输入 / 查看命令）"}
           className="w-full bg-elevated text-sm p-2 rounded border border-border outline-none resize-none focus:border-primary-500/50"
         />
         <button
-          onClick={() => submitText(chatInput)}
-          disabled={!chatInput.trim()}
+          onClick={() => chat.submitText(chat.chatInput)}
+          disabled={!chat.chatInput.trim()}
           className="w-full mt-2 py-1.5 text-sm bg-primary-500 hover:bg-primary-400 text-white rounded transition-colors disabled:opacity-40"
         >
-          {(chatSending || chatProcessing) ? '排队发送' : (chatSending ? '思考中...' : '发送')}
+          {(chat.chatSending || chat.chatProcessing) ? '排队发送' : (chat.chatSending ? '思考中...' : '发送')}
         </button>
-        {chatProcessing && (
+        {chat.chatProcessing && (
           <div className="text-[10px] text-textMuted mt-2 text-center">
             ⏳ 上一轮还在执行（刷新不影响），完成后自动显示
           </div>

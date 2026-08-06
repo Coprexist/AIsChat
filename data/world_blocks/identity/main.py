@@ -60,24 +60,21 @@ def _now() -> str:
 
 
 def _update_identity(user_id, name: str, role: str | None = None) -> dict:
-    """登记/更新身份：写 identity.{user_id} + 合并 identity_index 快照 → 发布状态"""
-    key = f"identity.{user_id}"
-    rec = _get(key) or {"id": user_id}
+    """登记/更新身份：合并 identity_index 快照（3 次 API：读 index + 写 identity + 写 index）→ 发布状态"""
+    idx = _get("identity_index") or {}
+    rec = idx.get(str(user_id)) or {"id": user_id}
     rec.update({"id": user_id, "name": name, "last_seen": _now()})
     if role:
         rec["role"] = role
-    _put(key, rec)
-    idx = _get("identity_index") or {}
+    _put(f"identity.{user_id}", rec)
     idx[str(user_id)] = rec
     _put("identity_index", idx)
-    publish({"identity_state": _state_payload()})
+    users = sorted(
+        (v for v in idx.values() if isinstance(v, dict)),
+        key=lambda u: u.get("last_seen", ""), reverse=True,
+    )
+    publish({"identity_state": {"users": users, "count": len(users)}})
     return rec
-
-
-def _state_payload() -> dict:
-    users = [v for v in (_get("identity_index") or {}).values() if isinstance(v, dict)]
-    users.sort(key=lambda u: u.get("last_seen", ""), reverse=True)
-    return {"users": users, "count": len(users)}
 
 
 # ── 命令解析 ──
@@ -116,7 +113,12 @@ def _parse_command(text: str, sender_id, sender_name: str) -> dict | None:
 
     # 3) 身份 谁在 / 谁在
     if re.match(r"^(?:身份\s*)?谁在$", text):
-        publish({"identity_state": _state_payload()})
+        idx = _get("identity_index") or {}
+        users = sorted(
+            (v for v in idx.values() if isinstance(v, dict)),
+            key=lambda u: u.get("last_seen", ""), reverse=True,
+        )
+        publish({"identity_state": {"users": users, "count": len(users)}})
         return {"action": "identity_list"}
 
     return None
