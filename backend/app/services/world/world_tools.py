@@ -80,14 +80,14 @@ WORLD_TOOLS = [
         "type": "function",
         "function": {
             "name": "suggest_questions",
-            "description": "向用户展示接下来可以问的问题（3 个，每个 ≤20 字，具体、好玩、引导用户探索这个世界）。在完成回复、觉得用户需要引导时调用——用户点一下就会问出来。",
+            "description": "向用户展示接下来的建议（3-4 个，每个 ≤20 字）：可以是问题（如「卡牌对战怎么玩？」）、陈述性要求（如「把背景改成星空」）或下一步选项（如「查看世界文件」）——具体、好玩、引导探索。完成回复觉得用户需要引导时调用——用户点一下就执行。",
             "parameters": {
                 "type": "object",
                 "properties": {
                     "questions": {
                         "type": "array",
                         "items": {"type": "string"},
-                        "description": "3 个建议问题（用户可直接点击发送）",
+                        "description": "3-4 个建议（问题/要求/下一步选项，用户可直接点击发送）",
                     },
                 },
                 "required": ["questions"],

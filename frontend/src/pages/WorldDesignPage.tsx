@@ -862,7 +862,7 @@ export default function WorldDesignPage() {
         {/* "你可以问"建议按钮（常驻；每块 = 文字 | 发送 | 插入，插入=追加到输入框不覆盖） */}
         {suggestions.length > 0 && (
           <div className="px-3 pb-1 flex flex-wrap items-center gap-1.5">
-            <span className="text-[10px] text-textMuted shrink-0">你可以问：</span>
+            <span className="text-[10px] text-textMuted shrink-0">你可以：</span>
             {suggestions.map((q, i) => (
               <div key={i} className="flex items-stretch rounded-full bg-elevated border border-border overflow-hidden shrink-0 max-w-[260px]">
                 <button

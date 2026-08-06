@@ -265,7 +265,7 @@ async def stream_world_chat(
     system_prompt = world_context_block(world) + "\n\n" + (
         cfg.get("system_prompt") or CREATOR_DEFAULT_CONFIG["system_prompt"]
     )
-    system_prompt += "\n【工具约定】你的工具与平台 AI 同名同义（文件类：file_read/file_write/file_edit/file_list/file_delete，作用于世界文件夹）；另有 update_world_info / compact_context / list_world_blocks / view_world_block / apply_world_block / view_api_doc / store_memory / recall_memory / web_search / web_fetch。调用工具时不要把工具调用的原始内容写进回复文本，直接说你要做什么/做了什么；创建文件后告知用户文件路径。"
+    system_prompt += "\n【工具约定】你的工具与平台 AI 同名同义（文件类：file_read/file_write/file_edit/file_list/file_delete，作用于世界文件夹）；另有 update_world_info / compact_context / list_world_blocks / view_world_block / apply_world_block / view_api_doc / store_memory / recall_memory / web_search / web_fetch。调用工具时不要把工具调用的原始内容写进回复文本，直接说你要做什么/做了什么；创建文件后告知用户文件路径。遇到不清楚的需求、含糊的指令或可能理解错的地方，主动提问确认，不要瞎猜。你也可以给用户下一步建议（问题/要求/选项都行）。"
     system_prompt += "\n【接口文档】平台接口文档按区分区（01 世界编号变量 / 02 WorldUI 桥 / 03 文件操作 / 04 积木体系 / 05 群聊 API / 06 页面与资源 / 07 懒通知与世界时间 / 08 错误与安全）。需要接口细节时用 view_api_doc 打开对应分区（工具描述里有各区介绍，先看介绍再决定开哪个，不要一次全读）。"
     system_prompt += "\n【记忆约定】你有本世界的长期记忆（store_memory 存 / recall_memory 取，按世界隔离），它是你跨上下文、跨会话的工作资产（clear_context 清空对话后靠它恢复）：\n- 每次执行完文件改动、配置修改、发布状态等实际改动后，用 store_memory 更新记忆——title 用固定名（如「工作状态」「当前计划」）即可覆盖刷新，content 写当前进度与结论\n- 每次写完计划/方案后也 store_memory 存一份（title 固定为「当前计划」）\n- 被 clear_context 清空上下文或新会话开始时：先 recall_memory 检索再继续工作，别从零开始\n- 重要的世界设定、用户偏好、关键事件、进行到一半的事都记下来；用户提到以前的事先 recall_memory 再答，别凭感觉编\n- 记忆是这个世界的资产，跨世界不共享"
     system_prompt += "\n【UI 约定】若你的页面实现了自己的侧边栏/菜单/导航，请调用 WorldUI.hideFloatingIcon() 隐藏平台悬浮图标（见接口文档），避免重复；未实现时不要调用。"
@@ -684,7 +684,7 @@ async def _suggest_fallback(db, world) -> list[str]:
         model = (wai.model if wai else None) or settings.default_chat_model
         resp = await chat_completion(
             messages=[
-                {"role": "system", "content": '你是对话引导助手。基于以下对话，生成 3 个用户接下来可能想问的简短问题（每个 ≤20 字，具体、好玩、引导探索），只输出 JSON 数组，如 ["问题1","问题2","问题3"]，不要其它文字。'},
+                {"role": "system", "content": '你是对话引导助手。基于以下对话，生成 3-4 个建议给用户（每个 ≤20 字）：可以是问题、陈述性要求或下一步选项，具体、好玩、引导探索。只输出 JSON 数组，如 ["建议1","建议2","建议3"]，不要其它文字。'},
                 {"role": "user", "content": recent},
             ],
             model=model, api_base_url=api_base, api_key=api_key,
