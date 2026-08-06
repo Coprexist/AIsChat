@@ -73,8 +73,9 @@ class CreatorConfigRequest(BaseModel):
 
 
 class ChatRequest(BaseModel):
-    """世界 AI 对话（单条消息无长度上限）"""
-    message: str = Field(..., min_length=1)
+    """世界 AI 对话：message 单条；messages 批量（排队消息一起发给 AI，多条气泡）"""
+    message: str | None = Field(None, min_length=1)
+    messages: list[str] | None = None
 
 
 async def _require_owner(db: AsyncSession, world_id: int, user_id: int):
@@ -478,7 +479,8 @@ async def post_chat(
     record_world_activity(world_id, current_user["user_id"])
     from app.services.world.world_turn import get_world_worker
     worker = get_world_worker(world_id)
-    turn_id = worker.enqueue(current_user["user_id"], req.message)
+    payload = req.messages if req.messages else ([req.message] if req.message else [])
+    turn_id = worker.enqueue(current_user["user_id"], payload)
     return {
         "turn_id": turn_id,
         "queued": worker.queue_size > 1,

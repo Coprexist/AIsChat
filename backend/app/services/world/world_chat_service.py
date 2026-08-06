@@ -193,7 +193,7 @@ async def stream_world_chat(
     db: AsyncSession,
     world_id: int,
     user_id: int,
-    message: str,
+    message: str | list[str],
     turn_id: str = "",
 ):
     """世界 AI 对话（SSE 流式，参考大同差异分析流式实现）。
@@ -266,18 +266,23 @@ async def stream_world_chat(
         {"role": "assistant" if m["role"] == "ai" else m["role"], "content": m["content"]}
         for m in history if m["role"] not in ("tool", "note")
     ]
+    # 用户消息列表（单条/批量统一；批量 = 排队消息一起发，逐条气泡）
+    msg_list = message if isinstance(message, list) else [message]
+    msg_list = [str(m).strip() for m in msg_list if str(m).strip()]
     from app.services.memory.context_compression_service import should_compress
     needs_compress = should_compress(
-        [{"role": "system", "content": system_prompt}, *hist_llm, {"role": "user", "content": message}],
+        [{"role": "system", "content": system_prompt}, *hist_llm,
+         *[{"role": "user", "content": m} for m in msg_list]],
         min_messages=WORLD_CONTEXT_MIN_MESSAGES,
     )
 
-    # 前缀稳定：位置2摘要（静态）+ 历史 + 用户消息
+    # 前缀稳定：位置2摘要（静态）+ 历史 + 用户消息（批量 = 逐条注入，AI 一次看到全部）
     messages = [{"role": "system", "content": system_prompt}]
     if summary:
         messages.append({"role": "system", "content": summary})
     messages += hist_llm
-    messages.append({"role": "user", "content": message})
+    for m in msg_list:
+        messages.append({"role": "user", "content": m})
 
     # 动态信息全部放末尾（每次变化，不影响前缀 cache）——与主对话同规则
     if notice_lines:
@@ -299,15 +304,16 @@ async def stream_world_chat(
     except Exception:
         pass
 
-    # ── 落库：用户消息（先提交，即使流失败也不丢）──
-    db.add(WorldChatMessage(world_id=world_id, user_id=user_id, role="user", content=message))
+    # ── 落库：用户消息（批量 = 排队消息一起发，逐条气泡；先提交，即使流失败也不丢）──
+    for m in msg_list:
+        db.add(WorldChatMessage(world_id=world_id, user_id=user_id, role="user", content=m))
     try:
         await db.commit()
     except Exception as e:
         logger.warning(f"🌐 世界 #{world_id} 用户消息落库失败: {e}")
 
-    # ── 用户斜杠命令（不走 LLM）：/clear 清空上下文（保留记忆） /compact 压缩上下文 ──
-    cmd_text = (message or "").strip()
+    # ── 用户斜杠命令（不走 LLM，仅单条）：/clear 清空上下文（保留记忆） /compact 压缩上下文 ──
+    cmd_text = msg_list[0] if len(msg_list) == 1 else ""
     if cmd_text.startswith("/clear") or cmd_text.startswith("/compact"):
         try:
             if cmd_text.startswith("/clear"):

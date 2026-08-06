@@ -120,12 +120,13 @@ class WorldTurnWorker:
                     tb.end()
                     self.turns.pop(item["turn_id"], None)
 
-    def enqueue(self, user_id: int, message: str) -> str:
-        """消息入队，返回 turn_id（订阅直播用）"""
+    def enqueue(self, user_id: int, message: str | list[str]) -> str:
+        """消息入队（支持批量：排队消息一起发给 AI），返回 turn_id（订阅直播用）"""
         turn_id = uuid.uuid4().hex[:12]
         self.turns[turn_id] = TurnBroadcast(turn_id)
         self.msg_queue.put_nowait({
-            "turn_id": turn_id, "user_id": user_id, "message": message,
+            "turn_id": turn_id, "user_id": user_id,
+            "message": message if isinstance(message, list) else [message],
         })
         return turn_id
 
