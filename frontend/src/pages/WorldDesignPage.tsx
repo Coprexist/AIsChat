@@ -603,7 +603,7 @@ export default function WorldDesignPage() {
         {chat.chatLoadingOlder && <div className="text-[10px] text-textMuted text-center py-1">加载更早消息…</div>}
         {chat.chatMsgs.length === 0 && (
           <div className="text-xs text-textMuted text-center mt-8">
-            暂无消息<br/>试试发送：「把页面标题改成红色」
+            暂无消息<br/>从「你可以」的建议开始，或直接告诉世界 AI 你想做什么
           </div>
         )}
         {chat.chatMsgs.map((m) => {
