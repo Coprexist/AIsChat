@@ -78,6 +78,16 @@ async def lifespan(app: FastAPI):
     from app.migration import run_migrations
     await run_migrations()
 
+    # 平台能力版本化（skills/tools 懒加载）：启动时对比内置工具定义，变更则写新版本
+    try:
+        from app.database import async_session
+        async with async_session() as cap_db:
+            from app.services.capability_versioning import ensure_platform_version
+            v = await ensure_platform_version(cap_db)
+            logger.info(f"🧬 平台能力版本: v{v}")
+    except Exception as e:
+        logger.warning(f"⚠️ 平台能力版本化失败（不影响启动）: {e}")
+
     # 启动时将 last_active_at=NULL 标记为当前时间（服务器重启前在线的用户）
     from app.database import async_session
     from sqlalchemy import update as sa_update, func

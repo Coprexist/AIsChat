@@ -26,6 +26,9 @@ class Agent(Base):
     # 当前配置（AI 可自修改）
     current_system_prompt = Column(Text)
     pending_system_prompt = Column(Text, nullable=True)  # AI自修改暂存，压缩时切到current
+    # 能力懒加载版本（2026-08-06）：{source: version}
+    cap_known_versions = Column(JSONB, default=dict, comment="能力源告知进度（已注入变更通知的版本）")
+    cap_effective_versions = Column(JSONB, default=dict, comment="能力源生效进度（请求实际使用的工具定义版本，compact 时更新）")
     current_temperature = Column(Float)
     current_top_p = Column(Float)
     current_presence_penalty = Column(Float)
@@ -203,4 +206,27 @@ class AgentCollaborator(Base):
 
     __table_args__ = (
         UniqueConstraint("agent_id", "user_id", name="uq_agent_collaborator"),
+    )
+
+
+class CapabilityVersion(Base):
+    """能力源版本 — skills/tools 版本化（平台 + 世界统一）
+
+    能力源：platform（内置工具） / world-{id}（世界 skills 生成的工具定义）。
+    每个源一条版本链：content_hash 变化 → 新版本 + changelog + definitions 快照。
+    旧版本永远保留：compact 前 AI 继续用 effective 版本的旧定义（前缀缓存稳定），
+    compact 后切到最新。
+    """
+    __tablename__ = "capability_versions"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    source = Column(String(50), nullable=False, comment="能力源：platform / world-{id}")
+    version = Column(Integer, nullable=False, comment="版本号（每源内递增）")
+    content_hash = Column(String(64), nullable=False, comment="源内容哈希（检测变更）")
+    changelog = Column(Text, default="", comment="本版本变更摘要（增量注入用）")
+    definitions = Column(JSONB, nullable=True, comment="工具定义快照（platform=内置全部；world=skills 转出）")
+    created_at = Column(DateTime, server_default=func.now())
+
+    __table_args__ = (
+        UniqueConstraint("source", "version", name="uq_capability_ver_source_version"),
     )

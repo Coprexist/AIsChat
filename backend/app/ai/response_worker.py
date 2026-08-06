@@ -573,10 +573,14 @@ async def _maybe_trigger_ai_reply(
         )
         messages.append({"role": "system", "content": delay_hint})
 
-    # 7.5 获取工具
+    # 7.5 获取工具（能力版本化：按 effective 版本取定义快照，前缀缓存稳定）
     from app.services.tool_registry import get_allowed_tools
+    from app.services.capability_versioning import get_effective_definitions, SOURCE_PLATFORM
     delay_allowed = await _is_delay_reply_allowed(db, agent)
-    tools = get_allowed_tools(agent.state, thinking_enabled=effective_cfg["thinking_enabled"], delay_reply_allowed=delay_allowed)
+    current_tools = get_allowed_tools(agent.state, thinking_enabled=effective_cfg["thinking_enabled"], delay_reply_allowed=delay_allowed)
+    allowed_names = {t["function"]["name"] for t in current_tools}
+    effective_defs = await get_effective_definitions(db, agent, SOURCE_PLATFORM, current_tools)
+    tools = [d for d in effective_defs if ((d or {}).get("function") or {}).get("name") in allowed_names]
     model = resolve_model(agent)
     logger.info(f"🔍 AI {agent.name}: model={model}, tools={len(tools)}")
 
@@ -736,10 +740,14 @@ async def _trigger_dm_ai_reply(
     # v0.1.3: DM 中 sender_id 即为触发用户
     messages = await build_dm_messages(db, agent, session_id, api_base_url=api_base, api_key=api_key, trigger_user_id=sender_id, system_prompt_override=effective_cfg.get("system_prompt"))
 
-    # 获取工具
+    # 获取工具（能力版本化：按 effective 版本取定义快照）
     from app.services.tool_registry import get_allowed_tools
+    from app.services.capability_versioning import get_effective_definitions, SOURCE_PLATFORM
     delay_allowed = await _is_delay_reply_allowed(db, agent)
-    tools = get_allowed_tools(agent_state, thinking_enabled=effective_cfg["thinking_enabled"], delay_reply_allowed=delay_allowed)
+    current_tools = get_allowed_tools(agent_state, thinking_enabled=effective_cfg["thinking_enabled"], delay_reply_allowed=delay_allowed)
+    allowed_names = {t["function"]["name"] for t in current_tools}
+    effective_defs = await get_effective_definitions(db, agent, SOURCE_PLATFORM, current_tools)
+    tools = [d for d in effective_defs if ((d or {}).get("function") or {}).get("name") in allowed_names]
     model = resolve_model(agent)
 
     logger.info(f"🚀 AI {agent_name}: 开始 DM 回复 (session={session_id})")

@@ -883,6 +883,12 @@ async def _do_execute(db: AsyncSession, world, name: str, arguments: str) -> dic
             if not summary:
                 return {"success": False, "error": "摘要提取失败"}
             world.config = {**(world.config or {}), "chat_summary": summary}
+            # 能力懒加载：压缩后 effective 对齐最新（世界 skill 工具定义直接用最新的）
+            try:
+                from app.services.capability_versioning import mark_effective_latest
+                await mark_effective_latest(db, world.config, [f"world-{world.id}"])
+            except Exception:
+                pass
             await db.flush()
             return {
                 "success": True,

@@ -1132,6 +1132,16 @@ async def build_messages(
     # 当前时间放在最后（每次变化，放末尾不影响前缀cache）
     current_ctx = await _build_current_context(db, agent, group_id, group_name, is_dm)
     messages.append({"role": "system", "content": current_ctx})
+
+    # 能力变更通知（懒加载：增量 changelog 追加尾部，known 更新与注入同轮；不影响前缀缓存）
+    try:
+        from app.services.capability_versioning import build_change_notice, SOURCE_PLATFORM
+        notice = await build_change_notice(db, agent, [SOURCE_PLATFORM])
+        if notice:
+            messages.append({"role": "system", "content": notice})
+            await db.commit()
+    except Exception:
+        pass
     return messages
 
 

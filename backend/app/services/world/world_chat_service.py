@@ -287,6 +287,17 @@ async def stream_world_chat(
     tz = ZoneInfo(settings.display_timezone)
     messages.append({"role": "system", "content": f"## 当前时间\n{datetime.now(tz).strftime(f'%Y-%m-%d %H:%M {tz.key}')}\n"})
 
+    # 能力变更通知（世界源懒加载：增量 changelog 追加尾部，known 更新与注入同轮）
+    try:
+        from app.services.capability_versioning import build_change_notice
+        world_source = f"world-{world_id}"
+        notice = await build_change_notice(db, world.config, [world_source])
+        if notice:
+            messages.append({"role": "system", "content": notice})
+            await db.commit()
+    except Exception:
+        pass
+
     # ── 落库：用户消息（先提交，即使流失败也不丢）──
     db.add(WorldChatMessage(world_id=world_id, user_id=user_id, role="user", content=message))
     try:
@@ -296,14 +307,20 @@ async def stream_world_chat(
 
     from app.services.world.world_tools import WORLD_TOOLS
     from app.services.world.world_skill_runtime import build_skill_tools
+    from app.services.capability_versioning import ensure_world_version, get_effective_definitions
+
+    # 工具列表 = 平台内置 + 文件式 skill（世界源版本化：变更不立即生效，通知后 compact 切换）
+    skill_tools = build_skill_tools(world_id)
+    if skill_tools:
+        await ensure_world_version(db, world_id, skill_tools)
+    world_source = f"world-{world_id}"
+    effective_skill_tools = await get_effective_definitions(db, world.config, world_source, skill_tools)
+    tools_for_world = [*WORLD_TOOLS, *effective_skill_tools]
 
     # ── 请求 DeepSeek（stream=true，透传 SSE）──
     api_key, api_base = await _resolve_world_credentials(db, world)
     model = cfg.get("model") or settings.default_chat_model
     thinking = bool(cfg.get("thinking", False))
-
-    # 工具列表 = 平台内置 + 文件式 skill（设计侧造物主工具 / 世界侧居民能力，动态加载）
-    tools_for_world = [*WORLD_TOOLS, *build_skill_tools(world_id)]
 
     payload: dict = {
         "model": model,

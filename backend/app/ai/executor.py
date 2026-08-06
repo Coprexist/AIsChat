@@ -545,6 +545,10 @@ async def _tool_call_loop(
                         try:
                             from app.services.agent.agent_service import apply_pending_config
                             await apply_pending_config(db, agent)
+                            # 能力懒加载：compact 后 effective 对齐最新（工具定义直接用最新的）
+                            from app.services.capability_versioning import mark_effective_latest, SOURCE_PLATFORM
+                            await mark_effective_latest(db, agent, [SOURCE_PLATFORM])
+                            await db.commit()
                         except Exception:
                             pass
 
