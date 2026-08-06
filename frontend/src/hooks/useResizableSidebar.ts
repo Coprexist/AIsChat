@@ -24,8 +24,10 @@ export function useResizableSidebar(
   const max = options?.max ?? SIDEBAR_MAX
   const resolveMax = () => (typeof max === 'function' ? max() : max)
   const [sidebarWidth, setSidebarWidth] = useState(() => {
+    // max 可能是函数（动态上限）——初始化时先 resolve，避免 Math.min(函数, 值) = NaN
+    const maxVal = typeof max === 'function' ? max() : max
     const saved = localStorage.getItem(storageKey)
-    if (saved) return Math.max(min, Math.min(max, Number(saved)))
+    if (saved) return Math.max(min, Math.min(maxVal, Number(saved)))
     return side === 'left' ? SIDEBAR_DEFAULT : RIGHT_DEFAULT
   })
   const resizing = useRef(false)
