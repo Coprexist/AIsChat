@@ -663,14 +663,23 @@ export default function WorldDesignPage() {
                   {m.content ? <MarkdownContent content={m.content} /> : (m.role === 'ai' ? <span className="opacity-40">…</span> : null)}
                 </div>
               )}
-              {/* 中断 → 【继续】；正常 → "你可以"建议（最后一条 AI 回复下面） */}
+              {/* 中断 → "你可以：继续"（同一套建议样式）；正常 → 建议列表 */}
               {isLastAi && isInterrupted && !chat.chatSending && !chat.chatProcessing && (
-                <div className="space-y-1.5 pl-1">
-                  <div className="text-[10px] text-textMuted">上次对话中断了：</div>
-                  <button
-                    onClick={() => chat.submitText('继续')}
-                    className="px-4 py-1.5 text-xs rounded-lg bg-primary-500 text-white hover:bg-primary-400 transition-colors"
-                  >继续之前的工作</button>
+                <div className="space-y-1.5 pl-1 w-full max-w-[420px]">
+                  <div className="text-[10px] text-textMuted">你可以：</div>
+                  <div className="flex items-stretch rounded-lg bg-elevated border border-border overflow-hidden w-full">
+                    <button
+                      onClick={() => chat.submitText('继续')}
+                      className="flex-1 min-w-0 px-2.5 py-1.5 text-left text-xs text-textSecondary hover:bg-primary-500/20 hover:text-primary-300 transition-colors truncate"
+                      title="继续之前的工作"
+                    >继续之前的工作</button>
+                    <div className="w-px bg-border shrink-0" />
+                    <button
+                      onClick={(e) => { e.stopPropagation(); chat.submitText('继续') }}
+                      className="px-2 flex items-center text-textMuted hover:text-primary-300 hover:bg-primary-500/20 transition-colors shrink-0"
+                      title="发送"
+                    ><Send size={11} /></button>
+                  </div>
                 </div>
               )}
               {(isLastAi || chat.chatMsgs.length === 0) && !isInterrupted && chat.suggestions.length > 0 && !chat.chatSending && !chat.chatProcessing && (
