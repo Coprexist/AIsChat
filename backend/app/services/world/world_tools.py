@@ -402,32 +402,32 @@ def _tool_result_summary(name: str, result: dict) -> str:
         return f"应用积木失败：{result.get('error', '未知错误')}"
     if name == "view_api_doc":
         if ok:
-            return f"📖 接口文档「{result.get('title') or result.get('section', '')}」已读取"
+            return f"接口文档「{result.get('title') or result.get('section', '')}」已读取"
         return f"接口文档读取失败：{result.get('error', '未知错误')}"
     if name == "store_memory":
-        return f"🧠 已记住「{result.get('title', '')}」" + ("（无向量）" if ok and not result.get("embedded") else "") if ok else f"记忆失败：{result.get('error', '未知错误')}"
+        return f"已记住「{result.get('title', '')}」" + ("（无向量）" if ok and not result.get("embedded") else "") if ok else f"记忆失败：{result.get('error', '未知错误')}"
     if name == "recall_memory":
         if ok:
             mems = result.get("memories") or []
             if not mems:
-                return "🧠 没找到相关记忆"
-            return f"🧠 检索到 {len(mems)} 条记忆：" + "、".join(m.get('title', '') for m in mems[:5])
+                return "没找到相关记忆"
+            return f"检索到 {len(mems)} 条记忆：" + "、".join(m.get('title', '') for m in mems[:5])
         return f"记忆检索失败：{result.get('error', '未知错误')}"
     if name == "web_search":
         if ok:
-            return f"🔍 搜索结果 {result.get('count', 0)} 条：" + "、".join(r.get('title', '')[:20] for r in (result.get('results') or [])[:5])
+            return f"搜索结果 {result.get('count', 0)} 条：" + "、".join(r.get('title', '')[:20] for r in (result.get('results') or [])[:5])
         return f"搜索失败：{result.get('error', '未知错误')}"
     if name == "web_fetch":
         if ok:
-            return f"🌐 已获取 {result.get('url', '')[:60]}"
+            return f"已获取 {result.get('url', '')[:60]}"
         return f"抓取失败：{result.get('error', '未知错误')}"
     if name == "run_world_code":
         if ok:
             if "result" in result:
-                return f"⚙️ 世界代码触发成功：{str(result.get('result'))[:120]}"
+                return f"世界代码触发成功：{str(result.get('result'))[:120]}"
             out = (result.get('stdout') or '').strip().splitlines()
-            return f"⚙️ 世界代码运行成功（{result.get('duration_ms', 0)}ms）：" + (out[-1][:120] if out else "无输出")
-        return f"⚙️ 世界代码执行失败：{result.get('error', '未知错误')}"
+            return f"世界代码运行成功（{result.get('duration_ms', 0)}ms）：" + (out[-1][:120] if out else "无输出")
+        return f"世界代码执行失败：{result.get('error', '未知错误')}"
     if name == "get_bound_groups":
         if ok:
             groups = result.get("groups") or []

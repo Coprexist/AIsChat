@@ -33,13 +33,13 @@ async def run_slash_command(db: AsyncSession, world, cmd_text: str) -> str | Non
         except Exception:
             pass
         await db.commit()
-        return "🧹 已清空对话上下文（历史消息+摘要+工作流记忆），长期记忆保留——AI 将从记忆恢复工作状态。"
+        return "已清空对话上下文（历史消息+摘要+工作流记忆），长期记忆保留——AI 将从记忆恢复工作状态。"
 
     if cmd_text.startswith("/compact"):
         from app.services.world.world_tools import _do_execute
         result = await _do_execute(db, world, "compact_context", "{}")
         if result.get("success"):
-            return (f"📦 上下文已压缩：{result.get('before_tokens')} → "
+            return (f"上下文已压缩：{result.get('before_tokens')} → "
                     f"{result.get('after_tokens')} tokens"
                     f"（压缩率 {result.get('compression_ratio_pct')}%）")
         return f"⚠️ 压缩未执行：{result.get('error', '未知原因')}"

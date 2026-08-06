@@ -6,7 +6,7 @@
  */
 import { useEffect, useState, useCallback, useRef, useMemo } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
-import { ChevronLeft, ChevronRight, ChevronDown, Folder, FolderOpen, FileText, FileCode, FileJson, FileImage, FileAudio, FileVideo, File, Trash2, Upload, Plus, Pencil, Eye, Brain, MessageCircle, Save, Send, CornerDownLeft, ArrowDown } from 'lucide-react'
+import { ChevronLeft, ChevronRight, ChevronDown, Folder, FolderOpen, FileText, FileCode, FileJson, FileImage, FileAudio, FileVideo, File, Trash2, Upload, Plus, Pencil, Eye, Brain, MessageCircle, Save, Send, CornerDownLeft, ArrowDown, Search, Globe, Terminal, Package, Clock, Wrench, Eraser } from 'lucide-react'
 import { api } from '../api/client'
 import MarkdownContent from '../components/shared/MarkdownContent'
 import CodeRenderer from '../components/shared/CodeRenderer'
@@ -25,6 +25,20 @@ function fileTypeIcon(name: string) {
   if (['md', 'txt'].includes(ext)) return <FileText size={13} className="text-textSecondary shrink-0" />
   if (['html', 'htm', 'css', 'js', 'ts', 'jsx', 'tsx', 'py', 'xml', 'yaml', 'yml', 'sh'].includes(ext)) return <FileCode size={13} className="text-primary-400 shrink-0" />
   return <File size={13} className="text-textMuted shrink-0" />
+}
+
+// 工具气泡图标：按摘要内容关键词映射（后端文本不带 emoji，图标由前端渲染）
+function toolIcon(content: string) {
+  const s = content || ''
+  if (s.includes('接口文档')) return <FileText size={12} />
+  if (s.includes('记住') || s.includes('记忆') || s.includes('检索')) return <Brain size={12} />
+  if (s.includes('搜索')) return <Search size={12} />
+  if (s.includes('获取') || s.includes('http')) return <Globe size={12} />
+  if (s.includes('世界代码')) return <Terminal size={12} />
+  if (s.includes('压缩')) return <Package size={12} />
+  if (s.includes('清空')) return <Eraser size={12} />
+  if (s.includes('排队')) return <Clock size={12} />
+  return <Wrench size={12} />
 }
 
 // 文件内容区：md/html/代码渲染、图片显示、纯文本编辑（桌面右栏 / 移动端编辑器共用）
@@ -589,8 +603,9 @@ export default function WorldDesignPage() {
           return (
             <div key={m.id} className="space-y-2">
               {m.role === 'tool' ? (
-                <div className={`text-[11px] text-center py-1 px-2 rounded-lg max-w-[90%] mx-auto ${m.error ? 'text-rose-400 bg-rose-500/10 border border-rose-500/20' : 'text-mint-400 bg-mint-400/10 border border-mint-400/20'}`}>
-                  🔧 {m.content}
+                <div className={`world-msg flex items-center justify-center gap-1.5 text-[11px] text-center py-1 px-2 rounded-lg max-w-[90%] mx-auto ${m.error ? 'text-rose-400 bg-rose-500/10 border border-rose-500/20' : 'text-mint-400 bg-mint-400/10 border border-mint-400/20'}`}>
+                  <span className="shrink-0">{toolIcon(m.content)}</span>
+                  <span className="min-w-0">{m.content}</span>
                 </div>
               ) : (
                 <div className={`world-msg text-sm max-w-[90%] p-2 rounded-lg ${m.error ? 'bg-rose-500/10 border border-rose-500/30 text-rose-400' : m.role === 'user' ? 'bg-primary-500/20 ml-auto' : 'bg-elevated/80'}`}>
