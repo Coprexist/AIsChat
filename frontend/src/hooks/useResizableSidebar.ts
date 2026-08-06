@@ -20,7 +20,9 @@ export function useResizableSidebar(
 ) {
   const side = options?.side ?? 'left'
   const min = options?.min ?? SIDEBAR_MIN
+  // max 支持 number 或函数（动态上限：拖动/窗口变化时实时算，如按其他区域保底反推）
   const max = options?.max ?? SIDEBAR_MAX
+  const resolveMax = () => (typeof max === 'function' ? max() : max)
   const [sidebarWidth, setSidebarWidth] = useState(() => {
     const saved = localStorage.getItem(storageKey)
     if (saved) return Math.max(min, Math.min(max, Number(saved)))
@@ -49,7 +51,7 @@ export function useResizableSidebar(
       const w = side === 'left'
         ? e.clientX - anchorRef.current
         : anchorRef.current - e.clientX
-      const clamped = Math.round(Math.max(min, Math.min(max, w)))
+      const clamped = Math.round(Math.max(min, Math.min(resolveMax(), w)))
       setSidebarWidth(clamped)
       localStorage.setItem(storageKey, String(clamped))
     }

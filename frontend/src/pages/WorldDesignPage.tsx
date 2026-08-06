@@ -126,8 +126,16 @@ export default function WorldDesignPage() {
   // 可拖拽面板（复用侧边栏 hook：左=文件树，右=对话）
   const fileTreeRef = useRef<HTMLDivElement>(null)
   const chatPanelRef = useRef<HTMLDivElement>(null)
-  const { sidebarWidth: fileWidth, handleResizeStart: fileResizeStart } = useResizableSidebar('world_files_width', fileTreeRef, { min: 160, max: 400 })
-  const { sidebarWidth: chatWidth, handleResizeStart: chatResizeStart } = useResizableSidebar('world_chat_width', chatPanelRef, { side: 'right', min: 320, max: 800 })
+  // 三栏动态保底：文件树 120 / 编辑区 200 / 对话 240，拖动上限按其他区域保底实时反推
+  const MIN_TREE = 120
+  const MIN_EDITOR = 200
+  const MIN_CHAT = 240
+  const { sidebarWidth: fileWidth, handleResizeStart: fileResizeStart } = useResizableSidebar('world_files_width', fileTreeRef, {
+    min: MIN_TREE, max: () => window.innerWidth - MIN_EDITOR - MIN_CHAT,
+  })
+  const { sidebarWidth: chatWidth, handleResizeStart: chatResizeStart } = useResizableSidebar('world_chat_width', chatPanelRef, {
+    side: 'right', min: MIN_CHAT, max: () => window.innerWidth - MIN_TREE - MIN_EDITOR,
+  })
 
   const [world, setWorld] = useState<World | null>(null)
   const [files, setFiles] = useState<WorldFile[]>([])
