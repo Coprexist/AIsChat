@@ -1001,12 +1001,12 @@ export default function WorldDesignPage() {
       <div className="hidden lg:flex flex-col h-full">
       {/* ═══ 标题栏（纯展示不切换；与移动端 tab 同款，窗口缩到 <lg 时原位变可切换 tab，过渡自然） ═══ */}
       <div className="flex items-stretch bg-surface border-b border-border text-xs">
-        <div style={{ width: fileWidth }} className="shrink-0 flex items-center gap-1.5 px-4 py-2 font-medium text-textSecondary border-r border-border">
+        <div style={{ width: fileWidth }} className="shrink-0 flex items-center justify-center gap-1.5 px-4 py-2 font-medium text-textSecondary border-r border-border">
           <Folder size={14} className="text-textMuted" />
           文件
         </div>
         <div className="flex-1" />
-        <div style={{ width: chatWidth }} className="shrink-0 flex items-center gap-1.5 px-4 py-2 font-medium text-textSecondary border-l border-border">
+        <div style={{ width: chatWidth }} className="shrink-0 flex items-center justify-center gap-1.5 px-4 py-2 font-medium text-textSecondary border-l border-border">
           <MessageCircle size={14} className="text-textMuted" />
           对话
         </div>
