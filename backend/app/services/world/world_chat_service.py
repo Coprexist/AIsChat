@@ -141,16 +141,20 @@ DEFAULT_PRESET_SUGGESTIONS = [
 
 
 async def _load_preset_suggestions(db) -> list[str]:
-    """统一读取预设：后台 system_settings.world_preset_suggestions（无则用默认）"""
+    """统一读取预设并随机挑 4 个：后台 system_settings.world_preset_suggestions（无则默认）——每次不同，引导探索"""
+    import random
     try:
         from app.services.infrastructure.system_settings_service import get_settings
         s = await get_settings(db)
         presets = s.get("world_preset_suggestions")
         if isinstance(presets, list) and presets:
-            return [str(q).strip()[:40] for q in presets if str(q).strip()][:10]
+            pool = [str(q).strip()[:40] for q in presets if str(q).strip()]
+        else:
+            pool = list(DEFAULT_PRESET_SUGGESTIONS)
     except Exception:
-        pass
-    return list(DEFAULT_PRESET_SUGGESTIONS)
+        pool = list(DEFAULT_PRESET_SUGGESTIONS)
+    random.shuffle(pool)
+    return pool[:4]
 
 
 async def get_chat_history(db: AsyncSession, world_id: int, limit: int = 30, before_id: int | None = None) -> list[dict]:
