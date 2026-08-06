@@ -290,6 +290,38 @@ class _GroupCtx:
             raise PermissionError(f"未声明权限 {perm}")
 
 
+class _DataCtx:
+    """世界数据（world_data 表，结构化/操作数据，只经 API/skill 读写）"""
+
+    def __init__(self, db, world_id: int, perms: set[str]):
+        self._db = db
+        self._world_id = world_id
+        self._perms = perms
+
+    def _need(self, perm: str) -> None:
+        if perm not in self._perms:
+            raise PermissionError(f"未声明权限 {perm}（manifest.permissions 里加上才能用）")
+
+    async def get(self, key: str):
+        """读世界数据；不存在返回 None"""
+        self._need("data:read")
+        from app.services.world.world_service import get_world_data
+        row = await get_world_data(self._db, self._world_id, key)
+        return row["value"] if row else None
+
+    async def set(self, key: str, value) -> dict:
+        """写世界数据（upsert）"""
+        self._need("data:write")
+        from app.services.world.world_service import set_world_data
+        return await set_world_data(self._db, self._world_id, key, value)
+
+    async def delete(self, key: str) -> bool:
+        """删世界数据"""
+        self._need("data:write")
+        from app.services.world.world_service import delete_world_data
+        return await delete_world_data(self._db, self._world_id, key)
+
+
 def _build_ctx(db, world, permissions: list[str]):
     """按 manifest.permissions 构造受控 ctx（属性访问风格：ctx.file.list() / ctx.group.send()）"""
     from types import SimpleNamespace
@@ -302,6 +334,8 @@ def _build_ctx(db, world, permissions: list[str]):
         ctx["file"] = _FileCtx(world.id, perms)
     if perms & {"world:read", "world:update"}:
         ctx["world"] = _WorldCtx(db, world, perms)
+    if "data:read" in perms or "data:write" in perms:
+        ctx["data"] = _DataCtx(db, world.id, perms)
     if "group:send" in perms:
         ctx["group"] = _GroupCtx(db, world, perms)
     return SimpleNamespace(**ctx)

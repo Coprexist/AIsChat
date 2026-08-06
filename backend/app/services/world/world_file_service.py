@@ -160,8 +160,10 @@ def import_zip(world_id: int, zip_bytes: bytes) -> dict:
     return {"imported": count}
 
 
-def export_zip(world_id: int) -> bytes:
-    """打包世界文件为 zip（代码+数据）"""
+def export_zip(world_id: int, include_content: bool = True) -> bytes:
+    """打包世界文件为 zip。代码/数据分离：
+    include_content=True（默认）包含 content/ 产物区（静态文字数据，世界自己的产物）；
+    False 只打包代码区（世界根目录 + skills 等），供世界发布用。"""
     import io
     import zipfile
 
@@ -171,6 +173,8 @@ def export_zip(world_id: int) -> bytes:
         for p in base.rglob("*"):
             if p.is_file():
                 rel = str(p.relative_to(base))
+                if not include_content and rel.startswith("content/"):
+                    continue
                 zf.write(p, rel)
-    logger.info(f"🌐 世界 #{world_id} 打包导出 {len(buf.getvalue())}B")
+    logger.info(f"🌐 世界 #{world_id} 打包导出 {len(buf.getvalue())}B (include_content={include_content})")
     return buf.getvalue()

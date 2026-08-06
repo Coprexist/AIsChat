@@ -5,7 +5,7 @@
 群聊/私信只是世界的访问入口（world_bindings）。
 """
 from sqlalchemy import (
-    Column, Integer, String, Text, DateTime, Float, Boolean, ForeignKey, UniqueConstraint, func, Index,
+    Column, Integer, String, Text, DateTime, Float, Boolean, ForeignKey, UniqueConstraint, func, Index, text,
 )
 from sqlalchemy.dialects.postgresql import JSONB
 from pgvector.sqlalchemy import Vector
@@ -131,6 +131,29 @@ class WorldAIMemory(Base):
 
     __table_args__ = (
         Index("ix_world_ai_memories_world_id", "world_id"),
+    )
+
+
+class WorldData(Base):
+    """世界数据 — 每世界 key-value 存储（结构化/操作数据，只经 API 读写）
+
+    代码/数据分离：
+    - 代码区（发布打包）：世界根目录（网页代码/skills/main.py 等）
+    - 数据区：本表（结构化数据，只经 API） + data/worlds/{id}/content/（静态文字类，自由层级，
+      世界自己的产物，发布不打包，下载可选默认包含）
+    """
+    __tablename__ = "world_data"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    world_id = Column(Integer, ForeignKey("worlds.id", ondelete="CASCADE"), nullable=False, comment="所属世界")
+    key = Column(String(200), nullable=False, comment="数据键（如 player.position / npc.lihua.relation）")
+    value = Column(JSONB, nullable=False, server_default=text("'{}'::jsonb"), comment="数据值（任意 JSON）")
+
+    created_at = Column(DateTime, server_default=func.now())
+    updated_at = Column(DateTime, server_default=func.now(), onupdate=func.now())
+
+    __table_args__ = (
+        UniqueConstraint("world_id", "key", name="uq_world_data_world_key"),
     )
 
 

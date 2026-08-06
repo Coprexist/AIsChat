@@ -443,6 +443,50 @@ def world_to_dict(w) -> dict:
 
 
 # ═══════════════════════════════════════════════════════════════
+# 世界数据（world_data）— 每世界 key-value，只经 API/skill ctx 读写
+# ═══════════════════════════════════════════════════════════════
+
+async def get_world_data(db: AsyncSession, world_id: int, key: str) -> dict | None:
+    """读世界数据；不存在返回 None"""
+    from app.models.world import WorldData
+    row = (await db.execute(
+        select(WorldData).where(WorldData.world_id == world_id, WorldData.key == key)
+    )).scalar_one_or_none()
+    if row is None:
+        return None
+    return {"key": row.key, "value": row.value}
+
+
+async def set_world_data(db: AsyncSession, world_id: int, key: str, value) -> dict:
+    """写世界数据（upsert）"""
+    from app.models.world import WorldData
+    row = (await db.execute(
+        select(WorldData).where(WorldData.world_id == world_id, WorldData.key == key)
+    )).scalar_one_or_none()
+    if row is None:
+        row = WorldData(world_id=world_id, key=key, value=value)
+        db.add(row)
+    else:
+        row.value = value
+    await db.commit()
+    await db.refresh(row)
+    return {"key": row.key, "value": row.value}
+
+
+async def delete_world_data(db: AsyncSession, world_id: int, key: str) -> bool:
+    """删世界数据；返回是否存在"""
+    from app.models.world import WorldData
+    row = (await db.execute(
+        select(WorldData).where(WorldData.world_id == world_id, WorldData.key == key)
+    )).scalar_one_or_none()
+    if row is None:
+        return False
+    await db.delete(row)
+    await db.commit()
+    return True
+
+
+# ═══════════════════════════════════════════════════════════════
 # 拆分模块再导出（世界 AI 对话 → world_chat_service；工具 → world_tools）
 # 路由等外部引用保持不变
 # ═══════════════════════════════════════════════════════════════

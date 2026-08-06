@@ -644,17 +644,74 @@ async def upload_file(
         raise HTTPException(status_code=400, detail=str(e))
 
 
+# ═══════════════════════════════════════════════════════════════
+# 世界数据（world_data）— 结构化/操作数据，只经 API 读写
+# （代码/数据分离：静态文字类产物放 data/worlds/{id}/content/，自由层级，发布不打包）
+# ═══════════════════════════════════════════════════════════════
+
+class WorldDataRequest(BaseModel):
+    """世界数据写入请求：value 为任意 JSON"""
+    value: dict | list | str | int | float | bool | None = None
+
+
+@router.get("/{world_id}/data/{key}")
+async def get_world_data(
+    world_id: int,
+    key: str,
+    current_user: dict = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """读世界数据（不存在返回 value=null）"""
+    await _require_owner(db, world_id, current_user["user_id"])
+    from app.services.world.world_service import get_world_data
+    row = await get_world_data(db, world_id, key)
+    return {"key": key, "value": row["value"] if row else None}
+
+
+@router.put("/{world_id}/data/{key}")
+async def put_world_data(
+    world_id: int,
+    key: str,
+    body: WorldDataRequest,
+    current_user: dict = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """写世界数据（upsert；key 长度限制 200）"""
+    await _require_owner(db, world_id, current_user["user_id"])
+    if len(key) > 200:
+        raise HTTPException(status_code=400, detail="key 过长（≤200）")
+    from app.services.world.world_service import set_world_data
+    return await set_world_data(db, world_id, key, body.value)
+
+
+@router.delete("/{world_id}/data/{key}")
+async def delete_world_data(
+    world_id: int,
+    key: str,
+    current_user: dict = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """删世界数据"""
+    await _require_owner(db, world_id, current_user["user_id"])
+    from app.services.world.world_service import delete_world_data
+    ok = await delete_world_data(db, world_id, key)
+    if not ok:
+        raise HTTPException(status_code=404, detail="数据不存在")
+    return {"success": True}
+
+
 @router.get("/{world_id}/export")
 async def export_zip(
     world_id: int,
+    include_content: bool = True,
     current_user: dict = Depends(get_current_user),
 ):
-    """一键打包下载（代码+数据）"""
+    """一键打包下载。include_content=true（默认）包含 content/ 产物区；false 只打包代码区（发布用）"""
 
     await _require_owner(db, world_id, current_user["user_id"])
     from fastapi.responses import Response
     from app.services.world.world_file_service import export_zip as fs_export
-    data = fs_export(world_id)
+    data = fs_export(world_id, include_content=include_content)
     return Response(
         content=data,
         media_type="application/zip",

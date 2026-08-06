@@ -52,9 +52,25 @@ ctx 只包含 `manifest.permissions` **声明过**的能力——没声明的根
 | 权限 | ctx 能力 | 说明 |
 |---|---|---|
 | `file:list` / `file:read` / `file:write` / `file:delete` | `ctx.file.*` | 只限本世界文件夹（隔离目录+扩展名白名单，复用 world_file_service） |
+| `data:read` / `data:write` | `ctx.data.*` | **世界数据（world_data 表）**：`await ctx.data.get(key)` / `set(key, value)` / `delete(key)`——结构化/操作数据只经 API/skill 读写 |
 | `world:read` / `world:update` | `ctx.world.*` | 世界信息读取/更新（以世界主人身份） |
 | `group:send` | `ctx.group.send()` | 发消息到绑定群（以世界创建者身份） |
 | （无） | `ctx.log()` | 平台日志（无需声明） |
+
+## 三·五、代码/数据分离（世界发布打包）
+
+世界文件夹约定（2026-08-06 珑哥定）：
+
+```
+data/worlds/{id}/
+├── index.html / skills/ / main.py ...   ← 代码区（发布世界时打包）
+└── content/                             ← 内容产物区（静态文字类，自由层级）
+```
+
+- **content/ 不属于代码**：世界创作者在自己世界的 content/ 里自由建层级（设定文本/文档/素材文字）
+- **发布世界不打包 content/**；下载数据**可选是否包含**（export `?include_content=false` 只打包代码，默认 true 包含）
+- **结构化数据不进 content/**：一律走 world_data 表（API/skill ctx.data 读写）
+- 现有世界（星野镇）暂不迁移，新约定对新世界生效
 
 ## 四、安全模型（v1 进程内 harness）
 
