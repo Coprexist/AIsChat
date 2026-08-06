@@ -940,12 +940,15 @@ export default function WorldDesignPage() {
           <button onClick={() => setMode('preview')} className={`text-xs px-3 py-1 rounded transition-colors ${mode === 'preview' ? 'bg-primary-500 text-white' : 'bg-elevated hover:bg-border'}`}>预览</button>
           {msg && <span className="text-xs text-amber-400">{msg}</span>}
         </div>
-        {/* 标题栏：文件（横跨文件树+编辑区） | 对话（右列上方）；内容行手柄贯穿 */}
+        {/* 标题栏：文件（居中于文件树+编辑区整块） | 对话（右列上方）；内容行手柄贯穿 */}
         <div className="flex items-stretch bg-surface border-b border-border">
-          <div style={{ width: fileWidth }} className="shrink-0" />
-          <div className="flex-1 flex items-center justify-center gap-1.5 h-9 font-medium text-textSecondary">
-            <Folder size={14} className="text-textMuted" />
-            文件
+          <div className="flex flex-1 relative h-9">
+            <div style={{ width: fileWidth }} className="shrink-0" />
+            <div className="flex-1" />
+            <div className="absolute inset-0 flex items-center justify-center gap-1.5 font-medium text-textSecondary">
+              <Folder size={14} className="text-textMuted" />
+              文件
+            </div>
           </div>
           <div style={{ width: chatWidth }} className="shrink-0 flex items-center justify-center gap-1.5 h-9 font-medium text-textSecondary border-l border-border">
             <MessageCircle size={14} className="text-textMuted" />
