@@ -412,6 +412,12 @@ export default function WorldDesignPage() {
   // ── 世界 AI 对话（状态/发送/排队/建议/命令 全部在 useWorldChat） ──
   const chat = useWorldChat({ wid, onRefresh: load, onMsg: setMsg })
 
+  // world 加载完成 → 聊天面板渲染 → 确保在底部（刷新时历史先到、面板后渲染，滚动要补一次）
+  useEffect(() => {
+    if (world) chat.forceScrollToBottom()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [world])
+
   // 最后一条 AI 回复的 id（建议按钮插在它下面）
   const lastAiMsgId = useMemo(() => {
     for (let i = chat.chatMsgs.length - 1; i >= 0; i--) {

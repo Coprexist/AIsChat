@@ -74,13 +74,7 @@ export function useWorldChat({ wid, onRefresh, onMsg }: UseWorldChatOptions) {
         setChatMsgs(r.messages || [])
         // 在底部（跟随模式）才滚到消息末尾；用户往上翻时不打扰
         if (isAtBottomRef.current) {
-          // 双重 rAF：等内容渲染/布局稳定后再滚，瞬时到位（避免停在中间）
-          requestAnimationFrame(() => {
-            requestAnimationFrame(() => {
-              const el = chatListRef.current
-              if (el) el.scrollTop = el.scrollHeight
-            })
-          })
+          forceScrollToBottom()
         }
       }
       setChatHasMore(!!r.has_more)
@@ -151,6 +145,23 @@ export function useWorldChat({ wid, onRefresh, onMsg }: UseWorldChatOptions) {
     setIsAtBottom(atBottom)
   }, [loadOlder])
 
+  // 滚到底部并校验：double rAF 等布局稳定 → 延时后仍不在底部再滚一次（兜底时序问题）
+  const forceScrollToBottom = useCallback(() => {
+    const settle = () => {
+      const el = chatListRef.current
+      if (!el) return
+      el.scrollTop = el.scrollHeight
+      // 兜底：内容可能还在渲染（图片/代码块），稍后不在底部再滚一次
+      window.setTimeout(() => {
+        const el2 = chatListRef.current
+        if (el2 && el2.scrollHeight - el2.scrollTop - el2.clientHeight > 10) {
+          el2.scrollTop = el2.scrollHeight
+        }
+      }, 250)
+    }
+    requestAnimationFrame(() => requestAnimationFrame(settle))
+  }, [])
+
   // 新消息到达：跟随模式（在底部）自动滚到最新——首次瞬时（等布局稳定），后续新消息平滑，流式内容更新瞬时
   const prevLenRef = useRef(0)
   const loadedOnceRef = useRef(false)
@@ -163,12 +174,7 @@ export function useWorldChat({ wid, onRefresh, onMsg }: UseWorldChatOptions) {
     const lenChanged = chatMsgs.length !== prevLenRef.current
     prevLenRef.current = chatMsgs.length
     if (first) {
-      requestAnimationFrame(() => {
-        requestAnimationFrame(() => {
-          const el2 = chatListRef.current
-          if (el2) el2.scrollTop = el2.scrollHeight
-        })
-      })
+      forceScrollToBottom()
     } else if (lenChanged) {
       el.scrollTo({ top: el.scrollHeight, behavior: 'smooth' })
     }
@@ -350,6 +356,6 @@ export function useWorldChat({ wid, onRefresh, onMsg }: UseWorldChatOptions) {
     chatSending, chatProcessing, chatHasMore, chatLoadingOlder,
     chatListRef, chatInputRef, pendingItems, setPendingItems, suggestions,
     cmdActive, setCmdActive, cmdQuery, setCmdQuery, cmdIdx, setCmdIdx, cmdFiltered,
-    handleChatScroll, submitText, insertSuggestion, isAtBottom, scrollToBottom,
+    handleChatScroll, submitText, insertSuggestion, isAtBottom, scrollToBottom, forceScrollToBottom,
   }
 }
