@@ -581,6 +581,28 @@ async def _maybe_trigger_ai_reply(
     allowed_names = {t["function"]["name"] for t in current_tools}
     effective_defs = await get_effective_definitions(db, agent, SOURCE_PLATFORM, current_tools)
     tools = [d for d in effective_defs if ((d or {}).get("function") or {}).get("name") in allowed_names]
+
+    # + 绑定世界的世界侧 skills（居民能力；群绑定或 agent 直接绑定；effective 版本快照，版本化懒加载）
+    try:
+        from app.services.world.world_service import find_worlds_by_entity
+        from app.services.world.world_skill_runtime import build_world_tools
+        from app.services.capability_versioning import ensure_world_version, get_effective_definitions as _get_eff
+        bound_worlds = await find_worlds_by_entity(db, "agent", agent.id)
+        if group_id is not None:
+            bound_worlds += await find_worlds_by_entity(db, "group", group_id)
+        seen = set()
+        for w in bound_worlds:
+            if w.id in seen:
+                continue
+            seen.add(w.id)
+            wtools = build_world_tools(w.id)
+            if wtools:
+                await ensure_world_version(db, w.id, wtools)
+            eff = await _get_eff(db, agent, f"world-{w.id}", wtools)
+            tools = [*tools, *eff]
+    except Exception as e:
+        logger.warning(f"🌐 AI {agent.name} 世界能力注入失败: {e}")
+
     model = resolve_model(agent)
     logger.info(f"🔍 AI {agent.name}: model={model}, tools={len(tools)}")
 

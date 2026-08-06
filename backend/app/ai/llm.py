@@ -1143,24 +1143,34 @@ async def build_messages(
     except Exception:
         pass
 
-    # 本群绑定世界 → world_command 能力清单（动态尾部，缓存友好；群 AI 可操作世界）
-    if group_id:
+    # 绑定世界（群绑定 + agent 直接绑定）→ 能力清单 + 世界侧 skill 变更通知（动态尾部，缓存友好）
+    if group_id or True:
         try:
-            from app.models.world import WorldBinding, World
-            wrows = (await db.execute(
-                select(WorldBinding).where(
-                    WorldBinding.entity_type == "group",
-                    WorldBinding.entity_id == group_id,
-                )
-            )).scalars().all()
-            if wrows:
-                w = await db.get(World, wrows[0].world_id)
-                if w:
-                    messages.append({"role": "system", "content":
-                        f"【本群世界】本群绑定世界「{w.name}」（#{w.id}）。"
-                        "你可用 world_command 工具发送命令操作它，命令由世界程序解析"
-                        "（如：旅人移动到 2,3 / 我去 2,3 / 公告 xxx / 身份 签到；以世界实际支持为准）。"
-                        "命令会以你的名义出现在群里，可见可审计。"})
+            from app.models.world import World
+            from app.services.world.world_service import find_worlds_by_entity
+            bound = await find_worlds_by_entity(db, "agent", agent.id)
+            if group_id:
+                bound += await find_worlds_by_entity(db, "group", group_id)
+            seen = set()
+            for w in bound:
+                if w.id in seen:
+                    continue
+                seen.add(w.id)
+                # 世界侧 skills 能力清单（群 AI 可直接工具调用；世界程序命令走 world_command）
+                from app.services.world.world_skill_runtime import build_world_tools
+                skill_names = [t["function"]["name"] for t in build_world_tools(w.id)]
+                wc_line = "；另有 world_command 可发文本命令（由世界程序解析，如 旅人移动到 2,3 / 我去 2,3 / 身份 签到）" if skill_names else "。可用 world_command 发送文本命令（由世界程序解析，如 旅人移动到 2,3 / 我去 2,3 / 身份 签到）"
+                messages.append({"role": "system", "content":
+                    f"【本群世界】本群绑定世界「{w.name}」（#{w.id}）。"
+                    + (f"你已获得世界能力工具：{'、'.join(skill_names)}" if skill_names else "")
+                    + wc_line
+                    + "。命令会以你的名义出现在群里，可见可审计。"})
+                # 世界源能力变更通知（版本化懒加载：增量 changelog，known 更新同轮）
+                from app.services.capability_versioning import build_change_notice
+                notice = await build_change_notice(db, agent, [f"world-{w.id}"])
+                if notice:
+                    messages.append({"role": "system", "content": notice})
+                    await db.commit()
         except Exception:
             pass
     return messages

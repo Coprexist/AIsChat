@@ -312,8 +312,7 @@ async def stream_world_chat(
     # 能力变更通知（世界源懒加载：增量 changelog 追加尾部，known 更新与注入同轮）
     try:
         from app.services.capability_versioning import build_change_notice
-        world_source = f"world-{world_id}"
-        notice = await build_change_notice(db, world.config, [world_source])
+        notice = await build_change_notice(db, world.config, ["ai-skills"])
         if notice:
             messages.append({"role": "system", "content": notice})
             await db.commit()
@@ -344,15 +343,15 @@ async def stream_world_chat(
         return
 
     from app.services.world.world_tools import WORLD_TOOLS
-    from app.services.world.world_skill_runtime import build_skill_tools
-    from app.services.capability_versioning import ensure_world_version, get_effective_definitions
+    from app.services.world.world_skill_runtime import build_ai_tools
+    from app.services.capability_versioning import ensure_source_version, get_effective_definitions
 
-    # 工具列表 = 平台内置 + 文件式 skill（世界源版本化：变更不立即生效，通知后 compact 切换）
-    skill_tools = build_skill_tools(world_id)
+    # 世界 AI（造物主）工具 = 平台内置 + 设计侧 skills（world_ai_skills/ 全局库；世界侧居民能力不注入）
+    # 版本源 ai-skills（全局共享）：设计侧变更 → 版本化懒加载（通知 + compact 生效）
+    skill_tools = build_ai_tools()
     if skill_tools:
-        await ensure_world_version(db, world_id, skill_tools)
-    world_source = f"world-{world_id}"
-    effective_skill_tools = await get_effective_definitions(db, world.config, world_source, skill_tools)
+        await ensure_source_version(db, "ai-skills", skill_tools, "设计侧能力")
+    effective_skill_tools = await get_effective_definitions(db, world.config, "ai-skills", skill_tools)
     tools_for_world = [*WORLD_TOOLS, *effective_skill_tools]
 
     # ── 请求 DeepSeek（stream=true，透传 SSE）──

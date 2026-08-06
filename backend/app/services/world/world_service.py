@@ -11,7 +11,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 logger = logging.getLogger(__name__)
 
-VALID_BIND_TYPES = {"group", "dm", "user"}
+VALID_BIND_TYPES = {"group", "dm", "user", "agent"}  # agent = AI 直接绑定世界（个人专属能力）
 DEFAULT_SLEEP_MEMORY_MB = 48  # 休眠配额（无人时默认 48MB/世界；24MB 连解释器都起不来，2026-08-05 实测）
 
 # 群视界机器人（世界 AI）默认配置 —— 建世界时自动初始化，就是世界的一份配置（非 agent、无账号）
@@ -338,6 +338,19 @@ async def find_world_by_entity(db: AsyncSession, entity_type: str, entity_id: in
         )
     )
     return result.scalar_one_or_none()
+
+
+async def find_worlds_by_entity(db: AsyncSession, entity_type: str, entity_id: int) -> list:
+    """按入口反查多个世界（群/agent 可绑多个世界）"""
+    from app.models.world import World, WorldBinding
+
+    rows = (await db.execute(
+        select(World).join(WorldBinding, WorldBinding.world_id == World.id).where(
+            WorldBinding.entity_type == entity_type,
+            WorldBinding.entity_id == entity_id,
+        )
+    )).scalars().all()
+    return list(rows)
 
 
 # ═══════════════════════════════════════════════════════════════

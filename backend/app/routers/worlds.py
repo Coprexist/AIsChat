@@ -49,7 +49,7 @@ class WorldTriggerRequest(BaseModel):
 
 
 class BindRequest(BaseModel):
-    entity_type: str = Field(..., description="group | dm | user")
+    entity_type: str = Field(..., description="group | dm | user | agent（AI 直接绑定）")
     entity_id: int
 
 

@@ -124,23 +124,35 @@ def list_world_skills(world_id: int) -> list[SkillDef]:
     ]
 
 
-def build_skill_tools(world_id: int) -> list[dict]:
-    """把该世界可用的文件式 skill 转成 function calling 定义（合并进 WORLD_TOOLS）"""
-    tools = []
-    for skill in [*list_ai_skills(), *list_world_skills(world_id)]:
-        tools.append({
-            "type": "function",
-            "function": {
-                "name": skill.name,
-                "description": skill.description,
-                "parameters": skill.arguments,
-            },
-        })
-    return tools
+def _to_tools(skills: list[SkillDef]) -> list[dict]:
+    return [{
+        "type": "function",
+        "function": {
+            "name": s.name,
+            "description": s.description,
+            "parameters": s.arguments,
+        },
+    } for s in skills]
 
 
-def find_skill(world_id: int, name: str) -> SkillDef | None:
-    for skill in [*list_ai_skills(), *list_world_skills(world_id)]:
+def build_ai_tools() -> list[dict]:
+    """设计侧（造物主工具库，全局共享）→ 世界 AI 的工具定义"""
+    return _to_tools(list_ai_skills())
+
+
+def build_world_tools(world_id: int) -> list[dict]:
+    """世界侧（世界颁布的居民能力）→ 群 AI 的工具定义"""
+    return _to_tools(list_world_skills(world_id))
+
+
+def find_skill(name: str, scope: str | None = None) -> SkillDef | None:
+    """按名字找 skill；scope='ai'（设计侧）/ 'world'（世界侧）/ None（都要，执行时按调用方限定）"""
+    pools = []
+    if scope in (None, 'ai'):
+        pools.extend(list_ai_skills())
+    if scope in (None, 'world'):
+        pools.extend(list_world_skills(0))  # 占位，实际 world_id 由 execute 侧处理
+    for skill in pools:
         if skill.name == name:
             return skill
     return None
@@ -342,9 +354,16 @@ def _build_ctx(db, world, permissions: list[str]):
 
 
 # ── 执行入口 ──
-async def execute_skill(db, world, name: str, arguments: str) -> dict | None:
-    """执行文件式 skill；名字不匹配任何 skill 时返回 None（由调用方走未知工具兜底）"""
-    skill = find_skill(world.id, name)
+async def execute_skill(db, world, name: str, arguments: str, scope: str | None = None) -> dict | None:
+    """执行文件式 skill；名字不匹配（或不在 scope 内）返回 None（由调用方走未知工具兜底）
+
+    scope：'ai' = 只执行设计侧（世界 AI 用）；'world' = 只执行世界侧（群 AI 用）；None = 两者（默认）
+    """
+    skill = None
+    if scope in (None, 'ai'):
+        skill = next((s for s in list_ai_skills() if s.name == name), None)
+    if skill is None and scope in (None, 'world'):
+        skill = next((s for s in list_world_skills(world.id) if s.name == name), None)
     if skill is None:
         return None
     try:

@@ -285,6 +285,25 @@ class ToolRegistry:
         """统一分发工具调用，记录性能指标"""
         plugin = cls._plugins.get(tool_name)
         if plugin is None:
+            # 兜底：世界侧文件式 skill（群 AI 调用绑定世界的居民能力；agent 绑定或群绑定）
+            try:
+                from app.models.agent import Agent
+                agent = context.get("_agent") or await db.get(Agent, agent_id)
+                from app.services.world.world_skill_runtime import execute_skill
+                from app.services.world.world_service import find_worlds_by_entity
+                worlds = await find_worlds_by_entity(db, "agent", agent_id) if agent_id else []
+                if group_id is not None:
+                    worlds += await find_worlds_by_entity(db, "group", group_id)
+                seen = set()
+                for w in worlds:
+                    if w.id in seen:
+                        continue
+                    seen.add(w.id)
+                    result = await execute_skill(db, w, tool_name, json.dumps(arguments, ensure_ascii=False), scope='world')
+                    if result is not None:
+                        return result
+            except Exception as e:
+                logger.warning(f"世界侧 skill 兜底执行失败 {tool_name}: {e}")
             return _build_tool_error(ToolErrorCode.UNKNOWN_TOOL, f"未知工具「{tool_name}」：没有此名称的工具")
 
         t0 = time.monotonic()

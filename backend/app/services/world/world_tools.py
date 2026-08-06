@@ -919,7 +919,7 @@ async def _do_execute(db: AsyncSession, world, name: str, arguments: str, turn_s
             # 能力懒加载：压缩后 effective 对齐最新（世界 skill 工具定义直接用最新的）
             try:
                 from app.services.capability_versioning import mark_effective_latest
-                await mark_effective_latest(db, world.config, [f"world-{world.id}"])
+                await mark_effective_latest(db, world.config, ["ai-skills"])
             except Exception:
                 pass
             await db.flush()
@@ -964,9 +964,9 @@ async def _do_execute(db: AsyncSession, world, name: str, arguments: str, turn_s
         except (ValueError, TypeError, json.JSONDecodeError) as e:
             return {"success": False, "error": str(e)}
 
-    # ── 文件式 skill（设计侧造物主工具 / 世界侧居民能力）──
+    # ── 文件式 skill（世界 AI 只用设计侧造物主工具；世界侧居民能力归群 AI）──
     from app.services.world.world_skill_runtime import execute_skill
-    skill_result = await execute_skill(db, world, name, arguments)
+    skill_result = await execute_skill(db, world, name, arguments, scope='ai')
     if skill_result is not None:
         return skill_result
 
