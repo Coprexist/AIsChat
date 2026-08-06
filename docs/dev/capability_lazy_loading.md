@@ -41,8 +41,16 @@
 
 ## 落地范围
 
-1. 平台启动：注册内置工具 → 生成定义 → 哈希对比 → 变更则写新版本（旧版本保留）
-2. 世界 skill 目录：变更检测（哈希）→ capability_versions 写新版本（含工具定义快照）
-3. 注入：build_messages / world_chat_service 时检测落后 → 追加变更通知 system 消息 → 更新 known
-4. compact：executor 压缩成功后 effective = latest（扩展 apply_pending_config）
-5. 群 AI 世界能力：world_command 稳定工具（缓存友好）+ 能力清单尾部化（后续）
+1. ✅ 平台启动：注册内置工具 → 生成定义 → 哈希对比 → 变更则写新版本（旧版本保留）——`main.py` lifespan
+2. ✅ 世界 skill 目录：变更检测（哈希）→ capability_versions 写新版本（含工具定义快照）——`world_chat_service`
+3. ✅ 注入：build_messages / world_chat_service 时检测落后 → 追加变更通知 system 消息 → 更新 known（同事务）
+4. ✅ compact：executor 压缩成功后 effective = latest（扩展 apply_pending_config）；世界 AI 压缩在 compact_context 工具内
+5. ⏳ 群 AI 世界能力：world_command 稳定工具（缓存友好）+ 能力清单尾部化
+
+## 实现（2026-08-06 650f1cb）
+
+- `capability_versions` 表：source（platform / world-{id}）+ version + content_hash + changelog + definitions 快照，旧版本保留
+- `agents.cap_known_versions` / `cap_effective_versions`（JSONB）；世界 AI 用 `worlds.config` 同名字段（holder 泛化：agent 对象或 dict）
+- `app/services/capability_versioning.py`：ensure_source_version（diff 自动 changelog）/ get_effective_definitions（快照回退）/ build_change_notice（增量注入）/ mark_effective_latest
+- 已接：平台源（群 AI/DM 对话 tools + 变更通知 + compact 切换）、世界源（世界 AI 工具集 + 变更通知 + compact_context 切换）
+- 验证：幂等 / 增量注入（known=v2 只注入 v3）/ effective 快照（旧定义请求）/ compact 切最新 / dict holder 全过
