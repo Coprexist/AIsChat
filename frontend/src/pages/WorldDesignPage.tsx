@@ -409,6 +409,14 @@ export default function WorldDesignPage() {
       </div>
     ))
 
+  // 最后一条 AI 回复的 id（建议按钮插在它下面）
+  const lastAiMsgId = useMemo(() => {
+    for (let i = chat.chatMsgs.length - 1; i >= 0; i--) {
+      if (chat.chatMsgs[i].role === 'ai') return chat.chatMsgs[i].id
+    }
+    return null
+  }, [chat.chatMsgs])
+
   // ── 世界 AI 对话（状态/发送/排队/建议/命令 全部在 useWorldChat） ──
   const chat = useWorldChat({ wid, onRefresh: load, onMsg: setMsg })
 
@@ -543,36 +551,78 @@ export default function WorldDesignPage() {
         </div>
       )}
 
-      {/* 消息列表（滚到顶加载更早） */}
-      <div ref={chat.chatListRef} onScroll={chat.handleChatScroll} className="flex-1 overflow-y-auto p-3 space-y-2">
+      {/* 消息列表（滚到顶加载更早；在底部 = 自动跟随最新，否则右下角 ↓ 可回底） */}
+      <div ref={chat.chatListRef} onScroll={chat.handleChatScroll} className="flex-1 overflow-y-auto p-3 space-y-2 relative">
         {chat.chatLoadingOlder && <div className="text-[10px] text-textMuted text-center py-1">加载更早消息…</div>}
         {chat.chatMsgs.length === 0 && (
           <div className="text-xs text-textMuted text-center mt-8">
             暂无消息<br/>试试发送：「把页面标题改成红色」
           </div>
         )}
-        {chat.chatMsgs.map((m) => (
-          m.role === 'tool' ? (
-            <div key={m.id} className={`text-[11px] text-center py-1 px-2 rounded-lg max-w-[90%] mx-auto ${m.error ? 'text-rose-400 bg-rose-500/10 border border-rose-500/20' : 'text-mint-400 bg-mint-400/10 border border-mint-400/20'}`}>
-              🔧 {m.content}
+        {chat.chatMsgs.map((m) => {
+          const isLastAi = m.role === 'ai' && m.id === lastAiMsgId
+          return (
+            <div key={m.id} className="space-y-2">
+              {m.role === 'tool' ? (
+                <div className={`text-[11px] text-center py-1 px-2 rounded-lg max-w-[90%] mx-auto ${m.error ? 'text-rose-400 bg-rose-500/10 border border-rose-500/20' : 'text-mint-400 bg-mint-400/10 border border-mint-400/20'}`}>
+                  🔧 {m.content}
+                </div>
+              ) : (
+                <div className={`text-sm max-w-[90%] p-2 rounded-lg ${m.error ? 'bg-rose-500/10 border border-rose-500/30 text-rose-400' : m.role === 'user' ? 'bg-primary-500/20 ml-auto' : 'bg-elevated/80'}`}>
+                  <div className="text-[10px] text-textMuted mb-0.5">{m.error ? '⚠️ 错误' : m.role === 'user' ? '我' : '世界 AI'}</div>
+                  {!m.error && (m.role === 'ai' || m.role === 'note') && !!m.reasoning && (
+                    <details className="group/details mb-1.5">
+                      <summary className="flex items-center gap-1 text-[10px] text-textMuted cursor-pointer select-none hover:text-textSecondary list-none [&::-webkit-details-marker]:hidden">
+                        <ChevronRight size={11} className="transition-transform group-open/details:rotate-90" />
+                        <Brain size={11} className="text-textMuted" />
+                        思考过程
+                      </summary>
+                      <div className="text-xs text-textMuted mt-1 whitespace-pre-wrap bg-elevated/70 rounded p-2">{m.reasoning}</div>
+                    </details>
+                  )}
+                  {m.content ? <MarkdownContent content={m.content} /> : (m.role === 'ai' ? <span className="opacity-40">…</span> : null)}
+                </div>
+              )}
+              {/* "你可以"建议：插在最后一条 AI 回复下面，一个建议一行（文字 | 发送 | 插入） */}
+              {isLastAi && chat.suggestions.length > 0 && (
+                <div className="space-y-1.5 pl-1">
+                  <div className="text-[10px] text-textMuted">你可以：</div>
+                  {chat.suggestions.map((q, i) => (
+                    <div key={i} className="flex items-stretch rounded-lg bg-elevated border border-border overflow-hidden max-w-[85%]">
+                      <button
+                        onClick={() => chat.submitText(q)}
+                        className="flex-1 min-w-0 px-2.5 py-1.5 text-left text-xs text-textSecondary hover:bg-primary-500/20 hover:text-primary-300 transition-colors truncate"
+                        title={q}
+                      >{q}</button>
+                      <div className="w-px bg-border shrink-0" />
+                      <button
+                        onClick={(e) => { e.stopPropagation(); chat.submitText(q) }}
+                        className="px-2 flex items-center text-textMuted hover:text-primary-300 hover:bg-primary-500/20 transition-colors shrink-0"
+                        title="发送这条"
+                      ><Send size={11} /></button>
+                      <div className="w-px bg-border shrink-0" />
+                      <button
+                        onClick={(e) => { e.stopPropagation(); chat.insertSuggestion(q) }}
+                        className="px-2 flex items-center text-textMuted hover:text-primary-300 hover:bg-primary-500/20 transition-colors shrink-0"
+                        title="插入到输入框（追加，不覆盖）"
+                      ><CornerDownLeft size={11} /></button>
+                    </div>
+                  ))}
+                </div>
+              )}
             </div>
-          ) : (
-          <div key={m.id} className={`text-sm max-w-[90%] p-2 rounded-lg ${m.error ? 'bg-rose-500/10 border border-rose-500/30 text-rose-400' : m.role === 'user' ? 'bg-primary-500/20 ml-auto' : 'bg-elevated/80'}`}>
-            <div className="text-[10px] text-textMuted mb-0.5">{m.error ? '⚠️ 错误' : m.role === 'user' ? '我' : '世界 AI'}</div>
-            {!m.error && (m.role === 'ai' || m.role === 'note') && !!m.reasoning && (
-              <details className="group/details mb-1.5">
-                <summary className="flex items-center gap-1 text-[10px] text-textMuted cursor-pointer select-none hover:text-textSecondary list-none [&::-webkit-details-marker]:hidden">
-                  <ChevronRight size={11} className="transition-transform group-open/details:rotate-90" />
-                  <Brain size={11} className="text-textMuted" />
-                  思考过程
-                </summary>
-                <div className="text-xs text-textMuted mt-1 whitespace-pre-wrap bg-elevated/70 rounded p-2">{m.reasoning}</div>
-              </details>
-            )}
-            {m.content ? <MarkdownContent content={m.content} /> : (m.role === 'ai' ? <span className="opacity-40">…</span> : null)}
-          </div>
           )
-        ))}
+        })}
+        {/* ↓ 回到底部（不在最下方时显示；显示即未跟随） */}
+        {!chat.isAtBottom && chat.chatMsgs.length > 0 && (
+          <button
+            onClick={() => chat.scrollToBottom(true)}
+            className="absolute bottom-3 right-3 z-40 flex items-center justify-center w-8 h-8 bg-elevated border border-border rounded-full shadow-lg text-textSecondary hover:text-textPrimary hover:bg-surface transition-all"
+            title="回到底部并跟随"
+          >
+            <ArrowDown size={14} />
+          </button>
+        )}
       </div>
 
       {/* 输入 */}

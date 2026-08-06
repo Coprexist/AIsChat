@@ -42,6 +42,9 @@ export function useWorldChat({ wid, onRefresh, onMsg }: UseWorldChatOptions) {
   const chatListRef = useRef<HTMLDivElement>(null)
   const msgSeqRef = useRef(0)  // 本地临时消息 id（负数，避免与 DB id 碰撞）
   const chatInputRef = useRef<HTMLTextAreaElement>(null)
+  // 滚动跟随：在底部 = 新消息自动滚到最新；不在底部 = 显示 ↓ 按钮
+  const [isAtBottom, setIsAtBottom] = useState(true)
+  const isAtBottomRef = useRef(true)
 
   // 斜杠命令列表（输入 / 弹出）
   const [cmdActive, setCmdActive] = useState(false)
@@ -67,11 +70,13 @@ export function useWorldChat({ wid, onRefresh, onMsg }: UseWorldChatOptions) {
         })
       } else {
         setChatMsgs(r.messages || [])
-        // 默认滚到消息末尾
-        requestAnimationFrame(() => {
-          const el = chatListRef.current
-          if (el) el.scrollTop = el.scrollHeight
-        })
+        // 在底部（跟随模式）才滚到消息末尾；用户往上翻时不打扰
+        if (isAtBottomRef.current) {
+          requestAnimationFrame(() => {
+            const el = chatListRef.current
+            if (el) el.scrollTop = el.scrollHeight
+          })
+        }
       }
       setChatHasMore(!!r.has_more)
     } catch { /* 历史拉不到不阻塞 */ }
@@ -125,7 +130,27 @@ export function useWorldChat({ wid, onRefresh, onMsg }: UseWorldChatOptions) {
   const handleChatScroll = useCallback((e: React.UIEvent<HTMLDivElement>) => {
     const el = e.currentTarget
     if (el.scrollTop < 30) loadOlder()
+    // 底部判定（rAF 节流由 React 事件天然节流；80px 阈值与主界面一致）
+    const atBottom = el.scrollHeight - el.scrollTop - el.clientHeight < 80
+    isAtBottomRef.current = atBottom
+    setIsAtBottom(atBottom)
   }, [loadOlder])
+
+  // 新消息到达：跟随模式（在底部）自动滚到最新
+  useEffect(() => {
+    if (isAtBottomRef.current && chatMsgs.length > 0) {
+      const el = chatListRef.current
+      if (el) el.scrollTop = el.scrollHeight
+    }
+  }, [chatMsgs])
+
+  const scrollToBottom = useCallback((smooth = true) => {
+    const el = chatListRef.current
+    if (!el) return
+    isAtBottomRef.current = true
+    setIsAtBottom(true)
+    el.scrollTo({ top: el.scrollHeight, behavior: smooth ? 'smooth' : 'auto' })
+  }, [])
 
   // ── 发送 ──
   const sendMessages = async (texts: string[]) => {
@@ -295,6 +320,6 @@ export function useWorldChat({ wid, onRefresh, onMsg }: UseWorldChatOptions) {
     chatSending, chatProcessing, chatHasMore, chatLoadingOlder,
     chatListRef, chatInputRef, pendingItems, setPendingItems, suggestions,
     cmdActive, setCmdActive, cmdQuery, setCmdQuery, cmdIdx, setCmdIdx, cmdFiltered,
-    handleChatScroll, submitText, insertSuggestion,
+    handleChatScroll, submitText, insertSuggestion, isAtBottom, scrollToBottom,
   }
 }
