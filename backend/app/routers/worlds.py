@@ -539,16 +539,13 @@ async def chat_status(
     from app.services.world.world_turn import get_world_worker
     worker = get_world_worker(world_id)
     queue_size = worker.queue_size
-    # 正在处理 = 队列有消息，或最后一条消息不是 ai 回复（轮次未闭合）
+    # 正在处理 = 队列有消息，或有进行中的轮次（active_turn 标记；比"最后消息非 ai"准确，
+    # worker 死后不会把排队消息永远误报为 processing，导致前端排队永不发送）
     processing = queue_size > 0
     if not processing:
-        last = (await db.execute(
-            select(WorldChatMessage)
-            .where(WorldChatMessage.world_id == world_id)
-            .order_by(WorldChatMessage.id.desc())
-            .limit(1)
-        )).scalar_one_or_none()
-        if last is not None and last.role != "ai":
+        from app.models.world import World as _World
+        world_row = await db.get(_World, world_id)
+        if world_row and (world_row.config or {}).get("active_turn"):
             processing = True
     return {"processing": processing, "queue_size": queue_size}
 
