@@ -602,8 +602,33 @@ export default function WorldDesignPage() {
       <div ref={chat.chatListRef} onScroll={chat.handleChatScroll} className="flex-1 overflow-y-auto p-3 space-y-2 relative">
         {chat.chatLoadingOlder && <div className="text-[10px] text-textMuted text-center py-1">加载更早消息…</div>}
         {chat.chatMsgs.length === 0 && (
-          <div className="text-xs text-textMuted text-center mt-8">
-            暂无消息<br/>从「你可以」的建议开始，或直接告诉世界 AI 你想做什么
+          <div className="text-center mt-8 space-y-3">
+            <div className="text-xs text-textMuted">暂无消息，从下面开始探索：</div>
+            {chat.suggestions.length > 0 && !chat.chatSending && !chat.chatProcessing && (
+              <div className="flex flex-col items-center gap-1.5">
+                {chat.suggestions.map((q, i) => (
+                  <div key={i} className="flex items-stretch rounded-lg bg-elevated border border-border overflow-hidden max-w-[85%]">
+                    <button
+                      onClick={() => chat.submitText(q)}
+                      className="flex-1 min-w-0 px-2.5 py-1.5 text-left text-xs text-textSecondary hover:bg-primary-500/20 hover:text-primary-300 transition-colors truncate"
+                      title={q}
+                    >{q}</button>
+                    <div className="w-px bg-border shrink-0" />
+                    <button
+                      onClick={(e) => { e.stopPropagation(); chat.submitText(q) }}
+                      className="px-2 flex items-center text-textMuted hover:text-primary-300 hover:bg-primary-500/20 transition-colors shrink-0"
+                      title="发送这条"
+                    ><Send size={11} /></button>
+                    <div className="w-px bg-border shrink-0" />
+                    <button
+                      onClick={(e) => { e.stopPropagation(); chat.insertSuggestion(q) }}
+                      className="px-2 flex items-center text-textMuted hover:text-primary-300 hover:bg-primary-500/20 transition-colors shrink-0"
+                      title="插入到输入框（追加，不覆盖）"
+                    ><Plus size={12} /></button>
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
         )}
         {chat.chatMsgs.map((m) => {
