@@ -309,6 +309,56 @@ async def world_api_publish_state(
     return {"ok": True}
 
 
+# ═══════════════════════════════════════════════════════════════
+# 世界数据（world_data 表）— 世界代码经受控 API 读写结构化数据
+# ═══════════════════════════════════════════════════════════════
+
+@router.get("/{world_id}/api/data/{key}")
+async def world_api_data_get(
+    world_id: int,
+    key: str,
+    request: Request,
+    db: AsyncSession = Depends(get_db),
+):
+    """受控 API：读世界数据（world_data 表；不存在 value=null）"""
+    await _authorize_world_api(db, world_id, request)
+    from app.services.world.world_service import get_world_data
+    row = await get_world_data(db, world_id, key)
+    return {"key": key, "value": row["value"] if row else None}
+
+
+@router.put("/{world_id}/api/data/{key}")
+async def world_api_data_put(
+    world_id: int,
+    key: str,
+    body: dict,
+    request: Request,
+    db: AsyncSession = Depends(get_db),
+):
+    """受控 API：写世界数据（upsert；key ≤200 字符）"""
+    await _authorize_world_api(db, world_id, request)
+    if len(key) > 200:
+        raise HTTPException(status_code=400, detail="key 过长（≤200）")
+    from app.services.world.world_service import set_world_data
+    return await set_world_data(db, world_id, key, body.get("value"))
+
+
+@router.delete("/{world_id}/api/data/{key}")
+async def world_api_data_delete(
+    world_id: int,
+    key: str,
+    request: Request,
+    db: AsyncSession = Depends(get_db),
+):
+    """受控 API：删世界数据"""
+    await _authorize_world_api(db, world_id, request)
+    from app.services.world.world_service import delete_world_data
+    ok = await delete_world_data(db, world_id, key)
+    if not ok:
+        raise HTTPException(status_code=404, detail="数据不存在")
+    return {"success": True}
+
+
 @router.get("/{world_id}/events")
 async def world_events(
     world_id: int,

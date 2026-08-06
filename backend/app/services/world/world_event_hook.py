@@ -135,6 +135,10 @@ async def _flush(world_id: int) -> None:
             if manager.is_resident(world) and await manager.dispatch(world.id, event):
                 return
             from app.services.world.world_sandbox import run_world_trigger
+            # 确保沙箱 env 注入 WORLD_API_TOKEN / WORLD_API_BASE（懒生成）
+            from app.routers.world_proxy import ensure_world_api_token
+            await ensure_world_api_token(db, world)
+            await db.commit()
             result = await run_world_trigger(world, event=event, background=True)
             if not result.get("success"):
                 logger.info(f"🌐 世界 #{world_id} 群消息感知：程序未处理（{result.get('reason', '')[:80]}）")

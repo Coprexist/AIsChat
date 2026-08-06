@@ -792,6 +792,10 @@ async def _do_execute(db: AsyncSession, world, name: str, arguments: str) -> dic
         # 2.1/2.2：沙箱执行世界代码（code 脚本）或触发入口 handle(event)
         try:
             args = json.loads(arguments or "{}")
+            # 确保沙箱 env 注入 WORLD_API_TOKEN / WORLD_API_BASE（懒生成，worlds.config.api_token）
+            from app.routers.world_proxy import ensure_world_api_token
+            await ensure_world_api_token(db, world)
+            await db.commit()
             from app.services.world.world_sandbox import run_world_code as _run_code, run_world_trigger as _run_trigger
             if args.get("event") is not None:
                 entry = str(args.get("entry") or "main.py").strip()

@@ -155,6 +155,10 @@ class ResidentManager:
     # ── 生命周期 ──
 
     async def start(self, db, world) -> bool:
+        # 确保常驻进程 env 注入 WORLD_API_TOKEN / WORLD_API_BASE（懒生成）
+        from app.routers.world_proxy import ensure_world_api_token
+        await ensure_world_api_token(db, world)
+        await db.commit()
         """启动常驻进程（已在跑则跳过）。返回是否新启动。"""
         if self.is_running(world.id):
             return False
