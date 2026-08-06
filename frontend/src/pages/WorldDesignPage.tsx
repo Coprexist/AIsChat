@@ -6,7 +6,7 @@
  */
 import { useEffect, useState, useCallback, useRef, useMemo } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
-import { ChevronLeft, ChevronRight, ChevronDown, Folder, FolderOpen, FileText, FileCode, FileJson, FileImage, FileAudio, FileVideo, File, Trash2, Upload, Plus, Pencil, Eye, Brain, MessageCircle, Save } from 'lucide-react'
+import { ChevronLeft, ChevronRight, ChevronDown, Folder, FolderOpen, FileText, FileCode, FileJson, FileImage, FileAudio, FileVideo, File, Trash2, Upload, Plus, Pencil, Eye, Brain, MessageCircle, Save, Send, CornerDownLeft } from 'lucide-react'
 import { api } from '../api/client'
 import MarkdownContent from '../components/shared/MarkdownContent'
 import CodeRenderer from '../components/shared/CodeRenderer'
@@ -540,11 +540,23 @@ export default function WorldDesignPage() {
       setPendingItems((items) => [...items, { kind: t.startsWith('/') ? 'cmd' : 'msg', text: t }])
       setChatInput('')
       setCmdActive(false)
-      setSuggestions([])
       return
     }
-    setSuggestions([])
     sendMessages([t])
+  }
+
+  // 插入建议到输入框（追加不覆盖）；输入框 ref 在 renderChatInner 的 textarea 上
+  const chatInputRef = useRef<HTMLTextAreaElement>(null)
+  const insertSuggestion = (q: string) => {
+    setChatInput((prev) => (prev ? prev + ' ' + q : q))
+    requestAnimationFrame(() => {
+      chatInputRef.current?.focus()
+      const ta = chatInputRef.current
+      if (ta) {
+        const pos = ta.value.length
+        ta.setSelectionRange(pos, pos)
+      }
+    })
   }
 
   const sendMessages = async (texts: string[]) => {
@@ -847,17 +859,30 @@ export default function WorldDesignPage() {
             ))}
           </div>
         )}
-        {/* "你可以问"建议按钮（AI 回复后展示；点击直接发送） */}
-        {suggestions.length > 0 && !chatSending && !chatProcessing && (
+        {/* "你可以问"建议按钮（常驻；每块 = 文字 | 发送 | 插入，插入=追加到输入框不覆盖） */}
+        {suggestions.length > 0 && (
           <div className="px-3 pb-1 flex flex-wrap items-center gap-1.5">
             <span className="text-[10px] text-textMuted shrink-0">你可以问：</span>
             {suggestions.map((q, i) => (
-              <button
-                key={i}
-                onClick={() => submitText(q)}
-                className="text-xs px-2.5 py-1 rounded-full bg-elevated hover:bg-primary-500/20 hover:text-primary-300 text-textSecondary border border-border transition-colors max-w-[220px] truncate"
-                title={q}
-              >{q}</button>
+              <div key={i} className="flex items-stretch rounded-full bg-elevated border border-border overflow-hidden shrink-0 max-w-[260px]">
+                <button
+                  onClick={() => submitText(q)}
+                  className="px-2.5 py-1 text-xs text-textSecondary hover:bg-primary-500/20 hover:text-primary-300 transition-colors truncate min-w-0"
+                  title={q}
+                >{q}</button>
+                <div className="w-px bg-border shrink-0" />
+                <button
+                  onClick={(e) => { e.stopPropagation(); submitText(q) }}
+                  className="px-1.5 flex items-center text-textMuted hover:text-primary-300 hover:bg-primary-500/20 transition-colors shrink-0"
+                  title="发送这条"
+                ><Send size={11} /></button>
+                <div className="w-px bg-border shrink-0" />
+                <button
+                  onClick={(e) => { e.stopPropagation(); insertSuggestion(q) }}
+                  className="px-1.5 flex items-center text-textMuted hover:text-primary-300 hover:bg-primary-500/20 transition-colors shrink-0"
+                  title="插入到输入框（追加，不覆盖）"
+                ><CornerDownLeft size={11} /></button>
+              </div>
             ))}
           </div>
         )}
@@ -881,6 +906,7 @@ export default function WorldDesignPage() {
           </div>
         )}
         <textarea
+          ref={chatInputRef}
           value={chatInput}
           onChange={(e) => {
             const ta = e.target
