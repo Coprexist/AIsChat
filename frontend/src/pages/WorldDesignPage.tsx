@@ -943,7 +943,7 @@ export default function WorldDesignPage() {
         {/* 内容行：标题栏与内容同列，拖拽手柄贯穿（拖动 = 整列宽度同步） */}
         <div className="flex flex-1 min-h-0">
         {/* 左列：文件标题 + 文件树 */}
-        <div className="flex flex-col shrink-0 bg-surface border-r border-border" style={{ width: fileWidth }}>
+        <div ref={fileTreeRef} className="flex flex-col shrink-0 bg-surface border-r border-border" style={{ width: fileWidth }}>
           <div className="flex items-center justify-center gap-1.5 h-9 font-medium text-textSecondary border-b border-border">
             <Folder size={14} className="text-textMuted" />
             文件
