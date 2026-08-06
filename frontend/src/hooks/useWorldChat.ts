@@ -41,7 +41,18 @@ export function useWorldChat({ wid, onRefresh, onMsg }: UseWorldChatOptions) {
   const chatProcessingRef = useRef(false)
   const [chatHasMore, setChatHasMore] = useState(false)
   const [chatLoadingOlder, setChatLoadingOlder] = useState(false)
-  const chatListRef = useRef<HTMLDivElement>(null)
+  // 移动/桌面双面板都渲染 renderChatInner → ref 收集所有实例，滚动作用在全部（否则只滚到隐藏的那个）
+  const listElsRef = useRef<HTMLDivElement[]>([])
+  const chatListRef = useCallback((el: HTMLDivElement | null) => {
+    if (el) {
+      if (!listElsRef.current.includes(el)) listElsRef.current.push(el)
+    } else {
+      listElsRef.current = listElsRef.current.filter((x) => x.isConnected)
+    }
+  }, [])
+  const eachList = useCallback((fn: (el: HTMLDivElement, i: number) => void) => {
+    listElsRef.current.forEach((el, i) => { if (el.isConnected) fn(el, i) })
+  }, [])
   const msgSeqRef = useRef(0)  // 本地临时消息 id（负数，避免与 DB id 碰撞）
   const chatInputRef = useRef<HTMLTextAreaElement>(null)
   // 滚动跟随：在底部 = 新消息自动滚到最新；不在底部 = 显示 ↓ 按钮
@@ -60,15 +71,13 @@ export function useWorldChat({ wid, onRefresh, onMsg }: UseWorldChatOptions) {
   const loadChat = useCallback(async (opts?: { before_id?: number; append?: boolean }) => {
     try {
       const q = opts?.before_id ? `?before_id=${opts.before_id}&limit=30` : '?limit=30'
-      // 翻页时记录原滚动位置（prepend 后补回）
-      const listEl = chatListRef.current
-      const prevScrollHeight = listEl?.scrollHeight ?? 0
+      // 翻页时记录原滚动位置（prepend 后补回，作用于所有面板实例）
+      const heights = listElsRef.current.map((el) => el.scrollHeight)
       const r = await api.get<{ messages: ChatMsg[]; has_more: boolean }>(`/worlds/${wid}/chat${q}`)
       if (opts?.append && opts.before_id) {
         setChatMsgs((msgs) => [...(r.messages || []), ...msgs])
         requestAnimationFrame(() => {
-          const el = chatListRef.current
-          if (el) el.scrollTop = el.scrollHeight - prevScrollHeight
+          eachList((el, i) => { el.scrollTop = el.scrollHeight - (heights[i] ?? 0) })
         })
       } else {
         setChatMsgs(r.messages || [])
@@ -148,27 +157,22 @@ export function useWorldChat({ wid, onRefresh, onMsg }: UseWorldChatOptions) {
   // 滚到底部并校验：double rAF 等布局稳定 → 延时后仍不在底部再滚一次（兜底时序问题）
   const forceScrollToBottom = useCallback(() => {
     const settle = () => {
-      const el = chatListRef.current
-      if (!el) return
-      el.scrollTop = el.scrollHeight
+      eachList((el) => { el.scrollTop = el.scrollHeight })
       // 兜底：内容可能还在渲染（图片/代码块），稍后不在底部再滚一次
       window.setTimeout(() => {
-        const el2 = chatListRef.current
-        if (el2 && el2.scrollHeight - el2.scrollTop - el2.clientHeight > 10) {
-          el2.scrollTop = el2.scrollHeight
-        }
+        eachList((el) => {
+          if (el.scrollHeight - el.scrollTop - el.clientHeight > 10) el.scrollTop = el.scrollHeight
+        })
       }, 250)
     }
     requestAnimationFrame(() => requestAnimationFrame(settle))
-  }, [])
+  }, [eachList])
 
   // 新消息到达：跟随模式（在底部）自动滚到最新——首次瞬时（等布局稳定），后续新消息平滑，流式内容更新瞬时
   const prevLenRef = useRef(0)
   const loadedOnceRef = useRef(false)
   useEffect(() => {
     if (!isAtBottomRef.current || chatMsgs.length === 0) return
-    const el = chatListRef.current
-    if (!el) return
     const first = !loadedOnceRef.current
     loadedOnceRef.current = true
     const lenChanged = chatMsgs.length !== prevLenRef.current
@@ -176,17 +180,15 @@ export function useWorldChat({ wid, onRefresh, onMsg }: UseWorldChatOptions) {
     if (first) {
       forceScrollToBottom()
     } else if (lenChanged) {
-      el.scrollTo({ top: el.scrollHeight, behavior: 'smooth' })
+      eachList((el) => { el.scrollTo({ top: el.scrollHeight, behavior: 'smooth' }) })
     }
   }, [chatMsgs])
 
   const scrollToBottom = useCallback((smooth = true) => {
-    const el = chatListRef.current
-    if (!el) return
     isAtBottomRef.current = true
     setIsAtBottom(true)
-    el.scrollTo({ top: el.scrollHeight, behavior: smooth ? 'smooth' : 'auto' })
-  }, [])
+    eachList((el) => { el.scrollTo({ top: el.scrollHeight, behavior: smooth ? 'smooth' : 'auto' }) })
+  }, [eachList])
 
   // ── 发送 ──
   const sendMessages = async (texts: string[]) => {
