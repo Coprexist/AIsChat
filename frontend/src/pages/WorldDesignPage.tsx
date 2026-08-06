@@ -151,6 +151,7 @@ export default function WorldDesignPage() {
   const [chatSending, setChatSending] = useState(false)
   const [chatProcessing, setChatProcessing] = useState(false)  // 刷新后恢复：后台轮次仍在执行
   const [pendingItems, setPendingItems] = useState<{ kind: 'msg' | 'cmd'; text: string }[]>([])  // AI 处理中排队消息（msg 一起发；cmd 串行执行）
+  const [suggestions, setSuggestions] = useState<string[]>([])  // "你可以问"建议（AI 生成 / 兜底 / 预设）
   const chatProcessingRef = useRef(false)
   const [chatHasMore, setChatHasMore] = useState(false)
   const [chatLoadingOlder, setChatLoadingOlder] = useState(false)
@@ -539,8 +540,10 @@ export default function WorldDesignPage() {
       setPendingItems((items) => [...items, { kind: t.startsWith('/') ? 'cmd' : 'msg', text: t }])
       setChatInput('')
       setCmdActive(false)
+      setSuggestions([])
       return
     }
+    setSuggestions([])
     sendMessages([t])
   }
 
@@ -615,6 +618,10 @@ export default function WorldDesignPage() {
             if (!line.startsWith('data: ')) continue
             const payload = line.slice(6)
             if (payload === '[DONE]') { gotDone = true; break }
+            if (payload.startsWith('[SUGGEST]')) {
+              try { setSuggestions(JSON.parse(payload.slice(9))) } catch { /* ignore */ }
+              continue
+            }
             if (payload.startsWith('[ERROR]')) throw new Error(payload.slice(7))
             if (payload.startsWith('[TOOL]')) {
               try {
@@ -840,7 +847,21 @@ export default function WorldDesignPage() {
             ))}
           </div>
         )}
-        {/* 排队消息（AI 处理中，输入框上方弹窗展示：普通消息一起发，命令逐个执行） */}
+        {/* "你可以问"建议按钮（AI 回复后展示；点击直接发送） */}
+        {suggestions.length > 0 && !chatSending && !chatProcessing && (
+          <div className="px-3 pb-1 flex flex-wrap items-center gap-1.5">
+            <span className="text-[10px] text-textMuted shrink-0">你可以问：</span>
+            {suggestions.map((q, i) => (
+              <button
+                key={i}
+                onClick={() => submitText(q)}
+                className="text-xs px-2.5 py-1 rounded-full bg-elevated hover:bg-primary-500/20 hover:text-primary-300 text-textSecondary border border-border transition-colors max-w-[220px] truncate"
+                title={q}
+              >{q}</button>
+            ))}
+          </div>
+        )}
+      {/* 排队消息（AI 处理中，输入框上方弹窗展示：普通消息一起发，命令逐个执行） */}
         {pendingItems.length > 0 && (
           <div className="absolute bottom-full left-3 right-3 mb-1 max-h-32 overflow-y-auto rounded-xl bg-elevated border border-border shadow-xl z-50">
             <div className="px-3 py-1.5 text-[10px] text-textMuted border-b border-border">

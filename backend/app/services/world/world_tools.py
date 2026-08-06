@@ -79,6 +79,24 @@ WORLD_TOOLS = [
     {
         "type": "function",
         "function": {
+            "name": "suggest_questions",
+            "description": "向用户展示接下来可以问的问题（3 个，每个 ≤20 字，具体、好玩、引导用户探索这个世界）。在完成回复、觉得用户需要引导时调用——用户点一下就会问出来。",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "questions": {
+                        "type": "array",
+                        "items": {"type": "string"},
+                        "description": "3 个建议问题（用户可直接点击发送）",
+                    },
+                },
+                "required": ["questions"],
+            },
+        },
+    },
+    {
+        "type": "function",
+        "function": {
             "name": "file_read",
             "description": "读取世界文件内容（编辑前确认内容用；长文件截断显示）。",
             "parameters": {
@@ -440,7 +458,7 @@ def _tool_result_summary(name: str, result: dict) -> str:
     return f"工具执行{'成功' if ok else '失败'}"
 
 
-async def _do_execute(db: AsyncSession, world, name: str, arguments: str) -> dict:
+async def _do_execute(db: AsyncSession, world, name: str, arguments: str, turn_state: dict | None = None) -> dict:
     """实际执行世界 AI 的工具调用（以世界主人身份写操作；文件走隔离目录+白名单）"""
     import json
 
@@ -933,6 +951,19 @@ async def _do_execute(db: AsyncSession, world, name: str, arguments: str) -> dic
             logger.warning(f"🌐 世界 #{world.id} 清空上下文失败: {e}")
             return {"success": False, "error": str(e)}
 
+    if name == "suggest_questions":
+        # "你可以问"建议：AI 自己生成问题 → 存 turn_state，流收尾时 [SUGGEST] 发给前端
+        try:
+            args = json.loads(arguments or "{}")
+            questions = [str(q).strip()[:40] for q in (args.get("questions") or []) if str(q).strip()]
+            if not questions:
+                return {"success": False, "error": "questions 不能为空"}
+            if turn_state is not None:
+                turn_state["suggestions"] = questions[:5]
+            return {"success": True, "count": len(questions), "note": "已生成建议问题，回复末尾会展示给用户"}
+        except (ValueError, TypeError, json.JSONDecodeError) as e:
+            return {"success": False, "error": str(e)}
+
     # ── 文件式 skill（设计侧造物主工具 / 世界侧居民能力）──
     from app.services.world.world_skill_runtime import execute_skill
     skill_result = await execute_skill(db, world, name, arguments)
@@ -951,7 +982,7 @@ async def _execute_world_tool(
     超过 5 分钟（如用户手动改了文件）允许重跑。
     """
     import time as _time
-    result = await _do_execute(db, world, name, arguments)
+    result = await _do_execute(db, world, name, arguments, turn_state)
     if turn_state is not None:
         executed = turn_state.setdefault("executed", {})
         key = f"{name}|{arguments}"

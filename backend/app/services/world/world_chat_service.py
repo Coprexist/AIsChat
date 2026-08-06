@@ -127,6 +127,14 @@ DEFAULT_MAX_TOOL_ROUNDS = 50       # 工具循环默认上限（可在设计页�
 
 CHAT_HISTORY_LIMIT = 30  # 每次对话携带的最近消息数
 
+# "你可以问"预设问题（首次进入编辑页 / clear 后无对话历史时展示）
+PRESET_SUGGESTIONS = [
+    "把页面标题改成红色",
+    "给这个世界生成一个欢迎页",
+    "这个世界能做什么？",
+    "讲讲这个世界的设定",
+]
+
 
 async def get_chat_history(db: AsyncSession, world_id: int, limit: int = 30, before_id: int | None = None) -> list[dict]:
     """世界 AI 对话历史（最近 limit 条；before_id 传最旧 id 可翻更早）"""
@@ -619,7 +627,56 @@ async def stream_world_chat(
         except Exception as e:
             logger.warning(f"🌐 世界 #{world_id} 回复落库失败: {e}")
 
+    # ── "你可以问"建议问题：AI 调过 suggest_questions → 用它；否则轻量 LLM 兜底（用世界 key）；再不行预设 ──
+    try:
+        suggestions = list(turn_state.get("suggestions") or []) if turn_state else []
+        if not suggestions:
+            suggestions = await _suggest_fallback(db, world)
+        if suggestions:
+            yield f"data: [SUGGEST]{json.dumps(suggestions[:5], ensure_ascii=False)}\n\n"
+    except Exception as e:
+        logger.warning(f"🌐 世界 #{world_id} 建议问题生成失败: {e}")
+
     yield "data: [DONE]\n\n"
+
+
+async def _suggest_fallback(db, world) -> list[str]:
+    """轻量 LLM 兜底生成建议问题（用世界 AI 自己的 key）；无历史/失败 → 预设"""
+    try:
+        from app.models.world import WorldChatMessage
+        rows = (await db.execute(
+            select(WorldChatMessage)
+            .where(WorldChatMessage.world_id == world.id, WorldChatMessage.role.in_(["user", "ai"]))
+            .order_by(WorldChatMessage.id.desc()).limit(6)
+        )).scalars().all()
+        if not rows:
+            return list(PRESET_SUGGESTIONS)
+        recent = "\n".join(
+            f"{'用户' if r.role == 'user' else 'AI'}: {r.content[:120]}" for r in reversed(rows)
+        )
+        from app.ai.llm import chat_completion
+        from app.services.world.world_chat_service import _resolve_world_credentials
+        api_key, api_base = await _resolve_world_credentials(db, world)
+        from app.models.world import WorldAI
+        wai = (await db.execute(select(WorldAI).where(WorldAI.world_id == world.id))).scalar_one_or_none()
+        from app.config import settings
+        model = (wai.model if wai else None) or settings.default_chat_model
+        resp = await chat_completion(
+            messages=[
+                {"role": "system", "content": '你是对话引导助手。基于以下对话，生成 3 个用户接下来可能想问的简短问题（每个 ≤20 字，具体、好玩、引导探索），只输出 JSON 数组，如 ["问题1","问题2","问题3"]，不要其它文字。'},
+                {"role": "user", "content": recent},
+            ],
+            model=model, api_base_url=api_base, api_key=api_key,
+            temperature=0.9, max_tokens=200,
+        )
+        text = (resp or {}).get("content") or ""
+        arr = json.loads(text.strip().strip("`").lstrip("json").strip())
+        if isinstance(arr, list):
+            return [str(q).strip()[:40] for q in arr if str(q).strip()][:5]
+        return list(PRESET_SUGGESTIONS)
+    except Exception as e:
+        logger.warning(f"🌐 世界 #{world.id} 建议兜底失败（用预设）: {e}")
+        return list(PRESET_SUGGESTIONS)
 
 
 # ═══════════════════════════════════════════════════════════════
