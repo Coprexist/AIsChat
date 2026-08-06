@@ -439,6 +439,14 @@
     // EventSource 断线自动重连，无需处理
   }
 
+  function currentUserId() {
+    try {
+      var me = localStorage.getItem('user_info');
+      if (me) return JSON.parse(me).id;
+    } catch (e) { /* ignore */ }
+    return null;
+  }
+
   function applyWorldState(state) {
     // NPC 说话
     if (state.npc_say) {
@@ -450,6 +458,22 @@
       if (npc) {
         npc.x = state.npc_move.x;
         npc.y = state.npc_move.y;
+      }
+    }
+    // 玩家移动（格子坐标；只对发送者本人生效，sender_id 为空 = 世界主动传送所有人）
+    if (state.player_move && typeof state.player_move.x === 'number' && typeof state.player_move.y === 'number') {
+      var sid = state.player_move.sender_id;
+      if (sid == null || String(sid) === String(currentUserId())) {
+        var c = state.player_move.x, r = state.player_move.y;
+        if (isWalkable(c, r)) {
+          var px = gridToPx(c, r);
+          state.player.x = px.x;
+          state.player.y = px.y;
+          save();
+          showBanner('你已传送到 (' + c + ',' + r + ')');
+        } else {
+          showBanner('(' + c + ',' + r + ') 过不去（有障碍物）');
+        }
       }
     }
     // 横幅

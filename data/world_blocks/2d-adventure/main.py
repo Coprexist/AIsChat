@@ -8,6 +8,8 @@
 群里可用的命令（对世界绑定的群说）：
   旅人说 你好呀        → 旅人弹出对话（npc_name 匹配游戏里的 NPC 名字）
   旅人移动到 2,3       → 旅人移动到格子 (2,3)
+  我去 2,3             → 发送者自己的玩家传送到格子 (2,3)（校验可走）
+  玩家移动到 2,3       → 同上（别名）
   公告 冒险开始！       → 页面顶部横幅
   未知内容             → 村长代为回应（世界有自己的回应方式）
 
@@ -48,13 +50,13 @@ def handle(event: dict) -> dict:
         text = (msg.get("content") or "").strip()
         if not text:
             continue
-        action = _parse_command(text)
+        action = _parse_command(text, msg.get("sender_id"))
         if action:
             actions.append(action)
     return {"ok": True, "actions": actions}
 
 
-def _parse_command(text: str) -> dict | None:
+def _parse_command(text: str, sender_id=None) -> dict | None:
     """关键词语法提取：把一句群消息翻译成即时游戏指令（返回发布的状态或 None）"""
     # 1) NPC 说话：<名字>[说|讲|喊|曰|<冒号>] <内容>（动词/冒号至少一个，避免误吞“移动到”等指令）
     m = re.match(rf"({'|'.join(NPC_NAMES)})(?:(?:说|讲|喊|曰)[:：]?|[:：])\s*(.+)", text)
@@ -69,6 +71,13 @@ def _parse_command(text: str) -> dict | None:
         state = {"npc_name": m.group(1), "npc_move": {"x": int(m.group(2)), "y": int(m.group(3))}}
         publish(state)
         return {"action": "npc_move", "npc": m.group(1)}
+
+    # 2.5) 玩家移动：我去 <x>,<y> / 玩家移动到 <x>,<y>（发送者自己的玩家传送，带 sender_id 供页面比对）
+    m = re.match(r"^(?:我去|玩家移动到|玩家去)\s*(\d+)\s*[,，]\s*(\d+)", text)
+    if m:
+        state = {"player_move": {"x": int(m.group(1)), "y": int(m.group(2)), "sender_id": _sender_id}}
+        publish(state)
+        return {"action": "player_move", "to": (int(m.group(1)), int(m.group(2)))}
 
     # 3) 公告/横幅：公告[:：]<内容>
     m = re.match(r"(?:公告|横幅)[:：]?\s*(.+)", text)
