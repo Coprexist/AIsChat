@@ -9,6 +9,7 @@ import {
   ResponsiveContainer, ComposedChart, Line
 } from 'recharts'
 import { ArrowLeft, Loader2, BarChart3, Activity, FileText, Cpu } from 'lucide-react'
+import PageHeader from '../components/PageHeader'
 
 interface DailyPoint {
   date: string
@@ -124,16 +125,10 @@ export default function UsagePage() {
   const selectedInfo = overview.find(a => a.agent_id === selectedAgent)
 
   return (
-    <div className="max-w-4xl mx-auto p-4 md:p-6 space-y-5 pb-24 md:pb-6">
-      {/* 头部 */}
-      <div className="flex items-center gap-3">
-        <button onClick={() => history.back()} className="p-1.5 rounded-lg hover:bg-elevated text-textMuted transition-colors">
-          <ArrowLeft size={18} />
-        </button>
-        <h2 className="text-lg font-semibold text-textPrimary flex items-center gap-2">
-          <BarChart3 size={20} className="text-primary-400" /> {t('usage.title')}
-        </h2>
-      </div>
+    <div className="h-full flex flex-col bg-canvas">
+      <PageHeader title={t('usage.title')} onBack={() => history.back()} />
+      <div className="flex-1 overflow-y-auto">
+        <div className="max-w-4xl mx-auto p-4 md:p-6 space-y-5 pb-24 md:pb-6">
 
       {/* 日期选择 */}
       <div className="flex gap-2">
@@ -344,6 +339,8 @@ export default function UsagePage() {
           </div>
         </div>
       )}
+    </div>
+      </div>
     </div>
   )
 }

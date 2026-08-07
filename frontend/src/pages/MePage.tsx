@@ -3,6 +3,7 @@ import { Link, useNavigate } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
 import { useT, useLang } from '../i18n/I18nContext'
 import { api } from '../api/client'
+import PageHeader from '../components/PageHeader'
 import { AI_TYPE_LABEL } from '../constants'
 import { fmtTokenNum } from '../utils/format'
 import { getStatusTextStyle, STATUS_COLORS, BG_SURFACE_LIGHT, BG_SURFACE_DARK } from '../utils/statusColor.tsx'
@@ -242,9 +243,10 @@ export default function MePage() {
   if (!user) return null
 
   return (
-    <div className="max-w-2xl mx-auto p-4 md:p-6 space-y-5 pb-24 md:pb-6">
-      {/* ====== 页面标题 ====== */}
-      <h1 className="text-lg font-bold text-textPrimary">{t('me.title')}</h1>
+    <div className="h-full flex flex-col bg-canvas">
+      <PageHeader title={t('me.title')} />
+      <div className="flex-1 overflow-y-auto">
+        <div className="max-w-2xl mx-auto p-4 md:p-6 space-y-5 pb-24 md:pb-6">
 
       {/* ====== 个人资料卡 ====== */}
       <div className="bg-surface rounded-2xl border border-border p-5">
@@ -715,6 +717,8 @@ export default function MePage() {
           </div>
         </div>
       )}
+        </div>
+      </div>
     </div>
   )
 }

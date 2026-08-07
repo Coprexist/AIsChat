@@ -11,6 +11,7 @@ import { useNavigate } from 'react-router-dom'
 import { Search, Download, Upload, X, Trash2, Globe, Tag, User, Clock, Package, Store } from 'lucide-react'
 import { api } from '../api/client'
 import { useT } from '../i18n/I18nContext'
+import PageHeader from '../components/PageHeader'
 
 interface MarketItem {
   id: number
@@ -138,21 +139,19 @@ export default function MarketPage() {
 
   return (
     <div className="h-full flex flex-col bg-canvas">
-      {/* 顶栏：搜索 + 发布 */}
-      <div className="px-4 py-3 border-b border-border bg-surface shrink-0">
+      {/* 标题栏（统一底座） */}
+      <PageHeader title="世界商城" subtitle="浏览 / 一键导入别人发布的世界">
+        <button
+          onClick={openPublish}
+          className="inline-flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-lg bg-primary-500 hover:bg-primary-400 text-white transition-colors shrink-0"
+        >
+          <Upload size={13} /> 发布世界
+        </button>
+      </PageHeader>
+
+      {/* 搜索 + 提示 */}
+      <div className="px-4 pt-3 pb-2 bg-canvas shrink-0">
         <div className="flex items-center gap-2">
-          <h1 className="text-base font-bold text-textPrimary flex items-center gap-1.5 shrink-0">
-            <Store size={16} className="text-primary-400" /> 世界商城
-          </h1>
-          <div className="flex-1" />
-          <button
-            onClick={openPublish}
-            className="inline-flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-lg bg-primary-500 hover:bg-primary-400 text-white transition-colors shrink-0"
-          >
-            <Upload size={13} /> 发布世界
-          </button>
-        </div>
-        <div className="flex items-center gap-2 mt-2">
           <div className="relative flex-1">
             <Search size={13} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-textMuted" />
             <input

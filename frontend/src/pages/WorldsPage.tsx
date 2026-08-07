@@ -3,8 +3,9 @@
  */
 import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { ChevronRight, Store, Trash2, Plus, Globe } from 'lucide-react'
+import { ChevronRight, Store, Trash2, Plus } from 'lucide-react'
 import { api } from '../api/client'
+import PageHeader from '../components/PageHeader'
 
 interface World {
   id: number
@@ -93,93 +94,88 @@ export default function WorldsPage() {
   if (loading) return <div className="flex items-center justify-center h-screen text-textMuted">加载中...</div>
 
   return (
-    <div className="max-w-3xl mx-auto p-6 text-textPrimary">
-      <div className="flex items-center justify-between mb-6">
-        <div>
-          <h1 className="text-xl font-semibold text-textPrimary inline-flex items-center gap-1.5">
-            <Globe size={20} className="text-primary-400" /> 群视界
-          </h1>
-          <p className="text-sm text-textMuted mt-1">给群聊一个可编程的世界——游戏、聊天室、小说互动，什么都行</p>
-        </div>
-        <div className="flex items-center gap-2">
-          <button
-            onClick={() => navigate('/market')}
-            className="px-4 py-2 bg-elevated hover:bg-border text-textSecondary rounded-lg text-sm inline-flex items-center gap-1.5 transition-colors"
-            title="世界商城：浏览 / 一键导入别人发布的世界"
-          >
-            <Store size={15} /> 商城
-          </button>
-          <button onClick={() => setShowCreate(!showCreate)} className="px-4 py-2 bg-primary-500 hover:bg-primary-400 text-white rounded-lg text-sm transition-colors">
-            <Plus size={15} className="inline mr-1" />创建世界
-          </button>
-        </div>
-      </div>
+    <div className="h-full flex flex-col bg-canvas text-textPrimary">
+      <PageHeader title="群视界" subtitle="给群聊一个可编程的世界——游戏、聊天室、小说互动，什么都行">
+        <button
+          onClick={() => navigate('/market')}
+          className="px-3 py-1.5 bg-elevated hover:bg-border text-textSecondary rounded-lg text-xs inline-flex items-center gap-1.5 transition-colors"
+          title="世界商城：浏览 / 一键导入别人发布的世界"
+        >
+          <Store size={14} /> 商城
+        </button>
+        <button onClick={() => setShowCreate(!showCreate)} className="px-3 py-1.5 bg-primary-500 hover:bg-primary-400 text-white rounded-lg text-xs inline-flex items-center gap-1 transition-colors">
+          <Plus size={14} />创建世界
+        </button>
+      </PageHeader>
 
-      {msg && <div className="text-sm text-amber-400 mb-4">{msg}</div>}
+      <div className="flex-1 overflow-y-auto">
+        <div className="max-w-3xl mx-auto p-6">
+          {msg && <div className="text-sm text-amber-400 mb-4">{msg}</div>}
 
-      {showCreate && (
-        <div className="bg-surface border border-border rounded-lg p-4 mb-6 space-y-3">
-          <input
-            value={name}
-            onChange={(e) => setName(e.target.value)}
-            placeholder="世界名称（如：木头大陆）"
-            className="w-full bg-elevated text-textPrimary px-3 py-2 rounded text-sm outline-none border border-border focus:border-primary-500/50"
-          />
-          <textarea
-            value={description}
-            onChange={(e) => setDescription(e.target.value)}
-            placeholder="世界观简介（可选）"
-            rows={2}
-            className="w-full bg-elevated text-textPrimary px-3 py-2 rounded text-sm outline-none resize-none border border-border focus:border-primary-500/50"
-          />
-          <button onClick={create} className="px-4 py-2 bg-primary-500 hover:bg-primary-400 text-white rounded-lg text-sm transition-colors">创建并进入设计页</button>
-        </div>
-      )}
-
-      {worlds.length === 0 && !showCreate && (
-        <div className="text-center text-textMuted py-20 text-sm">
-          <Globe size={36} className="mx-auto opacity-30 mb-3" />
-          还没有世界<br />
-          <span className="text-textSecondary text-xs">创建一个，然后绑定群聊，群成员就能"在沉浸界面打开"了</span>
-        </div>
-      )}
-
-      <div className="space-y-3">
-        {worlds.map((w) => (
-          <div key={w.id} className="bg-surface border border-border rounded-lg p-4 flex items-center gap-4 hover:border-primary-500/40 transition-colors">
-            <div className="flex-1 min-w-0">
-              <div className="flex items-center gap-2">
-                <span className="font-medium text-textPrimary truncate">{w.name}</span>
-                <span className={`text-[10px] px-2 py-0.5 rounded-full shrink-0 ${w.status === 'active' ? 'bg-green-500/20 text-green-400' : 'bg-elevated text-textMuted'}`}>
-                  {w.status === 'active' ? '活跃' : '休眠'}
-                </span>
-              </div>
-              {w.description && <div className="text-xs text-textSecondary truncate mt-0.5">{w.description}</div>}
-              <div className="text-[10px] text-textMuted mt-1">
-                入口: {w.bindings?.length ? w.bindings.map((b) => `${b.entity_type}#${b.entity_id}`).join(', ') : '未绑定'}
-              </div>
+          {showCreate && (
+            <div className="bg-surface border border-border rounded-lg p-4 mb-6 space-y-3">
+              <input
+                value={name}
+                onChange={(e) => setName(e.target.value)}
+                placeholder="世界名称（如：木头大陆）"
+                className="w-full bg-elevated text-textPrimary px-3 py-2 rounded text-sm outline-none border border-border focus:border-primary-500/50"
+              />
+              <textarea
+                value={description}
+                onChange={(e) => setDescription(e.target.value)}
+                placeholder="世界观简介（可选）"
+                rows={2}
+                className="w-full bg-elevated text-textPrimary px-3 py-2 rounded text-sm outline-none resize-none border border-border focus:border-primary-500/50"
+              />
+              <button onClick={create} className="px-4 py-2 bg-primary-500 hover:bg-primary-400 text-white rounded-lg text-sm transition-colors">创建并进入设计页</button>
             </div>
-            <div className="flex items-center gap-2 shrink-0">
-              <button onClick={() => openBindModal(w)} className="text-xs px-3 py-1.5 bg-elevated hover:bg-border text-textSecondary rounded transition-colors">绑定群</button>
-              <button onClick={() => toggleStatus(w)} className="text-xs px-3 py-1.5 bg-elevated hover:bg-border text-textSecondary rounded transition-colors">
-                {w.status === 'active' ? '休眠' : '唤醒'}
-              </button>
-              <button
-                onClick={() => navigate(`/worlds/${w.id}/design`)}
-                className="text-xs px-3 py-1.5 bg-primary-500 hover:bg-primary-400 text-white rounded transition-colors"
-              >
-                设计页 <ChevronRight size={13} className="inline" />
-              </button>
-              <button
-                onClick={() => deleteWorld(w)}
-                className="text-xs px-2.5 py-1.5 bg-elevated border border-red-500/40 text-red-400 rounded hover:bg-red-500/15 transition-colors"
-                title="删除世界（含文件与数据，不可恢复）"
-              >
-                <Trash2 size={13} />
-              </button>
+          )}
+
+          {worlds.length === 0 && !showCreate && (
+            <div className="text-center text-textMuted py-20 text-sm">
+              还没有世界<br />
+              <span className="text-textSecondary text-xs">创建一个，然后绑定群聊，群成员就能"在沉浸界面打开"了</span>
             </div>
+          )}
+
+          <div className="space-y-3">
+            {worlds.map((w) => (
+              <div key={w.id} className="bg-surface border border-border rounded-lg p-4 flex items-center gap-4 hover:border-primary-500/40 transition-colors">
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center gap-2">
+                    <span className="font-medium text-textPrimary truncate">{w.name}</span>
+                    <span className={`text-[10px] px-2 py-0.5 rounded-full shrink-0 ${w.status === 'active' ? 'bg-green-500/20 text-green-400' : 'bg-elevated text-textMuted'}`}>
+                      {w.status === 'active' ? '活跃' : '休眠'}
+                    </span>
+                  </div>
+                  {w.description && <div className="text-xs text-textSecondary truncate mt-0.5">{w.description}</div>}
+                  <div className="text-[10px] text-textMuted mt-1">
+                    入口: {w.bindings?.length ? w.bindings.map((b) => `${b.entity_type}#${b.entity_id}`).join(', ') : '未绑定'}
+                  </div>
+                </div>
+                <div className="flex items-center gap-2 shrink-0">
+                  <button onClick={() => openBindModal(w)} className="text-xs px-3 py-1.5 bg-elevated hover:bg-border text-textSecondary rounded transition-colors">绑定群</button>
+                  <button onClick={() => toggleStatus(w)} className="text-xs px-3 py-1.5 bg-elevated hover:bg-border text-textSecondary rounded transition-colors">
+                    {w.status === 'active' ? '休眠' : '唤醒'}
+                  </button>
+                  <button
+                    onClick={() => navigate(`/worlds/${w.id}/design`)}
+                    className="text-xs px-3 py-1.5 bg-primary-500 hover:bg-primary-400 text-white rounded transition-colors"
+                  >
+                    设计页 <ChevronRight size={13} className="inline" />
+                  </button>
+                  <button
+                    onClick={() => deleteWorld(w)}
+                    className="text-xs px-2.5 py-1.5 bg-elevated border border-red-500/40 text-red-400 rounded hover:bg-red-500/15 transition-colors"
+                    title="删除世界（含文件与数据，不可恢复）"
+                  >
+                    <Trash2 size={13} />
+                  </button>
+                </div>
+              </div>
+            ))}
           </div>
-        ))}
+        </div>
       </div>
 
       {/* 绑定群弹窗：群列表选择 */}

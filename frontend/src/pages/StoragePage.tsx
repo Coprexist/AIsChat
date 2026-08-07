@@ -84,14 +84,10 @@ export default function StoragePage() {
   }
 
   return (
-    <div className="max-w-2xl mx-auto p-4 space-y-4">
-      {/* 头部 */}
-      <div className="flex items-center gap-3 mb-2">
-        <button onClick={() => navigate('/me')} className="p-1.5 rounded-lg hover:bg-elevated text-textMuted transition-colors">
-          <ArrowLeft size={18} />
-        </button>
-        <h1 className="text-lg font-semibold text-textPrimary">存储空间</h1>
-      </div>
+    <div className="h-full flex flex-col bg-canvas">
+      <PageHeader title="存储空间" onBack={() => navigate('/me')} />
+      <div className="flex-1 overflow-y-auto">
+        <div className="max-w-2xl mx-auto p-4 space-y-4">
 
       {error && (
         <p className="text-sm text-rose-400 bg-rose-500/10 rounded-xl px-4 py-3">{error}</p>
@@ -190,8 +186,11 @@ export default function StoragePage() {
         />
       )}
     </div>
+      </div>
+    </div>
   )
 }
 
 // 复用已有的转发组件
 import ForwardFileModal from '../components/ForwardFileModal'
+import PageHeader from '../components/PageHeader'
