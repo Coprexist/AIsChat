@@ -1030,8 +1030,11 @@ export default function WorldDesignPage() {
             <div style={{ width: fileWidth }} className="shrink-0" />
             <div className="flex-1" />
             <div className="absolute inset-0 flex items-center justify-center gap-1.5 font-medium text-textSecondary">
-              <Folder size={14} className="text-textMuted" />
-              文件
+              {mode === 'preview' ? (
+                <><Eye size={14} className="text-textMuted" /> 预览</>
+              ) : (
+                <><Folder size={14} className="text-textMuted" /> 文件</>
+              )}
             </div>
           </div>
           <div style={{ width: effectiveChatWidth }} className="shrink-0 flex items-center justify-center gap-1.5 h-9 font-medium text-textSecondary border-l border-border">
@@ -1041,7 +1044,8 @@ export default function WorldDesignPage() {
         </div>
         {/* 内容行：拖拽手柄贯穿（拖动 = 整列宽度同步） */}
         <div className="flex flex-1 min-h-0">
-        {/* 左列：文件树 */}
+        {/* 左列：文件树（仅文件模式；预览模式隐藏，让预览覆盖文件树+编辑区整块） */}
+        {mode === 'files' && (
         <div ref={fileTreeRef} className="flex flex-col shrink-0 bg-surface border-r border-border" style={{ width: fileWidth }}>
           <div className="flex-1 overflow-y-auto p-2">
             <div className="flex items-center justify-between mb-2 px-1">
@@ -1062,8 +1066,11 @@ export default function WorldDesignPage() {
             {renderTree(fileTree.children, 0)}
           </div>
         </div>
+        )}
+        {mode === 'files' && (
         <div onMouseDown={fileResizeStart} className="w-1 shrink-0 cursor-col-resize hover:bg-primary-500/40 transition-colors" />
-        {/* 中列：编辑 / 预览（min-width 保底，拖动时不被压没） */}
+        )}
+        {/* 中列：编辑 / 预览（预览模式撑满文件树+编辑区整块） */}
         <div className="flex-1 flex flex-col min-w-0" style={{ minWidth: MIN_EDITOR }}>
           <div className="flex-1 min-h-0">
             {mode === 'files' ? (
