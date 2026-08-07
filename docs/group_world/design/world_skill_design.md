@@ -72,20 +72,24 @@ data/worlds/{id}/
 - **结构化数据不进 content/**：一律走 world_data 表（API/skill ctx.data 读写）
 - 现有世界（星野镇）暂不迁移，新约定对新世界生效
 
-## 四、安全模型（v1 进程内 harness）
+## 四、安全模型（v2 子进程沙箱，2026-08-07 加固）
 
-信任边界：**世界创作者（或其 AI）编写的代码**——防"AI 生成代码越权乱来"，
-不防对抗性恶意代码。恶意场景需后置 subprocess/seccomp 沙箱（2.1 生产加固）。
+信任边界：**世界创作者（或其 AI）编写的代码**——防"AI 生成代码越权乱来"
+（含内省逃逸），对抗性恶意代码的终极隔离（容器）仍后置。
 
-- **import 白名单**：ast 扫描 code.py 的 import，仅标准库安全子集
-  （`os/sys/subprocess/socket/pathlib/shutil/importlib/ctypes/sqlite3/http/...` 全拒）
-- **builtins 收紧**：禁 `open/eval/exec/compile/input/breakpoint/__import__` 等
-- **ctx 唯一出口**：代码无任何宿主对象/模块引用
-- **超时强杀**：单次执行 30s（`asyncio.wait_for`），超时返回错误
+- **子进程执行**：`python -I -u`（不吃 site/不继承 PYTHON* 环境）+ 独立进程组
+  （start_new_session）+ rlimit（内存 64MB / CPU 10s / 文件 4MB / NPROC 16）+ 超时 killpg 强杀
+- **Landlock**：文件系统锁死在世界目录（读写）+ skill 目录（只读）+ 标准库目录（只读），
+  其余路径（/etc、后端代码、其他世界数据）一律 EACCES；绕过 builtins 的 `open` 逃逸也读不到世界外
+- **seccomp-BPF**（x86_64）：禁 execve/网络/挂载/ptrace/内核接口等危险 syscall；
+  skill 沙箱连 fork/clone 一起禁（纯计算+协议，无线程需求）
+- **ctx 协议转发**：一切 IO（file/world/data/group）序列化回宿主校验权限后执行，
+  子进程零宿主引用——内省逃逸拿不到任何宿主对象
+- **import 白名单 + builtins 收紧**：纵深防御（即使逃逸，Landlock/seccomp 兜底）
+- **超时强杀**：单次执行 30s，killpg 连子进程/孙进程一起杀
 
-⚠️ 已知边界：Python 内省逃逸（`().__class__.__bases__[0].__subclasses__()`）理论上
-可绕过 builtins 限制——v1 接受该风险（AI 生成代码不会主动逃逸），
-对抗性安全留给沙箱层。
+⚠️ 已知边界：Landlock 按路径授权（同路径前缀内的文件均可访问）；进程内逃逸
+理论仍可读标准库源码（公开代码，无敏感信息）；终极隔离（容器）后置。
 
 ## 五、接入点
 
@@ -96,8 +100,9 @@ data/worlds/{id}/
 ## 六、路线图
 
 1. ✅ 运行时骨架 + 两个作用域 + 安全加载 + ctx 注入 + 示例 `world_stats`
-2. ⏳ 用户移动命令（`我去 2,3` → 世界程序解析 → 玩家传送）——语法先定
-3. ⏳ `world_command`：世界侧第一个真实 skill——群 AI 发命令操作世界，
-   命令统一交给世界程序解析（与用户共用语法，零重复逻辑）
-4. ⏳ 群 AI 上下文注入：「本群绑定世界 X，可用世界颁布的能力行动」
-5. ⏳ 沙箱加固（subprocess/rlimit/seccomp，对抗性安全）
+2. ✅ 用户移动命令（`我去 2,3` → 世界程序解析 → 玩家传送）——语法已定
+3. ✅ `world_command`：世界侧能力入口——群 AI 发命令操作世界（与用户共用语法）
+4. ✅ 群 AI 上下文注入：「本群绑定世界 X，可用世界颁布的能力行动」（能力懒加载版本化）
+5. ✅ 沙箱加固（2026-08-07：subprocess + Landlock + seccomp + 协议转发，
+   文件系统锁死世界目录、禁进程/网络/危险调用；对抗性逃逸验证通过）
+   - 终极隔离（容器化）后置

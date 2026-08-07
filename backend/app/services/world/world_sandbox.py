@@ -136,6 +136,9 @@ def _sanitized_env(world) -> dict:
         "TZ": os.environ.get("TZ", "Asia/Shanghai"),
         "HOME": "/tmp",
         "WORLD_ID": str(world.id),
+        "WORLD_DIR": str(_world_dir(world.id)),
+        # 隔离库目录（子进程 import sandbox_isolate 用；-I 模式下 sys.path 不含脚本目录）
+        "SANDBOX_LIB_DIR": str(Path(__file__).parent),
     }
     cfg = world.config or {}
     token = cfg.get("api_token")
@@ -207,7 +210,8 @@ async def _run_world_code(
             return {"success": False, "stdout": "", "stderr": "", "exit_code": -1,
                     "duration_ms": 0, "timed_out": False, "reason": "code 和 entry 至少给一个"}
 
-        cmd = [sys.executable, "-I", "-X", "utf8", str(target)]  # -I 隔离（不吃 site/忽略 PYTHON* 环境）；-X utf8 强制 UTF-8（世界代码 print 中文必需）
+        cmd = [sys.executable, "-I", "-X", "utf8", "-c", _SANDBOX_RUNNER_TEMPLATE, str(target)]
+        # 2026-08-07 加固：经 _SANDBOX_RUNNER_TEMPLATE 执行（Landlock 锁世界目录 + seccomp 禁进程/危险调用，保留网络）
         proc = await asyncio.create_subprocess_exec(
             *cmd,
             cwd=str(workdir),
@@ -255,11 +259,34 @@ async def _run_world_code(
                 pass
 
 
+# ── 隔离执行器（2026-08-07 加固）：Landlock 锁世界目录 + seccomp 禁进程/危险调用（保留网络）──
+# 经此 runner 执行目标 .py：应用隔离 → runpy 执行（世界内相对导入可用）
+_SANDBOX_RUNNER_TEMPLATE = r'''
+import os, runpy, sys
+
+def _main():
+    target = sys.argv[1]
+    world_dir = os.environ.get("WORLD_DIR", "")
+    sys.path.insert(0, os.environ.get("SANDBOX_LIB_DIR", ""))
+    from sandbox_isolate import apply_isolate
+    apply_isolate(world_dir=world_dir, deny_net=False, deny_process_creation=False)  # 世界代码保留网络（受控 API）+ 线程兼容（NPROC 限制，execve 仍禁）
+    sys.path.insert(0, world_dir)
+    runpy.run_path(target, run_name="__main__")
+
+_main()
+'''
+
+
 # ── 2.2 触发文件约定 ──
 # 世界目录 main.py 实现 handle(event) -> dict（可 async），平台 harness 导入并调用。
 # 世界代码零框架依赖；print 重定向到 stdout 字段，不污染结果 JSON。
-_TRIGGER_HARNESS_TEMPLATE = '''
+# 2026-08-07 加固：执行前 apply_isolate（Landlock 锁世界目录 + seccomp 禁进程，保留网络）。
+_TRIGGER_HARNESS_TEMPLATE = r'''
 import importlib, json, sys, asyncio, io, contextlib, os
+
+sys.path.insert(0, os.environ.get("SANDBOX_LIB_DIR", ""))
+from sandbox_isolate import apply_isolate
+apply_isolate(world_dir=os.environ.get("WORLD_DIR", ""), deny_net=False, deny_process_creation=False)
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 ENTRY = "__ENTRY__"

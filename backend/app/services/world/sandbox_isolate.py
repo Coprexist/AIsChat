@@ -1,0 +1,237 @@
+"""
+沙箱隔离原语 — Landlock（文件系统）+ seccomp-BPF（系统调用黑名单）
+
+2026-08-07 沙箱加固（对抗性安全，v2）：
+- Landlock：把进程的文件系统访问锁死在授权路径（世界目录读写 + skill 目录只读），
+  其他路径（/etc、后端代码、其他世界数据…）一律 EACCES——比 chroot 轻量且无需 root
+- seccomp：黑名单禁危险系统调用（execve/网络/挂载/ptrace/内核接口…），
+  世界代码沙箱保留网络（受控 API 是 HTTP），skill 沙箱连网络一起禁
+- 两者都在子进程 python 启动后（exec 完成后）应用，不干扰解释器加载；
+  no_new_privs 前置，非 root 也可用
+
+实现：ctypes 直调 syscall（glibc 无 landlock 符号），x86_64 syscall 号；
+非 x86_64 平台跳过 seccomp（Landlock 仍生效），失败一律降级不阻断（try/except，
+日志告警）——沙箱是纵深防御的一层，不因它本身故障影响功能。
+"""
+from __future__ import annotations
+
+import ctypes
+import errno
+import logging
+import os
+import platform
+from pathlib import Path
+
+logger = logging.getLogger(__name__)
+
+# ── Landlock ──
+SYS_LANDLOCK_CREATE_RULESET = 444
+SYS_LANDLOCK_ADD_RULE = 445
+SYS_LANDLOCK_RESTRICT_SELF = 446
+LANDLOCK_RULE_PATH_BENEATH = 1
+
+LANDLOCK_ACCESS_FS_EXECUTE = 1 << 0
+LANDLOCK_ACCESS_FS_WRITE_FILE = 1 << 1
+LANDLOCK_ACCESS_FS_READ_FILE = 1 << 2
+LANDLOCK_ACCESS_FS_READ_DIR = 1 << 3
+LANDLOCK_ACCESS_FS_REMOVE_DIR = 1 << 4
+LANDLOCK_ACCESS_FS_REMOVE_FILE = 1 << 5
+LANDLOCK_ACCESS_FS_MAKE_CHAR = 1 << 6
+LANDLOCK_ACCESS_FS_MAKE_DIR = 1 << 7
+LANDLOCK_ACCESS_FS_MAKE_REG = 1 << 8
+LANDLOCK_ACCESS_FS_MAKE_SOCK = 1 << 9
+LANDLOCK_ACCESS_FS_MAKE_FIFO = 1 << 10
+LANDLOCK_ACCESS_FS_MAKE_BLOCK = 1 << 11
+LANDLOCK_ACCESS_FS_MAKE_SYM = 1 << 12
+LANDLOCK_ACCESS_FS_TRUNCATE = 1 << 13
+# 全部 14 项（ABI v1 全集；不含 EXECUTE 时单独处理）
+ALL_FS_ACCESS = (1 << 14) - 1
+# 世界目录授予全集（不含 EXECUTE——世界/skill 代码不需要执行文件）
+FS_FULL_NO_EXEC = ALL_FS_ACCESS & ~LANDLOCK_ACCESS_FS_EXECUTE
+# 只读授予（skill 目录读 code.py 用）
+FS_READONLY = LANDLOCK_ACCESS_FS_READ_FILE | LANDLOCK_ACCESS_FS_READ_DIR
+
+
+class _RulesetAttr(ctypes.Structure):
+    _fields_ = [("handled_access_fs", ctypes.c_uint64)]
+
+
+class _PathBeneath(ctypes.Structure):
+    _fields_ = [("allowed_access", ctypes.c_uint64), ("parent_fd", ctypes.c_int)]
+
+
+# ── seccomp（x86_64 syscall 号）──
+PR_SET_NO_NEW_PRIVS = 38
+PR_SET_SECCOMP = 22
+SECCOMP_MODE_FILTER = 2
+SECCOMP_RET_ERRNO = 0x00050000
+SECCOMP_RET_ALLOW = 0x7FFF0000
+
+BPF_LD = 0x00
+BPF_W = 0x00
+BPF_ABS = 0x20
+BPF_JMP = 0x05
+BPF_JEQ = 0x10
+BPF_K = 0x00
+BPF_RET = 0x06
+
+# 禁用的危险系统调用（x86_64）。网络类仅 skill 沙箱禁（世界代码沙箱保留，受控 API 走 HTTP）。
+# 进程创建类（fork/clone）：skill 沙箱禁（纯计算+协议，无线程需求）；世界代码沙箱保留
+# （可能用 threading/线程池，数量由 NPROC rlimit 限制，且 execve 仍禁——fork 后无法 exec 真子进程）
+DENY_SYSCALLS_PROCESS_CREATION = {
+    56: "clone", 57: "fork", 58: "vfork", 435: "clone3", 272: "unshare",
+}
+DENY_SYSCALLS_GENERIC = {
+    # 进程/执行
+    59: "execve", 322: "execveat",
+    # 内核/权限
+    165: "mount", 166: "umount2", 167: "swapon", 168: "swapoff", 155: "pivot_root", 161: "chroot",
+    308: "setns", 173: "iopl", 172: "ioperm", 163: "acct", 169: "reboot", 170: "sethostname",
+    171: "setdomainname", 101: "ptrace", 310: "process_vm_readv", 311: "process_vm_writev",
+    # 模块/固件/内核接口
+    175: "init_module", 313: "finit_module", 176: "delete_module", 246: "kexec_load",
+    320: "kexec_file_load", 321: "bpf", 298: "perf_event_open", 425: "io_uring_setup",
+    426: "io_uring_enter", 427: "io_uring_register",
+    # 文件句柄/配额/fanotify（绕过路径控制的句柄操作）
+    304: "open_by_handle_at", 303: "name_to_handle_at", 300: "fanotify_init", 301: "fanotify_mark",
+    179: "quotactl", 288: "accept4",
+}
+DENY_SYSCALLS_NET = {
+    41: "socket", 42: "connect", 43: "accept", 49: "bind", 50: "listen",
+    # 53 socketpair 放行：asyncio 事件循环 self-pipe 必需，仅本地管道对（无网络出口）
+}
+# xattr 写/删（文件系统元数据越权路径；Landlock 不管 xattr）
+DENY_SYSCALLS_XATTR = {188: "setxattr", 189: "lsetxattr", 190: "fsetxattr",
+                       194: "removexattr", 195: "lremovexattr", 196: "fremovexattr"}
+
+
+class _SockFilter(ctypes.Structure):
+    _fields_ = [("code", ctypes.c_uint16), ("jt", ctypes.c_uint8),
+                ("jf", ctypes.c_uint8), ("k", ctypes.c_uint32)]
+
+
+class _SockFprog(ctypes.Structure):
+    _fields_ = [("len", ctypes.c_uint16), ("filter", ctypes.POINTER(_SockFilter))]
+
+
+def _libc():
+    return ctypes.CDLL(None, use_errno=True)
+
+
+def apply_landlock(read_dirs: list[str], write_dirs: list[str] | None = None) -> bool:
+    """把当前进程文件系统锁死：read_dirs 只读 + write_dirs 读写；其余路径全部拒绝。
+
+    返回是否成功（失败返回 False，调用方决定是否继续）。线程安全要求：必须在
+    单线程阶段调用（restrict_self 只影响当前线程——子进程入口处调用即全进程生效）。
+    """
+    libc = _libc()
+    if libc.prctl(PR_SET_NO_NEW_PRIVS, 1, 0, 0, 0) != 0:
+        logger.warning("🛡️ landlock: prctl(NO_NEW_PRIVS) 失败 errno=%s，跳过", ctypes.get_errno())
+        return False
+
+    # 只处理 read_dirs + write_dirs 的并集；handled = 全部权限（除 EXECUTE）
+    handled = FS_FULL_NO_EXEC
+    attr = _RulesetAttr(handled)
+    fd = libc.syscall(SYS_LANDLOCK_CREATE_RULESET, ctypes.byref(attr), ctypes.sizeof(attr), 0)
+    if fd < 0:
+        e = ctypes.get_errno()
+        logger.warning("🛡️ landlock: create_ruleset 失败 errno=%s（%s），跳过", e, errno.errorcode.get(e, "?"))
+        return False
+
+    try:
+        write_dirs = write_dirs or []
+        for path in [*read_dirs, *write_dirs]:
+            p = Path(path)
+            if not p.is_dir():
+                continue
+            dfd = os.open(p, os.O_RDONLY | os.O_DIRECTORY)
+            try:
+                perm = FS_READONLY if path in read_dirs and path not in write_dirs else FS_FULL_NO_EXEC
+                beneath = _PathBeneath(perm, dfd)
+                r = libc.syscall(SYS_LANDLOCK_ADD_RULE, fd, LANDLOCK_RULE_PATH_BENEATH,
+                                 ctypes.byref(beneath), 0)
+                if r != 0:
+                    logger.warning("🛡️ landlock: add_rule %s 失败 errno=%s", path, ctypes.get_errno())
+            finally:
+                os.close(dfd)
+        r = libc.syscall(SYS_LANDLOCK_RESTRICT_SELF, fd, 0)
+        if r != 0:
+            logger.warning("🛡️ landlock: restrict_self 失败 errno=%s", ctypes.get_errno())
+            return False
+        return True
+    finally:
+        os.close(fd)
+
+
+def apply_seccomp(deny_net: bool = True, deny_process_creation: bool = False) -> bool:
+    """seccomp-BPF 黑名单。
+
+    - deny_net=True：连网络一起禁（skill 沙箱）
+    - deny_process_creation=True：连 fork/clone 一起禁（skill 沙箱纯计算+协议，无线程需求）；
+      世界代码沙箱保留（可能用线程池，NPROC rlimit 限制数量，execve 仍禁）
+    """
+    if platform.machine() != "x86_64":
+        logger.warning("🛡️ seccomp: 非 x86_64 平台跳过（%s）", platform.machine())
+        return False
+    libc = _libc()
+    deny = set(DENY_SYSCALLS_GENERIC) | set(DENY_SYSCALLS_XATTR)
+    if deny_net:
+        deny |= set(DENY_SYSCALLS_NET)
+    if deny_process_creation:
+        deny |= set(DENY_SYSCALLS_PROCESS_CREATION)
+
+    filters: list[_SockFilter] = []
+    filters.append(_SockFilter(BPF_LD | BPF_W | BPF_ABS, 0, 0, 0))
+    for nr in sorted(deny):
+        filters.append(_SockFilter(BPF_JMP | BPF_JEQ | BPF_K, 0, 1, nr))
+        filters.append(_SockFilter(BPF_RET | BPF_K, 0, 0, SECCOMP_RET_ERRNO | errno.EPERM))
+    filters.append(_SockFilter(BPF_RET | BPF_K, 0, 0, SECCOMP_RET_ALLOW))
+
+    arr = (_SockFilter * len(filters))(*filters)
+    prog = _SockFprog(len(filters), arr)
+    if libc.prctl(PR_SET_NO_NEW_PRIVS, 1, 0, 0, 0) != 0:
+        logger.warning("🛡️ seccomp: prctl(NO_NEW_PRIVS) 失败 errno=%s，跳过", ctypes.get_errno())
+        return False
+    if libc.prctl(PR_SET_SECCOMP, SECCOMP_MODE_FILTER, ctypes.byref(prog), 0, 0) != 0:
+        logger.warning("🛡️ seccomp: prctl(SECCOMP_FILTER) 失败 errno=%s，跳过", ctypes.get_errno())
+        return False
+    return True
+
+
+def apply_isolate(*, world_dir: str | None = None, read_dirs: list[str] | None = None,
+                  deny_net: bool = True, deny_process_creation: bool = True,
+                  stdlib_readonly: bool = True) -> dict:
+    """子进程入口统一调用：Landlock（锁文件系统）+ seccomp（禁危险调用）。
+
+    - world_dir：授权读写（世界目录）；read_dirs：额外只读目录（如 skill 目录）
+    - deny_net：禁网络（skill 沙箱 True；世界代码沙箱 False——受控 API 是 HTTP）
+    - deny_process_creation：禁 fork/clone（skill 沙箱 True；世界代码沙箱 False——线程池兼容）
+    - stdlib_readonly：授权标准库目录只读（世界代码/skill 隔离后仍可 import 标准库；
+      标准库是公开代码无敏感信息，只读授权风险可忽略）
+    返回 {"landlock": bool, "seccomp": bool} 各层是否生效（仅记录用）。
+    """
+    read_dirs = list(read_dirs or [])
+    write_dirs = [world_dir] if world_dir else []
+    if world_dir:
+        read_dirs.append(world_dir)
+    if stdlib_readonly:
+        try:
+            import sysconfig
+            for key in ("stdlib", "platstdlib"):
+                p = sysconfig.get_paths().get(key)
+                if p and os.path.isdir(p) and p not in read_dirs:
+                    read_dirs.append(p)
+        except Exception:  # noqa: BLE001
+            pass
+    landlock_ok = False
+    if read_dirs or write_dirs:
+        try:
+            landlock_ok = apply_landlock(read_dirs, write_dirs)
+        except Exception as e:  # noqa: BLE001 —— 隔离层故障不阻断执行
+            logger.warning("🛡️ landlock 应用异常（降级继续）: %s", e)
+    seccomp_ok = False
+    try:
+        seccomp_ok = apply_seccomp(deny_net=deny_net, deny_process_creation=deny_process_creation)
+    except Exception as e:  # noqa: BLE001
+        logger.warning("🛡️ seccomp 应用异常（降级继续）: %s", e)
+    return {"landlock": landlock_ok, "seccomp": seccomp_ok}
