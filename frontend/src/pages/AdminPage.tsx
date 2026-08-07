@@ -97,7 +97,7 @@ export default function AdminPage() {
   return (
     <div className="h-full flex flex-col bg-canvas">
       {/* 头部 */}
-      <div className="px-4 md:px-6 py-4 border-b border-border bg-surface shrink-0">
+      <div className="px-4 md:px-6 py-2.5 border-b border-border bg-surface shrink-0">
         <div className="flex items-center gap-2 mb-1">
           {/* 返回按钮：移动端列表视图→我的；桌面端→我的；移动端详情→列表 */}
           {mobileView === 'detail' ? (
@@ -117,7 +117,7 @@ export default function AdminPage() {
               <ArrowLeft size={20} />
             </button>
           )}
-          <h1 className="text-xl font-bold text-textPrimary tracking-tight">
+          <h1 className="text-base font-semibold text-textPrimary">
             {mobileView === 'detail' && currentTab ? currentTab.label : t('admin.title')}
           </h1>
         </div>

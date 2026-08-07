@@ -1008,7 +1008,7 @@ export default function WorldDesignPage() {
       {/* ═══ 桌面端（≥lg）：标题栏 + 三栏（分隔线贯穿，拖拽手柄覆盖标题栏与内容区） ═══ */}
       <div className="hidden lg:flex flex-col h-full">
         {/* 顶部工具栏 */}
-        <div className="flex items-center gap-3 px-4 py-2 bg-surface border-b border-border">
+        <div className="flex items-center gap-3 px-4 h-14 bg-surface border-b border-border shrink-0">
           <button onClick={() => navigate('/worlds')} className="inline-flex items-center gap-1 text-sm text-textMuted hover:text-textPrimary transition-colors">
             <ChevronLeft size={14} />
             世界列表
