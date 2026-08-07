@@ -220,12 +220,13 @@ async def add_member(
     resolved_id = member_id
 
     if member_type == "ai":
-        agent = await db.get(AgentModel, member_id)
-        if not agent:
-            agent_result = await db.execute(
-                select(AgentModel).where(AgentModel.user_id == member_id)
-            )
-            agent = agent_result.scalar_one_or_none()
+        # v2.0.0: 调用方传 user_id（/search 统一返回 user_id）；fallback agent.id 兼容旧调用
+        agent_result = await db.execute(
+            select(AgentModel).where(AgentModel.user_id == member_id)
+        )
+        agent = agent_result.scalar_one_or_none()
+        if agent is None:
+            agent = await db.get(AgentModel, member_id)
         if agent and agent.user_id:
             resolved_id = agent.user_id
         else:
@@ -392,12 +393,12 @@ async def is_member_of_group(
     """检查成员是否在指定群聊中。"""
     lookup_id = member_id
     if member_type == "ai":
-        agent = await db.get(AgentModel, member_id)
+        agent_result = await db.execute(
+            select(AgentModel).where(AgentModel.user_id == member_id)
+        )
+        agent = agent_result.scalar_one_or_none()
         if agent is None:
-            agent_result = await db.execute(
-                select(AgentModel).where(AgentModel.user_id == member_id)
-            )
-            agent = agent_result.scalar_one_or_none()
+            agent = await db.get(AgentModel, member_id)
         if agent and agent.user_id:
             lookup_id = agent.user_id
 
@@ -554,7 +555,12 @@ async def _get_member(db: AsyncSession, group_id: int, member_type: str, member_
     )
     member = result.scalar_one_or_none()
     if member is None and member_type == "ai":
-        agent = await db.get(AgentModel, member_id)
+        agent_result = await db.execute(
+            select(AgentModel).where(AgentModel.user_id == member_id)
+        )
+        agent = agent_result.scalar_one_or_none()
+        if agent is None:
+            agent = await db.get(AgentModel, member_id)
         if agent and agent.user_id and agent.user_id != member_id:
             result = await db.execute(
                 select(GroupMember).where(
