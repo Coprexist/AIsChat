@@ -9,6 +9,7 @@
  * 样式与 AgentsPage / SettingsPage / FriendsPage 现有标题栏完全一致（h-14 + border-b + bg-surface）。
  */
 import type { ReactNode } from 'react'
+import { ChevronLeft } from 'lucide-react'
 
 interface PageHeaderProps {
   title: string
@@ -23,10 +24,10 @@ export default function PageHeader({ title, subtitle, onBack, children }: PageHe
       {onBack && (
         <button
           onClick={onBack}
-          className="-ml-1 px-1.5 rounded hover:bg-elevated text-textMuted hover:text-textPrimary transition-colors shrink-0 text-lg leading-none font-light"
+          className="p-1.5 -ml-1.5 rounded hover:bg-elevated text-textMuted hover:text-textPrimary transition-colors shrink-0"
           title="返回"
         >
-          &lt;
+          <ChevronLeft size={16} />
         </button>
       )}
       <h1 className="font-semibold text-textPrimary text-sm truncate">{title}</h1>
