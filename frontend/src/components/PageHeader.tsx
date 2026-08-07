@@ -24,10 +24,10 @@ export default function PageHeader({ title, subtitle, onBack, children }: PageHe
       {onBack && (
         <button
           onClick={onBack}
-          className="p-1.5 -ml-1 rounded-lg hover:bg-elevated text-textMuted hover:text-textPrimary transition-colors shrink-0"
+          className="-ml-1 px-1.5 rounded hover:bg-elevated text-textMuted hover:text-textPrimary transition-colors shrink-0 text-lg leading-none font-light"
           title="返回"
         >
-          <ArrowLeft size={16} />
+          &lt;
         </button>
       )}
       <h1 className="font-semibold text-textPrimary text-sm truncate">{title}</h1>
