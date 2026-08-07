@@ -162,7 +162,9 @@ export default function WorldsPage() {
                     onClick={() => navigate(`/worlds/${w.id}/design`)}
                     className="text-xs px-3 py-1.5 bg-primary-500 hover:bg-primary-400 text-white rounded transition-colors"
                   >
-                    设计页 <ChevronRight size={13} className="inline" />
+                    <span className="inline-flex items-center gap-0.5">
+                      设计页 <ChevronRight size={13} />
+                    </span>
                   </button>
                   <button
                     onClick={() => deleteWorld(w)}
