@@ -96,7 +96,9 @@ export default function WorldsPage() {
     <div className="max-w-3xl mx-auto p-6 text-textPrimary">
       <div className="flex items-center justify-between mb-6">
         <div>
-          <h1 className="text-xl font-semibold text-textPrimary">🌐 群视界</h1>
+          <h1 className="text-xl font-semibold text-textPrimary inline-flex items-center gap-1.5">
+            <Globe size={20} className="text-primary-400" /> 群视界
+          </h1>
           <p className="text-sm text-textMuted mt-1">给群聊一个可编程的世界——游戏、聊天室、小说互动，什么都行</p>
         </div>
         <div className="flex items-center gap-2">
