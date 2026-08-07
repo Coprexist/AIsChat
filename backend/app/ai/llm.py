@@ -1162,7 +1162,7 @@ async def build_messages(
                 wc_line = "；另有 world_command 可发文本命令（由世界程序解析，如 旅人移动到 2,3 / 我去 2,3 / 身份 签到）" if skill_names else "。可用 world_command 发送文本命令（由世界程序解析，如 旅人移动到 2,3 / 我去 2,3 / 身份 签到）"
                 messages.append({"role": "system", "content":
                     f"【本群世界】本群绑定世界「{w.name}」（#{w.id}）。"
-                    + (f"你已获得世界能力工具：{'、'.join(skill_names)}" if skill_names else "")
+                    + (f"你已获得世界颁布的技能工具，像调普通工具一样直接 function calling 调用：{'、'.join(skill_names)}" if skill_names else "")
                     + wc_line
                     + "。命令会以你的名义出现在群里，可见可审计。"})
                 # 世界源能力变更通知（版本化懒加载：增量 changelog，known 更新同轮）

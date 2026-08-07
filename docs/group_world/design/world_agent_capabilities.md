@@ -71,7 +71,21 @@ AI 调 `world_command("旅人移动到 2,3")` → 以 AI 身份发群消息 → 
 ## 五、实现清单
 
 1. ✅ world_command 工具（路径 B，已落地）
-2. ⏳ 世界 AI 工具集修正：只用设计侧 skills（world_chat_service 拆分 build_skill_tools）
-3. ⏳ AI 直接绑定世界：VALID_BIND_TYPES 加 agent + 绑定/查询 API
-4. ⏳ 群 AI 工具集注入：response_worker 群聊路径 = 默认 + 绑定世界世界侧 skills（effective 快照）
-5. ⏳ 群 AI 世界源变更通知（build_messages 注入 capability_versioning world 源）
+2. ✅ 世界 AI 工具集修正：只用设计侧 skills（world_chat_service 拆分 build_skill_tools）
+3. ✅ AI 直接绑定世界：world_bindings 支持 entity_type='agent' + 绑定/查询 API
+4. ✅ 群 AI 工具集注入：response_worker 群聊路径 = 默认 + 绑定世界世界侧 skills（effective 快照）
+5. ✅ 群 AI 世界源变更通知（build_messages 注入 capability_versioning world 源）
+6. ✅ 沙箱加固（2026-08-07）：skill 执行 subprocess + Landlock/seccomp + 协议转发
+
+## 六、AI 认知注入（2026-08-07 补充）
+
+机制实现 ≠ AI 知道。两处 system prompt 负责把能力边界讲清楚，
+避免 AI 凭猜测回答（如世界 AI 误说"群 AI 没有工具"）：
+
+- **世界 AI（造物主）**：【能力边界】段（world_chat_service 静态前缀）——
+  自己是造物主（平台工具+设计侧 skills）；群 AI 居民绑定世界后拥有世界侧 skills（工具化）
+  + world_command；技能由造物主在 worlds/{id}/skills/ 颁布；
+  用户直接发命令与世界程序交互是另一条并行路径
+- **群 AI（居民）**：【本群世界】段（llm.py 动态尾部）——
+  列出本群绑定世界 + 已获得的世界技能工具名（明确"像调普通工具一样 function calling 直接调用"）
+  + world_command 语法提示；能力版本化懒加载（known/effective）
