@@ -21,6 +21,7 @@ logger = logging.getLogger(__name__)
 class ToolErrorCode:
     UNKNOWN_TOOL = "UNKNOWN_TOOL"
     TOOL_EXEC_FAILED = "TOOL_EXEC_FAILED"
+    INVALID_ARGS = "INVALID_ARGS"
     OPENCLI_PERMISSION_DENIED = "OPENCLI_PERMISSION_DENIED"
     OPENCLI_TIMEOUT = "OPENCLI_TIMEOUT"
     OPENCLI_EXEC_FAILED = "OPENCLI_EXEC_FAILED"
@@ -291,15 +292,35 @@ class ToolRegistry:
                 agent = context.get("_agent") or await db.get(Agent, agent_id)
                 from app.services.world.world_skill_runtime import execute_skill
                 from app.services.world.world_service import find_worlds_by_entity
-                worlds = await find_worlds_by_entity(db, "agent", agent_id) if agent_id else []
-                if group_id is not None:
-                    worlds += await find_worlds_by_entity(db, "group", group_id)
+                # 绑定世界集合：当前群绑定优先（同名 skill 默认执行当前群的世界版本），agent 直接绑定其次
+                group_worlds = await find_worlds_by_entity(db, "group", group_id) if group_id is not None else []
+                agent_worlds = await find_worlds_by_entity(db, "agent", agent_id) if agent_id else []
+                worlds = [*group_worlds, *agent_worlds]
                 seen = set()
+                bound = []
                 for w in worlds:
                     if w.id in seen:
                         continue
                     seen.add(w.id)
-                    result = await execute_skill(db, w, tool_name, json.dumps(arguments, ensure_ascii=False), scope='world')
+                    bound.append(w)
+                # world_id 显式指定：AI 可选其他世界的同名技能（只允许已绑定世界，防越权）
+                target_world_id = arguments.get("world_id")
+                if target_world_id is not None:
+                    try:
+                        target_world_id = int(target_world_id)
+                    except (TypeError, ValueError):
+                        return _build_tool_error(ToolErrorCode.INVALID_ARGS, "world_id 必须是整数世界编号")
+                    w = next((x for x in bound if x.id == target_world_id), None)
+                    if w is None:
+                        return _build_tool_error(ToolErrorCode.INVALID_ARGS, f"world_id={target_world_id} 不在你绑定的世界范围内")
+                    clean_args = {k: v for k, v in arguments.items() if k != "world_id"}
+                    result = await execute_skill(db, w, tool_name, json.dumps(clean_args, ensure_ascii=False), scope='world')
+                    if result is not None:
+                        return result
+                    return _build_tool_error(ToolErrorCode.UNKNOWN_TOOL, f"世界 #{target_world_id} 没有技能「{tool_name}」")
+                for w in bound:
+                    clean_args = {k: v for k, v in arguments.items() if k != "world_id"}
+                    result = await execute_skill(db, w, tool_name, json.dumps(clean_args, ensure_ascii=False), scope='world')
                     if result is not None:
                         return result
             except Exception as e:

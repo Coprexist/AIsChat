@@ -89,3 +89,17 @@ AI 调 `world_command("旅人移动到 2,3")` → 以 AI 身份发群消息 → 
 - **群 AI（居民）**：【本群世界】段（llm.py 动态尾部）——
   列出本群绑定世界 + 已获得的世界技能工具名（明确"像调普通工具一样 function calling 直接调用"）
   + world_command 语法提示；能力版本化懒加载（known/effective）
+
+## 七、同名 skill 冲突策略（2026-08-07，方案 1+3）
+
+多群/多世界绑定下可能出现同名 skill（如两个世界都颁布 `travel`）：
+
+- **定义层去重**（response_worker）：同名只注入一个工具定义，
+  当前群绑定世界优先（agent 直接绑定世界的同名版本不重复注入）
+- **world_id 显式指定**（方案 3）：工具定义自动追加可选 `world_id` 参数（build_world_tools 生成，
+  skill 作者无感）；AI 可传 world_id 指定其他世界的同名版本
+- **执行路由**（ToolRegistry.dispatch 兜底）：world_id 存在 → 校验目标世界 ∈ 已绑定世界
+  （agent 绑定 + 群绑定，防越权）→ 执行指定世界版本；缺省 → 群绑定世界优先遍历
+- **清单告知**（llm.py【本群世界】）：同名技能列出所有颁布世界 id，提示可用 world_id 指定
+- 测试（真实 DB）：无 world_id → 群绑定版本；world_id=22 → 指定世界版本；
+  world_id=999/abc → INVALID_ARGS 拒绝

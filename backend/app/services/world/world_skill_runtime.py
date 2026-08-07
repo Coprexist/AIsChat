@@ -121,15 +121,31 @@ def list_world_skills(world_id: int) -> list[SkillDef]:
     ]
 
 
-def _to_tools(skills: list[SkillDef]) -> list[dict]:
-    return [{
-        "type": "function",
-        "function": {
-            "name": s.name,
-            "description": s.description,
-            "parameters": s.arguments,
-        },
-    } for s in skills]
+def _to_tools(skills: list[SkillDef], world_id: int | None = None) -> list[dict]:
+    """skill → function calling 工具定义。
+
+    world_id 非空（世界侧）：自动追加可选 world_id 参数——同一 AI 绑定多个世界且
+    多个世界颁布同名 skill 时，AI 可用 world_id 指定执行哪个世界的版本（缺省=当前对话世界）。
+    """
+    tools = []
+    for s in skills:
+        params = dict(s.arguments or {"type": "object", "properties": {}})
+        if world_id is not None:
+            props = dict(params.get("properties") or {})
+            props["world_id"] = {
+                "type": "integer",
+                "description": "可选：指定执行该技能的世界 id（当多个世界颁布同名技能时用）。缺省 = 当前对话群绑定/关联的世界。",
+            }
+            params = {"type": "object", "properties": props}
+        tools.append({
+            "type": "function",
+            "function": {
+                "name": s.name,
+                "description": s.description,
+                "parameters": params,
+            },
+        })
+    return tools
 
 
 def build_ai_tools() -> list[dict]:
@@ -138,8 +154,8 @@ def build_ai_tools() -> list[dict]:
 
 
 def build_world_tools(world_id: int) -> list[dict]:
-    """世界侧（世界颁布的居民能力）→ 群 AI 的工具定义"""
-    return _to_tools(list_world_skills(world_id))
+    """世界侧（世界颁布的居民能力）→ 群 AI 的工具定义（含可选 world_id 指定参数）"""
+    return _to_tools(list_world_skills(world_id), world_id=world_id)
 
 
 def find_skill(name: str, scope: str | None = None) -> SkillDef | None:

@@ -1152,6 +1152,19 @@ async def build_messages(
             if group_id:
                 bound += await find_worlds_by_entity(db, "group", group_id)
             seen = set()
+            # 同名技能跨世界统计（清单注明：可用 world_id 参数指定执行哪个世界的版本）
+            name_worlds: dict[str, list[int]] = {}
+            for w in bound:
+                if w.id in seen:
+                    continue
+                seen.add(w.id)
+                from app.services.world.world_skill_runtime import build_world_tools
+                for t in build_world_tools(w.id):
+                    nm = ((t or {}).get("function") or {}).get("name")
+                    if nm:
+                        name_worlds.setdefault(nm, []).append(w.id)
+            dup_hint = {nm: wids for nm, wids in name_worlds.items() if len(wids) > 1}
+            seen = set()
             for w in bound:
                 if w.id in seen:
                     continue
@@ -1159,10 +1172,15 @@ async def build_messages(
                 # 世界侧 skills 能力清单（群 AI 可直接工具调用；世界程序命令走 world_command）
                 from app.services.world.world_skill_runtime import build_world_tools
                 skill_names = [t["function"]["name"] for t in build_world_tools(w.id)]
+                dup_note = ""
+                if dup_hint:
+                    parts = [f"{nm}（世界 {'/'.join(map(str, wids))} 都有，调用时可用 world_id 参数指定目标世界）" for nm, wids in dup_hint.items()]
+                    dup_note = f"；注意：{'；'.join(parts)}"
                 wc_line = "；另有 world_command 可发文本命令（由世界程序解析，如 旅人移动到 2,3 / 我去 2,3 / 身份 签到）" if skill_names else "。可用 world_command 发送文本命令（由世界程序解析，如 旅人移动到 2,3 / 我去 2,3 / 身份 签到）"
                 messages.append({"role": "system", "content":
                     f"【本群世界】本群绑定世界「{w.name}」（#{w.id}）。"
                     + (f"你已获得世界颁布的技能工具，像调普通工具一样直接 function calling 调用：{'、'.join(skill_names)}" if skill_names else "")
+                    + dup_note
                     + wc_line
                     + "。命令会以你的名义出现在群里，可见可审计。"})
                 # 世界源能力变更通知（版本化懒加载：增量 changelog，known 更新同轮）

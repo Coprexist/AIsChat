@@ -583,25 +583,40 @@ async def _maybe_trigger_ai_reply(
     tools = [d for d in effective_defs if ((d or {}).get("function") or {}).get("name") in allowed_names]
 
     # + 绑定世界的世界侧 skills（居民能力；群绑定或 agent 直接绑定；effective 版本快照，版本化懒加载）
+    # 同名冲突策略（2026-08-07）：同名 skill 只注入一个定义（当前群绑定世界优先），
+    # 工具定义自带可选 world_id 参数，AI 可指定其他世界的同名版本（dispatch 校验绑定后路由）
     try:
         from app.services.world.world_service import find_worlds_by_entity
         from app.services.world.world_skill_runtime import build_world_tools
         from app.services.capability_versioning import ensure_world_version, get_effective_definitions as _get_eff
-        bound_worlds = await find_worlds_by_entity(db, "agent", agent.id)
-        if group_id is not None:
-            bound_worlds += await find_worlds_by_entity(db, "group", group_id)
-        seen = set()
-        for w in bound_worlds:
-            if w.id in seen:
+        agent_worlds = await find_worlds_by_entity(db, "agent", agent.id)
+        group_worlds = await find_worlds_by_entity(db, "group", group_id) if group_id is not None else []
+        # 优先级：当前群绑定世界 > agent 直接绑定（同名时保留群绑定版本）
+        ordered = [*group_worlds, *agent_worlds]
+        seen_w = set()
+        world_by_name: dict[str, tuple] = {}   # skill 名 → (世界, 定义)
+        multi_worlds: dict[str, list[int]] = {}  # skill 名 → 颁布它的所有世界 id（清单注明）
+        for w in ordered:
+            if w.id in seen_w:
                 continue
-            seen.add(w.id)
+            seen_w.add(w.id)
             wtools = build_world_tools(w.id)
             if wtools:
                 await ensure_world_version(db, w.id, wtools)
             eff = await _get_eff(db, agent, f"world-{w.id}", wtools)
-            tools = [*tools, *eff]
+            for d in eff:
+                nm = ((d or {}).get("function") or {}).get("name")
+                if not nm:
+                    continue
+                multi_worlds.setdefault(nm, []).append(w.id)
+                if nm not in world_by_name:  # 群绑定世界先遍历 → 同名保留群绑定版本
+                    world_by_name[nm] = (w, d)
+        tools = [*tools, *(d for _, d in world_by_name.values())]
+        # 同名多世界信息（供清单告知 AI 可用 world_id 指定）
+        dup_names = {nm: wids for nm, wids in multi_worlds.items() if len(wids) > 1}
     except Exception as e:
         logger.warning(f"🌐 AI {agent.name} 世界能力注入失败: {e}")
+        dup_names = {}
 
     model = resolve_model(agent)
     logger.info(f"🔍 AI {agent.name}: model={model}, tools={len(tools)}")
