@@ -38,6 +38,13 @@ class PublishRequest(BaseModel):
     tags: list[str] = []
 
 
+class UpdateItemRequest(BaseModel):
+    """编辑商品（字段可选，只更新提供的）"""
+    title: str | None = None
+    description: str | None = None
+    tags: list[str] | None = None
+
+
 # ═══════════════════════════════════════════════════════════════
 # 工具
 # ═══════════════════════════════════════════════════════════════
@@ -147,6 +154,31 @@ async def get_item(
     item = (await db.execute(select(WorldMarketItem).where(WorldMarketItem.id == item_id))).scalar_one_or_none()
     if item is None or item.status != "on":
         raise HTTPException(status_code=404, detail="商品不存在")
+    return _item_dict(item)
+
+
+@router.put("/items/{item_id}")
+async def update_item(
+    item_id: int,
+    req: UpdateItemRequest,
+    current_user: dict = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """编辑商品（标题/描述/标签；仅发布者或管理员）"""
+    from app.models.world import WorldMarketItem
+    item = (await db.execute(select(WorldMarketItem).where(WorldMarketItem.id == item_id))).scalar_one_or_none()
+    if item is None:
+        raise HTTPException(status_code=404, detail="商品不存在")
+    if item.author_id != current_user["user_id"] and current_user.get("role") != "admin":
+        raise HTTPException(status_code=403, detail="只有发布者或管理员可以编辑")
+    if req.title is not None and str(req.title).strip():
+        item.title = str(req.title).strip()[:100]
+    if req.description is not None:
+        item.description = str(req.description).strip()
+    if req.tags is not None:
+        item.tags = [str(t).strip()[:30] for t in req.tags if str(t).strip()][:10]
+    await db.commit()
+    await db.refresh(item)
     return _item_dict(item)
 
 

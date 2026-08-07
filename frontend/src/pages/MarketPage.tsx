@@ -8,7 +8,7 @@
  */
 import { useCallback, useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Search, Download, Upload, X, Trash2, Globe, Tag, User, Clock, Package, Store } from 'lucide-react'
+import { Search, Download, Upload, X, Trash2, Globe, Tag, User, Clock, Package, Store, Edit3, CheckCircle2 } from 'lucide-react'
 import { api } from '../api/client'
 import { useT } from '../i18n/I18nContext'
 import PageHeader from '../components/PageHeader'
@@ -48,6 +48,14 @@ export default function MarketPage() {
   const [publishing, setPublishing] = useState(false)
   // 导入中
   const [importingId, setImportingId] = useState<number | null>(null)
+  // 编辑弹窗
+  const [editItem, setEditItem] = useState<MarketItem | null>(null)
+  const [editTitle, setEditTitle] = useState('')
+  const [editDesc, setEditDesc] = useState('')
+  const [editTags, setEditTags] = useState('')
+  const [editing, setEditing] = useState(false)
+  // 居中 toast（导入成功等）
+  const [toast, setToast] = useState<string | null>(null)
   // 我的 user id（判断下架按钮）
   const [myId, setMyId] = useState<number | null>(null)
 
@@ -114,12 +122,38 @@ export default function MarketPage() {
     setMsg('')
     try {
       const r = await api.post<{ world_id: number; name: string; imported: number }>(`/market/items/${item.id}/import`)
-      setMsg(`✅ 已导入「${r.name}」（${r.imported} 个文件），正在打开…`)
-      setTimeout(() => navigate(`/worlds/${r.world_id}/design`), 800)
+      setToast(`✅ 已导入「${r.name}」（${r.imported} 个文件），正在打开…`)
+      setTimeout(() => navigate(`/worlds/${r.world_id}/design`), 900)
     } catch (e: any) {
       setMsg(`导入失败: ${e?.message || e}`)
-    } finally {
       setImportingId(null)
+    }
+  }
+
+  const openEdit = (item: MarketItem) => {
+    setEditItem(item)
+    setEditTitle(item.title)
+    setEditDesc(item.description || '')
+    setEditTags((item.tags || []).join(','))
+  }
+
+  const doEdit = async () => {
+    if (!editItem) return
+    setEditing(true)
+    try {
+      const updated = await api.put<MarketItem>(`/market/items/${editItem.id}`, {
+        title: editTitle.trim(),
+        description: editDesc.trim(),
+        tags: editTags.split(/[,，]/).map(s => s.trim()).filter(Boolean),
+      })
+      setEditItem(null)
+      setToast(`✅ 商品「${updated.title}」已更新`)
+      setTimeout(() => setToast(null), 2500)
+      load()
+    } catch (e: any) {
+      setMsg(`保存失败: ${e?.message || e}`)
+    } finally {
+      setEditing(false)
     }
   }
 
@@ -205,11 +239,18 @@ export default function MarketPage() {
                     </div>
                   </div>
                   {myId !== null && item.author_id === myId && (
-                    <button
-                      onClick={() => doUnpublish(item)}
-                      className="shrink-0 p-1 text-textMuted hover:text-rose-400 transition-colors"
-                      title="下架"
-                    ><Trash2 size={13} /></button>
+                    <div className="flex items-center shrink-0">
+                      <button
+                        onClick={() => openEdit(item)}
+                        className="p-1 text-textMuted hover:text-primary-400 transition-colors"
+                        title="编辑介绍"
+                      ><Edit3 size={13} /></button>
+                      <button
+                        onClick={() => doUnpublish(item)}
+                        className="p-1 text-textMuted hover:text-rose-400 transition-colors"
+                        title="下架"
+                      ><Trash2 size={13} /></button>
+                    </div>
                   )}
                 </div>
                 {item.description && (
@@ -247,6 +288,58 @@ export default function MarketPage() {
           <div className="text-center text-[10px] text-textMuted mt-3">共 {total} 个世界</div>
         )}
       </div>
+
+      {/* 居中 toast（导入/更新成功提示） */}
+      {toast && (
+        <div className="fixed top-6 left-1/2 -translate-x-1/2 z-[60] flex items-center gap-2 px-4 py-2.5 rounded-xl bg-surface border border-border shadow-2xl text-sm text-mint-400">
+          <CheckCircle2 size={16} className="shrink-0" />
+          <span className="whitespace-nowrap">{toast}</span>
+        </div>
+      )}
+
+      {/* 编辑弹窗 */}
+      {editItem && (
+        <div className="fixed inset-0 z-50 bg-black/50 flex items-center justify-center p-4" onClick={() => setEditItem(null)}>
+          <div className="w-full max-w-md rounded-2xl bg-surface border border-border p-4 space-y-3" onClick={(e) => e.stopPropagation()}>
+            <div className="flex items-center justify-between">
+              <span className="text-sm font-semibold text-textPrimary">编辑商品介绍</span>
+              <button onClick={() => setEditItem(null)} className="p-1 text-textMuted hover:text-textPrimary"><X size={15} /></button>
+            </div>
+            <div>
+              <div className="text-[10px] text-textMuted mb-1">标题</div>
+              <input
+                value={editTitle}
+                onChange={(e) => setEditTitle(e.target.value)}
+                className="w-full bg-elevated text-sm p-2 rounded-lg border border-border outline-none focus:border-primary-500/50 text-textPrimary"
+              />
+            </div>
+            <div>
+              <div className="text-[10px] text-textMuted mb-1">描述</div>
+              <textarea
+                value={editDesc}
+                onChange={(e) => setEditDesc(e.target.value)}
+                rows={3}
+                className="w-full bg-elevated text-sm p-2 rounded-lg border border-border outline-none resize-none focus:border-primary-500/50 text-textPrimary"
+              />
+            </div>
+            <div>
+              <div className="text-[10px] text-textMuted mb-1">标签（逗号分隔）</div>
+              <input
+                value={editTags}
+                onChange={(e) => setEditTags(e.target.value)}
+                className="w-full bg-elevated text-sm p-2 rounded-lg border border-border outline-none focus:border-primary-500/50 text-textPrimary"
+              />
+            </div>
+            <button
+              onClick={doEdit}
+              disabled={editing}
+              className="w-full py-2 text-sm bg-primary-500 hover:bg-primary-400 text-white rounded-lg transition-colors disabled:opacity-40"
+            >
+              {editing ? '保存中…' : '保存'}
+            </button>
+          </div>
+        </div>
+      )}
 
       {/* 发布弹窗 */}
       {showPublish && (
