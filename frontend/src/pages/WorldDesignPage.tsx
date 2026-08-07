@@ -437,7 +437,20 @@ export default function WorldDesignPage() {
       </div>
     ))
 
-  // ── 世界 AI 对话（状态/发送/排队/建议/命令 全部在 useWorldChat） ──
+  // 发布到商城：一键打包代码区（不含 content/）
+  const publishToMarket = async () => {
+    if (!world) return
+    if (!confirm(`把「${world.name}」发布到世界商城？（打包代码区，不含 content/ 数据；他人可一键导入为新世界）`)) return
+    setMsg('')
+    try {
+      await api.post('/market/items', { world_id: wid })
+      setMsg('✅ 已发布到世界商城，可在侧边栏「世界商城」查看')
+    } catch (e: any) {
+      setMsg(`发布失败: ${e?.message || e}`)
+    }
+  }
+
+  // 世界 AI 对话（状态/发送/排队/建议/命令 全部在 useWorldChat） ──
   const chat = useWorldChat({ wid, onRefresh: load, onMsg: setMsg })
 
   // world 加载完成 → 聊天面板渲染 → 确保在底部（刷新时历史先到、面板后渲染，滚动要补一次）
@@ -811,6 +824,9 @@ export default function WorldDesignPage() {
             {world.status === 'active' ? '活跃' : '休眠'}
           </span>
           <div className="flex-1" />
+          <button onClick={publishToMarket} className="shrink-0 text-xs text-primary-400 hover:text-primary-300 transition-colors px-2 py-1" title="发布到世界商城">
+            <Upload size={13} /> 发布
+          </button>
           {mobileTab === 'files' && (
             <div className="relative shrink-0">
               <button onClick={() => setUploadMenuOpen((v) => !v)} className="inline-flex items-center gap-1 text-xs text-primary-400 hover:text-primary-300 transition-colors px-2 py-1" title="上传文件">
@@ -1005,6 +1021,7 @@ export default function WorldDesignPage() {
           <div className="flex-1" />
           <button onClick={() => setMode('files')} className={`text-xs px-3 py-1 rounded transition-colors ${mode === 'files' ? 'bg-primary-500 text-white' : 'bg-elevated hover:bg-border'}`}>文件</button>
           <button onClick={() => setMode('preview')} className={`text-xs px-3 py-1 rounded transition-colors ${mode === 'preview' ? 'bg-primary-500 text-white' : 'bg-elevated hover:bg-border'}`}>预览</button>
+          <button onClick={publishToMarket} className="text-xs px-3 py-1 rounded transition-colors bg-elevated hover:bg-border text-primary-400" title="发布到世界商城（打包代码区）">发布</button>
           {msg && <span className="text-xs text-amber-400">{msg}</span>}
         </div>
         {/* 标题栏：文件（居中于文件树+编辑区整块） | 对话（右列上方）；内容行手柄贯穿 */}

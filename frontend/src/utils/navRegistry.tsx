@@ -9,7 +9,7 @@
  */
 import type { LucideIcon } from 'lucide-react'
 import { MessageCircle, Users, Bot, User } from 'lucide-react'
-import { Globe } from 'lucide-react'
+import { Globe, Store } from 'lucide-react'
 
 export interface NavItem {
   /** 路由路径 */
@@ -45,6 +45,7 @@ export const mainNavItems: NavItem[] = [
  * 次要导航项（只在 Sidebar 展开时显示）
  */
 export const secondaryNavItems: NavItem[] = [
+  { path: '/market', i18nKey: 'nav.market', icon: Store },
   { path: '/settings', i18nKey: 'nav.settings', icon: User },
 ]
 

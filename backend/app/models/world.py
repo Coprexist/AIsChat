@@ -176,3 +176,33 @@ class WorldLLMUsage(Base):
     __table_args__ = (
         Index("ix_world_llm_usage_world_id", "world_id"),
     )
+
+
+class WorldMarketItem(Base):
+    """世界商城商品（2026-08-07 MVP：world 世界包；block 积木后置）
+
+    发布 = 世界代码区（不含 content/）导出 zip 存 data/market/{id}.zip + 元数据；
+    导入 = 下载 zip → 创建新世界 → import_zip（一键复制）。
+    """
+    __tablename__ = "world_market_items"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    kind = Column(String(20), default="world", nullable=False, comment="world=完整世界 | block=积木组件（后置）")
+    title = Column(String(100), nullable=False, comment="商品标题")
+    description = Column(Text, default="", comment="商品描述")
+    tags = Column(JSONB, default=list, comment="标签数组，如 [\"2d冒险\",\"卡牌\"]")
+    author_id = Column(Integer, ForeignKey("users.id"), nullable=False, comment="发布者")
+    author_name = Column(String(50), default="", comment="发布者名（冗余，列表免 join）")
+    source_world_id = Column(Integer, nullable=True, comment="发布来源世界（kind=world 时）")
+    package_path = Column(String(255), nullable=False, comment="zip 包相对 data/ 的路径，如 market/12.zip")
+    package_size = Column(Integer, default=0, comment="zip 字节数")
+    downloads = Column(Integer, default=0, comment="导入次数")
+    status = Column(String(20), default="on", comment="on=在架 | off=下架")
+
+    created_at = Column(DateTime, server_default=func.now())
+    updated_at = Column(DateTime, server_default=func.now(), onupdate=func.now())
+
+    __table_args__ = (
+        Index("ix_world_market_items_created", "created_at"),
+        Index("ix_world_market_items_kind", "kind"),
+    )

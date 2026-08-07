@@ -12,6 +12,7 @@ const zh: TranslationDict = {
   // ======================== 导航 / Navigation ========================
   'nav.chat': '聊天',
   'nav.worlds': '群视界',
+  'nav.market': '世界商城',
   'nav.friends': '好友',
   'nav.ai': 'AI',
   'nav.me': '我的',
@@ -1813,6 +1814,7 @@ const en: TranslationDict = {
   // ======================== Navigation ========================
   'nav.chat': 'Chat',
   'nav.worlds': 'Worlds',
+  'nav.market': 'World Market',
   'nav.friends': 'Friends',
   'nav.ai': 'AI',
   'nav.me': 'Me',
