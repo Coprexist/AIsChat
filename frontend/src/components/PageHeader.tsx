@@ -9,7 +9,6 @@
  * 样式与 AgentsPage / SettingsPage / FriendsPage 现有标题栏完全一致（h-14 + border-b + bg-surface）。
  */
 import type { ReactNode } from 'react'
-import { ArrowLeft } from 'lucide-react'
 
 interface PageHeaderProps {
   title: string
