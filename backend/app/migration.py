@@ -2149,10 +2149,13 @@ async def _migrate_group_members_user_id(db):
     from app.models.agent import Agent
 
     # Step 0: 检查是否需要迁移（幂等判断）
+    # ⚠️ 必须排除 member_id 已是某 agent user_id 的情况：否则 user_id 被 JOIN 到别的 agent.id
+    # 会误判"需要迁移"，每次重启把成员改到错误的人（4→6→9→15 漂移，2026-08-07 事故）
     result = await db.execute(text(
         "SELECT COUNT(*) FROM group_members gm "
         "JOIN agents a ON a.id = gm.member_id "
-        "WHERE gm.member_type = 'ai' AND a.user_id IS NOT NULL AND gm.member_id <> a.user_id"
+        "WHERE gm.member_type = 'ai' AND a.user_id IS NOT NULL AND gm.member_id <> a.user_id "
+        "AND NOT EXISTS (SELECT 1 FROM agents a2 WHERE a2.user_id = gm.member_id)"
     ))
     count = result.scalar()
     if count == 0:
@@ -2193,7 +2196,7 @@ async def _migrate_group_members_user_id(db):
     """))
     logger.info("    🔀 旧 AI 条目清理完成")
 
-    # Step 3: 迁移剩余 AI 条目的 member_id → user_id
+    # Step 3: 迁移剩余 AI 条目的 member_id → user_id（同样排除已是 user_id 的）
     await db.execute(text("""
         UPDATE group_members gm
         SET member_id = a.user_id
@@ -2202,6 +2205,7 @@ async def _migrate_group_members_user_id(db):
         AND a.id = gm.member_id
         AND a.user_id IS NOT NULL
         AND gm.member_id <> a.user_id
+        AND NOT EXISTS (SELECT 1 FROM agents a2 WHERE a2.user_id = gm.member_id)
     """))
     logger.info("    ✅ AI member_id → user_id 转换完成")
 
