@@ -131,10 +131,11 @@ export default function WorldDesignPage() {
   const MIN_EDITOR = 160
   const MIN_CHAT = 200
   const { sidebarWidth: fileWidth, handleResizeStart: fileResizeStart } = useResizableSidebar('world_files_width', fileTreeRef, {
-    min: MIN_TREE, max: () => Math.max(MIN_TREE, window.innerWidth - MIN_EDITOR - MIN_CHAT),
+    min: MIN_TREE, max: () => Math.max(MIN_TREE, window.innerWidth - MIN_EDITOR - MIN_CHAT - 8), // 8 = 两个拖拽手柄
   })
+  // 聊天栏上限按「当前文件树实际宽度」实时反推（不是保底值）：文件树拖宽后，聊天栏同样不会被挤出右侧
   const { sidebarWidth: chatWidth, handleResizeStart: chatResizeStart } = useResizableSidebar('world_chat_width', chatPanelRef, {
-    side: 'right', min: MIN_CHAT, max: () => Math.max(MIN_CHAT, window.innerWidth - MIN_TREE - MIN_EDITOR),
+    side: 'right', min: MIN_CHAT, max: () => Math.max(MIN_CHAT, window.innerWidth - fileWidth - MIN_EDITOR - 8),
   })
 
   const [world, setWorld] = useState<World | null>(null)

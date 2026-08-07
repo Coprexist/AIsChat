@@ -32,6 +32,9 @@ export function useResizableSidebar(
   })
   const resizing = useRef(false)
   const anchorRef = useRef(0)
+  // 最新 max 解析器（max 可能是函数，闭包引用会随渲染变化；用 ref 保证监听器里取到最新）
+  const resolveMaxRef = useRef(resolveMax)
+  resolveMaxRef.current = resolveMax
 
   const handleResizeStart = useCallback((e: React.MouseEvent) => {
     e.preventDefault()
@@ -46,6 +49,23 @@ export function useResizableSidebar(
     document.body.style.cursor = 'col-resize'
     document.body.style.userSelect = 'none'
   }, [sidebarRef, side])
+
+  // 窗口 resize 时按最新上限回收宽度：防止宽屏拖宽后换小屏（仍桌面断点）把面板挤出屏幕
+  useEffect(() => {
+    const onResize = () => {
+      setSidebarWidth((w) => {
+        const maxVal = resolveMaxRef.current()
+        if (w > maxVal) {
+          const clamped = Math.max(min, maxVal)
+          localStorage.setItem(storageKey, String(clamped))
+          return clamped
+        }
+        return w
+      })
+    }
+    window.addEventListener('resize', onResize)
+    return () => window.removeEventListener('resize', onResize)
+  }, [storageKey, min])
 
   useEffect(() => {
     const onMove = (e: MouseEvent) => {
