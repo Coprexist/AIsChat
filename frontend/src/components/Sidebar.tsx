@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { NavLink, useNavigate } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
-import { Shield, LogOut, Menu, X, ChevronLeft, BookOpen, Settings } from 'lucide-react'
+import { Shield, LogOut, Menu, X, ChevronLeft, BookOpen, Settings, Store } from 'lucide-react'
 import { MANUAL_URL } from '../constants'
 import SearchOverlay from './SearchOverlay'
 import { useT } from '../i18n/I18nContext'
@@ -95,6 +95,11 @@ export default function Sidebar({ mobile, onClose, translucent }: { mobile?: boo
               )}
             </NavLink>
           ))}
+
+          <NavLink to="/market" onClick={() => { onClose?.() }} className={navLinkClass}>
+            <Store size={18} />
+            <span>{t('nav.market')}</span>
+          </NavLink>
 
           <NavLink to="/settings" onClick={() => { onClose?.() }} className={navLinkClass}>
             <Settings size={18} />
