@@ -174,7 +174,7 @@ export default function MarketPage() {
   return (
     <div className="h-full flex flex-col bg-canvas">
       {/* 标题栏（统一底座） */}
-      <PageHeader title="世界商城" subtitle="浏览 / 一键导入别人发布的世界">
+      <PageHeader title="世界商城" subtitle="浏览 / 一键导入别人发布的世界" onBack={() => navigate(-1)}>
         <button
           onClick={openPublish}
           className="inline-flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-lg bg-primary-500 hover:bg-primary-400 text-white transition-colors shrink-0"
