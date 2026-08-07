@@ -3,7 +3,7 @@
  */
 import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { ChevronRight, Store } from 'lucide-react'
+import { ChevronRight, Store, Trash2 } from 'lucide-react'
 import { api } from '../api/client'
 
 interface World {
@@ -77,6 +77,17 @@ export default function WorldsPage() {
       await api.post(`/worlds/${world.id}/${world.status === 'active' ? 'sleep' : 'wake'}`)
       load()
     } catch { /* ignore */ }
+  }
+
+  const deleteWorld = async (world: World) => {
+    if (!confirm(`确定删除世界「${world.name}」？\n\n会连同它的全部文件、数据、世界 AI 配置一起删除，不可恢复。`)) return
+    try {
+      await api.delete(`/worlds/${world.id}`)
+      setMsg(`✅ 世界「${world.name}」已删除`)
+      load()
+    } catch (e: any) {
+      setMsg(`删除失败: ${e?.message || e}`)
+    }
   }
 
   if (loading) return <div className="flex items-center justify-center h-screen text-gray-400">加载中...</div>
@@ -155,6 +166,13 @@ export default function WorldsPage() {
                 className="text-xs px-3 py-1.5 bg-primary-500 text-white rounded hover:bg-primary-400"
               >
                 设计页 <ChevronRight size={13} className="inline" />
+              </button>
+              <button
+                onClick={() => deleteWorld(w)}
+                className="text-xs px-2.5 py-1.5 bg-gray-800 border border-red-500/40 text-red-400 rounded hover:bg-red-500/15 transition-colors"
+                title="删除世界（含文件与数据，不可恢复）"
+              >
+                <Trash2 size={13} />
               </button>
             </div>
           </div>
