@@ -137,6 +137,11 @@ export default function WorldDesignPage() {
   const { sidebarWidth: chatWidth, handleResizeStart: chatResizeStart } = useResizableSidebar('world_chat_width', chatPanelRef, {
     side: 'right', min: MIN_CHAT, max: () => Math.max(MIN_CHAT, window.innerWidth - fileWidth - MIN_EDITOR - 8),
   })
+  // 渲染层兜底：无论拖拽/hook 状态怎么变，聊天栏实际宽度绝不超过可用空间（否则会被挤出屏幕右侧）
+  const effectiveChatWidth = Math.min(
+    chatWidth,
+    Math.max(MIN_CHAT, window.innerWidth - fileWidth - MIN_EDITOR - 8),
+  )
 
   const [world, setWorld] = useState<World | null>(null)
   const [files, setFiles] = useState<WorldFile[]>([])
@@ -1012,7 +1017,7 @@ export default function WorldDesignPage() {
               文件
             </div>
           </div>
-          <div style={{ width: chatWidth }} className="shrink-0 flex items-center justify-center gap-1.5 h-9 font-medium text-textSecondary border-l border-border">
+          <div style={{ width: effectiveChatWidth }} className="shrink-0 flex items-center justify-center gap-1.5 h-9 font-medium text-textSecondary border-l border-border">
             <MessageCircle size={14} className="text-textMuted" />
             对话
           </div>
@@ -1100,7 +1105,7 @@ export default function WorldDesignPage() {
         </div>
         <div onMouseDown={chatResizeStart} className="w-1 shrink-0 cursor-col-resize hover:bg-primary-500/40 transition-colors" />
         {/* 右列：对话面板（标题已在顶部标题栏） */}
-        <div ref={chatPanelRef} className="flex flex-col shrink-0 bg-surface" style={{ width: chatWidth }}>
+        <div ref={chatPanelRef} className="flex flex-col shrink-0 bg-surface" style={{ width: effectiveChatWidth, maxWidth: effectiveChatWidth }}>
           <div className="flex-1 min-h-0 flex flex-col">
             {renderChatInner()}
           </div>
