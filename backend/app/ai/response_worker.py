@@ -398,14 +398,15 @@ async def _maybe_trigger_ai_reply(
     from app.ai.decider import decide_action, ActionContext, ActionType
     from app.models.agent import Agent as AgentModel
 
-    # v2.0.0: agent_id 可能是 agent.id 或 user_id
-    agent = (await get_agent(db, agent_id)).ok
+    # v2.0.0: 群触发传入的 agent_id = group_members.member_id = user_id（7-3 已统一）
+    # ⚠️ 必须先用 user_id 查：否则 user_id 恰好等于某个 agent.id 时会错配（如涵吾珑 user_id=4 撞上任熠航 agent.id=4）
+    agent_result = await db.execute(
+        select(AgentModel).where(AgentModel.user_id == agent_id)
+    )
+    agent = agent_result.scalar_one_or_none()
     if agent is None:
-        # 通过 user_id 查找（group_members.member_id 现已统一为 user_id）
-        agent_result = await db.execute(
-            select(AgentModel).where(AgentModel.user_id == agent_id)
-        )
-        agent = agent_result.scalar_one_or_none()
+        # 老数据 fallback：按 agent.id 查（DM 路径传 agent.id 时兼容）
+        agent = (await get_agent(db, agent_id)).ok
     if agent is None:
         logger.warning(f"AI agent_id/user_id={agent_id} 不存在，跳过")
         return
@@ -458,7 +459,6 @@ async def _maybe_trigger_ai_reply(
     if not decision.should_act:
         # 处理 DND 暂存消息
         if decision.details.get("store_pending"):
-            from app.chat import chat_api
             await chat_api.store_pending(db, resolved_agent_id, group_id, trigger_message_id)
         return
 
@@ -516,7 +516,6 @@ async def _maybe_trigger_ai_reply(
     # 延迟回复（若已有积压消息则跳过，避免级联延迟）
     delay_skipped = False
     if skill_result.delay_seconds > 0:
-        from app.chat import chat_api
         pending = await chat_api.get_pending(db, resolved_agent_id, group_id)
         pending_count = len(pending) if pending else 0
         if pending_count > 0:
@@ -687,7 +686,6 @@ async def _maybe_trigger_ai_reply(
         pass
 
     # 10. 标记未读消息已处理
-    from app.chat import chat_api
     await chat_api.mark_pending_read(db, resolved_agent_id, group_id)
     await db.commit()
 
