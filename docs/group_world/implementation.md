@@ -16,7 +16,7 @@
 
 ---
 
-## 二、数据模型（迁移链 head = c4d5e6f7a8b9）
+## 二、数据模型（迁移链 head = d9e8f7a6b5c4，2026-08-07）
 
 | 表 | 职责 | 关键字段 |
 |----|------|---------|
@@ -27,8 +27,9 @@
 | `world_chat_messages` | 世界 AI 对话 | world_id / user_id / role(user\|ai\|tool\|note) / content / reasoning（思考过程，展示用不进上下文） |
 | `world_ai_memories` | **世界 AI 长期记忆（2.6）** | world_id / title / content / embedding(Vector 1536) / 时间戳 |
 | `world_llm_usage` | **LLM 用量与缓存命中（2.7）** | world_id / turn_id / round_no(0\|N\|final) / model / prompt / completion / reasoning / cached_tokens |
+| `world_market_items` | **世界商城商品（8-07 MVP）** | kind(world\|block) / title / description / tags(JSONB) / author_id / author_name / source_world_id / package_path(data/market/{id}.zip) / package_size / downloads / status(on\|off) |
 
-迁移链：`c0c1c2c3c4c5 → ab0d1f883cee（world 配置+聊天表）→ c2d3e4f5a6b7（重建误删三表）→ d4e5f6a7b8c9（备份设置）→ e5f6a7b8c9d0（列注释对齐）→ f6a7b8c9d0e1（reasoning 列）→ a2b3c4d5e6f7（world_ais 实体表）→ b3c4d5e6f7a8（world_ai_memories）→ c4d5e6f7a8b9（world_llm_usage）`
+迁移链：`c0c1c2c3c4c5 → ab0d1f883cee（world 配置+聊天表）→ c2d3e4f5a6b7（重建误删三表）→ d4e5f6a7b8c9（备份设置）→ e5f6a7b8c9d0（列注释对齐）→ f6a7b8c9d0e1（reasoning 列）→ a2b3c4d5e6f7（world_ais 实体表）→ b3c4d5e6f7a8（world_ai_memories）→ c4d5e6f7a8b9（world_llm_usage）→ b5c6d7e8f9a0（capability_versions）→ c6d7e8f9a0b1（预设建议）→ d7e8f9a0b1c2（conversation_log.user_id）→ d9e8f7a6b5c4（world_market_items）`
 
 ---
 
@@ -343,3 +344,35 @@ data/
 ├── world_blocks/                # 积木包
 └── world_llm_requests/{id}.jsonl  # 实际 LLM 请求日志（最近 10 条/世界）
 ```
+
+## 十三、世界商城（2026-08-07 MVP）
+
+- **数据**：`world_market_items`（kind=world，block 后置）；包文件存 `data/market/{uuid}.zip`（发布 = `export_zip(include_content=False)` 代码区打包，content/ 不进包）
+- **API**：`POST /market/items`（发布，owner 校验）/ `GET /market/items?q=&tag=&kind=`（搜索+标签）/ 详情 / `POST /market/items/{id}/import`（一键导入 = create_world + import_zip 安全过滤）/ 下载 / DELETE（下架，仅作者/管理员）
+- **前端**：`/market` 商城页（卡片/搜索/发布弹窗/一键导入/下架）+ 群视界页顶栏入口 + 设计页「发布」按钮
+- **已知限制**：GitHub 组件库同步、block 积木商品后置
+
+## 十四、沙箱加固（2026-08-07，v2）
+
+- **skill 子进程沙箱**：`skill_runner.py`（子进程入口：预加载白名单模块 → apply_isolate → 安全加载 code.py）+ `skill_sandbox.py`（宿主：协议循环，ctx 请求回宿主校验执行）+ `sandbox_isolate.py`（Landlock + seccomp 公共库，ctypes 直调 syscall 444/445/446 + BPF）
+- **世界代码沙箱**：runner/harness 注入 `apply_isolate(world_dir, deny_net=False, deny_process_creation=False)`——保留网络（受控 API）与线程，禁 execve/挂载/ptrace/内核接口
+- **skill 沙箱**：`deny_net=True` + `deny_process_creation=True`（纯计算+协议 IO）+ 标准库只读授权（stdlib_readonly）
+- **验证**：正常/file 协议/权限最小化/超时 30s 强杀/恶意 import 拒/内省逃逸（读 /etc → EACCES、Popen → EPERM、socket → 无模块）
+- **坑**：setrlimit CPU 要 int；`-I` 模式 sys.path 无脚本目录（手动加）；asyncio self-pipe 用 socketpair（seccomp 放行 53）；Landlock 后 import 需预加载/授权 stdlib；非 x86_64 跳 seccomp
+
+## 十五、同名 skill 冲突策略（2026-08-07，方案 1+3）
+
+- **去重注入**（response_worker）：同名 skill 只注入一个定义，当前群绑定世界优先
+- **world_id 参数**（build_world_tools 自动追加，skill 作者无感）：AI 可指定执行其他世界的同名版本
+- **执行路由**（ToolRegistry.dispatch 兜底）：world_id ∈ 已绑定世界（agent+group）才放行，防越权；缺省群绑定世界优先遍历
+- **清单告知**（llm.py【本群世界】）：同名技能列出所有颁布世界 id
+
+## 十六、世界 AI 中间轮输出（2026-08-07）
+
+工具循环中间轮（还要继续调工具时）的正文：流式 yield（前端 [TOOL] 封存机制天然拆成独立气泡）+ 落库 role=note（历史可见、不进 AI 上下文）——此前只覆盖变量被吞，用户只能看到首轮和收尾轮两句话。
+
+## 十七、列槽位健康检查（2026-08-07，事故防御）
+
+- **事故**：groups 表历史反复 ADD/DROP is_federated → pg_attribute 积累 1584 个 dropped 槽位 → 触顶 1600 → 任何 ALTER ADD COLUMN 失败 → 新代码首次启动崩溃（uvicorn exit 3）
+- **检查**：`_check_column_slot_health` 启动时扫全表（>1100 warning / >1400 ERROR）；迁移异常 print+logger 双通道
+- **清理**：VACUUM FULL 对 dropped 槽位无效（PG 怪癖）→ 用 RENAME 重建法（DROP 入站 FK → LIKE INCLUDING ALL 建新表 → INSERT → RENAME → `ALTER SEQUENCE ... OWNED BY` → DROP 旧表 → 重新 ADD FK；FK 按名字跟随 RENAME，序列 OWNED BY 会级联删序列需先改归属）

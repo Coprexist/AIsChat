@@ -7,6 +7,29 @@
 
 ---
 
+## [v0.3.1] - 2026-08-07
+
+### Added — ✨ 世界商城 MVP + 沙箱加固 + 群 AI 能力闭环
+
+- 🏪 **世界商城（MVP）**：`world_market_items` 表 + `/market` API（发布/列表/搜索/标签过滤/详情/一键导入/下载/下架）；发布 = 世界代码区打包（不含 content/）；导入 = 一键创建新世界 + 安全解压；前端商城页（卡片/搜索/发布弹窗）+ 群视界页顶栏入口 + 设计页「发布」按钮。
+- 🛡️ **沙箱加固（v2）**：skill 执行从进程内 harness 升级为**子进程沙箱**——`sandbox_isolate.py`（Landlock 锁文件系统 + seccomp-BPF 禁危险 syscall，ctypes 直调）+ `skill_runner.py`/`skill_sandbox.py`（协议转发 ctx，一切 IO 回宿主校验）；世界代码沙箱同样注入隔离（保留网络/线程，禁 execve/挂载/ptrace 等）；对抗性验证通过（读 /etc 被 Landlock 拒、Popen 被 seccomp EPERM、socket 无模块）。
+- 🤖 **群 AI 世界能力闭环**：世界侧 skills 工具化注入群 AI（function calling 直调，effective 版本快照）；`world_command` 文本命令路径；【本群世界】能力清单 + 同名冲突策略——**同名 skill 去重注入（当前群世界优先）+ 工具定义自动带可选 `world_id` 参数**（AI 可指定执行哪个世界的版本，未绑定世界拒绝）。
+- 🧠 **世界 AI 能力边界认知**：【能力边界】system prompt 段——造物主（平台工具+设计侧 skills）vs 居民（世界侧 skills+world_command）讲清楚，AI 不再误答"群 AI 没有工具"。
+- 💬 **世界 AI 中间轮输出**：工具循环中间轮的正文不再被吞——流式展示 + 落库 note（历史可见、不进上下文），每轮说的话独立气泡。
+- 🗄️ **列槽位健康检查**：启动时扫描全表 pg_attribute 槽位（>1100 warning / >1400 ERROR），防历史 ADD/DROP COLUMN 残留触顶 1600 上限；迁移异常改 print+logger 双通道完整打印。
+
+### Fixed
+
+- **groups 表 1600 列上限事故**：历史反复 ADD/DROP is_federated 积累 1584 个 dropped 槽位 → 任何 ALTER ADD COLUMN 失败 → 新代码首次启动崩溃（exit 3）。修复：RENAME 重建法清 dropped（34 行数据零丢失、11 个外键全恢复）；根因是 `--reload-exclude` 隐式开启 reload + 改文件触发并发启动。
+- **世界设计页聊天栏挤出屏幕**：窗口 resize 不回收宽度 + 上限未按文件树实际宽度反推 → 渲染层 clamp 双保险（hook 层 resize 回收 + maxWidth 兜底）。
+- **AI 建议未在正文阐述**：suggest_questions 工具描述 + 【工具约定】要求"阐述建议或说明生成逻辑"（可概括，不强制逐一）。
+- **世界设计页预览只显示编辑区**：预览模式隐藏文件树+手柄，iframe 撑满文件树+编辑区整块。
+
+### Changed
+
+- **页面标题栏统一底座**：新增 `PageHeader` 组件（h-14 + border-b + bg-surface），群视界/商城/我的/用量/存储空间接入；设计页/管理页顶栏高度对齐。
+- **群视界列表页主题适配**：硬编码灰色全部替换为 CSS 变量体系（日夜间一致），世界卡片/弹窗/空状态美化，新增删除世界按钮。
+- **世界 AI 建议与中间过程**：见上。
 ## [v0.3.0] - 2026-08-05
 
 ### Added — ✨ 群视界（Group World）：群聊即世界（阶段 2 全部完成）
