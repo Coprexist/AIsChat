@@ -555,11 +555,20 @@ async def stream_world_chat(
                         full_reasoning = reasoning
                         # 工具轮思考也流式显示给用户（刷新后仍可从历史看到）
                         yield f"data: [REASONING]{reasoning.replace(chr(10), '{NL}')}\n\n"
-                    if content:
-                        full_content = content
                     if not tcs:
+                        # 收尾轮：正文作为最终回复（finally 落库 ai），不进 note
                         final = content
                         break
+                    # 中间轮（还要继续调工具）：正文也流式展示 + 落库 note（历史可见、不进 AI 上下文）——
+                    # 此前只覆盖 full_content 变量被吞掉，用户只能看到首轮和收尾轮两句话
+                    if content:
+                        full_content = content
+                        db.add(WorldChatMessage(
+                            world_id=world_id, user_id=None, role="note",
+                            content=content[:4000],
+                        ))
+                        await db.commit()
+                        yield f"data: {content.replace(chr(10), '{NL}')}\n\n"
                     # 模型还要继续调工具：记录真实 tool_calls，进入下一轮
                     messages.append({"role": "assistant", "content": content or "", "tool_calls": tcs})
                     tool_call_acc = {

@@ -3,7 +3,7 @@
  */
 import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { ChevronRight } from 'lucide-react'
+import { ChevronRight, Store } from 'lucide-react'
 import { api } from '../api/client'
 
 interface World {
@@ -88,9 +88,18 @@ export default function WorldsPage() {
           <h1 className="text-xl font-semibold">🌐 群视界</h1>
           <p className="text-sm text-gray-500 mt-1">给群聊一个可编程的世界——游戏、聊天室、小说互动，什么都行</p>
         </div>
-        <button onClick={() => setShowCreate(!showCreate)} className="px-4 py-2 bg-primary-500 text-white rounded-lg text-sm">
-          + 创建世界
-        </button>
+        <div className="flex items-center gap-2">
+          <button
+            onClick={() => navigate('/market')}
+            className="px-4 py-2 bg-elevated hover:bg-border text-textSecondary rounded-lg text-sm inline-flex items-center gap-1.5 transition-colors"
+            title="世界商城：浏览 / 一键导入别人发布的世界"
+          >
+            <Store size={15} /> 商城
+          </button>
+          <button onClick={() => setShowCreate(!showCreate)} className="px-4 py-2 bg-primary-500 text-white rounded-lg text-sm">
+            + 创建世界
+          </button>
+        </div>
       </div>
 
       {msg && <div className="text-sm text-yellow-500 mb-4">{msg}</div>}
