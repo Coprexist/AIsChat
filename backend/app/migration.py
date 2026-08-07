@@ -137,12 +137,42 @@ async def run_migrations():
             await _migrate_group_is_paused(db)        # v2.0.5 群聊暂停对话
             await _migrate_audit_logs(db)          # v0.2.6 审计日志企业级字段
             await _fix_column_types(db)  # 必须是最后一个：修复老部署的列类型不匹配
+            await _check_column_slot_health(db)  # 列槽位健康检查（2026-08-07 事故防御）
             await db.commit()
             logger.info("✅ 数据库迁移检查完成")
         except Exception as e:
             await db.rollback()
+            # 双通道打印：logger + print（docker 日志对 stdout 收集最可靠，防止启动失败时 stderr 缓冲丢失）
+            import traceback as _tb
+            _tb.print_exc()
+            print("❌ 数据库迁移失败（完整堆栈已打印）", flush=True)
             logger.error(f"❌ 数据库迁移失败: {e}", exc_info=True)
             raise
+
+
+async def _check_column_slot_health(db) -> None:
+    """列槽位健康检查：历史反复 ADD/DROP COLUMN 会在 pg_attribute 积累 dropped 槽位，
+    触顶 Postgres 硬上限 1600 后任何 ALTER ADD COLUMN 都会失败（2026-08-07 生产事故，
+    groups 表 1584 个 dropped 槽位导致后端启动崩溃）。启动时扫描全表，接近上限打告警。"""
+    try:
+        rows = (await db.execute(text("""
+            SELECT c.relname AS tbl,
+                   count(*) FILTER (WHERE a.attnum > 0) AS slots,
+                   count(*) FILTER (WHERE a.attnum > 0 AND a.attisdropped) AS dropped
+            FROM pg_class c JOIN pg_attribute a ON a.attrelid = c.oid
+            WHERE c.relkind = 'r' AND c.relnamespace = 'public'::regnamespace
+            GROUP BY c.relname HAVING count(*) FILTER (WHERE a.attnum > 0) > 800
+            ORDER BY slots DESC
+        """))).fetchall()
+        for r in rows:
+            tbl, slots, dropped = str(r[0]), int(r[1]), int(r[2])
+            if slots >= 1400:
+                logger.error(f"🚨 列槽位告警（严重）: 表 {tbl} 已用 {slots}/1600（dropped {dropped}），"
+                             f"任何 ALTER ADD COLUMN 即将失败，需重建表清理 dropped 列（VACUUM FULL 无效时用 RENAME 重建法）")
+            elif slots >= 1100:
+                logger.warning(f"⚠️ 列槽位告警: 表 {tbl} 已用 {slots}/1600（dropped {dropped}），建议安排清理")
+    except Exception as e:
+        logger.warning(f"列槽位健康检查失败: {e}")
 
 
 async def _column_exists(db, table: str, column: str) -> bool:
