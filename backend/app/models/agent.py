@@ -151,6 +151,9 @@ class Agent(Base):
     # AI 调用总次数（v0.3.2）：情感/记忆衰减的时间尺度（分状态帧计数在 state_stack 帧内）
     llm_call_count = Column(Integer, default=0)
 
+    # 状态栈摘要长度上限（默认 500，AI 配置页可改；最新帧必保完整）
+    state_stack_max_chars = Column(Integer, default=500)
+
     created_at = Column(DateTime, server_default=func.now())
 
 

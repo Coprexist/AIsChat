@@ -63,19 +63,29 @@ async def push_state(
         logger.info(f"Agent({agent_id}) push 去重: [{frame.get('type')}] {frame.get('context_ref', '')}")
         return stack, f"状态帧 [{frame.get('type')}] 已存在，已合并更新"
 
-    # 原栈顶 active → paused，并作为新帧的“来源状态情感”
+    # 原栈顶 active → paused，并作为新帧的“来源状态情感”+“交接信息”
     source_emotion = {}
+    handoff = {}
     if stack and stack[-1].get("status") == "active":
-        stack[-1]["status"] = "paused"
+        prev = stack[-1]
+        prev["status"] = "paused"
         source_emotion = {
-            "type": stack[-1].get("type"),
-            "emotion": stack[-1].get("emotion") or {},
-            "emotion_text": stack[-1].get("emotion_text") or "",
+            "type": prev.get("type"),
+            "emotion": prev.get("emotion") or {},
+            "emotion_text": prev.get("emotion_text") or "",
+        }
+        # 交接打包：从哪来 / 在干嘛（旧交接不重复注入——切换时一次性携带）
+        handoff = {
+            "from_type": prev.get("type"),
+            "from_context_ref": prev.get("context_ref") or "",
+            "from_doing": (prev.get("doing") or prev.get("why") or "")[:200],
         }
 
     frame["status"] = "active"
     if not frame.get("source_emotion"):
         frame["source_emotion"] = source_emotion
+    if not frame.get("handoff"):
+        frame["handoff"] = handoff
     stack.append(frame)
 
     await _set_stack(db, agent_id, stack)
@@ -90,10 +100,13 @@ async def push_state(
 
 
 async def pop_state(
-    db: AsyncSession, agent_id: int,
+    db: AsyncSession, agent_id: int, target_frame_id: str = "",
 ) -> tuple[list[dict], str]:
     """
-    Pop 栈顶状态帧，恢复下一层 paused → active。
+    Pop 栈顶状态帧，选择性回跳：
+    - target_frame_id 为空 → 回到上一层（LIFO）
+    - target_frame_id 指定 → 直接回到目标帧，中间帧归档（completed，写 journal）
+    恢复帧记录 completed_handoff（刚完成啥 + 跳过层），摘要注入“回来的交接”。
     返回 (新栈, 消息)。
     """
     stack = await _get_stack(db, agent_id)
@@ -102,21 +115,46 @@ async def pop_state(
         return [], "状态栈为空，无需弹出"
 
     popped = stack.pop()
+    skipped: list[str] = []
 
-    # 恢复下一层
-    if stack and stack[-1].get("status") == "paused":
+    if target_frame_id:
+        # 选择性回跳：找到目标帧，中间的帧归档
+        idx = next((i for i, f in enumerate(stack) if f.get("id") == target_frame_id), None)
+        if idx is None:
+            # 目标不存在 → 回退为 LIFO（不破坏栈）
+            stack.append(popped)
+            return stack, f"未找到目标状态帧 {target_frame_id}，已回退为回到上一层"
+        skipped = [f"[{f.get('type')}]({(f.get('doing') or f.get('why') or '?')[:40]})"
+                   for f in stack[idx + 1:]]
+        for f in stack[idx + 1:]:
+            f["status"] = "completed"
+            await _auto_journal(db, agent_id, "pop", f)  # 归档写 journal
+        stack = stack[:idx + 1]
+
+    # 恢复目标帧（或下一层）
+    if stack and stack[-1].get("status") in ("paused", "completed"):
         stack[-1]["status"] = "active"
+
+    # 恢复帧记录“回来的交接”：刚完成啥 + 跳过了哪些层
+    if stack:
+        stack[-1]["completed_handoff"] = {
+            "type": popped.get("type"),
+            "doing": (popped.get("doing") or popped.get("why") or "")[:200],
+            "skipped": " → ".join(skipped) if skipped else "",
+        }
 
     await _set_stack(db, agent_id, stack)
 
-    # P4: 自动写 JOURNAL
+    # P4: 自动写 JOURNAL（弹栈帧）
     await _auto_journal(db, agent_id, "pop", popped)
 
-    logger.info(f"Agent({agent_id}) pop [{popped.get('type')}]: {popped.get('doing', '')[:50]}")
+    logger.info(f"Agent({agent_id}) pop [{popped.get('type')}]"
+                + (f" 跳过 {len(skipped)} 帧" if skipped else ""))
 
     if stack:
         nf = stack[-1]
-        return stack, f"已弹出 [{popped.get('type')}]，恢复到 [{nf.get('type')}]: {nf.get('doing', nf.get('why', ''))}"
+        suffix = f"（跳过 {len(skipped)} 帧）" if skipped else ""
+        return stack, f"已弹出 [{popped.get('type')}]，恢复到 [{nf.get('type')}]: {nf.get('doing', nf.get('why', ''))}{suffix}"
     return stack, f"已弹出 [{popped.get('type')}]，状态栈已空"
 
 
@@ -158,10 +196,17 @@ async def list_states(db: AsyncSession, agent_id: int) -> list[dict]:
     return await _get_stack(db, agent_id)
 
 
-async def get_state_stack_summary(db: AsyncSession, agent_id: int) -> str:
-    """获取状态栈摘要文本（注入 prompt 用）。"""
+async def get_state_stack_summary(db: AsyncSession, agent_id: int, max_chars: int | None = None) -> str:
+    """获取状态栈摘要文本（注入 prompt 用）。max_chars 默认 500（可被 agent 配置覆盖）。"""
     stack = await _get_stack(db, agent_id)
-    return format_state_stack_summary(stack)
+    if not stack:
+        return ""
+    if max_chars is None:
+        from sqlalchemy import text as _text
+        row = (await db.execute(_text("SELECT state_stack_max_chars FROM agents WHERE id = :aid"),
+                                {"aid": agent_id})).first()
+        max_chars = int(row[0]) if row and row[0] else 500
+    return format_state_stack_summary(stack, max_chars=max_chars)
 
 
 async def bump_frame_call_count(db: AsyncSession, agent_id: int, calls: int = 1) -> None:
