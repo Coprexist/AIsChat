@@ -14,6 +14,21 @@ import { tryOpenWorldWindow } from '../utils/worldView'
 import { isTauri, onKeyboardChange } from '../utils/tauri'
 import { scrollToInContainer } from '../utils/scroll'
 
+// ── 虚拟列表：消息高度估算（纯函数，窗口化渲染用）──
+// 估算偏保守（偏大），配合 overscan 消化误差，避免滚动时窗口露出空白
+const estimateMessageHeight = (msg: any): number => {
+  const base = 44                        // 气泡 + 间距基础
+  const text = msg.content || ''
+  const lines = Math.max(1, Math.ceil(text.length / 28))  // 每行约 28 字符
+  const textH = lines * 20
+  const attachH = (msg.attachments?.length || 0) * 88     // 附件/图片
+  const replyH = msg.reply_to ? 26 : 0                     // 回复引用
+  return base + textH + attachH + replyH
+}
+
+const VIRTUAL_OVERSCAN = 40   // 窗口外预渲染条数（估算误差缓冲）
+const OVERSCAN_PX = 1200      // 视口上下各多渲染的像素
+
 interface Message {
   id: number
   group_id?: number
@@ -147,6 +162,10 @@ export default function ChatView({ conversationType, conversationId }: ChatViewP
   const inputRef = useRef(input)
   inputRef.current = input // 保持同步，供 effect cleanup 闭包读取最新值
   const containerRef = useRef<HTMLDivElement>(null)
+
+  // ── 虚拟列表状态（窗口化渲染，长对话不卡）──
+  const [scrollTop, setScrollTop] = useState(0)
+  const [viewportH, setViewportH] = useState(600)
   const topSentinelRef = useRef<HTMLDivElement>(null)
   const bottomSentinelRef = useRef<HTMLDivElement>(null)
   const firstUnreadRef = useRef<HTMLDivElement>(null)
@@ -354,9 +373,32 @@ export default function ChatView({ conversationType, conversationId }: ChatViewP
     setProfileCard({ type, id, name, state })
   }, [])
 
-  // 消息列表 memo：依赖 messages 和少数稳定引用，输入变化时不重建
-  const messageElements = useMemo(() =>
-    messages.map((msg) => {
+  // 消息列表 memo：窗口化渲染（虚拟列表）——只渲染视口附近的消息，
+  // 上下用估算高度占位，解决“对话一多就卡”的 DOM 节点爆炸问题
+  const heights = useMemo(() => messages.map(m => estimateMessageHeight(m)), [messages])
+  const cumHeights = useMemo(() => {
+    const a: number[] = [0]
+    for (const h of heights) a.push(a[a.length - 1] + h)
+    return a
+  }, [heights])
+  const totalHeight = cumHeights[cumHeights.length - 1] || 0
+
+  const windowRange = useMemo(() => {
+    if (messages.length === 0) return { s: 0, e: 0 }
+    const startPx = Math.max(0, scrollTop - OVERSCAN_PX)
+    const endPx = scrollTop + viewportH + OVERSCAN_PX
+    let s = 0
+    while (s < messages.length && cumHeights[s + 1] <= startPx) s++
+    let e = s
+    while (e < messages.length && cumHeights[e] < endPx) e++
+    e = Math.min(messages.length, e + VIRTUAL_OVERSCAN)
+    s = Math.max(0, s - VIRTUAL_OVERSCAN)
+    return { s, e }
+  }, [scrollTop, viewportH, messages.length, cumHeights])
+
+  const messageElements = useMemo(() => {
+    const { s, e } = windowRange
+    const items = messages.slice(s, e).map((msg) => {
       const replyToData = msg.reply_to == null ? undefined : (() => {
         const quoted = messages.find(m => m.id === msg.reply_to)
         if (!quoted) return { id: msg.reply_to, sender: '?', content: '' }
@@ -394,9 +436,13 @@ export default function ChatView({ conversationType, conversationId }: ChatViewP
           />
         </div>
       )
-    }),
-    [messages, firstUnreadId, hasMoreBefore, isOwnMessage, handleAvatarClick, t]
-  )
+    })
+    return {
+      beforeH: cumHeights[s],
+      afterH: totalHeight - cumHeights[e],
+      items,
+    }
+  }, [windowRange, messages, cumHeights, totalHeight, firstUnreadId, hasMoreBefore, isOwnMessage, handleAvatarClick, t])
 
   // ============================================================
   // 消息加载器
@@ -516,14 +562,21 @@ export default function ChatView({ conversationType, conversationId }: ChatViewP
   const scrollToMessage = useCallback((messageId: number) => {
     const el = containerRef.current
     if (!el) return
-    const msgEl = el.querySelector(`[data-message-id="${messageId}"]`)
-    if (msgEl) {
-      isAutoScrolling.current = true
-      // 只滚动消息容器本身（scrollIntoView 会连带滚动外层 main/Layout，把标题栏滚出视口）
-      scrollToInContainer(el, msgEl, { smooth: true })
-      setTimeout(() => { isAutoScrolling.current = false }, 500)
+    const idx = messages.findIndex(m => m.id === messageId)
+    if (idx >= 0 && cumHeights[idx] !== undefined) {
+      // 目标可能在渲染窗口外：先滚到估算位置，窗口更新后再精确定位
+      el.scrollTop = cumHeights[idx]
     }
-  }, [])
+    requestAnimationFrame(() => {
+      const msgEl = el.querySelector(`[data-message-id="${messageId}"]`)
+      if (msgEl) {
+        isAutoScrolling.current = true
+        // 只滚动消息容器本身（scrollIntoView 会连带滚动外层 main/Layout，把标题栏滚出视口）
+        scrollToInContainer(el, msgEl, { smooth: true })
+        setTimeout(() => { isAutoScrolling.current = false }, 500)
+      }
+    })
+  }, [messages, cumHeights])
 
   const handleJumpToUnread = useCallback(async () => {
     if (!firstUnreadId) return
@@ -710,8 +763,11 @@ export default function ChatView({ conversationType, conversationId }: ChatViewP
       if (rafId) return // 上一帧的 DOM 查询尚未执行，跳过
       rafId = requestAnimationFrame(() => {
         rafId = 0
-        const { scrollTop, scrollHeight, clientHeight } = container
-        const atBottom = scrollHeight - scrollTop - clientHeight < 80
+        const { scrollTop: st, scrollHeight, clientHeight } = container
+        // 虚拟列表：跟踪滚动位置与视口高度（值变化才触发渲染）
+        setViewportH(clientHeight)
+        setScrollTop(prev => (Math.abs(prev - st) > 1 ? st : prev))
+        const atBottom = scrollHeight - st - clientHeight < 80
         setIsAtBottom(atBottom)
         isAtBottomRef.current = atBottom
 
@@ -1017,7 +1073,9 @@ export default function ChatView({ conversationType, conversationId }: ChatViewP
         ) : messages.length === 0 ? (
           <EmptyState icon={MessageSquare} title={conversationType === 'dm' ? '开始私信' : '开始群聊'} description={conversationType === 'dm' ? '给对方发送第一条消息吧' : '在群里发送第一条消息吧'} />
         ) : (
-          messageElements
+          <div style={{ paddingTop: messageElements.beforeH, paddingBottom: messageElements.afterH }}>
+            {messageElements.items}
+          </div>
         )}
 
         {/* 底部活动状态栏：合并 AI 思考/输入 + 人类打字 */}
