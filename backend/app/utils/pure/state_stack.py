@@ -154,7 +154,7 @@ def make_state_frame(
     }
 
 
-def format_state_stack_summary(stack: list[dict]) -> str:
+def format_state_stack_summary(stack: list[dict], max_chars: int = 1500) -> str:
     """
     纯函数：将状态栈转为 AI 可读摘要（高密度结构化，尾部放 prompt 缓存友好）。
 
@@ -164,56 +164,69 @@ def format_state_stack_summary(stack: list[dict]) -> str:
     ▸↑ [type] (context): 暂停的任务  TODO: xxx  PLAN: xxx
     ▸▶ [type] (context): 当前活跃任务  TODO: xxx  PLAN: xxx
 
-    底部追加指令：请继续执行栈顶任务。
+    长度控制（max_chars 默认 1500）：超限时从最旧帧开始降级——
+    去掉 TODO/PLAN/情感行只留主干，仍超限则截断末尾加省略号。
     """
     if not stack:
         return ""
 
-    lines = ["\n\n## 📋 状态栈（底→顶）"]
-    for i, frame in enumerate(stack):
-        status = frame.get("status", "active")
-        type_name = frame.get("type", "?")
-        context = frame.get("context_ref", "")
-        doing = frame.get("doing", "")
-        why = frame.get("why", "")
-        todo = frame.get("todo", "")
-        plan = frame.get("plan", "")
+    def render(frames: list[dict], verbose: bool) -> list[str]:
+        lines = ["\n\n## 📋 状态栈（底→顶）"]
+        for i, frame in enumerate(frames):
+            status = frame.get("status", "active")
+            type_name = frame.get("type", "?")
+            context = frame.get("context_ref", "")
+            doing = frame.get("doing", "")
+            why = frame.get("why", "")
+            todo = frame.get("todo", "")
+            plan = frame.get("plan", "")
 
-        # 标记图标
-        if i == len(stack) - 1 and status == "active":
-            marker = "▸▶"  # 当前活跃
-        elif status == "paused":
-            marker = "▸↑"  # 暂停
-        else:
-            marker = "▸"   # 基础/已关闭
+            if i == len(frames) - 1 and status == "active":
+                marker = "▸▶"
+            elif status == "paused":
+                marker = "▸↑"
+            else:
+                marker = "▸"
 
-        context_str = f"({context})" if context else ""
-        action = doing or why
-        line = f"{marker} [{type_name}] {context_str}: {action}"
-        lines.append(line)
+            context_str = f"({context})" if context else ""
+            action = doing or why
+            lines.append(f"{marker} [{type_name}] {context_str}: {action}")
+            if not verbose:
+                continue
+            if todo:
+                items = todo.strip().replace("\n", "; ")
+                lines.append(f"   TODO: {items}")
+            if plan:
+                items = plan.strip().replace("\n", "; ")
+                lines.append(f"   PLAN: {items}")
+            # 🎭 情感行：本状态情感 + 来源情感（并置不抹除）
+            emotion_text = frame.get("emotion_text") or ""
+            emotion_vec = frame.get("emotion") or {}
+            src_vec = (frame.get("source_emotion") or {}).get("emotion") or {}
+            if emotion_text:
+                lines.append(f"   🎭 心情: {emotion_text}")
+            elif any(v >= 0.05 for v in emotion_vec.values()):
+                lines.append(f"   🎭 情感: {emotion_to_text(emotion_vec)}")
+            if src_vec and any(v >= 0.05 for v in src_vec.values()):
+                src_type = (frame.get("source_emotion") or {}).get("type") or ""
+                prefix = f"   ← 来源状态({src_type})情感: " if src_type else "   ← 来源状态情感: "
+                lines.append(prefix + emotion_to_text(src_vec))
+        return lines
 
-        if todo:
-            items = todo.strip().replace("\n", "; ")
-            lines.append(f"   TODO: {items}")
-        if plan:
-            items = plan.strip().replace("\n", "; ")
-            lines.append(f"   PLAN: {items}")
-        # 🎭 情感行：本状态情感 + 来源情感（并置不抹除）
-        emotion_text = frame.get("emotion_text") or ""
-        emotion_vec = frame.get("emotion") or {}
-        src_vec = (frame.get("source_emotion") or {}).get("emotion") or {}
-        if emotion_text:
-            lines.append(f"   🎭 心情: {emotion_text}")
-        elif any(v >= 0.05 for v in emotion_vec.values()):
-            lines.append(f"   🎭 情感: {emotion_to_text(emotion_vec)}")
-        if src_vec and any(v >= 0.05 for v in src_vec.values()):
-            src_type = (frame.get("source_emotion") or {}).get("type") or ""
-            prefix = f"   ← 来源状态({src_type})情感: " if src_type else "   ← 来源状态情感: "
-            lines.append(prefix + emotion_to_text(src_vec))
+    def finish(lines: list[str]) -> str:
+        active_frames = [f for f in stack if f.get("status") == "active"]
+        if active_frames:
+            lines.append("\n请继续执行栈顶活跃任务。完成后调用 pop_state 回到上一层，或 close_state 放弃。")
+        return "\n".join(lines)
 
-    # 底部指令
-    active_frames = [f for f in stack if f.get("status") == "active"]
-    if active_frames:
-        lines.append("\n请继续执行栈顶活跃任务。完成后调用 pop_state 回到上一层，或 close_state 放弃。")
+    full = finish(render(stack, verbose=True))
+    if len(full) <= max_chars:
+        return full
 
-    return "\n".join(lines)
+    # 超限：从最旧帧开始降级（只留主干），保留顶部（最新）帧完整
+    degraded = finish(render(stack, verbose=False))
+    if len(degraded) <= max_chars:
+        return degraded
+
+    # 仍超限：截断末尾 + 省略号
+    return degraded[:max_chars].rstrip() + "\n……（状态栈摘要过长，已截断）"
