@@ -11,8 +11,8 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.models.agent import Agent
 from app.utils.pure.state_stack import (
     make_state_frame, format_state_stack_summary, MAX_STACK_DEPTH,
-    decay_emotion, apply_emotion_update,
 )
+from app.utils.pure.emotion import decay_emotion, apply_emotion_update
 
 logger = logging.getLogger(__name__)
 

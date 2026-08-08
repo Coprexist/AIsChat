@@ -1,179 +1,77 @@
 """
 状态栈纯函数 — 无 IO、无 DB 依赖。
 
-make_state_frame(): 构建单个状态帧
-format_state_stack_summary(): 栈 → AI 可读摘要文本
+make_state_frame(): 构建单个状态帧（交接驱动：handoff/completed_handoff）
+format_state_stack_summary(): 栈 → AI 可读摘要（只渲染当前帧 + 交接信息）
+
+情感向量纯函数见 emotion.py（独立模块）。
 """
+from __future__ import annotations
+
 from datetime import datetime, timezone
 import uuid
+
+from app.utils.pure.emotion import (
+    normalize_emotion, emotion_to_text,
+)
 
 
 MAX_STACK_DEPTH = 10
 
-# ─────────────────────────── 情感向量（Plutchik 8 类独立轴） ───────────────────────────
-# 每轴独立 0-1，不设对立合并：低落=joy/sadness 双低，复杂情绪=双高。
-
-PLUTCHIK_AXES = [
-    "joy", "trust", "fear", "surprise",  # 上半轮
-    "sadness", "disgust", "anger", "anticipation",  # 下半轮（独立轴，非对立）
-]
-
-EMOTION_AXIS_NAMES = {
-    "joy": "开心", "trust": "信任", "fear": "恐惧", "surprise": "惊讶",
-    "sadness": "伤心", "disgust": "厌恶", "anger": "愤怒", "anticipation": "期待",
-}
-
-# 概括词 → 默认向量（AI 可只传词；可扩展）
-EMOTION_WORD_MAP = {
-    "平静": {"joy": 0.3, "trust": 0.3, "sadness": 0.1, "anticipation": 0.2},
-    "开心": {"joy": 0.8, "trust": 0.5, "surprise": 0.2},
-    "难过": {"sadness": 0.8, "joy": 0.1},
-    "伤心": {"sadness": 0.8, "joy": 0.1},
-    "愤怒": {"anger": 0.8, "disgust": 0.4},
-    "生气": {"anger": 0.8, "disgust": 0.4},
-    "害怕": {"fear": 0.8, "surprise": 0.3},
-    "恐惧": {"fear": 0.8, "surprise": 0.3},
-    "厌恶": {"disgust": 0.8, "anger": 0.3},
-    "惊讶": {"surprise": 0.8, "joy": 0.2},
-    "信任": {"trust": 0.8, "joy": 0.2},
-    "期待": {"anticipation": 0.8, "joy": 0.3},
-    "喜极而泣": {"joy": 0.9, "sadness": 0.6, "surprise": 0.5},
-    "焦虑": {"fear": 0.6, "anticipation": 0.6, "sadness": 0.3},
-    "麻木": {"joy": 0.1, "sadness": 0.1, "trust": 0.1, "anticipation": 0.1},
-    "百感交集": {"joy": 0.6, "sadness": 0.6, "anticipation": 0.5},
-}
+# 帧的合法扩展字段（make_state_frame 白名单）
+_FRAME_FIELDS = (
+    "id", "type", "context_ref", "why", "doing", "todo", "plan", "journal",
+    "created_at", "status", "emotion", "emotion_text", "source_emotion",
+    "tools", "skills", "call_count", "handoff", "completed_handoff",
+)
 
 
-def empty_emotion() -> dict:
-    """全零情感向量"""
-    return {axis: 0.0 for axis in PLUTCHIK_AXES}
+def make_state_frame(type_: str, context_ref: str = "", **extras) -> dict:
+    """构建单个状态帧（纯函数）。extras 只收白名单字段，其余静默忽略。
 
-
-def normalize_emotion(emotion: dict) -> dict:
-    """清洗情感向量：只留合法轴，clamp 0-1"""
-    out = empty_emotion()
-    for k, v in (emotion or {}).items():
-        if k in PLUTCHIK_AXES:
-            try:
-                out[k] = max(0.0, min(1.0, float(v)))
-            except (TypeError, ValueError):
-                pass
-    return out
-
-
-def emotion_from_word(word: str) -> dict:
-    """概括词 → 情感向量（未收录的词 → 全零）"""
-    return normalize_emotion(EMOTION_WORD_MAP.get(word.strip(), {}))
-
-
-def apply_emotion_update(cur: dict | None, update) -> dict:
-    """应用情感更新：增量（"+0.2"/"-0.1" 字符串值）/ 完整向量（纯数字）/ 概括词（字符串）。"""
-    base = normalize_emotion(cur or {})
-    if update is None:
-        return base
-    if isinstance(update, str):
-        return emotion_from_word(update)
-    if isinstance(update, dict):
-        return _apply_dict(base, update)
-    return base
-
-
-def _apply_dict(base: dict, update: dict) -> dict:
-    out = dict(base)
-    for k, v in update.items():
-        if k not in PLUTCHIK_AXES:
-            continue
-        if isinstance(v, str):
-            s = v.strip()
-            try:
-                if s.startswith("+"):
-                    out[k] = max(0.0, min(1.0, out[k] + float(s[1:])))
-                elif s.startswith("-"):
-                    out[k] = max(0.0, min(1.0, out[k] - float(s[1:])))
-                else:
-                    out[k] = max(0.0, min(1.0, float(s)))
-            except ValueError:
-                pass
-        else:
-            try:
-                out[k] = max(0.0, min(1.0, float(v)))
-            except (TypeError, ValueError):
-                pass
-    return out
-
-
-def decay_emotion(emotion: dict, calls: int = 1, rate: float = 0.02) -> dict:
-    """情感随调用次数回归基线（mood homeostasis）：每次调用向 0 靠拢 rate。"""
-    out = normalize_emotion(emotion)
-    factor = max(0.0, 1.0 - rate * max(0, calls))
-    for k in out:
-        out[k] = round(out[k] * factor, 3)
-    return out
-
-
-def emotion_to_text(emotion: dict) -> str:
-    """情感向量 → 摘要文本（只显示非零轴）"""
-    e = normalize_emotion(emotion)
-    parts = [f"{EMOTION_AXIS_NAMES[k]} {v:.1f}" for k, v in e.items() if v >= 0.05]
-    return " · ".join(parts) if parts else "平静"
-
-
-def make_state_frame(
-    type_: str,
-    context_ref: str = "",
-    why: str = "",
-    doing: str = "",
-    todo: str = "",
-    plan: str = "",
-    journal: str = "",
-    status: str = "active",
-    emotion: dict | None = None,
-    emotion_text: str = "",
-    source_emotion: dict | None = None,
-    tools: list[str] | None = None,
-    skills: list[str] | None = None,
-    handoff: dict | None = None,
-    completed_handoff: dict | None = None,
-) -> dict:
-    """构建单个状态帧（纯函数）。
-    新增：情感向量/文字、来源情感、工具/技能白名单、调用计数、交接信息。
-    - handoff：本次切换的交接（从哪来/为什么/回去干啥）
-    - completed_handoff：pop 回来后记录的“刚完成啥”
+    常用 extras：why（为什么切换）/ doing（在干嘛）/ todo（回去继续啥）/
+    plan / emotion（情感向量）/ emotion_text（文字心情）/ tools、skills（工具隔离）/
+    handoff、completed_handoff（交接信息）。
     """
-    return {
+    frame = {
         "id": uuid.uuid4().hex[:12],
         "type": type_,
         "context_ref": context_ref,
-        "why": why,
-        "doing": doing,
-        "todo": todo,
-        "plan": plan,
-        "journal": journal,
+        "why": "",
+        "doing": "",
+        "todo": "",
+        "plan": "",
+        "journal": "",
         "created_at": datetime.now(timezone.utc).isoformat(),
-        "status": status,
-        "emotion": normalize_emotion(emotion) if emotion else {},
-        "emotion_text": emotion_text,
-        "source_emotion": source_emotion or {},
-        "tools": tools,          # None = 全部工具
-        "skills": skills,        # None = 全部技能
-        "call_count": 0,         # 该状态内 AI 调用次数（分状态时间尺度）
-        "handoff": handoff or {},
-        "completed_handoff": completed_handoff or {},
+        "status": "active",
+        "emotion": {},
+        "emotion_text": "",
+        "source_emotion": {},
+        "tools": None,
+        "skills": None,
+        "call_count": 0,
+        "handoff": {},
+        "completed_handoff": {},
     }
+    for key, value in extras.items():
+        if key in _FRAME_FIELDS and value is not None:
+            frame[key] = value
+    frame["emotion"] = normalize_emotion(frame["emotion"])
+    return frame
 
 
 def format_state_stack_summary(stack: list[dict], max_chars: int = 500) -> str:
-    """
-    纯函数：将状态栈转为 AI 可读摘要（交接驱动，尾部放 prompt 缓存友好）。
+    """栈 → AI 可读摘要（交接驱动）。
 
     只渲染「当前帧 + 交接信息」，不逐层展开历史帧：
     - 旧交接已在 LLM 对话历史里出现过（工具调用参数），不重复注入
     - 当前帧：doing / TODO / PLAN / 🎭 情感（完整）
     - handoff：本次切换的交接（← 从[来源]来，为什么，回去继续）
     - completed_handoff：pop 回来后刚完成的交接（📝 刚完成）
-    - 嵌套提示：栈深 > 1 时给"共 N 帧"计数（中间层未完成，可 list_states 查）
+    - 嵌套提示：栈深 > 1 时给"共 N 帧"计数
 
-    长度控制（max_chars 默认 500）：只含当前帧时极少超限；超限从最旧信息开始砍。
+    长度控制（max_chars 默认 500）：超限按降级阶梯（_RENDER_*），
+    最新帧的 TODO/PLAN 永不丢。
     """
     if not stack:
         return ""
@@ -191,14 +89,11 @@ def format_state_stack_summary(stack: list[dict], max_chars: int = 500) -> str:
 
         marker = "▸▶" if status == "active" else "▸"
         context_str = f"({context})" if context else ""
-        action = doing or why
-        lines.append(f"{marker} [{type_name}] {context_str}: {action}")
+        lines.append(f"{marker} [{type_name}] {context_str}: {doing or why}")
         if todo:
-            items = todo.strip().replace("\n", "; ")
-            lines.append(f"   TODO: {items}")
+            lines.append(f"   TODO: {todo.strip().replace(chr(10), '; ')}")
         if plan:
-            items = plan.strip().replace("\n", "; ")
-            lines.append(f"   PLAN: {items}")
+            lines.append(f"   PLAN: {plan.strip().replace(chr(10), '; ')}")
         # 🎭 情感（含来源情感并置）
         emotion_text = top.get("emotion_text") or ""
         emotion_vec = top.get("emotion") or {}
@@ -211,41 +106,36 @@ def format_state_stack_summary(stack: list[dict], max_chars: int = 500) -> str:
             src_type = (top.get("source_emotion") or {}).get("type") or ""
             prefix = f"   ← 来源状态({src_type})情感: " if src_type else "   ← 来源状态情感: "
             lines.append(prefix + emotion_to_text(src_vec))
-        # 嵌套提示
         if len(stack) > 1:
             lines.append(f"   ⏸ 另有 {len(stack) - 1} 帧未完成（可 list_states 查看）")
         return lines
 
     def render_handoff() -> list[str]:
         lines = []
-        # 📝 回来的交接（pop 后注入：刚完成啥）
         comp = top.get("completed_handoff") or {}
         if comp.get("type") or comp.get("doing"):
             lines.append(f"📝 刚完成: [{comp.get('type', '?')}] {comp.get('doing', '')}")
             if comp.get("skipped"):
                 lines.append(f"   （跳过了 {comp['skipped']}）")
-        # ← 本次切换的交接（从哪来/为什么/回去继续）
         handoff = top.get("handoff") or {}
         if handoff.get("from_type") or top.get("why"):
             src = f"[{handoff['from_type']}] {handoff.get('from_doing', '')}".strip()
             parts = [f"← 从{src}来" if src else "← 新状态"]
             if top.get("why"):
                 parts.append(f"原因: {top['why']}")
-            if todo_items := top.get("todo"):
-                parts.append(f"回去继续: {todo_items.strip().replace(chr(10), '; ')}")
+            if todo := top.get("todo"):
+                parts.append(f"回去继续: {todo.strip().replace(chr(10), '; ')}")
             lines.append("   " + " · ".join(parts))
         return lines
 
     def finish(lines: list[str]) -> str:
-        active_frames = [f for f in stack if f.get("status") == "active"]
-        if active_frames:
-            lines.append("\n请继续执行当前任务。完成后调用 pop_state 回到上一层（可指定目标帧），或 close_state 放弃。")
+        lines.append("\n请继续执行当前任务。完成后调用 pop_state 回到上一层（可指定目标帧），或 close_state 放弃。")
         return "\n".join(lines)
 
     full = finish(render_top() + render_handoff())
     if len(full) <= max_chars:
         return full
-    # 超限：砍交接的“原因”细节（保留结构主干）
+    # 超限：砍交接的"原因"细节（保留结构主干）
     compact = finish(render_top() + [l for l in render_handoff() if not l.strip().startswith("原因")])
     if len(compact) <= max_chars:
         return compact
