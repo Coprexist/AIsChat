@@ -145,6 +145,12 @@ class Agent(Base):
     # JSONB 数组，每个元素 {id, type, context_ref, why, doing, todo, plan, journal, created_at, status}
     state_stack = Column(JSONB, default=list)
 
+    # 情感向量化（v0.3.2）：勾选后情感用 Plutchik 8 轴向量（更拟人）；不勾退回文字心情描述
+    emotion_vectorized = Column(Boolean, default=False)
+
+    # AI 调用总次数（v0.3.2）：情感/记忆衰减的时间尺度（分状态帧计数在 state_stack 帧内）
+    llm_call_count = Column(Integer, default=0)
+
     created_at = Column(DateTime, server_default=func.now())
 
 

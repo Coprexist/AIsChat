@@ -621,6 +621,10 @@ async def update_agent_config(
     if "thinking_enabled" in updates and updates["thinking_enabled"] is not None:
         agent.thinking_enabled = updates["thinking_enabled"]
 
+    # emotion_vectorized 向量化情感开关
+    if "emotion_vectorized" in updates:
+        agent.emotion_vectorized = bool(updates["emotion_vectorized"])
+
     # hide_ai_identity 开关
     if "hide_ai_identity" in updates:
         agent.hide_ai_identity = updates["hide_ai_identity"]
@@ -1232,6 +1236,8 @@ def agent_to_dict(agent: Agent) -> dict:
         "user_can_view_logs": agent.user_can_view_logs,
         "is_ai_editable": agent.is_ai_editable,
         "thinking_enabled": agent.thinking_enabled,
+        "emotion_vectorized": agent.emotion_vectorized,
+        "llm_call_count": agent.llm_call_count,
         "config_profile": agent.config_profile or "chat",
         "delay_reply_enabled": agent.delay_reply_enabled,
         "max_tool_rounds": agent.max_tool_rounds,

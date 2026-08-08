@@ -337,6 +337,7 @@ function EditAgentModal({ agent, onClose, onUpdated }: {
   const [chatModel, setChatModel] = useState(agent.chat_model || '')
   const [workModel, setWorkModel] = useState(agent.work_model || '')
   const [thinkingEnabled, setThinkingEnabled] = useState(agent.thinking_enabled)
+  const [emotionVectorized, setEmotionVectorized] = useState(agent.emotion_vectorized || false)
   const [hideAiIdentity, setHideAiIdentity] = useState(agent.hide_ai_identity || false)
   const [delayReplyEnabled, setDelayReplyEnabled] = useState<boolean | null>(agent.delay_reply_enabled ?? null)
   const [configProfile, setConfigProfile] = useState(agent.config_profile || 'chat')
@@ -389,6 +390,7 @@ function EditAgentModal({ agent, onClose, onUpdated }: {
         chat_model: chatModel || null,
         work_model: workModel || null,
         thinking_enabled: thinkingEnabled,
+        emotion_vectorized: emotionVectorized,
         hide_ai_identity: hideIdentity,
         delay_reply_enabled: delayReplyEnabled,
         max_tool_rounds: maxToolRounds,
@@ -603,6 +605,16 @@ function EditAgentModal({ agent, onClose, onUpdated }: {
                 </div>
                 <label className="relative inline-flex items-center cursor-pointer">
                   <Toggle checked={hideAiIdentity} onChange={setHideAiIdentity} />
+                </label>
+              </div>
+              {/* 向量化情感（更拟人） */}
+              <div className="flex items-center justify-between pt-2 border-t border-border mt-2">
+                <div>
+                  <span className="text-xs text-textSecondary">向量化情感（更拟人）</span>
+                  <p className="text-[10px] text-textMuted mt-0.5">情感用 8 轴向量表达（开心/伤心/愤怒/恐惧/厌恶/惊讶/信任/期待），可同时多轴非零；不勾则用文字心情描述</p>
+                </div>
+                <label className="relative inline-flex items-center cursor-pointer">
+                  <Toggle checked={emotionVectorized} onChange={setEmotionVectorized} />
                 </label>
               </div>
               {/* 延迟回复 */}

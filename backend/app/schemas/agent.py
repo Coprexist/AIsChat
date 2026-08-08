@@ -82,6 +82,7 @@ class AgentUpdateConfigRequest(BaseModel):
     work_model: str | None = None
     thinking_enabled: bool | None = None
     hide_ai_identity: bool | None = None
+    emotion_vectorized: bool | None = None
     config_profile: str | None = None
     delay_reply_enabled: bool | None = None
     max_tool_rounds: int | None = Field(default=None, ge=1, le=20, description="工具调用轮次上限")

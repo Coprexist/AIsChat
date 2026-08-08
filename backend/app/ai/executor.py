@@ -595,6 +595,8 @@ async def _tool_call_loop(
                             pool_key_id=current_pool_key_id,
                             provider_supports_thinking=provider_supports_thinking,
                             on_tool_call=_dispatch_one_tool,
+                            agent_id=agent.id,
+                            db=db,
                         )
                         # 更新池 Key ID（可能已切换）
                         pool_key_id = current_pool_key_id

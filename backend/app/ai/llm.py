@@ -104,11 +104,13 @@ async def chat_completion(
     pool_key_id: int | None = None,
     provider_supports_thinking: bool | None = None,
     on_tool_call: callable = None,
+    agent_id: int | None = None,
+    db=None,
 ) -> dict:
     """
     LLM 聊天补全（支持流式/非流式，v0.1.3 拆分）。
 
-    v0.1.3: stream=False 调用非流式实现，stream=True 预留 SSE 接口。
+    agent_id + db：AI 调用计数（情感/记忆衰减的时间尺度，分状态帧计数）。
 
     返回 (非流式):
         {
@@ -137,6 +139,13 @@ async def chat_completion(
             )
         elapsed = _time.monotonic() - t0
         await metrics.record_llm_call(elapsed, success=True)
+        # AI 调用计数（分状态帧）：情感/记忆衰减的时间尺度
+        if agent_id and db is not None:
+            try:
+                from app.services.agent.state_stack_service import bump_frame_call_count
+                await bump_frame_call_count(db, agent_id)
+            except Exception:
+                pass
         return result
     except Exception:
         elapsed = _time.monotonic() - t0
@@ -494,11 +503,24 @@ async def _build_tools_segment(db, agent, is_dm: bool = False) -> str:
         delay_reply_allowed=delay_allowed,
     )
     current_tool_names = {t["function"]["name"] for t in current_tools}
+
+    # 🎭 状态帧工具隔离：栈顶帧指定了 tools/skills 白名单时，再过滤一层
+    from app.services.agent.state_stack_service import get_active_frame_tools
+    frame_tools, frame_skills = await get_active_frame_tools(db, agent.id)
+    frame_note = ""
+    if frame_tools is not None:
+        allowed = set(frame_tools)
+        current_tool_names &= allowed
+        frame_note = f"（当前状态帧限定工具：{', '.join(sorted(allowed))}）"
+    elif frame_skills is not None:
+        current_tool_names &= set(frame_skills)
+        frame_note = f"（当前状态帧限定技能：{', '.join(sorted(frame_skills))}）"
+
     all_segments = ToolRegistry.get_segments()
 
     lines = [
         "## 技能背包 · 当前可用工具",
-        f"你的状态：{agent.state}　可用工具：{len(current_tool_names)} 个",
+        f"你的状态：{agent.state}　可用工具：{len(current_tool_names)} 个{frame_note}",
         "",
     ]
 

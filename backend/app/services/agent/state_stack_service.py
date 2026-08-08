@@ -11,6 +11,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.models.agent import Agent
 from app.utils.pure.state_stack import (
     make_state_frame, format_state_stack_summary, MAX_STACK_DEPTH,
+    decay_emotion, apply_emotion_update,
 )
 
 logger = logging.getLogger(__name__)
@@ -62,11 +63,19 @@ async def push_state(
         logger.info(f"Agent({agent_id}) push 去重: [{frame.get('type')}] {frame.get('context_ref', '')}")
         return stack, f"状态帧 [{frame.get('type')}] 已存在，已合并更新"
 
-    # 原栈顶 active → paused
+    # 原栈顶 active → paused，并作为新帧的“来源状态情感”
+    source_emotion = {}
     if stack and stack[-1].get("status") == "active":
         stack[-1]["status"] = "paused"
+        source_emotion = {
+            "type": stack[-1].get("type"),
+            "emotion": stack[-1].get("emotion") or {},
+            "emotion_text": stack[-1].get("emotion_text") or "",
+        }
 
     frame["status"] = "active"
+    if not frame.get("source_emotion"):
+        frame["source_emotion"] = source_emotion
     stack.append(frame)
 
     await _set_stack(db, agent_id, stack)
@@ -153,6 +162,71 @@ async def get_state_stack_summary(db: AsyncSession, agent_id: int) -> str:
     """获取状态栈摘要文本（注入 prompt 用）。"""
     stack = await _get_stack(db, agent_id)
     return format_state_stack_summary(stack)
+
+
+async def bump_frame_call_count(db: AsyncSession, agent_id: int, calls: int = 1) -> None:
+    """LLM 每次调用后：agent 总计数 +1；栈顶 active 帧 call_count +1 并做情感衰减
+    （mood homeostasis——情感随该状态自己的调用次数回归基线）。"""
+    from sqlalchemy import text as _text
+    # agent 总计数
+    await db.execute(
+        _text("UPDATE agents SET llm_call_count = llm_call_count + :c WHERE id = :aid"),
+        {"c": calls, "aid": agent_id},
+    )
+    # 栈顶帧计数 + 情感衰减
+    stack = await _get_stack(db, agent_id)
+    if stack:
+        top = stack[-1]
+        if top.get("status") == "active":
+            top["call_count"] = int(top.get("call_count") or 0) + calls
+            if top.get("emotion"):
+                top["emotion"] = decay_emotion(top["emotion"], calls)
+            await _set_stack(db, agent_id, stack)
+
+
+async def update_active_emotion(db: AsyncSession, agent_id: int, update) -> dict:
+    """更新栈顶帧情感（情感工具用）：增量（"+0.2"）/ 完整向量 / 概括词。
+    无 active 帧时写 agent 级情感暂存（context_ref="" 的隐式帧不存在则忽略）。"""
+    stack = await _get_stack(db, agent_id)
+    if not stack:
+        return {}
+    top = stack[-1]
+    top["emotion"] = apply_emotion_update(top.get("emotion") or {}, update)
+    top["emotion_text"] = ""  # 向量化后清文字（摘要优先显示向量）
+    await _set_stack(db, agent_id, stack)
+    return top["emotion"]
+
+
+async def set_active_emotion_text(db: AsyncSession, agent_id: int, text: str) -> None:
+    """设置栈顶帧文字心情（未向量化模式）。"""
+    stack = await _get_stack(db, agent_id)
+    if not stack:
+        return
+    stack[-1]["emotion_text"] = text[:100]
+    await _set_stack(db, agent_id, stack)
+
+
+async def get_active_emotion(db: AsyncSession, agent_id: int) -> dict:
+    """读栈顶帧情感（向量 + 文字），供注入/展示。"""
+    stack = await _get_stack(db, agent_id)
+    if not stack:
+        return {}
+    top = stack[-1]
+    return {
+        "emotion": top.get("emotion") or {},
+        "emotion_text": top.get("emotion_text") or "",
+        "source_emotion": top.get("source_emotion") or {},
+        "call_count": top.get("call_count") or 0,
+    }
+
+
+async def get_active_frame_tools(db: AsyncSession, agent_id: int) -> tuple[list[str] | None, list[str] | None]:
+    """读栈顶帧的工具/技能白名单（None = 不隔离，保持全局）。"""
+    stack = await _get_stack(db, agent_id)
+    if not stack:
+        return None, None
+    top = stack[-1]
+    return top.get("tools"), top.get("skills")
 
 
 async def persist_last_task_as_state(
