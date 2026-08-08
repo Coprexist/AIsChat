@@ -130,10 +130,12 @@ async def pop_state(
             f["status"] = "completed"
             await _auto_journal(db, agent_id, "pop", f)  # 归档写 journal
         stack = stack[:idx + 1]
-
-    # 恢复目标帧（或下一层）
-    if stack and stack[-1].get("status") in ("paused", "completed"):
-        stack[-1]["status"] = "active"
+        if stack[-1].get("status") == "paused":
+            stack[-1]["status"] = "active"
+    else:
+        # LIFO：弹栈顶，恢复下一层
+        if stack and stack[-1].get("status") == "paused":
+            stack[-1]["status"] = "active"
 
     # 恢复帧记录“回来的交接”：刚完成啥 + 跳过了哪些层
     if stack:
@@ -158,6 +160,14 @@ async def pop_state(
     return stack, f"已弹出 [{popped.get('type')}]，状态栈已空"
 
 
+async def _pop_and_resume(stack: list[dict], index: int = -1) -> dict:
+    """弹出指定帧（默认栈顶），若新的栈顶是 paused 则恢复为 active。返回被弹的帧。"""
+    frame = stack.pop(index)
+    if stack and stack[-1].get("status") == "paused":
+        stack[-1]["status"] = "active"
+    return frame
+
+
 async def close_state(
     db: AsyncSession, agent_id: int, frame_id: str = "",
 ) -> tuple[list[dict], str]:
@@ -175,16 +185,10 @@ async def close_state(
         idx = next((i for i, f in enumerate(stack) if f.get("id") == frame_id), None)
         if idx is None:
             return stack, f"未找到状态帧 {frame_id}"
-        frame = stack.pop(idx)
-        frame["status"] = "closed"
-        # 如果 pop 掉的是栈顶且下层 paused，恢复它
-        if idx == len(stack) and stack and stack[-1].get("status") == "paused":
-            stack[-1]["status"] = "active"
+        frame = await _pop_and_resume(stack, idx)
     else:
-        frame = stack.pop()
-        frame["status"] = "closed"
-        if stack and stack[-1].get("status") == "paused":
-            stack[-1]["status"] = "active"
+        frame = await _pop_and_resume(stack)
+    frame["status"] = "closed"
 
     await _set_stack(db, agent_id, stack)
     logger.info(f"Agent({agent_id}) close [{frame.get('type')}]({frame.get('id')})")
