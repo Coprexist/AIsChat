@@ -2720,36 +2720,41 @@ async def _migrate_unify_ai_user_id(db):
     v0.2.2: 全局统一——将所有表中的 AI ID 从 agent.id 转为 agent.user_id。
     涉及: messages, group_members, file_metadata（dm_messages 不转换——天然用 user_id）。
     """
-    # 1. messages（安全：有 sender_type='ai' 过滤）
+    # 1. messages（安全：sender_type='ai' 过滤 + NOT EXISTS 防止 user_id 撞 agent.id 漂移）
     await db.execute(text("""
         UPDATE messages SET sender_id = a.user_id
         FROM agents a
         WHERE sender_type = 'ai' AND a.id = messages.sender_id AND messages.sender_id <> a.user_id
+          AND NOT EXISTS (SELECT 1 FROM agents a2 WHERE a2.user_id = messages.sender_id)
     """))
 
-    # 2. group_members（安全：有 member_type='ai' 过滤 + 去重）
+    # 2. group_members（安全：member_type='ai' 过滤 + 去重 + NOT EXISTS 防 user_id 撞 agent.id 漂移）
     await db.execute(text("""
         UPDATE group_members gm SET member_id = a.user_id
         FROM agents a
         WHERE gm.member_type = 'ai' AND a.id = gm.member_id AND gm.member_id <> a.user_id
           AND NOT EXISTS (SELECT 1 FROM group_members gm2 WHERE gm2.group_id=gm.group_id AND gm2.member_type='ai' AND gm2.member_id=a.user_id)
+          AND NOT EXISTS (SELECT 1 FROM agents a2 WHERE a2.user_id = gm.member_id)
     """))
 
-    # 3. file_metadata（安全：有 owner_type='ai' 过滤）
+    # 3. file_metadata（安全：owner_type='ai' 过滤 + NOT EXISTS 防漂移）
     await db.execute(text("""
         UPDATE file_metadata SET owner_id = a.user_id
         FROM agents a
         WHERE owner_type = 'ai' AND a.id = file_metadata.owner_id AND file_metadata.owner_id <> a.user_id
+          AND NOT EXISTS (SELECT 1 FROM agents a2 WHERE a2.user_id = file_metadata.owner_id)
     """))
 
     # 4. dm_messages 修复：sender_id 不属于会话参与者的消息
-    # 策略：sender_id 落在 agent.id 范围的 → 改为 agent.user_id；
-    #        仍然不对的 → 删掉（让对话自然重建）
+    # ⚠️ 必须保护：① human 用户消息（user.id 可能恰好等于某 agent.id，如 user1=涵吾珑 agent.id=1）
+    #             ② 已是某 agent user_id 的消息（否则 user_id 撞 agent.id 每次重启漂移）
     await db.execute(text("""
         UPDATE dm_messages dm SET sender_id = a.user_id
         FROM agents a
-        WHERE a.id = dm.sender_id AND a.user_id IS NOT NULL
+        WHERE a.id = dm.sender_id AND a.user_id IS NOT NULL AND dm.sender_id <> a.user_id
           AND EXISTS (SELECT 1 FROM dm_sessions ds WHERE ds.session_id = dm.session_id AND a.user_id IN (ds.user1_id, ds.user2_id))
+          AND NOT EXISTS (SELECT 1 FROM users u WHERE u.id = dm.sender_id AND u.type = 'human')
+          AND NOT EXISTS (SELECT 1 FROM agents a2 WHERE a2.user_id = dm.sender_id)
     """))
     # 剩下修不好的恢复为 user1（再不行就 user2）
     await db.execute(text("""
