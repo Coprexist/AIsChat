@@ -162,6 +162,18 @@ async def lifespan(app: FastAPI):
     except Exception as e:
         logger.warning(f"🌐 常驻世界恢复异常: {e}")
 
+    # 世界商城 GitHub 自动同步（配置开启时启动拉取一次最新索引）
+    try:
+        from app.services.world.market_github import refresh_from_github, get_market_config
+        async with async_session() as _mdb:
+            _mcfg = await get_market_config(_mdb)
+        if _mcfg.get("auto_sync_enabled") and _mcfg.get("github_repo") and _mcfg.get("github_token"):
+            async with async_session() as _mdb2:
+                r = await refresh_from_github(_mdb2)
+            logger.info(f"🏪 商城 GitHub 启动同步完成: +{r.get('added', 0)} 新增")
+    except Exception as e:
+        logger.warning(f"🏪 商城 GitHub 启动同步失败（不影响启动）: {e}")
+
     # 启动记忆批量写入 worker
     from app.services.memory.memory_buffer import memory_flush_worker
     memory_flush_task = asyncio.create_task(memory_flush_worker())

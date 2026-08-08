@@ -17,6 +17,10 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.database import get_db
 from app.utils.auth import get_current_user
+from app.services.world.market_github import (
+    snapshot_map, load_snapshot, compute_sync_state, sync_item_to_github,
+    refresh_from_github, import_from_github, verify_github_token,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -36,6 +40,7 @@ class PublishRequest(BaseModel):
     title: str = ""
     description: str = ""
     tags: list[str] = []
+    sync_github: bool = False  # 发布后同步到 GitHub（需后台已配置）
 
 
 class UpdateItemRequest(BaseModel):
@@ -49,7 +54,10 @@ class UpdateItemRequest(BaseModel):
 # 工具
 # ═══════════════════════════════════════════════════════════════
 
-def _item_dict(item) -> dict:
+def _item_dict(item, gh_entry: dict | None = None) -> dict:
+    """商品序列化。gh_entry = 快照里同 id 的 GitHub 条目（无则 None）——
+    用于携带云端信息（云端更新时间/下载数）与同步状态。"""
+    gh = gh_entry or {}
     return {
         "id": item.id,
         "kind": item.kind,
@@ -59,9 +67,15 @@ def _item_dict(item) -> dict:
         "author_id": item.author_id,
         "author_name": item.author_name,
         "source_world_id": item.source_world_id,
+        "source": getattr(item, "source", "local") or "local",
+        "github_path": getattr(item, "github_path", None),
         "package_size": item.package_size,
-        "downloads": item.downloads,
-        "created_at": item.created_at.isoformat() if item.created_at else None,
+        "downloads": item.downloads,                    # 本地下载数（本实例导入次数）
+        "github_downloads": gh.get("downloads"),       # 云端下载数（同步时快照）
+        "updated_at": item.updated_at.isoformat() if item.updated_at else None,
+        "github_updated_at": gh.get("updated_at"),     # 云端更新时间（对比用）
+        "sync_state": compute_sync_state(item, gh),     # unsynced / synced / stale
+        "slug": gh.get("slug"),
     }
 
 
@@ -100,6 +114,16 @@ async def publish_item(
     (MARKET_DIR / fname).write_bytes(data)
 
     title = (req.title or world.name).strip()[:100]
+    # 本地查重：同名且在架商品 → 拒绝（保证作者命名在 GitHub 上唯一）
+    dup = (await db.execute(
+        select(WorldMarketItem).where(
+            WorldMarketItem.kind == "world", WorldMarketItem.status == "on",
+            WorldMarketItem.title == title,
+        )
+    )).scalar_one_or_none()
+    if dup:
+        raise HTTPException(status_code=409, detail=f"同名世界「{title}」已在商城中（商品 #{dup.id}）")
+
     item = WorldMarketItem(
         kind="world",
         title=title,
@@ -115,6 +139,14 @@ async def publish_item(
     await db.commit()
     await db.refresh(item)
     logger.info(f"🏪 世界 #{world.id}「{title}」发布到商城（item {item.id}，{len(data)}B）")
+    # 发布后同步 GitHub（可选；失败不影响站内发布）
+    if req.sync_github:
+        try:
+            from app.services.world.market_github import sync_item_to_github
+            await sync_item_to_github(db, item)
+            await db.refresh(item)
+        except Exception as e:
+            logger.warning(f"🏪 商品 #{item.id} 同步 GitHub 失败（站内发布成功）: {e}")
     return _item_dict(item)
 
 
@@ -128,20 +160,21 @@ async def list_items(
     current_user: dict = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
-    """商城列表（在架商品；q 模糊搜索，tag 精确匹配）"""
+    """本地板块列表（在架商品；q 模糊搜索，tag 精确匹配）。
+    附带快照信息：同步状态、云端更新时间/下载数。"""
     from app.models.world import WorldMarketItem
     stmt = select(WorldMarketItem).where(WorldMarketItem.status == "on", WorldMarketItem.kind == kind)
     if q.strip():
         like = f"%{q.strip()}%"
         stmt = stmt.where(or_(WorldMarketItem.title.ilike(like), WorldMarketItem.description.ilike(like)))
     if tag.strip():
-        from sqlalchemy.dialects.postgresql import JSONB
         stmt = stmt.where(WorldMarketItem.tags.contains([tag.strip()]))
     total = (await db.execute(select(func.count()).select_from(stmt.subquery()))).scalar() or 0
     rows = (await db.execute(
         stmt.order_by(WorldMarketItem.created_at.desc()).offset(offset).limit(limit)
     )).scalars().all()
-    return {"total": total, "items": [_item_dict(r) for r in rows]}
+    gh_map = snapshot_map()
+    return {"total": total, "items": [_item_dict(r, gh_map.get(r.id)) for r in rows]}
 
 
 @router.get("/items/{item_id}")
@@ -230,6 +263,200 @@ async def import_item(
     await db.commit()
     logger.info(f"🏪 用户 {current_user['user_id']} 导入商城商品 {item_id} → 新世界 #{world_id}（{result.get('imported')} 文件）")
     return {"world_id": world_id, "name": created.get("name") or item.title, "imported": result.get("imported", 0)}
+
+
+@router.post("/items/{item_id}/sync-github")
+async def sync_item_github(
+    item_id: int,
+    current_user: dict = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """把商品同步到 GitHub 仓库（发布者或管理员）"""
+    from app.models.world import WorldMarketItem
+    item = (await db.execute(select(WorldMarketItem).where(WorldMarketItem.id == item_id))).scalar_one_or_none()
+    if item is None or item.status != "on":
+        raise HTTPException(status_code=404, detail="商品不存在")
+    if item.author_id != current_user["user_id"] and current_user.get("role") != "admin":
+        raise HTTPException(status_code=403, detail="只有发布者或管理员可以同步")
+    if item.source == "github":
+        raise HTTPException(status_code=400, detail="GitHub 缓存商品不能同步（它已在仓库中）")
+    try:
+        from app.services.world.market_github import sync_item_to_github
+        # 优先以用户自己的 GitHub 身份推送；未绑定则回退管理员 token
+        user_token = await _user_github_token(db, current_user["user_id"])
+        r = await sync_item_to_github(db, item, token_override=user_token)
+        return r
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    except Exception as e:
+        logger.warning(f"🏪 同步 GitHub 失败 item {item_id}: {e}")
+        raise HTTPException(status_code=502, detail=f"同步失败: {str(e)[:200]}")
+
+
+async def _user_github_token(db: AsyncSession, user_id: int) -> str | None:
+    """取用户绑定的 GitHub token（解密）；未绑定返回 None（回退管理员 token）"""
+    from app.models.user import User
+    from app.utils.crypto import decrypt_api_key
+    user = (await db.execute(select(User).where(User.id == user_id))).scalar_one_or_none()
+    if user and user.github_token_encrypted:
+        try:
+            return decrypt_api_key(user.github_token_encrypted)
+        except Exception:
+            logger.warning(f"👤 用户 {user_id} 的 GitHub token 解密失败，回退管理员 token")
+    return None
+
+
+@router.post("/github/bind")
+async def bind_github(
+    req: dict,
+    current_user: dict = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """绑定当前用户的 GitHub 账户：验证 token → 存用户名 + 加密存储 token。
+    同步到 GitHub 时优先以用户身份推送（回退管理员 token）。"""
+    token = str(req.get("token") or "").strip()
+    if not token:
+        raise HTTPException(status_code=400, detail="缺少 GitHub token")
+    try:
+        username = await verify_github_token(token)
+    except RuntimeError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+    from app.models.user import User
+    from app.utils.crypto import encrypt_api_key
+    user = (await db.execute(select(User).where(User.id == current_user["user_id"]))).scalar_one()
+    user.github_token_encrypted = encrypt_api_key(token)
+    user.github_username = username
+    await db.commit()
+    logger.info(f"👤 用户 {current_user['user_id']} 绑定 GitHub 账户 @{username}")
+    return {"bound": True, "username": username}
+
+
+@router.get("/github/bind")
+async def github_bind_status(
+    current_user: dict = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """当前用户的 GitHub 绑定状态（不回显 token）"""
+    from app.models.user import User
+    user = (await db.execute(select(User).where(User.id == current_user["user_id"]))).scalar_one()
+    return {"bound": bool(user.github_token_encrypted), "username": user.github_username}
+
+
+@router.delete("/github/bind")
+async def unbind_github(
+    current_user: dict = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """解绑当前用户的 GitHub 账户"""
+    from app.models.user import User
+    user = (await db.execute(select(User).where(User.id == current_user["user_id"]))).scalar_one()
+    user.github_token_encrypted = None
+    user.github_username = None
+    await db.commit()
+    logger.info(f"👤 用户 {current_user['user_id']} 解绑 GitHub 账户")
+    return {"bound": False}
+
+
+@router.get("/github/items")
+async def list_github_items(
+    current_user: dict = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """GitHub 板块列表：读索引快照（不实时请求远端），
+    标注 is_local——本地是否有同 id 的在架商品（即本地上传的）。"""
+    from app.models.world import WorldMarketItem
+    local_ids = set((await db.execute(
+        select(WorldMarketItem.id).where(
+            WorldMarketItem.status == "on", WorldMarketItem.source == "local")
+    )).scalars().all())
+    snap = load_snapshot()
+    items = []
+    for w in snap.get("worlds", []):
+        items.append({
+            "id": w.get("id"),
+            "slug": w.get("slug"),
+            "kind": w.get("kind") or "world",
+            "title": w.get("title"),
+            "description": w.get("description"),
+            "tags": w.get("tags") or [],
+            "author_name": w.get("author_name"),
+            "downloads": w.get("downloads"),          # 云端下载数
+            "updated_at": w.get("updated_at"),        # 云端更新时间
+            "is_local": int(w.get("id") or 0) in local_ids,
+        })
+    return {"synced_at": snap.get("synced_at"), "items": items, "total": len(items)}
+
+
+@router.post("/github/import")
+async def import_github_item(
+    req: dict,
+    current_user: dict = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """从 GitHub 导入资源（快照条目 → 下载 zip → 创建新世界）"""
+    item_id = int(req.get("id") or 0)
+    if not item_id:
+        raise HTTPException(status_code=400, detail="缺少资源 id")
+    try:
+        return await import_from_github(db, current_user["user_id"], item_id)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    except Exception as e:
+        logger.warning(f"🏪 GitHub 导入失败 item {item_id}: {e}")
+        raise HTTPException(status_code=502, detail=f"导入失败: {str(e)[:200]}")
+
+
+@router.post("/github/refresh")
+async def refresh_github(
+    current_user: dict = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """管理员手动刷新：拉取 GitHub 仓库最新索引，更新缓存商品"""
+    if current_user.get("role") != "admin":
+        raise HTTPException(status_code=403, detail="仅管理员可刷新 GitHub 商城")
+    try:
+        from app.services.world.market_github import refresh_from_github
+        r = await refresh_from_github(db)
+        return r
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    except Exception as e:
+        logger.warning(f"🏪 GitHub 刷新失败: {e}")
+        raise HTTPException(status_code=502, detail=f"刷新失败: {str(e)[:200]}")
+
+
+@router.get("/settings")
+async def get_market_settings(
+    current_user: dict = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """商城配置（管理员可见 token 状态；普通用户只见开关）"""
+    from app.services.world.market_github import get_market_config
+    cfg = await get_market_config(db)
+    if current_user.get("role") != "admin":
+        cfg["github_token"] = "***" if cfg["github_token"] else ""
+    return cfg
+
+
+@router.put("/settings")
+async def update_market_settings(
+    req: dict,
+    current_user: dict = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """更新商城配置（仅管理员）：github_repo / github_token / auto_sync_enabled"""
+    if current_user.get("role") != "admin":
+        raise HTTPException(status_code=403, detail="仅管理员可修改商城配置")
+    from app.services.world.market_github import save_market_config
+    cfg = await save_market_config(
+        db,
+        github_repo=req.get("github_repo"),
+        github_token=req.get("github_token"),
+        auto_sync_enabled=req.get("auto_sync_enabled"),
+    )
+    cfg["github_token"] = "***" if cfg.get("github_token") else ""
+    return cfg
 
 
 @router.get("/items/{item_id}/download")

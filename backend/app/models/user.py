@@ -24,6 +24,10 @@ class User(Base):
     api_base_url = Column(Text)
     api_key_encrypted = Column(Text)
 
+    # GitHub 账户绑定（加密存储；用于商城同步时以用户身份推送）
+    github_token_encrypted = Column(Text, comment="用户 GitHub token（加密）")
+    github_username = Column(String(100), comment="绑定时的 GitHub 用户名")
+
     # 时区（IANA 格式，如 Asia/Shanghai）
     timezone = Column(String(50), default="Asia/Shanghai")
 
