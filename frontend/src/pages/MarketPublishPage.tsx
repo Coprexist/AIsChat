@@ -14,8 +14,10 @@ interface WorldBrief { id: number; name: string; description: string }
 
 export default function MarketPublishPage() {
   const navigate = useNavigate()
+  // 支持 URL 预选世界：/market/publish?world_id=8（设计页发布入口跳转带参）
+  const preselectId = new URLSearchParams(window.location.search).get('world_id')
   const [myWorlds, setMyWorlds] = useState<WorldBrief[]>([])
-  const [worldId, setWorldId] = useState<number | null>(null)
+  const [worldId, setWorldId] = useState<number | null>(preselectId ? Number(preselectId) : null)
   const [title, setTitle] = useState('')
   const [description, setDescription] = useState('')
   const [tags, setTags] = useState('')
@@ -29,7 +31,10 @@ export default function MarketPublishPage() {
     api.get<WorldBrief[]>('/worlds').then((ws) => {
       const list = Array.isArray(ws) ? ws : []
       setMyWorlds(list)
-      if (list.length > 0) setWorldId(list[0].id)
+      if (list.length > 0) {
+        // URL 指定且存在 → 预选；否则默认第一个
+        setWorldId((cur) => (cur && list.some((w) => w.id === cur)) ? cur : list[0].id)
+      }
     }).catch(() => setMyWorlds([]))
     // GitHub 是否已配置（普通用户拿不到 token 详情，只关心是否配置）
     api.get<{ github_repo: string; github_token: string }>('/market/settings')

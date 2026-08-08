@@ -43,12 +43,13 @@ interface GithubItem {
   description: string
   tags: string[]
   author_name: string
+  author_github?: string | null
   downloads: number | null
   updated_at: string | null
   is_local: boolean
+  is_mine?: boolean
+  signature_valid?: boolean | null
 }
-
-interface WorldBrief { id: number; name: string }
 
 type Tab = 'local' | 'github'
 
@@ -76,17 +77,8 @@ export default function MarketPage() {
 
   // ── GitHub 绑定 ──
   const [bindState, setBindState] = useState<{ bound: boolean; username: string | null } | null>(null)
-  const [bindToken, setBindToken] = useState('')
-  const [binding, setBinding] = useState(false)
 
   // ── 发布/编辑/导入 ──
-  const [showPublish, setShowPublish] = useState(false)
-  const [myWorlds, setMyWorlds] = useState<WorldBrief[]>([])
-  const [pubWorld, setPubWorld] = useState<number | null>(null)
-  const [pubTitle, setPubTitle] = useState('')
-  const [pubDesc, setPubDesc] = useState('')
-  const [pubTags, setPubTags] = useState('')
-  const [publishing, setPublishing] = useState(false)
   const [importingId, setImportingId] = useState<number | null>(null)
   const [syncingId, setSyncingId] = useState<number | null>(null)
   const [editItem, setEditItem] = useState<MarketItem | null>(null)
@@ -96,6 +88,9 @@ export default function MarketPage() {
   const [editing, setEditing] = useState(false)
   const [toast, setToast] = useState<string | null>(null)
   const [myId, setMyId] = useState<number | null>(null)
+
+  // ── 卡片详情（桌面弹窗 / 手机全屏）──
+  const [detail, setDetail] = useState<{ kind: 'local' | 'github'; item: MarketItem | GithubItem } | null>(null)
 
   // ── 数据加载 ──
   const loadLocal = useCallback(async () => {
@@ -135,6 +130,13 @@ export default function MarketPage() {
     } catch { /* 非致命 */ }
   }, [])
 
+  // 绑定状态同步：监听其他页面（如“我的”页）的绑定变化
+  useEffect(() => {
+    const sync = () => loadBind()
+    window.addEventListener('gh-bind-changed', sync)
+    return () => window.removeEventListener('gh-bind-changed', sync)
+  }, [loadBind])
+
   useEffect(() => { loadLocal() }, [loadLocal])
   useEffect(() => { loadBind() }, [loadBind])
   useEffect(() => { if (tab === 'github') loadGithub() }, [tab, loadGithub])
@@ -147,28 +149,13 @@ export default function MarketPage() {
     } catch { /* ignore */ }
   }, [])
 
-  // ── GitHub 绑定 ──
-  const doBind = async () => {
-    if (!bindToken.trim()) { setMsg('请输入 GitHub token'); return }
-    setBinding(true)
-    try {
-      const r = await api.post<{ bound: boolean; username: string }>('/market/github/bind', { token: bindToken.trim() })
-      setBindState(r)
-      setBindToken('')
-      setToast(`✅ 已绑定 GitHub 账户 @${r.username}`)
-      setTimeout(() => setToast(null), 2500)
-    } catch (e: any) {
-      setMsg(`绑定失败: ${e?.message || e}`)
-    } finally {
-      setBinding(false)
-    }
-  }
-
+  // ── GitHub 绑定：统一到「我的」页绑定；状态跨页同步 ──
   const doUnbind = async () => {
     if (!confirm('解绑 GitHub 账户？（同步将回退为管理员 token）')) return
     try {
       await api.delete('/market/github/bind')
       setBindState({ bound: false, username: null })
+      window.dispatchEvent(new Event('gh-bind-changed'))
       setToast('已解绑 GitHub 账户')
       setTimeout(() => setToast(null), 2500)
     } catch (e: any) {
@@ -193,52 +180,35 @@ export default function MarketPage() {
     }
   }
 
-  // ── 发布 ──
-  const openPublish = async () => {
-    setShowPublish(true)
-    setMsg('')
-    try {
-      const ws = await api.get<WorldBrief[]>(`/worlds`)
-      setMyWorlds(Array.isArray(ws) ? ws : [])
-      if (ws.length > 0) setPubWorld(ws[0].id)
-    } catch { setMyWorlds([]) }
-  }
-
-  const doPublish = async () => {
-    if (!pubWorld) { setMsg('请选择要发布的世界'); return }
-    setPublishing(true)
-    try {
-      await api.post('/market/items', {
-        world_id: pubWorld,
-        title: pubTitle.trim(),
-        description: pubDesc.trim(),
-        tags: pubTags.split(/[,，]/).map(s => s.trim()).filter(Boolean),
-      })
-      setShowPublish(false)
-      setPubTitle(''); setPubDesc(''); setPubTags('')
-      setToast('✅ 发布成功')
-      setTimeout(() => setToast(null), 2500)
-      loadLocal()
-    } catch (e: any) {
-      setMsg(`发布失败: ${e?.message || e}`)
-    } finally {
-      setPublishing(false)
-    }
-  }
+  // ── 发布：统一跳转独立发布页 /market/publish ──
+  const openPublish = () => navigate('/market/publish')
 
   // ── 同步到 GitHub ──
   const doSync = async (item: MarketItem) => {
+    // 未绑定 GitHub → 拦截并引导去绑定
+    if (!bindState?.bound) {
+      if (confirm('同步到 GitHub 需要先绑定你自己的 GitHub 账户。现在去绑定？')) {
+        navigate('/me?bind=github')
+      }
+      return
+    }
     setSyncingId(item.id)
     setMsg('')
     try {
       const r = await api.post<{ success: boolean; path: string }>(`/market/items/${item.id}/sync-github`)
       setToast(`✅ 已同步到 GitHub: ${r.path}`)
       setTimeout(() => setToast(null), 3000)
+      setSyncingId(null)
       loadLocal()
       loadGithub()
     } catch (e: any) {
-      setMsg(`同步失败: ${e?.message || e}`)
-    } finally {
+      const m = e?.message || String(e)
+      // token 无效/过期 → 明确提示重新绑定
+      if (/token|401|无效|过期/i.test(m)) {
+        setMsg(`⚠️ ${m} —— 请到「我的」页重新绑定 GitHub`)
+      } else {
+        setMsg(`同步失败: ${m}`)
+      }
       setSyncingId(null)
     }
   }
@@ -310,6 +280,129 @@ export default function MarketPage() {
     return null
   }
 
+  // ── 详情弹窗：桌面居中卡片，手机全屏 ──
+  const DetailModal = () => {
+    if (!detail) return null
+    const isLocal = detail.kind === 'local'
+    const it = detail.item as any
+    const isMine = isLocal && myId !== null && it.author_id === myId
+    return (
+      <div className="fixed inset-0 z-50 bg-black/60 flex items-end md:items-center justify-center" onClick={() => setDetail(null)}>
+        <div
+          className="w-full md:max-w-lg bg-surface border-t md:border border-border md:rounded-2xl rounded-t-2xl max-h-[85vh] flex flex-col"
+          onClick={(e) => e.stopPropagation()}
+        >
+          {/* 头部 */}
+          <div className="flex items-center gap-3 p-4 pb-2 shrink-0">
+            <div className={`w-10 h-10 rounded-xl flex items-center justify-center shrink-0 ${isLocal ? 'bg-primary-500/15 text-primary-400' : 'bg-[#24292F]/10 dark:bg-white/10 text-[#24292F] dark:text-white'}`}>
+              {isLocal ? <Globe size={18} /> : <Github size={18} />}
+            </div>
+            <div className="min-w-0 flex-1">
+              <div className="flex items-center gap-2">
+                <span className="text-base font-semibold text-textPrimary truncate">{it.title}</span>
+                {isLocal ? <SyncBadge item={it} /> : it.is_local
+                  ? <span className="inline-flex items-center gap-1 text-[10px] px-1.5 py-0.5 rounded bg-primary-500/15 text-primary-400 shrink-0"><Store size={9} /> 本地</span>
+                  : <span className="inline-flex items-center gap-1 text-[10px] px-1.5 py-0.5 rounded bg-elevated text-textMuted shrink-0"><Github size={9} /> 远程</span>}
+              </div>
+              <div className="text-[10px] text-textMuted mt-0.5">
+                <span className="inline-flex items-center gap-1"><User size={10} /> {it.author_name || (isLocal ? `#${it.author_id}` : 'GitHub')}</span>
+                {isLocal && it.github_path && <span className="ml-2">📦 {it.github_path}</span>}
+                {!isLocal && it.slug && <span className="ml-2">📦 worlds/{it.slug}</span>}
+              </div>
+            </div>
+            <button onClick={() => setDetail(null)} className="p-1.5 text-textMuted hover:text-textPrimary transition-colors shrink-0"><X size={16} /></button>
+          </div>
+
+          {/* 正文 */}
+          <div className="flex-1 overflow-y-auto px-4 pb-2 space-y-3">
+            <p className="text-sm text-textSecondary leading-relaxed whitespace-pre-wrap">{it.description || '（无介绍）'}</p>
+            {it.tags?.length > 0 && (
+              <div className="flex flex-wrap gap-1.5">
+                {it.tags.map((tg: string) => (
+                  <span key={tg} className="inline-flex items-center gap-0.5 text-[10px] px-1.5 py-0.5 rounded bg-elevated text-textMuted"><Tag size={9} /> {tg}</span>
+                ))}
+              </div>
+            )}
+            {/* 信息网格 */}
+            <div className="grid grid-cols-2 gap-2 text-[11px]">
+              <div className="rounded-lg bg-elevated px-3 py-2">
+                <div className="text-textMuted">更新时间</div>
+                <div className="text-textPrimary mt-0.5">{isLocal ? fmtDate(it.updated_at) : fmtDate(it.updated_at)}</div>
+              </div>
+              {isLocal && (
+                <div className="rounded-lg bg-elevated px-3 py-2">
+                  <div className="text-textMuted">云端更新</div>
+                  <div className="text-textPrimary mt-0.5">{it.github_updated_at ? fmtDate(it.github_updated_at) : '—'}</div>
+                </div>
+              )}
+              <div className="rounded-lg bg-elevated px-3 py-2">
+                <div className="text-textMuted">{isLocal ? '本地下载' : '云端下载'}</div>
+                <div className="text-textPrimary mt-0.5">{isLocal ? `${it.downloads} 次导入` : `${it.downloads ?? 0} 次`}</div>
+              </div>
+              {isLocal && (
+                <div className="rounded-lg bg-elevated px-3 py-2">
+                  <div className="text-textMuted">云端下载</div>
+                  <div className="text-textPrimary mt-0.5">{it.github_downloads != null ? `${it.github_downloads} 次` : '—'}</div>
+                </div>
+              )}
+              <div className="rounded-lg bg-elevated px-3 py-2">
+                <div className="text-textMuted">包大小</div>
+                <div className="text-textPrimary mt-0.5">{fmtSize(it.package_size)}</div>
+              </div>
+              <div className="rounded-lg bg-elevated px-3 py-2">
+                <div className="text-textMuted">来源</div>
+                <div className="text-textPrimary mt-0.5">{isLocal ? '本地发布' : 'GitHub 仓库'}</div>
+              </div>
+            </div>
+          </div>
+
+          {/* 操作 */}
+          <div className="p-4 pt-2 shrink-0 flex items-center gap-2">
+            {isLocal && isMine && (
+              <button
+                onClick={() => { doSync(it); setDetail(null) }}
+                disabled={syncingId === it.id || it.sync_state === 'synced'}
+                className="flex-1 inline-flex items-center justify-center gap-1 text-xs px-3 py-2 rounded-lg bg-primary-500/15 text-primary-400 hover:bg-primary-500/25 transition-colors disabled:opacity-40"
+              >
+                <ArrowUpCircle size={12} /> {it.sync_state === 'synced' ? '已同步' : '同步到 GitHub'}
+              </button>
+            )}
+            {isLocal && isMine && (
+              <button
+                onClick={() => { setEditItem(it); setDetail(null) }}
+                className="flex-1 inline-flex items-center justify-center gap-1 text-xs px-3 py-2 rounded-lg bg-elevated text-textSecondary hover:text-primary-400 transition-colors"
+              ><Edit3 size={12} /> 编辑介绍</button>
+            )}
+            {isLocal && isMine && (
+              <button
+                onClick={() => { doUnpublish(it); setDetail(null) }}
+                className="inline-flex items-center gap-1 text-xs px-3 py-2 rounded-lg bg-elevated text-textMuted hover:text-rose-400 transition-colors"
+              ><Trash2 size={12} /> 下架</button>
+            )}
+            {(!isLocal && !it.is_local) && (
+              <button
+                onClick={() => { doImport(it); setDetail(null) }}
+                disabled={importingId === it.id}
+                className="flex-1 inline-flex items-center justify-center gap-1 text-xs px-3 py-2 rounded-lg bg-primary-500 text-white hover:bg-primary-400 transition-colors disabled:opacity-40"
+              >
+                <Download size={12} /> {importingId === it.id ? '导入中…' : '导入到我的世界'}
+              </button>
+            )}
+            {isLocal && !isMine && (
+              <button
+                onClick={() => { doImport(it); setDetail(null) }}
+                disabled={importingId === it.id}
+                className="flex-1 inline-flex items-center justify-center gap-1 text-xs px-3 py-2 rounded-lg bg-primary-500 text-white hover:bg-primary-400 transition-colors disabled:opacity-40"
+              >
+                <Download size={12} /> {importingId === it.id ? '导入中…' : '一键导入'}
+              </button>
+            )}
+          </div>
+        </div>
+      </div>
+    )
+  }
+
   return (
     <div className="h-full flex flex-col bg-canvas">
       {/* 标题栏（统一底座） */}
@@ -340,34 +433,26 @@ export default function MarketPage() {
         </div>
       </div>
 
-      {/* GitHub 绑定条 */}
+      {/* GitHub 绑定条（统一到「我的」页绑定，状态跨页同步） */}
       <div className="px-4 pt-2 shrink-0">
         <div className="flex items-center gap-2 text-xs rounded-lg bg-surface border border-border px-3 py-2">
           <Link2 size={12} className="text-textMuted shrink-0" />
           {bindState?.bound ? (
             <>
-              <span className="text-textSecondary">已绑定 GitHub：<span className="text-primary-400 font-semibold">@{bindState.username}</span>（同步以你的身份推送）</span>
-              <button onClick={doUnbind} className="ml-auto inline-flex items-center gap-1 text-[10px] px-2 py-1 rounded bg-elevated text-textMuted hover:text-rose-400 transition-colors shrink-0">
+              <span className="text-textSecondary">GitHub：<span className="text-primary-400 font-semibold">@{bindState.username}</span>（同步以你的身份推送）</span>
+              <button onClick={() => navigate('/me?bind=github')} className="ml-auto text-[10px] text-primary-400 hover:text-primary-300 transition-colors shrink-0">更换</button>
+              <button onClick={doUnbind} className="inline-flex items-center gap-1 text-[10px] px-2 py-1 rounded bg-elevated text-textMuted hover:text-rose-400 transition-colors shrink-0">
                 <Unlink size={10} /> 解绑
               </button>
             </>
           ) : (
             <>
-              <span className="text-textMuted shrink-0">绑定 GitHub 后同步用你的身份</span>
-              <input
-                value={bindToken}
-                onChange={(e) => setBindToken(e.target.value)}
-                onKeyDown={(e) => { if (e.key === 'Enter') doBind() }}
-                placeholder="github_pat_… / ghp_…"
-                type="password"
-                className="flex-1 min-w-0 bg-elevated text-xs px-2 py-1 rounded border border-border outline-none focus:border-primary-500/50 text-textPrimary"
-              />
+              <span className="text-textMuted">未绑定 GitHub（同步时用你的身份推送）</span>
               <button
-                onClick={doBind}
-                disabled={binding}
-                className="inline-flex items-center gap-1 text-[10px] px-2 py-1 rounded bg-primary-500/15 text-primary-400 hover:bg-primary-500/25 transition-colors shrink-0 disabled:opacity-40"
+                onClick={() => navigate('/me?bind=github')}
+                className="ml-auto inline-flex items-center gap-1 text-[10px] px-2 py-1 rounded bg-primary-500/15 text-primary-400 hover:bg-primary-500/25 transition-colors shrink-0"
               >
-                <Link2 size={10} /> {binding ? '绑定中…' : '绑定'}
+                <Link2 size={10} /> 去绑定 GitHub →
               </button>
             </>
           )}
@@ -434,7 +519,7 @@ export default function MarketPage() {
           ) : (
             <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-3">
               {items.map((item) => (
-                <div key={item.id} className="rounded-xl bg-surface border border-border p-3 flex flex-col gap-2 hover:border-primary-500/40 transition-colors">
+                <div key={item.id} className="rounded-xl bg-surface border border-border p-3 flex flex-col gap-2 hover:border-primary-500/40 transition-colors cursor-pointer" onClick={() => setDetail({ kind: 'local', item })}>
                   <div className="flex items-start gap-2">
                     <div className="w-9 h-9 rounded-lg bg-primary-500/15 text-primary-400 flex items-center justify-center shrink-0">
                       <Globe size={16} />
@@ -453,12 +538,12 @@ export default function MarketPage() {
                     {myId !== null && item.author_id === myId && (
                       <div className="flex items-center shrink-0">
                         <button
-                          onClick={() => openEdit(item)}
+                          onClick={(e) => { e.stopPropagation(); openEdit(item) }}
                           className="p-1 text-textMuted hover:text-primary-400 transition-colors"
                           title="编辑介绍"
                         ><Edit3 size={13} /></button>
                         <button
-                          onClick={() => doUnpublish(item)}
+                          onClick={(e) => { e.stopPropagation(); doUnpublish(item) }}
                           className="p-1 text-textMuted hover:text-rose-400 transition-colors"
                           title="下架"
                         ><Trash2 size={13} /></button>
@@ -473,7 +558,7 @@ export default function MarketPage() {
                       {item.tags.map((tg) => (
                         <button
                           key={tg}
-                          onClick={() => { setTag(tg); loadLocal() }}
+                          onClick={(e) => { e.stopPropagation(); setTag(tg); loadLocal() }}
                           className="inline-flex items-center gap-0.5 text-[10px] px-1.5 py-0.5 rounded bg-elevated text-textMuted hover:text-primary-400 transition-colors"
                         ><Tag size={9} /> {tg}</button>
                       ))}
@@ -487,7 +572,7 @@ export default function MarketPage() {
                     </span>
                     {myId !== null && item.author_id === myId && (
                       <button
-                        onClick={() => doSync(item)}
+                        onClick={(e) => { e.stopPropagation(); doSync(item) }}
                         disabled={syncingId === item.id || item.sync_state === 'synced'}
                         title={item.sync_state === 'synced' ? '已是最新' : '同步到 GitHub'}
                         className="inline-flex items-center gap-1 text-[10px] px-2 py-1 rounded bg-elevated text-textMuted hover:text-primary-400 transition-colors disabled:opacity-40 shrink-0"
@@ -498,7 +583,7 @@ export default function MarketPage() {
                     )}
                     {!(myId !== null && item.author_id === myId) && (
                       <button
-                        onClick={() => doImport(item)}
+                        onClick={(e) => { e.stopPropagation(); doImport(item) }}
                         disabled={importingId === item.id}
                         className="inline-flex items-center gap-1 text-xs px-2.5 py-1 rounded-lg bg-primary-500/15 text-primary-400 hover:bg-primary-500/25 transition-colors disabled:opacity-40"
                       >
@@ -523,7 +608,7 @@ export default function MarketPage() {
           ) : (
             <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-3">
               {ghItems.map((item) => (
-                <div key={item.id} className="rounded-xl bg-surface border border-border p-3 flex flex-col gap-2 hover:border-primary-500/40 transition-colors">
+                <div key={item.id} className="rounded-xl bg-surface border border-border p-3 flex flex-col gap-2 hover:border-primary-500/40 transition-colors cursor-pointer" onClick={() => setDetail({ kind: 'github', item })}>
                   <div className="flex items-start gap-2">
                     <div className="w-9 h-9 rounded-lg bg-[#24292F]/10 dark:bg-white/10 text-[#24292F] dark:text-white flex items-center justify-center shrink-0">
                       <Github size={16} />
@@ -531,14 +616,18 @@ export default function MarketPage() {
                     <div className="min-w-0 flex-1">
                       <div className="flex items-center gap-1.5">
                         <span className="text-sm font-semibold text-textPrimary truncate">{item.title}</span>
-                        {item.is_local ? (
+                        {item.is_mine ? (
+                          <span className="inline-flex items-center gap-1 text-[10px] px-1.5 py-0.5 rounded bg-mint-500/15 text-mint-400 shrink-0" title="GitHub 数字 id 与你绑定的账户一致">👑 我的</span>
+                        ) : item.is_local ? (
                           <span className="inline-flex items-center gap-1 text-[10px] px-1.5 py-0.5 rounded bg-primary-500/15 text-primary-400 shrink-0"><Store size={9} /> 本地</span>
                         ) : (
                           <span className="inline-flex items-center gap-1 text-[10px] px-1.5 py-0.5 rounded bg-elevated text-textMuted shrink-0"><Github size={9} /> 远程</span>
                         )}
                       </div>
                       <div className="text-[10px] text-textMuted flex items-center gap-1 mt-0.5">
-                        <User size={10} /> {item.author_name || 'GitHub'}
+                        <User size={10} /> {item.author_github ? `@${item.author_github}` : (item.author_name || 'GitHub')}
+                        {item.signature_valid === true && <span className="text-mint-400/80">· ✅ 机器人已验证</span>}
+                        {item.signature_valid === false && <span className="text-rose-400/80">· ⚠️ 签名无效</span>}
                         <span className="mx-0.5">·</span>
                         <Clock size={10} /> 更新 {fmtDate(item.updated_at)}
                       </div>
@@ -561,7 +650,7 @@ export default function MarketPage() {
                     </span>
                     {!item.is_local && (
                       <button
-                        onClick={() => doImport(item)}
+                        onClick={(e) => { e.stopPropagation(); doImport(item) }}
                         disabled={importingId === item.id}
                         className="inline-flex items-center gap-1 text-xs px-2.5 py-1 rounded-lg bg-primary-500/15 text-primary-400 hover:bg-primary-500/25 transition-colors disabled:opacity-40"
                       >
@@ -587,6 +676,9 @@ export default function MarketPage() {
           <span className="whitespace-nowrap">{toast}</span>
         </div>
       )}
+
+      {/* 卡片详情（桌面弹窗 / 手机全屏） */}
+      <DetailModal />
 
       {/* 编辑弹窗 */}
       {editItem && (
@@ -632,60 +724,6 @@ export default function MarketPage() {
         </div>
       )}
 
-      {/* 发布弹窗 */}
-      {showPublish && (
-        <div className="fixed inset-0 z-50 bg-black/50 flex items-center justify-center p-4" onClick={() => setShowPublish(false)}>
-          <div className="w-full max-w-md rounded-2xl bg-surface border border-border p-4 space-y-3" onClick={(e) => e.stopPropagation()}>
-            <div className="flex items-center justify-between">
-              <span className="text-sm font-semibold text-textPrimary">发布世界到商城</span>
-              <button onClick={() => setShowPublish(false)} className="p-1 text-textMuted hover:text-textPrimary"><X size={15} /></button>
-            </div>
-            <div>
-              <div className="text-[10px] text-textMuted mb-1">选择要发布的世界（打包代码区，不含 content/ 数据）</div>
-              <select
-                value={pubWorld ?? ''}
-                onChange={(e) => setPubWorld(Number(e.target.value))}
-                className="w-full bg-elevated text-sm p-2 rounded-lg border border-border outline-none text-textPrimary"
-              >
-                {myWorlds.length === 0 && <option value="">（没有可发布的世界）</option>}
-                {myWorlds.map((w) => <option key={w.id} value={w.id}>{w.name} (#{w.id})</option>)}
-              </select>
-            </div>
-            <div>
-              <div className="text-[10px] text-textMuted mb-1">标题（留空 = 世界名；同步到 GitHub 时作为目录名）</div>
-              <input
-                value={pubTitle}
-                onChange={(e) => setPubTitle(e.target.value)}
-                className="w-full bg-elevated text-sm p-2 rounded-lg border border-border outline-none focus:border-primary-500/50 text-textPrimary"
-              />
-            </div>
-            <div>
-              <div className="text-[10px] text-textMuted mb-1">描述</div>
-              <textarea
-                value={pubDesc}
-                onChange={(e) => setPubDesc(e.target.value)}
-                rows={2}
-                className="w-full bg-elevated text-sm p-2 rounded-lg border border-border outline-none resize-none focus:border-primary-500/50 text-textPrimary"
-              />
-            </div>
-            <div>
-              <div className="text-[10px] text-textMuted mb-1">标签（逗号分隔，如 2d冒险,卡牌）</div>
-              <input
-                value={pubTags}
-                onChange={(e) => setPubTags(e.target.value)}
-                className="w-full bg-elevated text-sm p-2 rounded-lg border border-border outline-none focus:border-primary-500/50 text-textPrimary"
-              />
-            </div>
-            <button
-              onClick={doPublish}
-              disabled={publishing || myWorlds.length === 0}
-              className="w-full py-2 text-sm bg-primary-500 hover:bg-primary-400 text-white rounded-lg transition-colors disabled:opacity-40"
-            >
-              {publishing ? '发布中…' : '发布'}
-            </button>
-          </div>
-        </div>
-      )}
     </div>
   )
 }

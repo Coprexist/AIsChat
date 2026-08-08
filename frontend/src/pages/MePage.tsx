@@ -13,7 +13,7 @@ import {
   User, Settings, LogOut, Shield,
   Gift, BarChart3, Bot, ChevronRight, Edit3,
   Loader2, Check, X, ArrowRight, Activity,
-  FileText, HardDrive, Camera, Users, MessageSquare, Share2
+  FileText, HardDrive, Camera, Users, MessageSquare, Share2, Github
 } from 'lucide-react'
 import AvatarPickerModal from '../components/AvatarPickerModal'
 
@@ -99,12 +99,56 @@ export default function MePage() {
   const [bindLoading, setBindLoading] = useState(false)
   const { rebindEmail, removeEmail } = useAuth()
 
+  // GitHub 绑定（商城同步以用户身份推送）
+  const [ghBind, setGhBind] = useState<{ bound: boolean; username: string | null }>({ bound: false, username: null })
+  const [showBindGithub, setShowBindGithub] = useState(false)
+  const [ghToken, setGhToken] = useState('')
+  const [ghBinding, setGhBinding] = useState(false)
+  const [ghError, setGhError] = useState('')
+
+  const doBindGithub = async () => {
+    if (!ghToken.trim()) return
+    setGhBinding(true); setGhError('')
+    try {
+      const r = await api.post<{ bound: boolean; username: string }>('/market/github/bind', { token: ghToken.trim() })
+      setGhBind(r); setShowBindGithub(false); setGhToken('')
+      window.dispatchEvent(new Event('gh-bind-changed'))  // 通知商城页同步
+    } catch (e: any) {
+      setGhError(e?.message || String(e))
+    } finally {
+      setGhBinding(false)
+    }
+  }
+
+  const doUnbindGithub = async () => {
+    if (!confirm('解绑 GitHub 账户？（商城同步将回退为管理员 token）')) return
+    try {
+      await api.delete('/market/github/bind')
+      setGhBind({ bound: false, username: null })
+      window.dispatchEvent(new Event('gh-bind-changed'))  // 通知商城页同步
+    } catch { /* ignore */ }
+  }
+
+  // 支持 /me?bind=github 从商城页跳转过来直接打开绑定弹窗
+  useEffect(() => {
+    if (new URLSearchParams(window.location.search).get('bind') === 'github') {
+      setShowBindGithub(true)
+      // 清理 URL 参数，避免刷新后重复弹
+      window.history.replaceState({}, '', '/me')
+    }
+  }, [])
+
 
 
   useEffect(() => {
     // 加载上传限制（头像选择时检查大小，每次进 MePage 刷新）
     api.get('/user/config/upload-limits').then((limits: any) => {
       sessionStorage.setItem('upload_limits', JSON.stringify({ ...limits, ts: Date.now() }))
+    }).catch(() => {})
+
+    // GitHub 绑定状态
+    api.get<{ bound: boolean; username: string | null }>('/market/github/bind').then((r) => {
+      setGhBind(r || { bound: false, username: null })
     }).catch(() => {})
 
     // 加载我的 AI 列表
@@ -320,6 +364,36 @@ export default function MePage() {
                   </button>
                 )}
               </div>
+            </div>
+            {/* GitHub（商城同步身份） */}
+            <div className="mt-3 pt-3 border-t border-border/60">
+              <span className="text-[10px] text-textMuted uppercase tracking-wider">GitHub</span>
+              <div className="flex items-center gap-2 mt-1">
+                <Github size={13} className="text-textMuted shrink-0" />
+                {ghBind.bound ? (
+                  <>
+                    <span className="text-sm text-textPrimary truncate">@{ghBind.username}</span>
+                    <span className="text-[10px] text-mint-400 bg-mint-500/10 px-1.5 py-0.5 rounded-full">已绑定</span>
+                  </>
+                ) : (
+                  <span className="text-sm text-textMuted">未绑定</span>
+                )}
+                <button
+                  onClick={() => setShowBindGithub(true)}
+                  className="text-[10px] text-primary-400 hover:text-primary-500 transition-colors"
+                >
+                  {ghBind.bound ? '更换' : '绑定'}
+                </button>
+                {ghBind.bound && (
+                  <button
+                    onClick={doUnbindGithub}
+                    className="text-[10px] text-rose-400 hover:text-rose-500 transition-colors"
+                  >
+                    解绑
+                  </button>
+                )}
+              </div>
+              <div className="text-[10px] text-textMuted mt-1">用于世界商城同步，以你的身份推送</div>
             </div>
           </div>
         </div>
@@ -711,6 +785,47 @@ export default function MePage() {
                   className="flex-1 py-2 text-sm rounded-xl bg-primary-500 hover:bg-primary-400 disabled:opacity-30 text-white font-medium transition-colors"
                 >
                   {bindLoading ? t('auth.verifying') : t('common.confirm')}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* GitHub 绑定弹窗 */}
+      {showBindGithub && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4" onClick={() => setShowBindGithub(false)}>
+          <div className="bg-surface border border-border rounded-2xl p-6 w-full max-w-sm shadow-2xl" onClick={e => e.stopPropagation()}>
+            <h3 className="text-lg font-semibold text-textPrimary mb-1">绑定 GitHub 账户</h3>
+            <p className="text-xs text-textMuted mb-4">用于世界商城同步——以你的身份推送到 AIsChat-Community。Token 加密存储，仅本实例可见。</p>
+            <div className="space-y-3">
+              <div>
+                <label className="block text-xs text-textSecondary mb-1">GitHub Token（classic 或 fine-grained，需仓库写权限）</label>
+                <input
+                  type="password"
+                  value={ghToken}
+                  onChange={e => setGhToken(e.target.value)}
+                  onKeyDown={e => { if (e.key === 'Enter') doBindGithub() }}
+                  placeholder="ghp_… / github_pat_…"
+                  className="w-full px-3 py-2 rounded-xl border border-border bg-canvas text-textPrimary text-sm focus:outline-none focus:ring-2 focus:ring-primary-500/60"
+                />
+              </div>
+              {ghError && (
+                <div className="text-sm text-rose-400 bg-rose-500/10 border border-rose-500/20 rounded-xl px-3 py-2">{ghError}</div>
+              )}
+              <div className="flex gap-2 pt-2">
+                <button
+                  onClick={() => setShowBindGithub(false)}
+                  className="flex-1 py-2 text-sm rounded-xl border border-border text-textSecondary hover:bg-elevated transition-colors"
+                >
+                  取消
+                </button>
+                <button
+                  onClick={doBindGithub}
+                  disabled={!ghToken.trim() || ghBinding}
+                  className="flex-1 py-2 text-sm rounded-xl bg-primary-500 hover:bg-primary-400 disabled:opacity-30 text-white font-medium transition-colors"
+                >
+                  {ghBinding ? '绑定中…' : '绑定'}
                 </button>
               </div>
             </div>

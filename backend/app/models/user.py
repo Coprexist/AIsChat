@@ -1,7 +1,7 @@
 """
 用户模型
 """
-from sqlalchemy import Column, Integer, String, Boolean, Text, DateTime, func
+from sqlalchemy import Column, Integer, String, Boolean, Text, DateTime, func, BigInteger
 from sqlalchemy.dialects.postgresql import JSONB
 from app.database import Base
 
@@ -27,6 +27,9 @@ class User(Base):
     # GitHub 账户绑定（加密存储；用于商城同步时以用户身份推送）
     github_token_encrypted = Column(Text, comment="用户 GitHub token（加密）")
     github_username = Column(String(100), comment="绑定时的 GitHub 用户名")
+    github_id = Column(BigInteger, comment="GitHub 数字 user id（身份锚，改名不变）")
+    github_sign_key_encrypted = Column(Text, comment="Ed25519 私钥（加密存储，作者签名用）")
+    github_public_key = Column(Text, comment="Ed25519 公钥（随 meta 发布供验签）")
 
     # 时区（IANA 格式，如 Asia/Shanghai）
     timezone = Column(String(50), default="Asia/Shanghai")

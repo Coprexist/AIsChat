@@ -37,8 +37,35 @@ SNAPSHOT_PATH = "data/market/github_index_cache.json"
 # ─────────────────────────── 配置 ───────────────────────────
 
 
+def _encrypt_token(tok: str) -> str:
+    """GitHub token 加密存储（Fernet）"""
+    from app.utils.crypto import encrypt_api_key
+    return encrypt_api_key(tok) if tok else ""
+
+
+def _decrypt_token(stored: str) -> str:
+    """解密 GitHub token；旧明文数据兼容（解密失败按明文处理）"""
+    if not stored:
+        return ""
+    from app.utils.crypto import decrypt_api_key
+    try:
+        return decrypt_api_key(stored)
+    except Exception:
+        return stored
+
+
+def mask_token(tok: str) -> str:
+    """脱敏显示：只留前 4 后 4（如 ghp_Wr…ku5N）；过短全隐"""
+    if not tok:
+        return ""
+    if len(tok) <= 8:
+        return "***"
+    return f"{tok[:4]}…{tok[-4:]}"
+
+
 async def get_market_config(db) -> dict:
-    """读商城配置（含 GitHub 设置）——直接查 DB（get_settings 的返回 dict 不含此字段）"""
+    """读商城配置（含 GitHub 设置）——直接查 DB；token 解密供服务内使用。
+    首次读取时若无机器人签名密钥 → 自动生成并保存（机器人负责社区仓库写入）。"""
     from sqlalchemy import text
     row = (await db.execute(text("SELECT market_config FROM system_settings WHERE id=1"))).first()
     raw = row[0] if row else None
@@ -48,17 +75,29 @@ async def get_market_config(db) -> dict:
         except json.JSONDecodeError:
             raw = {}
     cfg = dict(raw or {})
+    # 机器人签名密钥对（懒生成）：写入社区仓库时用机器人身份加签，其他实例以此验签
+    if not cfg.get("bot_public_key"):
+        priv_pem, pub_pem = _generate_signing_keypair()
+        cfg["bot_sign_key_encrypted"] = _encrypt_token(priv_pem)
+        cfg["bot_public_key"] = pub_pem
+        await db.execute(
+            text("UPDATE system_settings SET market_config = :cfg WHERE id = 1"),
+            {"cfg": json.dumps(cfg, ensure_ascii=False)},
+        )
+        await db.commit()
     return {
         "github_repo": str(cfg.get("github_repo") or "").strip(),
-        "github_token": str(cfg.get("github_token") or "").strip(),
+        "github_token": _decrypt_token(str(cfg.get("github_token") or "")),
         "auto_sync_enabled": bool(cfg.get("auto_sync_enabled", False)),
+        "bot_public_key": str(cfg.get("bot_public_key") or ""),
+        "bot_sign_key": _decrypt_token(str(cfg.get("bot_sign_key_encrypted") or "")),
     }
 
 
 async def save_market_config(db, *, github_repo: str | None = None,
                              github_token: str | None = None,
                              auto_sync_enabled: bool | None = None) -> dict:
-    """更新商城配置（仅更新传入的字段，其余保留）"""
+    """更新商城配置（仅更新传入的字段，其余保留）；token 加密存储"""
     from sqlalchemy import text
     row = (await db.execute(text("SELECT market_config FROM system_settings WHERE id=1"))).first()
     raw = row[0] if row else None
@@ -66,7 +105,7 @@ async def save_market_config(db, *, github_repo: str | None = None,
     if github_repo is not None:
         cfg["github_repo"] = github_repo.strip()
     if github_token is not None:
-        cfg["github_token"] = github_token.strip()
+        cfg["github_token"] = _encrypt_token(github_token)
     if auto_sync_enabled is not None:
         cfg["auto_sync_enabled"] = bool(auto_sync_enabled)
     await db.execute(
@@ -81,6 +120,65 @@ def _repo_parts(repo: str) -> tuple[str, str] | None:
     """'owner/name' → (owner, name)"""
     m = re.match(r"^([\w.-]+)/([\w.-]+)$", repo.strip())
     return (m.group(1), m.group(2)) if m else None
+
+
+# ─────────────────────────── 作者签名（Ed25519） ───────────────────────────
+# 签名 payload 覆盖 meta 关键字段 + zip 哈希，任何篡改（含换包）都会验签失败。
+# 双签名：作者签名（meta.signature）+ 机器人背书签名（bot_signature）——
+# 信任根 = 系统机器人公钥（固定已知），其他实例以此验签。
+
+SIGNED_FIELDS = ("id", "title", "description", "author_github_id", "updated_at", "zip_sha256", "downloads")
+
+
+def _sign_payload(meta: dict) -> str:
+    """meta 关键字段 → 规范化签名串（固定顺序，防拼接歧义）"""
+    return "\x1f".join(str(meta.get(k) or "") for k in SIGNED_FIELDS)
+
+
+def _load_privkey(pem: str):
+    from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey
+    from cryptography.hazmat.primitives import serialization
+    return serialization.load_pem_private_key(pem.encode(), password=None)
+
+
+def _load_pubkey(pem: str):
+    from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PublicKey
+    from cryptography.hazmat.primitives import serialization
+    return serialization.load_pem_public_key(pem.encode())
+
+
+def _generate_signing_keypair() -> tuple[str, str]:
+    """生成 Ed25519 密钥对，返回 (私钥PEM, 公钥PEM)"""
+    from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey
+    from cryptography.hazmat.primitives import serialization
+    priv = Ed25519PrivateKey.generate()
+    pub = priv.public_key()
+    priv_pem = priv.private_bytes(serialization.Encoding.PEM, serialization.PrivateFormat.PKCS8,
+                                  serialization.NoEncryption()).decode()
+    pub_pem = pub.public_bytes(serialization.Encoding.PEM, serialization.PublicFormat.SubjectPublicKeyInfo).decode()
+    return priv_pem, pub_pem
+
+
+def sign_meta(meta: dict, privkey_pem: str) -> str:
+    """对 meta 签名，返回 base64 签名"""
+    import base64
+    priv = _load_privkey(privkey_pem)
+    return base64.b64encode(priv.sign(_sign_payload(meta).encode())).decode()
+
+
+def verify_meta_signature(meta: dict) -> bool:
+    """用 meta 内的公钥验签（签名缺失/公钥缺失 → False）"""
+    import base64
+    sig = meta.get("signature")
+    pub_pem = meta.get("author_public_key")
+    if not sig or not pub_pem:
+        return False
+    try:
+        pub = _load_pubkey(pub_pem)
+        pub.verify(base64.b64decode(sig), _sign_payload(meta).encode())
+        return True
+    except Exception:
+        return False
 
 
 # ─────────────────────────── GitHub HTTP ───────────────────────────
@@ -127,16 +225,18 @@ async def _gh_download(owner: str, repo: str, path: str, token: str) -> bytes:
     return base64.b64decode(data["content"])
 
 
-async def verify_github_token(token: str) -> str:
-    """验证 GitHub token 有效性，返回 GitHub 用户名（失败抛 RuntimeError）"""
+async def verify_github_token(token: str) -> tuple[str, int]:
+    """验证 GitHub token 有效性，返回 (用户名, 数字 user id)——id 是身份锚（改名不变）"""
     async with httpx.AsyncClient(timeout=15) as client:
         r = await client.get(f"{GITHUB_API}/user", headers=_headers(token))
     if r.status_code != 200:
         raise RuntimeError(f"GitHub token 无效（{r.status_code}），请检查后重试")
-    username = r.json().get("login") or ""
-    if not username:
+    data = r.json()
+    username = data.get("login") or ""
+    uid = data.get("id")
+    if not username or not uid:
         raise RuntimeError("GitHub 响应异常，未获取到用户名")
-    return username
+    return username, int(uid)
 
 
 # ─────────────────────────── 索引快照 ───────────────────────────
@@ -224,24 +324,50 @@ def compute_sync_state(item, gh_entry: dict | None) -> str:
 # ─────────────────────────── 同步（本地 → GitHub） ───────────────────────────
 
 
-async def sync_item_to_github(db, item, token_override: str | None = None) -> dict:
-    """把本地商品推送到 GitHub：meta.json + world.zip + 更新 index.json + 刷新快照。
-    token_override：用户绑定的 token（以用户身份推送）；None 时用管理员配置 token。"""
+async def sync_item_to_github(db, item) -> dict:
+    """机器人模式同步：校验通过后由机器人（系统 token，唯一写权限）写入社区仓库。
+    - 目录所有权：worlds/{世界名}/ 不存在 → 创建；已存在且作者==发布者 → 更新；
+      作者是别人 → 拒绝（只能写自己的）
+    - 双签名：作者签名（meta.signature）+ 机器人背书签名（bot_signature）
+    - meta 记录：作者 GitHub id（身份锚）、来源仓库链接、zip 哈希"""
     cfg = await get_market_config(db)
     parts = _repo_parts(cfg["github_repo"])
     if not parts:
         raise ValueError("后台未配置 GitHub 仓库（market_config.github_repo）")
     owner, repo = parts
-    token = token_override or cfg["github_token"]
+    token = cfg["github_token"]
     if not token:
-        raise ValueError("未配置 GitHub Token（请绑定自己的 GitHub 账户，或由管理员配置）")
+        raise ValueError("系统未配置 GitHub Token（请管理员在后台配置机器人 token）")
+    bot_priv = cfg.get("bot_sign_key") or ""
+    bot_pub = cfg.get("bot_public_key") or ""
+    if not bot_priv or not bot_pub:
+        raise ValueError("系统机器人签名密钥缺失")
 
     pkg = Path("data") / item.package_path
     if not pkg.is_file():
         raise ValueError("商品包文件缺失，无法同步")
 
+    # 发布者的 GitHub 身份与作者签名密钥（users 表）
+    from sqlalchemy import text as _text
+    row = (await db.execute(_text(
+        "SELECT github_id, github_username, github_public_key, github_sign_key_encrypted FROM users WHERE id = :uid"
+    ), {"uid": item.author_id})).first()
+    gh_id = int(row.github_id) if row and row.github_id else 0
+    gh_name = (row.github_username or "") if row else ""
+    pub_pem = (row.github_public_key or "") if row else ""
+    priv_enc = (row.github_sign_key_encrypted or "") if row else ""
+    if not gh_id or not pub_pem or not priv_enc:
+        raise ValueError("发布者未绑定 GitHub（缺少签名密钥），无法同步")
+    from app.utils.crypto import decrypt_api_key
+    try:
+        priv_pem = decrypt_api_key(priv_enc)
+    except Exception:
+        raise ValueError("发布者签名密钥解密失败，请重新绑定 GitHub")
+
     slug = _slug(item)
     d = _item_dir(item)
+    import hashlib
+    zip_sha256 = hashlib.sha256(pkg.read_bytes()).hexdigest()
     meta = {
         "id": item.id,
         "kind": item.kind,
@@ -249,33 +375,51 @@ async def sync_item_to_github(db, item, token_override: str | None = None) -> di
         "description": item.description or "",
         "tags": item.tags or [],
         "author_name": item.author_name or f"user-{item.author_id}",
+        "author_github": gh_name,
+        "author_github_id": gh_id,
+        "author_public_key": pub_pem,
         "source_world_id": item.source_world_id,
         "package_size": item.package_size,
-        "downloads": item.downloads or 0,          # 云端下载数 = 同步时本地快照
+        "downloads": item.downloads or 0,
+        "zip_sha256": zip_sha256,
         "updated_at": item.updated_at.isoformat() if item.updated_at else None,
         "download_url": f"{d}/world.zip",
     }
+    meta["signature"] = sign_meta(meta, priv_pem)          # 作者签名
+    meta["bot_public_key"] = bot_pub
+    meta["bot_signature"] = sign_meta(meta, bot_priv)      # 机器人背书签名
 
-    # 重名检查：index.json 里已有同名目录（其他商品）→ 拒绝
+    # ① 目录所有权检查（账本 index.json）：同名目录若属别人 → 拒绝
     idx = await _gh_get(owner, repo, INDEX_PATH, token)
     worlds = _index_worlds(idx)
     dup = next((w for w in worlds if w.get("slug") == slug and int(w.get("id") or 0) != item.id), None)
     if dup:
-        raise ValueError(f"GitHub 上已存在同名世界「{dup.get('title')}」（{slug}），请修改标题后重试")
+        raise ValueError(f"GitHub 上已存在同名世界「{dup.get('title')}」（{slug}），属于 @{dup.get('author_github') or dup.get('author_name') or '?'}，你只能同步自己的世界")
+    # ② 目录所有权检查（meta 兑底）
+    old_meta_raw = await _gh_get(owner, repo, f"{d}/meta.json", token)
+    if old_meta_raw:
+        try:
+            old_meta = json.loads(base64.b64decode(old_meta_raw["content"]).decode())
+            old_owner = int(old_meta.get("author_github_id") or 0)
+            if old_owner and old_owner != gh_id:
+                raise ValueError("该目录属于其他 GitHub 用户，你只能同步自己的世界")
+        except ValueError:
+            raise
+        except Exception:
+            pass
 
-    # 逐文件推送（meta 与 zip 均带旧 sha 以支持覆盖更新）
-    old_meta = await _gh_get(owner, repo, f"{d}/meta.json", token)
+    # 机器人写入（唯一写权限）
     await _gh_put(owner, repo, f"{d}/meta.json",
                   base64.b64encode(json.dumps(meta, ensure_ascii=False).encode()).decode(),
-                  token, sha=old_meta.get("sha") if old_meta else None,
-                  message=f"sync {slug} meta")
+                  token, sha=old_meta_raw.get("sha") if old_meta_raw else None,
+                  message=f"sync {slug} meta (author @{gh_name}, by bot)")
     old_zip = await _gh_get(owner, repo, f"{d}/world.zip", token)
     await _gh_put(owner, repo, f"{d}/world.zip",
                   base64.b64encode(pkg.read_bytes()).decode(),
                   token, sha=old_zip.get("sha") if old_zip else None,
-                  message=f"sync {slug} package")
+                  message=f"sync {slug} package (author @{gh_name}, by bot)")
 
-    # 更新 index.json（同 id 条目替换）
+    # 更新 index.json（条目带双签名与哈希，供其他实例验签）
     entry = {
         "id": item.id,
         "slug": slug,
@@ -283,8 +427,14 @@ async def sync_item_to_github(db, item, token_override: str | None = None) -> di
         "description": meta["description"],
         "tags": meta["tags"],
         "author_name": meta["author_name"],
+        "author_github": gh_name,
+        "author_github_id": gh_id,
+        "author_public_key": pub_pem,
         "downloads": meta["downloads"],
         "updated_at": meta["updated_at"],
+        "zip_sha256": zip_sha256,
+        "signature": meta["signature"],
+        "bot_signature": meta["bot_signature"],
         "zip": f"{d}/world.zip",
         "meta": f"{d}/meta.json",
     }
@@ -297,12 +447,11 @@ async def sync_item_to_github(db, item, token_override: str | None = None) -> di
     save_snapshot(worlds)
 
     # 记录 github_path
-    from sqlalchemy import text
-    await db.execute(text("UPDATE world_market_items SET github_path = :p WHERE id = :id"),
+    await db.execute(_text("UPDATE world_market_items SET github_path = :p WHERE id = :id"),
                      {"p": d, "id": item.id})
     await db.commit()
-    logger.info(f"🏪 商品 #{item.id}「{item.title}」已同步到 GitHub {cfg['github_repo']}/{d}")
-    return {"success": True, "path": d}
+    logger.info(f"🏪 商品 #{item.id}「{item.title}」已由机器人同步到 {cfg['github_repo']}/{d}（作者 @{gh_name}）")
+    return {"success": True, "path": d, "author_github": gh_name}
 
 
 def _index_worlds(idx: dict | None) -> list[dict]:
@@ -320,7 +469,8 @@ def _index_worlds(idx: dict | None) -> list[dict]:
 
 
 async def refresh_from_github(db) -> dict:
-    """管理员手动/自动刷新：拉 index.json → 更新快照。返回新增/更新/移除统计"""
+    """管理员手动/自动刷新：拉 index.json → 机器人背书验签 → 更新快照。
+    每条目附带可信度：signature_valid（机器人签名有效）。"""
     cfg = await get_market_config(db)
     parts = _repo_parts(cfg["github_repo"])
     if not parts:
@@ -341,10 +491,24 @@ async def refresh_from_github(db) -> dict:
 
     worlds = _index_worlds(idx)
     old = {int(w.get("id") or 0): w for w in load_snapshot().get("worlds", [])}
-    added = sum(1 for w in worlds if int(w.get("id") or 0) not in old)
-    updated = sum(1 for w in worlds
-                  if int(w.get("id") or 0) in old
-                  and old[int(w.get("id") or 0)].get("updated_at") != w.get("updated_at"))
+    bot_pub = cfg.get("bot_public_key") or ""
+    added = updated = 0
+    for w in worlds:
+        wid = int(w.get("id") or 0)
+        if wid not in old:
+            added += 1
+        elif old[wid].get("updated_at") != w.get("updated_at"):
+            updated += 1
+        # 机器人背书验签：信任根 = 系统机器人公钥（固定已知，无需 TOFU）
+        w["signature_valid"] = None
+        w["key_changed"] = False
+        if bot_pub and w.get("bot_signature"):
+            try:
+                bot_key = _load_pubkey(bot_pub)
+                bot_key.verify(base64.b64decode(w["bot_signature"]), _sign_payload(w).encode())
+                w["signature_valid"] = True
+            except Exception:
+                w["signature_valid"] = False
     removed = sum(1 for wid in old if wid not in {int(w.get("id") or 0) for w in worlds})
     save_snapshot(worlds)
     logger.info(f"🏪 GitHub 商城刷新完成: +{added} 新增, {updated} 更新, -{removed} 移除")

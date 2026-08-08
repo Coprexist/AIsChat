@@ -282,11 +282,21 @@ async def sync_item_github(
         raise HTTPException(status_code=400, detail="GitHub 缓存商品不能同步（它已在仓库中）")
     try:
         from app.services.world.market_github import sync_item_to_github
-        # 优先以用户自己的 GitHub 身份推送；未绑定则回退管理员 token
+        # 机器人模式：校验身份后由系统 token（机器人，唯一写权限）写入。
+        # 同步前自动验证绑定 token 仍有效且 github_id 匹配（失效 → 拒绝并提示重新绑定）
         user_token = await _user_github_token(db, current_user["user_id"])
-        r = await sync_item_to_github(db, item, token_override=user_token)
+        if not user_token:
+            raise HTTPException(status_code=400, detail="请先在「我的」页绑定自己的 GitHub 账户，再进行同步")
+        username, gh_id = await verify_github_token(user_token)
+        from app.models.user import User
+        me = (await db.execute(select(User).where(User.id == current_user["user_id"]))).scalar_one()
+        if not me.github_id or gh_id != int(me.github_id):
+            raise HTTPException(status_code=400, detail="绑定的 GitHub token 与当前账户不匹配，请重新绑定")
+        r = await sync_item_to_github(db, item)
         return r
     except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    except RuntimeError as e:
         raise HTTPException(status_code=400, detail=str(e))
     except Exception as e:
         logger.warning(f"🏪 同步 GitHub 失败 item {item_id}: {e}")
@@ -294,7 +304,7 @@ async def sync_item_github(
 
 
 async def _user_github_token(db: AsyncSession, user_id: int) -> str | None:
-    """取用户绑定的 GitHub token（解密）；未绑定返回 None（回退管理员 token）"""
+    """取用户绑定的 GitHub token（解密）；未绑定返回 None（同步将被拒绝）"""
     from app.models.user import User
     from app.utils.crypto import decrypt_api_key
     user = (await db.execute(select(User).where(User.id == user_id))).scalar_one_or_none()
@@ -302,7 +312,7 @@ async def _user_github_token(db: AsyncSession, user_id: int) -> str | None:
         try:
             return decrypt_api_key(user.github_token_encrypted)
         except Exception:
-            logger.warning(f"👤 用户 {user_id} 的 GitHub token 解密失败，回退管理员 token")
+            logger.warning(f"👤 用户 {user_id} 的 GitHub token 解密失败")
     return None
 
 
@@ -318,17 +328,24 @@ async def bind_github(
     if not token:
         raise HTTPException(status_code=400, detail="缺少 GitHub token")
     try:
-        username = await verify_github_token(token)
+        username, gh_id = await verify_github_token(token)
     except RuntimeError as e:
         raise HTTPException(status_code=400, detail=str(e))
 
     from app.models.user import User
     from app.utils.crypto import encrypt_api_key
+    from app.services.world.market_github import _generate_signing_keypair
     user = (await db.execute(select(User).where(User.id == current_user["user_id"]))).scalar_one()
     user.github_token_encrypted = encrypt_api_key(token)
     user.github_username = username
+    user.github_id = gh_id
+    # 签名密钥对：首次绑定生成（Ed25519），私钥加密存储、公钥随 meta 发布
+    if not user.github_sign_key_encrypted:
+        priv_pem, pub_pem = _generate_signing_keypair()
+        user.github_sign_key_encrypted = encrypt_api_key(priv_pem)
+        user.github_public_key = pub_pem
     await db.commit()
-    logger.info(f"👤 用户 {current_user['user_id']} 绑定 GitHub 账户 @{username}")
+    logger.info(f"👤 用户 {current_user['user_id']} 绑定 GitHub 账户 @{username}（id={gh_id}）")
     return {"bound": True, "username": username}
 
 
@@ -363,16 +380,20 @@ async def list_github_items(
     current_user: dict = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
-    """GitHub 板块列表：读索引快照（不实时请求远端），
-    标注 is_local——本地是否有同 id 的在架商品（即本地上传的）。"""
+    """GitHub 板块列表：读索引快照（不实时请求远端）。
+    每条标注：is_local（本地同 id 在架商品）/ is_mine（当前用户 github_id == 作者）/ 签名状态。"""
     from app.models.world import WorldMarketItem
+    from app.models.user import User
     local_ids = set((await db.execute(
         select(WorldMarketItem.id).where(
             WorldMarketItem.status == "on", WorldMarketItem.source == "local")
     )).scalars().all())
+    me = (await db.execute(select(User).where(User.id == current_user["user_id"]))).scalar_one_or_none()
+    my_gh_id = int(me.github_id or 0) if me else 0
     snap = load_snapshot()
     items = []
     for w in snap.get("worlds", []):
+        author_gh_id = int(w.get("author_github_id") or 0)
         items.append({
             "id": w.get("id"),
             "slug": w.get("slug"),
@@ -381,9 +402,13 @@ async def list_github_items(
             "description": w.get("description"),
             "tags": w.get("tags") or [],
             "author_name": w.get("author_name"),
-            "downloads": w.get("downloads"),          # 云端下载数
-            "updated_at": w.get("updated_at"),        # 云端更新时间
+            "author_github": w.get("author_github"),
+            "downloads": w.get("downloads"),
+            "updated_at": w.get("updated_at"),
             "is_local": int(w.get("id") or 0) in local_ids,
+            "is_mine": bool(my_gh_id and author_gh_id and my_gh_id == author_gh_id),
+            "signature_valid": w.get("signature_valid"),
+            "key_changed": bool(w.get("key_changed")),
         })
     return {"synced_at": snap.get("synced_at"), "items": items, "total": len(items)}
 
@@ -431,11 +456,13 @@ async def get_market_settings(
     current_user: dict = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
-    """商城配置（管理员可见 token 状态；普通用户只见开关）"""
-    from app.services.world.market_github import get_market_config
+    """商城配置：管理员可见脱敏 token（前4…后4）；普通用户只见开关"""
+    from app.services.world.market_github import get_market_config, mask_token
     cfg = await get_market_config(db)
-    if current_user.get("role") != "admin":
-        cfg["github_token"] = "***" if cfg["github_token"] else ""
+    if current_user.get("role") == "admin":
+        cfg["github_token"] = mask_token(cfg["github_token"])
+    else:
+        cfg["github_token"] = ""
     return cfg
 
 
@@ -445,17 +472,24 @@ async def update_market_settings(
     current_user: dict = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
-    """更新商城配置（仅管理员）：github_repo / github_token / auto_sync_enabled"""
+    """更新商城配置（仅管理员）：github_repo / github_token / auto_sync_enabled。
+    token 加密存储；传入值与当前脱敏值一致视为未修改（防误存脱敏串）。"""
     if current_user.get("role") != "admin":
         raise HTTPException(status_code=403, detail="仅管理员可修改商城配置")
-    from app.services.world.market_github import save_market_config
+    from app.services.world.market_github import save_market_config, get_market_config, mask_token
+    new_token = req.get("github_token")
+    if new_token:
+        # 与当前脱敏值相同 → 管理员只是重新提交了显示值，未真正修改
+        cur = await get_market_config(db)
+        if new_token.strip() == mask_token(cur.get("github_token") or ""):
+            new_token = None
     cfg = await save_market_config(
         db,
         github_repo=req.get("github_repo"),
-        github_token=req.get("github_token"),
+        github_token=new_token,
         auto_sync_enabled=req.get("auto_sync_enabled"),
     )
-    cfg["github_token"] = "***" if cfg.get("github_token") else ""
+    cfg["github_token"] = mask_token(cfg.get("github_token") or "")
     return cfg
 
 

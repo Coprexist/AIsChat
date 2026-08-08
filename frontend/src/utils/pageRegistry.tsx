@@ -33,6 +33,7 @@ const InstanceSetupPage = lazy(() => import('../pages/InstanceSetupPage'))
 const LocalModelPage = lazy(() => import('../pages/LocalModelPage'))
 const WorldsPage = lazy(() => import('../pages/WorldsPage'))
 const MarketPage = lazy(() => import('../pages/MarketPage'))
+const MarketPublishPage = lazy(() => import('../pages/MarketPublishPage'))
 const WorldDesignPage = lazy(() => import('../pages/WorldDesignPage'))
 const WorldViewPage = lazy(() => import('../pages/WorldViewPage'))
 const NotFoundPage = lazy(() => import('../pages/NotFoundPage'))
@@ -98,6 +99,7 @@ export function getProtectedRoutes(AdminGuardComponent: ComponentType<{ children
     // 群视界
     { path: 'worlds', element: <WorldsPage /> },
     { path: 'market', element: <MarketPage /> },
+    { path: 'market/publish', element: <MarketPublishPage /> },
     { path: 'worlds/:worldId/design', element: <WorldDesignPage /> },
     { path: 'world-view/:worldId', element: <WorldViewPage /> },
     { path: 'manual', element: <ManualPage /> },

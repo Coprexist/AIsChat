@@ -437,17 +437,10 @@ export default function WorldDesignPage() {
       </div>
     ))
 
-  // 发布到商城：一键打包代码区（不含 content/）
-  const publishToMarket = async () => {
+  // 发布到商城：跳转统一发布页（带当前世界预选，表单含标题/描述/标签/同步 GitHub）
+  const publishToMarket = () => {
     if (!world) return
-    if (!confirm(`把「${world.name}」发布到世界商城？（打包代码区，不含 content/ 数据；他人可一键导入为新世界）`)) return
-    setMsg('')
-    try {
-      await api.post('/market/items', { world_id: wid })
-      setMsg('✅ 已发布到世界商城，可在侧边栏「世界商城」查看')
-    } catch (e: any) {
-      setMsg(`发布失败: ${e?.message || e}`)
-    }
+    navigate(`/market/publish?world_id=${wid}`)
   }
 
   // 世界 AI 对话（状态/发送/排队/建议/命令 全部在 useWorldChat） ──

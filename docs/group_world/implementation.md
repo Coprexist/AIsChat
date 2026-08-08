@@ -16,7 +16,7 @@
 
 ---
 
-## 二、数据模型（迁移链 head = d9e8f7a6b5c4，2026-08-07）
+## 二、数据模型（迁移链 head = f2b3c4d5e6f7，2026-08-08）
 
 | 表 | 职责 | 关键字段 |
 |----|------|---------|
@@ -27,9 +27,10 @@
 | `world_chat_messages` | 世界 AI 对话 | world_id / user_id / role(user\|ai\|tool\|note) / content / reasoning（思考过程，展示用不进上下文） |
 | `world_ai_memories` | **世界 AI 长期记忆（2.6）** | world_id / title / content / embedding(Vector 1536) / 时间戳 |
 | `world_llm_usage` | **LLM 用量与缓存命中（2.7）** | world_id / turn_id / round_no(0\|N\|final) / model / prompt / completion / reasoning / cached_tokens |
-| `world_market_items` | **世界商城商品（8-07 MVP）** | kind(world\|block) / title / description / tags(JSONB) / author_id / author_name / source_world_id / package_path(data/market/{id}.zip) / package_size / downloads / status(on\|off) |
+| `world_market_items` | **世界商城商品（8-07 MVP + 8-08 同步）** | kind(world\|block) / title / description / tags(JSONB) / author_id / author_name / source_world_id / package_path / package_size / downloads / status(on\|off) / source(local\|github) / github_path(同步目录) |
+| `users`（GitHub 绑定，8-08） | **用户 GitHub 身份与签名** | github_token_encrypted（加密）/ github_username / github_id（**数字 id 身份锚**）/ github_sign_key_encrypted（Ed25519 私钥加密）/ github_public_key |
 
-迁移链：`c0c1c2c3c4c5 → ab0d1f883cee（world 配置+聊天表）→ c2d3e4f5a6b7（重建误删三表）→ d4e5f6a7b8c9（备份设置）→ e5f6a7b8c9d0（列注释对齐）→ f6a7b8c9d0e1（reasoning 列）→ a2b3c4d5e6f7（world_ais 实体表）→ b3c4d5e6f7a8（world_ai_memories）→ c4d5e6f7a8b9（world_llm_usage）→ b5c6d7e8f9a0（capability_versions）→ c6d7e8f9a0b1（预设建议）→ d7e8f9a0b1c2（conversation_log.user_id）→ d9e8f7a6b5c4（world_market_items）`
+迁移链：`c0c1c2c3c4c5 → ab0d1f883cee → c2d3e4f5a6b7 → d4e5f6a7b8c9 → e5f6a7b8c9d0 → f6a7b8c9d0e1 → a2b3c4d5e6f7 → b3c4d5e6f7a8 → c4d5e6f7a8b9 → b5c6d7e8f9a0 → c6d7e8f9a0b1 → d7e8f9a0b1c2 → d9e8f7a6b5c4（world_market_items）→ e4f5a6b7c8d9（market source/github_path + market_config）→ f1a2b3c4d5e6（users github 绑定）→ f2b3c4d5e6f7（users github_id + 签名密钥）`
 
 ---
 
@@ -345,12 +346,19 @@ data/
 └── world_llm_requests/{id}.jsonl  # 实际 LLM 请求日志（最近 10 条/世界）
 ```
 
-## 十三、世界商城（2026-08-07 MVP）
+## 十三、世界商城（2026-08-07 MVP + 08-08 GitHub 同步/机器人模式）
 
-- **数据**：`world_market_items`（kind=world，block 后置）；包文件存 `data/market/{uuid}.zip`（发布 = `export_zip(include_content=False)` 代码区打包，content/ 不进包）
-- **API**：`POST /market/items`（发布，owner 校验）/ `GET /market/items?q=&tag=&kind=`（搜索+标签）/ 详情 / `POST /market/items/{id}/import`（一键导入 = create_world + import_zip 安全过滤）/ 下载 / DELETE（下架，仅作者/管理员）
-- **前端**：`/market` 商城页（卡片/搜索/发布弹窗/一键导入/下架）+ 群视界页顶栏入口 + 设计页「发布」按钮
-- **已知限制**：GitHub 组件库同步、block 积木商品后置
+- **数据**：`world_market_items`（kind=world，block 后置；source=local/github；github_path 同步目录）；包文件存 `data/market/{uuid}.zip`（发布 = `export_zip(include_content=False)` 代码区打包，content/ 不进包）；`system_settings.market_config` 存 GitHub 配置（repo/token/auto_sync/bot 签名密钥，token 加密存）
+- **API**：`POST /market/items`（发布，owner 校验 + 同名查重 409）/ `GET /market/items`（本地板块）/ `GET /market/github/items`（GitHub 板块=快照）/ `POST /market/github/refresh`（管理员拉索引→快照）/ `POST /market/github/import`（快照条目→下载 zip→建世界）/ `POST /market/items/{id}/sync-github`（机器人同步）/ `GET|PUT /market/settings`（管理员配置，token 脱敏前4后4）/ `POST|GET|DELETE /market/github/bind`（用户绑定 GitHub，token 加密 + 签名密钥）
+- **GitHub 同步（08-08，机器人模式）**：
+  - **写权限模型**：仓库写权限只给机器人（系统 token）；用户 token 只验证身份（绑定门槛低，无需仓库写权限）
+  - **同步流程**：校验绑定 token 有效性（GET /user，github_id 匹配）→ 目录所有权（worlds/{世界名}/ 不存在→创建；作者==自己→更新；别人→403）→ 查重 → 机器人写入
+  - **双签名**：作者 Ed25519 签名（meta.signature）+ 机器人背书签名（bot_signature），信任根=系统机器人公钥（lazy 生成存 market_config）；payload 覆盖 id/title/description/author_github_id/updated_at/zip_sha256/downloads（含 zip 哈希，换包也会验签失败）
+  - **身份锚**：GitHub 数字 user id（改名不变）；meta 记录 author_github_id + author_github（展示名）
+  - **快照**：refresh 拉 index.json → 本地快照文件 `data/market/github_index_cache.json`（GitHub 板块数据源，不实时请求）；refresh 时验机器人签名 → signature_valid
+  - **同步状态**（本地板块）：unsynced / synced（本地 updated_at ≤ 云端）/ stale（同步后又改过）；下载数双轨（本地 downloads + 云端 github_downloads）
+- **前端**：`/market` 双板块（本地/GitHub tab）+ 卡片详情（桌面弹窗/手机全屏）+ 同步状态徽标 + 👑我的/✅机器人已验证/⚠️签名无效 + 绑定条（跳 /me?bind=github）；`/market/publish` 独立发布页（设计页/商城页发布按钮统一跳转，支持 ?world_id= 预选）；「我的」页 GitHub 绑定（照邮箱样式，加密存 token）
+- **已知限制**：block 积木商品后置；GitHub 板块暂只同步 world 类
 
 ## 十四、沙箱加固（2026-08-07，v2）
 
