@@ -1,0 +1,47 @@
+name: Backend Tests
+
+on:
+  push:
+    paths:
+      - 'backend/**'
+      - '.github/workflows/test.yml'
+  pull_request:
+    paths:
+      - 'backend/**'
+
+jobs:
+  pytest:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: pgvector/pgvector:pg17
+        env:
+          POSTGRES_USER: ai_chat
+          POSTGRES_PASSWORD: test-pass
+          POSTGRES_DB: ai_group_chat_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U ai_chat"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install dependencies
+        run: |
+          pip install -r backend/requirements.txt
+          pip install pytest pytest-asyncio pytest-timeout
+
+      - name: Run backend tests
+        env:
+          TEST_DATABASE_URL: postgresql+asyncpg://ai_chat:test-pass@localhost:5432/ai_group_chat_test
+          TEST_DATABASE_URL_SYNC: postgresql://ai_chat:test-pass@localhost:5432/ai_group_chat_test
+        run: |
+          cd backend
+          python -m pytest tests/ -q
