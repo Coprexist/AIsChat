@@ -16,6 +16,7 @@
 - 📂 **群类型系统**：世界预设群类型（规则/绑定上限/助手模板），**配置在 group_types.json 随世界打包**、状态在 DB（slug 绑定）；群绑定类型时按模板自动创建群助手（agent 归属群、不占额度）；群主填 API/一键全局（加密）；群视界机器人 get/update_group_types 工具；群消息事件注入 group_type
 - 📥 **世界 AI web_download**：下载网页资源到世界文件夹（两阶段用户确认 + SSRF + 扩展名白名单）；世界文件上限 5→32MB
 - ⚡ **性能**：向量记忆 HNSW 索引（rough/detail/world_ai_memories）；前端虚拟列表（ChatView 窗口化渲染）
+- 💌 **好友申请 AI 闭环**：AI 上下文注入待处理好友申请（📨 申请人+留言）；新增 handle_friend_request 工具（accept/reject，防越权校验）；auto_respond_friend_request 触发独立事件处理（不建 DM 会话，通过与否由 AI 自主判断）
 
 ---
 
