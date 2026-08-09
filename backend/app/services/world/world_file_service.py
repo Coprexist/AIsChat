@@ -22,7 +22,7 @@ ALLOWED_EXTENSIONS = {
     # py 文件只允许写入（阶段 2 才执行，先允许存储）
     ".py",
 }
-MAX_FILE_SIZE = 5 * 1024 * 1024  # 单文件 5MB
+MAX_FILE_SIZE = 32 * 1024 * 1024  # 单文件 32MB（网页资源/下载文件用）
 
 
 def _world_dir(world_id: int) -> Path:
@@ -88,7 +88,7 @@ def read_file(world_id: int, rel_path: str) -> dict:
 def write_file(world_id: int, rel_path: str, content: str) -> dict:
     """写文件（自动建目录）"""
     if len(content.encode("utf-8")) > MAX_FILE_SIZE:
-        raise ValueError("文件超过 5MB 限制")
+        raise ValueError(f"文件超过 {MAX_FILE_SIZE // 1024 // 1024}MB 限制")
     target = _safe_path(world_id, rel_path)
     _check_ext(target)
     target.parent.mkdir(parents=True, exist_ok=True)
@@ -100,7 +100,7 @@ def write_file(world_id: int, rel_path: str, content: str) -> dict:
 def write_file_bytes(world_id: int, rel_path: str, data: bytes) -> dict:
     """写二进制文件（图片/音频等上传用；校验与 write_file 同一套：白名单/越界/大小）"""
     if len(data) > MAX_FILE_SIZE:
-        raise ValueError("文件超过 5MB 限制")
+        raise ValueError(f"文件超过 {MAX_FILE_SIZE // 1024 // 1024}MB 限制")
     target = _safe_path(world_id, rel_path)
     _check_ext(target)
     target.parent.mkdir(parents=True, exist_ok=True)
