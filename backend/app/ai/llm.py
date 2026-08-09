@@ -1033,7 +1033,7 @@ async def build_messages(
             if reqs:
                 lines = ["\n\n## 📨 待处理好友申请（有人申请加你为好友）"]
                 for r in reqs:
-                    lines.append(f"- 来自「{r['name']}」：{r['message']}")
+                    lines.append(f"- 来自「{r['name']}」：{r['message']}（申请 id: {r['id']}，可调 handle_friend_request 处理）")
                 lines.append("你可以回复对方，或视情况处理（是否通过由你与用户沟通后决定）。")
                 system_prompt += "\n".join(lines)
         except Exception as e:
@@ -1342,6 +1342,19 @@ async def build_dm_messages(
             system_prompt += stack_summary
     except Exception as e:
         logger.warning(f"DM 状态栈摘要注入失败（非致命）: {e}")
+
+    # 📨 待处理好友申请（AI 感知；动态内容沉底）
+    try:
+        from app.services.social.friend_service import get_pending_friend_requests_for_ai
+        reqs = await get_pending_friend_requests_for_ai(db, agent)
+        if reqs:
+            lines = ["\n\n## 📨 待处理好友申请（有人申请加你为好友）"]
+            for r in reqs:
+                lines.append(f"- 来自「{r['name']}」：{r['message']}（申请 id: {r['id']}，可调 handle_friend_request 处理）")
+            lines.append("你可以回复对方，或视情况处理（是否通过由你与用户沟通后决定）。")
+            system_prompt += "\n".join(lines)
+    except Exception as e:
+        logger.warning(f"DM 好友申请注入失败（非致命）: {e}")
 
     messages = [{"role": "system", "content": system_prompt}]
 
