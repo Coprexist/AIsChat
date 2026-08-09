@@ -6,8 +6,9 @@
  */
 import { useEffect, useState, useCallback, useRef, useMemo } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
-import { ChevronLeft, ChevronRight, ChevronDown, Folder, FolderOpen, FileText, FileCode, FileJson, FileImage, FileAudio, FileVideo, File, Trash2, Upload, Plus, Pencil, Eye, Brain, MessageCircle, Save, Send, ArrowDown, Search, Globe, Terminal, Package, Clock, Wrench, Eraser } from 'lucide-react'
+import { ChevronLeft, ChevronRight, ChevronDown, Folder, FolderOpen, FileText, FileCode, FileJson, FileImage, FileAudio, FileVideo, File, Trash2, Upload, Plus, Pencil, Eye, Brain, MessageCircle, Save, Send, ArrowDown, Search, Globe, Terminal, Package, Clock, Wrench, Eraser, MoreHorizontal } from 'lucide-react'
 import { api } from '../api/client'
+import GroupManagerModal from '../components/GroupManagerModal'
 import MarkdownContent from '../components/shared/MarkdownContent'
 import CodeRenderer from '../components/shared/CodeRenderer'
 import { getCodeLang, isMarkdownFile } from '../utils/mime'
@@ -94,6 +95,7 @@ interface World {
   id: number
   name: string
   description: string
+  owner_id: number
   status: string
   time_flow_rate: number
   world_time: string | null
@@ -172,6 +174,15 @@ export default function WorldDesignPage() {
   // 上传：顶部菜单（上传到此位置 / 选择其它位置）+ 目录选择弹层
   const [uploadMenuOpen, setUploadMenuOpen] = useState(false)
   const [uploadDirPickerOpen, setUploadDirPickerOpen] = useState(false)
+  const [groupManagerOpen, setGroupManagerOpen] = useState(false)
+  const [myId, setMyId] = useState<number | null>(null)
+
+  useEffect(() => {
+    try {
+      const me = localStorage.getItem('user_info')
+      if (me) setMyId(JSON.parse(me).id ?? null)
+    } catch { /* ignore */ }
+  }, [])
   const [uploadNavDir, setUploadNavDir] = useState('')
   const mobileUploadDirRef = useRef<string | null>(null)  // 非 null = 移动端上传，目标目录由此指定
   const fileExt = currentFile?.split('.').pop()?.toLowerCase() ?? ''
@@ -820,6 +831,9 @@ export default function WorldDesignPage() {
           <button onClick={publishToMarket} className="shrink-0 text-xs text-primary-400 hover:text-primary-300 transition-colors px-2 py-1" title="发布到世界商城">
             <Upload size={13} /> 发布
           </button>
+          <button onClick={() => setGroupManagerOpen(true)} className="shrink-0 p-1.5 text-textMuted hover:text-textPrimary transition-colors" title="群类型与群助手">
+            <MoreHorizontal size={16} />
+          </button>
           {mobileTab === 'files' && (
             <div className="relative shrink-0">
               <button onClick={() => setUploadMenuOpen((v) => !v)} className="inline-flex items-center gap-1 text-xs text-primary-400 hover:text-primary-300 transition-colors px-2 py-1" title="上传文件">
@@ -1015,6 +1029,9 @@ export default function WorldDesignPage() {
           <button onClick={() => setMode('files')} className={`text-xs px-3 py-1 rounded transition-colors ${mode === 'files' ? 'bg-primary-500 text-white' : 'bg-elevated hover:bg-border'}`}>文件</button>
           <button onClick={() => setMode('preview')} className={`text-xs px-3 py-1 rounded transition-colors ${mode === 'preview' ? 'bg-primary-500 text-white' : 'bg-elevated hover:bg-border'}`}>预览</button>
           <button onClick={publishToMarket} className="text-xs px-3 py-1 rounded transition-colors bg-elevated hover:bg-border text-primary-400" title="发布到世界商城（打包代码区）">发布</button>
+          <button onClick={() => setGroupManagerOpen(true)} className="p-1.5 text-textMuted hover:text-textPrimary transition-colors" title="群类型与群助手">
+            <MoreHorizontal size={16} />
+          </button>
           {msg && <span className="text-xs text-amber-400">{msg}</span>}
         </div>
         {/* 标题栏：文件（居中于文件树+编辑区整块） | 对话（右列上方）；内容行手柄贯穿 */}
@@ -1129,6 +1146,15 @@ export default function WorldDesignPage() {
         </div>
         </div>
       </div>
+
+      {/* 群类型与群助手管理（… 菜单） */}
+      {groupManagerOpen && world && (
+        <GroupManagerModal
+          worldId={wid}
+          isOwner={myId !== null && world.owner_id === myId}
+          onClose={() => setGroupManagerOpen(false)}
+        />
+      )}
     </div>
   )
 }
