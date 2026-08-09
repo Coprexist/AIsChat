@@ -128,6 +128,35 @@ async def create_friend_request(
                     db, current_user["user_id"], target_uid,
                     req.message, prefix="",
                 )
+
+        # 🎯 目标 AI 开启「自动响应好友申请」→ 主动触发 AI 处理（在双方 DM 里）
+        if req.target_type == "ai" and result.get("auto_respond"):
+            try:
+                from app.services.agent.agent_service import get_agent
+                from app.models.user import User as UserModel
+                from app.chat.dm import get_or_create_dm_session
+                from app.ai.response_worker import _trigger_dm_ai_reply
+                from app.models.agent import Agent as AgentModel
+
+                agent_res = await db.execute(
+                    select(AgentModel).where(AgentModel.user_id == req.target_id)
+                )
+                target_agent = agent_res.scalar_one_or_none()
+                requester_name = current_user.get("username") or f"用户{current_user['user_id']}"
+                if target_agent:
+                    # 确保双方 DM 会话存在（好友申请场景：跳过好友检查，允许临时私信）
+                    dm = await get_or_create_dm_session(
+                        db, current_user["user_id"], req.target_id,
+                        skip_friendship_check=True,
+                    )
+                    content = f"【好友申请】来自「{requester_name}」：{req.message or ''}——请处理这条好友申请（是否同意由你判断，可回复对方）。"
+                    await _trigger_dm_ai_reply(
+                        db, target_agent, dm["session_id"], content,
+                        trigger_message_id=0, sender_id=current_user["user_id"],
+                    )
+                    logger.info(f"🎯 AI「{target_agent.name}」自动响应好友申请（来自 {requester_name}）")
+            except Exception as e:
+                logger.warning(f"AI 自动响应好友申请失败: {e}")
             if result.get("reverse_message"):
                 await _inject_friend_greeting(
                     db, target_uid, current_user["user_id"],

@@ -1025,6 +1025,20 @@ async def build_messages(
         except Exception as e:
             logger.warning(f"状态栈摘要注入失败（非致命）: {e}")
 
+    # 📨 待处理好友申请（AI 感知；动态内容沉底，缓存友好）
+    if getattr(agent, "ai_type", None) in ("resonance", "general", "semi_general"):
+        try:
+            from app.services.social.friend_service import get_pending_friend_requests_for_ai
+            reqs = await get_pending_friend_requests_for_ai(db, agent)
+            if reqs:
+                lines = ["\n\n## 📨 待处理好友申请（有人申请加你为好友）"]
+                for r in reqs:
+                    lines.append(f"- 来自「{r['name']}」：{r['message']}")
+                lines.append("你可以回复对方，或视情况处理（是否通过由你与用户沟通后决定）。")
+                system_prompt += "\n".join(lines)
+        except Exception as e:
+            logger.warning(f"好友申请注入失败（非致命）: {e}")
+
     messages = [{"role": "system", "content": system_prompt}]
 
     # ── 多会话上下文（配置驱动）──

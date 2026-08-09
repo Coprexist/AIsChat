@@ -342,6 +342,32 @@ async def list_friends(
     return friends
 
 
+async def get_pending_friend_requests_for_ai(db: AsyncSession, agent) -> list[dict]:
+    """AI 视角：待处理的好友申请（target = 该 AI 的 user_id，status=pending）。
+    注入 AI 上下文用——让 AI 感知「有人加我」。"""
+    from app.models.friendship import FriendshipRequest
+    from app.models.user import User as UserModel
+    rows = (await db.execute(
+        select(FriendshipRequest).where(
+            FriendshipRequest.target_type == "ai",
+            FriendshipRequest.target_id == agent.user_id,
+            FriendshipRequest.status == "pending",
+        ).order_by(FriendshipRequest.created_at.desc()).limit(10)
+    )).scalars().all()
+    result = []
+    for r in rows:
+        name = (await db.execute(
+            select(UserModel.username).where(UserModel.id == r.requester_id)
+        )).scalar_one_or_none()
+        result.append({
+            "id": r.id,
+            "requester_id": r.requester_id,
+            "name": name or f"用户{r.requester_id}",
+            "message": r.message or "",
+        })
+    return result
+
+
 async def list_friend_requests(
     db: AsyncSession,
     user_id: int,
