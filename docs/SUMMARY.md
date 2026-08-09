@@ -42,6 +42,7 @@
 | 文档 | 适用人群 | 说明 |
 |------|---------|------|
 | [brain_controller_design.md](./brain_controller/design/brain_controller_design.md) | 开发者 | 心跳管理、状态机、冲突仲裁、人格锚点、资源调度 |
+| [emotion_state_design.md](./brain_controller/design/emotion_state_design.md) | 开发者 | 情感向量（Plutchik 8 轴）、跨状态情感同步、交接体系、工具按状态隔离 |
 
 #### 3.4 AI 记忆系统
 

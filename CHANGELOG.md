@@ -7,6 +7,18 @@
 
 ---
 
+## [v0.3.2] - 2026-08-09
+
+### Added — ✨ 情感状态栈 + 商城 GitHub 体系 + 群类型系统
+
+- 🎭 **情感状态栈（交接驱动）**：Plutchik 8 轴情感向量（独立轴，双高双低可表达）+ `update_emotion` 工具（增量/完整向量/概括词）；摘要只注入「当前帧+本次交接」（旧交接不重复注入）；pop 选择性回跳（target_frame_id + 跳过层归档汇报）；pop 回来交接（📝 刚完成）；分状态调用计数 + mood homeostasis 情感衰减；工具按状态隔离；摘要上限 500 可配（agents.state_stack_max_chars）；配置开关 emotion_vectorized
+- 🏪 **商城 GitHub 同步（机器人模式）**：仓库写权限只给机器人（系统 token），用户 token 只验证身份；目录所有权（worlds/{世界名}/ 只能写自己的）+ 查重 + **双签名**（作者 Ed25519 + 机器人背书）；GitHub 数字 id 身份锚（改名不变）；快照缓存；同步状态三态；token 全加密 + 管理员脱敏（前4后4）；用户 GitHub 绑定（我的页/商城页）
+- 📂 **群类型系统**：世界预设群类型（规则/绑定上限/助手模板），**配置在 group_types.json 随世界打包**、状态在 DB（slug 绑定）；群绑定类型时按模板自动创建群助手（agent 归属群、不占额度）；群主填 API/一键全局（加密）；群视界机器人 get/update_group_types 工具；群消息事件注入 group_type
+- 📥 **世界 AI web_download**：下载网页资源到世界文件夹（两阶段用户确认 + SSRF + 扩展名白名单）；世界文件上限 5→32MB
+- ⚡ **性能**：向量记忆 HNSW 索引（rough/detail/world_ai_memories）；前端虚拟列表（ChatView 窗口化渲染）
+
+---
+
 ## [v0.3.1] - 2026-08-07
 
 ### Added — ✨ 世界商城 MVP + 沙箱加固 + 群 AI 能力闭环
