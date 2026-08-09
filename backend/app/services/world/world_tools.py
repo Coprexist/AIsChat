@@ -524,7 +524,6 @@ def _tool_result_summary(name: str, result: dict) -> str:
 
 
 # ── web_download：网络文件下载到世界文件夹（两阶段：先确认后下载）──
-_DOWNLOAD_MAX_BYTES = 20 * 1024 * 1024          # 单文件 20MB
 _DOWNLOAD_CONFIRM_TTL = 300                     # 确认有效期 5 分钟
 _DOWNLOAD_EXT_WHITELIST = {
     ".html", ".htm", ".css", ".js", ".mjs", ".json", ".map",
@@ -614,18 +613,20 @@ async def _web_download(world, arguments: str) -> dict:
         if r.status_code != 200:
             return {"success": False, "error": f"下载失败：HTTP {r.status_code}"}
         content = r.content
-        if len(content) > _DOWNLOAD_MAX_BYTES:
-            return {"success": False, "error": f"文件过大（{len(content) // 1024 // 1024}MB > 20MB）"}
         ext = Path(path.split("?")[0]).suffix.lower()
         if ext and ext not in _DOWNLOAD_EXT_WHITELIST:
             return {"success": False, "error": f"不允许下载 {ext} 类型文件"}
         if not path:
             path = _auto_download_path(url, r.headers.get("content-type", ""))
-        from app.services.world.world_file_service import write_file_bytes
+        from app.services.world.world_file_service import write_file_bytes, MAX_FILE_SIZE
+        if len(content) > MAX_FILE_SIZE:
+            return {"success": False, "error": f"文件过大（{len(content) // 1024}KB > {MAX_FILE_SIZE // 1024 // 1024}MB）"}
         write_file_bytes(world.id, path, content)
         _pending_downloads.pop(wid, None)
         logger.info(f"🌐 世界 #{wid} 已下载 {url[:60]} → {path}（{len(content)}B）")
         return {"success": True, "path": path, "size": len(content), "url": url}
+    except ValueError as e:
+        return {"success": False, "error": f"保存失败：{str(e)[:120]}"}
     except httpx.HTTPError as e:
         return {"success": False, "error": f"下载失败：{str(e)[:120]}"}
 
