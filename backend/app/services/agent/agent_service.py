@@ -244,8 +244,14 @@ async def create_agent(
             raise ValueError("AI 创建额度不足，请联系管理员获取兑换码")
 
     # 创建 Agent 对应的 users 条目（统一 ID 空间，用于私信等场景）
+    # username 唯一（AI 无登录语义）：撞名加短后缀，显示名（agent.name）不受影响
+    from uuid import uuid4 as _uuid4
+    username = name
+    dup = (await db.execute(select(User.id).where(User.username == name))).first()
+    if dup:
+        username = f"{name}-{_uuid4().hex[:4]}"
     ai_user = User(
-        username=name,
+        username=username,
         type="ai",
         password_hash="",
         role="ai",

@@ -11,7 +11,7 @@ import { X, Plus, Trash2, Link2, Key, Globe, RefreshCw, Users, BookOpen, CheckCi
 import { api } from '../api/client'
 
 interface GroupType {
-  id: number
+  slug: string
   name: string
   description: string
   rules: string
@@ -23,7 +23,7 @@ interface GroupType {
 interface Assistant {
   id: number
   group_id: number
-  group_type_id: number | null
+  group_type_slug: string | null
   name: string
   configured: boolean
   has_global: boolean
@@ -45,7 +45,7 @@ export default function GroupManagerModal({ worldId, isOwner, onClose }: Props) 
 
   // ── 新建类型表单 ──
   const [newType, setNewType] = useState({ name: '', description: '', rules: '', bind_limit: 3, count: 1, need_api: true, default_name: '群助手' })
-  const [bindTarget, setBindTarget] = useState<{ typeId: number; groupId: number | null } | null>(null)
+  const [bindTarget, setBindTarget] = useState<{ typeSlug: string; groupId: number | null } | null>(null)
   const [apiInput, setApiInput] = useState<{ agentId: number; key: string; base: string } | null>(null)
   const [applying, setApplying] = useState(false)
 
@@ -81,10 +81,13 @@ export default function GroupManagerModal({ worldId, isOwner, onClose }: Props) 
   const createType = async () => {
     setApplying(true); setMsg('')
     try {
+      const current = types.map(({ bound_count: _b, ...t }) => t)
       await api.post(`/worlds/${worldId}/group-types`, {
-        name: newType.name, description: newType.description, rules: newType.rules,
-        bind_limit: Number(newType.bind_limit) || 3,
-        assistant_spec: { count: Number(newType.count) || 1, need_api: newType.need_api, default_name: newType.default_name },
+        types: [...current, {
+          name: newType.name, description: newType.description, rules: newType.rules,
+          bind_limit: Number(newType.bind_limit) || 3,
+          assistant_spec: { count: Number(newType.count) || 1, need_api: newType.need_api, default_name: newType.default_name },
+        }],
       })
       setNewType({ name: '', description: '', rules: '', bind_limit: 3, count: 1, need_api: true, default_name: '群助手' })
       load()
@@ -93,14 +96,14 @@ export default function GroupManagerModal({ worldId, isOwner, onClose }: Props) 
 
   const deleteType = async (t: GroupType) => {
     if (!confirm(`删除群类型「${t.name}」？（已绑定群将解除类型，群助手保留）`)) return
-    try { await api.delete(`/worlds/${worldId}/group-types/${t.id}`); load() }
+    try { await api.delete(`/worlds/${worldId}/group-types/${t.slug}`); load() }
     catch (e: any) { setMsg(`删除失败: ${e?.message || e}`) }
   }
 
-  const doBindGroup = async (typeId: number, groupId: number) => {
+  const doBindGroup = async (typeSlug: string, groupId: number) => {
     setApplying(true); setMsg('')
     try {
-      const r = await api.post<{ assistants: number[] }>(`/worlds/${worldId}/bind-group`, { group_id: groupId, type_id: typeId })
+      const r = await api.post<{ assistants: number[] }>(`/worlds/${worldId}/bind-group`, { group_id: groupId, type_slug: typeSlug })
       setMsg(`✅ 绑定成功，自动创建 ${r.assistants?.length || 0} 个群助手`)
       setBindTarget(null)
       load()
@@ -129,11 +132,11 @@ export default function GroupManagerModal({ worldId, isOwner, onClose }: Props) 
   }
 
   const needApi = (a: Assistant) => {
-    const t = types.find(x => x.id === a.group_type_id)
+    const t = types.find(x => x.slug === a.group_type_slug)
     return t ? (t.assistant_spec?.need_api !== false) : true
   }
 
-  const typeName = (id: number | null) => types.find(t => t.id === id)?.name || (id ? `类型#${id}` : '未绑定')
+  const typeName = (slug: string | null) => types.find(t => t.slug === slug)?.name || (slug ? `类型#${slug}` : '未绑定')
 
   return (
     <div className="fixed inset-0 z-50 bg-black/60 flex items-center justify-center p-4" onClick={onClose}>
@@ -166,7 +169,7 @@ export default function GroupManagerModal({ worldId, isOwner, onClose }: Props) 
             <>
               {/* 类型列表 */}
               {types.map(t => (
-                <div key={t.id} className="rounded-xl bg-elevated/50 border border-border p-3 space-y-1.5">
+                <div key={t.slug} className="rounded-xl bg-elevated/50 border border-border p-3 space-y-1.5">
                   <div className="flex items-center gap-2">
                     <span className="text-sm font-semibold text-textPrimary">{t.name}</span>
                     <span className={`text-[10px] px-1.5 py-0.5 rounded ${t.bound_count >= t.bind_limit ? 'bg-amber-500/15 text-amber-400' : 'bg-elevated text-textMuted'}`}>
@@ -181,23 +184,23 @@ export default function GroupManagerModal({ worldId, isOwner, onClose }: Props) 
                   {t.rules && <div className="text-xs text-textSecondary whitespace-pre-wrap line-clamp-3">{t.rules}</div>}
                   <div className="flex items-center gap-2 pt-1">
                     <button
-                      onClick={() => setBindTarget({ typeId: t.id, groupId: null })}
+                      onClick={() => setBindTarget({ typeSlug: t.slug, groupId: null })}
                       className="inline-flex items-center gap-1 text-[10px] px-2 py-1 rounded bg-primary-500/15 text-primary-400 hover:bg-primary-500/25"
                     >
                       <Link2 size={10} /> 绑定群
                     </button>
-                    {bindTarget?.typeId === t.id && (
+                    {bindTarget?.typeSlug === t.slug && (
                       <div className="flex items-center gap-1.5">
                         <select
                           value={bindTarget.groupId ?? ''}
-                          onChange={e => setBindTarget({ typeId: t.id, groupId: Number(e.target.value) })}
+                          onChange={e => setBindTarget({ typeSlug: t.slug, groupId: Number(e.target.value) })}
                           className="bg-elevated text-xs px-2 py-1 rounded border border-border text-textPrimary"
                         >
                           <option value="">选择已绑定世界的群…</option>
                           {groups.map(g => <option key={g.id} value={g.id}>{g.name}</option>)}
                         </select>
                         <button
-                          onClick={() => bindTarget.groupId && doBindGroup(t.id, bindTarget.groupId)}
+                          onClick={() => bindTarget.groupId && doBindGroup(t.slug, bindTarget.groupId)}
                           disabled={!bindTarget.groupId || applying}
                           className="text-[10px] px-2 py-1 rounded bg-primary-500 text-white disabled:opacity-40"
                         >确认</button>
@@ -240,7 +243,7 @@ export default function GroupManagerModal({ worldId, isOwner, onClose }: Props) 
                 <div key={a.id} className="rounded-xl bg-elevated/50 border border-border p-3 space-y-2">
                   <div className="flex items-center gap-2">
                     <span className="text-sm font-semibold text-textPrimary">{a.name}</span>
-                    <span className="text-[10px] text-textMuted">群#{a.group_id} · {typeName(a.group_type_id)}</span>
+                    <span className="text-[10px] text-textMuted">群#{a.group_id} · {typeName(a.group_type_slug)}</span>
                     <span className={`text-[10px] px-1.5 py-0.5 rounded ${a.configured ? 'bg-mint-500/15 text-mint-400' : 'bg-amber-500/15 text-amber-400'}`}>
                       {a.configured ? '✅ 已配置 API' : '未配置 API'}
                     </span>

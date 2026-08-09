@@ -231,24 +231,19 @@ async def unbind_entity(
 # ═══════════════════════════════════════════════════════════════
 
 @router.post("/{world_id}/group-types")
-async def create_group_type(
+async def save_group_types(
     world_id: int,
     req: dict,
     current_user: dict = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
-    """世界作者创建群类型（规则/绑定上限/助手模板）"""
-    from app.services.world.group_type_service import create_group_type as _create
+    """世界作者整体保存群类型定义（写 group_types.json，随世界打包）"""
+    from app.services.world.group_type_service import save_group_types_config
     try:
-        gt = await _create(
-            db, world_id, current_user["user_id"],
-            name=str(req.get("name") or ""),
-            description=str(req.get("description") or ""),
-            rules=str(req.get("rules") or ""),
-            bind_limit=int(req.get("bind_limit") or 3),
-            assistant_spec=req.get("assistant_spec"),
+        types = await save_group_types_config(
+            db, world_id, current_user["user_id"], req.get("types") or [],
         )
-        return {"id": gt.id, "name": gt.name, "bind_limit": gt.bind_limit, "assistant_spec": gt.assistant_spec}
+        return {"success": True, "types": types}
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
 
@@ -259,56 +254,32 @@ async def list_group_types(
     current_user: dict = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
-    """群类型列表（含每个类型的已绑定群数/上限，群主可见规则）"""
+    """群类型列表（定义+已绑定数/上限，群主可见规则）"""
     from app.services.world.group_type_service import list_group_types as _list
-    from app.models.world import WorldBinding
     types = await _list(db, world_id)
-    result = []
-    for gt in types:
-        bound = (await db.execute(
-            select(func.count()).select_from(WorldBinding).where(
-                WorldBinding.world_id == world_id,
-                WorldBinding.entity_type == "group",
-                WorldBinding.group_type_id == gt.id,
-            )
-        )).scalar() or 0
-        result.append({
-            "id": gt.id, "name": gt.name, "description": gt.description,
-            "rules": gt.rules, "bind_limit": gt.bind_limit,
-            "assistant_spec": gt.assistant_spec, "bound_count": bound,
-        })
-    return {"types": result}
+    return {"types": types}
 
 
-@router.put("/{world_id}/group-types/{type_id}")
-async def update_group_type(
-    world_id: int, type_id: int,
-    req: dict,
-    current_user: dict = Depends(get_current_user),
-    db: AsyncSession = Depends(get_db),
-):
-    from app.services.world.group_type_service import update_group_type as _update
-    try:
-        gt = await _update(
-            db, world_id, current_user["user_id"], type_id,
-            name=req.get("name"), description=req.get("description"),
-            rules=req.get("rules"), bind_limit=req.get("bind_limit"),
-            assistant_spec=req.get("assistant_spec"),
-        )
-        return {"success": True, "id": gt.id}
-    except ValueError as e:
-        raise HTTPException(status_code=400, detail=str(e))
-
-
-@router.delete("/{world_id}/group-types/{type_id}")
+@router.delete("/{world_id}/group-types/{type_slug}")
 async def delete_group_type(
-    world_id: int, type_id: int,
+    world_id: int, type_slug: str,
     current_user: dict = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
-    from app.services.world.group_type_service import delete_group_type as _delete
+    """删除类型定义（已绑定群解除类型，群助手保留）"""
+    from app.services.world.group_type_service import (
+        _require_world_owner, load_group_types, save_group_types,
+    )
+    from app.models.world import WorldBinding
     try:
-        await _delete(db, world_id, current_user["user_id"], type_id)
+        await _require_world_owner(db, world_id, current_user["user_id"])
+        types = [t for t in load_group_types(world_id) if t["slug"] != type_slug]
+        save_group_types(world_id, types)
+        await db.execute(
+            WorldBinding.__table__.update().where(
+                WorldBinding.group_type_slug == type_slug).values(group_type_slug=None)
+        )
+        await db.commit()
         return {"success": True}
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
@@ -321,13 +292,13 @@ async def bind_group_to_type(
     current_user: dict = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
-    """群主把群绑定到某群类型：校验上限 → 自动创建群助手（按模板）"""
+    """群主把群绑定到某群类型（slug）：校验上限 → 自动创建群助手（按模板）"""
     from app.services.world.group_type_service import bind_group_with_type
     try:
         result = await bind_group_with_type(
             db, world_id, current_user["user_id"],
             group_id=int(req.get("group_id") or 0),
-            type_id=int(req.get("type_id") or 0),
+            type_slug=str(req.get("type_slug") or ""),
         )
         return result
     except ValueError as e:
@@ -352,7 +323,7 @@ async def list_assistants(
     for wa in rows:
         st = await assistant_api_status(db, world_id, wa.agent_id)
         items.append({"id": wa.agent_id, "group_id": wa.group_id,
-                      "group_type_id": wa.group_type_id, **st})
+                      "group_type_slug": wa.group_type_slug, **st})
     return {"assistants": items}
 
 

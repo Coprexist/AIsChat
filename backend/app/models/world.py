@@ -48,8 +48,8 @@ class WorldBinding(Base):
     world_id = Column(Integer, ForeignKey("worlds.id", ondelete="CASCADE"), nullable=False)
     entity_type = Column(String(20), nullable=False, comment="group | dm | user")
     entity_id = Column(Integer, nullable=False, comment="群 ID / 会话用户 ID / 用户 ID")
-    group_type_id = Column(Integer, ForeignKey("world_group_types.id", ondelete="SET NULL"), nullable=True,
-                           comment="群绑定到哪个群类型（entity_type=group 时）")
+    group_type_slug = Column(String(50), nullable=True,
+                             comment="群绑定的类型 slug（定义在 group_types.json，随世界打包）")
 
     created_at = Column(DateTime, server_default=func.now())
 
@@ -70,7 +70,7 @@ class WorldAgent(Base):
     agent_id = Column(Integer, ForeignKey("agents.id", ondelete="CASCADE"), nullable=False)
     role = Column(String(20), default="resident", comment="resident(居民AI)；assistant(群助手)；creator 不走此表")
     group_id = Column(Integer, nullable=True, comment="群助手所属群（role=assistant 时）")
-    group_type_id = Column(Integer, nullable=True, comment="群助手所属群类型")
+    group_type_slug = Column(String(50), nullable=True, comment="群助手所属类型 slug")
 
     # 代码改动懒通知：用户手动改代码后记录，下次与 creator 对话时附送
     pending_notices = Column(JSONB, default=list, comment="[{file, location, summary, at}]")
@@ -96,22 +96,6 @@ class WorldChatMessage(Base):
     reasoning = Column(Text, nullable=True, comment="AI 思考过程（thinking 模式产生，展示用，不进上下文）")
 
     created_at = Column(DateTime, server_default=func.now())
-
-
-class WorldGroupType(Base):
-    """世界预设群类型 — 世界按类型分发，规则挂在类型上（不直接操作群聊）"""
-    __tablename__ = "world_group_types"
-
-    id = Column(Integer, primary_key=True, autoincrement=True)
-    world_id = Column(Integer, ForeignKey("worlds.id", ondelete="CASCADE"), nullable=False)
-    name = Column(String(50), nullable=False, comment="类型名，如 冒险团/商会")
-    description = Column(Text, nullable=True)
-    rules = Column(Text, nullable=True, comment="世界规则（群主可见；群助手行为继承）")
-    bind_limit = Column(Integer, default=3, nullable=False, comment="该类型可绑定群数上限")
-    assistant_spec = Column(JSONB, default=dict, comment="助手模板：{count, need_api, default_name}")
-
-    created_at = Column(DateTime, server_default=func.now())
-    updated_at = Column(DateTime, server_default=func.now(), onupdate=func.now())
 
 
 class WorldAI(Base):

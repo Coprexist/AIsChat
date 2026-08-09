@@ -34,6 +34,32 @@ WORLD_TOOLS = [
     {
         "type": "function",
         "function": {
+            "name": "get_group_types",
+            "description": "查看本世界的群类型配置（每个类型的规则/绑定上限/群助手模板），以及各类型已绑定的群数。用户问群类型/群助手相关时先调用它。",
+            "parameters": {"type": "object", "properties": {}},
+        },
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "update_group_types",
+            "description": "设置本世界的群类型配置（有多少种类型的群、每种的上限和规则、群助手模板）。传完整的 types 数组（先 get_group_types 看现状再改，只改要改的字段）。\n每个类型字段：name=类型名（如 冒险团/商会）、rules=世界规则（群主可见，群助手行为继承）、bind_limit=可绑定群数上限、assistant_spec={count: 每群助手数量, need_api: 是否需API, default_name: 助手默认名}。\n例：把冒险团上限改成 5 → types 里该类型 bind_limit=5。",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "types": {
+                        "type": "array",
+                        "items": {"type": "object"},
+                        "description": "完整群类型列表（全量替换，保留不想改的）",
+                    },
+                },
+                "required": ["types"],
+            },
+        },
+    },
+    {
+        "type": "function",
+        "function": {
             "name": "file_list",
             "description": "列出世界文件夹里的文件（网页代码等）。",
             "parameters": {"type": "object", "properties": {}},
@@ -349,6 +375,17 @@ def _tool_result_summary(name: str, result: dict) -> str:
                 parts.append("简介已更新")
             return "已更新世界信息" + (f"（{'，'.join(parts)}）" if parts else "")
         return f"更新世界信息失败：{result.get('error', '未知错误')}"
+    if name == "get_group_types":
+        types = result.get("types") or []
+        if not types:
+            return "本世界还没有群类型配置"
+        lines = [f"{t['name']}（上限{t['bind_limit']}，已绑{t['bound_count']}群，助手{t['assistant_spec'].get('count', 1)}个"
+                 + ("，无需API" if t['assistant_spec'].get('need_api') is False else "") + "）" for t in types]
+        return "群类型：" + "；".join(lines)
+    if name == "update_group_types":
+        if ok:
+            return f"群类型配置已更新（{len(result.get('types') or [])} 个类型）"
+        return f"更新群类型失败：{result.get('error', '未知错误')}"
     if name == "file_list":
         files = result.get("files") or []
         if not files:
@@ -461,6 +498,30 @@ def _tool_result_summary(name: str, result: dict) -> str:
 async def _do_execute(db: AsyncSession, world, name: str, arguments: str, turn_state: dict | None = None) -> dict:
     """实际执行世界 AI 的工具调用（以世界主人身份写操作；文件走隔离目录+白名单）"""
     import json
+
+    if name == "get_group_types":
+        try:
+            from app.services.world.group_type_service import list_group_types
+            types = await list_group_types(db, world.id)
+            return {"success": True, "types": types}
+        except Exception as e:
+            return {"success": False, "error": str(e)}
+
+    if name == "update_group_types":
+        try:
+            args = json.loads(arguments or "{}")
+        except json.JSONDecodeError:
+            return {"success": False, "error": "参数解析失败"}
+        try:
+            from app.services.world.group_type_service import save_group_types_config
+            types = await save_group_types_config(
+                db, world.id, world.owner_id, args.get("types") or [],
+            )
+            return {"success": True, "types": types}
+        except ValueError as e:
+            return {"success": False, "error": str(e)}
+        except Exception as e:
+            return {"success": False, "error": str(e)}
 
     if name == "update_world_info":
         try:

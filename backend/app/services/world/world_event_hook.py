@@ -63,6 +63,15 @@ async def notify_group_message(db, group_id: int, message, source: str) -> None:
         await _enqueue(db, row.world_id, group_id, message)
 
 
+async def _group_type_for_event(db, world_id: int, group_id: int) -> dict | None:
+    """群消息事件注入：群绑定的类型轻量信息（{slug, name}）；未绑定返回 None。"""
+    try:
+        from app.services.world.group_type_service import get_group_type_for_group
+        return await get_group_type_for_group(db, world_id, group_id)
+    except Exception:
+        return None
+
+
 async def _enqueue(db, world_id: int, group_id: int, message) -> None:
     from app.models.world import World
 
@@ -128,6 +137,7 @@ async def _flush(world_id: int) -> None:
                 "type": "group_message",
                 "group_id": p.group_id,
                 "source": "group",
+                "group_type": await _group_type_for_event(db, p.world_id, p.group_id),
                 "messages": p.msgs,
             }
             # 2.5：常驻世界 → 投递常驻进程（进程内队列）；非常驻/未在跑 → 临时触发
