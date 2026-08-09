@@ -465,3 +465,86 @@ async def _process_alarm_event(db, event: dict):
 
     await db.commit()
     logger.info(f"⏰ 闹钟 #{alarm_id}: AI {agent.name}({agent_id}) 执行完成")
+
+
+async def _process_friend_request_event(db, event: dict):
+    """处理好友申请事件：触发 AI（auto_respond 开启时）自主决定是否通过。
+
+    不创建 DM 会话——只是告诉 AI「有人现在加你」，通不通过由 AI 自己判断
+    （通过后自然成为好友，可随后私信）。
+    """
+    agent_id = event["agent_id"]
+    requester_id = event.get("requester_id")
+    requester_name = event.get("requester_name") or f"用户{requester_id}"
+    message = event.get("message") or ""
+
+    from app.models.agent import Agent as AgentModel
+    from app.ai.llm import CORE_IDENTITY, resolve_model, PROTOCOL_BY_PROFILE, PROTOCOL_CHAT
+    from app.services.tool_registry import get_allowed_tools
+    from app.ai.executor import _get_api_config, _tool_call_loop
+    from app.ai.response_worker import _run_serialized
+
+    agent_result = await db.execute(select(AgentModel).where(AgentModel.id == agent_id))
+    agent = agent_result.scalar_one_or_none()
+    if agent is None:
+        logger.warning(f"💌 好友申请事件: agent {agent_id} 不存在")
+        return
+
+    api_key, api_base, credit_source, pool_key_id, provider_info = await _get_api_config(db, agent)
+    profile = getattr(agent, 'config_profile', 'chat') or 'chat'
+    protocol = PROTOCOL_BY_PROFILE.get(profile, PROTOCOL_CHAT)
+    custom_prompt = agent.current_system_prompt or f"你是 {agent.name}，一个 AI 群聊参与者。"
+    system_prompt = CORE_IDENTITY + "\n\n" + custom_prompt + "\n\n" + protocol
+
+    from app.services.agent.agent_service import get_effective_config as _get_eff_cfg
+    from app.services.skill.skill_engine import _is_delay_reply_allowed
+    effective_cfg = await _get_eff_cfg(db, agent.id, user_id=None)
+    delay_allowed = await _is_delay_reply_allowed(db, agent)
+    tools = get_allowed_tools("active", thinking_enabled=effective_cfg["thinking_enabled"], delay_reply_allowed=delay_allowed)
+    tool_list = "、".join(t["function"]["name"] for t in tools)
+    system_prompt += (
+        f"\n\n## 当前会话\n"
+        f"- 这是**好友申请事件**——有人现在申请加你为好友\n"
+        f"- 你不在群聊或私信中，这是独立的事件处理\n"
+        f"- 通过与否由你自己判断（对方留言如下）\n"
+        f"- 决定后调用 handle_friend_request 工具（accept/reject + request_id）\n"
+        f"- 想先不处理也可以，申请会保持待处理（下次对话时你仍能看到）\n\n"
+        f"## 当前可用工具\n{tool_list}\n"
+    )
+
+    messages = [
+        {"role": "system", "content": system_prompt},
+        {
+            "role": "user",
+            "content": (
+                f"💌 **有人申请加你为好友！**\n\n"
+                f"申请人：{requester_name}\n"
+                f"留言：{message or '（无留言）'}\n\n"
+                f"你可以：\n"
+                f"1. 通过 → 调 handle_friend_request（action=accept）\n"
+                f"2. 拒绝 → 调 handle_friend_request（action=reject）\n"
+                f"3. 暂不处理 → 不调用工具，干净结束\n\n"
+                f"请根据你的判断处理。"
+            ),
+        },
+    ]
+
+    model = resolve_model(agent)
+    logger.info(f"💌 好友申请事件: AI {agent.name}({agent_id}) 处理来自 {requester_name} 的申请")
+
+    try:
+        await _run_serialized(agent, _tool_call_loop(
+            db=db, agent=agent, group_id=None, messages=messages, tools=tools,
+            model=model, api_base_url=api_base, api_key=api_key,
+            max_loops=effective_cfg.get("alarm_max_tool_rounds") or 5,
+            chain_depth=0, conversation_type="friend_request", session_id=None,
+            trigger_user_id=None, effective_cfg=effective_cfg,
+            credit_source=credit_source, pool_key_id=pool_key_id,
+            provider_supports_thinking=provider_info.get("thinking_supported"),
+            trigger="auto",
+        ))
+    except Exception as e:
+        logger.error(f"💌 好友申请事件: AI {agent.name} 处理失败: {e}", exc_info=True)
+
+    await db.commit()
+    logger.info(f"💌 好友申请事件: AI {agent.name}({agent_id}) 处理完成")
