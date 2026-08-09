@@ -1343,6 +1343,40 @@ async def build_dm_messages(
     except Exception as e:
         logger.warning(f"DM 状态栈摘要注入失败（非致命）: {e}")
 
+    # 📂 私信会话列表（v0.3.2）：AI 感知自己有哪些 DM 会话（存在性+未读数，不含内容）
+    try:
+        from app.models.dm import DMSession as DMSessionModel, DMMessage as DMMessageModel
+        from sqlalchemy import or_ as sa_or, func as sa_func
+        if agent.user_id:
+            sess_res = await db.execute(
+                sa_select(DMSessionModel)
+                .where(sa_or(DMSessionModel.user1_id == agent.user_id, DMSessionModel.user2_id == agent.user_id))
+                .order_by(DMSessionModel.last_message_at.desc().nullslast())
+                .limit(8)
+            )
+            dm_sess_list = sess_res.scalars().all()
+            if dm_sess_list:
+                lines = ["\n## 📂 你的私信会话（其他会话的消息不在这里，需要时可主动 send_dm 过去）"]
+                for ds in dm_sess_list:
+                    if ds.session_id == session_id:
+                        continue  # 当前会话单独展示
+                    other_id = ds.user2_id if ds.user1_id == agent.user_id else ds.user1_id
+                    oname = (await db.execute(
+                        sa_select(User.username).where(User.id == other_id)
+                    )).scalar_one_or_none() or f"用户{other_id}"
+                    # 未读数：对方发的且自己未读
+                    unread = (await db.execute(
+                        sa_select(sa_func.count())
+                        .select_from(DMMessageModel)
+                        .where(DMMessageModel.session_id == ds.session_id, DMMessageModel.sender_id == other_id, DMMessageModel.read_at.is_(None))
+                    )).scalar() or 0
+                    last_t = ds.last_message_at.strftime("%m-%d %H:%M") if ds.last_message_at else "—"
+                    unread_str = f"，{unread} 条未读" if unread else ""
+                    lines.append(f"- 私信「{oname}」(会话 {ds.session_id})：最后消息 {last_t}{unread_str}")
+                system_prompt += "\n".join(lines)
+    except Exception as e:
+        logger.warning(f"DM 会话列表注入失败（非致命）: {e}")
+
     # 📨 待处理好友申请（AI 感知；动态内容沉底）
     try:
         from app.services.social.friend_service import get_pending_friend_requests_for_ai
