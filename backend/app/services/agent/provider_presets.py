@@ -119,9 +119,22 @@ PRESETS: dict[str, ProviderPreset] = {
         "embedding_model": "embedding-2",
         "thinking_supported": False,
         "models": [
-            {"value": "glm-4-flash", "label": "GLM-4 Flash（快速）"},
-            {"value": "glm-4", "label": "GLM-4（均衡）"},
-            {"value": "glm-4-plus", "label": "GLM-4 Plus（高质量）"},
+            {"value": "glm-5.2", "label": "GLM-5.2（旗舰，1M上下文）"},
+            {"value": "glm-5.1", "label": "GLM-5.1（长程任务优化）"},
+            {"value": "glm-5", "label": "GLM-5（基座模型）"},
+            {"value": "glm-5-turbo", "label": "GLM-5-Turbo（龙虾任务优化）"},
+            {"value": "glm-4.7", "label": "GLM-4.7（全面升级）"},
+            {"value": "glm-4.7-flashx", "label": "GLM-4.7-FlashX（轻量高速）"},
+            {"value": "glm-4.6", "label": "GLM-4.6（200K上下文）"},
+            {"value": "glm-4.5-air", "label": "GLM-4.5-Air（高性价比）"},
+            {"value": "glm-4.5-airx", "label": "GLM-4.5-AirX（极速版本）"},
+            {"value": "glm-4-long", "label": "GLM-4-Long（1M上下文）"},
+            {"value": "glm-4-flashx-250414", "label": "GLM-4-FlashX-250414（免费增强版）"},
+            {"value": "glm-4.7-flash", "label": "GLM-4.7-Flash（免费模型）"},
+            {"value": "glm-4-flash-250414", "label": "GLM-4-Flash-250414（免费版）"},
+            {"value": "glm-4-plus", "label": "GLM-4-Plus（高性能）"},
+            {"value": "glm-4-air-250414", "label": "GLM-4-Air-250414（基座模型）"},
+            {"value": "glm-4-airx", "label": "GLM-4-AirX（极速推理）"},
         ],
     },
 
@@ -163,6 +176,8 @@ def get_all_presets() -> list[ProviderPreset]:
             "embedding_model": p["embedding_model"],
             "thinking_supported": p["thinking_supported"],
             "models": p["models"],
+            "global_default_chat_model": p.get("global_default_chat_model"),
+            "global_default_work_model": p.get("global_default_work_model"),
         }
         for p in PRESETS.values()
     ]

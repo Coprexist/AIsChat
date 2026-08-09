@@ -96,6 +96,10 @@ export default function SettingsPage() {
     try { return parseFloat(localStorage.getItem('ui_scale') || '1') } catch { return 1 }
   })
 
+  // 新增：全局默认模型（用户覆盖）
+  const [globalChatModel, setGlobalChatModel] = useState('')
+  const [globalWorkModel, setGlobalWorkModel] = useState('')
+
   // 应用 UI 缩放
   useEffect(() => {
     document.documentElement.style.fontSize = `${85 + (uiScale - 0.85) * 100}%`
@@ -224,7 +228,6 @@ export default function SettingsPage() {
     const ids = NAV_SECTIONS.map(s => `settings-${s.id}`)
     const observer = new IntersectionObserver(
       (entries) => {
-        // 找第一个可见的 section
         const visible = entries.filter(e => e.isIntersecting).sort((a, b) => {
           const aEl = a.target as HTMLElement
           const bEl = b.target as HTMLElement
@@ -249,6 +252,7 @@ export default function SettingsPage() {
   const [savedValues, setSavedValues] = useState<{
     apiBaseUrl: string; autoTimeout: number; autoDefault: boolean
     timezone: string; language: string; chatStyle: string; uiScale: number
+    globalChatModel?: string; globalWorkModel?: string
   } | null>(null)
 
   const hasUnsavedChanges = savedValues !== null && (
@@ -259,6 +263,8 @@ export default function SettingsPage() {
     language !== savedValues.language ||
     chatStyle !== savedValues.chatStyle ||
     uiScale !== savedValues.uiScale ||
+    globalChatModel !== (savedValues.globalChatModel || '') ||
+    globalWorkModel !== (savedValues.globalWorkModel || '') ||
     apiKey.trim() !== ''
   )
 
@@ -302,6 +308,9 @@ export default function SettingsPage() {
           const s = parseFloat(data.ui_prefs.ui_scale)
           if (s >= 0.7 && s <= 1.5) { setUiScale(s); try { localStorage.setItem('ui_scale', String(s)) } catch {} }
         }
+        // 加载全局默认模型覆盖
+        setGlobalChatModel(data.global_chat_model || '')
+        setGlobalWorkModel(data.global_work_model || '')
         setSavedValues({
           preferOwnKey: data.prefer_own_key ?? false,
           apiBaseUrl: apiUrl,
@@ -311,12 +320,13 @@ export default function SettingsPage() {
           language: lang,
           chatStyle: style,
           uiScale: data.ui_prefs?.ui_scale || 1,
+          globalChatModel: data.global_chat_model || '',
+          globalWorkModel: data.global_work_model || '',
         })
       }).catch(console.error)
       api.get<any[]>('/agents').then(list => {
         setAgents(list || [])
       }).catch(() => {})
-      // 拉取供应商预设
       api.get<{providers: ProviderPreset[]}>('/agents/models').then(d => {
         setProviderPresets(d.providers || [])
       }).catch(() => {})
@@ -365,6 +375,8 @@ export default function SettingsPage() {
         timezone,
         language,
         ui_prefs: { chat_style: chatStyle, ui_scale: uiScale },
+        global_chat_model: globalChatModel || null,
+        global_work_model: globalWorkModel || null,
       })
       try { localStorage.setItem('chat_style', chatStyle); localStorage.setItem('ui_scale', String(uiScale)) } catch {}
       setApiKey('')
@@ -377,6 +389,8 @@ export default function SettingsPage() {
         language,
         chatStyle,
         uiScale,
+        globalChatModel,
+        globalWorkModel,
       })
       saveToStorage(magicVision)
       refreshUser()
@@ -408,7 +422,6 @@ export default function SettingsPage() {
 
   const startEditAgentApi = (agent: any) => {
     setEditingAgentId(agent.id)
-    // 优先用已保存的，否则匹配默认预设
     const saved = agent.api_base_url || ''
     setAgentApiBaseUrl(saved || (providerPresets.find(p => p.is_default)?.base_url || ''))
     setAgentApiKey('')
@@ -432,8 +445,6 @@ export default function SettingsPage() {
   }
 
   /** 点击侧边栏 → 滚动到对应 section */
-
-
   const renderContent = () => {
     return sections;
   }
@@ -637,6 +648,36 @@ export default function SettingsPage() {
                 ) : null}
                 {testing ? t('settings.testing') : testResult === 'success' ? t('settings.testSuccess') : testResult === 'fail' ? t('settings.testFailed') : t('settings.testConnection')}
               </button>
+            </div>
+          </div>
+
+          {/* 全局默认模型覆盖 */}
+          <div className="grid grid-cols-2 gap-3 pt-3 border-t border-border">
+            <div>
+              <label className="block text-xs font-medium mb-1.5 text-textSecondary">
+                全局默认聊天模型（覆盖）
+              </label>
+              <input
+                type="text"
+                value={globalChatModel}
+                onChange={(e) => setGlobalChatModel(e.target.value)}
+                className="w-full px-3.5 py-2.5 rounded-xl border border-border bg-canvas text-sm text-textPrimary placeholder:text-textMuted focus:outline-none focus:ring-2 focus:ring-primary-500/50"
+                placeholder="例如：glm-4-flash"
+              />
+              <p className="text-[10px] text-textMuted mt-1">留空则使用系统全局默认</p>
+            </div>
+            <div>
+              <label className="block text-xs font-medium mb-1.5 text-textSecondary">
+                全局默认工作模型（覆盖）
+              </label>
+              <input
+                type="text"
+                value={globalWorkModel}
+                onChange={(e) => setGlobalWorkModel(e.target.value)}
+                className="w-full px-3.5 py-2.5 rounded-xl border border-border bg-canvas text-sm text-textPrimary placeholder:text-textMuted focus:outline-none focus:ring-2 focus:ring-primary-500/50"
+                placeholder="例如：glm-4"
+              />
+              <p className="text-[10px] text-textMuted mt-1">留空则使用系统全局默认</p>
             </div>
           </div>
 

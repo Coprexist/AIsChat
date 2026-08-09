@@ -49,6 +49,8 @@ export default function ProviderPresetSelector() {
   const [editModels, setEditModels] = useState('')
   const [editIsDefault, setEditIsDefault] = useState(false)
   const [editIndex, setEditIndex] = useState<number | null>(null)
+  const [editGlobalChatModel, setEditGlobalChatModel] = useState('')
+  const [editGlobalWorkModel, setEditGlobalWorkModel] = useState('')
 
   // 新增模式
   const [adding, setAdding] = useState(false)
@@ -77,6 +79,8 @@ export default function ProviderPresetSelector() {
     setEditThinking(p.thinking_supported)
     setEditModels(p.model_options?.length ? JSON.stringify(p.model_options, null, 2) : '')
     setEditIsDefault(p.is_default)
+    setEditGlobalChatModel(p.global_default_chat_model || '')
+    setEditGlobalWorkModel(p.global_default_work_model || '')
     setEditIndex(idx)
     setAdding(false)
     setNewPreset('')
@@ -100,6 +104,8 @@ export default function ProviderPresetSelector() {
       setEditModels('')
       setEditIsDefault(providers.length === 0)
       setEditIndex(null)
+      setEditGlobalChatModel('')
+      setEditGlobalWorkModel('')
     } else {
       const p = presets.find(pr => pr.key === presetKey)
       if (p) {
@@ -113,6 +119,8 @@ export default function ProviderPresetSelector() {
         setEditModels(JSON.stringify(p.models, null, 2))
         setEditIsDefault(providers.length === 0)
         setEditIndex(null)
+        setEditGlobalChatModel(p.global_default_chat_model || '')
+        setEditGlobalWorkModel(p.global_default_work_model || '')
       }
     }
   }
@@ -136,6 +144,8 @@ export default function ProviderPresetSelector() {
         thinking_supported: editThinking,
         is_default: editIsDefault,
         index: editIndex,
+        global_default_chat_model: editGlobalChatModel || undefined,
+        global_default_work_model: editGlobalWorkModel || undefined,
       })
       setSaved(true)
       await load()
@@ -222,6 +232,8 @@ export default function ProviderPresetSelector() {
                     editThinking={editThinking} setEditThinking={setEditThinking}
                     editModels={editModels} setEditModels={setEditModels}
                     editIsDefault={editIsDefault} setEditIsDefault={setEditIsDefault}
+                    editGlobalChatModel={editGlobalChatModel} setEditGlobalChatModel={setEditGlobalChatModel}
+                    editGlobalWorkModel={editGlobalWorkModel} setEditGlobalWorkModel={setEditGlobalWorkModel}
                     saving={saving} saved={saved}
                     onSave={handleSave}
                     t={t}
@@ -322,6 +334,8 @@ function ProviderEditForm({
   editThinking, setEditThinking,
   editModels, setEditModels,
   editIsDefault, setEditIsDefault,
+  editGlobalChatModel, setEditGlobalChatModel,
+  editGlobalWorkModel, setEditGlobalWorkModel,
   saving, saved, onSave, t, isNew,
 }: {
   editName: string; setEditName: (v: string) => void
@@ -332,6 +346,8 @@ function ProviderEditForm({
   editThinking: boolean; setEditThinking: (v: boolean) => void
   editModels: string; setEditModels: (v: string) => void
   editIsDefault: boolean; setEditIsDefault: (v: boolean) => void
+  editGlobalChatModel: string; setEditGlobalChatModel: (v: string) => void
+  editGlobalWorkModel: string; setEditGlobalWorkModel: (v: string) => void
   saving: boolean; saved: boolean; onSave: () => void
   t: (key: string) => string
   isNew?: boolean
@@ -381,6 +397,29 @@ function ProviderEditForm({
             onChange={e => setEditEmbed(e.target.value)}
             className="w-full px-3 py-2 rounded-lg border border-border bg-canvas text-textPrimary text-xs focus:outline-none focus:ring-2 focus:ring-primary-500/60"
           />
+        </div>
+      </div>
+      <div className="border-t border-border/60 pt-3 mt-3">
+        <p className="text-xs text-textMuted mb-2">全局默认模型（全站未指定模型时使用）</p>
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+          <div>
+            <label className="block text-xs text-textSecondary mb-1">全局默认聊天模型</label>
+            <input
+              type="text" value={editGlobalChatModel}
+              onChange={e => setEditGlobalChatModel(e.target.value)}
+              className="w-full px-3 py-2 rounded-lg border border-border bg-canvas text-textPrimary text-xs focus:outline-none focus:ring-2 focus:ring-primary-500/60"
+              placeholder="例如：glm-5.2"
+            />
+          </div>
+          <div>
+            <label className="block text-xs text-textSecondary mb-1">全局默认工作模型</label>
+            <input
+              type="text" value={editGlobalWorkModel}
+              onChange={e => setEditGlobalWorkModel(e.target.value)}
+              className="w-full px-3 py-2 rounded-lg border border-border bg-canvas text-textPrimary text-xs focus:outline-none focus:ring-2 focus:ring-primary-500/60"
+              placeholder="例如：glm-4.7-flash"
+            />
+          </div>
         </div>
       </div>
       <div className="flex items-center gap-4">

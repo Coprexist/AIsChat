@@ -11,13 +11,18 @@ from datetime import datetime, timedelta, timezone
 # 模型解析
 # ═══════════════════════════════════════════════════════════════
 
-def resolve_model(agent, default_model: str = "deepseek-v4-flash") -> str:
+def resolve_model(agent, default_model: str = "deepseek-v4-flash", global_default_model: str | None = None) -> str:
     """
     解析 AI 代理实际使用的模型（纯函数）。
-    优先使用 agent 自定义模型，否则使用传入的默认值。
+    优先级：agent 自定义模型 > 全局默认模型 > 传入的默认值
     """
+    # 1. 优先使用 agent 自定义模型
     if hasattr(agent, "chat_model") and agent.chat_model:
         return agent.chat_model
+    # 2. 其次使用全局默认模型
+    if global_default_model:
+        return global_default_model
+    # 3. 最后使用传入的默认值
     return default_model
 
 

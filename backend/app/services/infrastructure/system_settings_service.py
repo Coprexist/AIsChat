@@ -54,7 +54,12 @@ async def get_provider_for_pool_key(db: AsyncSession, pool_key) -> dict:
     providers = await get_providers(db)
     provider_name = getattr(pool_key, "provider_name", None)
     api_base_url = getattr(pool_key, "api_base_url", None)
-    return find_provider_for_pool_key(providers, provider_name, api_base_url) or {}
+    provider = find_provider_for_pool_key(providers, provider_name, api_base_url) or {}
+    # 返回全局默认模型配置
+    if provider:
+        provider["global_default_chat_model"] = provider.get("global_default_chat_model")
+        provider["global_default_work_model"] = provider.get("global_default_work_model")
+    return provider
 
 
 async def get_settings(db: AsyncSession) -> dict:
