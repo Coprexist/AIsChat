@@ -7,7 +7,7 @@ import logging
 
 from fastapi import APIRouter, Depends, HTTPException, UploadFile, Form
 from pydantic import BaseModel, Field
-from sqlalchemy import select
+from sqlalchemy import select, func
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.database import get_db
@@ -227,8 +227,180 @@ async def unbind_entity(
 
 
 # ═══════════════════════════════════════════════════════════════
-# 唤醒 / 休眠
+# 群类型系统（世界按类型分发群 + 群助手）
 # ═══════════════════════════════════════════════════════════════
+
+@router.post("/{world_id}/group-types")
+async def create_group_type(
+    world_id: int,
+    req: dict,
+    current_user: dict = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """世界作者创建群类型（规则/绑定上限/助手模板）"""
+    from app.services.world.group_type_service import create_group_type as _create
+    try:
+        gt = await _create(
+            db, world_id, current_user["user_id"],
+            name=str(req.get("name") or ""),
+            description=str(req.get("description") or ""),
+            rules=str(req.get("rules") or ""),
+            bind_limit=int(req.get("bind_limit") or 3),
+            assistant_spec=req.get("assistant_spec"),
+        )
+        return {"id": gt.id, "name": gt.name, "bind_limit": gt.bind_limit, "assistant_spec": gt.assistant_spec}
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+
+@router.get("/{world_id}/group-types")
+async def list_group_types(
+    world_id: int,
+    current_user: dict = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """群类型列表（含每个类型的已绑定群数/上限，群主可见规则）"""
+    from app.services.world.group_type_service import list_group_types as _list
+    from app.models.world import WorldBinding
+    types = await _list(db, world_id)
+    result = []
+    for gt in types:
+        bound = (await db.execute(
+            select(func.count()).select_from(WorldBinding).where(
+                WorldBinding.world_id == world_id,
+                WorldBinding.entity_type == "group",
+                WorldBinding.group_type_id == gt.id,
+            )
+        )).scalar() or 0
+        result.append({
+            "id": gt.id, "name": gt.name, "description": gt.description,
+            "rules": gt.rules, "bind_limit": gt.bind_limit,
+            "assistant_spec": gt.assistant_spec, "bound_count": bound,
+        })
+    return {"types": result}
+
+
+@router.put("/{world_id}/group-types/{type_id}")
+async def update_group_type(
+    world_id: int, type_id: int,
+    req: dict,
+    current_user: dict = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    from app.services.world.group_type_service import update_group_type as _update
+    try:
+        gt = await _update(
+            db, world_id, current_user["user_id"], type_id,
+            name=req.get("name"), description=req.get("description"),
+            rules=req.get("rules"), bind_limit=req.get("bind_limit"),
+            assistant_spec=req.get("assistant_spec"),
+        )
+        return {"success": True, "id": gt.id}
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+
+@router.delete("/{world_id}/group-types/{type_id}")
+async def delete_group_type(
+    world_id: int, type_id: int,
+    current_user: dict = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    from app.services.world.group_type_service import delete_group_type as _delete
+    try:
+        await _delete(db, world_id, current_user["user_id"], type_id)
+        return {"success": True}
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+
+@router.post("/{world_id}/bind-group")
+async def bind_group_to_type(
+    world_id: int,
+    req: dict,
+    current_user: dict = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """群主把群绑定到某群类型：校验上限 → 自动创建群助手（按模板）"""
+    from app.services.world.group_type_service import bind_group_with_type
+    try:
+        result = await bind_group_with_type(
+            db, world_id, current_user["user_id"],
+            group_id=int(req.get("group_id") or 0),
+            type_id=int(req.get("type_id") or 0),
+        )
+        return result
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+
+@router.get("/{world_id}/assistants")
+async def list_assistants(
+    world_id: int,
+    current_user: dict = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """世界视角：列出该世界所有群助手（含 API 状态，不回显 key）"""
+    from app.services.world.group_type_service import assistant_api_status
+    from app.models.world import WorldAgent
+    rows = (await db.execute(
+        select(WorldAgent).where(
+            WorldAgent.world_id == world_id, WorldAgent.role == "assistant")
+        .order_by(WorldAgent.id)
+    )).scalars().all()
+    items = []
+    for wa in rows:
+        st = await assistant_api_status(db, world_id, wa.agent_id)
+        items.append({"id": wa.agent_id, "group_id": wa.group_id,
+                      "group_type_id": wa.group_type_id, **st})
+    return {"assistants": items}
+
+
+@router.put("/{world_id}/assistants/{agent_id}/api")
+async def set_assistant_api(
+    world_id: int, agent_id: int,
+    req: dict,
+    current_user: dict = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """群主为群助手设置自定义 API（加密存储）"""
+    from app.services.world.group_type_service import set_assistant_api as _set
+    try:
+        return await _set(
+            db, world_id, current_user["user_id"], agent_id,
+            api_key=str(req.get("api_key") or "") or None,
+            api_base_url=str(req.get("api_base_url") or "") or None,
+        )
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+
+@router.post("/{world_id}/assistants/{agent_id}/apply-global")
+async def apply_global_api(
+    world_id: int, agent_id: int,
+    current_user: dict = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """一键应用群主的默认全局 API"""
+    from app.services.world.group_type_service import apply_global_api as _apply
+    try:
+        return await _apply(db, world_id, current_user["user_id"], agent_id)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+
+@router.delete("/{world_id}/assistants/{agent_id}/api")
+async def clear_assistant_api(
+    world_id: int, agent_id: int,
+    current_user: dict = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """清除群助手 API（回落系统默认）"""
+    from app.services.world.group_type_service import clear_assistant_api as _clear
+    try:
+        return await _clear(db, world_id, current_user["user_id"], agent_id)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
 
 @router.post("/{world_id}/wake")
 async def wake_world(
