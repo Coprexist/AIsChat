@@ -3,7 +3,7 @@
 本 CHANGELOG 遵循 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.0.0/) 规范，
 版本号遵守 [语义化版本](https://semver.org/lang/zh-CN/)。
 
-> **当前阶段**：v1.0 正式版 — 补丁版本号（第三位）递增。
+> **当前阶段**：v0.3 正式版 — 补丁版本号（第三位）递增。
 
 ---
 
