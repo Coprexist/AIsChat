@@ -213,6 +213,81 @@ async def get_state_stack_summary(db: AsyncSession, agent_id: int, max_chars: in
     return format_state_stack_summary(stack, max_chars=max_chars)
 
 
+# ═══════════════════════════════════════════════════════════
+# 会话帧自动维护（2026-08-09）：聊天即情景
+# ═══════════════════════════════════════════════════════════
+
+async def ensure_active_frame(
+    db: AsyncSession, agent_id: int,
+    conv_type: str, context_ref: str,
+    title: str, actor_name: str,
+) -> None:
+    """
+    确保状态栈栈顶帧 = 当前会话（DM/群聊触发时自动调用）。
+
+    聊天是一个情景：AI 切换会话时自动记录「我去干什么 / 我干了什么 /
+    回去接着干什么」，切回时带交接摘要，使 AI 在任何会话都能感知手头的事。
+
+    - 栈顶已是本会话：不动（同一会话继续）
+    - 栈里有本会话挂起帧：提到栈顶恢复 active，写 completed_handoff
+      （📝 刚完成：刚才在别的会话干了什么）
+    - 栈里没有：旧栈顶挂起（保留其 why/doing），push 新帧
+    - 栈顶是 AI 手动帧（非 dm/group_chat）：不干预，等 AI 自己 pop
+
+    注：超配额不触发回复时也会调用（帧记录「有人找过」），
+    AI 切回其他会话时通过摘要感知未处理的消息。
+    """
+    if conv_type not in ("dm", "group_chat"):
+        return
+    stack = await _get_stack(db, agent_id)
+
+    conv_label = "私信" if conv_type == "dm" else "群"
+
+    # 栈顶已是当前会话
+    if stack and stack[-1].get("context_ref") == context_ref:
+        return
+    # 栈顶是 AI 手动帧：不干预
+    if stack and stack[-1].get("type") not in ("dm", "group_chat"):
+        return
+
+    idx = next((i for i, f in enumerate(stack) if f.get("context_ref") == context_ref), None)
+
+    if idx is not None:
+        # 切回挂起的会话
+        frame = stack.pop(idx)
+        prev = stack[-1] if stack else None
+        if prev is not None:
+            prev["status"] = "suspended"
+            frame["completed_handoff"] = {
+                "type": prev.get("type"),
+                "doing": prev.get("doing"),
+            }
+        frame["status"] = "active"
+        frame["why"] = f"收到{actor_name}的消息"
+        frame["doing"] = f"在{conv_label}「{title}」中回复{actor_name}"
+        stack.append(frame)
+    else:
+        # 新会话：旧栈顶挂起 + push（handoff 写在新帧上——渲染读栈顶帧）
+        prev = stack[-1] if stack else None
+        frame = make_state_frame(
+            type_=conv_type,
+            context_ref=context_ref,
+            why=f"收到{actor_name}的消息",
+            doing=f"在{conv_label}「{title}」中回复{actor_name}",
+        )
+        if prev is not None:
+            prev["status"] = "suspended"
+            frame["handoff"] = {
+                "from_type": prev.get("type"),
+                "from_doing": prev.get("doing"),
+            }
+        stack.append(frame)
+
+    if len(stack) > MAX_STACK_DEPTH:
+        stack = stack[-MAX_STACK_DEPTH:]
+    await _set_stack(db, agent_id, stack)
+
+
 async def bump_frame_call_count(db: AsyncSession, agent_id: int, calls: int = 1) -> None:
     """LLM 每次调用后：agent 总计数 +1；栈顶 active 帧 call_count +1 并做情感衰减
     （mood homeostasis——情感随该状态自己的调用次数回归基线）。"""

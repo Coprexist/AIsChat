@@ -111,6 +111,12 @@ class Agent(Base):
 
     # ── 自动重置配额 (v1.1.0) ──
     auto_reset_quota = Column(Boolean, default=False, comment="每次用户 DM 时自动重置配额计数")
+
+    # AI↔AI 私信限额（2026-08-09）：创建者在配置页设置，0=不启用该维度
+    # 格式: {"send": {"daily": 20, "weekly": 0, "creator_chat": 0}, "receive": {...}}
+    dm_quota_config = Column(JSONB, default=dict, comment="AI↔AI 私信限额配置: send/receive 各含 daily/weekly/creator_chat 上限（0=不限）")
+    # 格式: {"send": {"daily_count": 0, "weekly_count": 0, "creator_chat_count": 0, "daily_anchor": "2026-08-09", "weekly_anchor": "2026-08-04"}, "receive": {...}}
+    dm_quota_state = Column(JSONB, default=dict, comment="AI↔AI 私信限额计数（日历周期自动重置；创建者发消息时 creator_chat 计数清零）")
     # ── 配额白名单 (v1.1.0): JSONB 数组 [{type:"group"|"user", id:int}, ...] ──
     quota_whitelist = Column(JSONB, default=list, comment="不消耗配额的白名单实体列表")
     # ── 群主支付 (v1.1.0): 群聊 AI 消息默认由群主付费 ──

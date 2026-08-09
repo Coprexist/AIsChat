@@ -119,7 +119,7 @@ def format_state_stack_summary(stack: list[dict], max_chars: int = 500) -> str:
                 lines.append(f"   （跳过了 {comp['skipped']}）")
         handoff = top.get("handoff") or {}
         if handoff.get("from_type") or top.get("why"):
-            src = f"[{handoff['from_type']}] {handoff.get('from_doing', '')}".strip()
+            src = f"[{handoff.get('from_type')}] {handoff.get('from_doing', '')}".strip() if handoff.get("from_type") else ""
             parts = [f"← 从{src}来" if src else "← 新状态"]
             if top.get("why"):
                 parts.append(f"原因: {top['why']}")

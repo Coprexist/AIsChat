@@ -111,6 +111,7 @@ class AgentUpdateConfigRequest(BaseModel):
     conversation_logs_limit: int | None = Field(default=None, description="对话日志保留上限（null=继承全局）")
     user_can_view_logs: bool | None = Field(default=None, description="用户可否查看此 AI 对话日志（null=继承全局）")
     auto_reset_quota: bool | None = Field(default=None, description="每次用户与 AI 对话后自动重置配额计数")
+    dm_quota_config: dict | None = Field(default=None, description="AI↔AI 私信限额配置: {send:{daily,weekly,creator_chat}, receive:{...}}，0=不启用该维度")
     group_owner_pays: bool | None = Field(default=None, description="群聊中 AI 消息是否由群主付费")
 
     @field_validator("status_text")
@@ -171,6 +172,7 @@ class AgentResponse(BaseModel):
     status_color: str | None = None
     auto_reset_quota: bool = False
     group_owner_pays: bool = True
+    dm_quota_config: dict | None = None
     reminder_grace: str = "every_time"
     auto_dnd_threshold: int = 20
     auto_dnd_duration: int = 5

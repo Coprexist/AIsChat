@@ -51,6 +51,10 @@ interface AgentData {
   status_color?: string | null
   auto_reset_quota?: boolean
   group_owner_pays?: boolean
+  dm_quota_config?: {
+    send?: { daily?: number; weekly?: number; creator_chat?: number }
+    receive?: { daily?: number; weekly?: number; creator_chat?: number }
+  }
 }
 
 interface ModelOption {
@@ -179,6 +183,15 @@ export default function AgentSettingsModal({
   const [autoResetQuota, setAutoResetQuota] = useState(agent.auto_reset_quota ?? false)
   const [groupOwnerPays, setGroupOwnerPays] = useState(agent.group_owner_pays ?? true)
 
+  // ── AI↔AI 私信限额（0 = 不启用）──
+  const dmCfg = agent.dm_quota_config || {}
+  const [dmSendDaily, setDmSendDaily] = useState(dmCfg.send?.daily ?? 20)
+  const [dmSendWeekly, setDmSendWeekly] = useState(dmCfg.send?.weekly ?? 0)
+  const [dmSendCreatorChat, setDmSendCreatorChat] = useState(dmCfg.send?.creator_chat ?? 0)
+  const [dmRecvDaily, setDmRecvDaily] = useState(dmCfg.receive?.daily ?? 20)
+  const [dmRecvWeekly, setDmRecvWeekly] = useState(dmCfg.receive?.weekly ?? 0)
+  const [dmRecvCreatorChat, setDmRecvCreatorChat] = useState(dmCfg.receive?.creator_chat ?? 0)
+
   // ── UI 状态 ──
   const [saving, setSaving] = useState(false)
   const [saveMsg, setSaveMsg] = useState('')
@@ -292,6 +305,10 @@ export default function AgentSettingsModal({
         user_can_view_logs: userCanViewLogs,
         auto_reset_quota: autoResetQuota,
         group_owner_pays: groupOwnerPays,
+        dm_quota_config: {
+          send: { daily: dmSendDaily, weekly: dmSendWeekly, creator_chat: dmSendCreatorChat },
+          receive: { daily: dmRecvDaily, weekly: dmRecvWeekly, creator_chat: dmRecvCreatorChat },
+        },
         bio: bio || null,
         status_text: statusText || null,
         status_color: statusColor || null,
@@ -669,6 +686,26 @@ export default function AgentSettingsModal({
                     )}
                   </div>
                 )}
+
+                {/* AI↔AI 私信限额（2026-08-09） */}
+                <div className="mt-4 pt-3 border-t border-border/40">
+                  <label className="block text-xs font-medium mb-1 text-textSecondary">{t('agents.dmQuotaTitle') || 'AI↔AI 私信限额'}</label>
+                  <p className="text-[10px] text-textMuted leading-relaxed mb-2">{t('agents.dmQuotaDesc') || '控制与其他 AI 私信互通的条数（0 = 不启用该维度）。超出后消息照常送达，但不触发对方自动回复；创建者发消息后计数重置。'}</p>
+                  <div className="grid grid-cols-2 gap-3">
+                    <div className="space-y-2">
+                      <span className="text-[11px] font-medium text-textSecondary block">{t('agents.dmQuotaSend') || '发送'}</span>
+                      <NumberField label={t('agents.dmQuotaDaily') || '每天'} value={dmSendDaily} setValue={setDmSendDaily} min={0} max={9999} />
+                      <NumberField label={t('agents.dmQuotaWeekly') || '每周'} value={dmSendWeekly} setValue={setDmSendWeekly} min={0} max={9999} />
+                      <NumberField label={t('agents.dmQuotaCreatorChat') || '距创建者对话'} value={dmSendCreatorChat} setValue={setDmSendCreatorChat} min={0} max={9999} />
+                    </div>
+                    <div className="space-y-2">
+                      <span className="text-[11px] font-medium text-textSecondary block">{t('agents.dmQuotaReceive') || '接收'}</span>
+                      <NumberField label={t('agents.dmQuotaDaily') || '每天'} value={dmRecvDaily} setValue={setDmRecvDaily} min={0} max={9999} />
+                      <NumberField label={t('agents.dmQuotaWeekly') || '每周'} value={dmRecvWeekly} setValue={setDmRecvWeekly} min={0} max={9999} />
+                      <NumberField label={t('agents.dmQuotaCreatorChat') || '距创建者对话'} value={dmRecvCreatorChat} setValue={setDmRecvCreatorChat} min={0} max={9999} />
+                    </div>
+                  </div>
+                </div>
               </Section>
 
               {/* 额度 */}

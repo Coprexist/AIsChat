@@ -52,6 +52,12 @@ class SendDM(ToolPlugin):
             msg = await send_dm_message(
                 db, session_id, sender_id=agent.user_id, content=content, reply_to=reply_to,
             )
+            # 2026-08-09: AI 发送私信后同样触发接收方 AI 回复（AI↔AI 限额由触发逻辑内部检查）
+            from app.routers.dm import _maybe_trigger_dm_ai_reply
+            await _maybe_trigger_dm_ai_reply(
+                db, session_id, msg, agent.user_id,
+                sender_name=context.get("agent_name", f"AI:{agent_id}"),
+            )
             await db.commit()
         except ValueError as e:
             return {"error": True, "message": str(e)}

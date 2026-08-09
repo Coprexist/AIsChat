@@ -695,6 +695,11 @@ async def update_agent_config(
     if "is_ai_editable" in updates:
         agent.is_ai_editable = updates["is_ai_editable"]
 
+    # 2026-08-09: AI↔AI 私信限额配置（0=不启用维度；规范化后写入）
+    if "dm_quota_config" in updates and updates["dm_quota_config"] is not None:
+        from app.services.social.dm_quota import _norm_config
+        agent.dm_quota_config = _norm_config(updates["dm_quota_config"])
+
     # v0.1.6: 文件系统记忆配置
     if "memory_load_mode" in updates and updates["memory_load_mode"] is not None:
         agent.memory_load_mode = updates["memory_load_mode"]
@@ -1276,6 +1281,7 @@ def agent_to_dict(agent: Agent) -> dict:
         "status_color": getattr(agent, 'status_color', None),
         "auto_reset_quota": getattr(agent, 'auto_reset_quota', False),
         "group_owner_pays": getattr(agent, 'group_owner_pays', True),
+        "dm_quota_config": getattr(agent, 'dm_quota_config', None),
     }
 
 

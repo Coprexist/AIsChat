@@ -162,7 +162,10 @@ async def send_dm(
             attachments=body.get("attachments"),
         )
         # 触发 AI 回复（如果对方是 AI）
-        await _maybe_trigger_dm_ai_reply(db, session_id, msg, current_user["user_id"])
+        await _maybe_trigger_dm_ai_reply(
+            db, session_id, msg, current_user["user_id"],
+            sender_name=current_user.get("username"),
+        )
         return msg
     except ValueError as e:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
@@ -317,6 +320,7 @@ async def _maybe_trigger_dm_ai_reply(
     msg: dict,
     sender_id: int,
     force_own_key: bool = False,
+    sender_name: str | None = None,
 ):
     """如果消息的接收方是 AI，触发 AI 自动回复"""
     import logging
@@ -351,6 +355,33 @@ async def _maybe_trigger_dm_ai_reply(
     agent = agent_result.scalar_one_or_none()
     if agent is None:
         return
+
+    # ── 2026-08-09: AI↔AI 私信限额 ──
+    from datetime import datetime
+    from zoneinfo import ZoneInfo
+    from app.config import settings
+    from app.services.social import dm_quota
+    now = datetime.now(ZoneInfo(settings.display_timezone))
+
+    # 创建者发消息 → 重置该 AI 的 creator_chat 计数
+    if sender_id == agent.owner_id:
+        dm_quota.reset_by_creator(agent, now)
+
+    # 发送方是 AI → AI↔AI 场景：双向限额检查，任一超限则不触发（消息已入库，AI 下次打开会话能看到）
+    sender_is_ai = await db.scalar(
+        select(User.id).where(User.id == sender_id, User.type == "ai")
+    )
+    if sender_is_ai:
+        sender_agent = await db.scalar(
+            select(Agent).where(Agent.user_id == sender_id)
+        )
+        if sender_agent is None:
+            return
+        if not dm_quota.quota_allows(sender_agent, "send", now) or not dm_quota.quota_allows(agent, "receive", now):
+            return
+        dm_quota.consume(sender_agent, "send", now)
+        dm_quota.consume(agent, "receive", now)
+        await db.flush()
 
     # ── v0.1.8: 对话权限与限额决策 ──
     is_owner = sender_id == agent.owner_id
@@ -450,7 +481,7 @@ async def _maybe_trigger_dm_ai_reply(
             "message_id": msg["id"],
             "session_id": session_id,
             "sender_id": sender_id,
-            "sender_name": current_user["username"],
+            "sender_name": sender_name,
         })
         logger.info(f"AI {agent.name}({agent.id}) 正忙，DM 中断消息已注入")
     else:
