@@ -3574,6 +3574,7 @@ const ja: TranslationDict = {
   // ======================== ナビゲーション / Navigation ========================
   'nav.chat': 'チャット',
   'nav.worlds': 'ワールド',
+  'nav.market': 'マーケット',
   'nav.friends': 'フレンド',
   'nav.ai': 'AI',
   'nav.me': 'マイ',

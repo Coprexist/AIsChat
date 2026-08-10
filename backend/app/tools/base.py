@@ -144,6 +144,10 @@ class ToolPlugin:
         """执行工具逻辑，子类必须实现"""
         raise NotImplementedError(f"{self.name}.execute() 未实现")
 
+    def get_task_summary(self, arguments: dict) -> str | None:
+        """根据工具参数生成中文任务摘要，子类可覆盖。默认返回 None。"""
+        return None
+
 
 # ============================================================
 # 工具注册中心

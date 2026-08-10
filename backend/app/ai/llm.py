@@ -24,6 +24,13 @@ from app.utils.pure.prompting import (
 
 logger = logging.getLogger(__name__)
 
+# ══════════════════════════════════════════════════════════════
+# 常量
+# ══════════════════════════════════════════════════════════════
+
+LLM_REQUEST_TIMEOUT_SECONDS = 120.0  # httpx 请求超时
+LLM_MAX_TOKENS_DEFAULT = 64000     # 默认最大 token 数
+
 
 # ══════════════════════════════════════════════════════════════
 # API 错误异常类（供上层分类重试）
@@ -96,7 +103,7 @@ async def chat_completion(
     top_p: float = 0.9,
     presence_penalty: float = 0.5,
     frequency_penalty: float = 0.5,
-    max_tokens: int = 64000,
+    max_tokens: int = LLM_MAX_TOKENS_DEFAULT,
     response_format: dict | None = None,
     thinking_enabled: bool = False,
     user_id: str | None = None,
@@ -153,31 +160,31 @@ async def chat_completion(
         raise
 
 
-async def _chat_completion_non_streaming(
-    messages: list[dict],
-    model: str,
-    api_base_url: str,
-    api_key: str | None = None,
-    tools: list[dict] | None = None,
-    temperature: float = 0.8,
-    top_p: float = 0.9,
-    presence_penalty: float = 0.5,
-    frequency_penalty: float = 0.5,
-    max_tokens: int = 64000,
-    response_format: dict | None = None,
-    thinking_enabled: bool = False,
-    user_id: str | None = None,
-    pool_key_id: int | None = None,
-    provider_supports_thinking: bool | None = None,
-) -> dict:
-    """
-    非流式聊天补全 — 当前生产路径。
-    """
+def _build_request_url_and_headers(api_base_url: str, api_key: str | None) -> tuple[str, dict]:
+    """构建 LLM API 请求 URL 和 headers（流式/非流式共用）。"""
     url = f"{api_base_url}/v1/chat/completions"
     headers = {"Content-Type": "application/json"}
     if api_key:
         headers["Authorization"] = f"Bearer {api_key}"
+    return url, headers
 
+
+def _build_chat_payload(
+    messages: list[dict],
+    model: str,
+    temperature: float,
+    top_p: float,
+    max_tokens: int,
+    tools: list[dict] | None = None,
+    response_format: dict | None = None,
+    presence_penalty: float = 0.5,
+    frequency_penalty: float = 0.5,
+    thinking_enabled: bool = False,
+    user_id: str | None = None,
+    provider_supports_thinking: bool | None = None,
+    stream: bool = False,
+) -> dict:
+    """构建 LLM chat completions 请求 payload（流式/非流式共用主体）。"""
     payload = {
         "model": model,
         "messages": messages,
@@ -185,7 +192,8 @@ async def _chat_completion_non_streaming(
         "top_p": top_p,
         "max_tokens": max_tokens,
     }
-
+    if stream:
+        payload["stream"] = True
     if presence_penalty != 0:
         payload["presence_penalty"] = presence_penalty
     if frequency_penalty != 0:
@@ -200,8 +208,39 @@ async def _chat_completion_non_streaming(
         payload["thinking"] = {"type": "enabled"}
     if user_id and _thinking_ok:
         payload["user_id"] = user_id
+    return payload
 
-    async with httpx.AsyncClient(timeout=120.0) as client:
+
+async def _chat_completion_non_streaming(
+    messages: list[dict],
+    model: str,
+    api_base_url: str,
+    api_key: str | None = None,
+    tools: list[dict] | None = None,
+    temperature: float = 0.8,
+    top_p: float = 0.9,
+    presence_penalty: float = 0.5,
+    frequency_penalty: float = 0.5,
+    max_tokens: int = LLM_MAX_TOKENS_DEFAULT,
+    response_format: dict | None = None,
+    thinking_enabled: bool = False,
+    user_id: str | None = None,
+    pool_key_id: int | None = None,
+    provider_supports_thinking: bool | None = None,
+) -> dict:
+    """
+    非流式聊天补全 — 当前生产路径。
+    """
+    url, headers = _build_request_url_and_headers(api_base_url, api_key)
+    payload = _build_chat_payload(
+        messages=messages, model=model, temperature=temperature, top_p=top_p,
+        max_tokens=max_tokens, tools=tools, response_format=response_format,
+        presence_penalty=presence_penalty, frequency_penalty=frequency_penalty,
+        thinking_enabled=thinking_enabled, user_id=user_id,
+        provider_supports_thinking=provider_supports_thinking,
+    )
+
+    async with httpx.AsyncClient(timeout=LLM_REQUEST_TIMEOUT_SECONDS) as client:
         response = await client.post(url, json=payload, headers=headers)
 
         if response.status_code != 200:
@@ -243,7 +282,7 @@ async def _chat_completion_streaming(
     top_p: float = 0.9,
     presence_penalty: float = 0.5,
     frequency_penalty: float = 0.5,
-    max_tokens: int = 64000,
+    max_tokens: int = LLM_MAX_TOKENS_DEFAULT,
     response_format: dict | None = None,
     thinking_enabled: bool = False,
     user_id: str | None = None,
@@ -261,34 +300,14 @@ async def _chat_completion_streaming(
     流式解析仅用于加速工具调用检测（不完整响应即可开始组装 tool_calls），
     消息内容不逐字推送前端——最终仍由 send_message 整段发送。
     """
-    url = f"{api_base_url}/v1/chat/completions"
-    headers = {"Content-Type": "application/json"}
-    if api_key:
-        headers["Authorization"] = f"Bearer {api_key}"
-
-    payload = {
-        "model": model,
-        "messages": messages,
-        "temperature": temperature,
-        "top_p": top_p,
-        "max_tokens": max_tokens,
-        "stream": True,
-    }
-
-    if presence_penalty != 0:
-        payload["presence_penalty"] = presence_penalty
-    if frequency_penalty != 0:
-        payload["frequency_penalty"] = frequency_penalty
-    if tools:
-        payload["tools"] = tools
-        payload["tool_choice"] = "auto"
-    if response_format:
-        payload["response_format"] = response_format
-    _thinking_ok = provider_supports_thinking if provider_supports_thinking is not None else settings.is_deepseek_api
-    if thinking_enabled and _thinking_ok:
-        payload["thinking"] = {"type": "enabled"}
-    if user_id and _thinking_ok:
-        payload["user_id"] = user_id
+    url, headers = _build_request_url_and_headers(api_base_url, api_key)
+    payload = _build_chat_payload(
+        messages=messages, model=model, temperature=temperature, top_p=top_p,
+        max_tokens=max_tokens, tools=tools, response_format=response_format,
+        presence_penalty=presence_penalty, frequency_penalty=frequency_penalty,
+        thinking_enabled=thinking_enabled, user_id=user_id,
+        provider_supports_thinking=provider_supports_thinking, stream=True,
+    )
 
     full_content = ""
     full_reasoning = ""
@@ -299,7 +318,7 @@ async def _chat_completion_streaming(
     tool_call_acc: dict[int, dict] = {}  # index → {id, name, arguments}
     dispatched: set[int] = set()  # 已通过 on_tool_call 分发的 index
 
-    async with httpx.AsyncClient(timeout=120.0) as client:
+    async with httpx.AsyncClient(timeout=LLM_REQUEST_TIMEOUT_SECONDS) as client:
         async with client.stream("POST", url, json=payload, headers=headers) as response:
             if response.status_code != 200:
                 error_text = (await response.aread()).decode()[:500]
@@ -749,138 +768,14 @@ async def _build_cross_conversation_context(
     trigger_user_id: int | None = None,
 ) -> list[dict]:
     """
-    为数字生命档/沉浸档 AI 收集并格式化多会话上下文。
+    跨对话多会话上下文收集（已禁用）。
 
-    两层架构：
-    1. 数据层（本函数）：查询 DB，产出结构化数据
-    2. 渲染层（format_context_for_ai）：纯函数，结构化数据 → AI 可读文本
+    v0.2.1 起永久返回空列表：原设计将其他群的消息注入为 system 上下文，
+    导致 LLM 跨群回复（"历史重播"死循环）。新的「状态栈系统」已通过状态栈摘要
+    提供跨任务上下文感知，不再需要原文注入。
+    保留函数签名以兼容调用方（调用方均有 if cross_msgs 保护）。
     """
-    from app.models.group import Group as GroupModel
-    from app.models.group import GroupMember
-    from app.models.dm import DMSession, DMMessage
-    from app.models.user import User as UserModel
-
-    # v0.2.1: 彻底禁用跨对话消息注入。
-    # 原设计将其他群的消息注入为 system 上下文，导致 LLM 跨群回复（"历史重播"死循环）。
-    # 新的「状态栈系统」已通过状态栈摘要提供跨任务上下文感知，
-    # 不需要再把其他群的消息原文注入当前对话。
     return []
-
-    # ── 1. 收集群聊数据 ──
-    try:
-        where = (
-            GroupMember.member_type == "ai",
-            GroupMember.member_id == (agent.user_id or 0),  # v2.0.0: member_id 统一为 user_id
-            GroupModel.id != current_group_id if current_group_id else True,
-        )
-        gm_result = await db.execute(
-            select(GroupModel.id, GroupModel.name)
-            .join(GroupMember, GroupModel.id == GroupMember.group_id)
-            .where(*where)
-            .limit(10)
-        )
-        ai_groups = gm_result.all()
-
-        for gid, gname in ai_groups:
-            if gname and gname.startswith("DM:"):
-                continue
-            recent = await get_recent_messages(db, gid, limit=1)  # 仅最近一条，字段从 3→1 防重播
-            if not recent:
-                continue
-
-            from app.models.agent import Agent as AgentModel
-            human_ids = {m.sender_id for m in recent if m.sender_type == "human"}
-            ai_ids = {m.sender_id for m in recent if m.sender_type == "ai"}
-            name_map: dict[tuple, str] = {}
-            if human_ids:
-                u_result = await db.execute(
-                    select(UserModel.id, UserModel.username).where(UserModel.id.in_(human_ids))
-                )
-                for row in u_result.all():
-                    name_map[("human", row[0])] = row[1]
-            if ai_ids:
-                a_result = await db.execute(
-                    select(AgentModel.id, AgentModel.name).where(AgentModel.id.in_(ai_ids))
-                )
-                for row in a_result.all():
-                    name_map[("ai", row[0])] = row[1]
-
-            msgs = []
-            for m in reversed(recent):
-                # v2.0.0 后 sender_id 统一为 user_id，只用 agent.user_id 判断自己
-                is_self = m.sender_type == "ai" and m.sender_id == agent.user_id
-                if is_self:
-                    speaker = agent.name
-                    sid = None
-                else:
-                    speaker = name_map.get((m.sender_type, m.sender_id), "未知")
-                    sid = m.sender_id
-                msgs.append({
-                    "is_self": is_self,
-                    "speaker_name": speaker,
-                    "speaker_id": sid,
-                    "content": m.content or "",
-                    "time": format_time_shanghai(m.created_at),
-                })
-            conversations.append({"type": "group", "name": gname, "id": gid, "messages": msgs})
-    except Exception as e:
-        logger.warning(f"多会话上下文(群聊)查询失败: {e}")
-
-    # ── 2. 收集私信数据 ──
-    try:
-        if agent.user_id:
-            dm_result = await db.execute(
-                select(DMSession)
-                .where(
-                    (DMSession.user1_id == agent.user_id) | (DMSession.user2_id == agent.user_id)
-                )
-                .order_by(DMSession.last_message_at.desc().nullslast())
-                .limit(10)
-            )
-            dm_sessions = dm_result.scalars().all()
-
-            for ds in dm_sessions:
-                if current_session_id and ds.session_id == current_session_id:
-                    continue
-                partner_id = ds.user2_id if ds.user1_id == agent.user_id else ds.user1_id
-                if is_filtered and partner_id != trigger_user_id:
-                    continue
-                partner_name = f"用户{partner_id}"
-                try:
-                    u = await db.get(UserModel, partner_id)
-                    if u:
-                        partner_name = u.username
-                except Exception:
-                    pass
-
-                dm_msgs = await db.execute(
-                    select(DMMessage)
-                    .where(DMMessage.session_id == ds.session_id)
-                    .order_by(DMMessage.created_at.desc())
-                    .limit(3)
-                )
-                dm_list = dm_msgs.scalars().all()
-                if not dm_list:
-                    continue
-
-                msgs = []
-                for m in reversed(dm_list):
-                    # v2.0.0 后 sender_id 统一为 user_id
-                    is_self = m.sender_id == agent.user_id
-                    speaker = agent.name if is_self else partner_name
-                    sid = None if is_self else m.sender_id
-                    msgs.append({
-                        "is_self": is_self,
-                        "speaker_name": speaker,
-                        "speaker_id": sid,
-                        "content": m.content or "",
-                        "time": format_time_shanghai(m.created_at),
-                    })
-                conversations.append({"type": "dm", "name": partner_name, "id": partner_id, "messages": msgs})
-    except Exception as e:
-        logger.warning(f"多会话上下文(私信)查询失败: {e}")
-
-    return format_context_for_ai(conversations, agent.name)
 
 
 async def build_messages(

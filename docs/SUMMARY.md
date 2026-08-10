@@ -1,6 +1,6 @@
 # AIsChat 文档目录
 
-> **版本**: v3.0.0 | **更新**: 2026-07-23
+> **版本**: v3.2.0 | **更新**: 2026-08-10
 
 ---
 
@@ -21,6 +21,10 @@
 | [用户手册.md](./guides/用户手册.md) | 终端用户 | 创建 AI、群聊、私信、记忆、用量等操作指南 |
 | [管理与开发者手册.md](./guides/管理与开发者手册.md) | 管理员/开发者 | 部署、架构、排错、WebSocket |
 | [创建 AI 流程设计.md](./guides/create_ai_flow_design.md) | 前端开发者 | 三档预设 + 子选项 + 详细设置的交互设计 |
+| [故障排查手册.md](./guides/troubleshooting.md) | 管理员/开发者 | 常见问题诊断流程图、错误码速查、一键诊断脚本 |
+| [备份与恢复指南.md](./guides/backup_and_recovery.md) | 管理员 | 3-2-1 备份策略、时点恢复、灾难恢复方案 |
+| [WebSocket 事件文档.md](./guides/ws_events.md) | 前端/集成开发者 | 所有 WS 事件的 payload 格式、时序图、重连策略 |
+| [测试策略文档.md](./guides/test_strategy.md) | 开发者/QA | 测试金字塔、单/集成/E2E 测试规范、CI/CD 集成 |
 
 ### 三、服务模块设计
 
@@ -80,23 +84,30 @@
 | [AIsChat 基于 Agent 的项目探索与架构探讨.md](./exploration/AIsChat 基于 Agent 的项目探索与架构探讨.md) | 研究者/开发者 | 项目探索与架构讨论（原始对话） |
 | [AIsChat 重构设计文档.md](./exploration/AIsChat 重构设计文档.md) | 开发者 | 重构设计总览（精简版） |
 
-### 六、项目参考
+### 六、技术参考
 
 | 文档 | 适用人群 | 说明 |
 |------|---------|------|
-| [项目全景报告.md](./reference/项目全景报告.md) | 开发者 | 项目全景分析 |
+| [CODE_WIKI.md](./CODE_WIKI.md) | 开发者/维护者 | **代码 Wiki**：项目架构、模块职责、关键类与函数、依赖关系、API 端点、数据模型、配置部署 |
+| [LEARNING_ROADMAP.md](./LEARNING_ROADMAP.md) | 新开发者 | **学习路线图**：5 阶段阶梯式学习，每阶段有目标、必读文件、Mermaid 图表、动手实践任务 |
+
+### 七、项目参考
+
+| 文档 | 适用人群 | 说明 |
+|------|---------|------|
+| [项目全景报告.md](./reference/项目全景报告.md) | AI 智能体/用户/企业 | 产品白皮书：核心亮点、能力矩阵、架构全景、用户画像 |
 | [项目参考.md](./reference/项目参考.md) | 开发者 | 参考项目架构思路和设计亮点 |
 
-### 七、归档文档
+### 八、归档文档
 
 | 文档 | 归档位置 | 说明 |
 |------|---------|------|
-| AI认知架构三空间模型.md | [archive/old_designs/](file:///c:/Users/frank/Documents/AIsChat/AIsChat/docs/archive/old_designs) | 内容已整合到记忆系统和薄大脑文档 |
-| AI对话链机制.md | [archive/old_designs/](file:///c:/Users/frank/Documents/AIsChat/AIsChat/docs/archive/old_designs) | 内容已整合到聊天服务和薄大脑文档 |
-| 记忆架构设计.md | [archive/old_designs/](file:///c:/Users/frank/Documents/AIsChat/AIsChat/docs/archive/old_designs) | 内容已整合到记忆系统文档 |
-| 流式响应系统.md | [archive/old_designs/](file:///c:/Users/frank/Documents/AIsChat/AIsChat/docs/archive/old_designs) | 内容已整合到 AI 底层服务文档 |
-| Skill 的三层设计.md | [archive/old_designs/](file:///c:/Users/frank/Documents/AIsChat/AIsChat/docs/archive/old_designs) | 内容已整合到技能管理系统文档 |
-| AI上下文与状态管理设计.md | [archive/old_designs/](file:///c:/Users/frank/Documents/AIsChat/AIsChat/docs/archive/old_designs) | 内容已整合到薄大脑文档 |
+| AI认知架构三空间模型.md | [archive/old_designs/](./archive/old_designs/) | 内容已整合到记忆系统和薄大脑文档 |
+| AI对话链机制.md | [archive/old_designs/](./archive/old_designs/) | 内容已整合到聊天服务和薄大脑文档 |
+| 记忆架构设计.md | [archive/old_designs/](./archive/old_designs/) | 内容已整合到记忆系统文档 |
+| 流式响应系统.md | [archive/old_designs/](./archive/old_designs/) | 内容已整合到 AI 底层服务文档 |
+| Skill 的三层设计.md | [archive/old_designs/](./archive/old_designs/) | 内容已整合到技能管理系统文档 |
+| AI上下文与状态管理设计.md | [archive/old_designs/](./archive/old_designs/) | 内容已整合到薄大脑文档 |
 
 ---
 
@@ -112,6 +123,17 @@
 ### 部署运维
 1. **管理与开发者手册.md** → 从部署到精通
 2. **部署合规建议书.md** → 中国境内内容标识 / 拟人化互动服务法规对照与操作建议
+3. **故障排查手册.md** → 遇到问题先看这里
+4. **备份与恢复指南.md** → 数据安全保障
+
+### 前端开发
+1. **WebSocket 事件文档.md** → 实时通信完整参考
+2. **测试策略文档.md** → 测试规范和 CI/CD 集成
+
+### 代码学习（新开发者推荐）
+1. **CODE_WIKI.md** → 代码 Wiki，了解架构、模块、API、数据模型
+2. **LEARNING_ROADMAP.md** → 学习路线图，按 5 阶段循序渐进
+3. **项目全景报告.md** → 产品全景，理解设计理念和能力边界
 
 ### 深入技术
 1. **chat_service_design.md** → 聊天底层服务
@@ -149,4 +171,4 @@
 
 ---
 
-*文档版本: v3.0.0 | 最后更新: 2026-07-23*
+*文档版本: v3.2.0 | 最后更新: 2026-08-10*

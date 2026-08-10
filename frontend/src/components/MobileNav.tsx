@@ -21,6 +21,7 @@ export default function MobileNav({ closeDrawer }: MobileNavProps) {
   }
 
   const visibleItems = mainNavItems.filter(item => !item.hidden)
+  const isCompact = visibleItems.length >= 6
 
   return (
     <nav
@@ -34,25 +35,23 @@ export default function MobileNav({ closeDrawer }: MobileNavProps) {
             <button
               key={item.path}
               onClick={() => { closeDrawer?.(); navigate(item.path) }}
-              className={`flex-1 flex flex-col items-center justify-center gap-0.5 transition-all duration-200 relative ${
+              className={`flex-1 flex flex-col items-center justify-center gap-0.5 transition-all duration-200 relative min-w-0 ${
                 active ? 'text-primary-400' : 'text-textMuted'
               }`}
             >
-              {/* Active top indicator */}
               {active && (
-                <div className="absolute top-0 left-1/4 right-1/4 h-0.5 bg-primary-400 rounded-full" />
+                <div className="absolute top-0 h-0.5 bg-primary-400 rounded-full" style={{ left: '20%', right: '20%' }} />
               )}
-              {/* Icon with optional pulse ring */}
               <div className="relative">
-                <item.icon size={22} strokeWidth={active ? 2.5 : 2} />
+                <item.icon size={isCompact ? 20 : 22} strokeWidth={active ? 2.5 : 2} />
                 {item.path === '/friends' && pendingRequests > 0 && (
                   <span className="absolute -top-1 -right-1.5 w-2.5 h-2.5 rounded-full bg-red-500 border-2 border-surface" />
                 )}
                 {active && (
-                  <div className="absolute -inset-1.5 rounded-full ai-pulse-active opacity-50" />
+                  <div className="absolute rounded-full ai-pulse-active opacity-50" style={{ inset: isCompact ? '-3px' : '-6px' }} />
                 )}
               </div>
-              <span className="text-[10px] font-medium">{t(item.i18nKey)}</span>
+              <span className={`${isCompact ? 'text-[9px]' : 'text-[10px]'} font-medium truncate max-w-full px-0.5`}>{t(item.i18nKey)}</span>
             </button>
           )
         })}

@@ -58,6 +58,8 @@ export function useWorldChat({ wid, onRefresh, onMsg }: UseWorldChatOptions) {
   // 滚动跟随：在底部 = 新消息自动滚到最新；不在底部 = 显示 ↓ 按钮
   const [isAtBottom, setIsAtBottom] = useState(true)
   const isAtBottomRef = useRef(true)
+  const [unreadCount, setUnreadCount] = useState(0)
+  const unreadCountRef = useRef(0)
 
   // 斜杠命令列表（输入 / 弹出）
   const [cmdActive, setCmdActive] = useState(false)
@@ -148,11 +150,27 @@ export function useWorldChat({ wid, onRefresh, onMsg }: UseWorldChatOptions) {
   const handleChatScroll = useCallback((e: React.UIEvent<HTMLDivElement>) => {
     const el = e.currentTarget
     if (el.scrollTop < 30) loadOlder()
-    // 底部判定（rAF 节流由 React 事件天然节流；80px 阈值与主界面一致）
     const atBottom = el.scrollHeight - el.scrollTop - el.clientHeight < 80
     isAtBottomRef.current = atBottom
     setIsAtBottom(atBottom)
+    if (atBottom) {
+      unreadCountRef.current = 0
+      setUnreadCount(0)
+    }
   }, [loadOlder])
+
+  // 新消息到达时，如果不在底部，增加未读计数
+  useEffect(() => {
+    // chatMsgs 更新时检查是否需要增加未读
+    if (!isAtBottomRef.current && chatMsgs.length > 0) {
+      const lastMsg = chatMsgs[chatMsgs.length - 1]
+      // 如果最后一条是 AI 或系统消息（不是用户自己刚发的），增加未读
+      if (lastMsg && lastMsg.role !== 'user' && !lastMsg.pending) {
+        unreadCountRef.current += 1
+        setUnreadCount(unreadCountRef.current)
+      }
+    }
+  }, [chatMsgs])
 
   // 滚到底部并校验：double rAF 等布局稳定 → 延时后仍不在底部再滚一次（兜底时序问题）
   const forceScrollToBottom = useCallback(() => {
@@ -361,5 +379,6 @@ export function useWorldChat({ wid, onRefresh, onMsg }: UseWorldChatOptions) {
     chatListRef, chatInputRef, pendingItems, setPendingItems, suggestions,
     cmdActive, setCmdActive, cmdQuery, setCmdQuery, cmdIdx, setCmdIdx, cmdFiltered,
     handleChatScroll, submitText, insertSuggestion, isAtBottom, scrollToBottom, forceScrollToBottom,
+    unreadCount,
   }
 }
