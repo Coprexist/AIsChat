@@ -1,8 +1,7 @@
-import { memo, useState, useRef, useCallback, useMemo } from 'react'
+import { memo, useState, useRef, useCallback, useMemo, forwardRef, useImperativeHandle, useEffect } from 'react'
 import { Send, Plus, ChevronRight, Brain, ArrowDown, FileText, Search, Globe, Terminal, Package, Clock, Wrench, Eraser } from 'lucide-react'
 import MarkdownContent from './shared/MarkdownContent'
-import { WORLD_COMMANDS } from '../hooks/useWorldChat'
-import type { UseWorldChatReturn } from '../hooks/useWorldChat'
+import { useWorldChat, WORLD_COMMANDS } from '../hooks/useWorldChat'
 
 // 工具气泡图标：按摘要内容关键词映射（后端文本不带 emoji，图标由前端渲染）
 function toolIcon(content: string) {
@@ -18,19 +17,63 @@ function toolIcon(content: string) {
   return <Wrench size={12} />
 }
 
-interface WorldChatPanelProps {
-  chat: UseWorldChatReturn
-  lastAiMsgId: number | null
+export interface WorldChatHandle {
+  forceScrollToBottom: () => void
+  unreadCount: number
   isInterrupted: boolean
+  lastAiMsgId: number | null
+}
+
+interface WorldChatPanelProps {
+  wid: number
+  onRefresh: () => void
+  onMsg: (msg: string) => void
+  /** 未读计数变化回调（父组件需要响应式更新标题栏徽章等） */
+  onUnreadCountChange?: (count: number) => void
 }
 
 /**
- * 世界聊天面板（独立组件）
- * - 管理自身输入/命令状态，打字不触发父组件重渲染
+ * 世界聊天面板（独立自包含组件）
+ * - 内部调用 useWorldChat 管理所有聊天状态
  * - 所有聊天相关 UI 逻辑集中在此
- * - 使用 React.memo 避免无关 prop 变化导致重渲染
+ * - 通过 forwardRef 暴露 forceScrollToBottom 等接口给父组件
+ * - 通过 onUnreadCountChange 回调通知父组件未读变化
+ * - 打字/消息更新仅重渲染此组件，不触发父组件
  */
-const WorldChatPanel = memo(({ chat, lastAiMsgId, isInterrupted }: WorldChatPanelProps) => {
+const WorldChatPanel = memo(forwardRef<WorldChatHandle, WorldChatPanelProps>(({ wid, onRefresh, onMsg, onUnreadCountChange }, ref) => {
+  // ── 内部管理所有聊天状态 ──
+  const chat = useWorldChat({ wid, onRefresh, onMsg })
+
+  // ── 计算派生状态 ──
+  const isInterrupted = useMemo(() => {
+    for (let i = chat.chatMsgs.length - 1; i >= 0; i--) {
+      const m = chat.chatMsgs[i]
+      if (m.role === 'ai') return String(m.content || '').includes('对话中断')
+      if (m.role === 'user') continue
+    }
+    return false
+  }, [chat.chatMsgs])
+
+  const lastAiMsgId = useMemo(() => {
+    for (let i = chat.chatMsgs.length - 1; i >= 0; i--) {
+      if (chat.chatMsgs[i].role === 'ai') return chat.chatMsgs[i].id
+    }
+    return null
+  }, [chat.chatMsgs])
+
+  // ── 暴露给父组件的接口 ──
+  useImperativeHandle(ref, () => ({
+    forceScrollToBottom: chat.forceScrollToBottom,
+    unreadCount: chat.unreadCount,
+    isInterrupted,
+    lastAiMsgId,
+  }), [chat.forceScrollToBottom, chat.unreadCount, isInterrupted, lastAiMsgId])
+
+  // ── 通知父组件未读计数变化 ──
+  useEffect(() => {
+    onUnreadCountChange?.(chat.unreadCount)
+  }, [chat.unreadCount, onUnreadCountChange])
+
   // ── 本地输入状态（打字时只有此组件重渲染） ──
   const [localInput, setLocalInput] = useState('')
   const localInputRef = useRef('')
@@ -316,9 +359,8 @@ const WorldChatPanel = memo(({ chat, lastAiMsgId, isInterrupted }: WorldChatPane
       </div>
     </>
   )
-})
+}))
 
 WorldChatPanel.displayName = 'WorldChatPanel'
 
 export default WorldChatPanel
-export type { UseWorldChatReturn }

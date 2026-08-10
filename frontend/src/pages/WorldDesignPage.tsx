@@ -10,11 +10,10 @@ import { ChevronLeft, ChevronRight, ChevronDown, Folder, FolderOpen, FileText, F
 import { api } from '../api/client'
 import GroupManagerModal from '../components/GroupManagerModal'
 import CodeRenderer from '../components/shared/CodeRenderer'
-import WorldChatPanel from '../components/WorldChatPanel'
+import WorldChatPanel, { type WorldChatHandle } from '../components/WorldChatPanel'
 import { getCodeLang, isMarkdownFile } from '../utils/mime'
 import { tryOpenWorldWindow } from '../utils/worldView'
 import { useResizableSidebar } from '../hooks/useResizableSidebar'
-import { useWorldChat } from '../hooks/useWorldChat'
 
 // 文件类型图标（与主界面风格一致）
 function fileTypeIcon(name: string) {
@@ -446,32 +445,15 @@ export default function WorldDesignPage() {
     navigate(`/market/publish?world_id=${wid}`)
   }
 
-  // 世界 AI 对话（状态/发送/排队/建议/命令 全部在 useWorldChat） ──
-  const chat = useWorldChat({ wid, onRefresh: load, onMsg: setMsg })
+  // ── 聊天面板引用（内部管理所有聊天状态） ──
+  const chatPanelRef = useRef<WorldChatHandle>(null)
+  const [chatUnreadCount, setChatUnreadCount] = useState(0)
 
-  // world 加载完成 → 聊天面板渲染 → 确保在底部（刷新时历史先到、面板后渲染，滚动要补一次）
+  // world 加载完成 → 聊天面板渲染 → 确保在底部
   useEffect(() => {
-    if (world) chat.forceScrollToBottom()
+    if (world) chatPanelRef.current?.forceScrollToBottom()
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [world])
-
-  // 上次对话是否中断：找最后一条 ai 消息（忽略后面可能卡住的 user 消息），若是中断 → 引导「继续」
-  const isInterrupted = useMemo(() => {
-    for (let i = chat.chatMsgs.length - 1; i >= 0; i--) {
-      const m = chat.chatMsgs[i]
-      if (m.role === 'ai') return String(m.content || '').includes('对话中断')
-      if (m.role === 'user') continue  // 卡住的排队消息不打断判断
-    }
-    return false
-  }, [chat.chatMsgs])
-
-  // 最后一条 AI 回复的 id（建议按钮插在它下面）
-  const lastAiMsgId = useMemo(() => {
-    for (let i = chat.chatMsgs.length - 1; i >= 0; i--) {
-      if (chat.chatMsgs[i].role === 'ai') return chat.chatMsgs[i].id
-    }
-    return null
-  }, [chat.chatMsgs])
 
   // ── 世界 AI 配置表单（单独表单，不属于 agent） ──
   const saveCreator = async () => {
@@ -503,9 +485,9 @@ export default function WorldDesignPage() {
       <div className="px-4 py-3 border-b border-border">
         <div className="flex items-center gap-2">
           <span className="text-sm font-semibold">{world.creator?.name || '群视界机器人'}</span>
-          {chat.unreadCount > 0 && (
+          {chatUnreadCount > 0 && (
             <span className="inline-flex items-center justify-center min-w-[18px] h-[18px] px-1 rounded-full bg-rose-500 text-white text-[10px] font-bold animate-pulse">
-              {chat.unreadCount > 99 ? '99+' : chat.unreadCount}
+              {chatUnreadCount > 99 ? '99+' : chatUnreadCount}
             </span>
           )}
           <span className="text-[10px] px-1.5 py-0.5 rounded bg-elevated text-textMuted">{world.creator?.id}</span>
@@ -609,7 +591,13 @@ export default function WorldDesignPage() {
         </div>
       )}
 
-      <WorldChatPanel chat={chat} lastAiMsgId={lastAiMsgId} isInterrupted={isInterrupted} />
+      <WorldChatPanel
+        ref={chatPanelRef}
+        wid={wid}
+        onRefresh={load}
+        onMsg={setMsg}
+        onUnreadCountChange={setChatUnreadCount}
+      />
     </>
   )
 
