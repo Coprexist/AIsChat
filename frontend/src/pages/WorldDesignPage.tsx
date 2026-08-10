@@ -14,7 +14,7 @@ import CodeRenderer from '../components/shared/CodeRenderer'
 import { getCodeLang, isMarkdownFile } from '../utils/mime'
 import { tryOpenWorldWindow } from '../utils/worldView'
 import { useResizableSidebar } from '../hooks/useResizableSidebar'
-import { useWorldChat } from '../hooks/useWorldChat'
+import { useWorldChat, WORLD_COMMANDS } from '../hooks/useWorldChat'
 
 // 文件类型图标（与主界面风格一致）
 function fileTypeIcon(name: string) {
@@ -158,6 +158,14 @@ export default function WorldDesignPage() {
   // 本地输入缓冲：打字时只更新本地状态，不触发整个页面重渲染
   const [localInput, setLocalInput] = useState('')
   const localInputRef = useRef('')
+
+  // 本地命令检测状态（避免触发 hook 重渲染）
+  const [localCmdActive, setLocalCmdActive] = useState(false)
+  const [localCmdQuery, setLocalCmdQuery] = useState('')
+  const [localCmdIdx, setLocalCmdIdx] = useState(0)
+  const localCmdFiltered = useMemo(() =>
+    localCmdQuery ? WORLD_COMMANDS.filter((c) => c.cmd.startsWith('/' + localCmdQuery)) : WORLD_COMMANDS
+  , [localCmdQuery])
 
   // 世界 AI 配置表单（单独表单，不属于 agent）
   const [showCreatorForm, setShowCreatorForm] = useState(false)
@@ -802,13 +810,13 @@ export default function WorldDesignPage() {
       {/* 输入 */}
       <div className="p-3 border-t border-border relative">
         {/* 斜杠命令列表（输入 / 弹出；选中即发送） */}
-        {chat.cmdActive && chat.cmdFiltered.length > 0 && (
+        {localCmdActive && localCmdFiltered.length > 0 && (
           <div className="absolute bottom-full left-3 mb-1 w-64 max-h-40 overflow-y-auto rounded-xl bg-elevated border border-border shadow-xl z-50">
-            {chat.cmdFiltered.map((c, i) => (
+            {localCmdFiltered.map((c, i) => (
               <button
                 key={c.cmd}
-                className={`w-full text-left px-3 py-2 transition-colors ${i === chat.cmdIdx ? 'bg-primary-500/20 text-primary-400' : 'text-textPrimary hover:bg-hover'}`}
-                onMouseDown={(e) => { e.preventDefault(); chat.submitText(c.cmd) }}
+                className={`w-full text-left px-3 py-2 transition-colors ${i === localCmdIdx ? 'bg-primary-500/20 text-primary-400' : 'text-textPrimary hover:bg-hover'}`}
+                onMouseDown={(e) => { e.preventDefault(); chat.submitText(c.cmd); setLocalInput(''); localInputRef.current = ''; setLocalCmdActive(false) }}
               >
                 <span className="font-mono text-xs">{c.cmd}</span>
                 <span className="block text-[10px] text-textMuted">{c.desc}</span>
@@ -823,18 +831,18 @@ export default function WorldDesignPage() {
             const val = e.target.value
             localInputRef.current = val
             setLocalInput(val)
-            // / 检测：只更新小范围状态（命令下拉），不触发消息列表重渲染
+            // / 检测：只更新本地状态，不触发 hook 重渲染
             const before = val.slice(0, e.target.selectionStart)
             const m = before.match(/^\/\w*$/)
-            if (m) { chat.setCmdQuery(before.slice(1)); chat.setCmdActive(true); chat.setCmdIdx(0) }
-            else if (chat.cmdActive) chat.setCmdActive(false)
+            if (m) { setLocalCmdQuery(before.slice(1)); setLocalCmdActive(true); setLocalCmdIdx(0) }
+            else if (localCmdActive) setLocalCmdActive(false)
           }}
           onKeyDown={(e) => {
-            if (chat.cmdActive && chat.cmdFiltered.length > 0) {
-              if (e.key === 'ArrowDown') { e.preventDefault(); chat.setCmdIdx((i) => (i + 1) % chat.cmdFiltered.length); return }
-              if (e.key === 'ArrowUp') { e.preventDefault(); chat.setCmdIdx((i) => (i - 1 + chat.cmdFiltered.length) % chat.cmdFiltered.length); return }
-              if (e.key === 'Enter' || e.key === 'Tab') { e.preventDefault(); chat.submitText(chat.cmdFiltered[chat.cmdIdx].cmd); setLocalInput(''); localInputRef.current = ''; return }
-              if (e.key === 'Escape') { e.preventDefault(); chat.setCmdActive(false); return }
+            if (localCmdActive && localCmdFiltered.length > 0) {
+              if (e.key === 'ArrowDown') { e.preventDefault(); setLocalCmdIdx((i) => (i + 1) % localCmdFiltered.length); return }
+              if (e.key === 'ArrowUp') { e.preventDefault(); setLocalCmdIdx((i) => (i - 1 + localCmdFiltered.length) % localCmdFiltered.length); return }
+              if (e.key === 'Enter' || e.key === 'Tab') { e.preventDefault(); chat.submitText(localCmdFiltered[localCmdIdx].cmd); setLocalInput(''); localInputRef.current = ''; setLocalCmdActive(false); return }
+              if (e.key === 'Escape') { e.preventDefault(); setLocalCmdActive(false); return }
             }
             if (e.key === 'Enter' && !e.shiftKey) {
               e.preventDefault()
@@ -843,6 +851,7 @@ export default function WorldDesignPage() {
               chat.submitText(text)
               setLocalInput('')
               localInputRef.current = ''
+              setLocalCmdActive(false)
             }
           }}
           rows={2}

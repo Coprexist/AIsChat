@@ -18,7 +18,7 @@ export interface ChatMsg {
 }
 
 // 斜杠命令列表（输入 / 弹出，像 @ 提及；仅世界设计页——主站保持人性化不加）
-const WORLD_COMMANDS = [
+export const WORLD_COMMANDS = [
   { cmd: '/clear', desc: '清空对话上下文（保留长期记忆）' },
   { cmd: '/compact', desc: '压缩对话上下文为摘要' },
 ]
@@ -60,6 +60,7 @@ export function useWorldChat({ wid, onRefresh, onMsg }: UseWorldChatOptions) {
   const isAtBottomRef = useRef(true)
   const [unreadCount, setUnreadCount] = useState(0)
   const unreadCountRef = useRef(0)
+  const loadingHistoryRef = useRef(false)  // 标记是否在加载历史（prepend），不增加未读
 
   // 斜杠命令列表（输入 / 弹出）
   const [cmdActive, setCmdActive] = useState(false)
@@ -140,9 +141,11 @@ export function useWorldChat({ wid, onRefresh, onMsg }: UseWorldChatOptions) {
     // 历史消息来自 DB，id 为正数；本地临时负数消息跳过
     if (!oldest || oldest < 0) return
     setChatLoadingOlder(true)
+    loadingHistoryRef.current = true  // 标记是历史加载，不增加未读
     try {
       await loadChat({ before_id: oldest, append: true })
     } finally {
+      loadingHistoryRef.current = false
       setChatLoadingOlder(false)
     }
   }, [chatLoadingOlder, chatHasMore, chatMsgs, loadChat])
@@ -159,9 +162,9 @@ export function useWorldChat({ wid, onRefresh, onMsg }: UseWorldChatOptions) {
     }
   }, [loadOlder])
 
-  // 新消息到达时，如果不在底部，增加未读计数
+  // 新消息到达时，如果不在底部，增加未读计数（历史加载时不增加）
   useEffect(() => {
-    // chatMsgs 更新时检查是否需要增加未读
+    if (loadingHistoryRef.current) return  // 历史加载，不增加未读
     if (!isAtBottomRef.current && chatMsgs.length > 0) {
       const lastMsg = chatMsgs[chatMsgs.length - 1]
       // 如果最后一条是 AI 或系统消息（不是用户自己刚发的），增加未读
