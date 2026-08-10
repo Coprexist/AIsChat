@@ -10,6 +10,7 @@ import { ChevronLeft, ChevronRight, ChevronDown, Folder, FolderOpen, FileText, F
 import { api } from '../api/client'
 import GroupManagerModal from '../components/GroupManagerModal'
 import CodeRenderer from '../components/shared/CodeRenderer'
+import MarkdownContent from '../components/shared/MarkdownContent'
 import WorldChatPanel, { type WorldChatHandle } from '../components/WorldChatPanel'
 import { getCodeLang, isMarkdownFile } from '../utils/mime'
 import { tryOpenWorldWindow } from '../utils/worldView'
