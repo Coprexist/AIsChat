@@ -595,6 +595,10 @@ async def stream_world_chat(
                     if fr:
                         full_reasoning = fr
                     full_content = final
+                else:
+                    # ⚠️ 正常收尾轮（模型不再调工具 → final=content 已 break）：收尾总结也必须进 full_content，
+                    # 否则流式显示正常但落库的是中间轮最后一段叙述 → 刷新后总结消失
+                    full_content = final
                 yield f"data: {final.replace(chr(10), '{NL}')}\n\n"
             except Exception as e:
                 had_error = True
