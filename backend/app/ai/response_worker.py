@@ -26,7 +26,7 @@ from app.config import settings
 from app.chat import chat_api
 from app.services.memory.context_compression_service import should_compress, inline_compress, get_compression_threshold
 from app.utils.text import extract_mentions as _extract_mentions, check_mention as _check_mention
-from app.ai.executor import _tool_call_loop, _active_run_agent_ids, _get_api_config, _check_rate_limit, _send_system_error, _send_system_error_notification
+from app.ai.executor import _tool_call_loop, _get_api_config, _check_rate_limit, _send_system_error, _send_system_error_notification, add_pending_interrupt, is_agent_running, mark_agent_running, unmark_agent_running
 from app.ai.alarm import _process_alarm_event
 
 logger = logging.getLogger(__name__)
@@ -60,11 +60,11 @@ async def _run_serialized(agent, coro):
         lock = asyncio.Lock()
         _agent_locks[agent.id] = lock
     async with lock:
-        _active_run_agent_ids.add(agent.id)
+        await mark_agent_running(agent.id)
         try:
             return await coro
         finally:
-            _active_run_agent_ids.discard(agent.id)
+            await unmark_agent_running(agent.id)
 
 
 # ============================================================
@@ -504,9 +504,8 @@ async def _maybe_trigger_ai_reply(
         return
 
     # 4.5. 忙时中断注入
-    if agent.id in _active_run_agent_ids:
-        from app.ai.executor import _pending_interrupts
-        _pending_interrupts.setdefault(agent.id, []).append({
+    if await is_agent_running(agent.id):
+        await add_pending_interrupt(agent.id, {
             "type": "user_message",
             "content": content,
             "group_id": group_id,
@@ -756,9 +755,8 @@ async def _trigger_dm_ai_reply(
         return
 
     # ── 忙时中断注入 ──
-    if agent_id in _active_run_agent_ids:
-        from app.ai.executor import _pending_interrupts
-        _pending_interrupts.setdefault(agent_id, []).append({
+    if await is_agent_running(agent_id):
+        await add_pending_interrupt(agent_id, {
             "type": "user_message",
             "content": content,
             "session_id": session_id,

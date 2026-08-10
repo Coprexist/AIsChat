@@ -167,6 +167,14 @@ export default function WorldDesignPage() {
   // 当前文件内联渲染：md 渲染 + 查看原文；html/代码高亮渲染；图片直接显示（不用弹窗）
   const [viewMode, setViewMode] = useState<'edit' | 'render'>('edit')
 
+  // ── 视口响应式：移动端 / 桌面端条件渲染（避免双实例导致输入卡顿） ──
+  const [isMobile, setIsMobile] = useState(() => window.innerWidth < 1024)
+  useEffect(() => {
+    const onResize = () => setIsMobile(window.innerWidth < 1024)
+    window.addEventListener('resize', onResize)
+    return () => window.removeEventListener('resize', onResize)
+  }, [])
+
   // ── 移动端（<lg）：tab 切换（文件/对话，对话默认打开）+ 目录逐层导航 ──
   const [mobileTab, setMobileTab] = useState<'files' | 'chat'>('chat')
   const [mobileView, setMobileView] = useState<'dirs' | 'file'>('dirs')
@@ -511,6 +519,11 @@ export default function WorldDesignPage() {
       <div className="px-4 py-3 border-b border-border">
         <div className="flex items-center gap-2">
           <span className="text-sm font-semibold">{world.creator?.name || '群视界机器人'}</span>
+          {chat.unreadCount > 0 && (
+            <span className="inline-flex items-center justify-center min-w-[18px] h-[18px] px-1 rounded-full bg-rose-500 text-white text-[10px] font-bold animate-pulse">
+              {chat.unreadCount > 99 ? '99+' : chat.unreadCount}
+            </span>
+          )}
           <span className="text-[10px] px-1.5 py-0.5 rounded bg-elevated text-textMuted">{world.creator?.id}</span>
           <div className="flex-1" />
           <button
@@ -686,7 +699,19 @@ export default function WorldDesignPage() {
                       <div className="text-xs text-textMuted mt-1 whitespace-pre-wrap bg-elevated/70 rounded p-2">{m.reasoning}</div>
                     </details>
                   )}
-                  {m.content ? <MarkdownContent content={m.content} /> : (m.role === 'ai' ? <span className="opacity-40">…</span> : null)}
+                  {m.content ? <MarkdownContent content={m.content} /> : m.role === 'ai' ? (
+                    m.reasoning ? (
+                      <span className="opacity-50 text-xs italic">
+                        {(() => { const r = m.reasoning.trim(); return r.length > 60 ? r.slice(-60) + '…' : r || '思考中…' })()}
+                      </span>
+                    ) : (
+                      <span className="inline-flex gap-0.5">
+                        <span className="w-1 h-1 bg-primary-400 rounded-full animate-bounce" style={{ animationDelay: '0ms' }} />
+                        <span className="w-1 h-1 bg-primary-400 rounded-full animate-bounce" style={{ animationDelay: '150ms' }} />
+                        <span className="w-1 h-1 bg-primary-400 rounded-full animate-bounce" style={{ animationDelay: '300ms' }} />
+                      </span>
+                    )
+                  ) : null}
                 </div>
               )}
               {/* 中断 → "你可以：继续"（同一套建议样式）；正常 → 建议列表 */}
@@ -737,14 +762,25 @@ export default function WorldDesignPage() {
             </div>
           )
         })}
-        {/* ↓ 回到底部（不在最下方时显示；显示即未跟随） */}
-        {!chat.isAtBottom && chat.chatMsgs.length > 0 && (
+        {/* ↓ 回到底部 / 有新消息时显示 */}
+        {(!chat.isAtBottom || chat.unreadCount > 0) && chat.chatMsgs.length > 0 && (
           <button
             onClick={() => chat.scrollToBottom(true)}
-            className="absolute bottom-3 right-3 z-40 flex items-center justify-center w-8 h-8 bg-elevated border border-border rounded-full shadow-lg text-textSecondary hover:text-textPrimary hover:bg-surface transition-all"
-            title="回到底部并跟随"
+            className={`absolute bottom-3 right-3 z-40 flex items-center justify-center gap-1 px-3 h-8 rounded-full shadow-lg transition-all ${
+              chat.unreadCount > 0
+                ? 'bg-rose-500 hover:bg-rose-400 text-white border border-rose-400 animate-bounce'
+                : 'bg-elevated border border-border text-textSecondary hover:text-textPrimary hover:bg-surface'
+            }`}
+            title="回到底部"
           >
-            <ArrowDown size={14} />
+            {chat.unreadCount > 0 ? (
+              <>
+                <ArrowDown size={14} />
+                <span className="text-xs font-semibold">{chat.unreadCount} 条新消息</span>
+              </>
+            ) : (
+              <ArrowDown size={14} />
+            )}
           </button>
         )}
       </div>
@@ -816,7 +852,7 @@ export default function WorldDesignPage() {
   return (
     <div className="h-screen bg-canvas text-textPrimary">
       {/* ═══ 移动端（<lg）：tab 切换 ── 文件（目录导航/编辑器）+ 对话（默认打开） ═══ */}
-      <div className="lg:hidden flex flex-col h-full relative pb-14 lg:pb-0">
+      {isMobile && <div className="flex flex-col h-full relative pb-14">}
         {/* 顶栏：返回 + 世界信息 + 上传（文件 tab 时显示） */}
         <div className="flex items-center gap-2 px-3 py-2 bg-surface border-b border-border">
           <button onClick={() => navigate('/worlds')} className="inline-flex items-center gap-1 text-sm text-textMuted hover:text-textPrimary transition-colors shrink-0">
@@ -1010,10 +1046,10 @@ export default function WorldDesignPage() {
             </div>
           </div>
         )}
-      </div>
+      </div>}
 
       {/* ═══ 桌面端（≥lg）：标题栏 + 三栏（分隔线贯穿，拖拽手柄覆盖标题栏与内容区） ═══ */}
-      <div className="hidden lg:flex flex-col h-full">
+      {!isMobile && <div className="flex flex-col h-full">
         {/* 顶部工具栏 */}
         <div className="flex items-center gap-3 px-4 h-14 bg-surface border-b border-border shrink-0">
           <button onClick={() => navigate('/worlds')} className="inline-flex items-center gap-1 text-sm text-textMuted hover:text-textPrimary transition-colors">
@@ -1145,7 +1181,7 @@ export default function WorldDesignPage() {
           </div>
         </div>
         </div>
-      </div>
+      </div>}
 
       {/* 群类型与群助手管理（… 菜单） */}
       {groupManagerOpen && world && (

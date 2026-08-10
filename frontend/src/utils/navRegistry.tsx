@@ -36,6 +36,7 @@ export interface NavItem {
 export const mainNavItems: NavItem[] = [
   { path: '/chat', i18nKey: 'nav.chat', icon: MessageCircle, matchSubPaths: true },
   { path: '/worlds', i18nKey: 'nav.worlds', icon: Globe },
+  { path: '/market', i18nKey: 'nav.market', icon: Store },
   { path: '/friends', i18nKey: 'nav.friends', icon: Users },
   { path: '/agents', i18nKey: 'nav.ai', icon: Bot },
   { path: '/me', i18nKey: 'nav.me', icon: User },
@@ -45,7 +46,6 @@ export const mainNavItems: NavItem[] = [
  * 次要导航项（只在 Sidebar 展开时显示）
  */
 export const secondaryNavItems: NavItem[] = [
-  { path: '/market', i18nKey: 'nav.market', icon: Store },
   { path: '/settings', i18nKey: 'nav.settings', icon: User },
 ]
 

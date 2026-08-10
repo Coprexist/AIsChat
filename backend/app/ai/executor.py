@@ -24,11 +24,55 @@ from app.chat import chat_api
 _pending_interrupts: dict[int, list[dict]] = {}
 # 当前正在 _tool_call_loop 中的 agent ID 集合
 _active_run_agent_ids: set[int] = set()
+# 全局状态锁（保护以上两个变量的并发访问）
+_state_lock = asyncio.Lock()
 
 logger = logging.getLogger(__name__)
 
 # 速率限制：{agent_id: last_call_timestamp}
 _rate_limit_tracker: dict[int, float] = {}
+
+
+async def add_pending_interrupt(agent_id: int, message: dict) -> None:
+    """线程安全地添加待处理的中断消息。"""
+    async with _state_lock:
+        _pending_interrupts.setdefault(agent_id, []).append(message)
+
+
+async def drain_pending_interrupts(agent_id: int) -> list[dict]:
+    """线程安全地取出并清空指定 agent 的待处理中断消息。"""
+    async with _state_lock:
+        return _pending_interrupts.pop(agent_id, None) or []
+
+
+async def is_agent_running(agent_id: int) -> bool:
+    """检查指定 agent 是否正在执行 _tool_call_loop。"""
+    async with _state_lock:
+        return agent_id in _active_run_agent_ids
+
+
+async def mark_agent_running(agent_id: int) -> None:
+    """标记 agent 为正在执行。"""
+    async with _state_lock:
+        _active_run_agent_ids.add(agent_id)
+
+
+async def unmark_agent_running(agent_id: int) -> None:
+    """取消 agent 的执行标记。"""
+    async with _state_lock:
+        _active_run_agent_ids.discard(agent_id)
+
+
+def _get_tool_task_summary(tool_name: str, arguments: dict) -> str | None:
+    """从 ToolRegistry 获取工具的中文任务摘要，找不到时返回 None。"""
+    try:
+        from app.tools.base import ToolRegistry
+        plugin = ToolRegistry.get_plugin(tool_name)
+        if plugin:
+            return plugin.get_task_summary(arguments)
+    except Exception:
+        pass
+    return None
 
 
 # ============================================================
@@ -40,7 +84,7 @@ async def _send_system_error(
     conversation_type: str = "group",
     group_id: int | None = None,
     session_id: str | None = None,
-):
+) -> None:
     """发送分类系统错误通知给 AI 的 owner（走 DM）"""
     from app.models.dm import DMMessage, DMSession
 
@@ -121,7 +165,7 @@ async def _send_system_error(
         logger.error(f"  发送系统通知失败: {e}")
 
 
-async def _send_system_error_notification(db, agent, content: str):
+async def _send_system_error_notification(db, agent, content: str) -> None:
     """发送自定义系统通知（降级/余额不足等），走 DM 发给 AI 的 owner"""
     from app.models.dm import DMMessage, DMSession
     SYSTEM_USER_ID = 0
@@ -306,7 +350,7 @@ async def _tool_call_loop(
     provider_supports_thinking: bool | None = None,
     trigger: str = "user",
     is_federated: bool = False,
-):
+) -> None:
     """
     工具调用循环：LLM 必须通过工具调用来执行所有操作（包括发消息）。
 
@@ -464,31 +508,8 @@ async def _tool_call_loop(
                             await chat_api.broadcast_to_group(group_id, _typing_event)
                     except Exception:
                         pass
-                # 任务摘要追踪
-                _work_tools = {
-                    "execute_command": lambda a: f"执行命令: {a.get('command', '?')}",
-                    "store_memory": lambda a: f"存储记忆: {a.get('title', '?')}",
-                    "file_write": lambda a: f"写文件: {a.get('file_path', '?')}",
-                    "file_read": lambda a: f"读文件: {a.get('file_path', '?')}",
-                    "file_delete": lambda a: f"删除文件: {a.get('file_path', '?')}",
-                    "send_gm": lambda a: f"在群聊中发言: {str(a.get('content', ''))[:40]}",
-                    "send_dm": lambda a: f"发私信: {str(a.get('content', ''))[:40]}",
-                    "send_friend_request": lambda a: f"发送好友申请: {a.get('message', '?')[:40]}",
-                    "toggle_thinking": lambda a: f"切换深度推理: {'开启' if a.get('enabled') else '关闭'}",
-                    "manage_workspace": lambda a: f"管理工作区: {a.get('action', '?')} — {a.get('section', '?')}",
-                    "set_alarm": lambda a: f"设置闹钟: {a.get('reason', '?')[:40]}",
-                    "push_state": lambda a: f"切换上下文: {a.get('doing', '?')[:40]}",
-                    "pop_state": lambda a: "结束当前任务，恢复上一层",
-                    "close_state": lambda a: "关闭状态帧",
-                    "list_states": lambda a: "查看状态栈",
-                    "enter_group": lambda a: f"进入群聊: {a.get('group_id', '?')}",
-                }
-                task_summary = None
-                if tool_name in _work_tools:
-                    try:
-                        task_summary = _work_tools[tool_name](arguments)
-                    except Exception:
-                        pass
+                # 任务摘要追踪（通过 ToolRegistry 获取，找不到时回退到通用摘要）
+                task_summary = _get_tool_task_summary(tool_name, arguments)
                 if not task_summary:
                     task_summary = f"调用工具 {tool_name}"
                 result = await dispatch_tool_call(db, agent.id, group_id, tool_name, arguments, context)
@@ -553,7 +574,7 @@ async def _tool_call_loop(
                             pass
 
             # ── 注入用户忙时消息（中断缓冲）──
-            pending_msgs = _pending_interrupts.pop(agent.id, None)
+            pending_msgs = await drain_pending_interrupts(agent.id)
             if pending_msgs:
                 for pm in pending_msgs:
                     if pm.get("type") == "user_message":
@@ -904,8 +925,8 @@ async def _tool_call_loop(
         try:
             from app.services.agent.workspace_service import save_current_task
             await save_current_task(db, agent.id, last_task)
-        except Exception:
-            pass
+        except Exception as e:
+            logger.warning(f"保存当前任务失败: {e}")
     # v0.1.8: LLM 调用后扣除额度
     if total_usage["api_calls"] > 0 and total_usage["total_tokens"] > 0:
         try:
@@ -958,7 +979,7 @@ def _check_rate_limit(agent_id: int) -> bool:
 # Key 致命错误日志
 # ============================================================
 
-async def _log_key_fatal(db, pool_key_id: int | None, status_code: int, message: str):
+async def _log_key_fatal(db, pool_key_id: int | None, status_code: int, message: str) -> None:
     """记录 402/401 致命错误到系统日志，通知管理员"""
     if pool_key_id is None:
         return
@@ -990,7 +1011,7 @@ async def _save_conversation_log_safe(
     has_output: bool = False,
     model: str | None = None,
     token_usage: dict | None = None,
-):
+) -> None:
     """安全保存对话日志（失败不影响主流程）"""
     try:
         from app.services.content.conversation_log_service import save_conversation_log

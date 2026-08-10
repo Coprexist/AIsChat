@@ -473,9 +473,9 @@ async def _maybe_trigger_dm_ai_reply(
         await db.flush()
 
     # ── 忙时中断注入：AI 正在执行，直接注入当前 tool loop ──
-    from app.ai.executor import _pending_interrupts, _active_run_agent_ids
-    if agent.id in _active_run_agent_ids:
-        _pending_interrupts.setdefault(agent.id, []).append({
+    from app.ai.executor import add_pending_interrupt, is_agent_running
+    if await is_agent_running(agent.id):
+        await add_pending_interrupt(agent.id, {
             "type": "user_message",
             "content": msg["content"],
             "message_id": msg["id"],
