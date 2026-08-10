@@ -84,6 +84,10 @@ export function useWorldChat({ wid, onRefresh, onMsg }: UseWorldChatOptions) {
   }, [])
   const msgSeqRef = useRef(0)  // 本地临时消息 id（负数，避免与 DB id 碰撞）
   const chatInputRef = useRef<HTMLTextAreaElement>(null)
+  // 工具执行完 → 世界文件可能被改 → 节流刷新（文件树/世界信息动态更新，不打断聊天流）
+  const refreshTimerRef = useRef<number | null>(null)
+  const onRefreshRef = useRef(onRefresh)
+  onRefreshRef.current = onRefresh
   // 滚动跟随：在底部 = 新消息自动滚到最新；不在底部 = 显示 ↓ 按钮
   const [isAtBottom, setIsAtBottom] = useState(true)
   const isAtBottomRef = useRef(true)
@@ -268,11 +272,13 @@ export function useWorldChat({ wid, onRefresh, onMsg }: UseWorldChatOptions) {
       const decoder = new TextDecoder()
       let buffer = ''
       // 首次内容/思考到达时开气泡（不在发消息时预建，避免空气泡）
+      // ⚠️ 创建时直接带当前内容：rAF 节流更新可能因 React 18 异步提交时序丢失
+      // （气泡 setState 尚未提交时，rAF 里 msgs.map 找不到该 id → 更新被吞）→ 创建即带内容，永不出现三个点
       const ensureBubble = () => {
         if (streamTargetId !== null) return
         const id = -(++msgSeqRef.current)
         streamTargetId = id
-        setChatMsgs((msgs) => [...msgs, { id, role: 'ai', content: '', reasoning: '' }])
+        setChatMsgs((msgs) => [...msgs, { id, role: 'ai', content: full, reasoning }])
       }
       // rAF 节流渲染（只更新当前流式气泡）
       let renderPending = false
@@ -321,6 +327,9 @@ export function useWorldChat({ wid, onRefresh, onMsg }: UseWorldChatOptions) {
                 content: t.summary || `${t.name} ${t.success ? '执行成功' : '执行失败'}`,
                 error: !t.success,
               }])
+              // 工具执行完 → 世界文件/配置可能被改 → 节流刷新（文件树动态更新；400ms 内多个工具合并一次）
+              if (refreshTimerRef.current) clearTimeout(refreshTimerRef.current)
+              refreshTimerRef.current = window.setTimeout(() => onRefreshRef.current(), 400)
             } catch { /* 解析失败忽略 */ }
             continue
           }
@@ -384,6 +393,13 @@ export function useWorldChat({ wid, onRefresh, onMsg }: UseWorldChatOptions) {
     check()
     return () => { cancelled = true; if (timer) clearTimeout(timer) }
   }, [wid, loadChat, subscribeTurnStream])
+
+  // 卸载清理（节流刷新定时器）
+  useEffect(() => {
+    return () => {
+      if (refreshTimerRef.current) clearTimeout(refreshTimerRef.current)
+    }
+  }, [])
 
   // ── 发送 ──
   const sendMessages = async (texts: string[]) => {
