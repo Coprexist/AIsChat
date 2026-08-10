@@ -155,7 +155,9 @@ export default function WorldDesignPage() {
   const [saving, setSaving] = useState(false)
   const [msg, setMsg] = useState('')
 
-  // 世界 AI 对话状态（世界级会话）
+  // 本地输入缓冲：打字时只更新本地状态，不触发整个页面重渲染
+  const [localInput, setLocalInput] = useState('')
+  const localInputRef = useRef('')
 
   // 世界 AI 配置表单（单独表单，不属于 agent）
   const [showCreatorForm, setShowCreatorForm] = useState(false)
@@ -465,6 +467,18 @@ export default function WorldDesignPage() {
   // 世界 AI 对话（状态/发送/排队/建议/命令 全部在 useWorldChat） ──
   const chat = useWorldChat({ wid, onRefresh: load, onMsg: setMsg })
 
+  // 本地建议插入（复用给建议按钮，更新本地输入缓冲）
+  const insertLocalSuggestion = useCallback((q: string) => {
+    const next = localInputRef.current ? localInputRef.current + ' ' + q : q
+    localInputRef.current = next
+    setLocalInput(next)
+    requestAnimationFrame(() => {
+      chat.chatInputRef.current?.focus()
+      const ta = chat.chatInputRef.current
+      if (ta) { const pos = next.length; ta.setSelectionRange(pos, pos) }
+    })
+  }, [chat])
+
   // world 加载完成 → 聊天面板渲染 → 确保在底部（刷新时历史先到、面板后渲染，滚动要补一次）
   useEffect(() => {
     if (world) chat.forceScrollToBottom()
@@ -667,7 +681,7 @@ export default function WorldDesignPage() {
                     ><Send size={11} /></button>
                     <div className="w-px bg-border shrink-0" />
                     <button
-                      onClick={(e) => { e.stopPropagation(); chat.insertSuggestion(q) }}
+                      onClick={(e) => { e.stopPropagation(); insertLocalSuggestion(q) }}
                       className="px-2 flex items-center text-textMuted hover:text-primary-300 hover:bg-primary-500/20 transition-colors shrink-0"
                       title="插入到输入框（追加，不覆盖）"
                     ><Plus size={12} /></button>
@@ -751,7 +765,7 @@ export default function WorldDesignPage() {
                       ><Send size={11} /></button>
                       <div className="w-px bg-border shrink-0" />
                       <button
-                        onClick={(e) => { e.stopPropagation(); chat.insertSuggestion(q) }}
+                        onClick={(e) => { e.stopPropagation(); insertLocalSuggestion(q) }}
                         className="px-2 flex items-center text-textMuted hover:text-primary-300 hover:bg-primary-500/20 transition-colors shrink-0"
                         title="插入到输入框（追加，不覆盖）"
                       ><Plus size={12} /></button>
@@ -804,32 +818,40 @@ export default function WorldDesignPage() {
         )}
         <textarea
           ref={chat.chatInputRef}
-          value={chat.chatInput}
+          value={localInput}
           onChange={(e) => {
-            const ta = e.target
-            chat.setChatInput(ta.value)
-            // / 检测：光标前只有 / + 字母（命令整行输入）；AI 忙时命令需等待，不弹列表
-            const before = ta.value.slice(0, ta.selectionStart)
+            const val = e.target.value
+            localInputRef.current = val
+            setLocalInput(val)
+            // / 检测：只更新小范围状态（命令下拉），不触发消息列表重渲染
+            const before = val.slice(0, e.target.selectionStart)
             const m = before.match(/^\/\w*$/)
             if (m) { chat.setCmdQuery(before.slice(1)); chat.setCmdActive(true); chat.setCmdIdx(0) }
-            else chat.setCmdActive(false)
+            else if (chat.cmdActive) chat.setCmdActive(false)
           }}
           onKeyDown={(e) => {
             if (chat.cmdActive && chat.cmdFiltered.length > 0) {
               if (e.key === 'ArrowDown') { e.preventDefault(); chat.setCmdIdx((i) => (i + 1) % chat.cmdFiltered.length); return }
               if (e.key === 'ArrowUp') { e.preventDefault(); chat.setCmdIdx((i) => (i - 1 + chat.cmdFiltered.length) % chat.cmdFiltered.length); return }
-              if (e.key === 'Enter' || e.key === 'Tab') { e.preventDefault(); chat.submitText(chat.cmdFiltered[chat.cmdIdx].cmd); return }
+              if (e.key === 'Enter' || e.key === 'Tab') { e.preventDefault(); chat.submitText(chat.cmdFiltered[chat.cmdIdx].cmd); setLocalInput(''); localInputRef.current = ''; return }
               if (e.key === 'Escape') { e.preventDefault(); chat.setCmdActive(false); return }
             }
-            if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); chat.submitText(chat.chatInput) }
+            if (e.key === 'Enter' && !e.shiftKey) {
+              e.preventDefault()
+              const text = localInputRef.current
+              if (!text.trim()) return
+              chat.submitText(text)
+              setLocalInput('')
+              localInputRef.current = ''
+            }
           }}
           rows={2}
           placeholder={(chat.chatSending || chat.chatProcessing) ? "AI 处理中，消息将排队…" : "和世界 AI 对话…（输入 / 查看命令）"}
           className="w-full bg-elevated text-sm p-2 rounded border border-border outline-none resize-none focus:border-primary-500/50"
         />
         <button
-          onClick={() => chat.submitText(chat.chatInput)}
-          disabled={!chat.chatInput.trim()}
+          onClick={() => { const t = localInputRef.current.trim(); if (t) { chat.submitText(t); setLocalInput(''); localInputRef.current = '' } }}
+          disabled={!localInput.trim()}
           className="w-full mt-2 py-1.5 text-sm bg-primary-500 hover:bg-primary-400 text-white rounded transition-colors disabled:opacity-40"
         >
           {(chat.chatSending || chat.chatProcessing) ? '排队发送' : (chat.chatSending ? '思考中...' : '发送')}
