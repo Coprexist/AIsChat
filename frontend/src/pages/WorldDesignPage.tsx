@@ -446,12 +446,12 @@ export default function WorldDesignPage() {
   }
 
   // ── 聊天面板引用（内部管理所有聊天状态） ──
-  const chatPanelRef = useRef<WorldChatHandle>(null)
+  const chatHandleRef = useRef<WorldChatHandle>(null)
   const [chatUnreadCount, setChatUnreadCount] = useState(0)
 
   // world 加载完成 → 聊天面板渲染 → 确保在底部
   useEffect(() => {
-    if (world) chatPanelRef.current?.forceScrollToBottom()
+    if (world) chatHandleRef.current?.forceScrollToBottom()
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [world])
 
@@ -592,7 +592,7 @@ export default function WorldDesignPage() {
       )}
 
       <WorldChatPanel
-        ref={chatPanelRef}
+        ref={chatHandleRef}
         wid={wid}
         onRefresh={load}
         onMsg={setMsg}
