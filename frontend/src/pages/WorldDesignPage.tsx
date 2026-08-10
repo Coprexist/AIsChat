@@ -6,15 +6,15 @@
  */
 import { useEffect, useState, useCallback, useRef, useMemo } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
-import { ChevronLeft, ChevronRight, ChevronDown, Folder, FolderOpen, FileText, FileCode, FileJson, FileImage, FileAudio, FileVideo, File, Trash2, Upload, Plus, Pencil, Eye, Brain, MessageCircle, Save, Send, ArrowDown, Search, Globe, Terminal, Package, Clock, Wrench, Eraser, MoreHorizontal } from 'lucide-react'
+import { ChevronLeft, ChevronRight, ChevronDown, Folder, FolderOpen, FileText, FileCode, FileJson, FileImage, FileAudio, FileVideo, File, Trash2, Upload, Plus, Pencil, Eye, MessageCircle, Save, MoreHorizontal } from 'lucide-react'
 import { api } from '../api/client'
 import GroupManagerModal from '../components/GroupManagerModal'
-import MarkdownContent from '../components/shared/MarkdownContent'
 import CodeRenderer from '../components/shared/CodeRenderer'
+import WorldChatPanel from '../components/WorldChatPanel'
 import { getCodeLang, isMarkdownFile } from '../utils/mime'
 import { tryOpenWorldWindow } from '../utils/worldView'
 import { useResizableSidebar } from '../hooks/useResizableSidebar'
-import { useWorldChat, WORLD_COMMANDS } from '../hooks/useWorldChat'
+import { useWorldChat } from '../hooks/useWorldChat'
 
 // 文件类型图标（与主界面风格一致）
 function fileTypeIcon(name: string) {
@@ -26,20 +26,6 @@ function fileTypeIcon(name: string) {
   if (['md', 'txt'].includes(ext)) return <FileText size={13} className="text-textSecondary shrink-0" />
   if (['html', 'htm', 'css', 'js', 'ts', 'jsx', 'tsx', 'py', 'xml', 'yaml', 'yml', 'sh'].includes(ext)) return <FileCode size={13} className="text-primary-400 shrink-0" />
   return <File size={13} className="text-textMuted shrink-0" />
-}
-
-// 工具气泡图标：按摘要内容关键词映射（后端文本不带 emoji，图标由前端渲染）
-function toolIcon(content: string) {
-  const s = content || ''
-  if (s.includes('接口文档')) return <FileText size={12} />
-  if (s.includes('记住') || s.includes('记忆') || s.includes('检索')) return <Brain size={12} />
-  if (s.includes('搜索')) return <Search size={12} />
-  if (s.includes('获取') || s.includes('http')) return <Globe size={12} />
-  if (s.includes('世界代码')) return <Terminal size={12} />
-  if (s.includes('压缩')) return <Package size={12} />
-  if (s.includes('清空')) return <Eraser size={12} />
-  if (s.includes('排队')) return <Clock size={12} />
-  return <Wrench size={12} />
 }
 
 // 文件内容区：md/html/代码渲染、图片显示、纯文本编辑（桌面右栏 / 移动端编辑器共用）
@@ -154,18 +140,6 @@ export default function WorldDesignPage() {
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
   const [msg, setMsg] = useState('')
-
-  // 本地输入缓冲：打字时只更新本地状态，不触发整个页面重渲染
-  const [localInput, setLocalInput] = useState('')
-  const localInputRef = useRef('')
-
-  // 本地命令检测状态（避免触发 hook 重渲染）
-  const [localCmdActive, setLocalCmdActive] = useState(false)
-  const [localCmdQuery, setLocalCmdQuery] = useState('')
-  const [localCmdIdx, setLocalCmdIdx] = useState(0)
-  const localCmdFiltered = useMemo(() =>
-    localCmdQuery ? WORLD_COMMANDS.filter((c) => c.cmd.startsWith('/' + localCmdQuery)) : WORLD_COMMANDS
-  , [localCmdQuery])
 
   // 世界 AI 配置表单（单独表单，不属于 agent）
   const [showCreatorForm, setShowCreatorForm] = useState(false)
@@ -475,18 +449,6 @@ export default function WorldDesignPage() {
   // 世界 AI 对话（状态/发送/排队/建议/命令 全部在 useWorldChat） ──
   const chat = useWorldChat({ wid, onRefresh: load, onMsg: setMsg })
 
-  // 本地建议插入（复用给建议按钮，更新本地输入缓冲）
-  const insertLocalSuggestion = useCallback((q: string) => {
-    const next = localInputRef.current ? localInputRef.current + ' ' + q : q
-    localInputRef.current = next
-    setLocalInput(next)
-    requestAnimationFrame(() => {
-      chat.chatInputRef.current?.focus()
-      const ta = chat.chatInputRef.current
-      if (ta) { const pos = next.length; ta.setSelectionRange(pos, pos) }
-    })
-  }, [chat])
-
   // world 加载完成 → 聊天面板渲染 → 确保在底部（刷新时历史先到、面板后渲染，滚动要补一次）
   useEffect(() => {
     if (world) chat.forceScrollToBottom()
@@ -572,26 +534,7 @@ export default function WorldDesignPage() {
           </div>
           <div>
             <div className="text-[10px] text-textMuted mb-0.5">系统提示词</div>
-            {/* 排队消息（AI 处理中，输入框上方弹窗展示：普通消息一起发，命令逐个执行） */}
-        {chat.pendingItems.length > 0 && (
-          <div className="absolute bottom-full left-3 right-3 mb-1 max-h-32 overflow-y-auto rounded-xl bg-elevated border border-border shadow-xl z-50">
-            <div className="px-3 py-1.5 text-[10px] text-textMuted border-b border-border">
-              ⏳ AI 处理中，以下 {chat.pendingItems.length} 条将按顺序执行（普通消息一起发，命令逐个执行）
-            </div>
-            {chat.pendingItems.map((it, i) => (
-              <div key={i} className="flex items-center gap-2 px-3 py-1.5 text-xs border-b border-border/40 last:border-b-0">
-                <span className={`truncate flex-1 ${it.kind === 'cmd' ? 'font-mono text-primary-400' : 'text-textPrimary'}`}>{it.text}</span>
-                <span className="shrink-0 text-[10px] text-textMuted">{it.kind === 'cmd' ? '命令' : '消息'}</span>
-                <button
-                  onClick={() => chat.setPendingItems((items) => items.filter((_, j) => j !== i))}
-                  className="shrink-0 text-textMuted hover:text-rose-400 transition-colors"
-                  title="移除这条"
-                >✕</button>
-              </div>
-            ))}
-          </div>
-        )}
-        <textarea
+            <textarea
               value={creatorForm.system_prompt}
               onChange={(e) => setCreatorForm((f) => ({ ...f, system_prompt: e.target.value }))}
               rows={6}
@@ -666,214 +609,7 @@ export default function WorldDesignPage() {
         </div>
       )}
 
-      {/* 消息列表（滚到顶加载更早；在底部 = 自动跟随最新，否则右下角 ↓ 可回底） */}
-      <div ref={chat.chatListRef} onScroll={chat.handleChatScroll} className="flex-1 overflow-y-auto p-3 space-y-2 relative">
-        {chat.chatLoadingOlder && <div className="text-[10px] text-textMuted text-center py-1">加载更早消息…</div>}
-        {chat.chatMsgs.length === 0 && (
-          <div className="text-center mt-8 space-y-3">
-            <div className="text-xs text-textMuted">暂无消息，从下面开始探索：</div>
-            {chat.suggestions.length > 0 && !chat.chatSending && !chat.chatProcessing && (
-              <div className="flex flex-col items-center gap-1.5 w-full max-w-[420px]">
-                {chat.suggestions.map((q, i) => (
-                  <div key={i} className="flex items-stretch rounded-lg bg-elevated border border-border overflow-hidden w-full">
-                    <button
-                      onClick={() => chat.submitText(q)}
-                      className="flex-1 min-w-0 px-2.5 py-1.5 text-left text-xs text-textSecondary hover:bg-primary-500/20 hover:text-primary-300 transition-colors truncate"
-                      title={q}
-                    >{q}</button>
-                    <div className="w-px bg-border shrink-0" />
-                    <button
-                      onClick={(e) => { e.stopPropagation(); chat.submitText(q) }}
-                      className="px-2 flex items-center text-textMuted hover:text-primary-300 hover:bg-primary-500/20 transition-colors shrink-0"
-                      title="发送这条"
-                    ><Send size={11} /></button>
-                    <div className="w-px bg-border shrink-0" />
-                    <button
-                      onClick={(e) => { e.stopPropagation(); insertLocalSuggestion(q) }}
-                      className="px-2 flex items-center text-textMuted hover:text-primary-300 hover:bg-primary-500/20 transition-colors shrink-0"
-                      title="插入到输入框（追加，不覆盖）"
-                    ><Plus size={12} /></button>
-                  </div>
-                ))}
-              </div>
-            )}
-          </div>
-        )}
-        {chat.chatMsgs.map((m) => {
-          const isLastAi = m.role === 'ai' && m.id === lastAiMsgId
-          return (
-            <div key={m.id} className="space-y-2">
-              {m.role === 'tool' ? (
-                <div className={`world-msg flex items-center justify-center gap-1.5 text-[11px] text-center py-1 px-2 rounded-lg max-w-[90%] mx-auto ${m.error ? 'text-rose-400 bg-rose-500/10 border border-rose-500/20' : 'text-mint-400 bg-mint-400/10 border border-mint-400/20'}`}>
-                  <span className="shrink-0">{toolIcon(m.content)}</span>
-                  <span className="min-w-0">{m.content}</span>
-                </div>
-              ) : (
-                <div className={`world-msg text-sm max-w-[90%] p-2 rounded-lg ${m.error ? 'bg-rose-500/10 border border-rose-500/30 text-rose-400' : m.role === 'user' ? 'bg-primary-500/20 ml-auto' : 'bg-elevated/80'}`}>
-                  <div className="text-[10px] text-textMuted mb-0.5">{m.error ? '⚠️ 错误' : m.role === 'user' ? (m.pending ? '我（排队中，发送后生效）' : '我') : '世界 AI'}</div>
-                  {!m.error && (m.role === 'ai' || m.role === 'note') && !!m.reasoning && (
-                    <details className="group/details mb-1.5">
-                      <summary className="flex items-center gap-1 text-[10px] text-textMuted cursor-pointer select-none hover:text-textSecondary list-none [&::-webkit-details-marker]:hidden">
-                        <ChevronRight size={11} className="transition-transform group-open/details:rotate-90" />
-                        <Brain size={11} className="text-textMuted" />
-                        思考过程
-                      </summary>
-                      <div className="text-xs text-textMuted mt-1 whitespace-pre-wrap bg-elevated/70 rounded p-2">{m.reasoning}</div>
-                    </details>
-                  )}
-                  {m.content ? <MarkdownContent content={m.content} /> : m.role === 'ai' ? (
-                    m.reasoning ? (
-                      <span className="opacity-50 text-xs italic">
-                        {(() => { const r = m.reasoning.trim(); return r.length > 60 ? r.slice(-60) + '…' : r || '思考中…' })()}
-                      </span>
-                    ) : (
-                      <span className="inline-flex gap-0.5">
-                        <span className="w-1 h-1 bg-primary-400 rounded-full animate-bounce" style={{ animationDelay: '0ms' }} />
-                        <span className="w-1 h-1 bg-primary-400 rounded-full animate-bounce" style={{ animationDelay: '150ms' }} />
-                        <span className="w-1 h-1 bg-primary-400 rounded-full animate-bounce" style={{ animationDelay: '300ms' }} />
-                      </span>
-                    )
-                  ) : null}
-                </div>
-              )}
-              {/* 中断 → "你可以：继续"（同一套建议样式）；正常 → 建议列表 */}
-              {isLastAi && isInterrupted && !chat.chatSending && !chat.chatProcessing && (
-                <div className="space-y-1.5 pl-1 w-full max-w-[420px]">
-                  <div className="text-[10px] text-textMuted">你可以：</div>
-                  <div className="flex items-stretch rounded-lg bg-elevated border border-border overflow-hidden w-full">
-                    <button
-                      onClick={() => chat.submitText('继续')}
-                      className="flex-1 min-w-0 px-2.5 py-1.5 text-left text-xs text-textSecondary hover:bg-primary-500/20 hover:text-primary-300 transition-colors truncate"
-                      title="继续之前的工作"
-                    >继续之前的工作</button>
-                    <div className="w-px bg-border shrink-0" />
-                    <button
-                      onClick={(e) => { e.stopPropagation(); chat.submitText('继续') }}
-                      className="px-2 flex items-center text-textMuted hover:text-primary-300 hover:bg-primary-500/20 transition-colors shrink-0"
-                      title="发送"
-                    ><Send size={11} /></button>
-                  </div>
-                </div>
-              )}
-              {(isLastAi || chat.chatMsgs.length === 0) && !isInterrupted && chat.suggestions.length > 0 && !chat.chatSending && !chat.chatProcessing && (
-                <div className="space-y-1.5 pl-1 w-full max-w-[420px]">
-                  <div className="text-[10px] text-textMuted">你可以：</div>
-                  {chat.suggestions.map((q, i) => (
-                    <div key={i} className="flex items-stretch rounded-lg bg-elevated border border-border overflow-hidden w-full">
-                      <button
-                        onClick={() => chat.submitText(q)}
-                        className="flex-1 min-w-0 px-2.5 py-1.5 text-left text-xs text-textSecondary hover:bg-primary-500/20 hover:text-primary-300 transition-colors truncate"
-                        title={q}
-                      >{q}</button>
-                      <div className="w-px bg-border shrink-0" />
-                      <button
-                        onClick={(e) => { e.stopPropagation(); chat.submitText(q) }}
-                        className="px-2 flex items-center text-textMuted hover:text-primary-300 hover:bg-primary-500/20 transition-colors shrink-0"
-                        title="发送这条"
-                      ><Send size={11} /></button>
-                      <div className="w-px bg-border shrink-0" />
-                      <button
-                        onClick={(e) => { e.stopPropagation(); insertLocalSuggestion(q) }}
-                        className="px-2 flex items-center text-textMuted hover:text-primary-300 hover:bg-primary-500/20 transition-colors shrink-0"
-                        title="插入到输入框（追加，不覆盖）"
-                      ><Plus size={12} /></button>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </div>
-          )
-        })}
-        {/* ↓ 回到底部 / 有新消息时显示 */}
-        {(!chat.isAtBottom || chat.unreadCount > 0) && chat.chatMsgs.length > 0 && (
-          <button
-            onClick={() => chat.scrollToBottom(true)}
-            className={`absolute bottom-3 right-3 z-40 flex items-center justify-center gap-1 px-3 h-8 rounded-full shadow-lg transition-all ${
-              chat.unreadCount > 0
-                ? 'bg-rose-500 hover:bg-rose-400 text-white border border-rose-400 animate-bounce'
-                : 'bg-elevated border border-border text-textSecondary hover:text-textPrimary hover:bg-surface'
-            }`}
-            title="回到底部"
-          >
-            {chat.unreadCount > 0 ? (
-              <>
-                <ArrowDown size={14} />
-                <span className="text-xs font-semibold">{chat.unreadCount} 条新消息</span>
-              </>
-            ) : (
-              <ArrowDown size={14} />
-            )}
-          </button>
-        )}
-      </div>
-
-      {/* 输入 */}
-      <div className="p-3 border-t border-border relative">
-        {/* 斜杠命令列表（输入 / 弹出；选中即发送） */}
-        {localCmdActive && localCmdFiltered.length > 0 && (
-          <div className="absolute bottom-full left-3 mb-1 w-64 max-h-40 overflow-y-auto rounded-xl bg-elevated border border-border shadow-xl z-50">
-            {localCmdFiltered.map((c, i) => (
-              <button
-                key={c.cmd}
-                className={`w-full text-left px-3 py-2 transition-colors ${i === localCmdIdx ? 'bg-primary-500/20 text-primary-400' : 'text-textPrimary hover:bg-hover'}`}
-                onMouseDown={(e) => { e.preventDefault(); chat.submitText(c.cmd); setLocalInput(''); localInputRef.current = ''; setLocalCmdActive(false) }}
-              >
-                <span className="font-mono text-xs">{c.cmd}</span>
-                <span className="block text-[10px] text-textMuted">{c.desc}</span>
-              </button>
-            ))}
-          </div>
-        )}
-        <textarea
-          ref={chat.chatInputRef}
-          value={localInput}
-          onChange={(e) => {
-            const val = e.target.value
-            localInputRef.current = val
-            setLocalInput(val)
-            // / 检测：只更新本地状态，不触发 hook 重渲染
-            const before = val.slice(0, e.target.selectionStart)
-            const m = before.match(/^\/\w*$/)
-            if (m) { setLocalCmdQuery(before.slice(1)); setLocalCmdActive(true); setLocalCmdIdx(0) }
-            else if (localCmdActive) setLocalCmdActive(false)
-          }}
-          onKeyDown={(e) => {
-            if (localCmdActive && localCmdFiltered.length > 0) {
-              if (e.key === 'ArrowDown') { e.preventDefault(); setLocalCmdIdx((i) => (i + 1) % localCmdFiltered.length); return }
-              if (e.key === 'ArrowUp') { e.preventDefault(); setLocalCmdIdx((i) => (i - 1 + localCmdFiltered.length) % localCmdFiltered.length); return }
-              if (e.key === 'Enter' || e.key === 'Tab') { e.preventDefault(); chat.submitText(localCmdFiltered[localCmdIdx].cmd); setLocalInput(''); localInputRef.current = ''; setLocalCmdActive(false); return }
-              if (e.key === 'Escape') { e.preventDefault(); setLocalCmdActive(false); return }
-            }
-            if (e.key === 'Enter' && !e.shiftKey) {
-              e.preventDefault()
-              const text = localInputRef.current
-              if (!text.trim()) return
-              chat.submitText(text)
-              setLocalInput('')
-              localInputRef.current = ''
-              setLocalCmdActive(false)
-            }
-          }}
-          rows={2}
-          placeholder={(chat.chatSending || chat.chatProcessing) ? "AI 处理中，消息将排队…" : "和世界 AI 对话…（输入 / 查看命令）"}
-          className="w-full bg-elevated text-sm p-2 rounded border border-border outline-none resize-none focus:border-primary-500/50"
-        />
-        <button
-          onClick={() => { const t = localInputRef.current.trim(); if (t) { chat.submitText(t); setLocalInput(''); localInputRef.current = '' } }}
-          disabled={!localInput.trim()}
-          className="w-full mt-2 py-1.5 text-sm bg-primary-500 hover:bg-primary-400 text-white rounded transition-colors disabled:opacity-40"
-        >
-          {(chat.chatSending || chat.chatProcessing) ? '排队发送' : (chat.chatSending ? '思考中...' : '发送')}
-        </button>
-        {chat.chatProcessing && (
-          <div className="text-[10px] text-textMuted mt-2 text-center">
-            ⏳ 上一轮还在执行（刷新不影响），完成后自动显示
-          </div>
-        )}
-        <div className="text-[10px] text-textMuted mt-2 text-center">
-          世界级会话（非 DM）：账单走世界主人，让它改界面、加功能
-        </div>
-      </div>
+      <WorldChatPanel chat={chat} lastAiMsgId={lastAiMsgId} isInterrupted={isInterrupted} />
     </>
   )
 

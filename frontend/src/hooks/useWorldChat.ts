@@ -2,7 +2,7 @@
  * 世界 AI 对话 hook — 聊天状态 + 流式发送 + 排队 + 建议按钮 + 斜杠命令
  * 从 WorldDesignPage 拆分（2026-08-06 重构）
  */
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState, type RefObject, type Dispatch, type SetStateAction, type UIEvent } from 'react'
 import { api } from '../api/client'
 
 // 世界 AI 对话消息（世界级会话，非 DM；reasoning = 思考过程；tool = 工具执行结果；note = 中间叙述）
@@ -29,6 +29,35 @@ interface UseWorldChatOptions {
   onRefresh: () => void
   /** 顶部提示消息 */
   onMsg: (msg: string) => void
+}
+
+export interface UseWorldChatReturn {
+  chatMsgs: ChatMsg[]
+  chatInput: string
+  setChatInput: (v: string) => void
+  chatSending: boolean
+  chatProcessing: boolean
+  chatHasMore: boolean
+  chatLoadingOlder: boolean
+  chatListRef: (el: HTMLDivElement | null) => void
+  chatInputRef: RefObject<HTMLTextAreaElement | null>
+  pendingItems: { kind: 'msg' | 'cmd'; text: string }[]
+  setPendingItems: Dispatch<SetStateAction<{ kind: 'msg' | 'cmd'; text: string }[]>>
+  suggestions: string[]
+  cmdActive: boolean
+  setCmdActive: (v: boolean) => void
+  cmdQuery: string
+  setCmdQuery: (v: string) => void
+  cmdIdx: number
+  setCmdIdx: Dispatch<SetStateAction<number>>
+  cmdFiltered: { cmd: string; desc: string }[]
+  handleChatScroll: (e: UIEvent<HTMLDivElement>) => void
+  submitText: (text: string) => void
+  insertSuggestion: (q: string) => void
+  isAtBottom: boolean
+  scrollToBottom: (force?: boolean) => void
+  forceScrollToBottom: () => void
+  unreadCount: number
 }
 
 export function useWorldChat({ wid, onRefresh, onMsg }: UseWorldChatOptions) {
