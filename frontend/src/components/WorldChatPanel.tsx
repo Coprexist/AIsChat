@@ -262,30 +262,33 @@ const WorldChatPanel = memo(forwardRef<WorldChatHandle, WorldChatPanelProps>(({ 
   return (
     <>
       {/* 消息列表 */}
-      <div ref={chat.chatListRef} onScroll={chat.handleChatScroll} className="flex-1 overflow-y-auto p-3 space-y-2 relative">
+      <div ref={chat.chatListRef} className="flex-1 overflow-y-auto p-3 space-y-2 relative">
         {chat.chatLoadingOlder && <div className="text-[10px] text-textMuted text-center py-1">加载更早消息…</div>}
         {chat.chatMsgs.length === 0 ? renderEmptySuggestions() : chat.chatMsgs.map(renderMessage)}
 
-        {/* 回到底部 / 新消息按钮 */}
-        {(!chat.isAtBottom || chat.unreadCount > 0) && chat.chatMsgs.length > 0 && (
-          <button
-            onClick={() => chat.scrollToBottom(true)}
-            className={`absolute bottom-3 right-3 z-40 flex items-center justify-center gap-1 px-3 h-8 rounded-full shadow-lg transition-all ${
-              chat.unreadCount > 0
-                ? 'bg-rose-500 hover:bg-rose-400 text-white border border-rose-400 animate-bounce'
-                : 'bg-elevated border border-border text-textSecondary hover:text-textPrimary hover:bg-surface'
-            }`}
-            title="回到底部"
-          >
-            {chat.unreadCount > 0 ? (
-              <>
+        {/* 回到底部 / 新消息按钮：不在底部（或未读>0，或列表不可滚动时给入口）才显示；可滚动且在底部隐藏
+            sticky 固定在聊天列表视口右下角（输入区正上方）：列表滚动时不动，不随消息内容滚 */}
+        {(!chat.isAtBottom || !chat.chatCanScroll || chat.unreadCount > 0) && (
+          <div className="sticky bottom-3 flex justify-end pointer-events-none z-40">
+            <button
+              onClick={() => chat.scrollToBottom(true)}
+              className={`pointer-events-auto flex items-center justify-center gap-1 px-3 h-8 rounded-full shadow-lg transition-all ${
+                chat.unreadCount > 0
+                  ? 'bg-rose-500 hover:bg-rose-400 text-white border border-rose-400 animate-bounce'
+                  : 'bg-elevated border border-border text-textSecondary hover:text-textPrimary hover:bg-surface'
+              }`}
+              title="回到底部"
+            >
+              {chat.unreadCount > 0 ? (
+                <>
+                  <ArrowDown size={14} />
+                  <span className="text-xs font-semibold">{chat.unreadCount} 条新消息</span>
+                </>
+              ) : (
                 <ArrowDown size={14} />
-                <span className="text-xs font-semibold">{chat.unreadCount} 条新消息</span>
-              </>
-            ) : (
-              <ArrowDown size={14} />
-            )}
-          </button>
+              )}
+            </button>
+          </div>
         )}
       </div>
 

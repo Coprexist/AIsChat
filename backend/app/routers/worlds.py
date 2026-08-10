@@ -685,12 +685,15 @@ async def chat_status(
     # 正在处理 = 队列有消息，或有进行中的轮次（active_turn 标记；比"最后消息非 ai"准确，
     # worker 死后不会把排队消息永远误报为 processing，导致前端排队永不发送）
     processing = queue_size > 0
+    turn_id = None
     if not processing:
         from app.models.world import World as _World
         world_row = await db.get(_World, world_id)
-        if world_row and (world_row.config or {}).get("active_turn"):
+        act = (world_row.config or {}).get("active_turn") if world_row else None
+        if act:
             processing = True
-    return {"processing": processing, "queue_size": queue_size}
+            turn_id = act.get("turn_id")  # 刷新后前端据此订阅 SSE 直播，而不是干等到整轮结束
+    return {"processing": processing, "queue_size": queue_size, "turn_id": turn_id}
 
 
 

@@ -6,76 +6,16 @@
  */
 import { useEffect, useState, useCallback, useRef, useMemo } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
-import { ChevronLeft, ChevronRight, ChevronDown, Folder, FolderOpen, FileText, FileCode, FileJson, FileImage, FileAudio, FileVideo, File, Trash2, Upload, Plus, Pencil, Eye, MessageCircle, Save, MoreHorizontal } from 'lucide-react'
+import { ChevronLeft, ChevronRight, Folder, FolderOpen, Upload, Plus, Pencil, Eye, MessageCircle, Save, MoreHorizontal, FileText, Trash2, Settings } from 'lucide-react'
 import { api } from '../api/client'
 import GroupManagerModal from '../components/GroupManagerModal'
-import CodeRenderer from '../components/shared/CodeRenderer'
-import MarkdownContent from '../components/shared/MarkdownContent'
 import WorldChatPanel, { type WorldChatHandle } from '../components/WorldChatPanel'
+import WorldFileTree, { buildWorldTree, type WorldFile } from '../components/world/WorldFileTree'
+import FileContentPane, { fileTypeIcon } from '../components/world/FileContentPane'
+import WorldCreatorConfig, { type WorldCreator, type WorldUsageStats } from '../components/world/WorldCreatorConfig'
 import { getCodeLang, isMarkdownFile } from '../utils/mime'
 import { tryOpenWorldWindow } from '../utils/worldView'
 import { useResizableSidebar } from '../hooks/useResizableSidebar'
-
-// 文件类型图标（与主界面风格一致）
-function fileTypeIcon(name: string) {
-  const ext = name.split('.').pop()?.toLowerCase() ?? ''
-  if (['png', 'jpg', 'jpeg', 'gif', 'webp', 'svg', 'ico', 'bmp'].includes(ext)) return <FileImage size={13} className="text-mint-400 shrink-0" />
-  if (['mp3', 'wav', 'ogg'].includes(ext)) return <FileAudio size={13} className="text-primary-400 shrink-0" />
-  if (['mp4', 'webm'].includes(ext)) return <FileVideo size={13} className="text-rose-400 shrink-0" />
-  if (['json'].includes(ext)) return <FileJson size={13} className="text-amber-400 shrink-0" />
-  if (['md', 'txt'].includes(ext)) return <FileText size={13} className="text-textSecondary shrink-0" />
-  if (['html', 'htm', 'css', 'js', 'ts', 'jsx', 'tsx', 'py', 'xml', 'yaml', 'yml', 'sh'].includes(ext)) return <FileCode size={13} className="text-primary-400 shrink-0" />
-  return <File size={13} className="text-textMuted shrink-0" />
-}
-
-// 文件内容区：md/html/代码渲染、图片显示、纯文本编辑（桌面右栏 / 移动端编辑器共用）
-function FileContentPane({ wid, currentFile, content, setContent, viewMode, canRender, isMdFile, fileCodeLang, isImgFile }: {
-  wid: number
-  currentFile: string
-  content: string
-  setContent: (v: string) => void
-  viewMode: 'edit' | 'render'
-  canRender: boolean
-  isMdFile: boolean
-  fileCodeLang: string
-  isImgFile: boolean
-}) {
-  if (viewMode === 'render' && canRender) {
-    if (isImgFile) {
-      return (
-        <div className="flex-1 overflow-hidden bg-canvas flex items-center justify-center">
-          <img
-            src={`/world/${wid}/files/${currentFile.split('/').map(encodeURIComponent).join('/')}`}
-            alt={currentFile}
-            className="w-full h-full object-contain"
-          />
-        </div>
-      )
-    }
-    return (
-      <div className="flex-1 overflow-auto bg-canvas [&_code]:!overflow-x-visible [&_code]:!rounded-none [&_code]:!border-0 [&_code]:!p-0 [&_code]:!bg-transparent">
-        <div className="w-full max-w-none text-sm leading-relaxed break-words text-textPrimary p-3 md:p-4">
-          {isMdFile ? (
-            <MarkdownContent content={content} isMine={false} />
-          ) : (
-            <CodeRenderer className={'language-' + fileCodeLang}>{content}</CodeRenderer>
-          )}
-        </div>
-      </div>
-    )
-  }
-  return (
-    <textarea
-      value={content}
-      onChange={(e) => setContent(e.target.value)}
-      spellCheck={false}
-      className="flex-1 bg-canvas text-sm text-textPrimary p-3 font-mono outline-none resize-none"
-      placeholder="在这里编辑代码…"
-    />
-  )
-}
-
-// ── 打字机效果：文本逐字显示（参考大同互动逐 token 渲染，简化版） ──
 
 interface World {
   id: number
@@ -88,22 +28,7 @@ interface World {
   bindings: { entity_type: string; entity_id: number }[]
   agents: { agent_id: number; role: string }[]
   // 群视界机器人 = 世界配置（非 agent、无账号），身份 = world-{id}
-  creator: {
-    id: string
-    name: string
-    system_prompt: string
-    model: string | null
-    temperature: number
-    top_p: number
-    thinking: boolean
-    max_tool_rounds: number
-    tools: string[]
-  } | null
-}
-
-interface WorldFile {
-  path: string
-  size: number
+  creator: WorldCreator | null
 }
 
 export default function WorldDesignPage() {
@@ -143,10 +68,8 @@ export default function WorldDesignPage() {
 
   // 世界 AI 配置表单（单独表单，不属于 agent）
   const [showCreatorForm, setShowCreatorForm] = useState(false)
-  const [creatorForm, setCreatorForm] = useState({ name: '', system_prompt: '', model: '', temperature: 0.8, thinking: false, max_tool_rounds: 50 })
-  const [creatorSaving, setCreatorSaving] = useState(false)
   // 2.7：LLM 用量/缓存命中率
-  const [usageStats, setUsageStats] = useState<{ total_calls: number; prompt_tokens: number; completion_tokens: number; cached_tokens: number; cache_hit_rate_pct: number } | null>(null)
+  const [usageStats, setUsageStats] = useState<WorldUsageStats | null>(null)
 
   // 当前文件内联渲染：md 渲染 + 查看原文；html/代码高亮渲染；图片直接显示（不用弹窗）
   const [viewMode, setViewMode] = useState<'edit' | 'render'>('edit')
@@ -160,7 +83,7 @@ export default function WorldDesignPage() {
   }, [])
 
   // ── 移动端（<lg）：tab 切换（文件/对话，对话默认打开）+ 目录逐层导航 ──
-  const [mobileTab, setMobileTab] = useState<'files' | 'chat'>('chat')
+  const [mobileTab, setMobileTab] = useState<'files' | 'chat' | 'preview'>('chat')
   const [mobileView, setMobileView] = useState<'dirs' | 'file'>('dirs')
   const [mobileDir, setMobileDir] = useState('')  // 当前浏览目录（'' = 根）
   // 上传：顶部菜单（上传到此位置 / 选择其它位置）+ 目录选择弹层
@@ -188,19 +111,11 @@ export default function WorldDesignPage() {
     try {
       const w = await api.get<World>(`/worlds/${wid}`)
       setWorld(w)
-      setCreatorForm({
-        name: w.creator?.name ?? '',
-        system_prompt: w.creator?.system_prompt ?? '',
-        model: w.creator?.model ?? '',
-        temperature: w.creator?.temperature ?? 0.8,
-        thinking: w.creator?.thinking ?? false,
-        max_tool_rounds: w.creator?.max_tool_rounds ?? 50,
-      })
       const f = await api.get<{ files: WorldFile[] }>(`/worlds/${wid}/files`)
       setFiles(f.files || [])
       // 2.7：缓存命中统计（失败静默，不影响主流程）
       try {
-        const u = await api.get<{ total_calls: number; prompt_tokens: number; completion_tokens: number; cached_tokens: number; cache_hit_rate_pct: number }>(`/worlds/${wid}/usage`)
+        const u = await api.get<WorldUsageStats>(`/worlds/${wid}/usage`)
         setUsageStats(u)
       } catch { /* ignore */ }
       // 默认选中第一个文件
@@ -333,38 +248,9 @@ export default function WorldDesignPage() {
   }
 
   // ── 文件树（按目录层级构建，文件夹可折叠） ──
-  interface TreeNode {
-    name: string
-    path: string
-    children: TreeNode[]
-    isDir: boolean
-  }
   const [collapsedDirs, setCollapsedDirs] = useState<Set<string>>(new Set())
 
-  const fileTree = useMemo(() => {
-    const root: TreeNode = { name: '', path: '', children: [], isDir: true }
-    for (const f of files) {
-      const parts = f.path.split('/')
-      let node = root
-      let acc = ''
-      for (let i = 0; i < parts.length; i++) {
-        acc = acc ? `${acc}/${parts[i]}` : parts[i]
-        const isLast = i === parts.length - 1
-        let child = node.children.find((c) => c.name === parts[i] && c.isDir === !isLast)
-        if (!child) {
-          child = { name: parts[i], path: acc, children: [], isDir: !isLast }
-          node.children.push(child)
-        }
-        node = child
-      }
-    }
-    const sortNodes = (nodes: TreeNode[]) => {
-      nodes.sort((a, b) => (a.isDir === b.isDir ? a.name.localeCompare(b.name) : a.isDir ? -1 : 1))
-      nodes.forEach((n) => sortNodes(n.children))
-    }
-    sortNodes(root.children)
-    return root
-  }, [files])
+  const fileTree = useMemo(() => buildWorldTree(files), [files])
 
   // 移动端：当前浏览目录节点 / 上传目录选择器节点（从 fileTree 定位）
   const mobileDirNode = useMemo(() => {
@@ -400,46 +286,6 @@ export default function WorldDesignPage() {
     })
   }
 
-  const renderTree = (nodes: TreeNode[], depth: number): JSX.Element[] =>
-    nodes.map((n) => (
-      <div key={n.path}>
-        {n.isDir ? (
-          <>
-            <button
-              onClick={() => toggleDir(n.path)}
-              style={{ paddingLeft: 6 + depth * 14 }}
-              className="flex items-center gap-1 w-full text-left text-xs py-1 pr-2 rounded transition-colors hover:bg-elevated text-textSecondary"
-              title={n.path}
-            >
-              <ChevronRight size={12} className={`shrink-0 transition-transform ${collapsedDirs.has(n.path) ? '' : 'rotate-90'}`} />
-              {collapsedDirs.has(n.path) ? <Folder size={13} className="text-textMuted shrink-0" /> : <FolderOpen size={13} className="text-primary-400 shrink-0" />}
-              <span className="truncate">{n.name}</span>
-            </button>
-            {!collapsedDirs.has(n.path) && renderTree(n.children, depth + 1)}
-          </>
-        ) : (
-          <div key={n.path} className="group flex items-center">
-            <button
-              onClick={() => selectFile(n.path)}
-              style={{ paddingLeft: 24 + depth * 14 }}
-              className={`flex items-center gap-1 flex-1 min-w-0 text-left text-xs py-1 pr-1 rounded truncate transition-colors ${currentFile === n.path ? 'bg-primary-500/20 text-primary-300' : 'hover:bg-elevated text-textSecondary'}`}
-              title={n.path}
-            >
-              <span className="shrink-0">{fileTypeIcon(n.name)}</span>
-              <span className="truncate">{n.name}</span>
-            </button>
-            <button
-              onClick={(ev) => { ev.stopPropagation(); deleteFile(n.path) }}
-              className="hidden group-hover:flex shrink-0 items-center justify-center w-6 h-6 text-textMuted hover:text-rose-400 transition-colors"
-              title="删除此文件"
-            >
-              <Trash2 size={13} />
-            </button>
-          </div>
-        )}
-      </div>
-    ))
-
   // 发布到商城：跳转统一发布页（带当前世界预选，表单含标题/描述/标签/同步 GitHub）
   const publishToMarket = () => {
     if (!world) return
@@ -456,30 +302,6 @@ export default function WorldDesignPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [world])
 
-  // ── 世界 AI 配置表单（单独表单，不属于 agent） ──
-  const saveCreator = async () => {
-    if (!world?.creator) return
-    setCreatorSaving(true)
-    try {
-      const patch: Record<string, unknown> = {
-        name: creatorForm.name,
-        system_prompt: creatorForm.system_prompt,
-        temperature: creatorForm.temperature,
-        thinking: creatorForm.thinking,
-        max_tool_rounds: creatorForm.max_tool_rounds,
-      }
-      if (creatorForm.model.trim()) patch.model = creatorForm.model.trim()
-      const updated = await api.put<World['creator']>(`/worlds/${wid}/creator`, patch)
-      setWorld((w) => (w ? { ...w, creator: updated } : w))
-      setShowCreatorForm(false)
-      setMsg('✅ 世界 AI 配置已保存')
-    } catch (e: any) {
-      setMsg(`保存失败: ${e?.message || e}`)
-    } finally {
-      setCreatorSaving(false)
-    }
-  }
-
   // ── 聊天面板内容（桌面右栏 / 移动端对话 tab 共用） ──
   const renderChatInner = () => (
     <>
@@ -495,101 +317,24 @@ export default function WorldDesignPage() {
           <div className="flex-1" />
           <button
             onClick={() => setShowCreatorForm((v) => !v)}
-            className="text-xs px-2 py-1 rounded bg-elevated hover:bg-border text-textSecondary transition-colors"
+            className="inline-flex items-center gap-1 text-xs px-2 py-1 rounded bg-elevated hover:bg-border text-textSecondary transition-colors"
             title="世界 AI 配置（单独表单，不属于 agent）"
           >
-            ⚙️ 配置
+            <Settings size={12} /> 配置
           </button>
         </div>
         <div className="text-xs text-textMuted mt-0.5">世界 AI 是世界的配置：让它改界面、加功能</div>
       </div>
 
-      {showCreatorForm && (
-        <div className="px-3 py-3 border-b border-border bg-elevated/50 space-y-2">
-          <div className="text-xs font-semibold text-textSecondary">群视界机器人配置（世界的，非 agent）</div>
-          <div>
-            <div className="text-[10px] text-textMuted mb-0.5">名字</div>
-            <input
-              value={creatorForm.name}
-              onChange={(e) => setCreatorForm((f) => ({ ...f, name: e.target.value }))}
-              className="w-full bg-elevated text-sm p-1.5 rounded border border-border outline-none focus:border-primary-500/50"
-            />
-          </div>
-          <div>
-            <div className="text-[10px] text-textMuted mb-0.5">系统提示词</div>
-            <textarea
-              value={creatorForm.system_prompt}
-              onChange={(e) => setCreatorForm((f) => ({ ...f, system_prompt: e.target.value }))}
-              rows={6}
-              className="w-full bg-elevated text-xs p-1.5 rounded border border-border outline-none resize-none font-mono focus:border-primary-500/50"
-            />
-          </div>
-          <div className="flex gap-2">
-            <div className="flex-1">
-              <div className="text-[10px] text-textMuted mb-0.5">模型（留空 = 全局默认）</div>
-              <input
-                value={creatorForm.model}
-                onChange={(e) => setCreatorForm((f) => ({ ...f, model: e.target.value }))}
-                placeholder="如 deepseek-v4-flash"
-                className="w-full bg-elevated text-sm p-1.5 rounded border border-border outline-none focus:border-primary-500/50"
-              />
-            </div>
-            <div className="w-20">
-              <div className="text-[10px] text-textMuted mb-0.5">温度</div>
-              <input
-                type="number"
-                min={0}
-                max={2}
-                step={0.1}
-                value={creatorForm.temperature}
-                onChange={(e) => setCreatorForm((f) => ({ ...f, temperature: Number(e.target.value) }))}
-                className="w-full bg-elevated text-sm p-1.5 rounded border border-border outline-none focus:border-primary-500/50"
-              />
-            </div>
-          </div>
-          <div className="flex items-center justify-between bg-elevated/60 rounded p-2">
-            <div>
-              <div className="text-[10px] text-textSecondary">深度思考（推理模式）</div>
-              <div className="text-[10px] text-amber-400/90">⚠️ 开启后推理 token 单独计费，费用显著增加</div>
-            </div>
-            <input
-              type="checkbox"
-              checked={creatorForm.thinking}
-              onChange={(e) => setCreatorForm((f) => ({ ...f, thinking: e.target.checked }))}
-              className="w-4 h-4 accent-primary-500"
-            />
-          </div>
-          <div className="flex items-center justify-between bg-elevated/60 rounded p-2">
-            <div>
-              <div className="text-[10px] text-textSecondary">工具循环上限</div>
-              <div className="text-[10px] text-textMuted">单次对话最多连续调几轮工具（1-200，默认 50）</div>
-            </div>
-            <input
-              type="number"
-              min={1}
-              max={200}
-              value={creatorForm.max_tool_rounds}
-              onChange={(e) => setCreatorForm((f) => ({ ...f, max_tool_rounds: Number(e.target.value) || 50 }))}
-              className="w-20 bg-elevated text-sm p-1.5 rounded border border-border outline-none text-right"
-            />
-          </div>
-          {usageStats && (
-            <div className="flex items-center justify-between bg-elevated/60 rounded p-2">
-              <div>
-                <div className="text-[10px] text-textSecondary">LLM 缓存命中率</div>
-                <div className="text-[10px] text-textMuted">{usageStats.total_calls} 次调用 · prompt {usageStats.prompt_tokens} / 缓存 {usageStats.cached_tokens} tok</div>
-              </div>
-              <div className="text-sm font-bold text-mint-400">{usageStats.cache_hit_rate_pct}%</div>
-            </div>
-          )}
-          <button
-            onClick={saveCreator}
-            disabled={creatorSaving}
-            className="w-full py-1.5 text-sm bg-primary-500 hover:bg-primary-400 text-white rounded transition-colors disabled:opacity-40"
-          >
-            {creatorSaving ? '保存中...' : (<span className="inline-flex items-center gap-1"><Save size={12} /> 保存配置</span>)}
-          </button>
-        </div>
+      {showCreatorForm && world && world.creator && (
+        <WorldCreatorConfig
+          wid={wid}
+          creator={world.creator}
+          usageStats={usageStats}
+          onSaved={(updated) => setWorld((w) => (w ? { ...w, creator: updated } : w))}
+          onClose={() => setShowCreatorForm(false)}
+          onMsg={setMsg}
+        />
       )}
 
       <WorldChatPanel
@@ -616,11 +361,11 @@ export default function WorldDesignPage() {
             世界
           </button>
           <span className="font-semibold truncate">{world.name}</span>
-          <span className={`text-xs px-2 py-0.5 rounded-full shrink-0 ${world.status === 'active' ? 'bg-green-500/20 text-green-400' : 'bg-elevated text-textMuted'}`}>
+          <span className={`hidden sm:inline-flex text-xs px-2 py-0.5 rounded-full shrink-0 ${world.status === 'active' ? 'bg-green-500/20 text-green-400' : 'bg-elevated text-textMuted'}`}>
             {world.status === 'active' ? '活跃' : '休眠'}
           </span>
           <div className="flex-1" />
-          <button onClick={publishToMarket} className="shrink-0 text-xs text-primary-400 hover:text-primary-300 transition-colors px-2 py-1" title="发布到世界商城">
+          <button onClick={publishToMarket} className="shrink-0 inline-flex items-center gap-1 text-xs text-primary-400 hover:text-primary-300 transition-colors px-2 py-1 whitespace-nowrap" title="发布到世界商城">
             <Upload size={13} /> 发布
           </button>
           <button onClick={() => setGroupManagerOpen(true)} className="shrink-0 p-1.5 text-textMuted hover:text-textPrimary transition-colors" title="群类型与群助手">
@@ -628,7 +373,7 @@ export default function WorldDesignPage() {
           </button>
           {mobileTab === 'files' && (
             <div className="relative shrink-0">
-              <button onClick={() => setUploadMenuOpen((v) => !v)} className="inline-flex items-center gap-1 text-xs text-primary-400 hover:text-primary-300 transition-colors px-2 py-1" title="上传文件">
+              <button onClick={() => setUploadMenuOpen((v) => !v)} className="inline-flex items-center gap-1 text-xs text-primary-400 hover:text-primary-300 transition-colors px-2 py-1 whitespace-nowrap" title="上传文件">
                 <Upload size={14} />
                 上传
               </button>
@@ -646,7 +391,7 @@ export default function WorldDesignPage() {
           )}
         </div>
 
-        {/* tab：文件 / 对话（对话默认打开） */}
+        {/* tab：文件 / 对话 / 预览（对话默认打开） */}
         <div className="flex items-stretch bg-surface border-b border-border">
           <button
             onClick={() => setMobileTab('files')}
@@ -660,12 +405,36 @@ export default function WorldDesignPage() {
           >
             <MessageCircle size={14} /> 对话
           </button>
+          <button
+            onClick={() => setMobileTab('preview')}
+            className={`flex-1 inline-flex items-center justify-center gap-1.5 py-2 text-sm transition-colors ${mobileTab === 'preview' ? 'text-primary-400 border-b-2 border-primary-500 font-medium' : 'text-textMuted'}`}
+          >
+            <Eye size={14} /> 预览
+          </button>
         </div>
 
-        {/* 内容区：对话 tab（默认）/ 文件 tab（目录导航 → 编辑器） */}
+        {/* 内容区：对话 tab（默认）/ 预览 tab（iframe）/ 文件 tab（目录导航 → 编辑器） */}
         {mobileTab === 'chat' ? (
           <div className="flex-1 flex flex-col min-h-0 bg-surface">
             {renderChatInner()}
+          </div>
+        ) : mobileTab === 'preview' ? (
+          <div className="flex-1 flex flex-col min-h-0">
+            <div className="px-3 py-1.5 text-xs text-textSecondary bg-surface/60 border-b border-border flex items-center gap-2">
+              <span className="truncate flex-1">世界预览（/world/{wid}/preview）</span>
+              <button onClick={() => setPreviewKey((k) => k + 1)} className="text-primary-400 hover:text-primary-300 transition-colors shrink-0" title="刷新预览">↻ 刷新</button>
+              <button
+                onClick={() => { if (!tryOpenWorldWindow(wid)) navigate(`/world-view/${wid}`) }}
+                className="text-primary-400 hover:text-primary-300 transition-colors shrink-0"
+                title="在沉浸界面新窗口打开（WebView 下自动应用内跳转）"
+              >↗ 沉浸窗口</button>
+            </div>
+            <iframe
+              key={previewKey}
+              src={`/world/${wid}/preview`}
+              className="w-full flex-1 bg-white dark:bg-gray-900"
+              title="世界预览"
+            />
           </div>
         ) : mobileView === 'file' ? (
           <div className="flex-1 flex flex-col min-h-0">
@@ -865,7 +634,7 @@ export default function WorldDesignPage() {
             </div>
             <input ref={fileInputRef} type="file" className="hidden" onChange={handleUploadPick} />
             {files.length === 0 && <div className="text-xs text-textMuted p-2">空世界，点 + 新建或让机器人生成</div>}
-            {renderTree(fileTree.children, 0)}
+            <WorldFileTree files={files} currentFile={currentFile} collapsedDirs={collapsedDirs} onToggleDir={toggleDir} onSelect={selectFile} onDelete={deleteFile} />
           </div>
         </div>
         )}

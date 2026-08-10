@@ -254,7 +254,7 @@ async def stream_world_chat(
     system_prompt += "\n【工具约定】你的工具与平台 AI 同名同义（文件类：file_read/file_write/file_edit/file_list/file_delete，作用于世界文件夹）；另有 update_world_info / web_download / compact_context / list_world_blocks / view_world_block / apply_world_block / view_api_doc / store_memory / recall_memory / web_search / web_fetch。调用工具时不要把工具调用的原始内容写进回复文本，直接说你要做什么/做了什么；创建文件后告知用户文件路径。遇到不清楚的需求、含糊的指令或可能理解错的地方，主动提问确认，不要瞎猜。你也可以给用户下一步建议（问题/要求/选项都行）。⚠️ 如果你调用 suggest_questions 生成建议，要在回复正文里阐述这些建议或说明生成逻辑（可逐一展开，也可概括说明每个建议是什么/点了会发生什么），不要只丢一个列表让用户猜。收尾时最后一句要写实质内容（结论要点、建议选项的描述或你的思考脉络），不要用「我已经给出结论和下一步选项了，等你定方向」这类空话元话术。"
     system_prompt += "\n【能力边界】平台里有两类 AI，能力不同，被问起时准确回答，不要凭猜测：\n- 你（世界 AI / 群视界机器人）= 造物主：平台工具 + 设计侧技能库（data/world_ai_skills/，全局共享），在世界之外设计世界，不用也不会拿到世界侧技能\n- 群里的 AI 成员（居民，平台 agent，如绑定了本世界的群 AI）= 绑定本世界后拥有：① 世界侧技能（data/worlds/{id}/skills/ 下颁布的 manifest+code.py，像调普通工具一样 function calling 直接调用）② world_command 文本命令工具（把命令发到群里，由世界程序 main.py handle() 解析执行，与用户共用同一套语法）——所以群 AI 不是「只会说话没有工具」，它有工具，能力取决于这个世界颁布了什么技能\n- 世界侧技能由你（或世界配置）颁布：在世界的 skills/ 目录放 manifest.json + code.py，绑定本世界的群 AI 就能直接工具调用；你没颁布技能时它们就没有世界侧工具（只剩 world_command 和平台默认工具）\n- 用户/群成员直接在群里发命令文本（如「收诗：xxx」「我去 2,3」）→ 群消息钩子 → 世界程序 main.py 解析执行——这是「人直接与世界交互」，与群 AI 调工具是两条并存的路径，别混为一谈"
     system_prompt += "\n【接口文档】平台接口文档按区分区（01 世界编号变量 / 02 WorldUI 桥 / 03 文件操作 / 04 积木体系 / 05 群聊 API / 06 页面与资源 / 07 懒通知与世界时间 / 08 错误与安全）。需要接口细节时用 view_api_doc 打开对应分区（工具描述里有各区介绍，先看介绍再决定开哪个，不要一次全读）。"
-    system_prompt += "\n【记忆约定】你有本世界的长期记忆（store_memory 存 / recall_memory 取，按世界隔离），它是你跨上下文、跨会话的工作资产（clear_context 清空对话后靠它恢复）：\n- 每次执行完文件改动、配置修改、发布状态等实际改动后，用 store_memory 更新记忆——title 用固定名（如「工作状态」「当前计划」）即可覆盖刷新，content 写当前进度与结论\n- 每次写完计划/方案后也 store_memory 存一份（title 固定为「当前计划」）\n- 被 clear_context 清空上下文或新会话开始时：先 recall_memory 检索再继续工作，别从零开始\n- 重要的世界设定、用户偏好、关键事件、进行到一半的事都记下来；用户提到以前的事先 recall_memory 再答，别凭感觉编\n- 记忆是这个世界的资产，跨世界不共享"
+    system_prompt += "\n【记忆约定】你的长期记忆（按世界隔离）一律用 manage_records 结构化存储（「目录/子目录/字段」三级，精确读写、不依赖向量）：\n- 记忆内容：项目进度、页面/功能清单、设定档案、知识库条目、关键决策、用户偏好、进行到一半的事\n- 写：action='set'（如 category='project', sub_key='图鉴页面', field='进度', value='已完成收录，待优化筛选'）；读：action='get' 或 action='summary'（快照）；列目录：action='categories'；删：action='delete'\n- 每次执行完文件改动、配置修改、发布状态等实际改动后，用 manage_records 更新对应记录（没有就 set 新建）\n- 每次写完计划/方案后也 manage_records 存一份（category='project', sub_key='当前计划'）\n- ⚠️ 不要用 store_memory/recall_memory 来记忆（本环境向量检索不可靠）：那是保留的旧工具，结构化记忆请走 manage_records\n- 被 clear_context 清空上下文或新会话开始时：先 manage_records categories + 相关 get 检索再继续工作，别从零开始\n- 记忆是这个世界的资产，跨世界不共享"
     system_prompt += "\n【UI 约定】若你的页面实现了自己的侧边栏/菜单/导航，请调用 WorldUI.hideFloatingIcon() 隐藏平台悬浮图标（见接口文档），避免重复；未实现时不要调用。"
     system_prompt += "\n【侧边栏约定】世界侧边栏/菜单必须保留平台基础菜单（首页/聊天/世界列表/设置四个目的地，可折叠成可展开的「平台」项但绝不能缺失，否则用户无法回到主应用）；平台项跳主应用（window.parent），世界自定义项跳世界内页面。组名/项名/样式可自行调整，推荐直接应用 platform-sidebar 积木。"
     system_prompt += "\n【路径约定】页面内资源（css/js/图片）一律用相对路径引用（支持跨文件夹 ../），不要用 / 开头的绝对路径（会 404）；数据请求用 /world/${WORLD_ID}/ 变量路径。"
@@ -506,9 +506,11 @@ async def stream_world_chat(
                         content=full_content or "（…）", reasoning=full_reasoning or None,
                     ))
                     await db.commit()
-                # 第一轮正文/思考重置（最终以收尾轮为准，思考也从后续轮重新捕获）
+                # 第一轮正文重置（最终以收尾轮为准）
                 full_content = ""
-                full_reasoning = ""
+                # 首轮思考保留：后续轮有思考会覆盖；但工具轮 DeepSeek 常不输出 reasoning_content，
+                # 若清空则落库无思考（刷新后「思考过程」丢失）——保留首轮思考作兜底
+                # full_reasoning = ""
                 # 第一轮流式里收集到的 tool_calls（重构为 API 格式；content 用空串而非 None，避免部分接口/思考模式异常）
                 messages.append({
                     "role": "assistant",
@@ -561,14 +563,19 @@ async def stream_world_chat(
                         break
                     # 中间轮（还要继续调工具）：正文也流式展示 + 落库 note（历史可见、不进 AI 上下文）——
                     # 此前只覆盖 full_content 变量被吞掉，用户只能看到首轮和收尾轮两句话
-                    if content:
-                        full_content = content
+                    if content or reasoning:
+                        # 中间轮思考也要落库（对齐首轮 note：reasoning 字段），否则刷新后「工具调用的思考」丢失；
+                        # 只有思考没正文时也用「（…）」占位，避免历史里空气泡
+                        if content:
+                            full_content = content
                         db.add(WorldChatMessage(
                             world_id=world_id, user_id=None, role="note",
-                            content=content[:4000],
+                            content=(content or "（…）")[:4000],
+                            reasoning=reasoning or None,
                         ))
                         await db.commit()
-                        yield f"data: {content.replace(chr(10), '{NL}')}\n\n"
+                        if content:
+                            yield f"data: {content.replace(chr(10), '{NL}')}\n\n"
                     # 模型还要继续调工具：记录真实 tool_calls，进入下一轮
                     messages.append({"role": "assistant", "content": content or "", "tool_calls": tcs})
                     tool_call_acc = {

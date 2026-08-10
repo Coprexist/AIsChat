@@ -138,6 +138,29 @@ class WorldAIMemory(Base):
     )
 
 
+class WorldStructuredRecord(Base):
+    """世界 AI 结构化记忆（world_structured_records）— 对齐主站 manage_records（目录级键值）
+
+    目录结构：{category}/{sub_key}/{field} → value；纯文本、不依赖 embedding（DeepSeek 无 embedding API）。
+    UNIQUE(world_id, category, sub_key, field) 实现 upsert。
+    """
+    __tablename__ = "world_structured_records"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    world_id = Column(Integer, ForeignKey("worlds.id", ondelete="CASCADE"), nullable=False, comment="所属世界")
+    category = Column(String(100), nullable=False, comment="顶层目录名（如 project / setting / knowledge）")
+    sub_key = Column(String(200), nullable=False, comment="子目录名（key，如项目 id / 页面名）")
+    field = Column(String(200), nullable=False, comment="字段名")
+    value = Column(Text, nullable=False, comment="字段值")
+    created_at = Column(DateTime, server_default=func.now())
+    updated_at = Column(DateTime, server_default=func.now(), onupdate=func.now())
+
+    __table_args__ = (
+        UniqueConstraint("world_id", "category", "sub_key", "field", name="uq_wsr_path"),
+        Index("ix_wsr_world_category", "world_id", "category"),
+    )
+
+
 class WorldData(Base):
     """世界数据 — 每世界 key-value 存储（结构化/操作数据，只经 API 读写）
 

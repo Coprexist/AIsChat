@@ -298,6 +298,24 @@ WORLD_TOOLS = [
             },
         },
     },
+    {
+        "type": "function",
+        "function": {
+            "name": "manage_records",
+            "description": "目录级结构记忆（对齐主站 manage_records）。把你的结构化数据按「目录/子目录/字段」三级存到数据库（世界维度），支持精确读写、列子目录、生成摘要。与 store_memory 的区别：store_memory 存模糊印象/事实，用文本检索找回；manage_records 存结构化数据（项目进度、设定档案、知识库），用精确 key 查找。\n使用示例：\n- 写: action='set', category='project', sub_key='图鉴页面', field='进度', value='已完成收录功能，待优化筛选'\n- 读: action='get', category='project', sub_key='图鉴页面'\n- 列: action='list', category='project'\n- 快照: action='summary', category='project', sub_key='图鉴页面'\n- 目录: action='categories'\n- 删: action='delete', category='...', sub_key='...', field='...'（field 可选，不填删整个 sub_key）",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "action": {"type": "string", "enum": ["set", "get", "list", "summary", "categories", "delete"], "description": "操作类型：set=写入，get=读取，list=列子目录，summary=快照，categories=列目录，delete=删除"},
+                    "category": {"type": "string", "description": "顶层目录名（如 project / setting / knowledge）"},
+                    "sub_key": {"type": "string", "description": "子目录名（key，如项目 id / 页面名）。categories 时不需要。"},
+                    "field": {"type": "string", "description": "字段名。set 必填；get/summary 可选（不填返回全部）"},
+                    "value": {"type": "string", "description": "字段值（仅 set 时使用）"},
+                },
+                "required": ["action", "category"],
+            },
+        },
+    },
     # ── 群聊 API（以世界创建者身份执行；群 id 默认取本世界绑定的群，AI 无需知道编号）──
     {
         "type": "function",
@@ -999,10 +1017,14 @@ async def _do_execute(db: AsyncSession, world, name: str, arguments: str, turn_s
                     .order_by(WorldAIMemory.created_at.desc())
                     .limit(200)
                 )).scalars().all()
-                q = query.lower()
+                # 分词匹配：query 常是「当前计划 工作状态 图鉴 页面」整串（带空格），
+                # 整串子串匹配永远命中不了单条记忆 → 任一关键词命中即算（DeepSeek 无 embedding API，文本回退是主路径）
+                import re as _re
+                keywords = [k.lower() for k in _re.split(r"[\s,，、;；:：]+", query) if k.strip()]
                 memories = [
                     {"title": m.title, "content": m.content, "created_at": str(m.created_at) if m.created_at else None}
-                    for m in rows if q in (m.title or "").lower() or q in (m.content or "").lower()
+                    for m in rows
+                    if any(k in (m.title or "").lower() or k in (m.content or "").lower() for k in keywords)
                 ][:top_k]
             return {"success": True, "query": query, "memories": memories}
         except (ValueError, TypeError, json.JSONDecodeError) as e:
@@ -1161,6 +1183,90 @@ async def _do_execute(db: AsyncSession, world, name: str, arguments: str, turn_s
             if turn_state is not None:
                 turn_state["suggestions"] = questions[:5]
             return {"success": True, "count": len(questions), "note": "已生成建议问题，回复末尾会展示给用户"}
+        except (ValueError, TypeError, json.JSONDecodeError) as e:
+            return {"success": False, "error": str(e)}
+
+    if name == "manage_records":
+        # 目录级结构记忆（对齐主站 manage_records）：{category}/{sub_key}/{field} → value，纯文本不依赖 embedding。
+        # 内部直接 commit：即使后续轮次中断/取消，记忆已落库（与 store_memory 不同，可靠性优先）
+        try:
+            args = json.loads(arguments or "{}")
+            action = str(args.get("action", "")).strip()
+            category = str(args.get("category", "")).strip()
+            sub_key = str(args.get("sub_key", "")).strip() or ""
+            field = str(args.get("field", "")).strip() or None
+            value = str(args.get("value", "")).strip() if action == "set" else None
+            if not category:
+                return {"success": False, "error": "category 不能为空"}
+            from app.models.world import WorldStructuredRecord
+            from sqlalchemy import select as sa_select, delete as sa_delete
+            wid = world.id
+
+            if action == "set":
+                if not sub_key or not field or not value:
+                    return {"success": False, "error": "set 需要 sub_key/field/value"}
+                existing = (await db.execute(sa_select(WorldStructuredRecord).where(
+                    WorldStructuredRecord.world_id == wid,
+                    WorldStructuredRecord.category == category,
+                    WorldStructuredRecord.sub_key == sub_key,
+                    WorldStructuredRecord.field == field,
+                ))).scalars().first()
+                if existing:
+                    existing.value = value
+                else:
+                    db.add(WorldStructuredRecord(world_id=wid, category=category, sub_key=sub_key, field=field, value=value))
+                await db.commit()
+                return {"success": True, "action": "set", "category": category, "sub_key": sub_key, "field": field, "updated": existing is not None}
+
+            if action == "get":
+                conds = [WorldStructuredRecord.world_id == wid, WorldStructuredRecord.category == category]
+                if sub_key:
+                    conds.append(WorldStructuredRecord.sub_key == sub_key)
+                if field:
+                    conds.append(WorldStructuredRecord.field == field)
+                rows = (await db.execute(sa_select(WorldStructuredRecord).where(*conds))).scalars().all()
+                return {"success": True, "records": [
+                    {"sub_key": r.sub_key, "field": r.field, "value": r.value, "updated_at": str(r.updated_at) if r.updated_at else None}
+                    for r in rows
+                ]}
+
+            if action == "list":
+                rows = (await db.execute(sa_select(WorldStructuredRecord).where(
+                    WorldStructuredRecord.world_id == wid,
+                    WorldStructuredRecord.category == category,
+                ))).scalars().all()
+                subs: dict = {}
+                for r in rows:
+                    subs.setdefault(r.sub_key, {})[r.field] = r.value
+                return {"success": True, "sub_keys": subs}
+
+            if action == "summary":
+                conds = [WorldStructuredRecord.world_id == wid, WorldStructuredRecord.category == category]
+                if sub_key:
+                    conds.append(WorldStructuredRecord.sub_key == sub_key)
+                rows = (await db.execute(sa_select(WorldStructuredRecord).where(*conds))).scalars().all()
+                lines = [f"{r.sub_key}.{r.field}: {r.value[:200]}" for r in rows]
+                return {"success": True, "summary": chr(10).join(lines) or "（无记录）"}
+
+            if action == "categories":
+                rows = (await db.execute(
+                    sa_select(WorldStructuredRecord.category)
+                    .where(WorldStructuredRecord.world_id == wid)
+                    .distinct()
+                )).scalars().all()
+                return {"success": True, "categories": list(rows)}
+
+            if action == "delete":
+                conds = [WorldStructuredRecord.world_id == wid, WorldStructuredRecord.category == category]
+                if sub_key:
+                    conds.append(WorldStructuredRecord.sub_key == sub_key)
+                if field:
+                    conds.append(WorldStructuredRecord.field == field)
+                result = await db.execute(sa_delete(WorldStructuredRecord).where(*conds))
+                await db.commit()
+                return {"success": True, "deleted": result.rowcount or 0}
+
+            return {"success": False, "error": f"未知 action: {action}"}
         except (ValueError, TypeError, json.JSONDecodeError) as e:
             return {"success": False, "error": str(e)}
 

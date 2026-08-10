@@ -38,7 +38,7 @@ from app.models.agent_skill_relation import AgentSkillRelation
 from app.models.alarm import AgentAlarm
 from app.models.structured_record import StructuredRecord
 from app.models.workspace import AgentWorkspace
-from app.models.world import (World, WorldBinding, WorldAgent, WorldChatMessage, WorldAI, WorldAIMemory, WorldLLMUsage, WorldMarketItem)
+from app.models.world import (World, WorldBinding, WorldAgent, WorldChatMessage, WorldAI, WorldAIMemory, WorldStructuredRecord, WorldLLMUsage, WorldMarketItem)
 
 __all__ = [
     "User",
@@ -96,6 +96,7 @@ __all__ = [
     "WorldChatMessage",
     "WorldAI",
     "WorldAIMemory",
+    "WorldStructuredRecord",
     "WorldLLMUsage",
     "UserGroupPreference",
     "UserDMPreference",

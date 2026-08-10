@@ -51,10 +51,10 @@ export interface UseWorldChatReturn {
   cmdIdx: number
   setCmdIdx: Dispatch<SetStateAction<number>>
   cmdFiltered: { cmd: string; desc: string }[]
-  handleChatScroll: (e: UIEvent<HTMLDivElement>) => void
   submitText: (text: string) => void
   insertSuggestion: (q: string) => void
   isAtBottom: boolean
+  chatCanScroll: boolean
   scrollToBottom: (force?: boolean) => void
   forceScrollToBottom: () => void
   unreadCount: number
@@ -87,6 +87,9 @@ export function useWorldChat({ wid, onRefresh, onMsg }: UseWorldChatOptions) {
   // 滚动跟随：在底部 = 新消息自动滚到最新；不在底部 = 显示 ↓ 按钮
   const [isAtBottom, setIsAtBottom] = useState(true)
   const isAtBottomRef = useRef(true)
+  // 列表是否可滚动（内容溢出）：不可滚动时永远算"在底部"，但按钮入口仍要显示（没消息也要能直达底部）
+  const [chatCanScroll, setChatCanScroll] = useState(false)
+  const chatCanScrollRef = useRef(false)
   const [unreadCount, setUnreadCount] = useState(0)
   const unreadCountRef = useRef(0)
   const loadingHistoryRef = useRef(false)  // 标记是否在加载历史（prepend），不增加未读
@@ -134,35 +137,6 @@ export function useWorldChat({ wid, onRefresh, onMsg }: UseWorldChatOptions) {
     return () => { cancelled = true }
   }, [wid])
 
-  // 刷新后恢复「思考中」状态：world_turn 在服务器端继续执行，前端状态丢失后轮询恢复
-  useEffect(() => {
-    if (!wid) return
-    let timer: number | undefined
-    const check = async () => {
-      try {
-        const base = (localStorage.getItem('instance_url') || '').replace(/\/+$/, '') + '/api'
-        const r = await fetch(`${base}/worlds/${wid}/chat/status`, {
-          headers: { 'Authorization': `Bearer ${localStorage.getItem('access_token')}` },
-        })
-        const s = await r.json()
-        if (s && s.processing) {
-          chatProcessingRef.current = true
-          setChatProcessing(true)
-          timer = window.setTimeout(check, 4000)
-        } else {
-          if (chatProcessingRef.current) {
-            chatProcessingRef.current = false
-            setChatProcessing(false)
-            loadChat()  // 处理完成：拉最新历史（含 AI 回复）
-          }
-        }
-      } catch { /* 失败静默重试 */ timer = window.setTimeout(check, 8000) }
-    }
-    chatProcessingRef.current = false
-    check()
-    return () => { if (timer) clearTimeout(timer) }
-  }, [wid])
-
   // 滚到顶 → 加载更早消息（主聊天同款无限滚动）
   const loadOlder = useCallback(async () => {
     if (chatLoadingOlder || !chatHasMore || chatMsgs.length === 0) return
@@ -179,17 +153,51 @@ export function useWorldChat({ wid, onRefresh, onMsg }: UseWorldChatOptions) {
     }
   }, [chatLoadingOlder, chatHasMore, chatMsgs, loadChat])
 
-  const handleChatScroll = useCallback((e: React.UIEvent<HTMLDivElement>) => {
-    const el = e.currentTarget
-    if (el.scrollTop < 30) loadOlder()
-    const atBottom = el.scrollHeight - el.scrollTop - el.clientHeight < 80
+  // 滚动状态统一处理（rAF 节流）：capture 监听 window scroll（scroll 不冒泡但经捕获阶段，覆盖列表/页面任何滚动）
+  // ⚠️ 每帧最多一次布局读取 + 状态更新：滚动事件高频触发，若每次都读 scrollHeight/clientHeight（reflow）会卡
+  const loadOlderRef = useRef(loadOlder)
+  loadOlderRef.current = loadOlder
+  const scrollRafRef = useRef<number | null>(null)
+  const updateScrollState = useCallback(() => {
+    scrollRafRef.current = null
+    const el = listElsRef.current.find((x) => x.isConnected)
+    if (!el) return
+    if (el.scrollTop < 30) loadOlderRef.current()
+    const listCanScroll = el.scrollHeight - el.clientHeight > 4
+    const atBottom = listCanScroll
+      ? el.scrollHeight - el.scrollTop - el.clientHeight < 80
+      : window.scrollY < 80
     isAtBottomRef.current = atBottom
     setIsAtBottom(atBottom)
+    chatCanScrollRef.current = listCanScroll
+    setChatCanScroll(listCanScroll)
     if (atBottom) {
       unreadCountRef.current = 0
       setUnreadCount(0)
     }
-  }, [loadOlder])
+  }, [])
+  const onAnyScroll = useCallback(() => {
+    if (scrollRafRef.current !== null) return
+    scrollRafRef.current = requestAnimationFrame(updateScrollState)
+  }, [updateScrollState])
+  useEffect(() => {
+    window.addEventListener('scroll', onAnyScroll, true)
+    return () => {
+      window.removeEventListener('scroll', onAnyScroll, true)
+      if (scrollRafRef.current !== null) cancelAnimationFrame(scrollRafRef.current)
+    }
+  }, [onAnyScroll])
+
+  // 消息/布局变化后重新测量可滚性（列表不可滚动时按钮仍显示入口）
+  // ⚠️ 依赖 chatMsgs.length 而非 chatMsgs：气泡内容流式更新（每 token 一次）不触发测量，
+  // 否则流式输出期间高频读取 scrollHeight/clientHeight 强制 reflow，底部滑动时卡顿
+  useEffect(() => {
+    const el = listElsRef.current.find((x) => x.isConnected)
+    if (!el) return
+    const can = el.scrollHeight - el.clientHeight > 4
+    chatCanScrollRef.current = can
+    setChatCanScroll(can)
+  }, [chatMsgs.length])
 
   // 新消息到达时，如果不在底部，增加未读计数（历史加载时不增加）
   useEffect(() => {
@@ -230,15 +238,152 @@ export function useWorldChat({ wid, onRefresh, onMsg }: UseWorldChatOptions) {
     if (first) {
       forceScrollToBottom()
     } else if (lenChanged) {
-      eachList((el) => { el.scrollTo({ top: el.scrollHeight, behavior: 'smooth' }) })
+      // 流式输出中（chatSending）用瞬时滚动：smooth 动画在快速连续输出时会堆积打架导致卡顿
+      eachList((el) => { el.scrollTo({ top: el.scrollHeight, behavior: chatSending ? 'auto' : 'smooth' }) })
     }
-  }, [chatMsgs])
+  }, [chatMsgs, chatSending])
 
   const scrollToBottom = useCallback((smooth = true) => {
     isAtBottomRef.current = true
     setIsAtBottom(true)
     eachList((el) => { el.scrollTo({ top: el.scrollHeight, behavior: smooth ? 'smooth' : 'auto' }) })
   }, [eachList])
+
+  // ── 订阅 turn 直播（SSE）：发消息后 / 刷新恢复 共用 ──
+  // 断开自动重连（最多 2 次）；返回是否收到 [DONE]（false = 连接失败/重连耗尽，调用方拉历史收尾）
+  const subscribeTurnStream = useCallback(async (turnId: string): Promise<boolean> => {
+    let full = ''
+    let reasoning = ''
+    let streamTargetId: number | null = null  // 当前流式气泡（[TOOL] 后封存、开新气泡）
+    const base = (localStorage.getItem('instance_url') || '').replace(/\/+$/, '') + '/api'
+    const authHeaders = {
+      'Authorization': `Bearer ${localStorage.getItem('access_token')}`,
+      'Content-Type': 'application/json',
+    }
+    let gotDone = false
+    for (let attempt = 0; attempt < 2 && !gotDone; attempt++) {
+      const streamResp = await fetch(`${base}/worlds/${wid}/chat/stream?turn_id=${turnId}`, { headers: authHeaders })
+      if (!streamResp.ok || !streamResp.body) return false
+      const reader = streamResp.body.getReader()
+      const decoder = new TextDecoder()
+      let buffer = ''
+      // 首次内容/思考到达时开气泡（不在发消息时预建，避免空气泡）
+      const ensureBubble = () => {
+        if (streamTargetId !== null) return
+        const id = -(++msgSeqRef.current)
+        streamTargetId = id
+        setChatMsgs((msgs) => [...msgs, { id, role: 'ai', content: '', reasoning: '' }])
+      }
+      // rAF 节流渲染（只更新当前流式气泡）
+      let renderPending = false
+      const scheduleRender = () => {
+        if (renderPending) return
+        renderPending = true
+        requestAnimationFrame(() => {
+          renderPending = false
+          if (streamTargetId === null) return
+          setChatMsgs((msgs) => msgs.map((m) => m.id === streamTargetId ? { ...m, content: full, reasoning } : m))
+        })
+      }
+      while (true) {
+        const { done, value } = await reader.read()
+        if (done) break
+        buffer += decoder.decode(value, { stream: true })
+        const lines = buffer.split('\n')
+        buffer = lines.pop()!
+        for (const line of lines) {
+          if (!line.startsWith('data: ')) continue
+          const payload = line.slice(6)
+          if (payload === '[DONE]') { gotDone = true; break }
+          if (payload.startsWith('[SUGGEST]')) {
+            try { setSuggestions(JSON.parse(payload.slice(9))) } catch { /* ignore */ }
+            continue
+          }
+          if (payload.startsWith('[ERROR]')) throw new Error(payload.slice(7))
+          if (payload.startsWith('[TOOL]')) {
+            try {
+              const t = JSON.parse(payload.slice(6))
+              // 先把当前叙述气泡同步封存（rAF 节流可能还没跑：正文和 [TOOL] 同一 chunk 到达时
+              // streamTargetId 已被重置，rAF 回调会 return，气泡永远停在「…」——这里不等 rAF，直接写入）
+              if (streamTargetId !== null) {
+                setChatMsgs((msgs) => msgs.map((m) => m.id === streamTargetId ? { ...m, content: full, reasoning } : m))
+              }
+              // 后续内容开新气泡；full/reasoning 重置避免拼接
+              // renderPending 也要重置：否则 [TOOL] 前排队的 rAF 会因 streamTargetId=null 空转 return，
+              // 之后紧跟的 [REASONING]/正文触发 scheduleRender 时被 renderPending=true 挡住不排队 → 新气泡永不渲染（三个点）
+              streamTargetId = null
+              full = ''
+              reasoning = ''
+              renderPending = false
+              setChatMsgs((msgs) => [...msgs, {
+                id: -(++msgSeqRef.current),
+                role: 'tool',
+                content: t.summary || `${t.name} ${t.success ? '执行成功' : '执行失败'}`,
+                error: !t.success,
+              }])
+            } catch { /* 解析失败忽略 */ }
+            continue
+          }
+          if (payload.startsWith('[REASONING]')) {
+            reasoning += payload.slice(11).replace(/\{NL\}/g, '\n')
+          } else {
+            full += payload.replace(/\{NL\}/g, '\n')
+          }
+          ensureBubble()
+          scheduleRender()
+        }
+        if (gotDone) break
+      }
+      if (gotDone) break
+      // 连接断开且未完成：稍等重连（间隔 1s/2s）
+      await new Promise((res) => setTimeout(res, 1000 * (attempt + 1)))
+    }
+    return gotDone
+  }, [wid])
+
+  // 刷新后恢复「思考中」状态：world_turn 在服务器端继续执行，前端状态丢失后订阅直播 + 轮询恢复
+  useEffect(() => {
+    if (!wid) return
+    let timer: number | undefined
+    let cancelled = false
+    const check = async () => {
+      try {
+        const base = (localStorage.getItem('instance_url') || '').replace(/\/+$/, '') + '/api'
+        const r = await fetch(`${base}/worlds/${wid}/chat/status`, {
+          headers: { 'Authorization': `Bearer ${localStorage.getItem('access_token')}` },
+        })
+        const s = await r.json()
+        if (s && s.processing) {
+          chatProcessingRef.current = true
+          setChatProcessing(true)
+          // 有进行中的 turn → 订阅 SSE 直播，实时看到流式内容（不用等整轮跑完才一次性更新）
+          if (s.turn_id && !cancelled) {
+            try {
+              const done = await subscribeTurnStream(s.turn_id)
+              if (cancelled) return
+              if (done) {
+                // 直播正常结束：拉权威历史收尾
+                chatProcessingRef.current = false
+                setChatProcessing(false)
+                loadChat()
+                return
+              }
+            } catch { /* 直播失败/中断：继续轮询兜底 */ }
+          }
+          timer = window.setTimeout(check, 4000)
+        } else {
+          if (chatProcessingRef.current) {
+            chatProcessingRef.current = false
+            setChatProcessing(false)
+            loadChat()  // 处理完成：拉最新历史（含 AI 回复）
+          }
+        }
+      } catch { /* 失败静默重试 */ if (!cancelled) timer = window.setTimeout(check, 8000) }
+    }
+    chatProcessingRef.current = false
+    check()
+    return () => { cancelled = true; if (timer) clearTimeout(timer) }
+  }, [wid, loadChat, subscribeTurnStream])
 
   // ── 发送 ──
   const sendMessages = async (texts: string[]) => {
@@ -256,15 +401,7 @@ export function useWorldChat({ wid, onRefresh, onMsg }: UseWorldChatOptions) {
       }])
     }
 
-    // 服务器端轮次（不依赖本页面）：入队 → 订阅直播（断开自动重连）
-    let full = ''
-    let reasoning = ''
-    let streamTargetId: number | null = null  // 当前流式气泡（[TOOL] 后封存、开新气泡）
-    const base = (localStorage.getItem('instance_url') || '').replace(/\/+$/, '') + '/api'
-    const authHeaders = {
-      'Authorization': `Bearer ${localStorage.getItem('access_token')}`,
-      'Content-Type': 'application/json',
-    }
+    // 服务器端轮次（不依赖本页面）：入队 → 订阅直播（断开自动重连，逻辑见 subscribeTurnStream）
     try {
       // 1. 入队（返回 turn_id；若前面有消息在跑会排队）
       const r = await api.post<{ turn_id: string; queued: boolean; position: number }>(`/worlds/${wid}/chat`, { messages: list })
@@ -272,84 +409,14 @@ export function useWorldChat({ wid, onRefresh, onMsg }: UseWorldChatOptions) {
         setChatMsgs((msgs) => [...msgs, { id: -(++msgSeqRef.current), role: 'tool', content: `⏳ 已排队（前面还有 ${r.position} 条在跑）` }])
       }
 
-      // 2. 订阅直播（SSE）；断开自动重连（最多 2 次，服务重启中断场景快速收尾拉历史）
-      let gotDone = false
-      for (let attempt = 0; attempt < 2 && !gotDone; attempt++) {
-        const streamResp = await fetch(`${base}/worlds/${wid}/chat/stream?turn_id=${r.turn_id}`, { headers: authHeaders })
-        if (!streamResp.ok || !streamResp.body) throw new Error(`直播连接失败(${streamResp.status})`)
-        const reader = streamResp.body.getReader()
-        const decoder = new TextDecoder()
-        let buffer = ''
-        // 首次内容/思考到达时开气泡（不在发消息时预建，避免空气泡）
-        const ensureBubble = () => {
-          if (streamTargetId !== null) return
-          const id = -(++msgSeqRef.current)
-          streamTargetId = id
-          setChatMsgs((msgs) => [...msgs, { id, role: 'ai', content: '', reasoning: '' }])
-        }
-        // rAF 节流渲染（只更新当前流式气泡）
-        let renderPending = false
-        const scheduleRender = () => {
-          if (renderPending) return
-          renderPending = true
-          requestAnimationFrame(() => {
-            renderPending = false
-            if (streamTargetId === null) return
-            setChatMsgs((msgs) => msgs.map((m) => m.id === streamTargetId ? { ...m, content: full, reasoning } : m))
-          })
-        }
-        while (true) {
-          const { done, value } = await reader.read()
-          if (done) break
-          buffer += decoder.decode(value, { stream: true })
-          const lines = buffer.split('\n')
-          buffer = lines.pop()!
-          for (const line of lines) {
-            if (!line.startsWith('data: ')) continue
-            const payload = line.slice(6)
-            if (payload === '[DONE]') { gotDone = true; break }
-            if (payload.startsWith('[SUGGEST]')) {
-              try { setSuggestions(JSON.parse(payload.slice(9))) } catch { /* ignore */ }
-              continue
-            }
-            if (payload.startsWith('[ERROR]')) throw new Error(payload.slice(7))
-            if (payload.startsWith('[TOOL]')) {
-              try {
-                const t = JSON.parse(payload.slice(6))
-                // 封存当前叙述气泡（内容已渲染），后续内容开新气泡；full/reasoning 重置避免拼接
-                streamTargetId = null
-                full = ''
-                reasoning = ''
-                setChatMsgs((msgs) => [...msgs, {
-                  id: -(++msgSeqRef.current),
-                  role: 'tool',
-                  content: t.summary || `${t.name} ${t.success ? '执行成功' : '执行失败'}`,
-                  error: !t.success,
-                }])
-              } catch { /* 解析失败忽略 */ }
-              continue
-            }
-            if (payload.startsWith('[REASONING]')) {
-              reasoning += payload.slice(11).replace(/\{NL\}/g, '\n')
-            } else {
-              full += payload.replace(/\{NL\}/g, '\n')
-            }
-            ensureBubble()
-            scheduleRender()
-          }
-          if (gotDone) break
-        }
-        if (gotDone) break
-        // 连接断开且未完成：稍等重连（间隔 1s/2s）
-        await new Promise((res) => setTimeout(res, 1000 * (attempt + 1)))
-      }
+      // 2. 订阅直播（SSE）；断连自动重连最多 2 次，耗尽后拉权威历史收尾
+      await subscribeTurnStream(r.turn_id)
       // 用权威历史收尾（含断开期间漏掉的工具气泡/最终回复）；世界信息可能被工具改过，一并刷新
       await loadChat()
       onRefresh()
     } catch (e: any) {
-      // 出错：独立错误气泡
+      // 出错：独立错误气泡（已流式显示的内容保留，不抹掉）
       const errText = e?.message || '未知错误'
-      setChatMsgs((msgs) => streamTargetId === null ? msgs : msgs.map((m) => m.id === streamTargetId ? { ...m, content: '', reasoning: '' } : m))
       setChatMsgs((msgs) => [...msgs, { id: -(++msgSeqRef.current), role: 'ai', content: errText, error: true }])
       onMsg(`发送失败: ${errText}`)
     } finally {
@@ -410,7 +477,9 @@ export function useWorldChat({ wid, onRefresh, onMsg }: UseWorldChatOptions) {
     chatSending, chatProcessing, chatHasMore, chatLoadingOlder,
     chatListRef, chatInputRef, pendingItems, setPendingItems, suggestions,
     cmdActive, setCmdActive, cmdQuery, setCmdQuery, cmdIdx, setCmdIdx, cmdFiltered,
-    handleChatScroll, submitText, insertSuggestion, isAtBottom, scrollToBottom, forceScrollToBottom,
+    submitText, insertSuggestion, isAtBottom, chatCanScroll, scrollToBottom, forceScrollToBottom,
     unreadCount,
   }
 }
+
+// vite-transform-cache-bump: 2026-08-10 14:16
