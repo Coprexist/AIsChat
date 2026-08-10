@@ -852,7 +852,7 @@ export default function WorldDesignPage() {
   return (
     <div className="h-screen bg-canvas text-textPrimary">
       {/* ═══ 移动端（<lg）：tab 切换 ── 文件（目录导航/编辑器）+ 对话（默认打开） ═══ */}
-      {isMobile && <div className="flex flex-col h-full relative pb-14">}
+      {isMobile && <div className="flex flex-col h-full relative pb-14">
         {/* 顶栏：返回 + 世界信息 + 上传（文件 tab 时显示） */}
         <div className="flex items-center gap-2 px-3 py-2 bg-surface border-b border-border">
           <button onClick={() => navigate('/worlds')} className="inline-flex items-center gap-1 text-sm text-textMuted hover:text-textPrimary transition-colors shrink-0">
