@@ -6,6 +6,7 @@
 import { useState, useEffect, useCallback } from 'react'
 import { api } from '../api/client'
 import { Github, Save, RefreshCw, CheckCircle, XCircle, Globe, Key } from 'lucide-react'
+import ExternalLinkSafe from './ExternalLinkSafe'
 
 interface MarketSettings {
   github_repo: string
@@ -116,6 +117,7 @@ export default function MarketGithubTab() {
         <div>
           <label className="flex items-center gap-1.5 text-xs text-textSecondary mb-1.5">
             <Key size={11} /> 系统 Token（classic 或 fine-grained，需仓库写权限）
+            <ExternalLinkSafe href="https://github.com/settings/tokens/new" className="text-[10px] text-primary-400 hover:text-primary-300 transition-colors shrink-0 ml-auto">去 GitHub 生成 token →</ExternalLinkSafe>
           </label>
           <input
             type="password"
