@@ -987,7 +987,7 @@ export default function WorldDesignPage() {
           <div className="w-full max-w-xs bg-surface border border-border rounded-2xl p-5 shadow-xl" onClick={(e) => e.stopPropagation()}>
             <div className="text-sm font-semibold text-textPrimary mb-1">导入世界包</div>
             <div className="text-[10px] text-textMuted mb-3 leading-relaxed">
-              选择 zip 包批量导入世界文件。数据文件（content/）是运行产物，默认保留。
+              选择 zip 包导入：包内文件<b className="text-textSecondary">同名替换</b>本地文件，包内没有的本地文件原样保留（增量合并）。
             </div>
             <div className="space-y-2">
               <button
@@ -1000,11 +1000,11 @@ export default function WorldDesignPage() {
                 onClick={() => { setImportMode('full'); importZipRef.current?.click() }}
                 className="w-full inline-flex items-center justify-center gap-1.5 py-2.5 text-sm bg-elevated hover:bg-border text-textPrimary rounded-xl transition-colors"
               >
-                <FolderInput size={13} /> 导入（覆盖数据文件）
+                <FolderInput size={13} /> 导入（数据文件也同名替换）
               </button>
             </div>
             <div className="mt-2 text-[10px] text-textMuted leading-relaxed">
-              保留数据文件：跳过 content/，同名代码/资源覆盖；<br />覆盖数据文件：全量导入，含 content/ 同名覆盖。
+              保留数据文件：content/ 不参与替换（推荐）；<br />数据文件也同名替换：content/ 一并参与。
             </div>
             <button onClick={() => setWorldImportOpen(false)} className="w-full mt-3 py-1.5 text-xs text-textMuted hover:text-textPrimary transition-colors">取消</button>
           </div>
