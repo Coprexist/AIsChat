@@ -289,16 +289,29 @@ export function useWorldChat({ wid, onRefresh, onMsg }: UseWorldChatOptions) {
       const reader = streamResp.body.getReader()
       const decoder = new TextDecoder()
       let buffer = ''
+      // 流式气泡：函数式更新（存在则更新、不存在则创建），同一 id 永不重复——
+      // ⚠️ 根本修复：React 18 setState 异步提交，气泡创建未提交时 msgs.map 找不到 id → 更新被吞 → 气泡永远空。
+      // 用函数式 setState：无论提交时序，最终 state 里气泡必带最新内容（创建即带内容，更新不丢）。
+      const updateBubble = (id: number, content: string, reasoning: string) => {
+        setChatMsgs((msgs) => {
+          const idx = msgs.findIndex((m) => m.id === id)
+          if (idx >= 0) {
+            if (msgs[idx].content === content && msgs[idx].reasoning === reasoning) return msgs
+            const next = msgs.slice()
+            next[idx] = { ...next[idx], content, reasoning }
+            return next
+          }
+          return [...msgs, { id, role: 'ai' as const, content, reasoning }]
+        })
+      }
       // 首次内容/思考到达时开气泡（不在发消息时预建，避免空气泡）
-      // ⚠️ 创建时直接带当前内容：rAF 节流更新可能因 React 18 异步提交时序丢失
-      // （气泡 setState 尚未提交时，rAF 里 msgs.map 找不到该 id → 更新被吞）→ 创建即带内容，永不出现三个点
       const ensureBubble = () => {
         if (streamTargetId !== null) return
         const id = -(++msgSeqRef.current)
         streamTargetId = id
-        setChatMsgs((msgs) => [...msgs, { id, role: 'ai', content: full, reasoning }])
+        updateBubble(id, full, reasoning)
       }
-      // rAF 节流渲染（只更新当前流式气泡）
+      // rAF 节流渲染（每帧最多一次函数式更新）
       let renderPending = false
       const scheduleRender = () => {
         if (renderPending) return
@@ -306,7 +319,7 @@ export function useWorldChat({ wid, onRefresh, onMsg }: UseWorldChatOptions) {
         requestAnimationFrame(() => {
           renderPending = false
           if (streamTargetId === null) return
-          setChatMsgs((msgs) => msgs.map((m) => m.id === streamTargetId ? { ...m, content: full, reasoning } : m))
+          updateBubble(streamTargetId, full, reasoning)
         })
       }
       while (true) {
@@ -327,10 +340,9 @@ export function useWorldChat({ wid, onRefresh, onMsg }: UseWorldChatOptions) {
           if (payload.startsWith('[TOOL]')) {
             try {
               const t = JSON.parse(payload.slice(6))
-              // 先把当前叙述气泡同步封存（rAF 节流可能还没跑：正文和 [TOOL] 同一 chunk 到达时
-              // streamTargetId 已被重置，rAF 回调会 return，气泡永远停在「…」——这里不等 rAF，直接写入）
+              // 先把当前叙述气泡同步封存（函数式更新：存在则更新；即使创建未提交也会带内容创建，不丢）
               if (streamTargetId !== null) {
-                setChatMsgs((msgs) => msgs.map((m) => m.id === streamTargetId ? { ...m, content: full, reasoning } : m))
+                updateBubble(streamTargetId, full, reasoning)
               }
               // 后续内容开新气泡；full/reasoning 重置避免拼接
               // renderPending 也要重置：否则 [TOOL] 前排队的 rAF 会因 streamTargetId=null 空转 return，
