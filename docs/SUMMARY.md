@@ -1,6 +1,6 @@
 # AIsChat 文档目录
 
-> **版本**: v3.2.0 | **更新**: 2026-08-10
+> **版本**: v3.2.1 | **更新**: 2026-08-11
 
 ---
 
@@ -75,6 +75,7 @@
 | [群视界设计文档](./group_world/design/group_world_design.md) | 开发者 | 总设计：世界模型、群视界机器人、阶段规划 |
 | [群视界实现文档](./group_world/implementation.md) | 开发者 | 实现现状 + 阶段 2 架构决策与踩坑（ADR 风格） |
 | [群视界阶段 2 规划](./group_world/plan_phase2.md) | 开发者 | 阶段 2 清单（2.1-2.5 已完成）与估算 |
+| [接口文档服务](./group_world/design/api_docs_service.md) | 开发者 / 管理员 | /kb 接口 + docx 导出 + pandoc 安装、路径规则、422 local_kw 坑 |
 | [群视界 API 文档](./group_world/api/world_api_docs.md) | 开发者 / 世界 AI | 9 大分区接口手册（变量/文件/积木/群聊/受控 API…） |
 
 ### 五、探索与讨论
@@ -171,4 +172,4 @@
 
 ---
 
-*文档版本: v3.2.0 | 最后更新: 2026-08-10*
+*文档版本: v3.2.1 | 最后更新: 2026-08-11*
