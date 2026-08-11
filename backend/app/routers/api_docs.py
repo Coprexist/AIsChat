@@ -27,7 +27,7 @@ router = APIRouter(prefix="/kb", tags=["接口文档"])
 DOCX_MEDIA = "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
 
 # ── docx 表格边框 + 斑马纹模板（pandoc 默认 reference.docx 的 Table 样式无边框无条纹，丑）──
-_REF_DOCX_PATH = "/tmp/docx-ref-bordered-v2.docx"
+_REF_DOCX_PATH = "/tmp/docx-ref-bordered-v3.docx"
 _TBL_BORDERS = (
     "<w:tblBorders>"
     '<w:top w:val="single" w:sz="4" w:space="0" w:color="auto"/>'
@@ -62,7 +62,8 @@ def _ensure_ref_docx() -> str:
 
         def add_borders(m: re.Match) -> str:
             block = m.group(0)
-            if "<w:tblStylePr" in block:
+            # 已注入过（边框 + 斑马纹都在）则跳过；pandoc 默认模板自带 firstRow 的 tblStylePr，不能以此判断
+            if "<w:tblBorders>" in block and 'w:type="band1Horz"' in block:
                 return block
             if "<w:tblPr" in block and "</w:tblPr>" in block:
                 # 边框进 tblPr，斑马纹紧跟 tblPr 之后（Word schema 顺序：tblPr → tblStylePr）
