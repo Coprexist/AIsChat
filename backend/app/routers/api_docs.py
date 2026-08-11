@@ -103,6 +103,39 @@ def _ensure_ref_docx() -> str:
 _INSTALL_STATE: dict = {"running": False, "ok": False, "error": "", "started_at": ""}
 
 
+def _apply_zebra(data: bytes) -> bytes:
+    """偶数行浅灰底（硬编码单元格 shd——样式条件格式 band1Horz 在 Word/WPS 渲染保守，这招任何查看器都显示）"""
+    try:
+        from io import BytesIO
+
+        from docx import Document
+        from docx.oxml import OxmlElement
+        from docx.oxml.ns import qn
+
+        doc = Document(BytesIO(data))
+        for tbl in doc.tables:
+            for idx, row in enumerate(tbl.rows):
+                if idx % 2 == 0:
+                    continue
+                seen = set()
+                for cell in row.cells:
+                    if id(cell._tc) in seen:
+                        continue  # 横向合并单元格去重
+                    seen.add(id(cell._tc))
+                    tc_pr = cell._tc.get_or_add_tcPr()
+                    shd = OxmlElement("w:shd")
+                    shd.set(qn("w:val"), "clear")
+                    shd.set(qn("w:color"), "auto")
+                    shd.set(qn("w:fill"), "F2F2F2")
+                    tc_pr.append(shd)
+        buf = BytesIO()
+        doc.save(buf)
+        return buf.getvalue()
+    except Exception:
+        logger.warning("斑马纹硬编码失败，返回原 docx", exc_info=True)
+        return data
+
+
 def docx_available() -> bool:
     """pandoc 是否可用（可选依赖：容器装了/在线装完才有 docx 导出）"""
     return shutil.which("pandoc") is not None
@@ -196,7 +229,7 @@ async def export_docx(
         cmd = [
             "pandoc", "-f", "markdown", "-t", "docx",
             "--toc", "--toc-depth=2",
-            "--highlight-style=pygments",  # 代码块语法高亮
+            "--highlight-style=tango",  # 代码块语法高亮（tango 配色，Word 生态最顺眼）
         ]
         ref = _ensure_ref_docx()
         if ref:
@@ -212,7 +245,7 @@ async def export_docx(
         raise HTTPException(status_code=500, detail=f"pandoc 错误: {result.stderr.decode(errors='replace')[:200]}")
     filename = req.filename if req.filename.endswith(".docx") else req.filename + ".docx"
     return Response(
-        result.stdout,
+        _apply_zebra(result.stdout),
         media_type=DOCX_MEDIA,
         headers={"Content-Disposition": f'attachment; filename="{filename}"'},
     )
