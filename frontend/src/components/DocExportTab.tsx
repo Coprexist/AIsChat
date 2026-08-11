@@ -21,7 +21,7 @@ export default function DocExportTab() {
 
   const load = useCallback(async () => {
     try {
-      const s = await api.get<ExportStatus>('/api-docs/export/status')
+      const s = await api.get<ExportStatus>('/api/kb/export/status')
       setStatus(s)
       if (!s.installing) setInstalling(false)
     } catch { /* ignore */ }
@@ -40,7 +40,7 @@ export default function DocExportTab() {
     setInstalling(true)
     setMsg('')
     try {
-      await api.post('/api-docs/install')
+      await api.post('/api/kb/install')
     } catch (e: any) {
       setMsg(`安装失败: ${e?.message || e}`)
       setInstalling(false)
@@ -60,7 +60,7 @@ export default function DocExportTab() {
       {/* 状态卡 */}
       {!status && (
         <div className="rounded-xl border border-amber-500/30 bg-amber-500/10 p-4 text-xs text-amber-400">
-          状态加载失败——后端可能未重启（新接口 /api-docs/export/status 未生效）。
+          状态加载失败——后端可能未重启（新接口 /api/kb/export/status 未生效）。
           <button onClick={load} className="ml-2 text-primary-400 hover:text-primary-300 transition-colors">重试</button>
         </div>
       )}

@@ -18,7 +18,7 @@ from app.routers.auth import get_current_user
 
 logger = logging.getLogger(__name__)
 
-router = APIRouter(prefix="/api-docs", tags=["接口文档"])
+router = APIRouter(prefix="/api/kb", tags=["接口文档"])
 
 DOCX_MEDIA = "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
 

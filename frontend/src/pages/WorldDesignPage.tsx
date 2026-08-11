@@ -80,12 +80,12 @@ export default function WorldDesignPage() {
   const openDocs = async () => {
     setDocsOpen(true)
     try {
-      const r = await api.get<{ sections: { id: string; title: string; intro: string }[] }>('/api-docs')
+      const r = await api.get<{ sections: { id: string; title: string; intro: string }[] }>('/api/kb')
       setDocsSections(r.sections || [])
       if (r.sections?.length) selectDoc(r.sections[0].id)
     } catch { /* ignore */ }
     try {
-      const st = await api.get<{ docx_available: boolean; is_admin: boolean }>('/api-docs/export/status')
+      const st = await api.get<{ docx_available: boolean; is_admin: boolean }>('/api/kb/export/status')
       setDocxAvailable(!!st.docx_available)
       setIsAdminUser(!!st.is_admin)
     } catch { setDocxAvailable(false); setIsAdminUser(false) }
@@ -94,7 +94,7 @@ export default function WorldDesignPage() {
     setDocsActive(id)
     setDocsLoading(true)
     try {
-      const r = await api.get<{ content: string }>(`/api-docs/${id}`)
+      const r = await api.get<{ content: string }>(`/api/kb/${id}`)
       setDocsContent(r.content || '')
     } catch { setDocsContent('（文档读取失败）') } finally { setDocsLoading(false) }
   }
@@ -113,7 +113,7 @@ export default function WorldDesignPage() {
     const parts = ['# AIsChat 世界 API 接口文档\n']
     for (const sec of docsSections) {
       try {
-        const r = await api.get<{ content: string }>(`/api-docs/${sec.id}`)
+        const r = await api.get<{ content: string }>(`/api/kb/${sec.id}`)
         parts.push(`\n\n---\n\n# ${sec.id} ${sec.title}\n\n` + (r.content || ''))
       } catch { /* 单区失败跳过 */ }
     }
@@ -123,7 +123,7 @@ export default function WorldDesignPage() {
   const downloadDocx = async (md: string, filename: string) => {
     try {
       const base = (localStorage.getItem('instance_url') || '').replace(/\/+$/, '') + '/api'
-      const res = await fetch(`${base}/api-docs/export`, {
+      const res = await fetch(`${base}/api/kb/export`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
