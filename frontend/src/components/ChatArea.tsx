@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect, useMemo, useRef } from 'react'
 import { useNavigate, useOutletContext } from 'react-router-dom'
 import { api } from '../api/client'
 import ChatView from './ChatView'
@@ -501,6 +501,13 @@ function InviteMemberModal({
   const [manualType, setManualType] = useState<'ai' | 'human'>('ai')
   const [manualId, setManualId] = useState('')
 
+  // 已选成员保留在列表顶部（搜索其他人时已选的不消失）
+  const displayResults = useMemo(() => {
+    const selected = Array.from(selectedEntries.values())
+    const selKeys = new Set(selected.map((r) => `${r.type}:${r.id}`))
+    return [...selected, ...results.filter((r) => !selKeys.has(`${r.type}:${r.id}`))]
+  }, [results, selectedEntries])
+
   // 防抖搜索
   useEffect(() => {
     if (query.length < 1) {
@@ -604,12 +611,13 @@ function InviteMemberModal({
     }
   }
 
-  const getStateIcon = (s?: string) => {
+  // 在线状态：CSS 圆点（不用 emoji）
+  const stateDot = (s?: string) => {
     switch (s) {
-      case 'active': return '\u{1F7E2}'
-      case 'dnd': return '\u{1F534}'
-      case 'inactive': return '\u26AB'
-      default: return ''
+      case 'active': return <span className="inline-block w-2 h-2 rounded-full bg-mint-400 shrink-0" title="在线" />
+      case 'dnd': return <span className="inline-block w-2 h-2 rounded-full bg-rose-400 shrink-0" title="忙碌" />
+      case 'inactive': return <span className="inline-block w-2 h-2 rounded-full bg-slate-500 shrink-0" title="离线" />
+      default: return null
     }
   }
 
@@ -635,18 +643,16 @@ function InviteMemberModal({
 
         {/* 搜索结果 */}
         <div className="flex-1 overflow-y-auto border border-border rounded-xl divide-y divide-border/50 mb-4 max-h-48">
-          {query.length < 1 ? (
+          {displayResults.length === 0 ? (
             <div className="py-6 text-center text-xs text-textMuted">
-              {t('chat.inviteSearchPrompt')}
+              {query.length < 1 ? t('chat.inviteSearchPrompt') : searchLoading ? t('common.searching') : t('common.noResults')}
             </div>
-          ) : searchLoading ? (
+          ) : searchLoading && results.length === 0 ? (
             <div className="flex items-center justify-center py-6">
               <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-primary-500" />
             </div>
-          ) : results.length === 0 ? (
-            <div className="py-6 text-center text-xs text-textMuted">{t('common.noResults')}</div>
           ) : (
-            results.map((r) => {
+            displayResults.map((r) => {
               const key = `${r.type}:${r.id}`
               const checked = selected.has(key)
               return (
@@ -665,7 +671,7 @@ function InviteMemberModal({
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2">
                       <span className="text-sm font-medium text-textPrimary truncate">{r.name}</span>
-                      <span className="text-xs">{getStateIcon(r.state)}</span>
+                      <span className="text-xs">{stateDot(r.state)}</span>
                     </div>
                   </div>
                   <span className="text-xs text-textMuted shrink-0">
