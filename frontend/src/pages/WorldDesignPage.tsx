@@ -6,7 +6,7 @@
  */
 import { useEffect, useState, useCallback, useRef, useMemo } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
-import { ChevronLeft, ChevronRight, Folder, FolderOpen, Upload, Plus, Pencil, Eye, MessageCircle, Save, MoreHorizontal, FileText, Trash2, Settings, RefreshCw, ExternalLink, BookOpen, X, Download, Archive } from 'lucide-react'
+import { ChevronLeft, ChevronRight, Folder, FolderOpen, FolderInput, Upload, Plus, Pencil, Eye, MessageCircle, Save, MoreHorizontal, FileText, Trash2, Settings, RefreshCw, ExternalLink, BookOpen, X, Download, Archive } from 'lucide-react'
 import { api } from '../api/client'
 import GroupManagerModal from '../components/GroupManagerModal'
 import WorldChatPanel, { type WorldChatHandle } from '../components/WorldChatPanel'
@@ -494,6 +494,12 @@ export default function WorldDesignPage() {
           <div className="flex-1" />
           <button onClick={openDocs} className="shrink-0 p-1.5 text-textMuted hover:text-textPrimary transition-colors" title="接口文档（发给世界 AI 的 md）">
             <BookOpen size={14} />
+          </button>
+          <button onClick={downloadWorldZip} className="shrink-0 p-1.5 text-textMuted hover:text-textPrimary transition-colors" title="下载世界包（zip：代码+资源+数据）">
+            <Archive size={14} />
+          </button>
+          <button onClick={() => importZipRef.current?.click()} className="shrink-0 p-1.5 text-textMuted hover:text-textPrimary transition-colors" title="导入世界包（zip 批量导入，不动数据文件）">
+            <FolderInput size={14} />
           </button>
           <button onClick={publishToMarket} className="shrink-0 inline-flex items-center gap-1 text-xs text-primary-400 hover:text-primary-300 transition-colors px-2 py-1 whitespace-nowrap" title="发布到世界商城">
             <Upload size={13} /> 发布
