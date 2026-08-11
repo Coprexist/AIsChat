@@ -128,6 +128,21 @@ docker compose up -d
 docker compose exec postgres psql -U ai_chat -d ai_chat -c "SELECT 1"
 ```
 
+### 2.4 ⚠️ 重启后端请用 force-recreate，不要用 restart
+
+`docker compose restart backend` 可能**杀不干净旧 uvicorn**（SIGTERM 被卡住/忽略时旧进程成孤儿继续占着 8000 端口），导致：
+
+- 新代码不生效（请求打到旧进程）
+- 诡异 500 / 日志里看不到请求记录（请求没进新进程）
+- 症状排查：`docker top ai_group_backend | grep -c uvicorn` 结果 **≥ 2** 即实锤
+
+**正确姿势**：
+
+```bash
+# 重建容器（新 PID 命名空间，旧进程物理消灭）—— 后端每次重启都用这条
+docker compose up -d --force-recreate backend
+```
+
 ---
 
 ## 三、数据库问题
