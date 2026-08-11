@@ -379,6 +379,7 @@ export default function WorldDesignPage() {
   // 发布到商城：跳转统一发布页（带当前世界预选，表单含标题/描述/标签/同步 GitHub）
   // ── 世界打包：下载 / 导入 zip ──
   const [worldZipOpen, setWorldZipOpen] = useState(false)
+  const [worldImportOpen, setWorldImportOpen] = useState(false)
   const downloadWorldZip = async (includeContent: boolean) => {
     setWorldZipOpen(false)
     try {
@@ -403,7 +404,7 @@ export default function WorldDesignPage() {
     e.target.value = ''  // 允许重复选同一文件
     if (!f) return
     if (!f.name.toLowerCase().endsWith('.zip')) { setMsg('请选择 zip 文件'); return }
-    if (!confirm('导入将覆盖除数据文件（content/）外的同名文件，确认继续？')) return
+    setWorldImportOpen(false)
     try {
       const fd = new FormData()
       fd.append('file', f)
@@ -500,7 +501,7 @@ export default function WorldDesignPage() {
           <button onClick={() => setWorldZipOpen(true)} className="shrink-0 p-1.5 text-textMuted hover:text-textPrimary transition-colors" title="下载世界包（zip）">
             <Download size={14} />
           </button>
-          <button onClick={() => importZipRef.current?.click()} className="shrink-0 p-1.5 text-textMuted hover:text-textPrimary transition-colors" title="导入世界包（zip 批量导入，不动数据文件）">
+          <button onClick={() => setWorldImportOpen(true)} className="shrink-0 p-1.5 text-textMuted hover:text-textPrimary transition-colors" title="导入世界包（zip 批量导入，不动数据文件）">
             <FolderInput size={14} />
           </button>
           <button onClick={publishToMarket} className="shrink-0 inline-flex items-center gap-1 text-xs text-primary-400 hover:text-primary-300 transition-colors px-2 py-1 whitespace-nowrap" title="发布到世界商城">
@@ -734,7 +735,7 @@ export default function WorldDesignPage() {
             <Download size={13} className="inline mr-1" />下载世界包
           </button>
           <input ref={importZipRef} type="file" accept=".zip" className="hidden" onChange={handleImportZip} />
-          <button onClick={() => importZipRef.current?.click()} className="text-xs px-3 py-1 rounded transition-colors bg-elevated hover:bg-border text-textSecondary" title="导入世界包（zip 批量导入，不动数据文件）">
+          <button onClick={() => setWorldImportOpen(true)} className="text-xs px-3 py-1 rounded transition-colors bg-elevated hover:bg-border text-textSecondary" title="导入世界包（zip 批量导入，不动数据文件）">
             <Upload size={13} className="inline mr-1" />导入世界包
           </button>
           <button onClick={publishToMarket} className="text-xs px-3 py-1 rounded transition-colors bg-elevated hover:bg-border text-primary-400" title="发布到世界商城（打包代码区）">发布</button>
@@ -974,6 +975,26 @@ export default function WorldDesignPage() {
               </button>
             </div>
             <button onClick={() => setWorldZipOpen(false)} className="w-full mt-3 py-1.5 text-xs text-textMuted hover:text-textPrimary transition-colors">取消</button>
+          </div>
+        </div>
+      )}
+
+      {/* 世界包导入（说明覆盖规则 → 选文件） */}
+      {worldImportOpen && (
+        <div className="fixed inset-0 z-[70] bg-black/60 flex items-center justify-center p-4" onClick={() => setWorldImportOpen(false)}>
+          <div className="w-full max-w-xs bg-surface border border-border rounded-2xl p-5 shadow-xl" onClick={(e) => e.stopPropagation()}>
+            <div className="text-sm font-semibold text-textPrimary mb-1">导入世界包</div>
+            <div className="text-[10px] text-textMuted mb-3 leading-relaxed">
+              选择 zip 包批量导入世界文件。<br />
+              将覆盖除数据文件（content/）外的同名文件；数据文件自动跳过。
+            </div>
+            <button
+              onClick={() => importZipRef.current?.click()}
+              className="w-full inline-flex items-center justify-center gap-1.5 py-2.5 text-sm bg-primary-500 hover:bg-primary-400 text-white rounded-xl transition-colors"
+            >
+              <FolderInput size={13} /> 选择 zip 文件
+            </button>
+            <button onClick={() => setWorldImportOpen(false)} className="w-full mt-3 py-1.5 text-xs text-textMuted hover:text-textPrimary transition-colors">取消</button>
           </div>
         </div>
       )}
