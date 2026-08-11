@@ -198,35 +198,40 @@ async def ensure_session_lifecycle(db, world) -> dict:
 
     返回 {auto_newed: bool, cleaned: int}"""
     from datetime import datetime, timezone, timedelta
+    from zoneinfo import ZoneInfo
     from app.models.world import WorldChatMessage
     from sqlalchemy import delete as sa_delete
 
-    now = datetime.now(timezone.utc).replace(tzinfo=None)
+    # auto_new 按用户时区（display_timezone）算；retention 用 UTC（时长比较与基准无关）
+    from app.config import settings as _settings
+    tz = ZoneInfo(_settings.display_timezone)
+    local_now = datetime.now(tz)
+    now_utc = datetime.now(timezone.utc).replace(tzinfo=None)
     cfg = dict(world.config or {})
     st = session_settings(world)
     result = {"auto_newed": False, "cleaned": 0}
 
-    # ── auto_new：跨过配置时间点 → 开新会话 ──
+    # ── auto_new：跨过配置时间点（用户时区）→ 开新会话 ──
     if st["auto_new_enabled"]:
         try:
             hh, mm = str(st["auto_new_time"]).split(":")[:2]
-            today_cutoff = now.replace(hour=int(hh), minute=int(mm), second=0, microsecond=0)
+            today_cutoff = local_now.replace(hour=int(hh), minute=int(mm), second=0, microsecond=0)
         except Exception:
-            today_cutoff = now.replace(hour=4, minute=0, second=0, microsecond=0)
+            today_cutoff = local_now.replace(hour=4, minute=0, second=0, microsecond=0)
         # 最近一次应 new 的时间点：现在未到今天的配置点（凌晨）→ 取昨天的；否则取今天的
         # ⚠️ 若直接取「今天」的配置点，凌晨时它在未来 → last 永远 < cutoff → 每次访问都开新会话（会话爆炸）
-        cutoff = today_cutoff - timedelta(days=1) if now < today_cutoff else today_cutoff
+        cutoff = today_cutoff - timedelta(days=1) if local_now < today_cutoff else today_cutoff
         last = cfg.get("last_auto_new_at")
         if last is None or last < cutoff.isoformat():
-            # 跨过时间点且今天还没 new 过 → 开新会话（旧会话保存，可切回）
+            # 跨过时间点且还没 new 过 → 开新会话（旧会话保存，可切回）
             cfg["current_session"] = new_session_id(world)
             sessions = dict(cfg.get("sessions") or {})
             sessions[cfg["current_session"]] = {
-                "created_at": now.isoformat(),
-                "last_active_at": now.isoformat(),
+                "created_at": local_now.isoformat(),
+                "last_active_at": local_now.isoformat(),
             }
             cfg["sessions"] = sessions
-            cfg["last_auto_new_at"] = now.isoformat()
+            cfg["last_auto_new_at"] = local_now.isoformat()
             world.config = cfg
             await db.commit()
             result["auto_newed"] = True
@@ -248,7 +253,7 @@ async def ensure_session_lifecycle(db, world) -> dict:
                 la_dt = datetime.fromisoformat(la)
             except Exception:
                 continue
-            if now - la_dt > timedelta(days=days):
+            if now_utc - la_dt > timedelta(days=days):
                 expired.append(sid)
         if expired:
             for sid in expired:
