@@ -378,10 +378,12 @@ export default function WorldDesignPage() {
 
   // 发布到商城：跳转统一发布页（带当前世界预选，表单含标题/描述/标签/同步 GitHub）
   // ── 世界打包：下载 / 导入 zip ──
-  const downloadWorldZip = async () => {
+  const [worldZipOpen, setWorldZipOpen] = useState(false)
+  const downloadWorldZip = async (includeContent: boolean) => {
+    setWorldZipOpen(false)
     try {
       const base = (localStorage.getItem('instance_url') || '').replace(/\/+$/, '') + '/api'
-      const res = await fetch(`${base}/worlds/${worldId}/export?include_content=true`, {
+      const res = await fetch(`${base}/worlds/${worldId}/export?include_content=${includeContent}`, {
         headers: { 'Authorization': `Bearer ${localStorage.getItem('access_token')}` },
       })
       if (!res.ok) throw new Error((await res.text()).slice(0, 120) || '下载失败')
@@ -392,7 +394,7 @@ export default function WorldDesignPage() {
       a.download = `world_${worldId}.zip`
       a.click()
       URL.revokeObjectURL(url)
-      setMsg('已下载世界包')
+      setMsg(includeContent ? '已下载世界包（含数据文件）' : '已下载世界包（不含数据文件）')
     } catch (err: any) { setMsg(`下载失败: ${err?.message || err}`) }
   }
   const importZipRef = useRef<HTMLInputElement>(null)
@@ -495,7 +497,7 @@ export default function WorldDesignPage() {
           <button onClick={openDocs} className="shrink-0 p-1.5 text-textMuted hover:text-textPrimary transition-colors" title="接口文档（发给世界 AI 的 md）">
             <BookOpen size={14} />
           </button>
-          <button onClick={downloadWorldZip} className="shrink-0 p-1.5 text-textMuted hover:text-textPrimary transition-colors" title="下载世界包（zip：代码+资源+数据）">
+          <button onClick={() => setWorldZipOpen(true)} className="shrink-0 p-1.5 text-textMuted hover:text-textPrimary transition-colors" title="下载世界包（zip）">
             <Archive size={14} />
           </button>
           <button onClick={() => importZipRef.current?.click()} className="shrink-0 p-1.5 text-textMuted hover:text-textPrimary transition-colors" title="导入世界包（zip 批量导入，不动数据文件）">
@@ -728,7 +730,7 @@ export default function WorldDesignPage() {
           <button onClick={openDocs} className="p-1.5 text-textMuted hover:text-textPrimary transition-colors" title="接口文档（发给世界 AI 的 md）">
             <BookOpen size={15} />
           </button>
-          <button onClick={downloadWorldZip} className="text-xs px-3 py-1 rounded transition-colors bg-elevated hover:bg-border text-textSecondary" title="下载世界包（zip：代码+资源+数据）">
+          <button onClick={() => setWorldZipOpen(true)} className="text-xs px-3 py-1 rounded transition-colors bg-elevated hover:bg-border text-textSecondary" title="下载世界包（zip）">
             <Archive size={13} className="inline mr-1" />下载世界包
           </button>
           <input ref={importZipRef} type="file" accept=".zip" className="hidden" onChange={handleImportZip} />
@@ -945,6 +947,33 @@ export default function WorldDesignPage() {
               </div>
             )}
             <button onClick={() => setDownloadTarget(null)} className="w-full mt-3 py-1.5 text-xs text-textMuted hover:text-textPrimary transition-colors">取消</button>
+          </div>
+        </div>
+      )}
+
+      {/* 世界包下载（含/不含数据文件） */}
+      {worldZipOpen && (
+        <div className="fixed inset-0 z-[70] bg-black/60 flex items-center justify-center p-4" onClick={() => setWorldZipOpen(false)}>
+          <div className="w-full max-w-xs bg-surface border border-border rounded-2xl p-5 shadow-xl" onClick={(e) => e.stopPropagation()}>
+            <div className="text-sm font-semibold text-textPrimary mb-1">下载世界包</div>
+            <div className="text-[10px] text-textMuted mb-3">
+              导出为 zip，Windows 可直接解压。数据文件（content/）是运行产物。
+            </div>
+            <div className="space-y-2">
+              <button
+                onClick={() => downloadWorldZip(true)}
+                className="w-full inline-flex items-center justify-center gap-1.5 py-2.5 text-sm bg-elevated hover:bg-border text-textPrimary rounded-xl transition-colors"
+              >
+                <Archive size={13} /> 含数据文件（完整备份）
+              </button>
+              <button
+                onClick={() => downloadWorldZip(false)}
+                className="w-full inline-flex items-center justify-center gap-1.5 py-2.5 text-sm bg-primary-500 hover:bg-primary-400 text-white rounded-xl transition-colors"
+              >
+                <Archive size={13} /> 不含数据文件（代码+资源）
+              </button>
+            </div>
+            <button onClick={() => setWorldZipOpen(false)} className="w-full mt-3 py-1.5 text-xs text-textMuted hover:text-textPrimary transition-colors">取消</button>
           </div>
         </div>
       )}
