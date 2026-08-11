@@ -86,9 +86,10 @@ export default function Layout() {
   // 桌面通知：标签页标题未读计数 + 任务栏闪烁（所有页面生效）
   useDesktopNotification()
 
-  // 聊天详情页（群聊/私信）隐藏底部导航栏，给输入框更多空间
+  // 聊天详情页（群聊/私信）/ 沉浸界面（世界视界）隐藏底部导航栏
   const hideNav = /^\/chat\/(dm\/[^/]+|\d+)/.test(location.pathname)
                    || /^\/dm\/[^/]+/.test(location.pathname)
+                   || /^\/world-view\//.test(location.pathname)
 
   // 沉浸界面（世界视界）：隐藏侧边栏，全屏沉浸
   const hideSidebar = /^\/world-view\//.test(location.pathname)
