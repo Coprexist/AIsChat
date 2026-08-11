@@ -75,7 +75,7 @@ export default function WorldDesignPage() {
   const openDocs = async () => {
     setDocsOpen(true)
     try {
-      const r = await api.get<{ sections: { id: string; title: string; intro: string }[] }>('/worlds/api-docs')
+      const r = await api.get<{ sections: { id: string; title: string; intro: string }[] }>('/api-docs')
       setDocsSections(r.sections || [])
       if (r.sections?.length) selectDoc(r.sections[0].id)
     } catch { /* ignore */ }
@@ -84,7 +84,7 @@ export default function WorldDesignPage() {
     setDocsActive(id)
     setDocsLoading(true)
     try {
-      const r = await api.get<{ content: string }>(`/worlds/api-docs/${id}`)
+      const r = await api.get<{ content: string }>(`/api-docs/${id}`)
       setDocsContent(r.content || '')
     } catch { setDocsContent('（文档读取失败）') } finally { setDocsLoading(false) }
   }
@@ -102,7 +102,7 @@ export default function WorldDesignPage() {
     const parts = ['# AIsChat 世界 API 接口文档\n']
     for (const sec of docsSections) {
       try {
-        const r = await api.get<{ content: string }>(`/worlds/api-docs/${sec.id}`)
+        const r = await api.get<{ content: string }>(`/api-docs/${sec.id}`)
         parts.push(`\n\n---\n\n# ${sec.id} ${sec.title}\n\n` + (r.content || ''))
       } catch { /* 单区失败跳过 */ }
     }
