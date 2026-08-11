@@ -7,6 +7,39 @@
 
 ---
 
+## [v0.3.3] - 2026-08-11
+
+### Added — ✨ 接口文档服务 + 世界包下载/导入 + 会话体系 + 结构化记忆
+
+- 📖 **接口文档服务**：设计页/管理页查看平台接口文档（与世界 AI `view_api_doc` 同源，代码区 `services/world/api_docs/` 随 git 跟踪、改文档即时生效）；分区查看 + 单区/全部合并下载；**md → docx 导出**（pandoc 可选能力，管理页插件管理一键在线安装，未装自动隐藏入口）；**docx 产品化**——表格边框 + 斑马纹（python-docx 硬编码，任何查看器显示）、品牌紫标题/表头/链接（#7C3AED）、代码块 Consolas 9pt + tango 语法高亮、LaTeX 公式转 Word 原生 OMML
+- 📦 **世界包下载/导入**：设计页工具栏（桌面文字按钮/移动端图标）——下载弹窗（完整备份含数据 / 仅代码与资源）、导入弹窗（保留数据文件推荐 / 连同数据文件替换，**同名替换增量合并**、包外文件保留，导入前确认）；Windows 解压中文文件名正常（UTF-8 flag）；`import_zip` 默认跳过 content/ 数据文件（商城导入新世界不受影响）
+- 💬 **对话会话体系**：/new /sessions /use /pin /unpin + 生命周期（auto_new 每日 4 点按用户时区、idle compact 18h、retention 90 天 + 收藏保护）；流式正文根治（气泡函数式更新，不再丢内容）
+- 🧠 **结构化记忆**：world_structured_records 表 + `manage_records` 工具（set/get/list/summary/categories/delete），prompt 约定「记忆一律用 manage_records」（DeepSeek 无 embedding，向量 404 不可靠）
+- 🔗 **绑定群 + AI 重做**：BindGroupModal 双 tab（群聊/AI）+ bind-entries 批量接口 + 默认类型「默认类型」开箱即用；`group-types` 按 entity_type 分别统计绑定数（AI 计数此前从未正确）；入口分流 WORLD_ENTRY（沉浸窗口按群类型/私聊/直进渲染）；默认群类型 + prompt 群类型约定（slug 稳定/改名不动/默认兜底）
+- 🏪 **商城 GitHub 完善**：实例配置入口（管理员配实例 token）、token 回退 .env、挂载即预加载快照、绑定弹窗「去 GitHub 生成 token」链接
+- 👥 **群聊体验**：邀请成员弹窗（好友列表分页/已选独立列表/搜索置顶/在线圆点）、AI 好友 friend_id=user_id 标准统一（兼容旧数据双通道解析）
+
+### Fixed
+
+- 🔥 **422 local_kw 悬案（根治）**：`/kb/status`、`/kb/install` 带 token 必 422 `local_kw required`——路由 `Depends(_async_session)` 把 **async_sessionmaker 实例**当依赖，FastAPI 从 `sessionmaker.__call__(self, **local_kw)` 挖出必填 query 参数；源码 grep 不到、看起来像 nginx 拦截（改路径/换词/查反代全无效）；修复：`Depends(get_db)`，排查法 = 打印 route.dependant 依赖树；全项目扫描确认无同类写法（330 处 get_db 均安全）
+- **export_zip 路由签名漏 db 参数**（`_require_owner(db,...)` 直接 NameError 500）——接口从未被 HTTP 调用过，加下载 UI 才首次触发
+- **绑定 AI 显示群类型**：文案按 tab 区分（AI 类型 / x 个 AI / 勾选 AI），bound_count 按 entity_type 统计
+- **docx convert 500**：subprocess input 传 str → encode utf-8；模板注入误判（pandoc 默认 Table 自带 firstRow tblStylePr 被当「已注入」跳过，边框/斑马纹从未生效）
+- **流式正文三连修**：收尾总结刷新后消失（full_content 只写强制收尾分支）、recall_memory 分词回退（整串子串匹配永远空）、工具轮思考保留（首轮兜底 + note 补 reasoning）
+- **暗色模式**：hljs 补 tag/name 颜色、滚动条交汇角落不再白块、文档弹窗表格夜间变量默认值
+- **WS/好友**：群聊推送补 sender_name（以 users 表为准）、thinking/typing 事件统一 user_id（前端禁止 agent_id）
+- **AI 文件跳转**：load 闭包 currentFile 冻结 → currentFileRef；拖拽手柄 z-index 统一（高于遮罩）
+
+### Changed
+
+- **接口文档路径统一 /kb**：前端路径不带 /api 前缀 → 浏览器单 `/api/kb/...` → vite 剥一层 → 后端 prefix `/kb`（避开双 /api/api 段）；路径不再含 export 词
+- **后端重启建议 `up -d --force-recreate`**（restart 个别情况留孤儿 uvicorn 占 8000 致诡异 500/新代码不生效，`docker top` 见 2 个 uvicorn 即实锤）——troubleshooting 2.4 + 手册速查已更新
+- **文档体系**：troubleshooting 新增第九章（422 依赖注入坑）+ 错误码表 422 行、开发者手册加「依赖注入红线」、新增接口文档服务设计文档（api_docs_service.md）、SUMMARY v3.2.1
+- **类型债清零**：tsc --noEmit 38 → 0（顺带修真 bug：setActiveSection→setActiveTab、WebviewWindow await、demoSetup blobToBase64、Toggle enabled→checked）
+- **图标统一**：全项目残留 emoji/符号 → lucide（下载/导入用 Download/Upload 成对）
+
+---
+
 ## [v0.3.2] - 2026-08-09
 
 ### Added — ✨ 情感状态栈 + 商城 GitHub 体系 + 群类型系统
