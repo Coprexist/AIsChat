@@ -492,6 +492,12 @@ function InviteMemberModal({
   const [query, setQuery] = useState('')
   const [results, setResults] = useState<SearchResult[]>([])
   const [searchLoading, setSearchLoading] = useState(false)
+  // 好友预加载（空输入时显示；滚动到底加载更多）
+  const [friends, setFriends] = useState<SearchResult[]>([])
+  const [friendsOffset, setFriendsOffset] = useState(0)
+  const [friendsLoading, setFriendsLoading] = useState(false)
+  const [friendsHasMore, setFriendsHasMore] = useState(true)
+  const friendsLoadingRef = useRef(false)
   const [selected, setSelected] = useState<Set<string>>(new Set())
   const [selectedEntries, setSelectedEntries] = useState<Map<string, SearchResult>>(new Map())
   const [loading, setLoading] = useState(false)
@@ -500,6 +506,34 @@ function InviteMemberModal({
   const [showManual, setShowManual] = useState(false)
   const [manualType, setManualType] = useState<'ai' | 'human'>('ai')
   const [manualId, setManualId] = useState('')
+
+  const loadFriends = async (reset = false) => {
+    if (friendsLoadingRef.current) return
+    friendsLoadingRef.current = true
+    setFriendsLoading(true)
+    try {
+      const offset = reset ? 0 : friendsOffset
+      const data = await api.get<
+        { id: number; friend_type: string; friend_id: number; friend_name: string; state?: string }[]
+      >(`/friends?limit=30&offset=${offset}`)
+      const items: SearchResult[] = (Array.isArray(data) ? data : []).map((f) => ({
+        id: f.friend_id,
+        type: (f.friend_type === 'ai' ? 'ai' : 'human') as 'human' | 'ai',
+        name: f.friend_name, state: f.state,
+      }))
+      setFriends((prev) => (reset ? items : [...prev, ...items]))
+      setFriendsOffset(offset + items.length)
+      setFriendsHasMore(items.length >= 30)
+    } catch { /* ignore */ } finally {
+      friendsLoadingRef.current = false
+      setFriendsLoading(false)
+    }
+  }
+  // 空输入 → 预加载好友；清空搜索时重置
+  useEffect(() => {
+    if (query.length < 1) loadFriends(true)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [query])
 
   // 防抖搜索
   useEffect(() => {
@@ -614,6 +648,36 @@ function InviteMemberModal({
     }
   }
 
+  // 统一列表项渲染（好友列表 / 搜索结果共用）
+  const renderEntry = (r: SearchResult) => {
+    const key = `${r.type}:${r.id}`
+    const checked = selected.has(key)
+    return (
+      <label
+        key={key}
+        className={`flex items-center gap-3 px-3 py-2.5 cursor-pointer transition-colors ${
+          checked ? 'bg-primary-500/10' : 'hover:bg-elevated'
+        }`}
+      >
+        <input
+          type="checkbox"
+          checked={checked}
+          onChange={() => toggleMember(r)}
+          className="w-4 h-4 rounded border-border bg-canvas text-primary-500 focus:ring-primary-500/50"
+        />
+        <div className="flex-1 min-w-0">
+          <div className="flex items-center gap-2">
+            <span className="text-sm font-medium text-textPrimary truncate">{r.name}</span>
+            <span className="text-xs">{stateDot(r.state)}</span>
+          </div>
+        </div>
+        <span className="text-xs text-textMuted shrink-0">
+          {r.type === 'ai' ? <><Bot size={12} className="inline" /> AI</> : <User size={12} className="inline" />}
+        </span>
+      </label>
+    )
+  }
+
   return (
     <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-[60]" onClick={onClose}>
       <div
@@ -635,11 +699,27 @@ function InviteMemberModal({
         </div>
 
         {/* 搜索结果 */}
-        <div className="flex-1 overflow-y-auto border border-border rounded-xl divide-y divide-border/50 mb-4 max-h-48">
-          {query.length < 1 ? (
-            <div className="py-6 text-center text-xs text-textMuted">
-              {t('chat.inviteSearchPrompt')}
-            </div>
+        <div
+          className="flex-1 overflow-y-auto border border-border rounded-xl divide-y divide-border/50 mb-4 max-h-64"
+          onScroll={(e) => {
+            const el = e.currentTarget
+            // 空输入（好友列表）滚到底 → 加载更多；搜索模式不加载
+            if (query.length > 0) return
+            if (el.scrollTop + el.clientHeight >= el.scrollHeight - 40) loadFriends()
+          }}
+        >
+                    {query.length < 1 ? (
+            friendsLoading && friends.length === 0 ? (
+              <div className="flex items-center justify-center py-6">
+                <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-primary-500" />
+              </div>
+            ) : friends.length === 0 ? (
+              <div className="py-6 text-center text-xs text-textMuted">
+                {t('chat.inviteSearchPrompt')}
+              </div>
+            ) : (
+              friends.map(renderEntry)
+            )
           ) : searchLoading ? (
             <div className="flex items-center justify-center py-6">
               <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-primary-500" />
@@ -647,34 +727,11 @@ function InviteMemberModal({
           ) : results.length === 0 ? (
             <div className="py-6 text-center text-xs text-textMuted">{t('common.noResults')}</div>
           ) : (
-            results.map((r) => {
-              const key = `${r.type}:${r.id}`
-              const checked = selected.has(key)
-              return (
-                <label
-                  key={key}
-                  className={`flex items-center gap-3 px-3 py-2.5 cursor-pointer transition-colors ${
-                    checked ? 'bg-primary-500/10' : 'hover:bg-elevated'
-                  }`}
-                >
-                  <input
-                    type="checkbox"
-                    checked={checked}
-                    onChange={() => toggleMember(r)}
-                    className="w-4 h-4 rounded border-border bg-canvas text-primary-500 focus:ring-primary-500/50"
-                  />
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-2">
-                      <span className="text-sm font-medium text-textPrimary truncate">{r.name}</span>
-                      <span className="text-xs">{stateDot(r.state)}</span>
-                    </div>
-                  </div>
-                  <span className="text-xs text-textMuted shrink-0">
-                    {r.type === 'ai' ? <><Bot size={12} className="inline" /> AI</> : <User size={12} className="inline" />}
-                  </span>
-                </label>
-              )
-            })
+            results.map(renderEntry)
+          )}
+          {/* 底部加载更多指示（好友列表滚动加载） */}
+          {query.length < 1 && friendsLoading && friends.length > 0 && (
+            <div className="py-2.5 text-center text-xs text-textMuted">加载中…</div>
           )}
         </div>
 
