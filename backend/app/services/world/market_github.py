@@ -85,9 +85,11 @@ async def get_market_config(db) -> dict:
             {"cfg": json.dumps(cfg, ensure_ascii=False)},
         )
         await db.commit()
+    from app.config import settings as _settings
     return {
         "github_repo": str(cfg.get("github_repo") or "").strip(),
-        "github_token": _decrypt_token(str(cfg.get("github_token") or "")),
+        # DB 配置优先，空则回退 .env GITHUB_TOKEN（部署时 .env 是默认权威；商城页设置可覆盖）
+        "github_token": _decrypt_token(str(cfg.get("github_token") or "")) or _settings.github_token,
         "auto_sync_enabled": bool(cfg.get("auto_sync_enabled", False)),
         "bot_public_key": str(cfg.get("bot_public_key") or ""),
         "bot_sign_key": _decrypt_token(str(cfg.get("bot_sign_key_encrypted") or "")),
