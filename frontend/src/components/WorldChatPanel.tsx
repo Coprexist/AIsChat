@@ -1,5 +1,5 @@
 import { memo, useState, useRef, useCallback, useMemo, forwardRef, useImperativeHandle, useEffect } from 'react'
-import { Send, Plus, ChevronRight, Brain, ArrowDown, FileText, Search, Globe, Terminal, Package, Clock, Wrench, Eraser, Folder, Pin, ChevronDown } from 'lucide-react'
+import { Send, Plus, ChevronRight, Brain, ArrowDown, FileText, Search, Globe, Terminal, Package, Clock, Wrench, Eraser, Pin, ChevronDown } from 'lucide-react'
 import MarkdownContent from './shared/MarkdownContent'
 import { useWorldChat, WORLD_COMMANDS } from '../hooks/useWorldChat'
 
@@ -297,10 +297,7 @@ const WorldChatPanel = memo(forwardRef<WorldChatHandle, WorldChatPanelProps>(({ 
 
       {/* 会话工具条：当前会话 + 收藏 + 新对话 + 会话列表（/new 后对话保存可切回） */}
       <div className="flex items-center gap-1.5 px-3 py-1.5 border-t border-border bg-surface/60 text-[10px] text-textMuted relative">
-        <span className="inline-flex items-center gap-1 min-w-0 shrink-0">
-          <Folder size={11} className="shrink-0 text-textMuted" />
-          <span className="truncate font-mono max-w-[140px]" title={chat.currentSession}>{chat.currentSession === 'default' ? '默认会话' : chat.currentSession}</span>
-        </span>
+        <span className="truncate font-mono max-w-[180px] shrink-0" title={chat.currentSession}>{chat.currentSession === 'default' ? '默认会话' : chat.currentSession}</span>
         <button
           onClick={async () => { const p = await chat.togglePin(); if (!p && onMsg) onMsg('已取消收藏（收藏的会话不会被自动清理）') }}
           className={`shrink-0 p-1 rounded transition-colors ${chat.sessionList.find((s) => s.id === chat.currentSession)?.pinned ? 'text-amber-400 bg-amber-400/10' : 'hover:bg-elevated hover:text-textSecondary'}`}
