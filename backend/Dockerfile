@@ -11,6 +11,7 @@ RUN sed -i 's/deb.debian.org/mirrors.tuna.tsinghua.edu.cn/g' /etc/apt/sources.li
     ca-certificates \
     postgresql-client \
     chromium \
+    pandoc \
     && curl -fsSL https://deb.nodesource.com/setup_20.x | bash - \
     && apt-get install -y --no-install-recommends nodejs \
     && npm config set registry https://registry.npmmirror.com \

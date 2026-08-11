@@ -72,6 +72,9 @@ export default function WorldDesignPage() {
   const [docsActive, setDocsActive] = useState<string>('')
   const [docsContent, setDocsContent] = useState('')
   const [docsLoading, setDocsLoading] = useState(false)
+  const [docxAvailable, setDocxAvailable] = useState(false)
+  const [isAdminUser, setIsAdminUser] = useState(false)
+  const [downloadTarget, setDownloadTarget] = useState<{ scope: 'section' | 'all'; title: string } | null>(null)
   const openDocs = async () => {
     setDocsOpen(true)
     try {
@@ -79,6 +82,11 @@ export default function WorldDesignPage() {
       setDocsSections(r.sections || [])
       if (r.sections?.length) selectDoc(r.sections[0].id)
     } catch { /* ignore */ }
+    try {
+      const st = await api.get<{ docx_available: boolean; is_admin: boolean }>('/api-docs/export/status')
+      setDocxAvailable(!!st.docx_available)
+      setIsAdminUser(!!st.is_admin)
+    } catch { setDocxAvailable(false); setIsAdminUser(false) }
   }
   const selectDoc = async (id: string) => {
     setDocsActive(id)
@@ -98,7 +106,8 @@ export default function WorldDesignPage() {
     a.click()
     URL.revokeObjectURL(url)
   }
-  const downloadAllDocs = async () => {
+  // 收集全部文档 md（合并）
+  const getAllDocsMd = async () => {
     const parts = ['# AIsChat 世界 API 接口文档\n']
     for (const sec of docsSections) {
       try {
@@ -106,7 +115,43 @@ export default function WorldDesignPage() {
         parts.push(`\n\n---\n\n# ${sec.id} ${sec.title}\n\n` + (r.content || ''))
       } catch { /* 单区失败跳过 */ }
     }
-    downloadDoc(parts.join('\n'), 'aischat-world-api-docs.md')
+    return parts.join('\n')
+  }
+  // 下载 docx（pandoc，POST 原生 fetch）
+  const downloadDocx = async (md: string, filename: string) => {
+    try {
+      const base = (localStorage.getItem('instance_url') || '').replace(/\/+$/, '') + '/api'
+      const res = await fetch(`${base}/api-docs/export`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${localStorage.getItem('access_token')}`,
+        },
+        body: JSON.stringify({ md, filename }),
+      })
+      if (!res.ok) throw new Error((await res.text()) || '导出失败')
+      const blob = await res.blob()
+      const url = URL.createObjectURL(blob)
+      const a = document.createElement('a')
+      a.href = url
+      a.download = filename.endsWith('.docx') ? filename : filename + '.docx'
+      a.click()
+      URL.revokeObjectURL(url)
+    } catch (e: any) { setMsg(`docx 导出失败: ${e?.message || e}`) }
+  }
+  // 下载弹窗确认：按格式执行
+  const doDownload = async (format: 'md' | 'docx') => {
+    if (!downloadTarget) return
+    const { scope, title } = downloadTarget
+    const filename = scope === 'section' ? `api-doc-${docsActive || 'doc'}` : 'aischat-world-api-docs'
+    if (format === 'md') {
+      const md = scope === 'section' ? docsContent : await getAllDocsMd()
+      downloadDoc(md, filename + '.md')
+    } else {
+      const md = scope === 'section' ? docsContent : await getAllDocsMd()
+      await downloadDocx(md, filename + '.docx')
+    }
+    setDownloadTarget(null)
   }
 
   // 世界 AI 配置表单（单独表单，不属于 agent）
@@ -793,14 +838,14 @@ export default function WorldDesignPage() {
                     {docsSections.find((s) => s.id === docsActive)?.title || '接口文档'}
                   </span>
                   <button
-                    onClick={() => downloadDoc(docsContent, `api-doc-${docsActive || 'all'}.md`)}
+                    onClick={() => setDownloadTarget({ scope: 'section', title: '下载此分区' })}
                     disabled={!docsContent || docsLoading}
                     className="inline-flex items-center gap-1 text-[11px] px-2 py-1 rounded bg-elevated text-textSecondary hover:text-textPrimary transition-colors disabled:opacity-40 shrink-0"
                   >
                     <Download size={11} /> 下载此分区
                   </button>
                   <button
-                    onClick={downloadAllDocs}
+                    onClick={() => setDownloadTarget({ scope: 'all', title: '下载全部' })}
                     className="inline-flex items-center gap-1 text-[11px] px-2 py-1 rounded bg-elevated text-textSecondary hover:text-textPrimary transition-colors shrink-0"
                   >
                     <Archive size={11} /> 下载全部
@@ -817,6 +862,40 @@ export default function WorldDesignPage() {
                 </div>
               </div>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* 下载类型弹窗（md / docx；未装 pandoc 时只 md，管理员看安装提示） */}
+      {downloadTarget && (
+        <div className="fixed inset-0 z-[70] bg-black/60 flex items-center justify-center p-4" onClick={() => setDownloadTarget(null)}>
+          <div className="w-full max-w-xs bg-surface border border-border rounded-2xl p-5 shadow-xl" onClick={(e) => e.stopPropagation()}>
+            <div className="text-sm font-semibold text-textPrimary mb-1">{downloadTarget.title}</div>
+            <div className="text-[10px] text-textMuted mb-3">
+              {downloadTarget.scope === 'section' ? `当前分区：${docsSections.find((s) => s.id === docsActive)?.title || docsActive || '文档'}` : '全部分区合并'}
+            </div>
+            <div className="space-y-2">
+              <button
+                onClick={() => doDownload('md')}
+                className="w-full inline-flex items-center justify-center gap-1.5 py-2.5 text-sm bg-elevated hover:bg-border text-textPrimary rounded-xl transition-colors"
+              >
+                <FileText size={13} /> 下载 .md
+              </button>
+              {docxAvailable && (
+                <button
+                  onClick={() => doDownload('docx')}
+                  className="w-full inline-flex items-center justify-center gap-1.5 py-2.5 text-sm bg-primary-500 hover:bg-primary-400 text-white rounded-xl transition-colors"
+                >
+                  <FileText size={13} /> 下载 .docx（Word）
+                </button>
+              )}
+            </div>
+            {!docxAvailable && isAdminUser && (
+              <div className="mt-3 text-[10px] text-amber-400/90 leading-relaxed">
+                如需下载为 docx（Word），请前往管理页安装 pandoc 插件后重启后端。
+              </div>
+            )}
+            <button onClick={() => setDownloadTarget(null)} className="w-full mt-3 py-1.5 text-xs text-textMuted hover:text-textPrimary transition-colors">取消</button>
           </div>
         </div>
       )}
