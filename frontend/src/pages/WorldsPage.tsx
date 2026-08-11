@@ -52,9 +52,9 @@ export default function WorldsPage() {
     }
   }
 
-  const [bindWorld, setBindWorld] = useState<World | null>(null)
+  const [bindWorld, setBindWorld] = useState<{ world: World; tab?: 'group' | 'agent' } | null>(null)
 
-  const openBindModal = (world: World) => setBindWorld(world)
+  const openBindModal = (world: World, tab?: 'group' | 'agent') => setBindWorld({ world, tab })
 
   const toggleStatus = async (world: World) => {
     try {
@@ -137,7 +137,8 @@ export default function WorldsPage() {
                   </div>
                 </div>
                 <div className="flex items-center gap-2 shrink-0">
-                  <button onClick={() => openBindModal(w)} className="text-xs px-3 py-1.5 bg-elevated hover:bg-border text-textSecondary rounded transition-colors">绑定群</button>
+                  <button onClick={() => openBindModal(w, 'group')} className="text-xs px-3 py-1.5 bg-elevated hover:bg-border text-textSecondary rounded transition-colors">绑定群</button>
+                  <button onClick={() => openBindModal(w, 'agent')} className="text-xs px-3 py-1.5 bg-elevated hover:bg-border text-textSecondary rounded transition-colors">绑定 AI</button>
                   <button onClick={() => toggleStatus(w)} className="text-xs px-3 py-1.5 bg-elevated hover:bg-border text-textSecondary rounded transition-colors">
                     {w.status === 'active' ? '休眠' : '唤醒'}
                   </button>
@@ -166,7 +167,8 @@ export default function WorldsPage() {
       {/* 绑定群弹窗：选类型 → 勾选群批量绑定（BindGroupModal 自包含） */}
       {bindWorld && (
         <BindGroupModal
-          worldId={bindWorld.id}
+          worldId={bindWorld.world.id}
+          initialTab={bindWorld.tab}
           onClose={() => setBindWorld(null)}
           onBound={() => { setBindWorld(null); load() }}
         />

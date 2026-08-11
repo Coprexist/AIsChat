@@ -311,11 +311,11 @@ async def bind_group_to_type(
     db: AsyncSession = Depends(get_db),
 ):
     """群主把群绑定到某群类型（slug）：校验上限 → 自动创建群助手（按模板）"""
-    from app.services.world.group_type_service import bind_group_with_type
+    from app.services.world.group_type_service import bind_entry_with_type
     try:
-        result = await bind_group_with_type(
-            db, world_id, current_user["user_id"],
-            group_id=int(req.get("group_id") or 0),
+        result = await bind_entry_with_type(
+            db, world_id, current_user["user_id"], "group",
+            entity_id=int(req.get("group_id") or 0),
             type_slug=str(req.get("type_slug") or ""),
         )
         return result
@@ -331,11 +331,33 @@ async def bind_groups_to_type(
     db: AsyncSession = Depends(get_db),
 ):
     """批量把多个群绑定到某类型（勾选多群一次绑定；逐群校验，互不影响）"""
-    from app.services.world.group_type_service import bind_groups_with_type
+    from app.services.world.group_type_service import bind_entries_with_type
     try:
-        return await bind_groups_with_type(
-            db, world_id, current_user["user_id"],
-            group_ids=[int(x) for x in (req.get("group_ids") or []) if int(x) > 0],
+        return await bind_entries_with_type(
+            db, world_id, current_user["user_id"], "group",
+            entity_ids=[int(x) for x in (req.get("group_ids") or []) if int(x) > 0],
+            type_slug=str(req.get("type_slug") or ""),
+        )
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+
+@router.post("/{world_id}/bind-entries")
+async def bind_entries(
+    world_id: int,
+    req: dict,
+    current_user: dict = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """通用批量绑定入口（entity_type: group=群聊 / agent=AI）：选类型 → 勾选多条 → 一次绑定"""
+    from app.services.world.group_type_service import bind_entries_with_type
+    entity_type = str(req.get("entity_type") or "group")
+    if entity_type not in ("group", "agent"):
+        raise HTTPException(status_code=400, detail="entity_type 仅支持 group/agent")
+    try:
+        return await bind_entries_with_type(
+            db, world_id, current_user["user_id"], entity_type,
+            entity_ids=[int(x) for x in (req.get("entity_ids") or []) if int(x) > 0],
             type_slug=str(req.get("type_slug") or ""),
         )
     except ValueError as e:

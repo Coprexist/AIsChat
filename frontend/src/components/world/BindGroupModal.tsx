@@ -5,7 +5,7 @@
  * 自动创建群助手（按类型模板），绑定结果逐群反馈。
  */
 import { useEffect, useMemo, useState } from 'react'
-import { X, Link2, Users, CheckSquare, Loader2, AlertCircle } from 'lucide-react'
+import { X, Link2, Users, CheckSquare, Loader2, AlertCircle, Bot } from 'lucide-react'
 import { api } from '../../api/client'
 
 interface GroupType {
@@ -24,19 +24,26 @@ interface GroupItem {
   is_pinned?: boolean
 }
 
+type BindTab = 'group' | 'agent'
+
 interface BindGroupModalProps {
   worldId: number
   /** 预选类型（群类型卡片点「绑定群」时传入） */
   initialTypeSlug?: string
+  /** 初始 tab：group=绑定群聊 / agent=绑定 AI（世界列表页「绑定 AI」按钮用） */
+  initialTab?: BindTab
   onClose: () => void
   /** 绑定成功后回调（刷新类型绑定数/群助手） */
   onBound: () => void
 }
 
-export default function BindGroupModal({ worldId, initialTypeSlug, onClose, onBound }: BindGroupModalProps) {
+export default function BindGroupModal({ worldId, initialTypeSlug, initialTab = 'group', onClose, onBound }: BindGroupModalProps) {
+  const [tab, setTab] = useState<BindTab>(initialTab)
   const [types, setTypes] = useState<GroupType[]>([])
   const [groups, setGroups] = useState<GroupItem[]>([])
+  const [agents, setAgents] = useState<{ id: number; name: string; owner_id?: number }[]>([])
   const [boundGroupIds, setBoundGroupIds] = useState<Set<number>>(new Set())
+  const [boundAgentIds, setBoundAgentIds] = useState<Set<number>>(new Set())
   const [typeSlug, setTypeSlug] = useState<string>(initialTypeSlug || '')
   const [selected, setSelected] = useState<Set<number>>(new Set())
   const [msg, setMsg] = useState('')
@@ -49,15 +56,18 @@ export default function BindGroupModal({ worldId, initialTypeSlug, onClose, onBo
     let cancelled = false
     ;(async () => {
       try {
-        const [t, g, w] = await Promise.all([
+        const [t, g, w, a] = await Promise.all([
           api.get<{ types: GroupType[] }>(`/worlds/${worldId}/group-types`),
           api.get<GroupItem[]>('/groups'),
           api.get<{ bindings: { entity_type: string; entity_id: number }[] }>(`/worlds/${worldId}`),
+          api.get<{ id: number; name: string; owner_id?: number }[]>('/agents'),
         ])
         if (cancelled) return
         setTypes(t.types || [])
         setGroups(g || [])
+        setAgents(Array.isArray(a) ? a : [])
         setBoundGroupIds(new Set((w.bindings || []).filter((b) => b.entity_type === 'group').map((b) => b.entity_id)))
+        setBoundAgentIds(new Set((w.bindings || []).filter((b) => b.entity_type === 'agent').map((b) => b.entity_id)))
       } catch { /* 失败静默，弹窗可关 */ }
     })()
     return () => { cancelled = true }
@@ -68,6 +78,14 @@ export default function BindGroupModal({ worldId, initialTypeSlug, onClose, onBo
     () => groups.filter((g) => g.owner_type === 'human' && g.owner_id === myId),
     [groups, myId],
   )
+  // 可绑定 AI：仅「我拥有的」（owner_id=我；合作的 AI 不绑我的世界）
+  const ownedAgents = useMemo(
+    () => agents.filter((a) => a.owner_id === myId || a.owner_id == null),
+    [agents, myId],
+  )
+  // 当前 tab 的已绑集合 + 候选列表
+  const boundIds = tab === 'group' ? boundGroupIds : boundAgentIds
+  const candidates = tab === 'group' ? ownedGroups : ownedAgents
   const currentType = types.find((t) => t.slug === typeSlug)
 
   const toggle = (gid: number) => {
@@ -84,12 +102,16 @@ export default function BindGroupModal({ worldId, initialTypeSlug, onClose, onBo
     setBinding(true)
     setMsg('')
     try {
-      const r = await api.post<{ bound: number; failed: number; results: { group_id: number; success: boolean; error?: string }[] }>(
-        `/worlds/${worldId}/bind-groups`, { type_slug: typeSlug, group_ids: [...selected] },
+      const r = await api.post<{ bound: number; failed: number; results: { entity_id: number; success: boolean; error?: string }[] }>(
+        `/worlds/${worldId}/bind-entries`, { entity_type: tab, type_slug: typeSlug, entity_ids: [...selected] },
       )
       // 绑定成功的群从勾选移除 + 标记已绑
-      const done = new Set((r.results || []).filter((x) => x.success).map((x) => x.group_id))
-      setBoundGroupIds((prev) => { const n = new Set(prev); done.forEach((g) => n.add(g)); return n })
+      const done = new Set((r.results || []).filter((x) => x.success).map((x) => x.entity_id))
+      if (tab === 'group') {
+        setBoundGroupIds((prev) => { const n = new Set(prev); done.forEach((g) => n.add(g)); return n })
+      } else {
+        setBoundAgentIds((prev) => { const n = new Set(prev); done.forEach((g) => n.add(g)); return n })
+      }
       setSelected((prev) => { const n = new Set(prev); done.forEach((g) => n.delete(g)); return n })
       if (r.failed === 0) {
         // 全部成功：直接关闭（结果已在类型/群列表上体现）
@@ -115,8 +137,17 @@ export default function BindGroupModal({ worldId, initialTypeSlug, onClose, onBo
         <div className="flex items-center justify-between p-4 pb-2 shrink-0">
           <div className="flex items-center gap-2">
             <Link2 size={16} className="text-primary-400" />
-            <span className="text-sm font-semibold text-textPrimary">绑定群聊</span>
-            <span className="text-[10px] text-textMuted">选类型 → 勾选群 → 批量绑定（自动创建群助手）</span>
+            <span className="text-sm font-semibold text-textPrimary">绑定入口</span>
+            <span className="text-[10px] text-textMuted">选类型 → 勾选 → 批量绑定</span>
+          </div>
+          {/* Tab：群聊 / AI */}
+          <div className="flex items-center gap-1 bg-elevated rounded-lg p-0.5 shrink-0">
+            <button onClick={() => { setTab('group'); setSelected(new Set()) }} className={`inline-flex items-center gap-1 text-xs px-3 py-1 rounded-md ${tab === 'group' ? 'bg-primary-500/15 text-primary-400' : 'text-textSecondary'}`}>
+              <Users size={12} /> 群聊
+            </button>
+            <button onClick={() => { setTab('agent'); setSelected(new Set()) }} className={`inline-flex items-center gap-1 text-xs px-3 py-1 rounded-md ${tab === 'agent' ? 'bg-primary-500/15 text-primary-400' : 'text-textSecondary'}`}>
+              <Bot size={12} /> AI
+            </button>
           </div>
           <button onClick={onClose} className="p-1 text-textMuted hover:text-textPrimary transition-colors" title="关闭"><X size={16} /></button>
         </div>
@@ -150,12 +181,12 @@ export default function BindGroupModal({ worldId, initialTypeSlug, onClose, onBo
           {typeSlug && (
             <div>
               <div className="text-[10px] text-textSecondary uppercase tracking-wide font-medium mb-1.5 flex items-center gap-1"><CheckSquare size={11} className="text-primary-400" /> 2. 勾选群聊（仅显示你群主的群）</div>
-              {ownedGroups.length === 0 ? (
-                <div className="text-xs text-textMuted bg-elevated/40 rounded-xl p-3">你没有可绑定的群（需要是你创建的群）。</div>
+              {candidates.length === 0 ? (
+                <div className="text-xs text-textMuted bg-elevated/40 rounded-xl p-3">{tab === 'group' ? '你没有可绑定的群（需要是你创建的群）。' : '你没有可绑定的 AI（需要是你创建的 AI）。'}</div>
               ) : (
                 <div className="space-y-1">
-                  {ownedGroups.map((g) => {
-                    const isBound = boundGroupIds.has(g.id)
+                  {candidates.map((g: any) => {
+                    const isBound = boundIds.has(g.id)
                     const isSelected = selected.has(g.id)
                     return (
                       <label
@@ -192,7 +223,7 @@ export default function BindGroupModal({ worldId, initialTypeSlug, onClose, onBo
             className="inline-flex items-center gap-1.5 px-4 py-2 text-sm bg-primary-500 hover:bg-primary-400 text-white rounded-lg transition-colors disabled:opacity-40"
           >
             {binding ? <Loader2 size={14} className="animate-spin" /> : <Link2 size={14} />}
-            绑定 {selected.size > 0 ? `${selected.size} 个群` : ''}
+            绑定 {selected.size > 0 ? `${selected.size} 个${tab === 'group' ? '群' : 'AI'}` : ''}
           </button>
         </div>
       </div>

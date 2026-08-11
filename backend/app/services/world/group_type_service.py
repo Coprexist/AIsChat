@@ -31,6 +31,14 @@ logger = logging.getLogger(__name__)
 GROUP_TYPES_FILE = "group_types.json"          # 世界文件夹内（相对世界根目录）
 DEFAULT_ASSISTANT_SPEC = {"count": 1, "need_api": True, "default_name": "群助手"}
 
+# 默认群类型：世界还没配置 group_types.json 时兜底（开箱即用，群/AI 都可绑定；用户自定义后覆盖）
+DEFAULT_GROUP_TYPES = [
+    {"slug": "resident", "name": "居民", "description": "普通参与者：日常互动、观光体验",
+     "rules": "", "bind_limit": 10, "assistant_spec": {"count": 1, "need_api": False, "default_name": "居民助手"}},
+    {"slug": "core", "name": "核心成员", "description": "深度参与者：常驻世界、参与建设",
+     "rules": "", "bind_limit": 5, "assistant_spec": {"count": 1, "need_api": False, "default_name": "核心助手"}},
+]
+
 
 # ═══════════════════════════════════════════════════════════════
 # 文件读写（定义层）
@@ -43,13 +51,17 @@ def _types_path(world_id: int) -> Path:
 
 
 def load_group_types(world_id: int) -> list[dict]:
-    """读世界文件夹的 group_types.json（定义层）。缺失/损坏 → 空列表。"""
+    """读世界文件夹的 group_types.json（定义层）。缺失/损坏/为空 → 返回内置默认类型（开箱即用）。"""
+    import copy
     try:
         data = json.loads(_types_path(world_id).read_text(encoding="utf-8"))
         types = data.get("types", []) if isinstance(data, dict) else []
-        return [t for t in types if isinstance(t, dict) and t.get("slug")]
+        types = [t for t in types if isinstance(t, dict) and t.get("slug")]
+        if types:
+            return types
     except (OSError, json.JSONDecodeError):
-        return []
+        pass
+    return copy.deepcopy(DEFAULT_GROUP_TYPES)
 
 
 def save_group_types(world_id: int, types: list[dict]) -> None:
@@ -133,10 +145,16 @@ async def save_group_types_config(
 # 绑定群到类型 + 自动创建群助手
 # ═══════════════════════════════════════════════════════════════
 
-async def bind_group_with_type(
-    db: AsyncSession, world_id: int, owner_id: int, group_id: int, type_slug: str,
+async def bind_entry_with_type(
+    db: AsyncSession, world_id: int, owner_id: int, entity_type: str, entity_id: int, type_slug: str,
 ) -> dict:
-    """把群绑定到某类型（slug）：校验定义/上限 → 更新绑定 → 按模板自动创建群助手。"""
+    """把入口（群聊 group / AI agent）绑定到某类型（slug）：校验定义/上限 → 更新绑定。
+
+    - group：按模板自动创建群助手（幂等）
+    - agent：AI 直接绑定世界（个人专属能力），只绑定 + 类型标记，不建助手
+    """
+    if entity_type not in ("group", "agent"):
+        raise ValueError(f"仅支持绑定 group/agent，收到 {entity_type}")
     await _require_world_owner(db, world_id, owner_id)
     type_def = next((t for t in load_group_types(world_id) if t["slug"] == type_slug), None)
     if type_def is None:
@@ -145,19 +163,19 @@ async def bind_group_with_type(
     bound = (await db.execute(
         select(func.count()).select_from(WorldBinding).where(
             WorldBinding.world_id == world_id,
-            WorldBinding.entity_type == "group",
+            WorldBinding.entity_type == entity_type,
             WorldBinding.group_type_slug == type_slug,
         )
     )).scalar() or 0
     binding = (await db.execute(
         select(WorldBinding).where(
             WorldBinding.world_id == world_id,
-            WorldBinding.entity_type == "group",
-            WorldBinding.entity_id == group_id,
+            WorldBinding.entity_type == entity_type,
+            WorldBinding.entity_id == entity_id,
         )
     )).scalar_one_or_none()
     if binding is None:
-        binding = WorldBinding(world_id=world_id, entity_type="group", entity_id=group_id)
+        binding = WorldBinding(world_id=world_id, entity_type=entity_type, entity_id=entity_id)
         db.add(binding)
     elif binding.group_type_slug == type_slug:
         return {"success": True, "assistants": [], "already": True}
@@ -166,38 +184,39 @@ async def bind_group_with_type(
     binding.group_type_slug = type_slug
     await db.flush()
 
-    # 按模板自动创建群助手（幂等：该群该类型已有助手则不重复建）
-    spec = type_def["assistant_spec"]
-    count = int(spec["count"])
-    existing = (await db.execute(
-        select(WorldAgent).where(
-            WorldAgent.world_id == world_id,
-            WorldAgent.group_id == group_id,
-            WorldAgent.group_type_slug == type_slug,
-        )
-    )).scalars().all()
-    world = await db.get(World, world_id)
     created = []
-    for i in range(len(existing), count):
-        agent_id = await _create_group_assistant(db, world, group_id, type_slug, spec, i)
-        if agent_id:
-            created.append(agent_id)
+    if entity_type == "group":
+        # 按模板自动创建群助手（幂等：该群该类型已有助手则不重复建）
+        spec = type_def["assistant_spec"]
+        count = int(spec["count"])
+        existing = (await db.execute(
+            select(WorldAgent).where(
+                WorldAgent.world_id == world_id,
+                WorldAgent.group_id == entity_id,
+                WorldAgent.group_type_slug == type_slug,
+            )
+        )).scalars().all()
+        world = await db.get(World, world_id)
+        for i in range(len(existing), count):
+            agent_id = await _create_group_assistant(db, world, entity_id, type_slug, spec, i)
+            if agent_id:
+                created.append(agent_id)
     await db.commit()
-    logger.info(f"🔗 世界 #{world_id} 群 {group_id} 绑定类型「{type_def['name']}」，创建 {len(created)} 个群助手")
+    logger.info(f"🔗 世界 #{world_id} {entity_type} {entity_id} 绑定类型「{type_def['name']}」，创建 {len(created)} 个群助手")
     return {"success": True, "assistants": created}
 
 
-async def bind_groups_with_type(
-    db: AsyncSession, world_id: int, owner_id: int, group_ids: list[int], type_slug: str,
+async def bind_entries_with_type(
+    db: AsyncSession, world_id: int, owner_id: int, entity_type: str, entity_ids: list[int], type_slug: str,
 ) -> dict:
-    """批量把多个群绑定到同一类型（逐个复用 bind_group_with_type，互不影响；返回逐群结果）"""
+    """批量把多个入口（群/AI）绑定到同一类型（逐个复用 bind_entry_with_type，互不影响；返回逐条结果）"""
     results = []
-    for gid in group_ids:
+    for eid in entity_ids:
         try:
-            r = await bind_group_with_type(db, world_id, owner_id, gid, type_slug)
-            results.append({"group_id": gid, "success": True, "assistants": r.get("assistants", []), "already": r.get("already", False)})
+            r = await bind_entry_with_type(db, world_id, owner_id, entity_type, eid, type_slug)
+            results.append({"entity_id": eid, "success": True, "assistants": r.get("assistants", []), "already": r.get("already", False)})
         except ValueError as e:
-            results.append({"group_id": gid, "success": False, "error": str(e)})
+            results.append({"entity_id": eid, "success": False, "error": str(e)})
     ok = sum(1 for r in results if r["success"])
     return {"success": True, "bound": ok, "failed": len(results) - ok, "results": results}
 
