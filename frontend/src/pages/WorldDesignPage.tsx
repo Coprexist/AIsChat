@@ -6,7 +6,7 @@
  */
 import { useEffect, useState, useCallback, useRef, useMemo } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
-import { ChevronLeft, ChevronRight, Folder, FolderOpen, FolderInput, Upload, Plus, Pencil, Eye, MessageCircle, Save, MoreHorizontal, FileText, Trash2, Settings, RefreshCw, ExternalLink, BookOpen, X, Download, Archive } from 'lucide-react'
+import { ChevronLeft, ChevronRight, Folder, FolderOpen, FolderInput, Upload, Plus, Pencil, Eye, MessageCircle, Save, MoreHorizontal, FileText, Trash2, Settings, RefreshCw, ExternalLink, BookOpen, X, Download } from 'lucide-react'
 import { api } from '../api/client'
 import GroupManagerModal from '../components/GroupManagerModal'
 import WorldChatPanel, { type WorldChatHandle } from '../components/WorldChatPanel'
@@ -498,7 +498,7 @@ export default function WorldDesignPage() {
             <BookOpen size={14} />
           </button>
           <button onClick={() => setWorldZipOpen(true)} className="shrink-0 p-1.5 text-textMuted hover:text-textPrimary transition-colors" title="下载世界包（zip）">
-            <Archive size={14} />
+            <Download size={14} />
           </button>
           <button onClick={() => importZipRef.current?.click()} className="shrink-0 p-1.5 text-textMuted hover:text-textPrimary transition-colors" title="导入世界包（zip 批量导入，不动数据文件）">
             <FolderInput size={14} />
@@ -731,7 +731,7 @@ export default function WorldDesignPage() {
             <BookOpen size={15} />
           </button>
           <button onClick={() => setWorldZipOpen(true)} className="text-xs px-3 py-1 rounded transition-colors bg-elevated hover:bg-border text-textSecondary" title="下载世界包（zip）">
-            <Archive size={13} className="inline mr-1" />下载世界包
+            <Download size={13} className="inline mr-1" />下载世界包
           </button>
           <input ref={importZipRef} type="file" accept=".zip" className="hidden" onChange={handleImportZip} />
           <button onClick={() => importZipRef.current?.click()} className="text-xs px-3 py-1 rounded transition-colors bg-elevated hover:bg-border text-textSecondary" title="导入世界包（zip 批量导入，不动数据文件）">
@@ -899,7 +899,7 @@ export default function WorldDesignPage() {
                     onClick={() => setDownloadTarget({ scope: 'all', title: '下载全部' })}
                     className="inline-flex items-center gap-1 text-[11px] px-2 py-1 rounded bg-elevated text-textSecondary hover:text-textPrimary transition-colors shrink-0"
                   >
-                    <Archive size={11} /> 下载全部
+                    <Download size={11} /> 下载全部
                   </button>
                 </div>
                 <div className="flex-1 overflow-y-auto p-4 min-w-0">
@@ -964,13 +964,13 @@ export default function WorldDesignPage() {
                 onClick={() => downloadWorldZip(true)}
                 className="w-full inline-flex items-center justify-center gap-1.5 py-2.5 text-sm bg-elevated hover:bg-border text-textPrimary rounded-xl transition-colors"
               >
-                <Archive size={13} /> 含数据文件（完整备份）
+                <Download size={13} /> 含数据文件（完整备份）
               </button>
               <button
                 onClick={() => downloadWorldZip(false)}
                 className="w-full inline-flex items-center justify-center gap-1.5 py-2.5 text-sm bg-primary-500 hover:bg-primary-400 text-white rounded-xl transition-colors"
               >
-                <Archive size={13} /> 不含数据文件（代码+资源）
+                <Download size={13} /> 不含数据文件（代码+资源）
               </button>
             </div>
             <button onClick={() => setWorldZipOpen(false)} className="w-full mt-3 py-1.5 text-xs text-textMuted hover:text-textPrimary transition-colors">取消</button>
