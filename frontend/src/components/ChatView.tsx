@@ -7,7 +7,7 @@ import ChatInput from './ChatInput'
 import ActivityBar, { type ActivityUser } from './ActivityBar'
 import ProfileCard from './ProfileCard'
 import EmptyState from './EmptyState'
-import { Send, Loader2, AlertTriangle, X, ArrowDown, ArrowUp, Paperclip, FileIcon, Bot, User, MessageSquare, Inbox, Settings , Gamepad2 } from 'lucide-react'
+import { Send, Loader2, AlertTriangle, X, ArrowDown, ArrowUp, Paperclip, FileIcon, Bot, User, MessageSquare, Inbox, Settings , Gamepad2 , Globe } from 'lucide-react'
 import { getStateDotColor, CHAT_REFRESH_EVENT } from '../constants'
 import { useT } from '../i18n/I18nContext'
 import { tryOpenWorldWindow } from '../utils/worldView'
@@ -1023,7 +1023,7 @@ export default function ChatView({ conversationType, conversationId }: ChatViewP
       {worldModalOpen && boundWorldId && conversationType === 'group' && (
         <div className="absolute inset-0 z-[60] flex items-center justify-center bg-black/70 backdrop-blur-sm">
           <div className="w-full max-w-md mx-4 bg-surface rounded-2xl border border-primary-500/30 shadow-2xl p-8 text-center">
-            <div className="text-5xl mb-4">🌐</div>
+            <div className="mb-4"><Globe size={48} className="mx-auto text-primary-400" /></div>
             <h2 className="text-lg font-semibold text-textPrimary">这个群聊绑定了群视界</h2>
             <p className="text-sm text-textMuted mt-2 mb-7">世界已就绪，选择一种方式进入</p>
             <div className="space-y-2.5">
