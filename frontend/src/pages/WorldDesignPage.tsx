@@ -6,10 +6,11 @@
  */
 import { useEffect, useState, useCallback, useRef, useMemo } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
-import { ChevronLeft, ChevronRight, Folder, FolderOpen, Upload, Plus, Pencil, Eye, MessageCircle, Save, MoreHorizontal, FileText, Trash2, Settings, RefreshCw, ExternalLink } from 'lucide-react'
+import { ChevronLeft, ChevronRight, Folder, FolderOpen, Upload, Plus, Pencil, Eye, MessageCircle, Save, MoreHorizontal, FileText, Trash2, Settings, RefreshCw, ExternalLink, BookOpen, X } from 'lucide-react'
 import { api } from '../api/client'
 import GroupManagerModal from '../components/GroupManagerModal'
 import WorldChatPanel, { type WorldChatHandle } from '../components/WorldChatPanel'
+import MarkdownContent from '../components/shared/MarkdownContent'
 import WorldFileTree, { buildWorldTree, type WorldFile } from '../components/world/WorldFileTree'
 import FileContentPane, { fileTypeIcon } from '../components/world/FileContentPane'
 import WorldCreatorConfig, { type WorldCreator, type WorldUsageStats } from '../components/world/WorldCreatorConfig'
@@ -65,6 +66,28 @@ export default function WorldDesignPage() {
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
   const [msg, setMsg] = useState('')
+  // 接口文档查看（程序员用：发给世界 AI 的 md）
+  const [docsOpen, setDocsOpen] = useState(false)
+  const [docsSections, setDocsSections] = useState<{ id: string; title: string; intro: string }[]>([])
+  const [docsActive, setDocsActive] = useState<string>('')
+  const [docsContent, setDocsContent] = useState('')
+  const [docsLoading, setDocsLoading] = useState(false)
+  const openDocs = async () => {
+    setDocsOpen(true)
+    try {
+      const r = await api.get<{ sections: { id: string; title: string; intro: string }[] }>('/worlds/api-docs')
+      setDocsSections(r.sections || [])
+      if (r.sections?.length) selectDoc(r.sections[0].id)
+    } catch { /* ignore */ }
+  }
+  const selectDoc = async (id: string) => {
+    setDocsActive(id)
+    setDocsLoading(true)
+    try {
+      const r = await api.get<{ content: string }>(`/worlds/api-docs/${id}`)
+      setDocsContent(r.content || '')
+    } catch { setDocsContent('（文档读取失败）') } finally { setDocsLoading(false) }
+  }
 
   // 世界 AI 配置表单（单独表单，不属于 agent）
   const [showCreatorForm, setShowCreatorForm] = useState(false)
@@ -368,6 +391,9 @@ export default function WorldDesignPage() {
             {world.status === 'active' ? '活跃' : '休眠'}
           </span>
           <div className="flex-1" />
+          <button onClick={openDocs} className="shrink-0 p-1.5 text-textMuted hover:text-textPrimary transition-colors" title="接口文档（发给世界 AI 的 md）">
+            <BookOpen size={14} />
+          </button>
           <button onClick={publishToMarket} className="shrink-0 inline-flex items-center gap-1 text-xs text-primary-400 hover:text-primary-300 transition-colors px-2 py-1 whitespace-nowrap" title="发布到世界商城">
             <Upload size={13} /> 发布
           </button>
@@ -592,6 +618,9 @@ export default function WorldDesignPage() {
           <div className="flex-1" />
           <button onClick={() => setMode('files')} className={`text-xs px-3 py-1 rounded transition-colors ${mode === 'files' ? 'bg-primary-500 text-white' : 'bg-elevated hover:bg-border'}`}>文件</button>
           <button onClick={() => setMode('preview')} className={`text-xs px-3 py-1 rounded transition-colors ${mode === 'preview' ? 'bg-primary-500 text-white' : 'bg-elevated hover:bg-border'}`}>预览</button>
+          <button onClick={openDocs} className="p-1.5 text-textMuted hover:text-textPrimary transition-colors" title="接口文档（发给世界 AI 的 md）">
+            <BookOpen size={15} />
+          </button>
           <button onClick={publishToMarket} className="text-xs px-3 py-1 rounded transition-colors bg-elevated hover:bg-border text-primary-400" title="发布到世界商城（打包代码区）">发布</button>
           <button onClick={() => setGroupManagerOpen(true)} className="p-1.5 text-textMuted hover:text-textPrimary transition-colors" title="群类型与群助手">
             <MoreHorizontal size={16} />
@@ -710,6 +739,47 @@ export default function WorldDesignPage() {
         </div>
         </div>
       </div>}
+
+      {/* 接口文档查看（程序员用） */}
+      {docsOpen && (
+        <div className="fixed inset-0 z-50 bg-black/60 flex items-center justify-center p-4" onClick={() => setDocsOpen(false)}>
+          <div className="w-full max-w-4xl bg-surface border border-border rounded-2xl max-h-[85vh] flex flex-col shadow-xl" onClick={(e) => e.stopPropagation()}>
+            <div className="flex items-center justify-between px-4 py-3 border-b border-border shrink-0">
+              <div className="flex items-center gap-2">
+                <BookOpen size={15} className="text-primary-400" />
+                <span className="text-sm font-semibold text-textPrimary">世界 API 接口文档</span>
+                <span className="text-[10px] text-textMuted">发给世界 AI 的 md（view_api_doc 同源）</span>
+              </div>
+              <button onClick={() => setDocsOpen(false)} className="p-1 text-textMuted hover:text-textPrimary transition-colors" title="关闭"><X size={16} /></button>
+            </div>
+            <div className="flex flex-1 min-h-0">
+              {/* 分区列表 */}
+              <div className="w-52 shrink-0 border-r border-border overflow-y-auto p-2 space-y-1">
+                {docsSections.map((sec) => (
+                  <button
+                    key={sec.id}
+                    onClick={() => selectDoc(sec.id)}
+                    className={`w-full text-left px-2.5 py-2 rounded-lg transition-colors ${docsActive === sec.id ? 'bg-primary-500/15 text-primary-300' : 'hover:bg-elevated text-textSecondary'}`}
+                  >
+                    <div className="text-xs font-medium">{sec.id} {sec.title}</div>
+                    <div className="text-[10px] text-textMuted line-clamp-2 mt-0.5">{sec.intro}</div>
+                  </button>
+                ))}
+              </div>
+              {/* 内容 */}
+              <div className="flex-1 overflow-y-auto p-4 min-w-0">
+                {docsLoading ? (
+                  <div className="flex items-center justify-center py-16 text-textMuted text-sm">加载中…</div>
+                ) : (
+                  <div className="max-w-none prose prose-sm dark:prose-invert">
+                    <MarkdownContent content={docsContent} isMine={false} />
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* 群类型与群助手管理（… 菜单） */}
       {groupManagerOpen && world && (

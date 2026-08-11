@@ -1106,3 +1106,21 @@ async def export_zip(
         media_type="application/zip",
         headers={"Content-Disposition": f"attachment; filename=world_{world_id}.zip"},
     )
+
+
+
+@router.get("/api-docs")
+async def list_api_docs(current_user: dict = Depends(get_current_user)):
+    """世界 API 文档分区列表（程序员查看用：发给世界 AI 的接口文档）"""
+    from app.services.world.world_api_docs import SECTIONS
+    return {"sections": SECTIONS}
+
+
+@router.get("/api-docs/{section_id}")
+async def get_api_doc(section_id: str, current_user: dict = Depends(get_current_user)):
+    """读取某个分区的接口文档内容（防路径穿越：仅注册表内 id）"""
+    from app.services.world.world_api_docs import view_section
+    try:
+        return view_section(section_id)
+    except (ValueError, FileNotFoundError) as e:
+        raise HTTPException(status_code=404, detail=str(e))
