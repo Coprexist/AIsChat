@@ -5,7 +5,7 @@
  * 自动创建群助手（按类型模板），绑定结果逐群反馈。
  */
 import { useEffect, useMemo, useState } from 'react'
-import { X, Link2, Users, CheckSquare, Loader2 } from 'lucide-react'
+import { X, Link2, Users, CheckSquare, Loader2, AlertCircle } from 'lucide-react'
 import { api } from '../../api/client'
 
 interface GroupType {
@@ -87,12 +87,19 @@ export default function BindGroupModal({ worldId, initialTypeSlug, onClose, onBo
       const r = await api.post<{ bound: number; failed: number; results: { group_id: number; success: boolean; error?: string }[] }>(
         `/worlds/${worldId}/bind-groups`, { type_slug: typeSlug, group_ids: [...selected] },
       )
-      const errors = (r.results || []).filter((x) => !x.success).map((x) => x.error).filter(Boolean)
-      setMsg(`绑定成功 ${r.bound} 个群` + (r.failed ? `，失败 ${r.failed} 个${errors.length ? '：' + errors[0] : ''}` : ''))
       // 绑定成功的群从勾选移除 + 标记已绑
       const done = new Set((r.results || []).filter((x) => x.success).map((x) => x.group_id))
       setBoundGroupIds((prev) => { const n = new Set(prev); done.forEach((g) => n.add(g)); return n })
       setSelected((prev) => { const n = new Set(prev); done.forEach((g) => n.delete(g)); return n })
+      if (r.failed === 0) {
+        // 全部成功：直接关闭（结果已在类型/群列表上体现）
+        onBound()
+        onClose()
+        return
+      }
+      // 部分失败：留在弹窗，只提示失败的
+      const errors = (r.results || []).filter((x) => !x.success).map((x) => x.error).filter(Boolean)
+      setMsg(`${r.failed} 个群绑定失败${errors.length ? '：' + errors[0] : ''}`)
       onBound()
     } catch (e: any) {
       setMsg(`绑定失败: ${e?.message || e}`)
@@ -172,7 +179,7 @@ export default function BindGroupModal({ worldId, initialTypeSlug, onClose, onBo
               )}
             </div>
           )}
-          {msg && <div className="text-xs text-amber-400">{msg}</div>}
+          {msg && <div className="inline-flex items-center gap-1 text-xs text-rose-400"><AlertCircle size={12} className="shrink-0" /> {msg}</div>}
         </div>
 
         {/* 底部操作 */}
