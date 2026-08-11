@@ -642,7 +642,7 @@ export default function WorldDesignPage() {
         </div>
         )}
         {mode === 'files' && (
-        <div onMouseDown={fileResizeStart} className="w-1 shrink-0 cursor-col-resize hover:bg-primary-500/40 transition-colors" />
+        <div onMouseDown={fileResizeStart} className="w-1 shrink-0 cursor-col-resize hover:bg-primary-500/40 transition-colors relative z-20" />
         )}
         {/* 中列：编辑 / 预览（预览模式撑满文件树+编辑区整块） */}
         <div className="flex-1 flex flex-col min-w-0" style={{ minWidth: MIN_EDITOR }}>
@@ -701,7 +701,7 @@ export default function WorldDesignPage() {
             )}
           </div>
         </div>
-        <div onMouseDown={chatResizeStart} className="w-1 shrink-0 cursor-col-resize hover:bg-primary-500/40 transition-colors" />
+        <div onMouseDown={chatResizeStart} className="w-1 shrink-0 cursor-col-resize hover:bg-primary-500/40 transition-colors relative z-20" />
         {/* 右列：对话面板（标题已在顶部标题栏） */}
         <div ref={chatPanelRef} className="flex flex-col shrink-0 bg-surface" style={{ width: effectiveChatWidth, maxWidth: effectiveChatWidth }}>
           <div className="flex-1 min-h-0 flex flex-col">
