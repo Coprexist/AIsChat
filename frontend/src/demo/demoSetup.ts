@@ -5,7 +5,7 @@
 
 import { initDemoData, getDemoUser, updateDemoUser, getApiKey, setApiKey,
   getGroups, getGroup, getMembers, getAgents,
-  getMessages, addMessage, read, write } from './demoStorage'
+  getMessages, addMessage, read, write, blobToBase64 } from './demoStorage'
 
 const API = '/api'
 
@@ -80,7 +80,7 @@ export function setupDemo() {
     // 头像下载
     if (path.indexOf('/demo/avatar') === 0 || path.indexOf('/api/fs/download-avatar') === 0) {
       const key = 'demo_avatar_' + path.replace('/demo/avatar/', '').replace('/api/fs/download-avatar/', '')
-      const data = read(key, '')
+      const data: string = read(key, '')
       if (data) return new Response(atob(data.split(',')[1] || ''), { status: 200, headers: { 'Content-Type': 'image/jpeg' } })
       return jsonRes({}, 404)
     }

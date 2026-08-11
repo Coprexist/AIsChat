@@ -25,7 +25,7 @@ export function GroupAvatarGroup({ g }: { g: GroupAvatarData }) {
   if (mode === 'custom' && g.avatar_url) {
     return (
       <div className="w-9 h-9 rounded-lg overflow-hidden shrink-0 bg-elevated">
-        <img key={g.avatar_url} src={thumbUrl(g.avatar_url) || g.avatar_url} alt="" className="w-full h-full object-cover" loading="lazy" />
+        <img key={g.avatar_url} src={thumbUrl(g.avatar_url) || g.avatar_url || undefined} alt="" className="w-full h-full object-cover" loading="lazy" />
       </div>
     )
   }
@@ -50,7 +50,7 @@ export function GroupAvatarGroup({ g }: { g: GroupAvatarData }) {
     <div className="w-9 h-9 rounded-lg bg-elevated grid grid-cols-2 grid-rows-2 gap-px overflow-hidden shrink-0">
       {avatars.slice(0, 4).map((url, i) => (
         <div key={i} className="bg-canvas flex items-center justify-center">
-          <img src={thumbUrl(url) || url} alt="" className="w-full h-full object-cover" loading="lazy" />
+          <img src={thumbUrl(url) || url || undefined} alt="" className="w-full h-full object-cover" loading="lazy" />
         </div>
       ))}
       {avatars.length < 4 && Array.from({ length: 4 - avatars.length }).map((_, i) => (
@@ -73,7 +73,7 @@ export function GroupAvatarHeader({
   const mode = g.avatar_mode || 'default'
   const img = (
     <div className="w-8 h-8 rounded-lg overflow-hidden shrink-0 bg-elevated cursor-pointer hover:opacity-80 transition-opacity">
-      <img key={g.avatar_url} src={thumbUrl(g.avatar_url) || g.avatar_url} alt="" className="w-full h-full object-cover" loading="lazy" />
+      <img key={g.avatar_url} src={thumbUrl(g.avatar_url) || g.avatar_url || undefined} alt="" className="w-full h-full object-cover" loading="lazy" />
     </div>
   )
   const icon = (

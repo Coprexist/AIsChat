@@ -332,7 +332,7 @@ function MermaidBlock({ code, compact = false }: MermaidBlockProps) {
         <div
           ref={containerRef}
           className={isFullscreenClass}
-          dangerouslySetInnerHTML={{ __html: displaySvg }}
+          dangerouslySetInnerHTML={{ __html: displaySvg ?? '' }}
         />
       </div>
 
@@ -370,7 +370,7 @@ function MermaidBlock({ code, compact = false }: MermaidBlockProps) {
                   const e = extractCleanSvg(containerRef.current)
                   return e ? normalizeSvgWidth(e) : svg
                 })()
-                a.href = 'data:image/svg+xml,' + encodeURIComponent(raw)
+                a.href = 'data:image/svg+xml,' + encodeURIComponent(raw ?? '')
                 a.download = 'diagram.svg'
                 a.click()
               }} className="p-2 rounded-xl bg-black/30 hover:bg-black/50 text-white/80 hover:text-white transition-colors" title="下载 SVG">
@@ -384,7 +384,7 @@ function MermaidBlock({ code, compact = false }: MermaidBlockProps) {
               ref={svgWrapRef}
               className="cursor-grab active:cursor-grabbing"
               style={{ transition: 'transform 0.12s ease-out' }}
-              dangerouslySetInnerHTML={{ __html: displaySvg }}
+              dangerouslySetInnerHTML={{ __html: displaySvg ?? '' }}
             />
           </div>
         </div>

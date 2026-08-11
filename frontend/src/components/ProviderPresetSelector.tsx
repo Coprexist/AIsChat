@@ -14,6 +14,9 @@ interface Preset {
   embedding_model: string
   thinking_supported: boolean
   models: ModelOption[]
+  global_default_chat_model?: string
+  global_default_work_model?: string
+
 }
 
 interface ProviderItem {
@@ -26,6 +29,9 @@ interface ProviderItem {
   model_options: ModelOption[]
   thinking_supported: boolean
   is_default: boolean
+  global_default_chat_model?: string
+  global_default_work_model?: string
+
 }
 
 export default function ProviderPresetSelector() {
@@ -304,6 +310,8 @@ export default function ProviderPresetSelector() {
               editThinking={editThinking} setEditThinking={setEditThinking}
               editModels={editModels} setEditModels={setEditModels}
               editIsDefault={editIsDefault} setEditIsDefault={setEditIsDefault}
+              editGlobalChatModel={editGlobalChatModel} setEditGlobalChatModel={setEditGlobalChatModel}
+              editGlobalWorkModel={editGlobalWorkModel} setEditGlobalWorkModel={setEditGlobalWorkModel}
               saving={saving} saved={saved}
               onSave={handleSave}
               t={t}

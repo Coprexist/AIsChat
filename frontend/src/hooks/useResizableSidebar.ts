@@ -16,12 +16,12 @@ const RIGHT_DEFAULT = 480
 export function useResizableSidebar(
   storageKey: string,
   sidebarRef: React.RefObject<HTMLElement | null>,
-  options?: { side?: 'left' | 'right'; min?: number; max?: number },
+  options?: { side?: 'left' | 'right'; min?: number; max?: number | (() => number) },
 ) {
   const side = options?.side ?? 'left'
   const min = options?.min ?? SIDEBAR_MIN
   // max 支持 number 或函数（动态上限：拖动/窗口变化时实时算，如按其他区域保底反推）
-  const max = options?.max ?? SIDEBAR_MAX
+  const max: number | (() => number) = options?.max ?? SIDEBAR_MAX
   const resolveMax = () => (typeof max === 'function' ? max() : max)
   const [sidebarWidth, setSidebarWidth] = useState(() => {
     // max 可能是函数（动态上限）——初始化时先 resolve，避免 Math.min(函数, 值) = NaN

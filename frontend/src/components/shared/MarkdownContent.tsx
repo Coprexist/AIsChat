@@ -14,7 +14,7 @@ import CodeRenderer from './CodeRenderer'
 
 // 将行内代码重定向到独立组件，避免和代码块共用同一个 code 组件
 function remarkInlineCode() {
-  return (tree) => { visit(tree, 'inlineCode', (node) => {
+  return (tree: any) => { visit(tree, 'inlineCode', (node: any) => {
     node.data = { hName: 'inlinecode' }
   }) }
 }
@@ -61,15 +61,15 @@ export default function MarkdownContent({ content, isMine = false }: { content: 
           div: [...(defaultSchema.attributes?.div || []), 'class'],
         },
       }], rehypeKatex]}
-      components={{
+      components={{ 
         code: CodeRenderer,
-        inlinecode: ({ children }) => (
+        inlinecode: ({ children }: any) => (
           <code className="bg-black/5 dark:bg-white/10 rounded px-1 py-0.5 text-[0.85em] inline-block max-w-full break-words">{children}</code>
         ),
-        table: ({ node, ...props }) => <div className="markdown-table-wrapper"><table {...props} /></div>,
-        th: ({ node, ...props }) => <th {...props} />,
-        td: ({ node, ...props }) => <td {...props} />,
-      }}
+        table: ({ node, ...props }: any) => <div className="markdown-table-wrapper"><table {...props} /></div>,
+        th: ({ node, ...props }: any) => <th {...props} />,
+        td: ({ node, ...props }: any) => <td {...props} />,
+      } as any}
     />
   )
 }

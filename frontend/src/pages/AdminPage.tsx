@@ -440,7 +440,7 @@ function ImportCsvDialog({ onDone, onClose }: { onDone: (count: number) => void;
   }
 
   return (
-    <Modal open title={results ? null : t('admin.importCsvTitle')} onClose={onClose}>
+    <Modal open title={results ? undefined : t('admin.importCsvTitle')} onClose={onClose}>
       {results ? (
         <div className="text-sm space-y-1">
           {results.error ? (
@@ -1209,7 +1209,7 @@ function LogsTab() {
   useEffect(() => {
     api.get('/admin/logs?page_size=50').then((d) => {
       setData(d)
-      const ips = [...new Set(d.items.map((l: any) => l.ip_address).filter(Boolean))]
+      const ips: string[] = [...new Set<string>((d.items || []).map((l: any) => String(l.ip_address)).filter(Boolean))]
       const uncached = ips.filter(ip => !geoip[ip])
       if (uncached.length > 0) {
         api.post('/admin/geoip/resolve', { ips: uncached }).then(res => {

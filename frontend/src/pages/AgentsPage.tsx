@@ -45,6 +45,8 @@ interface Agent {
   avatar_url: string | null
   ai_type: string
   created_at: string
+  emotion_vectorized?: boolean
+
 }
 
 interface ConfigHistory {

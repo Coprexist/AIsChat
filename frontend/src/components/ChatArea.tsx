@@ -22,6 +22,7 @@ interface Group {
   speak_limit_per_minute: number
   speak_limit_window_seconds: number
   is_paused: boolean
+  is_pinned?: boolean
   concurrent_ai_limit: number
   my_role: string
   unread_count: number

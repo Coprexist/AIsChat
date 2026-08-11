@@ -235,7 +235,7 @@ export default function SettingsPage() {
         })
         if (visible.length > 0) {
           const id = visible[0].target.id.replace('settings-', '')
-          setActiveSection(id)
+          setActiveTab(id)
         }
       },
       { root: el, rootMargin: '-60px 0px -60% 0px', threshold: 0 }
@@ -252,7 +252,7 @@ export default function SettingsPage() {
   const [savedValues, setSavedValues] = useState<{
     apiBaseUrl: string; autoTimeout: number; autoDefault: boolean
     timezone: string; language: string; chatStyle: string; uiScale: number
-    globalChatModel?: string; globalWorkModel?: string
+    globalChatModel?: string; globalWorkModel?: string; preferOwnKey?: boolean
   } | null>(null)
 
   const hasUnsavedChanges = savedValues !== null && (
@@ -688,7 +688,7 @@ export default function SettingsPage() {
               <p className="text-xs text-textMuted mt-0.5">开启后优先使用自己的 API Key，再尝试系统额度</p>
             </div>
             <Toggle
-              enabled={preferOwnKey}
+              checked={preferOwnKey}
               onChange={setPreferOwnKey}
             />
           </div>

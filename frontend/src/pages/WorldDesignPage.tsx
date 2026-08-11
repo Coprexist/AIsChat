@@ -303,7 +303,9 @@ export default function WorldDesignPage() {
   }, [world])
 
   // ── 聊天面板内容（桌面右栏 / 移动端对话 tab 共用） ──
-  const renderChatInner = () => (
+  const renderChatInner = () => {
+    if (!world) return null
+    return (
     <>
       <div className="px-4 py-3 border-b border-border">
         <div className="flex items-center gap-2">
@@ -345,7 +347,8 @@ export default function WorldDesignPage() {
         onUnreadCountChange={setChatUnreadCount}
       />
     </>
-  )
+    )
+  }
 
   if (loading) return <div className="flex items-center justify-center h-screen text-textMuted">加载中...</div>
   if (!world) return <div className="p-8 text-textMuted">世界不存在</div>

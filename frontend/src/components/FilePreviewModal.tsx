@@ -384,7 +384,7 @@ export default function FilePreviewModal({ fileId, fileName, fileSize, mimeType,
       </button>
 
       <button
-        onClick={() => setForwardFile({ file_id: fileId, name: fileName, size: fileSize, mime_type: mimeType })}
+        onClick={() => setForwardFile({ file_id: fileId ?? 0, name: fileName, size: fileSize, mime_type: mimeType })}
         className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-border text-textSecondary hover:bg-elevated text-xs font-medium transition-colors"
         title={t('forward.send')}
       >

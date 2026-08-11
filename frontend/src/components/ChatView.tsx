@@ -572,7 +572,7 @@ export default function ChatView({ conversationType, conversationId }: ChatViewP
       if (msgEl) {
         isAutoScrolling.current = true
         // 只滚动消息容器本身（scrollIntoView 会连带滚动外层 main/Layout，把标题栏滚出视口）
-        scrollToInContainer(el, msgEl, { smooth: true })
+        scrollToInContainer(el, msgEl as HTMLElement, { smooth: true })
         setTimeout(() => { isAutoScrolling.current = false }, 500)
       }
     })
@@ -617,13 +617,14 @@ export default function ChatView({ conversationType, conversationId }: ChatViewP
   // 沉浸界面：独立窗口打开（按世界复用）——桌面 Tauri 用 WebviewWindow，网页用 window.open 新窗口
   // 失败/被拦截 → 回退应用内全屏
   const openImmersive = useCallback(() => {
+    if (boundWorldId == null) return
     const url = `/world-view/${boundWorldId}?group_id=${conversationId}`
     if ('__TAURI_INTERNALS__' in window) {
       ;(async () => {
         try {
           const { WebviewWindow } = await import('@tauri-apps/api/webviewWindow')
           const label = `world-immersive-${boundWorldId}`
-          const existing = WebviewWindow.getByLabel(label)
+          const existing = await WebviewWindow.getByLabel(label)
           if (existing) { existing.setFocus(); return }
           const win = new WebviewWindow(label, { url })
           const failTimer = setTimeout(() => { window.location.href = url }, 3000)
@@ -636,7 +637,7 @@ export default function ChatView({ conversationType, conversationId }: ChatViewP
       return
     }
     // 网页端：命名窗口（同名复用+聚焦）；WebView/被弹窗拦截（返回 null）→ 回退应用内
-    if (!tryOpenWorldWindow(boundWorldId, conversationId)) window.location.href = url
+    if (!tryOpenWorldWindow(boundWorldId, typeof conversationId === 'number' ? conversationId : undefined)) window.location.href = url
   }, [boundWorldId, conversationId])
 
   useEffect(() => {
@@ -705,7 +706,7 @@ export default function ChatView({ conversationType, conversationId }: ChatViewP
         if (msgEl) {
           isAutoScrolling.current = true
           // 只滚动消息容器本身，避免 scrollIntoView 连带滚动外层 main/Layout
-          scrollToInContainer(container, msgEl)
+          scrollToInContainer(container, msgEl as HTMLElement)
           setTimeout(() => { isAutoScrolling.current = false }, 500)
         }
       } else if (container.scrollHeight > container.clientHeight) {
