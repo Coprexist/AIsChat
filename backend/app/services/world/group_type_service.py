@@ -32,11 +32,10 @@ GROUP_TYPES_FILE = "group_types.json"          # 世界文件夹内（相对世�
 DEFAULT_ASSISTANT_SPEC = {"count": 1, "need_api": True, "default_name": "群助手"}
 
 # 默认群类型：世界还没配置 group_types.json 时兜底（开箱即用，群/AI 都可绑定；用户自定义后覆盖）
+# slug=稳定 id（绑定存 slug，改名只改 name 不影响存量绑定）
 DEFAULT_GROUP_TYPES = [
-    {"slug": "resident", "name": "居民", "description": "普通参与者：日常互动、观光体验",
-     "rules": "", "bind_limit": 10, "assistant_spec": {"count": 1, "need_api": False, "default_name": "居民助手"}},
-    {"slug": "core", "name": "核心成员", "description": "深度参与者：常驻世界、参与建设",
-     "rules": "", "bind_limit": 5, "assistant_spec": {"count": 1, "need_api": False, "default_name": "核心助手"}},
+    {"slug": "default", "name": "默认类型", "description": "未配置群类型时的兜底类型",
+     "rules": "", "bind_limit": 10, "assistant_spec": {"count": 1, "need_api": False, "default_name": "群助手"}},
 ]
 
 
