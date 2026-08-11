@@ -90,6 +90,7 @@ class WorldChatMessage(Base):
 
     id = Column(Integer, primary_key=True, autoincrement=True)
     world_id = Column(Integer, ForeignKey("worlds.id", ondelete="CASCADE"), nullable=False)
+    session_id = Column(String(32), nullable=True, index=True, comment="会话 id（NULL=默认会话，/new 后新会话独立）")
     user_id = Column(Integer, nullable=True, comment="发言用户（AI 消息为 Null）")
     role = Column(String(10), nullable=False, comment="user | ai | tool | note")
     content = Column(Text, nullable=False)

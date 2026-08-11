@@ -1102,18 +1102,17 @@ async def _do_execute(db: AsyncSession, world, name: str, arguments: str, turn_s
         except (ValueError, FileNotFoundError, json.JSONDecodeError) as e:
             return {"success": False, "error": str(e)}
     if name == "compact_context":
-        # 复用主对话的压缩服务：总结中间消息 → 存 worlds.config.chat_summary → 下次只发摘要+最近 N 条
+        # 复用主对话的压缩服务：总结中间消息 → 存 worlds.config.chat_summaries[会话] → 下次只发摘要+最近 N 条
         try:
             from app.config import settings
             from app.services.memory.context_compression_service import compress_messages
-            from app.services.world.world_chat_service import _resolve_world_credentials
+            from app.services.world.world_chat_service import _resolve_world_credentials, get_chat_history, session_key, session_id_for_db, WORLD_CHAT_KEEP_LAST, WORLD_CONTEXT_MIN_MESSAGES
             api_key, api_base = await _resolve_world_credentials(db, world)
             from app.models.world import WorldAI
             wai = (await db.execute(select(WorldAI).where(WorldAI.world_id == world.id))).scalar_one_or_none()
             model = (wai.model if wai else None) or settings.default_chat_model
-            from app.services.world.world_chat_service import get_chat_history
-            history = await get_chat_history(db, world.id, 200)
-            from app.services.world.world_chat_service import WORLD_CHAT_KEEP_LAST, WORLD_CONTEXT_MIN_MESSAGES
+            sid_db = session_id_for_db(world)
+            history = await get_chat_history(db, world.id, 200, session_id=sid_db)
             if len(history) < WORLD_CONTEXT_MIN_MESSAGES:
                 return {"success": False, "error": f"对话太短（{len(history)} 条），无需压缩"}
             msgs = [{"role": "system", "content": "世界 AI 对话"}]  # keep_system 保留
@@ -1137,7 +1136,11 @@ async def _do_execute(db: AsyncSession, world, name: str, arguments: str, turn_s
             )
             if not summary:
                 return {"success": False, "error": "摘要提取失败"}
-            world.config = {**(world.config or {}), "chat_summary": summary}
+            cfg = dict(world.config or {})
+            summaries = dict(cfg.get("chat_summaries") or {})
+            summaries[session_key(world)] = summary
+            cfg["chat_summaries"] = summaries
+            world.config = cfg
             # 能力懒加载：压缩后 effective 对齐最新（世界 skill 工具定义直接用最新的）
             try:
                 from app.services.capability_versioning import mark_effective_latest
@@ -1156,19 +1159,26 @@ async def _do_execute(db: AsyncSession, world, name: str, arguments: str, turn_s
             return {"success": False, "error": str(e)}
 
     if name == "clear_context":
-        # 清空对话上下文（历史消息 + 工作流记忆），长期记忆（world_ai_memories）保留——
-        # 清空后 AI 从 store_memory 的记忆恢复工作状态
+        # 清空当前会话上下文（历史消息 + 摘要 + 工作流记忆），其他会话保留；长期记忆（world_ai_memories）保留
         try:
             from app.models.world import WorldChatMessage
             from sqlalchemy import delete as sa_delete
-            await db.execute(sa_delete(WorldChatMessage).where(WorldChatMessage.world_id == world.id))
-            world.config = {
-                **(world.config or {}),
-                "chat_summary": None,
-                "workflow_memory": None,
-            }
+            from app.services.world.world_chat_service import session_key, session_id_for_db
+            sid_db = session_id_for_db(world)
+            q = sa_delete(WorldChatMessage).where(WorldChatMessage.world_id == world.id)
+            if sid_db is None:
+                q = q.where(WorldChatMessage.session_id.is_(None))
+            else:
+                q = q.where(WorldChatMessage.session_id == sid_db)
+            await db.execute(q)
+            cfg = dict(world.config or {})
+            summaries = dict(cfg.get("chat_summaries") or {})
+            summaries.pop(session_key(world), None)
+            cfg["chat_summaries"] = summaries
+            cfg["workflow_memory"] = None
+            world.config = cfg
             await db.commit()
-            return {"success": True, "note": "对话上下文已清空（历史消息+摘要+工作流记忆）；长期记忆保留，请从记忆恢复工作状态。"}
+            return {"success": True, "note": "当前会话上下文已清空（历史消息+摘要+工作流记忆），其他会话保留；长期记忆保留，请从记忆恢复工作状态。"}
         except Exception as e:
             logger.warning(f"🌐 世界 #{world.id} 清空上下文失败: {e}")
             return {"success": False, "error": str(e)}

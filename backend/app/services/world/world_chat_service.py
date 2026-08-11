@@ -141,13 +141,136 @@ DEFAULT_MAX_TOOL_ROUNDS = 50       # 工具循环默认上限（可在设计页�
 
 CHAT_HISTORY_LIMIT = 30  # 每次对话携带的最近消息数
 
-# "你可以问"默认预设问题（首次进入编辑页 / clear 后无对话历史时展示）
-# 优先级：管理员后台 system_settings.world_preset_suggestions（统一维护）> 此处默认
-async def get_chat_history(db: AsyncSession, world_id: int, limit: int = 30, before_id: int | None = None) -> list[dict]:
-    """世界 AI 对话历史（最近 limit 条；before_id 传最旧 id 可翻更早）"""
+
+def session_key(world) -> str:
+    """当前会话 key（world.config.current_session；无 = 默认会话 'default'）"""
+    return (world.config or {}).get("current_session") or "default"
+
+
+def session_id_for_db(world) -> str | None:
+    """落库用的 session_id：默认会话存 NULL（兼容旧数据），/new 会话存 uuid"""
+    return (world.config or {}).get("current_session") or None
+
+def session_settings(world, global_defaults: dict | None = None) -> dict:
+    """会话生命周期配置：世界配置（设计页可改）> 全局默认（管理员 system_settings）> 代码默认
+    auto_new_enabled / auto_new_time("04:00") / compact_idle_hours(18, 0=关) / retention_days(90, 0=关)"""
+    g = global_defaults or {}
+    cfg = (world.config or {}).get("session_settings") or {}
+    return {
+        "auto_new_enabled": bool(cfg.get("auto_new_enabled", g.get("auto_new_enabled", True))),
+        "auto_new_time": str(cfg.get("auto_new_time") or g.get("auto_new_time") or "04:00"),
+        "compact_idle_hours": int(cfg.get("compact_idle_hours") or g.get("compact_idle_hours") or 18),
+        "retention_days": int(cfg.get("retention_days") or g.get("retention_days") or 90),
+    }
+
+def new_session_id(world) -> str:
+    """生成会话 id：w{wid}:{type}:{uuid12}；与已存在会话碰撞则重试（uuid 防碰撞）"""
+    import uuid as _uuid
+    sessions = ((world.config or {}).get("sessions") or {})
+    typ = "m"  # 分类：m=设计页主对话（预留 g{群id}=群入口）
+    while True:
+        sid = f"w{world.id}:{typ}:{_uuid.uuid4().hex[:12]}"
+        if sid not in sessions:
+            return sid
+
+
+def touch_session(world) -> None:
+    """更新当前会话元信息（last_active_at）"""
+    from datetime import datetime, timezone
+    cfg = dict(world.config or {})
+    sessions = dict(cfg.get("sessions") or {})
+    key = (cfg.get("current_session") or "default")
+    meta = dict(sessions.get(key) or {})
+    meta["last_active_at"] = datetime.now(timezone.utc).replace(tzinfo=None).isoformat()
+    sessions[key] = meta
+    cfg["sessions"] = sessions
+    world.config = cfg
+
+
+async def ensure_session_lifecycle(db, world) -> dict:
+    """懒加载会话生命周期检查（GET/POST /chat 入口调用，无定时器）：
+
+    - auto_new：跨过每日 auto_new_time（默认 04:00）→ 自动开新会话（已 new 过不重复）
+
+    - retention：未收藏会话超过保留天数 → 删除（id+消息+列表）
+
+    - idle_compact 不在此处（放 stream_world_chat 开头，需 LLM 压缩）
+
+    返回 {auto_newed: bool, cleaned: int}"""
+    from datetime import datetime, timezone, timedelta
+    from app.models.world import WorldChatMessage
+    from sqlalchemy import delete as sa_delete
+
+    now = datetime.now(timezone.utc).replace(tzinfo=None)
+    cfg = dict(world.config or {})
+    st = session_settings(world)
+    result = {"auto_newed": False, "cleaned": 0}
+
+    # ── auto_new：跨过配置时间点 → 开新会话 ──
+    if st["auto_new_enabled"]:
+        try:
+            hh, mm = str(st["auto_new_time"]).split(":")[:2]
+            cutoff = now.replace(hour=int(hh), minute=int(mm), second=0, microsecond=0)
+        except Exception:
+            cutoff = now.replace(hour=4, minute=0, second=0, microsecond=0)
+        last = cfg.get("last_auto_new_at")
+        if last is None or last < cutoff.isoformat():
+            # 跨过时间点且今天还没 new 过 → 开新会话（旧会话保存，可切回）
+            cfg["current_session"] = new_session_id(world)
+            sessions = dict(cfg.get("sessions") or {})
+            sessions[cfg["current_session"]] = {
+                "created_at": now.isoformat(),
+                "last_active_at": now.isoformat(),
+            }
+            cfg["sessions"] = sessions
+            cfg["last_auto_new_at"] = now.isoformat()
+            world.config = cfg
+            await db.commit()
+            result["auto_newed"] = True
+
+    # ── retention：清理过期未收藏会话 ──
+    days = st["retention_days"]
+    if days > 0:
+        sessions = dict(cfg.get("sessions") or {})
+        expired = []
+        for sid, meta in sessions.items():
+            if sid == (cfg.get("current_session") or "default"):
+                continue  # 当前会话不清理
+            if (meta or {}).get("pinned_by"):
+                continue  # 收藏的会话不清理
+            la = (meta or {}).get("last_active_at")
+            if not la:
+                continue
+            try:
+                la_dt = datetime.fromisoformat(la)
+            except Exception:
+                continue
+            if now - la_dt > timedelta(days=days):
+                expired.append(sid)
+        if expired:
+            for sid in expired:
+                q = sa_delete(WorldChatMessage).where(
+                    WorldChatMessage.world_id == world.id,
+                    WorldChatMessage.session_id == sid,
+                )
+                await db.execute(q)
+                sessions.pop(sid, None)
+            cfg["sessions"] = sessions
+            world.config = cfg
+            await db.commit()
+            result["cleaned"] = len(expired)
+    return result
+
+
+async def get_chat_history(db: AsyncSession, world_id: int, limit: int = 30, before_id: int | None = None, session_id: str | None = None) -> list[dict]:
+    """世界 AI 对话历史（最近 limit 条；before_id 传最旧 id 可翻更早；session_id 过滤会话）"""
     from app.models.world import WorldChatMessage
 
     query = select(WorldChatMessage).where(WorldChatMessage.world_id == world_id)
+    if session_id is None:
+        query = query.where(WorldChatMessage.session_id.is_(None))
+    else:
+        query = query.where(WorldChatMessage.session_id == session_id)
     if before_id is not None:
         query = query.where(WorldChatMessage.id < before_id)
     query = query.order_by(WorldChatMessage.id.desc()).limit(limit)
@@ -164,7 +287,7 @@ async def get_chat_history(db: AsyncSession, world_id: int, limit: int = 30, bef
     ]
 
 
-async def _save_ai_reply(db: AsyncSession, world, content: str, reasoning: str) -> None:
+async def _save_ai_reply(db: AsyncSession, world, content: str, reasoning: str, session_id: str | None = None) -> None:
     """落库 AI 回复（含思考过程）；内容为空则跳过"""
     from app.services.world.world_service import _now
     from app.models.world import WorldChatMessage
@@ -173,6 +296,7 @@ async def _save_ai_reply(db: AsyncSession, world, content: str, reasoning: str) 
     db.add(WorldChatMessage(
         world_id=world.id, user_id=None, role="ai",
         content=content, reasoning=reasoning or None,
+        session_id=session_id,
     ))
     world.last_active_at = _now()
     await db.commit()
@@ -238,6 +362,28 @@ async def stream_world_chat(
     apply_time_compensation(world)
     await db.commit()
 
+    # ── 会话空闲自动 compact（懒加载：发消息时检查；空闲超时先压缩再继续，趁缓存最大化利用）──
+    try:
+        from datetime import datetime as _dt, timedelta as _td, timezone as _tz
+        st = session_settings(world)
+        hours = st["compact_idle_hours"]
+        if hours > 0:
+            _cfg = world.config or {}
+            _key = _cfg.get("current_session") or "default"
+            _meta = (_cfg.get("sessions") or {}).get(_key) or {}
+            _la = _meta.get("last_active_at")
+            if _la:
+                _la_dt = _dt.fromisoformat(_la)
+                _now = _dt.now(_tz.utc).replace(tzinfo=None)
+                if _now - _la_dt > _td(hours=hours):
+                    from app.services.world.world_tools import _do_execute
+                    await _do_execute(db, world, "compact_context", "{}")
+                    touch_session(world)
+                    await db.commit()
+                    logger.info(f"🌐 世界 #{world_id} 会话 {_key} 空闲 {hours}h 已自动压缩")
+    except Exception as e:
+        logger.warning(f"🌐 世界 #{world_id} 空闲自动压缩失败: {e}")
+
     from app.services.world.world_service import ensure_world_ai, take_pending_notices, CREATOR_DEFAULT_CONFIG
     wai = await ensure_world_ai(db, world_id)
     cfg = {
@@ -268,7 +414,9 @@ async def stream_world_chat(
     ) if notices else ""
 
     # ── 上下文：有压缩摘要则 摘要+最近 N 条，否则最近 30 条；接近上限时提示 AI 调 compact（与主对话一致）──
-    summary = (world.config or {}).get("chat_summary") or ""
+    sid_db = session_id_for_db(world)  # 落库用 session_id（默认会话 None）
+    summaries = (world.config or {}).get("chat_summaries") or {}
+    summary = summaries.get(session_key(world)) or ""
     # 未完成工作流记忆：上次对话中断（无最终回复）→ 本次继续，不重做
     wm = (world.config or {}).get("workflow_memory")
     if wm and wm.get("tools_done"):
@@ -277,7 +425,7 @@ async def stream_world_chat(
             "\n\n【未完成工作流】上次对话在 " + str(wm.get("interrupted_at", ""))[:19] +
             " 中断，已执行：" + done + "。请继续完成剩余工作并给出总结，不要重复已完成的步骤。"
         )
-    history = await get_chat_history(db, world_id, WORLD_CHAT_KEEP_LAST if summary else CHAT_HISTORY_LIMIT)
+    history = await get_chat_history(db, world_id, WORLD_CHAT_KEEP_LAST if summary else CHAT_HISTORY_LIMIT, session_id=sid_db)
     hist_llm = [
         {"role": "assistant" if m["role"] == "ai" else m["role"], "content": m["content"]}
         for m in history if m["role"] not in ("tool", "note")
@@ -336,7 +484,7 @@ async def stream_world_chat(
 
     # ── 落库：用户消息（批量 = 排队消息一起发，逐条气泡；先提交，即使流失败也不丢）──
     for m in msg_list:
-        db.add(WorldChatMessage(world_id=world_id, user_id=user_id, role="user", content=m))
+        db.add(WorldChatMessage(world_id=world_id, user_id=user_id, role="user", content=m, session_id=sid_db))
     try:
         await db.commit()
     except Exception as e:
@@ -347,8 +495,8 @@ async def stream_world_chat(
     if cmd_text.startswith("/") and cmd_text in ("/clear", "/compact"):
         try:
             from app.services.world.world_chat_commands import run_slash_command
-            note = await run_slash_command(db, world, cmd_text)
-            db.add(WorldChatMessage(world_id=world_id, user_id=None, role="tool", content=note))
+            note = await run_slash_command(db, world, cmd_text, user_id=user_id)
+            db.add(WorldChatMessage(world_id=world_id, user_id=None, role="tool", content=note, session_id=sid_db))
             await db.commit()
             yield f"data: [TOOL]{json.dumps({'name': cmd_text, 'success': True, 'summary': note}, ensure_ascii=False)}\n\n"
         except Exception as e:
@@ -504,6 +652,7 @@ async def stream_world_chat(
                     db.add(WorldChatMessage(
                         world_id=world_id, user_id=None, role="note",
                         content=full_content or "（…）", reasoning=full_reasoning or None,
+                        session_id=sid_db,
                     ))
                     await db.commit()
                 # 第一轮正文重置（最终以收尾轮为准）
@@ -539,7 +688,7 @@ async def stream_world_chat(
                         "tool_call_id": acc["id"] or f"call_{idx}",
                         "content": json.dumps(result, ensure_ascii=False),
                     })
-                    db.add(WorldChatMessage(world_id=world_id, user_id=None, role="tool", content=summary))
+                    db.add(WorldChatMessage(world_id=world_id, user_id=None, role="tool", content=summary, session_id=sid_db))
                     yield f"data: [TOOL]{json.dumps({'name': acc['name'], 'success': bool(result.get('success')), 'summary': summary}, ensure_ascii=False)}\n\n"
                     await db.commit()
 
@@ -572,6 +721,7 @@ async def stream_world_chat(
                             world_id=world_id, user_id=None, role="note",
                             content=(content or "（…）")[:4000],
                             reasoning=reasoning or None,
+                            session_id=sid_db,
                         ))
                         await db.commit()
                         if content:
@@ -624,7 +774,7 @@ async def stream_world_chat(
                             full_content = full_content or "（工具执行中断）"
                     else:
                         full_content = _friendly_llm_error(turn_error) if turn_error else "（对话中断：工具执行出错，请重试或换个说法）"
-                await _save_ai_reply(db, world, full_content, full_reasoning)
+                await _save_ai_reply(db, world, full_content, full_reasoning, session_id=sid_db)
                 # 工作流记忆：完整结束（有最终回复）→ 清除；中断 → 记录已做步骤，下次对话继续
                 try:
                     cfg_all = dict(world.config or {})
@@ -648,7 +798,7 @@ async def stream_world_chat(
     else:
         # ── 非工具场景：落库 AI 回复（完整内容 + 思考过程）──
         try:
-            await _save_ai_reply(db, world, full_content, full_reasoning)
+            await _save_ai_reply(db, world, full_content, full_reasoning, session_id=sid_db)
         except Exception as e:
             logger.warning(f"🌐 世界 #{world_id} 回复落库失败: {e}")
 

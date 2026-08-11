@@ -19,8 +19,13 @@ export interface ChatMsg {
 
 // 斜杠命令列表（输入 / 弹出，像 @ 提及；仅世界设计页——主站保持人性化不加）
 export const WORLD_COMMANDS = [
-  { cmd: '/clear', desc: '清空对话上下文（保留长期记忆）' },
-  { cmd: '/compact', desc: '压缩对话上下文为摘要' },
+  { cmd: '/new', desc: '开新对话（旧对话保存，可切回）' },
+  { cmd: '/sessions', desc: '列出所有会话（id + 时间 + 收藏）' },
+  { cmd: '/use <id>', desc: '切回指定会话继续对话' },
+  { cmd: '/pin', desc: '收藏当前会话（最多 16 个，不被清理）' },
+  { cmd: '/unpin', desc: '取消收藏当前会话' },
+  { cmd: '/clear', desc: '清空当前会话上下文（保留长期记忆）' },
+  { cmd: '/compact', desc: '压缩当前会话上下文为摘要' },
 ]
 
 interface UseWorldChatOptions {
@@ -55,6 +60,10 @@ export interface UseWorldChatReturn {
   insertSuggestion: (q: string) => void
   isAtBottom: boolean
   chatCanScroll: boolean
+  currentSession: string
+  sessionList: { id: string; last_active_at?: string; pinned?: boolean }[]
+  switchSession: (sid: string) => Promise<boolean>
+  togglePin: () => Promise<boolean>
   scrollToBottom: (force?: boolean) => void
   forceScrollToBottom: () => void
   unreadCount: number
@@ -67,6 +76,13 @@ export function useWorldChat({ wid, onRefresh, onMsg }: UseWorldChatOptions) {
   const [chatProcessing, setChatProcessing] = useState(false)  // 刷新后恢复：后台轮次仍在执行
   const [pendingItems, setPendingItems] = useState<{ kind: 'msg' | 'cmd'; text: string }[]>([])  // AI 处理中排队消息（msg 一起发；cmd 串行执行）
   const [suggestions, setSuggestions] = useState<string[]>([])  // "你可以"建议（AI 生成 / 兜底 / 预设）
+  // 会话（/new 开新对话、可切回；展示当前会话 id + 列表）
+  const [currentSession, setCurrentSession] = useState<string>('default')
+  const [sessionList, setSessionList] = useState<{ id: string; last_active_at?: string; pinned?: boolean }[]>([])
+  const currentSessionRef = useRef(currentSession)
+  currentSessionRef.current = currentSession
+  const sessionListRef = useRef(sessionList)
+  sessionListRef.current = sessionList
   const chatProcessingRef = useRef(false)
   const [chatHasMore, setChatHasMore] = useState(false)
   const [chatLoadingOlder, setChatLoadingOlder] = useState(false)
@@ -112,7 +128,9 @@ export function useWorldChat({ wid, onRefresh, onMsg }: UseWorldChatOptions) {
       const q = opts?.before_id ? `?before_id=${opts.before_id}&limit=30` : '?limit=30'
       // 翻页时记录原滚动位置（prepend 后补回，作用于所有面板实例）
       const heights = listElsRef.current.map((el) => el.scrollHeight)
-      const r = await api.get<{ messages: ChatMsg[]; has_more: boolean }>(`/worlds/${wid}/chat${q}`)
+      const r = await api.get<{ messages: ChatMsg[]; has_more: boolean; current_session?: string; sessions?: { id: string; last_active_at?: string; pinned?: boolean }[] }>(`/worlds/${wid}/chat${q}`)
+      if (r.current_session) setCurrentSession(r.current_session)
+      if (Array.isArray(r.sessions)) setSessionList(r.sessions)
       if (opts?.append && opts.before_id) {
         setChatMsgs((msgs) => [...(r.messages || []), ...msgs])
         requestAnimationFrame(() => {
@@ -401,6 +419,31 @@ export function useWorldChat({ wid, onRefresh, onMsg }: UseWorldChatOptions) {
     }
   }, [])
 
+  // ── 会话切换 / 收藏（/new /use /pin 的前端等价操作，走 API 不占对话轮次）──
+  const switchSession = useCallback(async (sid: string): Promise<boolean> => {
+    try {
+      const r = await api.post<{ messages: ChatMsg[]; current_session: string; sessions: { id: string; last_active_at?: string; pinned?: boolean }[] }>(
+        `/worlds/${wid}/chat/session`, { session_id: sid },
+      )
+      setCurrentSession(r.current_session)
+      if (Array.isArray(r.sessions)) setSessionList(r.sessions)
+      if (Array.isArray(r.messages)) setChatMsgs(r.messages)
+      setChatHasMore(false)
+      forceScrollToBottom()
+      return true
+    } catch { return false }
+  }, [wid, forceScrollToBottom])
+
+  const togglePin = useCallback(async (): Promise<boolean> => {
+    try {
+      const cur = currentSessionRef.current
+      const isPinned = sessionListRef.current.find((s) => s.id === cur)?.pinned
+      const r = await api.post<{ pinned: boolean; count: number }>(`/worlds/${wid}/chat/session/pin`, { pin: !isPinned })
+      setSessionList((prev) => prev.map((s) => s.id === cur ? { ...s, pinned: r.pinned } : s))
+      return r.pinned
+    } catch { return false }
+  }, [wid])
+
   // ── 发送 ──
   const sendMessages = async (texts: string[]) => {
     const list = texts.map((t) => t.trim()).filter(Boolean)
@@ -494,7 +537,7 @@ export function useWorldChat({ wid, onRefresh, onMsg }: UseWorldChatOptions) {
     chatListRef, chatInputRef, pendingItems, setPendingItems, suggestions,
     cmdActive, setCmdActive, cmdQuery, setCmdQuery, cmdIdx, setCmdIdx, cmdFiltered,
     submitText, insertSuggestion, isAtBottom, chatCanScroll, scrollToBottom, forceScrollToBottom,
-    unreadCount,
+    currentSession, sessionList, switchSession, togglePin, unreadCount,
   }
 }
 

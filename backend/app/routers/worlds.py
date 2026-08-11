@@ -78,6 +78,24 @@ class ChatRequest(BaseModel):
     messages: list[str] | None = None
 
 
+class ChatSessionRequest(BaseModel):
+    """切换会话"""
+    session_id: str
+
+
+class ChatPinRequest(BaseModel):
+    """收藏/取消收藏当前会话"""
+    pin: bool = True
+
+
+class ChatSettingsUpdate(BaseModel):
+    """会话生命周期设置（0 = 关闭对应项）"""
+    auto_new_enabled: bool | None = None
+    auto_new_time: str | None = None
+    compact_idle_hours: int | None = None
+    retention_days: int | None = None
+
+
 async def _require_owner(db: AsyncSession, world_id: int, user_id: int):
     """设计页/编辑接口：仅创建者可进入世界编辑界面"""
     from app.models.world import World
@@ -595,17 +613,35 @@ async def get_chat(
     current_user: dict = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
-    """世界 AI 对话历史（仅创建者；before_id 翻更早，has_more 判断是否还有）"""
+    """世界 AI 对话历史（仅创建者；before_id 翻更早，has_more 判断是否还有；按当前会话过滤）"""
     await _require_owner(db, world_id, current_user["user_id"])
     # 2.3：活跃埋点（动态限流按人数加成）
     from app.routers.world_proxy import record_world_activity
     record_world_activity(world_id, current_user["user_id"])
-    from app.services.world.world_service import get_chat_history
+    from app.models.world import World
+    from app.services.world.world_chat_service import get_chat_history, ensure_session_lifecycle, session_id_for_db
+    world = await db.get(World, world_id)
+    if world is None:
+        raise HTTPException(status_code=404, detail="世界不存在")
+    # 懒加载会话生命周期（auto_new / 过期清理）
+    await ensure_session_lifecycle(db, world)
+    sid = session_id_for_db(world)
     limit = max(1, min(limit, 100))
     # 多取一条判断是否还有更早
-    msgs = await get_chat_history(db, world_id, limit=limit + 1, before_id=before_id)
+    msgs = await get_chat_history(db, world_id, limit=limit + 1, before_id=before_id, session_id=sid)
     has_more = len(msgs) > limit
-    return {"messages": msgs[-limit:], "has_more": has_more}
+    cfg = world.config or {}
+    sessions = [
+        {"id": k, "created_at": (v or {}).get("created_at"), "last_active_at": (v or {}).get("last_active_at"),
+         "pinned": bool((v or {}).get("pinned_by"))}
+        for k, v in (cfg.get("sessions") or {}).items()
+    ]
+    return {
+        "messages": msgs[-limit:],
+        "has_more": has_more,
+        "current_session": cfg.get("current_session") or "default",
+        "sessions": sessions,
+    }
 
 
 @router.post("/{world_id}/chat")
@@ -620,6 +656,14 @@ async def post_chat(
     # 2.3：活跃埋点（动态限流按人数加成）
     from app.routers.world_proxy import record_world_activity
     record_world_activity(world_id, current_user["user_id"])
+    # 懒加载会话生命周期（auto_new / 过期清理）+ 活跃时间
+    from app.models.world import World
+    from app.services.world.world_chat_service import ensure_session_lifecycle, touch_session
+    world = await db.get(World, world_id)
+    if world is not None:
+        await ensure_session_lifecycle(db, world)
+        touch_session(world)
+        await db.commit()
     from app.services.world.world_turn import get_world_worker
     worker = get_world_worker(world_id)
     payload = req.messages if req.messages else ([req.message] if req.message else [])
@@ -629,6 +673,119 @@ async def post_chat(
         "queued": worker.queue_size > 1,
         "position": max(0, worker.queue_size - 1),
     }
+
+
+@router.post("/{world_id}/chat/session")
+async def switch_chat_session(
+    world_id: int,
+    req: ChatSessionRequest,
+    current_user: dict = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """切换当前会话（id 一致：切回旧会话继续对话，上下文按会话隔离）"""
+    await _require_owner(db, world_id, current_user["user_id"])
+    from app.models.world import World
+    from app.services.world.world_chat_service import get_chat_history, session_id_for_db
+    world = await db.get(World, world_id)
+    if world is None:
+        raise HTTPException(status_code=404, detail="世界不存在")
+    cfg = dict(world.config or {})
+    sessions = cfg.get("sessions") or {}
+    if req.session_id not in sessions:
+        raise HTTPException(status_code=404, detail="会话不存在")
+    cfg["current_session"] = req.session_id
+    world.config = cfg
+    await db.commit()
+    msgs = await get_chat_history(db, world_id, 30, session_id=session_id_for_db(world))
+    return {
+        "current_session": req.session_id,
+        "messages": msgs,
+        "sessions": [
+            {"id": k, "created_at": (v or {}).get("created_at"), "last_active_at": (v or {}).get("last_active_at"),
+             "pinned": bool((v or {}).get("pinned_by"))}
+            for k, v in sessions.items()
+        ],
+    }
+
+
+@router.post("/{world_id}/chat/session/pin")
+async def pin_chat_session(
+    world_id: int,
+    req: ChatPinRequest,
+    current_user: dict = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """收藏/取消收藏当前会话（每用户最多 16 个；收藏的会话不被自动清理）"""
+    await _require_owner(db, world_id, current_user["user_id"])
+    from app.models.world import World
+    world = await db.get(World, world_id)
+    if world is None:
+        raise HTTPException(status_code=404, detail="世界不存在")
+    cfg = dict(world.config or {})
+    sessions = dict(cfg.get("sessions") or {})
+    key = cfg.get("current_session") or "default"
+    meta = dict(sessions.get(key) or {})
+    pinned = list(meta.get("pinned_by") or [])
+    uid = current_user["user_id"]
+    if req.pin:
+        if uid not in pinned:
+            if len(pinned) >= 16:
+                raise HTTPException(status_code=400, detail="收藏已达上限（16 个）")
+            pinned.append(uid)
+    else:
+        if uid in pinned:
+            pinned.remove(uid)
+    meta["pinned_by"] = pinned
+    sessions[key] = meta
+    cfg["sessions"] = sessions
+    world.config = cfg
+    await db.commit()
+    return {"pinned": bool(pinned), "count": len(pinned)}
+
+
+@router.get("/{world_id}/chat/settings")
+async def get_chat_settings(
+    world_id: int,
+    current_user: dict = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """会话生命周期设置（世界级；未配置时给默认值）"""
+    await _require_owner(db, world_id, current_user["user_id"])
+    from app.models.world import World
+    from app.services.world.world_chat_service import session_settings
+    world = await db.get(World, world_id)
+    if world is None:
+        raise HTTPException(status_code=404, detail="世界不存在")
+    return session_settings(world)
+
+
+@router.put("/{world_id}/chat/settings")
+async def update_chat_settings(
+    world_id: int,
+    req: ChatSettingsUpdate,
+    current_user: dict = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """更新会话生命周期设置（设计页配置面板用）"""
+    await _require_owner(db, world_id, current_user["user_id"])
+    from app.models.world import World
+    world = await db.get(World, world_id)
+    if world is None:
+        raise HTTPException(status_code=404, detail="世界不存在")
+    cfg = dict(world.config or {})
+    st = dict(cfg.get("session_settings") or {})
+    patch = req.model_dump(exclude_none=True)
+    if "auto_new_time" in patch:
+        try:
+            hh, mm = str(patch["auto_new_time"]).split(":")[:2]
+            patch["auto_new_time"] = f"{int(hh):02d}:{int(mm):02d}"
+        except Exception:
+            raise HTTPException(status_code=400, detail="auto_new_time 格式应为 HH:MM")
+    st.update(patch)
+    cfg["session_settings"] = st
+    world.config = cfg
+    await db.commit()
+    return st
 
 
 @router.get("/{world_id}/chat/stream")

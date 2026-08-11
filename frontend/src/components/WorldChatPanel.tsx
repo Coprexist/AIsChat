@@ -74,6 +74,9 @@ const WorldChatPanel = memo(forwardRef<WorldChatHandle, WorldChatPanelProps>(({ 
     onUnreadCountChange?.(chat.unreadCount)
   }, [chat.unreadCount, onUnreadCountChange])
 
+  // ── 会话列表下拉 ──
+  const [sessionOpen, setSessionOpen] = useState(false)
+
   // ── 本地输入状态（打字时只有此组件重渲染） ──
   const [localInput, setLocalInput] = useState('')
   const localInputRef = useRef('')
@@ -288,6 +291,46 @@ const WorldChatPanel = memo(forwardRef<WorldChatHandle, WorldChatPanelProps>(({ 
                 <ArrowDown size={14} />
               )}
             </button>
+          </div>
+        )}
+      </div>
+
+      {/* 会话工具条：当前会话 + 收藏 + 新对话 + 会话列表（/new 后对话保存可切回） */}
+      <div className="flex items-center gap-1.5 px-3 py-1.5 border-t border-border bg-surface/60 text-[10px] text-textMuted relative">
+        <span className="inline-flex items-center gap-1 min-w-0 shrink-0">
+          <span className="shrink-0">📁</span>
+          <span className="truncate font-mono max-w-[140px]" title={chat.currentSession}>{chat.currentSession === 'default' ? '默认会话' : chat.currentSession}</span>
+        </span>
+        <button
+          onClick={async () => { const p = await chat.togglePin(); if (!p && onMsg) onMsg('已取消收藏（收藏的会话不会被自动清理）') }}
+          className={`shrink-0 px-1.5 py-0.5 rounded transition-colors ${chat.sessionList.find((s) => s.id === chat.currentSession)?.pinned ? 'text-amber-400 bg-amber-400/10' : 'hover:bg-elevated hover:text-textSecondary'}`}
+          title={chat.sessionList.find((s) => s.id === chat.currentSession)?.pinned ? '取消收藏' : '收藏此会话（不被自动清理）'}
+        >
+          📌
+        </button>
+        <button
+          onClick={() => chat.submitText('/new')}
+          className="shrink-0 px-1.5 py-0.5 rounded hover:bg-elevated hover:text-textSecondary transition-colors"
+          title="开新对话（旧对话保存）"
+        >＋ 新对话</button>
+        <div className="flex-1" />
+        <button
+          onClick={() => setSessionOpen((v) => !v)}
+          className="shrink-0 px-1.5 py-0.5 rounded hover:bg-elevated hover:text-textSecondary transition-colors"
+        >▾ 会话列表（{chat.sessionList.length}）</button>
+        {sessionOpen && chat.sessionList.length > 0 && (
+          <div className="absolute bottom-full right-3 mb-1 w-72 max-h-56 overflow-y-auto rounded-xl bg-elevated border border-border shadow-xl z-50">
+            <div className="px-3 py-1.5 text-[10px] text-textMuted border-b border-border">会话列表（点击切换；📌=已收藏，不会被自动清理）</div>
+            {chat.sessionList.map((s) => (
+              <button
+                key={s.id}
+                onClick={async () => { if (await chat.switchSession(s.id)) setSessionOpen(false) }}
+                className={`w-full flex items-center gap-1.5 px-3 py-1.5 text-[11px] text-left border-b border-border/40 last:border-b-0 transition-colors ${s.id === chat.currentSession ? 'bg-primary-500/15 text-primary-300' : 'hover:bg-surface text-textSecondary'}`}
+              >
+                <span className="truncate flex-1 font-mono" title={s.id}>{s.id === 'default' ? '默认会话' : s.id}</span>
+                <span className="shrink-0 text-textMuted">{s.pinned ? '📌' : ''}{s.id === chat.currentSession ? ' ←当前' : ''}</span>
+              </button>
+            ))}
           </div>
         )}
       </div>

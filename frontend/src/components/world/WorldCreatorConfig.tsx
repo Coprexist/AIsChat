@@ -4,7 +4,7 @@
  * 2026-08-10：改为 Modal 弹窗（原内联展开），对齐 GroupManagerModal 风格
  */
 import { useEffect, useState } from 'react'
-import { Save, X, Settings, Brain, SlidersHorizontal } from 'lucide-react'
+import { Save, X, Settings, Brain, SlidersHorizontal, History } from 'lucide-react'
 import { api } from '../../api/client'
 
 export interface WorldCreator {
@@ -46,6 +46,16 @@ export default function WorldCreatorConfig({ wid, creator, usageStats, onSaved, 
     max_tool_rounds: creator.max_tool_rounds ?? 50,
   })
   const [saving, setSaving] = useState(false)
+  // 会话生命周期设置（/new 自动开、空闲压缩、保留天数）
+  const [settings, setSettings] = useState<{ auto_new_enabled: boolean; auto_new_time: string; compact_idle_hours: number; retention_days: number } | null>(null)
+  const [settingsSaving, setSettingsSaving] = useState(false)
+
+  // 加载会话生命周期设置（失败静默，不阻塞表单）
+  useEffect(() => {
+    api.get<{ auto_new_enabled: boolean; auto_new_time: string; compact_idle_hours: number; retention_days: number }>(`/worlds/${wid}/chat/settings`)
+      .then((r) => setSettings(r))
+      .catch(() => { /* ignore */ })
+  }, [wid])
 
   // creator 外部更新（load 重拉）后同步表单
   useEffect(() => {
@@ -81,6 +91,20 @@ export default function WorldCreatorConfig({ wid, creator, usageStats, onSaved, 
     }
   }
 
+  const saveSettings = async () => {
+    if (!settings) return
+    setSettingsSaving(true)
+    try {
+      const updated = await api.put<typeof settings>(`/worlds/${wid}/chat/settings`, settings)
+      setSettings(updated)
+      onMsg('✅ 会话生命周期设置已保存')
+    } catch (e: any) {
+      onMsg(`保存失败: ${e?.message || e}`)
+    } finally {
+      setSettingsSaving(false)
+    }
+  }
+
   const fieldLabel = 'text-[10px] text-textMuted mb-1'
   const fieldInput = 'w-full bg-elevated text-sm p-2 rounded-lg border border-border outline-none focus:border-primary-500/50 transition-colors'
 
@@ -101,6 +125,72 @@ export default function WorldCreatorConfig({ wid, creator, usageStats, onSaved, 
 
         {/* 表单体 */}
         <div className="flex-1 overflow-y-auto px-4 py-3 space-y-3">
+          {/* 对话生命周期（/new 自动开、空闲压缩、保留天数） */}
+          {settings && (
+            <div className="bg-elevated/40 rounded-xl p-3 space-y-2.5">
+              <div className="flex items-center gap-1.5 text-[10px] font-medium text-textSecondary uppercase tracking-wide">
+                <History size={11} className="text-primary-400" /> 对话生命周期
+              </div>
+              <div className="flex items-center justify-between bg-elevated/60 rounded-lg p-2.5">
+                <div>
+                  <div className="text-xs text-textSecondary">每日自动开新对话</div>
+                  <div className="text-[10px] text-textMuted mt-0.5">跨过设定时间自动 /new（旧对话保存可切回）</div>
+                </div>
+                <div className="flex items-center gap-2 shrink-0">
+                  <input
+                    type="time"
+                    value={settings.auto_new_time}
+                    onChange={(e) => setSettings((s) => (s ? { ...s, auto_new_time: e.target.value } : s))}
+                    className="bg-elevated text-xs p-1 rounded-lg border border-border outline-none focus:border-primary-500/50"
+                  />
+                  <input
+                    type="checkbox"
+                    checked={settings.auto_new_enabled}
+                    onChange={(e) => setSettings((s) => (s ? { ...s, auto_new_enabled: e.target.checked } : s))}
+                    className="w-4 h-4 accent-primary-500"
+                  />
+                </div>
+              </div>
+              <div className="flex items-center justify-between bg-elevated/60 rounded-lg p-2.5">
+                <div>
+                  <div className="text-xs text-textSecondary">空闲自动压缩</div>
+                  <div className="text-[10px] text-textMuted mt-0.5">超过 N 小时未对话，下次发消息前自动 compact（0 = 关闭）</div>
+                </div>
+                <input
+                  type="number"
+                  min={0}
+                  max={720}
+                  value={settings.compact_idle_hours}
+                  onChange={(e) => setSettings((s) => (s ? { ...s, compact_idle_hours: Number(e.target.value) || 0 } : s))}
+                  className="w-20 bg-elevated text-sm p-1.5 rounded-lg border border-border outline-none text-right focus:border-primary-500/50"
+                  title="小时"
+                />
+              </div>
+              <div className="flex items-center justify-between bg-elevated/60 rounded-lg p-2.5">
+                <div>
+                  <div className="text-xs text-textSecondary">会话保留天数</div>
+                  <div className="text-[10px] text-textMuted mt-0.5">未收藏的会话超过 N 天未活跃将被清理（0 = 不清理）</div>
+                </div>
+                <input
+                  type="number"
+                  min={0}
+                  max={3650}
+                  value={settings.retention_days}
+                  onChange={(e) => setSettings((s) => (s ? { ...s, retention_days: Number(e.target.value) || 0 } : s))}
+                  className="w-20 bg-elevated text-sm p-1.5 rounded-lg border border-border outline-none text-right focus:border-primary-500/50"
+                  title="天"
+                />
+              </div>
+              <button
+                onClick={saveSettings}
+                disabled={settingsSaving}
+                className="w-full py-1.5 text-xs bg-elevated hover:bg-border text-textSecondary rounded-lg transition-colors disabled:opacity-40"
+              >
+                {settingsSaving ? '保存中...' : '保存会话设置'}
+              </button>
+            </div>
+          )}
+
           {/* 用量（置顶：一眼看到成本/缓存） */}
           {usageStats && (
             <div className="bg-elevated/40 rounded-xl p-3">
