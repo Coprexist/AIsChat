@@ -998,15 +998,16 @@ async def delete_file(
 async def import_zip(
     world_id: int,
     file: UploadFile,
+    exclude_content: bool = Form(True),
     current_user: dict = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
-    """zip 批量导入（仅创建者，文件夹导入接口）"""
+    """zip 批量导入（仅创建者）。exclude_content=true（默认）跳过 content/ 数据文件；false 全量覆盖含数据文件"""
     await _require_owner(db, world_id, current_user["user_id"])
     from app.services.world.world_file_service import import_zip as fs_import
     try:
         data = await file.read()
-        result = fs_import(world_id, data)
+        result = fs_import(world_id, data, exclude_content=exclude_content)
         return result
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))

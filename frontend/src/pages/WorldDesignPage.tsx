@@ -399,6 +399,7 @@ export default function WorldDesignPage() {
     } catch (err: any) { setMsg(`下载失败: ${err?.message || err}`) }
   }
   const importZipRef = useRef<HTMLInputElement>(null)
+  const [importMode, setImportMode] = useState<'safe' | 'full'>('safe')
   const handleImportZip = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const f = e.target.files?.[0]
     e.target.value = ''  // 允许重复选同一文件
@@ -408,6 +409,7 @@ export default function WorldDesignPage() {
     try {
       const fd = new FormData()
       fd.append('file', f)
+      fd.append('exclude_content', String(importMode === 'safe'))
       const r = await api.post<{ imported: number; skipped_content?: number }>(`/worlds/${worldId}/files/import`, fd)
       setMsg(`导入成功：${r?.imported ?? 0} 个文件${r?.skipped_content ? `（跳过数据文件 ${r.skipped_content}）` : ''}`)
       load()
@@ -985,15 +987,25 @@ export default function WorldDesignPage() {
           <div className="w-full max-w-xs bg-surface border border-border rounded-2xl p-5 shadow-xl" onClick={(e) => e.stopPropagation()}>
             <div className="text-sm font-semibold text-textPrimary mb-1">导入世界包</div>
             <div className="text-[10px] text-textMuted mb-3 leading-relaxed">
-              选择 zip 包批量导入世界文件。<br />
-              将覆盖除数据文件（content/）外的同名文件；数据文件自动跳过。
+              选择 zip 包批量导入世界文件。数据文件（content/）是运行产物，默认保留。
             </div>
-            <button
-              onClick={() => importZipRef.current?.click()}
-              className="w-full inline-flex items-center justify-center gap-1.5 py-2.5 text-sm bg-primary-500 hover:bg-primary-400 text-white rounded-xl transition-colors"
-            >
-              <FolderInput size={13} /> 选择 zip 文件
-            </button>
+            <div className="space-y-2">
+              <button
+                onClick={() => { setImportMode('safe'); importZipRef.current?.click() }}
+                className="w-full inline-flex items-center justify-center gap-1.5 py-2.5 text-sm bg-primary-500 hover:bg-primary-400 text-white rounded-xl transition-colors"
+              >
+                <FolderInput size={13} /> 导入（保留数据文件）
+              </button>
+              <button
+                onClick={() => { setImportMode('full'); importZipRef.current?.click() }}
+                className="w-full inline-flex items-center justify-center gap-1.5 py-2.5 text-sm bg-elevated hover:bg-border text-textPrimary rounded-xl transition-colors"
+              >
+                <FolderInput size={13} /> 导入（覆盖数据文件）
+              </button>
+            </div>
+            <div className="mt-2 text-[10px] text-textMuted leading-relaxed">
+              保留数据文件：跳过 content/，同名代码/资源覆盖；<br />覆盖数据文件：全量导入，含 content/ 同名覆盖。
+            </div>
             <button onClick={() => setWorldImportOpen(false)} className="w-full mt-3 py-1.5 text-xs text-textMuted hover:text-textPrimary transition-colors">取消</button>
           </div>
         </div>
