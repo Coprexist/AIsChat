@@ -958,22 +958,25 @@ export default function WorldDesignPage() {
       {worldZipOpen && (
         <div className="fixed inset-0 z-[70] bg-black/60 flex items-center justify-center p-4" onClick={() => setWorldZipOpen(false)}>
           <div className="w-full max-w-xs bg-surface border border-border rounded-2xl p-5 shadow-xl" onClick={(e) => e.stopPropagation()}>
-            <div className="text-sm font-semibold text-textPrimary mb-1">下载世界包</div>
-            <div className="text-[10px] text-textMuted mb-3">
-              导出为 zip，Windows 可直接解压。数据文件（content/）是运行产物。
+            <div className="flex items-center gap-2 mb-1">
+              <Download size={15} className="text-primary-400" />
+              <span className="text-sm font-semibold text-textPrimary">下载世界包</span>
             </div>
+            <div className="text-xs text-textMuted mb-4">导出为 zip 压缩包，Windows 可直接解压。</div>
             <div className="space-y-2">
               <button
                 onClick={() => downloadWorldZip(true)}
-                className="w-full inline-flex items-center justify-center gap-1.5 py-2.5 text-sm bg-elevated hover:bg-border text-textPrimary rounded-xl transition-colors"
+                className="w-full text-left px-3.5 py-3 rounded-xl border border-border bg-elevated/40 hover:bg-elevated transition-colors"
               >
-                <Download size={13} /> 含数据文件（完整备份）
+                <div className="flex items-center gap-2 text-sm text-textPrimary"><Download size={13} className="text-primary-400" /> 完整备份（含数据文件）</div>
+                <div className="text-[10px] text-textMuted mt-1 pl-5">代码 + 资源 + 运行数据（content/）</div>
               </button>
               <button
                 onClick={() => downloadWorldZip(false)}
-                className="w-full inline-flex items-center justify-center gap-1.5 py-2.5 text-sm bg-primary-500 hover:bg-primary-400 text-white rounded-xl transition-colors"
+                className="w-full text-left px-3.5 py-3 rounded-xl border border-border bg-elevated/40 hover:bg-elevated transition-colors"
               >
-                <Download size={13} /> 不含数据文件（代码+资源）
+                <div className="flex items-center gap-2 text-sm text-textPrimary"><Download size={13} className="text-primary-400" /> 仅代码与资源</div>
+                <div className="text-[10px] text-textMuted mt-1 pl-5">不含运行数据，适合分享给他人</div>
               </button>
             </div>
             <button onClick={() => setWorldZipOpen(false)} className="w-full mt-3 py-1.5 text-xs text-textMuted hover:text-textPrimary transition-colors">取消</button>
@@ -981,30 +984,30 @@ export default function WorldDesignPage() {
         </div>
       )}
 
-      {/* 世界包导入（说明覆盖规则 → 选文件） */}
+      {/* 世界包导入（选择策略 → 选文件） */}
       {worldImportOpen && (
         <div className="fixed inset-0 z-[70] bg-black/60 flex items-center justify-center p-4" onClick={() => setWorldImportOpen(false)}>
           <div className="w-full max-w-xs bg-surface border border-border rounded-2xl p-5 shadow-xl" onClick={(e) => e.stopPropagation()}>
-            <div className="text-sm font-semibold text-textPrimary mb-1">导入世界包</div>
-            <div className="text-[10px] text-textMuted mb-3 leading-relaxed">
-              选择 zip 包导入：包内文件<b className="text-textSecondary">同名替换</b>本地文件，包内没有的本地文件原样保留（增量合并）。
+            <div className="flex items-center gap-2 mb-1">
+              <FolderInput size={15} className="text-primary-400" />
+              <span className="text-sm font-semibold text-textPrimary">导入世界包</span>
             </div>
+            <div className="text-xs text-textMuted mb-4">从 zip 导入：已存在的同名文件会被替换，其余文件保持不变。</div>
             <div className="space-y-2">
               <button
                 onClick={() => { setImportMode('safe'); importZipRef.current?.click() }}
-                className="w-full inline-flex items-center justify-center gap-1.5 py-2.5 text-sm bg-primary-500 hover:bg-primary-400 text-white rounded-xl transition-colors"
+                className="w-full text-left px-3.5 py-3 rounded-xl border border-primary-500/40 bg-primary-500/10 hover:bg-primary-500/15 transition-colors"
               >
-                <FolderInput size={13} /> 导入（保留数据文件）
+                <div className="flex items-center gap-2 text-sm text-textPrimary"><FolderInput size={13} className="text-primary-400" /> 保留数据文件</div>
+                <div className="text-[10px] text-textMuted mt-1 pl-5">只替换代码与资源，运行数据（content/）不动 · 推荐</div>
               </button>
               <button
                 onClick={() => { setImportMode('full'); importZipRef.current?.click() }}
-                className="w-full inline-flex items-center justify-center gap-1.5 py-2.5 text-sm bg-elevated hover:bg-border text-textPrimary rounded-xl transition-colors"
+                className="w-full text-left px-3.5 py-3 rounded-xl border border-border bg-elevated/40 hover:bg-elevated transition-colors"
               >
-                <FolderInput size={13} /> 导入（数据文件也同名替换）
+                <div className="flex items-center gap-2 text-sm text-textPrimary"><FolderInput size={13} className="text-primary-400" /> 连同数据文件替换</div>
+                <div className="text-[10px] text-textMuted mt-1 pl-5">代码、资源、运行数据全部按包内版本替换</div>
               </button>
-            </div>
-            <div className="mt-2 text-[10px] text-textMuted leading-relaxed">
-              保留数据文件：content/ 不参与替换（推荐）；<br />数据文件也同名替换：content/ 一并参与。
             </div>
             <button onClick={() => setWorldImportOpen(false)} className="w-full mt-3 py-1.5 text-xs text-textMuted hover:text-textPrimary transition-colors">取消</button>
           </div>
