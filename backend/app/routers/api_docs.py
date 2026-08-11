@@ -118,7 +118,7 @@ async def export_docx(
     try:
         result = subprocess.run(
             ["pandoc", "-f", "markdown", "-t", "docx", "--toc", "--toc-depth=2"],
-            input=req.md, capture_output=True, timeout=30,
+            input=req.md.encode("utf-8"), capture_output=True, timeout=30,
         )
     except Exception as e:
         logger.error(f"pandoc 转换失败: {e}")
