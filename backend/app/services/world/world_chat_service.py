@@ -499,20 +499,24 @@ async def stream_world_chat(
     except Exception as e:
         logger.warning(f"🌐 世界 #{world_id} 用户消息落库失败: {e}")
 
-    # ── 用户斜杠命令（不走 LLM，仅单条）：/clear 清空上下文（保留记忆） /compact 压缩上下文 ──
+    # ── 用户斜杠命令（不走 LLM，仅单条）：命令注册表在 world_chat_commands（/clear /compact /new /sessions /use /pin /unpin）──
     cmd_text = msg_list[0] if len(msg_list) == 1 else ""
-    if cmd_text.startswith("/") and cmd_text in ("/clear", "/compact"):
+    if cmd_text.startswith("/"):
         try:
             from app.services.world.world_chat_commands import run_slash_command
             note = await run_slash_command(db, world, cmd_text, user_id=user_id)
-            db.add(WorldChatMessage(world_id=world_id, user_id=None, role="tool", content=note, session_id=sid_db))
-            await db.commit()
-            yield f"data: [TOOL]{json.dumps({'name': cmd_text, 'success': True, 'summary': note}, ensure_ascii=False)}\n\n"
         except Exception as e:
             logger.warning(f"🌐 世界 #{world_id} 命令执行失败: {e}")
             yield f"data: [ERROR]命令执行失败: {e}\n\n"
-        yield "data: [DONE]\n\n"
-        return
+            yield "data: [DONE]\n\n"
+            return
+        if note is not None:
+            db.add(WorldChatMessage(world_id=world_id, user_id=None, role="tool", content=note, session_id=sid_db))
+            await db.commit()
+            yield f"data: [TOOL]{json.dumps({'name': cmd_text, 'success': True, 'summary': note}, ensure_ascii=False)}\n\n"
+            yield "data: [DONE]\n\n"
+            return
+        # note 为 None = 非注册命令：继续走 LLM（未知斜杠当普通消息处理）
 
     from app.services.world.world_tools import WORLD_TOOLS
     from app.services.world.world_skill_runtime import build_ai_tools

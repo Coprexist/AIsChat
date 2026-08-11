@@ -60,6 +60,8 @@ export default function WorldDesignPage() {
   const [world, setWorld] = useState<World | null>(null)
   const [files, setFiles] = useState<WorldFile[]>([])
   const [currentFile, setCurrentFile] = useState<string>('')
+  const currentFileRef = useRef('')  // load 闭包读实时值（避免 useCallback 冻结导致每次 load 都跳第一个文件）
+  currentFileRef.current = currentFile
   const [content, setContent] = useState('')
   const [mode, setMode] = useState<'files' | 'preview'>('files')
   const [previewKey, setPreviewKey] = useState(0)
@@ -206,8 +208,8 @@ export default function WorldDesignPage() {
         const u = await api.get<WorldUsageStats>(`/worlds/${wid}/usage`)
         setUsageStats(u)
       } catch { /* ignore */ }
-      // 默认选中第一个文件
-      if (f.files?.length && !currentFile) {
+      // 默认选中第一个文件（仅当前确实没选中时；用 ref 读实时值，AI 工具刷新不会强制跳转）
+      if (f.files?.length && !currentFileRef.current) {
         selectFile(f.files[0].path)
       }
     } catch (e: any) {
