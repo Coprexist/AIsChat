@@ -109,15 +109,15 @@ async def _require_world_owner(db: AsyncSession, world_id: int, owner_id: int) -
     return world
 
 
-async def list_group_types(db: AsyncSession, world_id: int) -> list[dict]:
-    """类型定义 + 每类型已绑定群数（群主可见规则）。"""
+async def list_group_types(db: AsyncSession, world_id: int, entity_type: str = "group") -> list[dict]:
+    """类型定义 + 每类型已绑定数（bound_count 按 entity_type 区分：group=群 / agent=AI）。"""
     types = load_group_types(world_id)
     result = []
     for t in types:
         bound = (await db.execute(
             select(func.count()).select_from(WorldBinding).where(
                 WorldBinding.world_id == world_id,
-                WorldBinding.entity_type == "group",
+                WorldBinding.entity_type == entity_type,
                 WorldBinding.group_type_slug == t["slug"],
             )
         )).scalar() or 0

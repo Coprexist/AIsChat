@@ -57,7 +57,7 @@ export default function BindGroupModal({ worldId, initialTypeSlug, initialTab = 
     ;(async () => {
       try {
         const [t, g, w, a] = await Promise.all([
-          api.get<{ types: GroupType[] }>(`/worlds/${worldId}/group-types`),
+          api.get<{ types: GroupType[] }>(`/worlds/${worldId}/group-types?entity_type=${tab}`),
           api.get<GroupItem[]>('/groups'),
           api.get<{ bindings: { entity_type: string; entity_id: number }[] }>(`/worlds/${worldId}`),
           api.get<{ id: number; name: string; owner_id?: number }[]>('/agents'),
@@ -71,7 +71,7 @@ export default function BindGroupModal({ worldId, initialTypeSlug, initialTab = 
       } catch { /* 失败静默，弹窗可关 */ }
     })()
     return () => { cancelled = true }
-  }, [worldId])
+  }, [worldId, tab])
 
   // 可绑定群：仅「我是群主」（owner_type=human 且 owner_id=我）
   const ownedGroups = useMemo(
@@ -142,10 +142,10 @@ export default function BindGroupModal({ worldId, initialTypeSlug, initialTab = 
           </div>
           {/* Tab：群聊 / AI */}
           <div className="flex items-center gap-1 bg-elevated rounded-lg p-0.5 shrink-0">
-            <button onClick={() => { setTab('group'); setSelected(new Set()) }} className={`inline-flex items-center gap-1 text-xs px-3 py-1 rounded-md ${tab === 'group' ? 'bg-primary-500/15 text-primary-400' : 'text-textSecondary'}`}>
+            <button onClick={() => { setTab('group'); setSelected(new Set()); setTypeSlug('') }} className={`inline-flex items-center gap-1 text-xs px-3 py-1 rounded-md ${tab === 'group' ? 'bg-primary-500/15 text-primary-400' : 'text-textSecondary'}`}>
               <Users size={12} /> 群聊
             </button>
-            <button onClick={() => { setTab('agent'); setSelected(new Set()) }} className={`inline-flex items-center gap-1 text-xs px-3 py-1 rounded-md ${tab === 'agent' ? 'bg-primary-500/15 text-primary-400' : 'text-textSecondary'}`}>
+            <button onClick={() => { setTab('agent'); setSelected(new Set()); setTypeSlug('') }} className={`inline-flex items-center gap-1 text-xs px-3 py-1 rounded-md ${tab === 'agent' ? 'bg-primary-500/15 text-primary-400' : 'text-textSecondary'}`}>
               <Bot size={12} /> AI
             </button>
           </div>
@@ -155,9 +155,9 @@ export default function BindGroupModal({ worldId, initialTypeSlug, initialTab = 
         <div className="flex-1 overflow-y-auto px-4 py-3 space-y-3">
           {/* 1. 选类型 */}
           <div>
-            <div className="text-[10px] text-textSecondary uppercase tracking-wide font-medium mb-1.5 flex items-center gap-1"><Users size={11} className="text-primary-400" /> 1. 选择群类型</div>
+            <div className="text-[10px] text-textSecondary uppercase tracking-wide font-medium mb-1.5 flex items-center gap-1"><Users size={11} className="text-primary-400" /> 1. 选择{tab === 'group' ? '群类型' : 'AI 类型'}</div>
             {types.length === 0 ? (
-              <div className="text-xs text-textMuted bg-elevated/40 rounded-xl p-3">还没有群类型——先去「群类型与群助手」里创建（如 冒险团/商会/座谈会），才能给群分类。</div>
+              <div className="text-xs text-textMuted bg-elevated/40 rounded-xl p-3">{tab === 'group' ? '还没有群类型——先去「群类型与群助手」里创建（如 冒险团/商会/座谈会），才能给群分类。' : '还没有类型定义——群与 AI 共用同一套类型，先去「群类型与群助手」里创建。'}</div>
             ) : (
               <div className="space-y-1.5">
                 {types.map((t) => (
@@ -168,7 +168,7 @@ export default function BindGroupModal({ worldId, initialTypeSlug, initialTab = 
                   >
                     <div className="flex items-center justify-between">
                       <span className="text-sm text-textPrimary">{t.name}</span>
-                      <span className="text-[10px] text-textMuted">{t.bound_count ?? '?'}/{t.bind_limit} 群</span>
+                      <span className="text-[10px] text-textMuted">{t.bound_count ?? '?'}/{t.bind_limit} {tab === 'group' ? '群' : 'AI'}</span>
                     </div>
                     {t.description && <div className="text-xs text-textSecondary line-clamp-1 mt-0.5">{t.description}</div>}
                   </button>
@@ -180,7 +180,7 @@ export default function BindGroupModal({ worldId, initialTypeSlug, initialTab = 
           {/* 2. 勾选群 */}
           {typeSlug && (
             <div>
-              <div className="text-[10px] text-textSecondary uppercase tracking-wide font-medium mb-1.5 flex items-center gap-1"><CheckSquare size={11} className="text-primary-400" /> 2. 勾选群聊（仅显示你群主的群）</div>
+              <div className="text-[10px] text-textSecondary uppercase tracking-wide font-medium mb-1.5 flex items-center gap-1"><CheckSquare size={11} className="text-primary-400" /> 2. 勾选{tab === 'group' ? '群聊（仅显示你群主的群）' : 'AI（仅显示你创建的 AI）'}</div>
               {candidates.length === 0 ? (
                 <div className="text-xs text-textMuted bg-elevated/40 rounded-xl p-3">{tab === 'group' ? '你没有可绑定的群（需要是你创建的群）。' : '你没有可绑定的 AI（需要是你创建的 AI）。'}</div>
               ) : (
