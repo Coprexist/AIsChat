@@ -495,7 +495,7 @@ async def _tool_call_loop(
                 logger.info(f"AI {agent.name} 调用工具: {tool_name}({arguments})")
                 # 消息类工具推送"正在输入中…"状态
                 if tool_name in ("send_gm", "send_dm") and trigger == "user":
-                    _typing_data: dict = {"agent_id": agent.id, "agent_name": agent.name, "agent_avatar_url": agent.avatar_url, "trigger": trigger}
+                    _typing_data: dict = {"user_id": agent.user_id, "agent_name": agent.name, "agent_avatar_url": agent.avatar_url, "trigger": trigger}
                     if conversation_type == "dm" and session_id:
                         _typing_data["session_id"] = session_id
                     elif group_id is not None:

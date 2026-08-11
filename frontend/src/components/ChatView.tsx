@@ -272,19 +272,19 @@ export default function ChatView({ conversationType, conversationId }: ChatViewP
       const d = msg.data
       if (d.trigger === 'auto') return
       if (!isMessageForThisConversation(d, conversationType, conversationId)) return
-      addToMap(setThinkingAgents, d.agent_id, { name: d.agent_name, avatarUrl: d.agent_avatar_url || null })
+      addToMap(setThinkingAgents, d.user_id, { name: d.agent_name, avatarUrl: d.agent_avatar_url || null })
     } else if (msg.type === 'ai_thinking_end') {
       const d = msg.data
       if (d.trigger === 'auto') return
       if (!isMessageForThisConversation(d, conversationType, conversationId)) return
-      removeFromMap(setThinkingAgents, d.agent_id)
-      removeFromMap(setTypingAgents, d.agent_id)
+      removeFromMap(setThinkingAgents, d.user_id)
+      removeFromMap(setTypingAgents, d.user_id)
     } else if (msg.type === 'ai_typing') {
       const d = msg.data
       if (d.trigger === 'auto') return
       if (!isMessageForThisConversation(d, conversationType, conversationId)) return
-      setTimeout(() => removeFromMap(setThinkingAgents, d.agent_id), 1500)
-      addToMap(setTypingAgents, d.agent_id, { name: d.agent_name, avatarUrl: d.agent_avatar_url || null })
+      setTimeout(() => removeFromMap(setThinkingAgents, d.user_id), 1500)
+      addToMap(setTypingAgents, d.user_id, { name: d.agent_name, avatarUrl: d.agent_avatar_url || null })
     } else if (msg.type === 'typing') {
       // 人类打字状态
       const d = msg.data

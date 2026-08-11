@@ -661,7 +661,7 @@ async def _maybe_trigger_ai_reply(
             {
                 "type": "ai_thinking",
                 "data": {
-                    "agent_id": agent.id,
+                    "user_id": agent.user_id,
                     "agent_name": agent.name,
                     "agent_avatar_url": agent.avatar_url,
                     "group_id": group_id,
@@ -698,7 +698,7 @@ async def _maybe_trigger_ai_reply(
             {
                 "type": "ai_thinking_end",
                 "data": {
-                    "agent_id": agent.id,
+                    "user_id": agent.user_id,
                     "agent_name": agent.name,
                     "agent_avatar_url": agent.avatar_url,
                     "group_id": group_id,
