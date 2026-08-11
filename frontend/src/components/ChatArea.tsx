@@ -131,7 +131,7 @@ export default function ChatArea({ groupId, dmSessionId }: ChatAreaProps) {
         />
         {/* 拖拽手柄（仅桌面端） */}
         <div
-          className="hidden md:block absolute top-0 -right-1.5 w-1.5 h-full cursor-col-resize hover:bg-primary-400/30 active:bg-primary-400/50 transition-colors z-10"
+          className="hidden md:block absolute top-0 -right-1.5 w-1.5 h-full cursor-col-resize hover:bg-primary-400/30 active:bg-primary-400/50 transition-colors z-[70]"
           onMouseDown={handleResizeStart}
         />
       </div>
