@@ -13,7 +13,7 @@ from fastapi import APIRouter, Depends, HTTPException, Response
 from pydantic import BaseModel
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.database import async_session as _async_session
+from app.database import get_db
 from app.routers.auth import get_current_user
 
 logger = logging.getLogger(__name__)
@@ -68,7 +68,7 @@ async def list_api_docs(current_user: dict = Depends(get_current_user)):
 @router.get("/status")
 async def export_status(
     current_user: dict = Depends(get_current_user),
-    db: AsyncSession = Depends(_async_session),
+    db: AsyncSession = Depends(get_db),
 ):
     """导出能力状态：docx 是否可用 + 当前用户是否管理员（未装时管理员看安装提示，普通用户不显示）"""
     from app.models.user import User
@@ -85,7 +85,7 @@ async def export_status(
 @router.post("/install")
 async def install_pandoc(
     current_user: dict = Depends(get_current_user),
-    db: AsyncSession = Depends(_async_session),
+    db: AsyncSession = Depends(get_db),
 ):
     """管理员在线安装 pandoc（apt-get，后台执行；轮询 export/status 看 installing/ok）"""
     from app.models.user import User
