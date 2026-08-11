@@ -6,7 +6,7 @@
  */
 import { useEffect, useState, useCallback, useRef, useMemo } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
-import { ChevronLeft, ChevronRight, Folder, FolderOpen, Upload, Plus, Pencil, Eye, MessageCircle, Save, MoreHorizontal, FileText, Trash2, Settings, RefreshCw, ExternalLink, BookOpen, X } from 'lucide-react'
+import { ChevronLeft, ChevronRight, Folder, FolderOpen, Upload, Plus, Pencil, Eye, MessageCircle, Save, MoreHorizontal, FileText, Trash2, Settings, RefreshCw, ExternalLink, BookOpen, X, Download, Archive } from 'lucide-react'
 import { api } from '../api/client'
 import GroupManagerModal from '../components/GroupManagerModal'
 import WorldChatPanel, { type WorldChatHandle } from '../components/WorldChatPanel'
@@ -87,6 +87,26 @@ export default function WorldDesignPage() {
       const r = await api.get<{ content: string }>(`/worlds/api-docs/${id}`)
       setDocsContent(r.content || '')
     } catch { setDocsContent('（文档读取失败）') } finally { setDocsLoading(false) }
+  }
+  // 下载文档（md 文件）
+  const downloadDoc = (content: string, filename: string) => {
+    const blob = new Blob([content], { type: 'text/markdown;charset=utf-8' })
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = filename
+    a.click()
+    URL.revokeObjectURL(url)
+  }
+  const downloadAllDocs = async () => {
+    const parts = ['# AIsChat 世界 API 接口文档\n']
+    for (const sec of docsSections) {
+      try {
+        const r = await api.get<{ content: string }>(`/worlds/api-docs/${sec.id}`)
+        parts.push(`\n\n---\n\n# ${sec.id} ${sec.title}\n\n` + (r.content || ''))
+      } catch { /* 单区失败跳过 */ }
+    }
+    downloadDoc(parts.join('\n'), 'aischat-world-api-docs.md')
   }
 
   // 世界 AI 配置表单（单独表单，不属于 agent）
@@ -767,7 +787,26 @@ export default function WorldDesignPage() {
                 ))}
               </div>
               {/* 内容 */}
-              <div className="flex-1 overflow-y-auto p-4 min-w-0">
+              <div className="flex-1 flex flex-col min-w-0">
+                <div className="flex items-center gap-2 px-4 py-2 border-b border-border shrink-0">
+                  <span className="text-xs text-textSecondary truncate flex-1">
+                    {docsSections.find((s) => s.id === docsActive)?.title || '接口文档'}
+                  </span>
+                  <button
+                    onClick={() => downloadDoc(docsContent, `api-doc-${docsActive || 'all'}.md`)}
+                    disabled={!docsContent || docsLoading}
+                    className="inline-flex items-center gap-1 text-[11px] px-2 py-1 rounded bg-elevated text-textSecondary hover:text-textPrimary transition-colors disabled:opacity-40 shrink-0"
+                  >
+                    <Download size={11} /> 下载此分区
+                  </button>
+                  <button
+                    onClick={downloadAllDocs}
+                    className="inline-flex items-center gap-1 text-[11px] px-2 py-1 rounded bg-elevated text-textSecondary hover:text-textPrimary transition-colors shrink-0"
+                  >
+                    <Archive size={11} /> 下载全部
+                  </button>
+                </div>
+                <div className="flex-1 overflow-y-auto p-4 min-w-0">
                 {docsLoading ? (
                   <div className="flex items-center justify-center py-16 text-textMuted text-sm">加载中…</div>
                 ) : (
@@ -775,6 +814,7 @@ export default function WorldDesignPage() {
                     <MarkdownContent content={docsContent} isMine={false} />
                   </div>
                 )}
+                </div>
               </div>
             </div>
           </div>
