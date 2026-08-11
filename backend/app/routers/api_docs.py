@@ -5,9 +5,13 @@
 
 导出：md 直接下载；docx 走 pandoc（可选能力——容器装了 pandoc 才可用）。
 """
+import io
 import logging
+import os
+import re
 import shutil
 import subprocess
+import zipfile
 
 from fastapi import APIRouter, Depends, HTTPException, Response
 from pydantic import BaseModel
@@ -21,6 +25,67 @@ logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/kb", tags=["接口文档"])
 
 DOCX_MEDIA = "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+
+# ── docx 表格边框模板（pandoc 默认 reference.docx 的 Table 样式无边框，丑）──
+_REF_DOCX_PATH = "/tmp/docx-ref-bordered.docx"
+_TBL_BORDERS = (
+    "<w:tblBorders>"
+    '<w:top w:val="single" w:sz="4" w:space="0" w:color="auto"/>'
+    '<w:left w:val="single" w:sz="4" w:space="0" w:color="auto"/>'
+    '<w:bottom w:val="single" w:sz="4" w:space="0" w:color="auto"/>'
+    '<w:right w:val="single" w:sz="4" w:space="0" w:color="auto"/>'
+    '<w:insideH w:val="single" w:sz="4" w:space="0" w:color="auto"/>'
+    '<w:insideV w:val="single" w:sz="4" w:space="0" w:color="auto"/>'
+    "</w:tblBorders>"
+)
+
+
+def _ensure_ref_docx() -> str:
+    """生成带表格边框的 pandoc reference docx（基于默认模板改 styles.xml，缓存 /tmp）"""
+    if os.path.exists(_REF_DOCX_PATH):
+        return _REF_DOCX_PATH
+    try:
+        proc = subprocess.run(
+            ["pandoc", "--print-default-data-file", "reference.docx"],
+            capture_output=True, timeout=15,
+        )
+        if proc.returncode != 0:
+            return ""
+        zin = zipfile.ZipFile(io.BytesIO(proc.stdout))
+        styles = zin.read("word/styles.xml").decode("utf-8")
+
+        def add_borders(m: re.Match) -> str:
+            block = m.group(0)
+            if "<w:tblBorders>" in block:
+                return block
+            if "<w:tblPr" in block and "</w:tblPr>" in block:
+                return block.replace("</w:tblPr>", _TBL_BORDERS + "</w:tblPr>", 1)
+            return block
+
+        # 默认表格样式：w:type="table" 且 w:default="1"（pandoc reference.docx 的 Table）
+        styles2 = re.sub(
+            r'<w:style [^>]*w:type="table"[^>]*w:default="1".*?</w:style>',
+            add_borders, styles, flags=re.S,
+        )
+        if styles2 == styles:
+            # 兜底：按 styleId="Table" 匹配
+            styles2 = re.sub(
+                r'<w:style [^>]*w:type="table"[^>]*w:styleId="Table".*?</w:style>',
+                add_borders, styles, flags=re.S,
+            )
+        buf = io.BytesIO()
+        with zipfile.ZipFile(buf, "w", zipfile.ZIP_DEFLATED) as zout:
+            for item in zin.infolist():
+                content = zin.read(item.filename)
+                if item.filename == "word/styles.xml":
+                    content = styles2.encode("utf-8")
+                zout.writestr(item, content)
+        with open(_REF_DOCX_PATH, "wb") as f:
+            f.write(buf.getvalue())
+        return _REF_DOCX_PATH
+    except Exception:
+        logger.warning("生成 docx 边框模板失败，退回无模板", exc_info=True)
+        return ""
 
 # pandoc 在线安装状态（内存态；重启后 pandoc 已装则 docx_available 直接为 True）
 _INSTALL_STATE: dict = {"running": False, "ok": False, "error": "", "started_at": ""}
@@ -116,8 +181,12 @@ async def export_docx(
     if not docx_available():
         raise HTTPException(status_code=400, detail="docx 导出未安装（需要 pandoc）")
     try:
+        cmd = ["pandoc", "-f", "markdown", "-t", "docx", "--toc", "--toc-depth=2"]
+        ref = _ensure_ref_docx()
+        if ref:
+            cmd.append(f"--reference-doc={ref}")
         result = subprocess.run(
-            ["pandoc", "-f", "markdown", "-t", "docx", "--toc", "--toc-depth=2"],
+            cmd,
             input=req.md.encode("utf-8"), capture_output=True, timeout=30,
         )
     except Exception as e:

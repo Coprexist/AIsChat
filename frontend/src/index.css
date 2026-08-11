@@ -46,6 +46,11 @@
 /* 滚动条 */
   --tw-scrollbar-thumb: 42 37 64;  /* #2A2540 */
   --tw-scrollbar-thumb-hover: 61 53 96; /* #3D3560 */
+
+  /* Markdown 表格（文档弹窗等未注入 inline 变量的场景；气泡会 inline 覆盖） */
+  --b-thead-r: 55; --b-thead-g: 45; --b-thead-b: 70; --b-thead-a: 1;
+  --b-zebra-r: 48; --b-zebra-g: 40; --b-zebra-b: 60; --b-zebra-a: 0.5;
+  --b-hover-r: 55; --b-hover-g: 45; --b-hover-b: 70; --b-hover-a: 0.8;
 }
 
 @layer base {
