@@ -6,7 +6,7 @@
  */
 import { useEffect, useState, useCallback, useRef, useMemo } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
-import { ChevronLeft, ChevronRight, Folder, FolderOpen, Upload, Plus, Pencil, Eye, MessageCircle, Save, MoreHorizontal, FileText, Trash2, Settings } from 'lucide-react'
+import { ChevronLeft, ChevronRight, Folder, FolderOpen, Upload, Plus, Pencil, Eye, MessageCircle, Save, MoreHorizontal, FileText, Trash2, Settings, RefreshCw, ExternalLink } from 'lucide-react'
 import { api } from '../api/client'
 import GroupManagerModal from '../components/GroupManagerModal'
 import WorldChatPanel, { type WorldChatHandle } from '../components/WorldChatPanel'
@@ -422,12 +422,12 @@ export default function WorldDesignPage() {
           <div className="flex-1 flex flex-col min-h-0">
             <div className="px-3 py-1.5 text-xs text-textSecondary bg-surface/60 border-b border-border flex items-center gap-2">
               <span className="truncate flex-1">世界预览（/world/{wid}/preview）</span>
-              <button onClick={() => setPreviewKey((k) => k + 1)} className="text-primary-400 hover:text-primary-300 transition-colors shrink-0" title="刷新预览">↻ 刷新</button>
+              <button onClick={() => setPreviewKey((k) => k + 1)} className="text-primary-400 hover:text-primary-300 transition-colors shrink-0" title="刷新预览"><RefreshCw size={12} /> 刷新</button>
               <button
                 onClick={() => { if (!tryOpenWorldWindow(wid)) navigate(`/world-view/${wid}`) }}
-                className="text-primary-400 hover:text-primary-300 transition-colors shrink-0"
+                className="inline-flex items-center gap-1 text-primary-400 hover:text-primary-300 transition-colors shrink-0"
                 title="在沉浸界面新窗口打开（WebView 下自动应用内跳转）"
-              >↗ 沉浸窗口</button>
+              ><ExternalLink size={12} /> 沉浸窗口</button>
             </div>
             <iframe
               key={previewKey}
@@ -679,13 +679,13 @@ export default function WorldDesignPage() {
               <div className="h-full flex flex-col">
                 <div className="px-3 py-1.5 text-xs text-textSecondary bg-surface/60 border-b border-border flex items-center gap-2">
                   <span className="truncate flex-1">世界预览（/world/{wid}/preview）</span>
-                  <button onClick={() => setPreviewKey((k) => k + 1)} className="text-primary-400 hover:text-primary-300 transition-colors shrink-0" title="刷新预览">↻ 刷新</button>
+                  <button onClick={() => setPreviewKey((k) => k + 1)} className="text-primary-400 hover:text-primary-300 transition-colors shrink-0" title="刷新预览"><RefreshCw size={12} /> 刷新</button>
                   <button
                     onClick={() => { if (!tryOpenWorldWindow(wid)) navigate(`/world-view/${wid}`) }}
-                    className="text-primary-400 hover:text-primary-300 transition-colors shrink-0"
+                    className="inline-flex items-center gap-1 text-primary-400 hover:text-primary-300 transition-colors shrink-0"
                     title="在沉浸界面新窗口打开（WebView 下自动应用内跳转）"
                   >
-                    ↗ 沉浸窗口
+                    <ExternalLink size={12} /> 沉浸窗口
                   </button>
                 </div>
                 <iframe
