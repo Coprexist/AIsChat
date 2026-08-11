@@ -210,9 +210,12 @@ async def ensure_session_lifecycle(db, world) -> dict:
     if st["auto_new_enabled"]:
         try:
             hh, mm = str(st["auto_new_time"]).split(":")[:2]
-            cutoff = now.replace(hour=int(hh), minute=int(mm), second=0, microsecond=0)
+            today_cutoff = now.replace(hour=int(hh), minute=int(mm), second=0, microsecond=0)
         except Exception:
-            cutoff = now.replace(hour=4, minute=0, second=0, microsecond=0)
+            today_cutoff = now.replace(hour=4, minute=0, second=0, microsecond=0)
+        # 最近一次应 new 的时间点：现在未到今天的配置点（凌晨）→ 取昨天的；否则取今天的
+        # ⚠️ 若直接取「今天」的配置点，凌晨时它在未来 → last 永远 < cutoff → 每次访问都开新会话（会话爆炸）
+        cutoff = today_cutoff - timedelta(days=1) if now < today_cutoff else today_cutoff
         last = cfg.get("last_auto_new_at")
         if last is None or last < cutoff.isoformat():
             # 跨过时间点且今天还没 new 过 → 开新会话（旧会话保存，可切回）

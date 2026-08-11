@@ -320,7 +320,7 @@ const WorldChatPanel = memo(forwardRef<WorldChatHandle, WorldChatPanelProps>(({ 
         ><ChevronDown size={11} /> 会话列表（{chat.sessionList.length}）</button>
         {sessionOpen && chat.sessionList.length > 0 && (
           <div className="absolute bottom-full right-3 mb-1 w-72 max-h-56 overflow-y-auto rounded-xl bg-elevated border border-border shadow-xl z-50">
-            <div className="px-3 py-1.5 text-[10px] text-textMuted border-b border-border">会话列表（点击切换；📌=已收藏，不会被自动清理）</div>
+            <div className="px-3 py-1.5 text-[10px] text-textMuted border-b border-border flex items-center gap-1">会话列表（点击切换；<Pin size={9} className="text-amber-400 fill-current" />=已收藏，不会被自动清理）</div>
             {chat.sessionList.map((s) => (
               <button
                 key={s.id}
@@ -328,7 +328,7 @@ const WorldChatPanel = memo(forwardRef<WorldChatHandle, WorldChatPanelProps>(({ 
                 className={`w-full flex items-center gap-1.5 px-3 py-1.5 text-[11px] text-left border-b border-border/40 last:border-b-0 transition-colors ${s.id === chat.currentSession ? 'bg-primary-500/15 text-primary-300' : 'hover:bg-surface text-textSecondary'}`}
               >
                 <span className="truncate flex-1 font-mono" title={s.id}>{s.id === 'default' ? '默认会话' : s.id}</span>
-                <span className="shrink-0 flex items-center gap-1 text-textMuted">{s.pinned ? <Pin size={10} className="text-amber-400 fill-current" /> : ''}{s.id === chat.currentSession ? ' ←当前' : ''}</span>
+                <span className="shrink-0 flex items-center gap-1 text-textMuted">{s.pinned ? <Pin size={10} className="text-amber-400 fill-current" /> : ''}{s.id === chat.currentSession ? '当前' : ''}</span>
               </button>
             ))}
           </div>

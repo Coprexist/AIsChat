@@ -636,6 +636,16 @@ async def get_chat(
          "pinned": bool((v or {}).get("pinned_by"))}
         for k, v in (cfg.get("sessions") or {}).items()
     ]
+    # 默认会话（旧数据无 session_id）若还有消息，也进列表（否则点哪个都空、默认会话找不到）
+    from sqlalchemy import func as _f
+    from app.models.world import WorldChatMessage as _WCM
+    has_default = (await db.execute(
+        select(_f.count()).select_from(_WCM).where(
+            _WCM.world_id == world_id, _WCM.session_id.is_(None),
+        )
+    )).scalar() or 0
+    if has_default:
+        sessions.insert(0, {"id": "default", "last_active_at": None, "pinned": bool((cfg.get("sessions") or {}).get("default", {}).get("pinned_by"))})
     return {
         "messages": msgs[-limit:],
         "has_more": has_more,
@@ -691,20 +701,31 @@ async def switch_chat_session(
         raise HTTPException(status_code=404, detail="世界不存在")
     cfg = dict(world.config or {})
     sessions = cfg.get("sessions") or {}
-    if req.session_id not in sessions:
+    # default 会话始终可切（旧数据）；其他会话须存在于列表
+    if req.session_id != "default" and req.session_id not in sessions:
         raise HTTPException(status_code=404, detail="会话不存在")
-    cfg["current_session"] = req.session_id
+    cfg["current_session"] = None if req.session_id == "default" else req.session_id
     world.config = cfg
     await db.commit()
     msgs = await get_chat_history(db, world_id, 30, session_id=session_id_for_db(world))
+    from sqlalchemy import func as _f
+    from app.models.world import WorldChatMessage as _WCM
+    has_default = (await db.execute(
+        select(_f.count()).select_from(_WCM).where(
+            _WCM.world_id == world_id, _WCM.session_id.is_(None),
+        )
+    )).scalar() or 0
+    out = [
+        {"id": k, "created_at": (v or {}).get("created_at"), "last_active_at": (v or {}).get("last_active_at"),
+         "pinned": bool((v or {}).get("pinned_by"))}
+        for k, v in sessions.items()
+    ]
+    if has_default:
+        out.insert(0, {"id": "default", "last_active_at": None, "pinned": bool(sessions.get("default", {}).get("pinned_by"))})
     return {
         "current_session": req.session_id,
         "messages": msgs,
-        "sessions": [
-            {"id": k, "created_at": (v or {}).get("created_at"), "last_active_at": (v or {}).get("last_active_at"),
-             "pinned": bool((v or {}).get("pinned_by"))}
-            for k, v in sessions.items()
-        ],
+        "sessions": out,
     }
 
 
