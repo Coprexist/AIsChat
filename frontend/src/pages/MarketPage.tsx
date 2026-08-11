@@ -143,6 +143,8 @@ export default function MarketPage() {
 
   useEffect(() => { loadLocal() }, [loadLocal])
   useEffect(() => { loadBind() }, [loadBind])
+  // 挂载即预加载 GitHub 快照（tab 徽标显示真实数量，而不是初始 0）；切到 GitHub tab 时再刷一次
+  useEffect(() => { loadGithub() }, [loadGithub])
   useEffect(() => { if (tab === 'github') loadGithub() }, [tab, loadGithub])
 
   // 当前用户 id（操作权限判断）
