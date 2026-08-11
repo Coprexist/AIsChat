@@ -4,7 +4,7 @@
 > **版本**：v1.0 ｜ **日期**：2026-08-05
 > **接口规范**：RESTful + JSON，认证统一 `Authorization: Bearer <JWT>`
 
-> 📌 本文档为**索引**。接口详细内容按**功能分区**存放：运行时可编辑副本在 `data/world_api_docs/`（后端 `view_api_doc` 工具读取的位置），分区文件 `sections/01-*.md` … `sections/09-*.md`。**AI 只拿到本索引的区名与区介绍，自行选择打开哪个分区。**
+> 📌 本文档为**索引**。接口详细内容按**功能分区**存放：运行时文档在代码区 `backend/app/services/world/api_docs/`（后端 `view_api_doc` 工具读取的位置，随代码 git 跟踪），分区文件 `sections/01-*.md` … `sections/09-*.md`。**AI 只拿到本索引的区名与区介绍，自行选择打开哪个分区。**
 
 ---
 

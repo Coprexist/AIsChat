@@ -13,7 +13,8 @@ from pathlib import Path
 
 logger = logging.getLogger(__name__)
 
-DOCS_ROOT = Path("data/world_api_docs")
+# 文档随代码走（git 跟踪；__file__ 相对，不依赖 cwd）
+DOCS_ROOT = Path(__file__).resolve().parent / "api_docs"
 SECTIONS_DIR = DOCS_ROOT / "sections"
 
 # 分区注册表（id → 标题/文件名/区介绍）——工具 description 与 view_section 共用同一份
