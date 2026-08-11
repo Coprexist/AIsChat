@@ -4,7 +4,9 @@ AI群聊社交网络 - FastAPI 主应用入口
 import asyncio
 import json
 import logging
+import os
 from contextlib import asynccontextmanager
+from pathlib import Path
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from app.config import settings
@@ -32,7 +34,7 @@ async def _start_browser_service():
         else:
             logger.warning("⚠️  Chromium CDP 启动失败，browser 命令将不可用")
     except Exception as e:
-        logger.warning(f"⚠️  浏览器服务启动失败（非致命）: {e}")
+        logger.warning(f"⚠️  浏览器服务启动失败（非致命）: {e}", exc_info=True)
 
 
 async def _stop_browser_service():
@@ -45,13 +47,17 @@ async def _stop_browser_service():
     except Exception:
         pass
 
-# 配置日志
+# 配置日志（路径可配：LOG_FILE env，默认后端目录 app.log）
+_LOG_FILE = os.environ.get(
+    "LOG_FILE",
+    str(Path(__file__).resolve().parent.parent / "app.log"),
+)
 logging.basicConfig(
     level=logging.INFO,
     format="%(asctime)s [%(levelname)s] %(name)s: %(message)s",
     handlers=[
         logging.StreamHandler(),
-        logging.FileHandler("app.log", encoding="utf-8"),
+        logging.FileHandler(_LOG_FILE, encoding="utf-8"),
     ],
 )
 logger = logging.getLogger(__name__)
@@ -86,7 +92,7 @@ async def lifespan(app: FastAPI):
             v = await ensure_platform_version(cap_db)
             logger.info(f"🧬 平台能力版本: v{v}")
     except Exception as e:
-        logger.warning(f"⚠️ 平台能力版本化失败（不影响启动）: {e}")
+        logger.warning(f"⚠️ 平台能力版本化失败（不影响启动）: {e}", exc_info=True)
 
     # 启动时将 last_active_at=NULL 标记为当前时间（服务器重启前在线的用户）
     from app.database import async_session
@@ -100,7 +106,7 @@ async def lifespan(app: FastAPI):
             await startup_db.commit()
         logger.info("✅ 已重置在线用户的上次活跃时间")
     except Exception as e:
-        logger.warning(f"⚠️ 重置在线用户活跃时间失败: {e}")
+        logger.warning(f"⚠️ 重置在线用户活跃时间失败: {e}", exc_info=True)
 
     # 启动 AI 回复 Worker
     from app.ai.response_worker import ai_response_worker
@@ -146,7 +152,7 @@ async def lifespan(app: FastAPI):
                 deleted = prune_backups(int(s.get("daily_backup_keep", 7) or 7))
                 logger.info(f"💾 每日备份完成（清理 {deleted} 份过期）")
             except Exception as e:
-                logger.warning(f"⚠️ 每日备份失败: {e}")
+                logger.warning(f"⚠️ 每日备份失败: {e}", exc_info=True)
     daily_backup_task = asyncio.create_task(daily_backup_loop())
 
     # 启动世界懒加载调度器（休眠/唤醒 + 离线时间补偿；手动模式下 no-op）
@@ -198,17 +204,17 @@ async def lifespan(app: FastAPI):
     async with async_session() as db:
         await initialize_instance(db)
     # 连接所有已启用的对等端（在后台执行，不阻塞启动）
-    asyncio.create_task(federation_manager.connect_all_enabled_peers())
+    fed_connect_task = asyncio.create_task(federation_manager.connect_all_enabled_peers())
     fed_heartbeat_task = asyncio.create_task(federation_heartbeat())
     fed_reconnect_task = asyncio.create_task(federation_reconnect())
     fed_profile_sync_task = asyncio.create_task(federation_profile_sync())
 
     # 启动共享 Chromium 服务（所有 AI 共用的浏览器 CDP）
-    asyncio.create_task(_start_browser_service())
+    browser_start_task = asyncio.create_task(_start_browser_service())
 
     # 启动薄大脑控制系统（心跳）
     from app.services.brain.brain_controller import brain_controller
-    asyncio.create_task(brain_controller.initialize())
+    brain_init_task = asyncio.create_task(brain_controller.initialize())
 
     # 技能运行时：注册为 Skill 事件总线的派发器（自治 Skill 执行引擎）
     from app.services.skill.skill_runtime import skill_runtime
@@ -225,9 +231,9 @@ async def lifespan(app: FastAPI):
     asyncio.create_task(event_bus.emit(EventType.SYSTEM_STARTUP))
 
     # 启动完成，退出自动维护（但手动维护仍生效）
-    if _os.path.exists(_MAINTENANCE_AUTO):
-        _os.remove(_MAINTENANCE_AUTO)
-        logger.info("🟢 自动维护已关闭，服务就绪" if not _os.path.exists(_MAINTENANCE_SOFT) else "🟡 服务就绪但软维护仍开启")
+    if os.path.exists(_MAINTENANCE_AUTO):
+        os.remove(_MAINTENANCE_AUTO)
+        logger.info("🟢 自动维护已关闭，服务就绪" if not os.path.exists(_MAINTENANCE_SOFT) else "🟡 服务就绪但软维护仍开启")
 
     yield
 
@@ -256,7 +262,9 @@ async def lifespan(app: FastAPI):
         pass
     for task in [ai_worker_task, vector_worker_task, alarm_scheduler_task, audit_cleanup_task,
                   memory_flush_task, metrics_flush_task, orphan_cleanup_task,
-                  fed_heartbeat_task, fed_reconnect_task, trigger_sweep_task]:
+                  fed_heartbeat_task, fed_reconnect_task, fed_profile_sync_task,
+                  fed_connect_task, browser_start_task, brain_init_task,
+                  trigger_sweep_task]:
         task.cancel()
         try:
             await task
@@ -306,17 +314,17 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# 维护模式中间件
-import os as _os
-_MAINTENANCE_AUTO = "/tmp/maintenance_startup"
-_MAINTENANCE_SOFT = "/tmp/maintenance_soft"
-_MAINTENANCE_ADMIN_HARD = "/tmp/maintenance_admin_hard"
-_MAINTENANCE_MSG_FILE = "/tmp/maintenance_msg.json"
+# 维护模式中间件（文件路径可配：MAINTENANCE_DIR env，默认 /tmp；Linux 容器部署）
+_MAINTENANCE_DIR = os.environ.get("MAINTENANCE_DIR", "/tmp")
+_MAINTENANCE_AUTO = os.path.join(_MAINTENANCE_DIR, "maintenance_startup")
+_MAINTENANCE_SOFT = os.path.join(_MAINTENANCE_DIR, "maintenance_soft")
+_MAINTENANCE_ADMIN_HARD = os.path.join(_MAINTENANCE_DIR, "maintenance_admin_hard")
+_MAINTENANCE_MSG_FILE = os.path.join(_MAINTENANCE_DIR, "maintenance_msg.json")
 
 def _get_maintenance_msg() -> dict:
     """读取自定义维护文本，不存在则返回默认"""
     try:
-        if _os.path.exists(_MAINTENANCE_MSG_FILE):
+        if os.path.exists(_MAINTENANCE_MSG_FILE):
             with open(_MAINTENANCE_MSG_FILE) as f:
                 return json.loads(f.read())
     except Exception:
@@ -352,7 +360,7 @@ async def maintenance_middleware(request, call_next):
     bypass = path in ("/health", "/", "/docs", "/openapi.json") or path.startswith("/admin") or path.startswith("/auth") or path.startswith("/maintenance-msg")
 
     # 硬维护（自动启动/关闭 或 管理员手动）：503 拦截
-    if (_os.path.exists(_MAINTENANCE_AUTO) or _os.path.exists(_MAINTENANCE_ADMIN_HARD)) and not bypass:
+    if (os.path.exists(_MAINTENANCE_AUTO) or os.path.exists(_MAINTENANCE_ADMIN_HARD)) and not bypass:
         msg = _get_maintenance_msg()
         from fastapi.responses import JSONResponse
         return JSONResponse(
@@ -362,7 +370,7 @@ async def maintenance_middleware(request, call_next):
 
     # 软维护（手动）：API 正常但前端显示提示
     response = await call_next(request)
-    if _os.path.exists(_MAINTENANCE_SOFT) and not bypass:
+    if os.path.exists(_MAINTENANCE_SOFT) and not bypass:
         response.headers["X-Maintenance"] = "true"
     return response
 
