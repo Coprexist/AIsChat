@@ -810,7 +810,7 @@ export default function WorldDesignPage() {
                 {docsLoading ? (
                   <div className="flex items-center justify-center py-16 text-textMuted text-sm">加载中…</div>
                 ) : (
-                  <div className="max-w-none prose prose-sm dark:prose-invert">
+                  <div className="max-w-none prose prose-sm dark:prose-invert [&_pre]:!bg-transparent [&_pre]:!p-0 [&_pre]:!m-0 [&_pre]:!rounded-none [&_pre]:!border-0">
                     <MarkdownContent content={docsContent} isMine={false} />
                   </div>
                 )}
