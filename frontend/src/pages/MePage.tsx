@@ -4,9 +4,10 @@ import { useAuth } from '../context/AuthContext'
 import { useT, useLang } from '../i18n/I18nContext'
 import { api } from '../api/client'
 import PageHeader from '../components/PageHeader'
+import ExternalLinkSafe from '../components/ExternalLinkSafe'
 import { AI_TYPE_LABEL } from '../constants'
 import { fmtTokenNum } from '../utils/format'
-import { getStatusTextStyle, STATUS_COLORS, BG_SURFACE_LIGHT, BG_SURFACE_DARK } from '../utils/statusColor.tsx'
+import { getStatusTextStyle, STATUS_COLORS, BG_SURFACE_LIGHT, BG_SURFACE_DARK } from '../utils/statusColor'
 import VerificationCodeInput from '../components/VerificationCodeInput'
 import { useTheme } from '../context/ThemeContext'
 import {
@@ -800,7 +801,10 @@ export default function MePage() {
             <p className="text-xs text-textMuted mb-4">用于世界商城同步——以你的身份推送到 AIsChat-Community。Token 加密存储，仅本实例可见。</p>
             <div className="space-y-3">
               <div>
-                <label className="block text-xs text-textSecondary mb-1">GitHub Token（classic 或 fine-grained，需仓库写权限）</label>
+                <div className="flex items-center justify-between mb-1">
+                  <label className="block text-xs text-textSecondary">GitHub Token（classic 或 fine-grained，需仓库写权限）</label>
+                  <ExternalLinkSafe href="https://github.com/settings/tokens/new" className="text-[10px] text-primary-400 hover:text-primary-300 transition-colors shrink-0">去 GitHub 生成 token →</ExternalLinkSafe>
+                </div>
                 <input
                   type="password"
                   value={ghToken}

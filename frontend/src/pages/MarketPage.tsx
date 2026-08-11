@@ -468,6 +468,7 @@ export default function MarketPage() {
               >
                 <Link2 size={10} /> 去绑定 GitHub →
               </button>
+
             </>
           )}
         </div>
