@@ -400,6 +400,19 @@ async def _process_group_event(db, event: dict):
 # 编排：群聊回复触发
 # ============================================================
 
+async def _recheck_state_before_run(db, agent) -> bool:
+    """执行前复查状态：入口快照可能已过期（skill 评估/建消息等耗时操作期间可能被封禁）。
+    返回 False 表示应跳过本次回复。"""
+    from app.models.agent import Agent as AgentModel
+    fresh = (await db.execute(
+        select(AgentModel.state).where(AgentModel.id == agent.id)
+    )).scalar_one_or_none()
+    if fresh == "blocked":
+        logger.info(f"AI {agent.name}({agent.id}) 执行前复查状态为 blocked，跳过回复")
+        return False
+    return True
+
+
 async def _maybe_trigger_ai_reply(
     db, agent_id: int, group_id: int, group, content: str, trigger_message_id: int,
     chain_depth: int = 0,
@@ -669,6 +682,8 @@ async def _maybe_trigger_ai_reply(
                 },
             },
         )
+        if not await _recheck_state_before_run(db, agent):
+            return
         await _run_serialized(agent, _tool_call_loop(
             db=db,
             agent=agent,
@@ -834,6 +849,8 @@ async def _trigger_dm_ai_reply(
                 },
             },
         )
+        if not await _recheck_state_before_run(db, agent):
+            return
         await _run_serialized(agent, _tool_call_loop(
             db=db,
             agent=agent,
