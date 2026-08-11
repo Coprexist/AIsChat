@@ -22,10 +22,40 @@ router = APIRouter(prefix="/api-docs", tags=["接口文档"])
 
 DOCX_MEDIA = "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
 
+# pandoc 在线安装状态（内存态；重启后 pandoc 已装则 docx_available 直接为 True）
+_INSTALL_STATE: dict = {"running": False, "ok": False, "error": "", "started_at": ""}
+
 
 def docx_available() -> bool:
-    """pandoc 是否可用（可选依赖：容器装了才有 docx 导出）"""
+    """pandoc 是否可用（可选依赖：容器装了/在线装完才有 docx 导出）"""
     return shutil.which("pandoc") is not None
+
+
+async def _install_pandoc_background() -> None:
+    """后台安装 pandoc（apt-get；管理员触发，进度靠轮询 status）"""
+    from datetime import datetime, timezone
+    _INSTALL_STATE["running"] = True
+    _INSTALL_STATE["error"] = ""
+    _INSTALL_STATE["started_at"] = datetime.now(timezone.utc).isoformat()
+    try:
+        import asyncio
+        proc = await asyncio.create_subprocess_exec(
+            "apt-get", "update", "-qq",
+            stdout=asyncio.subprocess.DEVNULL, stderr=asyncio.subprocess.DEVNULL,
+        )
+        await proc.wait()
+        proc = await asyncio.create_subprocess_exec(
+            "apt-get", "install", "-y", "-qq", "--no-install-recommends", "pandoc",
+            stdout=asyncio.subprocess.DEVNULL, stderr=asyncio.subprocess.DEVNULL,
+        )
+        await proc.wait()
+        _INSTALL_STATE["ok"] = proc.returncode == 0
+        _INSTALL_STATE["error"] = "" if proc.returncode == 0 else f"apt 安装失败（code {proc.returncode}）"
+    except Exception as e:
+        _INSTALL_STATE["ok"] = False
+        _INSTALL_STATE["error"] = str(e)
+    finally:
+        _INSTALL_STATE["running"] = False
 
 
 @router.get("")
@@ -44,7 +74,31 @@ async def export_status(
     from app.models.user import User
     u = await db.get(User, current_user["user_id"])
     is_admin = bool(u and u.role == "admin")
-    return {"docx_available": docx_available(), "is_admin": is_admin}
+    return {
+        "docx_available": docx_available(),
+        "is_admin": is_admin,
+        "installing": _INSTALL_STATE["running"],
+        "install_error": _INSTALL_STATE["error"] or None,
+    }
+
+
+@router.post("/install")
+async def install_pandoc(
+    current_user: dict = Depends(get_current_user),
+    db: AsyncSession = Depends(_async_session),
+):
+    """管理员在线安装 pandoc（apt-get，后台执行；轮询 export/status 看 installing/ok）"""
+    from app.models.user import User
+    u = await db.get(User, current_user["user_id"])
+    if not (u and u.role == "admin"):
+        raise HTTPException(status_code=403, detail="仅管理员可安装")
+    if docx_available():
+        return {"docx_available": True, "installing": False}
+    if _INSTALL_STATE["running"]:
+        return {"docx_available": False, "installing": True}
+    import asyncio
+    asyncio.create_task(_install_pandoc_background())
+    return {"docx_available": False, "installing": True}
 
 
 class DocxExportRequest(BaseModel):

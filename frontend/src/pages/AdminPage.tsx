@@ -20,8 +20,9 @@ import PluginManager from '../components/PluginManager'
 import MaintenanceMsgEditor from '../components/MaintenanceMsgEditor'
 import CleanupTab from '../components/CleanupTab'
 import MarketGithubTab from '../components/MarketGithubTab'
+import DocExportTab from '../components/DocExportTab'
 
-type Tab = 'overview' | 'users' | 'agents' | 'groups' | 'codes' | 'logs' | 'opencli' | 'backup' | 'federation' | 'convlog' | 'usage' | 'metrics' | 'apipool' | 'system' | 'prompt' | 'tools' | 'auth' | 'plugins' | 'cleanup' | 'market'
+type Tab = 'overview' | 'users' | 'agents' | 'groups' | 'codes' | 'logs' | 'opencli' | 'backup' | 'federation' | 'convlog' | 'usage' | 'metrics' | 'apipool' | 'system' | 'prompt' | 'tools' | 'auth' | 'plugins' | 'cleanup' | 'market' | 'docexport'
 type TabCategory = string
 
 const renderContent = (activeTab: Tab) => {
@@ -46,6 +47,7 @@ const renderContent = (activeTab: Tab) => {
     case 'plugins': return <PluginManager />
     case 'cleanup': return <CleanupTab />
     case 'market': return <MarketGithubTab />
+    case 'docexport': return <DocExportTab />
     default: return <OverviewTab />
   }
 }
@@ -74,6 +76,7 @@ export default function AdminPage() {
     { key: 'plugins', label: '插件管理', icon: Plug, desc: '管理浏览器上网等扩展服务', category: t('admin.categorySystem') },
     { key: 'cleanup', label: t('admin.cleanup'), icon: Eraser, desc: t('admin.cleanupDesc'), category: t('admin.categorySystem') },
     { key: 'market', label: '世界商城', icon: Store, desc: 'GitHub 同步配置（仓库/系统 Token/自动获取）', category: t('admin.categorySystem') },
+    { key: 'docexport', label: '文档导出', icon: FileText, desc: 'pandoc 安装与状态（接口文档 md→docx）', category: t('admin.categorySystem') },
   ]
   const initialTab = (searchParams.get('tab') as Tab) || 'overview'
   const [activeTab, setActiveTab] = useState<Tab>(initialTab)
