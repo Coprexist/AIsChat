@@ -267,8 +267,9 @@ async def list_friends(
         for u in user_results.scalars().all():
             users_map[u.id] = u
 
-    # ── AI 状态查询（需要 agent 表的 state）──
+    # ── AI 状态/名字查询：双通道兼容新旧数据（新：friend_id=user_id；旧：friend_id=agent_id）──
     agents_by_user_id: dict[int, Agent] = {}
+    agents_by_id: dict[int, Agent] = {}
     ai_friend_ids = [f.friend_id for f in friendships if f.friend_type == "ai"]
     if ai_friend_ids:
         agent_results = await db.execute(
@@ -276,6 +277,11 @@ async def list_friends(
         )
         for a in agent_results.scalars().all():
             agents_by_user_id[a.user_id] = a
+        agent_results2 = await db.execute(
+            select(Agent).where(Agent.id.in_(ai_friend_ids))
+        )
+        for a in agent_results2.scalars().all():
+            agents_by_id[a.id] = a
 
     # ── 批量查询：所有 DM session 的 last_message_at ──
     session_ids: list[str] = []
@@ -312,8 +318,9 @@ async def list_friends(
             status_color = getattr(u, 'status_color', None)
 
         if f.friend_type == "ai":
-            a = agents_by_user_id.get(f.friend_id)
+            a = agents_by_user_id.get(f.friend_id) or agents_by_id.get(f.friend_id)
             if a:
+                name = a.name  # AI 名字以 agent 表为准（不依赖 user 账号名）
                 state = a.state
                 avatar_url = a.avatar_url or avatar_url
                 status_text = getattr(a, 'status_text', None) or status_text
