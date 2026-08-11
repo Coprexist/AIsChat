@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo, useRef } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { useNavigate, useOutletContext } from 'react-router-dom'
 import { api } from '../api/client'
 import ChatView from './ChatView'
@@ -501,13 +501,6 @@ function InviteMemberModal({
   const [manualType, setManualType] = useState<'ai' | 'human'>('ai')
   const [manualId, setManualId] = useState('')
 
-  // 已选成员保留在列表顶部（搜索其他人时已选的不消失）
-  const displayResults = useMemo(() => {
-    const selected = Array.from(selectedEntries.values())
-    const selKeys = new Set(selected.map((r) => `${r.type}:${r.id}`))
-    return [...selected, ...results.filter((r) => !selKeys.has(`${r.type}:${r.id}`))]
-  }, [results, selectedEntries])
-
   // 防抖搜索
   useEffect(() => {
     if (query.length < 1) {
@@ -643,16 +636,18 @@ function InviteMemberModal({
 
         {/* 搜索结果 */}
         <div className="flex-1 overflow-y-auto border border-border rounded-xl divide-y divide-border/50 mb-4 max-h-48">
-          {displayResults.length === 0 ? (
+          {query.length < 1 ? (
             <div className="py-6 text-center text-xs text-textMuted">
-              {query.length < 1 ? t('chat.inviteSearchPrompt') : searchLoading ? t('common.searching') : t('common.noResults')}
+              {t('chat.inviteSearchPrompt')}
             </div>
-          ) : searchLoading && results.length === 0 ? (
+          ) : searchLoading ? (
             <div className="flex items-center justify-center py-6">
               <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-primary-500" />
             </div>
+          ) : results.length === 0 ? (
+            <div className="py-6 text-center text-xs text-textMuted">{t('common.noResults')}</div>
           ) : (
-            displayResults.map((r) => {
+            results.map((r) => {
               const key = `${r.type}:${r.id}`
               const checked = selected.has(key)
               return (
@@ -683,10 +678,19 @@ function InviteMemberModal({
           )}
         </div>
 
-        {/* 已选成员摘要 */}
+        {/* 已选成员列表（独立区域，搜索不影响） */}
         {selected.size > 0 && (
-          <div className="mb-3 text-xs text-textMuted">
-            {t('chat.selectedMembers').replace('{size}', String(selected.size))}
+          <div className="mb-3">
+            <div className="text-xs text-textMuted mb-1.5">{t('chat.selectedMembers').replace('{size}', String(selected.size))}</div>
+            <div className="flex flex-wrap gap-1.5">
+              {Array.from(selectedEntries.entries()).map(([key, r]) => (
+                <span key={key} className="inline-flex items-center gap-1 px-2 py-1 bg-primary-500/10 border border-primary-500/20 rounded-lg text-xs text-textPrimary">
+                  {r.type === 'ai' ? <Bot size={10} className="text-mint-400" /> : <User size={10} className="text-primary-400" />}
+                  {r.name}
+                  <button onClick={() => toggleMember(r)} className="ml-0.5 hover:text-rose-400 transition-colors" title="取消选择"><X size={12} /></button>
+                </span>
+              ))}
+            </div>
           </div>
         )}
 
