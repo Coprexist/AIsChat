@@ -7,7 +7,7 @@ import ChatInput from './ChatInput'
 import ActivityBar, { type ActivityUser } from './ActivityBar'
 import ProfileCard from './ProfileCard'
 import EmptyState from './EmptyState'
-import { Send, Loader2, AlertTriangle, X, ArrowDown, ArrowUp, Paperclip, FileIcon, Bot, User, MessageSquare, Inbox, Settings } from 'lucide-react'
+import { Send, Loader2, AlertTriangle, X, ArrowDown, ArrowUp, Paperclip, FileIcon, Bot, User, MessageSquare, Inbox, Settings , Gamepad2 } from 'lucide-react'
 import { getStateDotColor, CHAT_REFRESH_EVENT } from '../constants'
 import { useT } from '../i18n/I18nContext'
 import { tryOpenWorldWindow } from '../utils/worldView'
@@ -1029,13 +1029,13 @@ export default function ChatView({ conversationType, conversationId }: ChatViewP
             <div className="space-y-2.5">
               <button
                 onClick={openImmersive}
-                className="w-full py-3 bg-primary-500 hover:bg-primary-400 text-white rounded-xl font-medium transition-colors"
+                className="w-full inline-flex items-center justify-center gap-1.5 py-3 bg-primary-500 hover:bg-primary-400 text-white rounded-xl font-medium transition-colors"
               >
-                🎮 在沉浸界面打开
+                <Gamepad2 size={14} /> 在沉浸界面打开
               </button>
               <button
                 onClick={closeWorldModal}
-                className="w-full py-3 bg-elevated hover:bg-border text-textPrimary rounded-xl font-medium transition-colors"
+                className="w-full inline-flex items-center justify-center gap-1.5 py-3 bg-elevated hover:bg-border text-textPrimary rounded-xl font-medium transition-colors"
               >
                 <Settings size={12} /> 在此标准界面打开
               </button>
