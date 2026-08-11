@@ -29,6 +29,10 @@
 - **暗色模式**：hljs 补 tag/name 颜色、滚动条交汇角落不再白块、文档弹窗表格夜间变量默认值
 - **WS/好友**：群聊推送补 sender_name（以 users 表为准）、thinking/typing 事件统一 user_id（前端禁止 agent_id）
 - **AI 文件跳转**：load 闭包 currentFile 冻结 → currentFileRef；拖拽手柄 z-index 统一（高于遮罩）
+- **代码质量加固（外部 review 三轮 15 条，采纳 8 条）**：
+  - main.py：维护/日志路径 env 可配（MAINTENANCE_DIR/LOG_FILE）、lifespan warning 补 exc_info 保留 traceback、全部 18 个后台任务统一 `_spawn` 异常监控（Worker 异常退出记 ERROR 不再静默）
+  - executor.py：LLM 压缩失败降级 inline 兜底并标记（不再反复重试耗 API）、中断消息注入异常时回写缓冲（不再永久丢失）、`_is_conversation_idle` 未来时间统一防御、max_tool_rounds 默认 3→5（典型 5 轮工具链不再被截断，有 end_turn 提前退出不会死循环）
+  - 驳回 7 条均附依据：连接池已显式配置（10/40/pre_ping）、chat_chain 单线程原子无竞态、联邦重连已有指数退避+上限、沙箱路径已 resolve+startswith 校验、状态栈双写完整持久化、pending_results 用 tool_call_id 关联与顺序无关、「统一会话」是坏建议
 
 ### Changed
 
