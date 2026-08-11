@@ -1114,7 +1114,7 @@ function BackupTab() {
           <h3 className="font-semibold text-textPrimary">本地自动备份</h3>
           <button onClick={loadLocalBackups} className="text-xs text-textSecondary hover:text-textPrimary">🔄 刷新</button>
         </div>
-        <p className="text-sm text-textMuted mb-4">每日备份功能产生的文件（服务器 data/backups/），可选择一个回档（⚠️ 覆盖当前所有数据）</p>
+        <p className="text-sm text-textMuted mb-4">每日备份功能产生的文件（服务器 data/backups/），可选择一个回档（覆盖当前所有数据）</p>
         {localBackups.length === 0 ? (
           <div className="text-sm text-textMuted bg-canvas border border-border rounded-xl p-4">
             暂无本地备份——在「系统设置」里开启每日备份后，每天会自动生成
@@ -1434,7 +1434,7 @@ function OpenCLIAgentsSection() {
 }
 
 // ---- 命令白名单 ----
-// ⚠️ 预设命令定义：与后端 POST /admin/opencli/commands/presets 保持一致
+// 预设命令定义：与后端 POST /admin/opencli/commands/presets 保持一致
 //    每个预设包含 pattern（命令名或正则）、is_regex、description（i18n key）、category（i18n key）
 function OpenCLICommandsSection() {
   const t = useT()

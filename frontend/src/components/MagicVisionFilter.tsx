@@ -104,7 +104,7 @@ export default function MagicVisionFilter({ value, onChange }: Props) {
           {warn && (
             <div className="flex items-start gap-2 p-2.5 mb-3 rounded-lg bg-accent-500/5 border border-accent-500/15 text-xs text-textSecondary">
               <AlertTriangle size={14} className="shrink-0 mt-0.5 text-accent-500" />
-              <span>⚠️ 部分滤镜（如模糊、投影）可能影响页面性能。如遇卡顿请关闭不必要的魔棒。</span>
+              <span>部分滤镜（如模糊、投影）可能影响页面性能。如遇卡顿请关闭不必要的魔棒。</span>
             </div>
           )}
 

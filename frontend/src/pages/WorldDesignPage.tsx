@@ -161,7 +161,7 @@ export default function WorldDesignPage() {
       await api.put(`/worlds/${wid}/files`, { path: currentFile, content })
       await pushNotice(currentFile, 'manual-edit', `用户手动编辑了 ${currentFile}`)
       setPreviewKey((k) => k + 1) // 刷新预览
-      setMsg('✅ 已保存')
+      setMsg('已保存')
     } catch (e: any) {
       const errMsg = `保存失败: ${e?.message || e}`
       // 报错也进懒通知，agent 下次对话能看到
@@ -194,7 +194,7 @@ export default function WorldDesignPage() {
       await api.post(`/worlds/${wid}/files/upload`, fd)
       await load()
       selectFile(targetPath.replace(/^\/+/, ''))
-      setMsg('✅ 已上传')
+      setMsg('已上传')
     } catch (err: any) {
       setMsg(`上传失败: ${err?.message || err}`)
     }
@@ -241,7 +241,7 @@ export default function WorldDesignPage() {
       await api.delete(`/worlds/${wid}/files?path=${encodeURIComponent(path)}`)
       if (currentFile === path) setCurrentFile('')
       await load()
-      setMsg(`✅ 已删除 ${path}`)
+      setMsg(`已删除 ${path}`)
     } catch (e: any) {
       setMsg(`删除失败: ${e?.message || e}`)
     }

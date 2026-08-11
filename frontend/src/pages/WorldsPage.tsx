@@ -5,6 +5,7 @@ import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { ChevronRight, Store, Trash2, Plus } from 'lucide-react'
 import { api } from '../api/client'
+import BindGroupModal from '../components/world/BindGroupModal'
 import PageHeader from '../components/PageHeader'
 
 interface World {
@@ -52,26 +53,8 @@ export default function WorldsPage() {
   }
 
   const [bindWorld, setBindWorld] = useState<World | null>(null)
-  const [groupList, setGroupList] = useState<{ id: number; name: string }[]>([])
 
-  const openBindModal = async (world: World) => {
-    setBindWorld(world)
-    try {
-      const groups = await api.get<{ id: number; name: string }[]>('/groups')
-      setGroupList(groups || [])
-    } catch { setGroupList([]) }
-  }
-
-  const doBind = async (groupId: number) => {
-    if (!bindWorld) return
-    try {
-      await api.post(`/worlds/${bindWorld.id}/bind`, { entity_type: 'group', entity_id: groupId })
-      setBindWorld(null)
-      load()
-    } catch (e: any) {
-      setMsg(`绑定失败: ${e?.message || e}`)
-    }
-  }
+  const openBindModal = (world: World) => setBindWorld(world)
 
   const toggleStatus = async (world: World) => {
     try {
@@ -84,7 +67,7 @@ export default function WorldsPage() {
     if (!confirm(`确定删除世界「${world.name}」？\n\n会连同它的全部文件、数据、世界 AI 配置一起删除，不可恢复。`)) return
     try {
       await api.delete(`/worlds/${world.id}`)
-      setMsg(`✅ 世界「${world.name}」已删除`)
+      setMsg(`世界「${world.name}」已删除`)
       load()
     } catch (e: any) {
       setMsg(`删除失败: ${e?.message || e}`)
@@ -180,35 +163,13 @@ export default function WorldsPage() {
         </div>
       </div>
 
-      {/* 绑定群弹窗：群列表选择 */}
+      {/* 绑定群弹窗：选类型 → 勾选群批量绑定（BindGroupModal 自包含） */}
       {bindWorld && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60" onClick={() => setBindWorld(null)}>
-          <div className="bg-surface border border-border rounded-xl p-5 w-96 max-h-[70vh] flex flex-col" onClick={(e) => e.stopPropagation()}>
-            <div className="font-medium text-textPrimary mb-3">给「{bindWorld.name}」绑定群聊</div>
-            {groupList.length === 0 ? (
-              <div className="text-sm text-textMuted py-6 text-center">
-                你还没有群聊<br />
-                <span className="text-xs text-textSecondary">先去聊天里创建一个群再回来绑定</span>
-              </div>
-            ) : (
-              <div className="flex-1 overflow-y-auto space-y-1.5">
-                {groupList.map((g) => (
-                  <button
-                    key={g.id}
-                    onClick={() => doBind(g.id)}
-                    className="w-full text-left px-3 py-2 bg-elevated hover:bg-border text-textPrimary rounded-lg text-sm flex items-center gap-2 transition-colors"
-                  >
-                    <span>💬</span>
-                    <span className="truncate">{g.name}</span>
-                    <span className="text-[10px] text-textMuted ml-auto">#{g.id}</span>
-                  </button>
-                ))}
-              </div>
-            )}
-            <button onClick={() => setBindWorld(null)} className="mt-3 text-xs text-textMuted hover:text-textPrimary transition-colors">取消</button>
-          </div>
-        </div>
-      )}
-    </div>
+        <BindGroupModal
+          worldId={bindWorld.id}
+          onClose={() => setBindWorld(null)}
+          onBound={() => { setBindWorld(null); load() }}
+        />
+      )}    </div>
   )
 }

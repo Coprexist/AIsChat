@@ -323,6 +323,25 @@ async def bind_group_to_type(
         raise HTTPException(status_code=400, detail=str(e))
 
 
+@router.post("/{world_id}/bind-groups")
+async def bind_groups_to_type(
+    world_id: int,
+    req: dict,
+    current_user: dict = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """批量把多个群绑定到某类型（勾选多群一次绑定；逐群校验，互不影响）"""
+    from app.services.world.group_type_service import bind_groups_with_type
+    try:
+        return await bind_groups_with_type(
+            db, world_id, current_user["user_id"],
+            group_ids=[int(x) for x in (req.get("group_ids") or []) if int(x) > 0],
+            type_slug=str(req.get("type_slug") or ""),
+        )
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+
 @router.get("/{world_id}/assistants")
 async def list_assistants(
     world_id: int,

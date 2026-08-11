@@ -187,6 +187,21 @@ async def bind_group_with_type(
     return {"success": True, "assistants": created}
 
 
+async def bind_groups_with_type(
+    db: AsyncSession, world_id: int, owner_id: int, group_ids: list[int], type_slug: str,
+) -> dict:
+    """批量把多个群绑定到同一类型（逐个复用 bind_group_with_type，互不影响；返回逐群结果）"""
+    results = []
+    for gid in group_ids:
+        try:
+            r = await bind_group_with_type(db, world_id, owner_id, gid, type_slug)
+            results.append({"group_id": gid, "success": True, "assistants": r.get("assistants", []), "already": r.get("already", False)})
+        except ValueError as e:
+            results.append({"group_id": gid, "success": False, "error": str(e)})
+    ok = sum(1 for r in results if r["success"])
+    return {"success": True, "bound": ok, "failed": len(results) - ok, "results": results}
+
+
 async def _create_group_assistant(
     db: AsyncSession, world: World, group_id: int, type_slug: str,
     spec: dict, index: int,

@@ -51,7 +51,7 @@ export default function MarketGithubTab() {
         auto_sync_enabled: autoSync,
       })
       setToken('')
-      setMsg({ ok: true, text: '✅ 配置已保存' })
+      setMsg({ ok: true, text: '配置已保存' })
       load()
     } catch (e: any) {
       setMsg({ ok: false, text: `保存失败: ${e?.message || e}` })
@@ -65,7 +65,7 @@ export default function MarketGithubTab() {
     setMsg(null)
     try {
       const r = await api.post<{ added: number; updated: number; removed: number }>('/market/github/refresh')
-      setMsg({ ok: true, text: `✅ 连接正常，GitHub 索引已刷新（+${r.added} 新增, ${r.updated} 更新, -${r.removed} 移除）` })
+      setMsg({ ok: true, text: `连接正常，GitHub 索引已刷新（+${r.added} 新增, ${r.updated} 更新, -${r.removed} 移除）` })
     } catch (e: any) {
       setMsg({ ok: false, text: `连接失败: ${e?.message || e}` })
     } finally {
@@ -125,7 +125,7 @@ export default function MarketGithubTab() {
             className="w-full bg-elevated text-sm px-3 py-2 rounded-lg border border-border outline-none focus:border-primary-500/50 text-textPrimary"
           />
           <div className="text-[10px] text-textMuted mt-1">
-            {hasToken ? `✅ 已配置系统 token（加密存储，仅显示 ${masked}）` : '⚠️ 未配置——用户未绑定 GitHub 时同步将失败'}
+            {hasToken ? `已配置系统 token（加密存储，仅显示 ${masked}）` : '未配置——用户未绑定 GitHub 时同步将失败'}
           </div>
         </div>
 

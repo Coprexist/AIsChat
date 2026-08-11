@@ -83,7 +83,7 @@ export default function WorldCreatorConfig({ wid, creator, usageStats, onSaved, 
       const updated = await api.put<WorldCreator>(`/worlds/${wid}/creator`, patch)
       onSaved(updated)
       onClose()
-      onMsg('✅ 世界 AI 配置已保存')
+      onMsg('世界 AI 配置已保存')
     } catch (e: any) {
       onMsg(`保存失败: ${e?.message || e}`)
     } finally {
@@ -97,7 +97,7 @@ export default function WorldCreatorConfig({ wid, creator, usageStats, onSaved, 
     try {
       const updated = await api.put<typeof settings>(`/worlds/${wid}/chat/settings`, settings)
       setSettings(updated)
-      onMsg('✅ 会话生命周期设置已保存')
+      onMsg('会话生命周期设置已保存')
     } catch (e: any) {
       onMsg(`保存失败: ${e?.message || e}`)
     } finally {
@@ -268,7 +268,7 @@ export default function WorldCreatorConfig({ wid, creator, usageStats, onSaved, 
             <div className="flex items-center justify-between bg-elevated/60 rounded-lg p-2.5">
               <div>
                 <div className="text-xs text-textSecondary">深度思考（推理模式）</div>
-                <div className="text-[10px] text-amber-400/90 mt-0.5">⚠️ 推理 token 单独计费，费用显著增加</div>
+                <div className="text-[10px] text-amber-400/90 mt-0.5">推理 token 单独计费，费用显著增加</div>
               </div>
               <input
                 type="checkbox"

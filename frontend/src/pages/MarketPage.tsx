@@ -169,7 +169,7 @@ export default function MarketPage() {
     setMsg('')
     try {
       const r = await api.post<{ added: number; updated: number; removed: number }>('/market/github/refresh')
-      setToast(`✅ GitHub 刷新完成: +${r.added} 新增, ${r.updated} 更新, -${r.removed} 移除`)
+      setToast(`GitHub 刷新完成: +${r.added} 新增, ${r.updated} 更新, -${r.removed} 移除`)
       setTimeout(() => setToast(null), 3000)
       loadGithub()
       loadLocal() // 本地同步状态可能变化
@@ -196,7 +196,7 @@ export default function MarketPage() {
     setMsg('')
     try {
       const r = await api.post<{ success: boolean; path: string }>(`/market/items/${item.id}/sync-github`)
-      setToast(`✅ 已同步到 GitHub: ${r.path}`)
+      setToast(`已同步到 GitHub: ${r.path}`)
       setTimeout(() => setToast(null), 3000)
       setSyncingId(null)
       loadLocal()
@@ -205,7 +205,7 @@ export default function MarketPage() {
       const m = e?.message || String(e)
       // token 无效/过期 → 明确提示重新绑定
       if (/token|401|无效|过期/i.test(m)) {
-        setMsg(`⚠️ ${m} —— 请到「我的」页重新绑定 GitHub`)
+        setMsg(`${m} —— 请到「我的」页重新绑定 GitHub`)
       } else {
         setMsg(`同步失败: ${m}`)
       }
@@ -222,7 +222,7 @@ export default function MarketPage() {
         item && 'is_local' in item ? `/market/github/import` : `/market/items/${item.id}/import`,
         item && 'is_local' in item ? { id: item.id } : undefined,
       )
-      setToast(`✅ 已导入「${r.name}」（${r.imported} 个文件），正在打开…`)
+      setToast(`已导入「${r.name}」（${r.imported} 个文件），正在打开…`)
       setTimeout(() => navigate(`/worlds/${r.world_id}/design`), 900)
     } catch (e: any) {
       setMsg(`导入失败: ${e?.message || e}`)
@@ -248,7 +248,7 @@ export default function MarketPage() {
         tags: editTags.split(/[,，]/).map(s => s.trim()).filter(Boolean),
       })
       setEditItem(null)
-      setToast(`✅ 商品「${updated.title}」已更新`)
+      setToast(`商品「${updated.title}」已更新`)
       setTimeout(() => setToast(null), 2500)
       loadLocal()
     } catch (e: any) {
@@ -262,7 +262,7 @@ export default function MarketPage() {
     if (!confirm(`下架「${item.title}」？（不影响已导入的世界）`)) return
     try {
       await api.delete(`/market/items/${item.id}`)
-      setMsg('✅ 已下架')
+      setMsg('已下架')
       loadLocal()
     } catch (e: any) {
       setMsg(`下架失败: ${e?.message || e}`)
@@ -626,8 +626,8 @@ export default function MarketPage() {
                       </div>
                       <div className="text-[10px] text-textMuted flex items-center gap-1 mt-0.5">
                         <User size={10} /> {item.author_github ? `@${item.author_github}` : (item.author_name || 'GitHub')}
-                        {item.signature_valid === true && <span className="text-mint-400/80">· ✅ 机器人已验证</span>}
-                        {item.signature_valid === false && <span className="text-rose-400/80">· ⚠️ 签名无效</span>}
+                        {item.signature_valid === true && <span className="text-mint-400/80">· 机器人已验证</span>}
+                        {item.signature_valid === false && <span className="text-rose-400/80">· 签名无效</span>}
                         <span className="mx-0.5">·</span>
                         <Clock size={10} /> 更新 {fmtDate(item.updated_at)}
                       </div>

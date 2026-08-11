@@ -54,7 +54,7 @@ export default function MarketPublishPage() {
         tags: tags.split(/[,，]/).map(s => s.trim()).filter(Boolean),
         sync_github: syncGithub,
       })
-      setOk(syncGithub ? '✅ 已发布到商城并同步 GitHub' : '✅ 已发布到商城')
+      setOk(syncGithub ? '已发布到商城并同步 GitHub' : '已发布到商城')
       setTimeout(() => navigate('/market'), 1200)
     } catch (e: any) {
       setMsg(`发布失败: ${e?.message || e}`)
@@ -119,7 +119,7 @@ export default function MarketPublishPage() {
             </button>
             {syncGithub && !githubConfigured && (
               <div className="text-[11px] text-amber-400 bg-amber-500/10 rounded-lg px-3 py-2">
-                ⚠️ 后台尚未配置 GitHub 仓库/Token——站内发布仍会成功，同步会失败。请管理员在商城页「GitHub 设置」里配置。
+                后台尚未配置 GitHub 仓库/Token——站内发布仍会成功，同步会失败。请管理员在商城页「GitHub 设置」里配置。
               </div>
             )}
 

@@ -9,6 +9,7 @@
 import { useCallback, useEffect, useState } from 'react'
 import { X, Plus, Trash2, Link2, Key, Globe, RefreshCw, Users, BookOpen, CheckCircle2 } from 'lucide-react'
 import { api } from '../api/client'
+import BindGroupModal from './world/BindGroupModal'
 
 interface GroupType {
   slug: string
@@ -39,13 +40,12 @@ export default function GroupManagerModal({ worldId, isOwner, onClose }: Props) 
   const [tab, setTab] = useState<'types' | 'assistants'>('types')
   const [types, setTypes] = useState<GroupType[]>([])
   const [assistants, setAssistants] = useState<Assistant[]>([])
-  const [groups, setGroups] = useState<{ id: number; name: string }[]>([])
   const [msg, setMsg] = useState('')
   const [loading, setLoading] = useState(false)
 
   // ── 新建类型表单 ──
   const [newType, setNewType] = useState({ name: '', description: '', rules: '', bind_limit: 3, count: 1, need_api: true, default_name: '群助手' })
-  const [bindTarget, setBindTarget] = useState<{ typeSlug: string; groupId: number | null } | null>(null)
+
   const [apiInput, setApiInput] = useState<{ agentId: number; key: string; base: string } | null>(null)
   const [applying, setApplying] = useState(false)
 
@@ -66,17 +66,7 @@ export default function GroupManagerModal({ worldId, isOwner, onClose }: Props) 
   }, [worldId])
 
   // 世界已绑定的群（绑定群时选择）
-  const loadGroups = useCallback(async () => {
-    try {
-      const w = await api.get<any>(`/worlds/${worldId}`)
-      const ids = (w.bindings || []).filter((b: any) => b.entity_type === 'group').map((b: any) => b.entity_id)
-      if (ids.length === 0) { setGroups([]); return }
-      const gs = await api.get<any[]>('/groups')
-      setGroups((Array.isArray(gs) ? gs : []).filter((g: any) => ids.includes(g.id)).map((g: any) => ({ id: g.id, name: g.name || `群#${g.id}` })))
-    } catch { /* 非致命 */ }
-  }, [worldId])
-
-  useEffect(() => { load(); loadGroups() }, [load, loadGroups])
+  useEffect(() => { load() }, [load])
 
   const createType = async () => {
     setApplying(true); setMsg('')
@@ -100,15 +90,8 @@ export default function GroupManagerModal({ worldId, isOwner, onClose }: Props) 
     catch (e: any) { setMsg(`删除失败: ${e?.message || e}`) }
   }
 
-  const doBindGroup = async (typeSlug: string, groupId: number) => {
-    setApplying(true); setMsg('')
-    try {
-      const r = await api.post<{ assistants: number[] }>(`/worlds/${worldId}/bind-group`, { group_id: groupId, type_slug: typeSlug })
-      setMsg(`✅ 绑定成功，自动创建 ${r.assistants?.length || 0} 个群助手`)
-      setBindTarget(null)
-      load()
-    } catch (e: any) { setMsg(`绑定失败: ${e?.message || e}`) } finally { setApplying(false) }
-  }
+  // 绑定群弹窗（选类型 → 勾选群批量绑定）
+  const [bindOpen, setBindOpen] = useState<{ typeSlug: string } | null>(null)
 
   const saveApi = async (agentId: number) => {
     if (!apiInput) return
@@ -184,34 +167,26 @@ export default function GroupManagerModal({ worldId, isOwner, onClose }: Props) 
                   {t.rules && <div className="text-xs text-textSecondary whitespace-pre-wrap line-clamp-3">{t.rules}</div>}
                   <div className="flex items-center gap-2 pt-1">
                     <button
-                      onClick={() => setBindTarget({ typeSlug: t.slug, groupId: null })}
+                      onClick={() => setBindOpen({ typeSlug: t.slug })}
                       className="inline-flex items-center gap-1 text-[10px] px-2 py-1 rounded bg-primary-500/15 text-primary-400 hover:bg-primary-500/25"
                     >
                       <Link2 size={10} /> 绑定群
                     </button>
-                    {bindTarget?.typeSlug === t.slug && (
-                      <div className="flex items-center gap-1.5">
-                        <select
-                          value={bindTarget.groupId ?? ''}
-                          onChange={e => setBindTarget({ typeSlug: t.slug, groupId: Number(e.target.value) })}
-                          className="bg-elevated text-xs px-2 py-1 rounded border border-border text-textPrimary"
-                        >
-                          <option value="">选择已绑定世界的群…</option>
-                          {groups.map(g => <option key={g.id} value={g.id}>{g.name}</option>)}
-                        </select>
-                        <button
-                          onClick={() => bindTarget.groupId && doBindGroup(t.slug, bindTarget.groupId)}
-                          disabled={!bindTarget.groupId || applying}
-                          className="text-[10px] px-2 py-1 rounded bg-primary-500 text-white disabled:opacity-40"
-                        >确认</button>
-                      </div>
-                    )}
                   </div>
                 </div>
               ))}
               {types.length === 0 && <div className="text-center text-textMuted text-xs py-6">还没有群类型。创建第一个，让群按类型接入你的世界。</div>}
 
-              {/* 新建类型（世界作者） */}
+              {bindOpen && (
+        <BindGroupModal
+          worldId={worldId}
+          initialTypeSlug={bindOpen.typeSlug}
+          onClose={() => setBindOpen(null)}
+          onBound={() => { load() }}
+        />
+      )}
+
+      {/* 新建类型（世界作者） */}
               {isOwner && (
                 <div className="rounded-xl border border-border p-3 space-y-2">
                   <div className="text-xs font-semibold text-textPrimary flex items-center gap-1"><Plus size={12} /> 新建群类型</div>
@@ -245,7 +220,7 @@ export default function GroupManagerModal({ worldId, isOwner, onClose }: Props) 
                     <span className="text-sm font-semibold text-textPrimary">{a.name}</span>
                     <span className="text-[10px] text-textMuted">群#{a.group_id} · {typeName(a.group_type_slug)}</span>
                     <span className={`text-[10px] px-1.5 py-0.5 rounded ${a.configured ? 'bg-mint-500/15 text-mint-400' : 'bg-amber-500/15 text-amber-400'}`}>
-                      {a.configured ? '✅ 已配置 API' : '未配置 API'}
+                      {a.configured ? '已配置 API' : '未配置 API'}
                     </span>
                     <div className="flex-1" />
                     <button onClick={() => setApiInput({ agentId: a.id, key: '', base: '' })} className="text-[10px] px-2 py-1 rounded bg-primary-500/15 text-primary-400 hover:bg-primary-500/25">
@@ -288,7 +263,7 @@ export default function GroupManagerModal({ worldId, isOwner, onClose }: Props) 
 
         <div className="p-3 pt-0 shrink-0 flex items-center justify-between text-[10px] text-textMuted">
           <span>群助手归属群，不占个人额度；API 加密存储，世界打包不含 key</span>
-          <button onClick={() => { load(); loadGroups() }} className="inline-flex items-center gap-1 text-primary-400 hover:text-primary-300">
+          <button onClick={() => { load() }} className="inline-flex items-center gap-1 text-primary-400 hover:text-primary-300">
             <RefreshCw size={10} /> 刷新
           </button>
         </div>
