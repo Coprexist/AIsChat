@@ -377,6 +377,40 @@ export default function WorldDesignPage() {
   }
 
   // 发布到商城：跳转统一发布页（带当前世界预选，表单含标题/描述/标签/同步 GitHub）
+  // ── 世界打包：下载 / 导入 zip ──
+  const downloadWorldZip = async () => {
+    try {
+      const base = (localStorage.getItem('instance_url') || '').replace(/\/+$/, '') + '/api'
+      const res = await fetch(`${base}/worlds/${worldId}/export?include_content=true`, {
+        headers: { 'Authorization': `Bearer ${localStorage.getItem('access_token')}` },
+      })
+      if (!res.ok) throw new Error((await res.text()).slice(0, 120) || '下载失败')
+      const blob = await res.blob()
+      const url = URL.createObjectURL(blob)
+      const a = document.createElement('a')
+      a.href = url
+      a.download = `world_${worldId}.zip`
+      a.click()
+      URL.revokeObjectURL(url)
+      setMsg('已下载世界包')
+    } catch (err: any) { setMsg(`下载失败: ${err?.message || err}`) }
+  }
+  const importZipRef = useRef<HTMLInputElement>(null)
+  const handleImportZip = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const f = e.target.files?.[0]
+    e.target.value = ''  // 允许重复选同一文件
+    if (!f) return
+    if (!f.name.toLowerCase().endsWith('.zip')) { setMsg('请选择 zip 文件'); return }
+    if (!confirm('导入将覆盖除数据文件（content/）外的同名文件，确认继续？')) return
+    try {
+      const fd = new FormData()
+      fd.append('file', f)
+      const r = await api.post<{ imported: number; skipped_content?: number }>(`/worlds/${worldId}/files/import`, fd)
+      setMsg(`导入成功：${r?.imported ?? 0} 个文件${r?.skipped_content ? `（跳过数据文件 ${r.skipped_content}）` : ''}`)
+      load()
+    } catch (err: any) { setMsg(`导入失败: ${err?.message || err}`) }
+  }
+
   const publishToMarket = () => {
     if (!world) return
     navigate(`/market/publish?world_id=${wid}`)
@@ -687,6 +721,13 @@ export default function WorldDesignPage() {
           <button onClick={() => setMode('preview')} className={`text-xs px-3 py-1 rounded transition-colors ${mode === 'preview' ? 'bg-primary-500 text-white' : 'bg-elevated hover:bg-border'}`}>预览</button>
           <button onClick={openDocs} className="p-1.5 text-textMuted hover:text-textPrimary transition-colors" title="接口文档（发给世界 AI 的 md）">
             <BookOpen size={15} />
+          </button>
+          <button onClick={downloadWorldZip} className="text-xs px-3 py-1 rounded transition-colors bg-elevated hover:bg-border text-textSecondary" title="下载世界包（zip：代码+资源+数据）">
+            <Archive size={13} className="inline mr-1" />下载世界包
+          </button>
+          <input ref={importZipRef} type="file" accept=".zip" className="hidden" onChange={handleImportZip} />
+          <button onClick={() => importZipRef.current?.click()} className="text-xs px-3 py-1 rounded transition-colors bg-elevated hover:bg-border text-textSecondary" title="导入世界包（zip 批量导入，不动数据文件）">
+            <Upload size={13} className="inline mr-1" />导入世界包
           </button>
           <button onClick={publishToMarket} className="text-xs px-3 py-1 rounded transition-colors bg-elevated hover:bg-border text-primary-400" title="发布到世界商城（打包代码区）">发布</button>
           <button onClick={() => setGroupManagerOpen(true)} className="p-1.5 text-textMuted hover:text-textPrimary transition-colors" title="群类型与群助手">

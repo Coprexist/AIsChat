@@ -126,13 +126,16 @@ def delete_file(world_id: int, rel_path: str) -> None:
 # 文件夹导入（zip 或批量文件）
 # ═══════════════════════════════════════════════════════════════
 
-def import_zip(world_id: int, zip_bytes: bytes) -> dict:
-    """解压 zip 到世界目录（过滤越界与危险文件）"""
+def import_zip(world_id: int, zip_bytes: bytes, exclude_content: bool = True) -> dict:
+    """解压 zip 到世界目录（过滤越界与危险文件）。
+    exclude_content=True（默认）：跳过 content/ 数据文件——数据是运行产物，导入包不该覆盖；
+    商城导入（新世界）不受影响（新世界无 content）。"""
     import io
     import zipfile
 
     base = _world_dir(world_id)
     count = 0
+    skipped_content = 0
     try:
         with zipfile.ZipFile(io.BytesIO(zip_bytes)) as zf:
             for info in zf.infolist():
@@ -141,6 +144,9 @@ def import_zip(world_id: int, zip_bytes: bytes) -> dict:
                 if name.startswith("/") or ".." in name.split("/"):
                     continue
                 if info.is_dir():
+                    continue
+                if exclude_content and name.startswith("content/"):
+                    skipped_content += 1
                     continue
                 target = (base / name).resolve()
                 if not str(target).startswith(str(base.resolve())):
@@ -156,8 +162,8 @@ def import_zip(world_id: int, zip_bytes: bytes) -> dict:
                 count += 1
     except zipfile.BadZipFile:
         raise ValueError("无效的 zip 文件")
-    logger.info(f"🌐 世界 #{world_id} zip 导入 {count} 个文件")
-    return {"imported": count}
+    logger.info(f"🌐 世界 #{world_id} zip 导入 {count} 个文件（跳过数据文件 {skipped_content}）")
+    return {"imported": count, "skipped_content": skipped_content}
 
 
 def export_zip(world_id: int, include_content: bool = True) -> bytes:
