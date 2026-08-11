@@ -15,7 +15,8 @@
 6. [API Key 与额度问题](#六api-key-与额度问题)
 7. [联邦通信问题](#七联邦通信问题)
 8. [性能问题](#八性能问题)
-9. [错误码速查](#九错误码速查)
+9. [422 local_kw 必填参数错误（FastAPI 依赖注入坑）](#九422-local_kw-必填参数错误fastapi-依赖注入坑)
+10. [错误码速查](#十错误码速查)
 
 ---
 
@@ -481,7 +482,64 @@ curl http://localhost:5228/metrics
 
 ---
 
-## 九、错误码速查
+## 九、422 local_kw 必填参数错误（FastAPI 依赖注入坑）
+
+> 2026-08-11 实锤根因（此前被误判为 nginx 拦截，折腾一天）。
+
+### 症状
+
+- 接口返回 `422`，body 为：`{"detail":[{"type":"missing","loc":["query","local_kw"],"msg":"Field required","input":null}]}`
+- 后端源码里**搜不到 `local_kw`**（全盘 grep 只有 SQLAlchemy 库代码命中）
+- 同一个接口：不带 token → `401`；带有效 token → `422`（FastAPI 先跑鉴权依赖、后校验参数）
+- 看起来像 nginx/网关层拦截（响应头 `server: nginx`），改路径、换单词、查反代配置都无效
+
+### 根因
+
+路由里把 **`async_sessionmaker` 实例**直接当 FastAPI 依赖注入：
+
+```python
+# ❌ 错误：Depends(sessionmaker 实例)
+from app.database import async_session as _async_session
+
+db: AsyncSession = Depends(_async_session)
+```
+
+FastAPI 检查依赖 callable 签名时，SQLAlchemy 的 `sessionmaker.__call__(self, **local_kw)` 里的 **`**local_kw` 被当成必填 query 参数** → 请求过鉴权后参数校验必 422。
+
+### 修复
+
+```python
+# ✅ 正确：用 app.database 的 async generator
+from app.database import get_db
+
+db: AsyncSession = Depends(get_db)
+```
+
+（`get_db` 还自带事务管理：成功 commit、异常 rollback。）
+
+### 快速定位命令
+
+```bash
+# 打印运行中路由的完整依赖树，直接看 call 和 query_params
+cd /aischat && docker compose exec backend python -c "
+from app.main import app
+for r in app.routes:
+    if getattr(r, 'path', '') == '/kb/status':
+        print(r.endpoint)
+        print(r.dependant)
+"
+```
+
+依赖树里出现 `call=async_sessionmaker(...)` 且 `query_params=[ModelField(name='local_kw', ...)]` 即实锤。
+
+### 预防
+
+- **禁止 `Depends(<sessionmaker实例>)`**——数据库会话一律 `Depends(get_db)`
+- 全局排查：`grep -rn "Depends(_async_session)\|Depends(async_session)" backend/app --include='*.py'`
+
+---
+
+## 十、错误码速查
 
 ### HTTP 状态码
 
@@ -493,6 +551,7 @@ curl http://localhost:5228/metrics
 | 401 | 未认证 | Token 缺失或过期 |
 | 403 | 无权限 | 角色不足 |
 | 404 | 资源不存在 | ID 错误 |
+| 422 | 参数校验失败 | 必填参数缺失/类型错误；若报 `local_kw` required 且你没传过这参数 → 见[第九章](#九422-local_kw-必填参数错误fastapi-依赖注入坑) |
 | 429 | 请求过多 | 触发速率限制 |
 | 500 | 服务器错误 | 查看后端日志 |
 | 503 | 服务不可用 | 依赖服务未就绪 |
