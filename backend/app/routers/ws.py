@@ -267,7 +267,7 @@ async def websocket_endpoint(ws: WebSocket, token: str = Query(...)):
                         except Exception as e:
                             logger.error(f"获取头像失败: {e}", exc_info=True)
 
-                        msg_data = message_to_dict(message, sender_avatar_url=sender_avatar, sender_state=sender_state)
+                        msg_data = message_to_dict(message, sender_name=username, sender_avatar_url=sender_avatar, sender_state=sender_state)
 
                         # 审计日志：用户发送消息（fire-and-forget）
                         asyncio.create_task(_log_message_audit(user_id, "group", group_id, message.id))
