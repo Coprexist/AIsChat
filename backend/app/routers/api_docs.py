@@ -65,7 +65,7 @@ async def list_api_docs(current_user: dict = Depends(get_current_user)):
     return {"sections": SECTIONS}
 
 
-@router.get("/export/status")
+@router.get("/status")
 async def export_status(
     current_user: dict = Depends(get_current_user),
     db: AsyncSession = Depends(_async_session),
@@ -107,7 +107,7 @@ class DocxExportRequest(BaseModel):
     filename: str = "api-doc.docx"
 
 
-@router.post("/export")
+@router.post("/convert")
 async def export_docx(
     req: DocxExportRequest,
     current_user: dict = Depends(get_current_user),

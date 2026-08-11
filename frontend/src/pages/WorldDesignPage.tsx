@@ -85,7 +85,7 @@ export default function WorldDesignPage() {
       if (r.sections?.length) selectDoc(r.sections[0].id)
     } catch { /* ignore */ }
     try {
-      const st = await api.get<{ docx_available: boolean; is_admin: boolean }>('/api/kb/export/status')
+      const st = await api.get<{ docx_available: boolean; is_admin: boolean }>('/api/kb/convert/status')
       setDocxAvailable(!!st.docx_available)
       setIsAdminUser(!!st.is_admin)
     } catch { setDocxAvailable(false); setIsAdminUser(false) }
@@ -123,7 +123,7 @@ export default function WorldDesignPage() {
   const downloadDocx = async (md: string, filename: string) => {
     try {
       const base = (localStorage.getItem('instance_url') || '').replace(/\/+$/, '') + '/api'
-      const res = await fetch(`${base}/api/kb/export`, {
+      const res = await fetch(`${base}/api/kb/convert`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
