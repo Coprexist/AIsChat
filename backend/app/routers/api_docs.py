@@ -46,6 +46,50 @@ _TBL_BANDING = (
 )
 
 
+# ── docx 产品色美化（violet 品牌色：主 #7C3AED / 浅紫 #EDE9FE / 紫调灰 #F8F7FC / 代码底 #F6F5FA）──
+_BRAND_VIOLET = "7C3AED"
+_HEADER_FILL = "EDE9FE"
+_ZEBRA_FILL = "F8F7FC"
+_CODE_FILL = "F6F5FA"
+
+
+def _inject_style_rpr(xml: str, style_id: str, rpr_xml: str) -> str:
+    """给指定 styleId 的样式块注入 rPr 内容（幂等）"""
+    marker = f"<w:styleId>{style_id}</w:styleId>"
+    pos = xml.find(marker)
+    if pos < 0:
+        return xml
+    start = xml.rfind("<w:style ", 0, pos)
+    end = xml.find("</w:style>", pos)
+    if start < 0 or end < 0:
+        return xml
+    block = xml[start:end]
+    if rpr_xml in block:
+        return xml
+    if "<w:rPr>" in block:
+        new_block = block.replace("</w:rPr>", rpr_xml + "</w:rPr>", 1)
+    else:
+        new_block = block.replace("</w:style>", "<w:rPr>" + rpr_xml + "</w:rPr></w:style>", 1)
+    return xml[:start] + new_block + xml[end:]
+
+
+def _inject_style_ppr(xml: str, style_id: str, ppr_xml: str) -> str:
+    """给指定 styleId 的样式块注入 pPr 内容（仅当块内已有 pPr；幂等）"""
+    marker = f"<w:styleId>{style_id}</w:styleId>"
+    pos = xml.find(marker)
+    if pos < 0:
+        return xml
+    start = xml.rfind("<w:style ", 0, pos)
+    end = xml.find("</w:style>", pos)
+    if start < 0 or end < 0:
+        return xml
+    block = xml[start:end]
+    if ppr_xml in block or "<w:pPr>" not in block:
+        return xml
+    new_block = block.replace("</w:pPr>", ppr_xml + "</w:pPr>", 1)
+    return xml[:start] + new_block + xml[end:]
+
+
 def _ensure_ref_docx() -> str:
     """生成带表格边框的 pandoc reference docx（基于默认模板改 styles.xml，缓存 /tmp）"""
     if os.path.exists(_REF_DOCX_PATH):
@@ -85,6 +129,20 @@ def _ensure_ref_docx() -> str:
                 r'<w:style [^>]*w:type="table"[^>]*w:styleId="Table".*?</w:style>',
                 add_borders, styles, flags=re.S,
             )
+        # ── 产品色美化：标题/链接品牌紫，代码块 Consolas 9pt + 紫调底纹 ──
+        for sid in ("Heading1", "Heading2", "Heading3"):
+            styles2 = _inject_style_rpr(styles2, sid, f'<w:color w:val="{_BRAND_VIOLET}"/>')
+        styles2 = _inject_style_rpr(styles2, "Hyperlink", f'<w:color w:val="{_BRAND_VIOLET}"/>')
+        styles2 = _inject_style_rpr(
+            styles2, "SourceCode",
+            '<w:rFonts w:ascii="Consolas" w:hAnsi="Consolas" w:eastAsia="Consolas"/>'
+            '<w:sz w:val="18"/><w:color w:val="334155"/>',
+        )
+        styles2 = _inject_style_ppr(styles2, "SourceCode", f'<w:shd w:val="clear" w:color="auto" w:fill="{_CODE_FILL}"/>')
+        styles2 = _inject_style_rpr(
+            styles2, "VerbatimChar",
+            '<w:rFonts w:ascii="Consolas" w:hAnsi="Consolas" w:eastAsia="Consolas"/>',
+        )
         buf = io.BytesIO()
         with zipfile.ZipFile(buf, "w", zipfile.ZIP_DEFLATED) as zout:
             for item in zin.infolist():
@@ -103,19 +161,24 @@ def _ensure_ref_docx() -> str:
 _INSTALL_STATE: dict = {"running": False, "ok": False, "error": "", "started_at": ""}
 
 
-def _apply_zebra(data: bytes) -> bytes:
-    """偶数行浅灰底（硬编码单元格 shd——样式条件格式 band1Horz 在 Word/WPS 渲染保守，这招任何查看器都显示）"""
+def _post_process_docx(data: bytes) -> bytes:
+    """docx 后处理：表头浅紫底+深紫加粗字；偶数行紫调斑马纹（硬编码单元格 shd，任何查看器都显示）"""
     try:
         from io import BytesIO
 
         from docx import Document
         from docx.oxml import OxmlElement
         from docx.oxml.ns import qn
+        from docx.shared import RGBColor
 
         doc = Document(BytesIO(data))
         for tbl in doc.tables:
             for idx, row in enumerate(tbl.rows):
-                if idx % 2 == 0:
+                if idx == 0:
+                    fill = _HEADER_FILL
+                elif idx % 2 == 1:
+                    fill = _ZEBRA_FILL
+                else:
                     continue
                 seen = set()
                 for cell in row.cells:
@@ -126,13 +189,18 @@ def _apply_zebra(data: bytes) -> bytes:
                     shd = OxmlElement("w:shd")
                     shd.set(qn("w:val"), "clear")
                     shd.set(qn("w:color"), "auto")
-                    shd.set(qn("w:fill"), "F2F2F2")
+                    shd.set(qn("w:fill"), fill)
                     tc_pr.append(shd)
+                    if idx == 0:
+                        for p in cell.paragraphs:
+                            for run in p.runs:
+                                run.font.color.rgb = RGBColor(0x7C, 0x3A, 0xED)
+                                run.font.bold = True
         buf = BytesIO()
         doc.save(buf)
         return buf.getvalue()
     except Exception:
-        logger.warning("斑马纹硬编码失败，返回原 docx", exc_info=True)
+        logger.warning("docx 后处理失败，返回原 docx", exc_info=True)
         return data
 
 
@@ -245,7 +313,7 @@ async def export_docx(
         raise HTTPException(status_code=500, detail=f"pandoc 错误: {result.stderr.decode(errors='replace')[:200]}")
     filename = req.filename if req.filename.endswith(".docx") else req.filename + ".docx"
     return Response(
-        _apply_zebra(result.stdout),
+        _post_process_docx(result.stdout),
         media_type=DOCX_MEDIA,
         headers={"Content-Disposition": f'attachment; filename="{filename}"'},
     )
