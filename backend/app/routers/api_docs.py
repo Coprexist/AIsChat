@@ -192,7 +192,11 @@ async def export_docx(
     if not docx_available():
         raise HTTPException(status_code=400, detail="docx 导出未安装（需要 pandoc）")
     try:
-        cmd = ["pandoc", "-f", "markdown", "-t", "docx", "--toc", "--toc-depth=2"]
+        cmd = [
+            "pandoc", "-f", "markdown", "-t", "docx",
+            "--toc", "--toc-depth=2",
+            "--highlight-style=pygments",  # 代码块语法高亮
+        ]
         ref = _ensure_ref_docx()
         if ref:
             cmd.append(f"--reference-doc={ref}")
