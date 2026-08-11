@@ -392,6 +392,15 @@
 :is(.dark, .bubble-content.text-white) .hljs-selector-class { color: #c4b5fd; }
 :is(.dark, .bubble-content.text-white) .hljs-deletion { color: #f87171; }
 :is(.dark, .bubble-content.text-white) .hljs-link { color: #818cf8; text-decoration: underline; }
+/* 补漏：HTML 标签名/结构符（tag/name/punctuation 等）——日间是深色，暗色必须覆盖否则看不清 */
+:is(.dark, .bubble-content.text-white) .hljs-tag,
+:is(.dark, .bubble-content.text-white) .hljs-name,
+:is(.dark, .bubble-content.text-white) .hljs-operator,
+:is(.dark, .bubble-content.text-white) .hljs-punctuation,
+:is(.dark, .bubble-content.text-white) .hljs-property,
+:is(.dark, .bubble-content.text-white) .hljs-params,
+:is(.dark, .bubble-content.text-white) .hljs-function,
+:is(.dark, .bubble-content.text-white) .hljs-selector-pseudo { color: #e2e8f0; }
 
 /* react-easy-crop 方形裁剪圆角 */
 .rounded-crop-area {
