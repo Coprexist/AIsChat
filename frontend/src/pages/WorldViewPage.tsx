@@ -11,6 +11,7 @@ export default function WorldViewPage() {
   const navigate = useNavigate()
   const [params] = useSearchParams()
   const groupId = params.get('group_id')
+  const entryFrom = params.get('from')
   const iframeRef = useRef<HTMLIFrameElement>(null)
   const [title, setTitle] = useState('沉浸界面')
   const [notFound, setNotFound] = useState(false)
@@ -89,7 +90,7 @@ export default function WorldViewPage() {
         ) : (
           <iframe
             ref={iframeRef}
-            src={`/world/${wid}/preview${groupId ? `?group_id=${groupId}` : ''}`}
+            src={`/world/${wid}/preview${groupId ? `?group_id=${groupId}` : entryFrom ? `?from=${entryFrom}` : ''}`}
             className="w-full h-full bg-white"
             title="世界"
             onLoad={(e) => {

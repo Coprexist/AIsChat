@@ -601,7 +601,10 @@ async def _get_creator_name(db: AsyncSession, world_id: int) -> str:
     return cfg.get("name") or "群视界机器人"
 
 
-def _inject_world_vars(html: str, world_id: int, creator_name: str, group_id: int | None, world_name: str = "") -> str:
+def _inject_world_vars(
+    html: str, world_id: int, creator_name: str, group_id: int | None, world_name: str = "",
+    entry: dict | None = None,
+) -> str:
     """向世界 HTML 注入环境变量（世界代码零硬编码，打包/换实例即插即用）。
 
     变量（world code 直接读 window.*）：
@@ -611,6 +614,8 @@ def _inject_world_vars(html: str, world_id: int, creator_name: str, group_id: in
       WORLD_AI_NAME 群视界 AI 名字
       GROUP_ID     入口群聊编号（无 = null）
       USER_ID      当前用户编号（无登录态 = null，客户端可补）
+      WORLD_ENTRY  入口分流：{kind: 'group'|'dm'|'main', group_id, group_type_slug}
+                   世界代码据此渲染不同界面（群类型→对应场景、私聊→对话地点、直进→主页）
     """
     script = (
         "<script>\n"
@@ -619,6 +624,7 @@ def _inject_world_vars(html: str, world_id: int, creator_name: str, group_id: in
         f"window.WORLD_AI_ID = 'world-{world_id}';\n"
         f"window.WORLD_AI_NAME = {json.dumps(creator_name, ensure_ascii=False)};\n"
         f"window.GROUP_ID = {group_id if group_id is not None else 'null'};\n"
+        f"window.WORLD_ENTRY = {json.dumps(entry or {'kind': 'main', 'group_id': None, 'group_type_slug': None}, ensure_ascii=False)};\n"
         "window.USER_ID = null; // 由宿主环境注入\n"
         "</script>\n"
         "<script>\n"
@@ -649,6 +655,7 @@ async def serve_world_file(
     path: str,
     request: Request,
     group_id: int | None = Query(default=None, description="入口群聊编号"),
+    entry_from: str | None = Query(default=None, alias="from", description="入口类型：dm=私聊 / main=直进（群入口由 group_id 推断）"),
     db: AsyncSession = Depends(get_db),
 ):
     """静态资源路由：/world/{WORLD_ID}/files/<相对路径>（HTML 自动注入世界变量）"""
@@ -677,8 +684,23 @@ async def serve_world_file(
                     group_id = row.entity_id
             except Exception:
                 pass
+        # 入口分流：WORLD_ENTRY（群入口查绑定类型；dm/main 由 from 参数指定）
+        entry: dict = {"kind": "main", "group_id": None, "group_type_slug": None}
+        if group_id is not None:
+            entry["kind"] = "group"
+            entry["group_id"] = group_id
+            try:
+                from app.models.world import WorldBinding as _WB
+                _b = (await db.execute(select(_WB).where(
+                    _WB.world_id == world_id, _WB.entity_type == "group", _WB.entity_id == group_id,
+                ))).scalar_one_or_none()
+                entry["group_type_slug"] = _b.group_type_slug if _b else None
+            except Exception:
+                pass
+        elif entry_from in ("dm", "main"):
+            entry["kind"] = entry_from
         html = target.read_text(encoding="utf-8", errors="replace")
-        return HTMLResponse(_inject_world_vars(html, world_id, creator_name, group_id, world_name))
+        return HTMLResponse(_inject_world_vars(html, world_id, creator_name, group_id, world_name, entry=entry))
     # 世界代码频繁变化：ETag 条件缓存——更新后自动拿新版（免强刷），
     # 未更新时浏览器 304 走缓存（不重复下载）（2026-08-05 珑哥）
     etag = f'"{target.stat().st_mtime_ns:x}-{target.stat().st_size:x}"'
@@ -691,6 +713,7 @@ async def serve_world_file(
 @router.get("/{world_id}/preview")
 async def world_preview(
     world_id: int,
+    request: Request,
     group_id: int | None = Query(default=None, description="入口群聊编号"),
     db: AsyncSession = Depends(get_db),
 ):
@@ -718,6 +741,16 @@ async def world_preview(
     except Exception:
         pass
     url = f"/world/{world_id}/files/index.html"
+    qs = []
     if group_id is not None:
-        url += f"?group_id={group_id}"
+        qs.append(f"group_id={group_id}")
+    entry_from: str | None = None
+    try:
+        entry_from = request.query_params.get("from")
+    except Exception:
+        pass
+    if entry_from in ("dm", "main"):
+        qs.append(f"from={entry_from}")
+    if qs:
+        url += "?" + "&".join(qs)
     return RedirectResponse(url, status_code=307)
