@@ -8,7 +8,7 @@ import GroupSettingsPanel from './GroupSettingsPanel'
 import { GroupAvatarHeader, thumbUrl } from './GroupAvatar'
 import ProfileCard from './ProfileCard'
 import SearchOverlay from './SearchOverlay'
-import { Bell, BellOff, UserPlus, Settings, ArrowLeft, Bot, User, Globe, X, Check, Users } from 'lucide-react'
+import { Bell, BellOff, UserPlus, Settings, ArrowLeft, Bot, User, Globe, X, Check, Users, AlertTriangle } from 'lucide-react'
 import { useT } from '../i18n/I18nContext'
 import { useResizableSidebar } from '../hooks/useResizableSidebar'
 
@@ -733,7 +733,7 @@ function InviteMemberModal({
 
         {error && (
           <div className="text-sm text-rose-400 bg-rose-500/10 border border-rose-500/30 rounded-lg px-3 py-2.5 mb-3 flex items-start gap-2 whitespace-pre-line">
-            <span className="shrink-0 mt-0.5">⚠</span>
+            <AlertTriangle size={14} className="shrink-0 mt-0.5" />
             <span>{error}</span>
           </div>
         )}

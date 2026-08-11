@@ -7,7 +7,7 @@ import ChatInput from './ChatInput'
 import ActivityBar, { type ActivityUser } from './ActivityBar'
 import ProfileCard from './ProfileCard'
 import EmptyState from './EmptyState'
-import { Send, Loader2, AlertTriangle, X, ArrowDown, ArrowUp, Paperclip, FileIcon, Bot, User, MessageSquare, Inbox } from 'lucide-react'
+import { Send, Loader2, AlertTriangle, X, ArrowDown, ArrowUp, Paperclip, FileIcon, Bot, User, MessageSquare, Inbox, Settings } from 'lucide-react'
 import { getStateDotColor, CHAT_REFRESH_EVENT } from '../constants'
 import { useT } from '../i18n/I18nContext'
 import { tryOpenWorldWindow } from '../utils/worldView'
@@ -1036,7 +1036,7 @@ export default function ChatView({ conversationType, conversationId }: ChatViewP
                 onClick={closeWorldModal}
                 className="w-full py-3 bg-elevated hover:bg-border text-textPrimary rounded-xl font-medium transition-colors"
               >
-                ⚙️ 在此标准界面打开
+                <Settings size={12} /> 在此标准界面打开
               </button>
             </div>
           </div>

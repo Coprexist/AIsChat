@@ -4,8 +4,7 @@ import { useT } from '../i18n/I18nContext'
 import { STATE_LABELS, STATE_TAG_COLORS } from '../constants'
 import {
   MessagesSquare, Folder, Brain, Users, Settings, Clock,
-  ChevronDown, ChevronUp, Puzzle,
-} from 'lucide-react'
+  ChevronDown, ChevronUp, Puzzle, X } from 'lucide-react'
 
 // ─── 类型 ────────────────────────────────────────────
 
@@ -152,7 +151,7 @@ export default function SkillBackpack({ agentId, className = '' }: Props) {
         <div className="bg-surface rounded-xl border border-primary-500/20 p-4 space-y-2.5 shadow-lg">
           <div className="flex items-center justify-between">
             <p className="text-xs font-semibold text-textPrimary">{expandedSeg.name} — {t('backpack.toolsInSkill')} ({expandedSeg.tool_count})</p>
-            <button onClick={() => setExpandedSegment(null)} className="text-[11px] text-textMuted hover:text-textSecondary transition-colors">收起 ✕</button>
+            <button onClick={() => setExpandedSegment(null)} className="text-[11px] text-textMuted hover:text-textSecondary transition-colors">收起 <X size={12} /></button>
           </div>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
             {expandedSeg.tools.map(tool => (

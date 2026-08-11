@@ -288,7 +288,7 @@ function OverviewTab() {
         </div>
         <div className="flex items-center gap-1.5 text-[11px] text-textMuted">
           <div className={`w-1.5 h-1.5 rounded-full ${mt.auto ? 'bg-amber-400 animate-pulse' : mt.hard ? 'bg-rose-400' : mt.soft ? 'bg-amber-400' : 'bg-mint-400'}`} />
-          {mt.auto ? '⚡ 服务启动中，自动暂停' :
+          {mt.auto ? '服务启动中，自动暂停' :
            mt.hard ? '🔴 已暂停——所有用户看到维护提示，API 不可用' :
            mt.soft ? '🟡 温馨提示中——用户看到提示条，API 正常' :
            '🟢 正常运行'}

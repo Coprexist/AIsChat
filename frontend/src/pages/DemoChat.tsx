@@ -98,7 +98,7 @@ export default function DemoChat() {
         }
       }
     } catch (e: any) {
-      setMsgs(prev => [...prev, { role: 'assistant', content: `❌ ${e.message || '请求失败'}` }])
+      setMsgs(prev => [...prev, { role: 'assistant', content: `${e.message || '请求失败'}` }])
     }
     setLoading(false)
   }

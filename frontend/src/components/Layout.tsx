@@ -4,7 +4,7 @@ import Sidebar from './Sidebar'
 import MobileNav from './MobileNav'
 import BalancePromptModal from './BalancePromptModal'
 import { useDesktopNotification } from '../hooks/useDesktopNotification'
-import { Wrench } from 'lucide-react'
+import { Wrench, X } from 'lucide-react'
 import { loadFromStorage, apply } from '../utils/cssFilters'
 
 export default function Layout() {
@@ -196,7 +196,7 @@ export default function Layout() {
         <div className="fixed top-0 left-0 right-0 z-[65] text-xs text-center py-2 px-4 font-medium flex items-center justify-center gap-2" style={{ backgroundColor: softColor, color: softTextColor }}>
           <span>{softText}</span>
           <button onClick={() => { setSoftMaintenance(false); if (softOnce) sessionStorage.setItem('maint_soft_done', '1') }}
-            className="shrink-0 px-2 py-0.5 rounded text-[10px] opacity-80 hover:opacity-100 transition-opacity" style={{ backgroundColor: 'rgba(0,0,0,0.15)' }}>✕</button>
+            className="shrink-0 px-2 py-0.5 rounded text-[10px] opacity-80 hover:opacity-100 transition-opacity" style={{ backgroundColor: 'rgba(0,0,0,0.15)' }}><X size={12} /></button>
         </div>
       )}
       {/* 软维护——弹窗 */}
@@ -215,7 +215,7 @@ export default function Layout() {
         <div className="fixed top-0 left-0 right-0 z-[70] text-xs text-center py-2 px-4 font-medium flex items-center justify-center gap-2" style={{ backgroundColor: hardText.color, color: hardText.textColor }}>
           <span>{hardText.title} · {hardText.body}</span>
           <button onClick={() => setMaintenance(false)}
-            className="shrink-0 px-2 py-0.5 rounded text-[10px] opacity-80 hover:opacity-100 transition-opacity" style={{ backgroundColor: 'rgba(0,0,0,0.15)' }}>✕</button>
+            className="shrink-0 px-2 py-0.5 rounded text-[10px] opacity-80 hover:opacity-100 transition-opacity" style={{ backgroundColor: 'rgba(0,0,0,0.15)' }}><X size={12} /></button>
         </div>
       )}
       {/* 硬维护——弹窗 */}

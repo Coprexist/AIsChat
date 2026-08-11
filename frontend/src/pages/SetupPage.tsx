@@ -8,8 +8,7 @@ import { api } from '../api/client'
 import {
   Globe, Check, User, Key, Bot, Mail, Shield, Sparkles,
   Upload, Loader2, Eye, EyeOff, ChevronLeft, ChevronRight,
-  Server, X, Pen, ExternalLink,
-} from 'lucide-react'
+  Server, X, Pen, ExternalLink, Star } from 'lucide-react'
 
 import AvatarCropModal from '../components/AvatarCropModal'
 import CreateAgentModal from '../components/CreateAgentModal'
@@ -613,7 +612,7 @@ export default function SetupPage() {
                           : 'bg-canvas border-border text-textSecondary hover:text-textPrimary hover:border-primary-500/30'
                       }`}
                     >
-                      {p.name}{p.is_default ? ' ★' : ''}
+                      {p.name}{p.is_default ? <Star size={10} className="fill-current text-amber-400" /> : null}
                     </button>
                   ))}
                 </div>

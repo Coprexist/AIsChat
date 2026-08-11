@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import { api } from '../api/client'
-import { Plus, Save, Upload } from 'lucide-react'
+import { Plus, Save, Upload, Pencil, Check } from 'lucide-react'
 import { useT } from '../i18n/I18nContext'
 
 interface MsgData {
@@ -123,7 +123,7 @@ export default function MaintenanceMsgEditor() {
         <button onClick={() => handlePresetAction('save')} className="shrink-0 px-3 py-1.5 text-[11px] rounded-lg border border-dashed border-border text-textMuted hover:text-primary-400 transition-colors"><Plus size={13} className="inline mr-0.5" />存预设</button>
         {selPreset && (
           <>
-            <button onClick={() => handlePresetAction('rename', selPreset)} className="text-[11px] text-textMuted hover:text-primary-400">✏️</button>
+            <button onClick={() => handlePresetAction('rename', selPreset)} className="text-[11px] text-textMuted hover:text-primary-400"><Pencil size={12} /></button>
             <button onClick={() => handlePresetAction('del', selPreset)} className="text-[11px] text-rose-400/70 hover:text-rose-400">🗑</button>
           </>
         )}
@@ -250,7 +250,7 @@ export default function MaintenanceMsgEditor() {
           className="flex items-center gap-1.5 px-5 py-2 rounded-lg bg-primary-500 text-white text-xs font-medium hover:bg-primary-400 disabled:opacity-50 transition-colors">
           <Save size={14} />{saving ? '保存中···' : '保存'}
         </button>
-        {saved && <span className="text-xs text-mint-400">✓ 已保存</span>}
+        {saved && <span className="text-xs text-mint-400"><Check size={12} className="inline text-mint-400" /> 已保存</span>}
       </div>
     </div>
   )

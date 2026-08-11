@@ -1,7 +1,7 @@
 import { useState, useEffect, Fragment } from 'react'
 import { api } from '../api/client'
 import { useT } from '../i18n/I18nContext'
-import { Globe, Link, Plus, Trash2, RefreshCw, Power, Shield } from 'lucide-react'
+import { Globe, Link, Plus, Trash2, RefreshCw, Power, Shield, X } from 'lucide-react'
 import ExternalLinkSafe from './ExternalLinkSafe'
 
 interface InstanceInfo {
@@ -358,7 +358,7 @@ export default function FederationTab() {
       {error && (
         <div className="flex items-start gap-2 bg-rose-400/5 border border-rose-400/20 rounded-lg px-4 py-2.5">
           <span className="text-rose-400 text-sm flex-1 whitespace-pre-wrap">{error}</span>
-          <button onClick={() => setError('')} className="text-rose-400/60 hover:text-rose-400 shrink-0 text-sm">✕</button>
+          <button onClick={() => setError('')} className="text-rose-400/60 hover:text-rose-400 shrink-0 text-sm"><X size={14} /></button>
         </div>
       )}
       {/* 风险告知弹窗 */}

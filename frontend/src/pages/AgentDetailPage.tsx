@@ -1638,7 +1638,7 @@ export default function AgentDetailPage() {
               ) : deleteFileRefs && deleteFileRefs.reference_count > 0 ? (
                 <>
                   <p className="text-amber-400 font-medium mb-2">
-                    ⚠ {t('agentDetail.fileReferencedBy').replace('{count}', String(deleteFileRefs.reference_count))}
+                    {t('agentDetail.fileReferencedBy').replace('{count}', String(deleteFileRefs.reference_count))}
                   </p>
                   <div className="space-y-1 max-h-32 overflow-y-auto">
                     {deleteFileRefs.references.map((ref, i) => (

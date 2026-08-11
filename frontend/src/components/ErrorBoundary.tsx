@@ -1,4 +1,5 @@
 import { Component, type ReactNode } from 'react'
+import { AlertTriangle } from 'lucide-react'
 
 interface Props { children: ReactNode }
 interface State { hasError: boolean; error: Error | null }
@@ -15,7 +16,7 @@ export default class ErrorBoundary extends Component<Props, State> {
       return (
         <div className="min-h-screen flex items-center justify-center bg-canvas p-6">
           <div className="text-center max-w-sm">
-            <div className="text-6xl mb-4 text-textMuted/30 font-bold">⚠</div>
+            <AlertTriangle size={48} className="mx-auto text-textMuted/30 mb-4" />
             <h1 className="text-xl font-semibold text-textPrimary mb-2">出错了</h1>
             <p className="text-sm text-textMuted mb-6 leading-relaxed">
               应用发生了意外错误。请刷新页面重试，或联系管理员。

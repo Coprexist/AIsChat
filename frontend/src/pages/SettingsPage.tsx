@@ -13,7 +13,7 @@ import { LANGUAGES } from '../i18n/languages'
 import { isDesktop } from '../utils/platform'
 import { invoke } from '../utils/tauri'
 import { getApiKeyUrl } from '../utils/providers.tsx'
-import { Key, Zap, Save, Clock, Palette, Bell, Eye, EyeOff, CheckCircle, XCircle, Loader2, Globe, Layout, Bot, Pencil, X, Ticket, Plus, ChevronDown, ChevronRight, Shield, AlertTriangle, ArrowLeft, Mail, Monitor, HardDrive, Trash2, Cpu, Wrench, Box, ExternalLink, BarChart3 } from 'lucide-react'
+import { Key, Zap, Save, Clock, Palette, Bell, Eye, EyeOff, CheckCircle, XCircle, Loader2, Globe, Layout, Bot, Pencil, X, Ticket, Plus, ChevronDown, ChevronRight, Shield, AlertTriangle, ArrowLeft, Mail, Monitor, HardDrive, Trash2, Cpu, Wrench, Box, ExternalLink, BarChart3, Star } from 'lucide-react'
 import { useNavigate, useBlocker, useLocation, useSearchParams } from 'react-router-dom'
 
 // 常用时区列表
@@ -578,7 +578,7 @@ export default function SettingsPage() {
                         : 'bg-canvas border-border text-textSecondary hover:text-textPrimary hover:border-primary-500/30'
                     }`}
                   >
-                    {p.name}{p.is_default ? ' ★' : ''}
+                    {p.name}{p.is_default ? <Star size={10} className="fill-current text-amber-400" /> : null}
                   </button>
                 ))}
               </div>

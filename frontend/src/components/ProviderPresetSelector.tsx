@@ -437,7 +437,7 @@ function ProviderEditForm({
             onChange={e => setEditIsDefault(e.target.checked)}
             className="rounded"
           />
-          ⭐ {t('admin.setAsDefault') || '设为默认'}
+          <Star size={12} className="fill-current" /> {t('admin.setAsDefault') || '设为默认'}
         </label>
       </div>
       <div>

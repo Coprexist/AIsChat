@@ -674,7 +674,7 @@ export default function AuthSettingsTab() {
             <span className="text-sm text-textPrimary">{t('admin.requireEmailVerification')}</span>
             <p className="text-xs text-textMuted mt-0.5">{t('admin.requireEmailVerificationDesc')}</p>
             {!settings?.smtp_configured && (
-              <p className="text-xs text-amber-400 mt-1">⚠ {t('admin.requireEmailVerificationWarning')}</p>
+              <p className="text-xs text-amber-400 mt-1">{t('admin.requireEmailVerificationWarning')}</p>
             )}
           </div>
           <button

@@ -233,7 +233,7 @@ function ApiKeyGetLink({ providers }: { providers: ProviderInfo[] }) {
 function renderModelOptions(models: ModelOption[], providers: ProviderInfo[]) {
   if (providers.length > 0) {
     return providers.map(p => (
-      <optgroup key={p.name} label={`${p.name}${p.is_default ? ' ★' : ''}`}>
+      <optgroup key={p.name} label={`${p.name}${p.is_default ? '（默认）' : ''}`}>
         {p.models.map(m => (
           <option key={m.value} value={m.value}>{m.label}</option>
         ))}
