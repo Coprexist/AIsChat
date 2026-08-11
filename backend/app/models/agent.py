@@ -77,7 +77,7 @@ class Agent(Base):
     delay_reply_enabled = Column(Boolean, nullable=True, comment="延迟回复功能开关，NULL=继承全局默认")
 
     # 单次回复最大工具调用轮次（3 档预设：chat=2 / immersive=4 / digital_life=10）
-    max_tool_rounds = Column(Integer, default=3)
+    max_tool_rounds = Column(Integer, default=5)
 
     # 闹钟/心跳最大工具调用轮次（独立于普通回复，默认更高以支持深度自主任务）
     alarm_max_tool_rounds = Column(Integer, default=10)

@@ -339,7 +339,7 @@ async def _tool_call_loop(
     model: str,
     api_base_url: str,
     api_key: str | None,
-    max_loops: int = 3,
+    max_loops: int = 5,
     chain_depth: int = 0,
     conversation_type: str = "group",
     session_id: str | None = None,
@@ -555,9 +555,13 @@ async def _tool_call_loop(
                         else:
                             logger.warning(
                                 f"AI {agent.name}({agent.id}) LLM 压缩失败"
-                                f"（{compress_stats.get('reason', '未知')}），"
-                                "下一轮重试"
+                                f"（{compress_stats.get('reason', '未知')}），降级为内联压缩兜底"
                             )
+                            # 兜底：不依赖 LLM 的内联截断——避免 LLM 超时/Key 不可用时反复重试耗 API
+                            messages, inline_stats = inline_compress(messages)
+                            if inline_stats.get("compressed"):
+                                _auto_compressed = True
+                                compress_stats = inline_stats
                     if _auto_compressed:
                         logger.info(
                             f"AI {agent.name}({agent.id}) 上下文压缩完成："
@@ -576,26 +580,36 @@ async def _tool_call_loop(
             # ── 注入用户忙时消息（中断缓冲）──
             pending_msgs = await drain_pending_interrupts(agent.id)
             if pending_msgs:
-                for pm in pending_msgs:
-                    if pm.get("type") == "user_message":
-                        from zoneinfo import ZoneInfo
-                        tz = ZoneInfo(settings.display_timezone)
-                        now_str = datetime.now(tz).strftime(f"%Y-%m-%d %H:%M {tz.key}")
-                        sender_name = pm.get("sender_name", "用户")
-                        sender_id = pm.get("sender_id")
-                        msg_struct = {
-                            "time": now_str,
-                            "speaker_name": sender_name,
-                            "speaker_id": sender_id,
-                            "is_self": False,
-                            "content": pm.get("content", ""),
-                        }
-                        from app.utils.pure.prompting import format_message
-                        messages.append({
-                            "role": "user",
-                            "content": format_message(msg_struct, agent.name, max_content_len=-1),
-                        })
-                logger.info(f"AI {agent.name}({agent.id}): 注入 {len(pending_msgs)} 条中断消息")
+                try:
+                    for pm in pending_msgs:
+                        if pm.get("type") == "user_message":
+                            from zoneinfo import ZoneInfo
+                            tz = ZoneInfo(settings.display_timezone)
+                            now_str = datetime.now(tz).strftime(f"%Y-%m-%d %H:%M {tz.key}")
+                            sender_name = pm.get("sender_name", "用户")
+                            sender_id = pm.get("sender_id")
+                            msg_struct = {
+                                "time": now_str,
+                                "speaker_name": sender_name,
+                                "speaker_id": sender_id,
+                                "is_self": False,
+                                "content": pm.get("content", ""),
+                            }
+                            from app.utils.pure.prompting import format_message
+                            messages.append({
+                                "role": "user",
+                                "content": format_message(msg_struct, agent.name, max_content_len=-1),
+                            })
+                    logger.info(f"AI {agent.name}({agent.id}): 注入 {len(pending_msgs)} 条中断消息")
+                except Exception:
+                    # 注入失败：回写缓冲，避免消息永久丢失
+                    logger.warning(
+                        f"AI {agent.name}({agent.id}) 中断消息注入失败，回写 {len(pending_msgs)} 条",
+                        exc_info=True,
+                    )
+                    async with _state_lock:
+                        old = _pending_interrupts.get(agent.id) or []
+                        _pending_interrupts[agent.id] = pending_msgs + old
 
             try:
                 # 内层：同 Key 重试（500/503）
@@ -1050,8 +1064,8 @@ def _is_conversation_idle(messages: list[dict], hours: int = 12) -> bool:
                 try:
                     year = now.year + offset
                     msg_time = datetime.strptime(f"{year}-{time_str}", "%Y-%m-%d %H:%M")
-                    if msg_time > now and offset == 0:
-                        continue
+                    if msg_time > now:
+                        continue  # 解析到未来（跨年边界/时钟偏差）→ 试去年/放弃
                     idle_seconds = (now - msg_time).total_seconds()
                     return idle_seconds > hours * 3600
                 except ValueError:
