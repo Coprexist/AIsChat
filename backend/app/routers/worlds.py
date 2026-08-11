@@ -1096,6 +1096,7 @@ async def export_zip(
     world_id: int,
     include_content: bool = True,
     current_user: dict = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
 ):
     """一键打包下载。include_content=true（默认）包含 content/ 产物区；false 只打包代码区（发布用）"""
 
