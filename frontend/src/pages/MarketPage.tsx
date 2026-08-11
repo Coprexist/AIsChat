@@ -11,11 +11,12 @@ import { useCallback, useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import {
   Search, Download, Upload, X, Trash2, Globe, Tag, User, Clock,
-  Package, Store, Edit3, CheckCircle2, RefreshCw, Github, Link2, Unlink, ArrowUpCircle, Database,
+  Package, Store, Edit3, CheckCircle2, RefreshCw, Github, Link2, Unlink, ArrowUpCircle, Database, Settings,
 } from 'lucide-react'
 import { api } from '../api/client'
 import { useT } from '../i18n/I18nContext'
 import PageHeader from '../components/PageHeader'
+import MarketGithubTab from '../components/MarketGithubTab'
 
 interface MarketItem {
   id: number
@@ -80,6 +81,9 @@ export default function MarketPage() {
 
   // ── 发布/编辑/导入 ──
   const [importingId, setImportingId] = useState<number | null>(null)
+  // 实例 GitHub 配置（管理员）：点击先探测权限（非管理员 403）
+  const [settingsOpen, setSettingsOpen] = useState(false)
+  const [settingsDenied, setSettingsDenied] = useState(false)
   const [syncingId, setSyncingId] = useState<number | null>(null)
   const [editItem, setEditItem] = useState<MarketItem | null>(null)
   const [editTitle, setEditTitle] = useState('')
@@ -164,6 +168,16 @@ export default function MarketPage() {
   }
 
   // ── 刷新 GitHub 快照（管理员）──
+  const openGithubSettings = async () => {
+    try {
+      await api.get('/market/settings')
+      setSettingsDenied(false)
+      setSettingsOpen(true)
+    } catch {
+      setSettingsDenied(true)
+    }
+  }
+
   const doRefreshGithub = async () => {
     setRefreshing(true)
     setMsg('')
@@ -497,6 +511,14 @@ export default function MarketPage() {
               >
                 <RefreshCw size={11} className={refreshing ? 'animate-spin' : ''} /> {refreshing ? '刷新中…' : '刷新'}
               </button>
+              <button
+                onClick={openGithubSettings}
+                className="inline-flex items-center gap-1 text-xs px-3 py-1.5 rounded-lg bg-elevated hover:bg-border text-textSecondary transition-colors shrink-0"
+                title="实例 GitHub 配置（管理员）"
+              >
+                <Settings size={11} /> 实例配置
+              </button>
+              {settingsDenied && <span className="text-[10px] text-textMuted shrink-0">仅管理员可配置实例 GitHub</span>}
             </>
           )}
         </div>
@@ -724,6 +746,21 @@ export default function MarketPage() {
         </div>
       )}
 
+
+      {/* 实例 GitHub 配置（管理员） */}
+      {settingsOpen && (
+        <div className="fixed inset-0 z-50 bg-black/60 flex items-center justify-center p-4" onClick={() => setSettingsOpen(false)}>
+          <div className="w-full max-w-lg bg-surface border border-border rounded-2xl max-h-[85vh] overflow-y-auto shadow-xl" onClick={(e) => e.stopPropagation()}>
+            <div className="sticky top-0 bg-surface border-b border-border px-4 py-3 flex items-center justify-between">
+              <span className="text-sm font-semibold text-textPrimary">实例 GitHub 配置</span>
+              <button onClick={() => setSettingsOpen(false)} className="p-1 text-textMuted hover:text-textPrimary transition-colors"><X size={16} /></button>
+            </div>
+            <div className="p-4">
+              <MarketGithubTab />
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }
