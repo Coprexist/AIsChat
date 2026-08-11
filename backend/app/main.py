@@ -14,6 +14,21 @@ from app.database import check_db_connection
 
 logger = logging.getLogger("app.main")
 
+def _spawn(coro, name: str) -> asyncio.Task:
+    """创建后台任务并监控异常退出（异常不静默——记 ERROR 日志，方便发现 Worker 死亡）"""
+    task = asyncio.create_task(coro)
+
+    def _done(t: asyncio.Task) -> None:
+        if t.cancelled():
+            return
+        exc = t.exception()
+        if exc is not None:
+            logger.error(f"💥 后台任务 {name} 异常退出: {exc!r}", exc_info=exc)
+
+    task.add_done_callback(_done)
+    return task
+
+
 
 async def _start_browser_service():
     """启动共享 Chromium CDP 服务（稍延迟，等数据库就绪）"""
@@ -110,15 +125,15 @@ async def lifespan(app: FastAPI):
 
     # 启动 AI 回复 Worker
     from app.ai.response_worker import ai_response_worker
-    ai_worker_task = asyncio.create_task(ai_response_worker())
+    ai_worker_task = _spawn(ai_response_worker(), "ai_response_worker")
 
     # 启动向量化 Pipeline Worker
     from app.services.memory.vector_pipeline import vector_pipeline_worker
-    vector_worker_task = asyncio.create_task(vector_pipeline_worker())
+    vector_worker_task = _spawn(vector_pipeline_worker(), "vector_pipeline_worker")
 
     # 启动闹钟调度器（心跳机制 — 事件驱动模式）
     from app.ai.alarm import alarm_scheduler
-    alarm_scheduler_task = asyncio.create_task(alarm_scheduler())
+    alarm_scheduler_task = _spawn(alarm_scheduler(), "alarm_scheduler")
 
     # 启动审计日志清理（每天凌晨 3 点检查）
     async def audit_cleanup_loop():
@@ -133,7 +148,7 @@ async def lifespan(app: FastAPI):
                         logging.getLogger(__name__).info(f"审计日志清理: 删除 {result['deleted']} 条")
             except Exception:
                 pass
-    audit_cleanup_task = asyncio.create_task(audit_cleanup_loop())
+    audit_cleanup_task = _spawn(audit_cleanup_loop(), "audit_cleanup_loop")
 
     # 启动每日数据库备份（管理员开关 daily_backup_enabled；保留份数 daily_backup_keep）
     async def daily_backup_loop():
@@ -153,11 +168,11 @@ async def lifespan(app: FastAPI):
                 logger.info(f"💾 每日备份完成（清理 {deleted} 份过期）")
             except Exception as e:
                 logger.warning(f"⚠️ 每日备份失败: {e}", exc_info=True)
-    daily_backup_task = asyncio.create_task(daily_backup_loop())
+    daily_backup_task = _spawn(daily_backup_loop(), "daily_backup_loop")
 
     # 启动世界懒加载调度器（休眠/唤醒 + 离线时间补偿；手动模式下 no-op）
     from app.services.world.world_scheduler import world_scheduler
-    world_scheduler_task = asyncio.create_task(world_scheduler())
+    world_scheduler_task = _spawn(world_scheduler(), "world_scheduler")
 
     # 2.5：恢复常驻世界（config.resident=true）——后端重启后常驻进程继续跑
     try:
@@ -182,15 +197,15 @@ async def lifespan(app: FastAPI):
 
     # 启动记忆批量写入 worker
     from app.services.memory.memory_buffer import memory_flush_worker
-    memory_flush_task = asyncio.create_task(memory_flush_worker())
+    memory_flush_task = _spawn(memory_flush_worker(), "memory_flush_worker")
 
     # 启动孤儿文件清理 worker
     from app.services.content.file_service import orphan_cleanup_worker
-    orphan_cleanup_task = asyncio.create_task(orphan_cleanup_worker())
+    orphan_cleanup_task = _spawn(orphan_cleanup_worker(), "orphan_cleanup_worker")
 
     # 启动系统指标收集 flush worker
     from app.services.infrastructure.metrics_collector import metrics_flush_worker
-    metrics_flush_task = asyncio.create_task(metrics_flush_worker())
+    metrics_flush_task = _spawn(metrics_flush_worker(), "metrics_flush_worker")
 
     # 启动联邦通信（v0.1.2 跨实例直连）
     from app.database import async_session
@@ -204,17 +219,17 @@ async def lifespan(app: FastAPI):
     async with async_session() as db:
         await initialize_instance(db)
     # 连接所有已启用的对等端（在后台执行，不阻塞启动）
-    fed_connect_task = asyncio.create_task(federation_manager.connect_all_enabled_peers())
-    fed_heartbeat_task = asyncio.create_task(federation_heartbeat())
-    fed_reconnect_task = asyncio.create_task(federation_reconnect())
-    fed_profile_sync_task = asyncio.create_task(federation_profile_sync())
+    fed_connect_task = _spawn(federation_manager.connect_all_enabled_peers(), "federation_manager")
+    fed_heartbeat_task = _spawn(federation_heartbeat(), "federation_heartbeat")
+    fed_reconnect_task = _spawn(federation_reconnect(), "federation_reconnect")
+    fed_profile_sync_task = _spawn(federation_profile_sync(), "federation_profile_sync")
 
     # 启动共享 Chromium 服务（所有 AI 共用的浏览器 CDP）
-    browser_start_task = asyncio.create_task(_start_browser_service())
+    browser_start_task = _spawn(_start_browser_service(), "_start_browser_service")
 
     # 启动薄大脑控制系统（心跳）
     from app.services.brain.brain_controller import brain_controller
-    brain_init_task = asyncio.create_task(brain_controller.initialize())
+    brain_init_task = _spawn(brain_controller.initialize(), "brain_controller")
 
     # 技能运行时：注册为 Skill 事件总线的派发器（自治 Skill 执行引擎）
     from app.services.skill.skill_runtime import skill_runtime
@@ -222,13 +237,13 @@ async def lifespan(app: FastAPI):
 
     # 启动时间触发器周期扫描（time 维度的执行引擎）
     from app.services.skill.trigger_sweep import trigger_sweep_worker
-    trigger_sweep_task = asyncio.create_task(trigger_sweep_worker())
+    trigger_sweep_task = _spawn(trigger_sweep_worker(), "trigger_sweep_worker")
 
     logger.info("✅ 后台 worker 已全部启动（含联邦通信）")
 
     # 发出系统启动完成事件
     from app.services.brain.event_bus import event_bus, EventType
-    asyncio.create_task(event_bus.emit(EventType.SYSTEM_STARTUP))
+    _spawn(event_bus.emit(EventType.SYSTEM_STARTUP), "event_bus")
 
     # 启动完成，退出自动维护（但手动维护仍生效）
     if os.path.exists(_MAINTENANCE_AUTO):
