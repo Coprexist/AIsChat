@@ -26,8 +26,8 @@ router = APIRouter(prefix="/kb", tags=["接口文档"])
 
 DOCX_MEDIA = "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
 
-# ── docx 表格边框模板（pandoc 默认 reference.docx 的 Table 样式无边框，丑）──
-_REF_DOCX_PATH = "/tmp/docx-ref-bordered.docx"
+# ── docx 表格边框 + 斑马纹模板（pandoc 默认 reference.docx 的 Table 样式无边框无条纹，丑）──
+_REF_DOCX_PATH = "/tmp/docx-ref-bordered-v2.docx"
 _TBL_BORDERS = (
     "<w:tblBorders>"
     '<w:top w:val="single" w:sz="4" w:space="0" w:color="auto"/>'
@@ -37,6 +37,12 @@ _TBL_BORDERS = (
     '<w:insideH w:val="single" w:sz="4" w:space="0" w:color="auto"/>'
     '<w:insideV w:val="single" w:sz="4" w:space="0" w:color="auto"/>'
     "</w:tblBorders>"
+)
+# 行带斑马纹（Word 条件格式 band1Horz，浅灰底）
+_TBL_BANDING = (
+    '<w:tblStylePr w:type="band1Horz"><w:tcPr>'
+    '<w:shd w:val="clear" w:color="auto" w:fill="F2F2F2"/>'
+    "</w:tcPr></w:tblStylePr>"
 )
 
 
@@ -56,10 +62,15 @@ def _ensure_ref_docx() -> str:
 
         def add_borders(m: re.Match) -> str:
             block = m.group(0)
-            if "<w:tblBorders>" in block:
+            if "<w:tblStylePr" in block:
                 return block
             if "<w:tblPr" in block and "</w:tblPr>" in block:
-                return block.replace("</w:tblPr>", _TBL_BORDERS + "</w:tblPr>", 1)
+                # 边框进 tblPr，斑马纹紧跟 tblPr 之后（Word schema 顺序：tblPr → tblStylePr）
+                return block.replace(
+                    "</w:tblPr>",
+                    _TBL_BORDERS + "</w:tblPr>" + _TBL_BANDING,
+                    1,
+                )
             return block
 
         # 默认表格样式：w:type="table" 且 w:default="1"（pandoc reference.docx 的 Table）
