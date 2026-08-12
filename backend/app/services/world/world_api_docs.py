@@ -25,7 +25,7 @@ SECTIONS: list[dict] = [
      "intro": "控制宿主外壳：侧边栏/悬浮图标显隐"},
     {"id": "03", "title": "文件操作", "file": "03-files.md",
      "intro": "file_list/write/read/edit/delete 全部参数、类型白名单与越界防护"},
-    {"id": "04", "title": "积木体系", "file": "04-blocks.md",
+    {"id": "04", "title": "世界块体系（积木）", "file": "04-blocks.md",
      "intro": "list/view/apply_world_block 用法、现有积木（侧边栏/群聊对话窗）与侧边栏约定"},
     {"id": "05", "title": "群聊 API", "file": "05-group-chat.md",
      "intro": "读消息/发消息/成员列表/角色管理工具、身份与权限约定"},

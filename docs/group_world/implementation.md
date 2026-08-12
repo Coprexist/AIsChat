@@ -120,15 +120,18 @@ window.WorldUI = {              // UI 桥（postMessage → 宿主 Layout）
 
 ---
 
-## 七、积木体系（预制世界块）
+## 七、世界块体系（积木）
 
 - 积木包：`data/world_blocks/{block_id}/`（manifest.json + 自包含 css/js）
+- **分块结构**（2026-08-12）：应用后世界目录 `blocks/{id}/` = 主文件（平台管，可更新覆盖）+ `diy/` 用户定制区（`custom.css`/`custom.js` 自动加载、更新跳过不覆盖）+ `.bak/` 更新备份（旧主文件可回滚）
+- **DIY 约定**：改样式/逻辑写 `diy/custom.css`|`diy/custom.js`（加载顺序在主文件后），**不改主文件**（更新会覆盖主文件但保留 diy/）
+- **更新机制**：重新 apply 检测版本变化 → 懒通知注入世界 AI（「积木已更新 vX → vY，你的 DIY 已保留」）；管理员可 `POST /admin/blocks/{id}/update` 批量更新所有使用世界；主文件更新必须向后兼容（类名/CSS 变量/钩子只增不改）
 - 现有积木：
   - `platform-sidebar`（平台侧边栏——**内置平台基础菜单：首页/聊天/世界列表/设置，必保留**（可折叠「平台」组，跳主应用 window.parent），+ 世界自定义菜单 `SIDEBAR_ITEMS`，组名/项名可自定义 `SIDEBAR_PLATFORM_TITLE/LABELS`，应用后自动 `WorldUI.hideFloatingIcon()`）
   - `group-chat`（**群聊对话窗，2026-08-05**：消息列表+输入发送+轮询；**样式与主界面聊天一致**——渐变头像（自己紫/别人青/系统红，有头像用图）、左右布局、相对时间（刚刚/X分钟前/HH:MM）、Markdown 轻量渲染（标题/粗体/代码/列表/引用/链接，先转义防 XSS）、附件（图片缩略图/文件芯片）；发送人区分：`window.USER_ID` 优先 + localStorage `user_info` 回退，`sender_type === 'human'`；挂载点 `<div id="group-chat">` + `GROUP_CHAT_CONFIG{mountId,groupId,height,title,apiBase,pollMs}`）
 - AI 工具：查（list）/ 看（view，完整代码）/ 应用（apply → 复制进世界 `blocks/{id}/`，随世界打包导出）
 - 约定：任何世界侧边栏必须保留平台基础菜单（四目的地），否则用户回不了主应用
-- ⚠️ 已应用过积木的世界不会自动更新（文件是复制的），平台侧升级需重新 apply
+- ⚠️ 已应用过积木的世界不会自动更新（文件是复制的），平台侧升级需重新 apply（或管理员批量更新）
 
 ---
 
