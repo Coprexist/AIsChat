@@ -3399,56 +3399,6 @@ async def list_api_doc_sections(
     admin: dict = Depends(require_admin),
     db: AsyncSession = Depends(get_db),
 ):
-    """接口文档分区（含覆盖状态）：md 默认 + DB 覆盖，供管理表单编辑"""
-    from app.services.world.world_api_docs import _discover_sections, get_sections
-    from app.models.system_settings import SystemSettings
-    row = await db.get(SystemSettings, 1)
-    overrides = (row.api_doc_section_overrides or {}) if row else {}
-    sections = await get_sections(db)
-    for s in sections:
-        ov = overrides.get(s["id"]) or {}
-        s["default_title"] = s["title"]
-        s["default_intro"] = s["intro"]
-        s["title_overridden"] = bool(ov.get("title"))
-        s["intro_overridden"] = bool(ov.get("intro"))
-    return {"sections": sections}
-
-
-@router.put("/api-doc-sections")
-async def save_api_doc_sections(
-    body: dict,
-    admin: dict = Depends(require_admin),
-    db: AsyncSession = Depends(get_db),
-):
-    """保存接口文档分区标题/介绍覆盖（部署者/开发者表单注入，存 DB；md 默认不动）"""
-    from app.services.world.world_api_docs import _discover_sections
-    from app.models.system_settings import SystemSettings
-    valid_ids = {s["id"] for s in _discover_sections()}
-    overrides = {}
-    for sid, ov in (body.get("overrides") or {}).items():
-        if sid not in valid_ids:
-            continue
-        item = {}
-        if isinstance(ov.get("title"), str) and ov["title"].strip():
-            item["title"] = ov["title"].strip()
-        if isinstance(ov.get("intro"), str) and ov["intro"].strip():
-            item["intro"] = ov["intro"].strip()
-        if item:
-            overrides[sid] = item
-    row = await db.get(SystemSettings, 1)
-    if row is None:
-        row = SystemSettings(id=1)
-        db.add(row)
-    row.api_doc_section_overrides = overrides or None
-    await db.commit()
-    return {"saved": len(overrides), "overrides": overrides}
-
-
-@router.get("/api-doc-sections")
-async def list_api_doc_sections(
-    admin: dict = Depends(require_admin),
-    db: AsyncSession = Depends(get_db),
-):
     """接口文档分区（DB 快照 + md 源对比状态），供管理表单编辑"""
     from app.services.world.world_api_docs import get_sections, _discover_sections
     sections = await get_sections(db)
