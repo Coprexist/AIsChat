@@ -219,74 +219,148 @@ async def sr_delete(
         return {"ok": False, "error": str(e)}
 
 
+async def sr_rename(
+    db: AsyncSession,
+    agent_id: int,
+    category: str,
+    new_name: str,
+    level: str = "category",
+    sub_key: str | None = None,
+    field: str | None = None,
+) -> dict:
+    """改名：category / sub_key / field 任一级（对齐世界版 2026-08-12）"""
+    try:
+        new_name = (new_name or "").strip()
+        if not new_name:
+            return {"ok": False, "error": "new_name 不能为空"}
+        conditions = [StructuredRecord.agent_id == agent_id, StructuredRecord.category == category]
+        if level == "sub_key":
+            if not sub_key:
+                return {"ok": False, "error": "rename sub_key 需要 sub_key 定位"}
+            conditions.append(StructuredRecord.sub_key == sub_key)
+        elif level == "field":
+            if not sub_key or not field:
+                return {"ok": False, "error": "rename field 需要 sub_key + field 定位"}
+            conditions.append(StructuredRecord.sub_key == sub_key)
+            conditions.append(StructuredRecord.field == field)
+        elif level != "category":
+            return {"ok": False, "error": f"未知 level: {level}（category|sub_key|field）"}
+
+        rows = (await db.execute(select(StructuredRecord).where(*conditions))).scalars().all()
+        if not rows:
+            return {"ok": False, "error": "没有匹配的记录"}
+        for r in rows:
+            if level == "category":
+                r.category = new_name
+            elif level == "sub_key":
+                r.sub_key = new_name
+            else:
+                r.field = new_name
+        await db.commit()
+        return {"ok": True, "renamed": len(rows), "level": level, "new_name": new_name}
+    except Exception as e:
+        await db.rollback()
+        logger.error(f"sr_rename 失败: {e}", exc_info=True)
+        return {"ok": False, "error": str(e)}
+
+
+async def sr_move(
+    db: AsyncSession,
+    agent_id: int,
+    category: str,
+    sub_key: str,
+    to_category: str,
+    field: str | None = None,
+) -> dict:
+    """移动：整组 sub_key 或单条 field 跨目录（对齐世界版 2026-08-12）"""
+    try:
+        to_category = (to_category or "").strip()
+        if not to_category or not sub_key:
+            return {"ok": False, "error": "move 需要 to_category + sub_key"}
+        conditions = [
+            StructuredRecord.agent_id == agent_id,
+            StructuredRecord.category == category,
+            StructuredRecord.sub_key == sub_key,
+        ]
+        if field:
+            conditions.append(StructuredRecord.field == field)
+        rows = (await db.execute(select(StructuredRecord).where(*conditions))).scalars().all()
+        if not rows:
+            return {"ok": False, "error": "没有匹配的记录"}
+        for r in rows:
+            r.category = to_category
+        await db.commit()
+        return {"ok": True, "moved": len(rows), "to_category": to_category}
+    except Exception as e:
+        await db.rollback()
+        logger.error(f"sr_move 失败: {e}", exc_info=True)
+        return {"ok": False, "error": str(e)}
+
+
 async def format_db_records_for_prompt(db: AsyncSession, agent_id: int) -> str:
     """
-    将结构化记录注入系统提示词。
+    记忆索引（缩进树 + 软锚定，2026-08-12 瘦身对齐世界版）。
 
-    核心思想：无论空还是不空，始终展示目录结构——像人脑分区一样，
-    即使知识为空，框架也清晰可见，引导 AI 按照正确的方式填充经验。
+    格式（省 token + LLM 解析友好）：
+    ## 记忆索引
+    project/
+      图鉴页面/
+        进度
+      ⭐当前计划
+    user/
+      ❗偏好
 
-    空时 → 展示推荐目录 + 用法示例
-    有数据时 → 展示实际目录 + 字段摘要
+    规则：只注入有内容的路径（空目录不出现）；⭐=重要记忆 ❗=硬约束（value 前缀标记，软锚定）；
+    详细内容用 manage_records get 按需取。
     """
-    categories = await sr_categories(db, agent_id)
-    cat_list = categories.get("categories", [])
-    has_data = len(cat_list) > 0
+    def _mark(value: str) -> str:
+        v = (value or "").strip()
+        if v.startswith("❗"):
+            return "❗"
+        if v.startswith("⭐"):
+            return "⭐"
+        return ""
 
-    lines: list[str] = [
-        "## 你的记忆索引",
-        "",
-    ]
+    try:
+        from app.models.structured_record import StructuredRecord
+        rows = (await db.execute(
+            select(StructuredRecord).where(
+                StructuredRecord.agent_id == agent_id
+            ).order_by(StructuredRecord.category, StructuredRecord.sub_key, StructuredRecord.field)
+        )).scalars().all()
+    except Exception as e:
+        logger.error(f"记忆索引查询失败: {e}", exc_info=True)
+        return ""
 
-    if has_data:
-        lines.append("以下是你的长期记忆。按目录组织，越用越丰富。")
-    else:
-        lines.append("你的记忆目前是空的——像一个空书架，等待你填充。")
-        lines.append("用 manage_records 把重要的事记录下来，它们会按目录沉淀为长期记忆。")
-    lines.append("")
+    if not rows:
+        return (
+            "## 记忆索引\n"
+            "（空）用 manage_records 记录重要的事：people/ 人、topics/ 事、tasks/ 任务、journal/ 日志"
+        )
 
-    # ── 已有数据：展示实际目录 ──
-    if has_data:
-        for cat in cat_list[:8]:
-            name = cat["name"]
-            record_count = cat["record_count"]
-            sub_count = cat["sub_count"]
-            lines.append(f"📋 **{name}/** — {sub_count} 个子目录，{record_count} 条记录")
-
-            try:
-                sub_list = await sr_list(db, agent_id, name)
-                for item in sub_list.get("items", [])[:5]:
-                    sub = item["sub_key"]
-                    cnt = item["field_count"]
-                    fields_result = await sr_get(db, agent_id, name, sub)
-                    field_names = list(fields_result.get("fields", {}).keys())[:3]
-                    previews = []
-                    for fn in field_names:
-                        val = fields_result.get("fields", {}).get(fn, "")
-                        short = val[:30] + "..." if len(val) > 30 else val
-                        previews.append(f"{fn}: {short}")
-                    preview_str = "；".join(previews) if previews else f"{cnt}字段"
-                    lines.append(f"  {sub} — {preview_str}")
-            except Exception:
-                pass
-            lines.append("")
-
-    # ── 推荐目录模板（通用，不预设职业或场景）──
-    lines.extend([
-        "📋 推荐记忆目录（语义化标签，可自创）：",
-        "  people/    — 人：重要对象的信息、偏好、习惯、关系",
-        "  topics/    — 事：讨论过的话题、学到的知识、形成的观点",
-        "  tasks/     — 任务：项目进度、待办追踪、决策记录",
-        "  journal/   — 日志：自我反思、成长轨迹、重要事件",
-        "",
-    ])
-
-    # ── 用法速查（始终展示）──
-    lines.extend([
-        "---",
-        "查详情 → manage_records(action='get', category='...', sub_key='...')",
-        "写记录 → manage_records(action='set', category='...', sub_key='...', field='...', value='...')",
-        "看概览 → manage_records(action='summary', category='...', sub_key='...')",
-        "列目录 → manage_records(action='categories')",
-    ])
+    cats: dict[str, dict[str, dict[str, str]]] = {}
+    for r in rows:
+        cats.setdefault(r.category, {}).setdefault(r.sub_key, {})[r.field] = r.value
+    lines = ["## 记忆索引"]
+    for cat in sorted(cats):
+        subs = cats[cat]
+        if not subs or (len(subs) == 1 and "" in subs):
+            fields = subs.get("", {})
+            if fields:
+                lines.append(f"{cat}/")
+                for f in sorted(fields):
+                    lines.append(f"  {_mark(fields[f])}{f}")
+            continue
+        lines.append(f"{cat}/")
+        for sk in sorted(subs):
+            if sk == "":
+                continue
+            fields = {f: v for f, v in subs[sk].items() if f}
+            if fields:
+                lines.append(f"  {sk}/")
+                for f in sorted(fields):
+                    lines.append(f"    {_mark(fields[f])}{f}")
+            else:
+                lines.append(f"  {sk}")
+    lines.append("⭐重要 ❗硬约束；详情 manage_records get 按需取")
     return "\n".join(lines)

@@ -30,14 +30,16 @@ class ManageRecords(ToolPlugin):
         "- 列出所有学生: action='list', category='student_profile'\n"
         "- 学生快照: action='summary', category='student_profile', sub_key='1'\n"
         "- 查看目录: action='categories'\n"
-        "- 删除: action='delete', category='...', sub_key='...', field='...'  (field可选，不填删整个sub_key)"
+        "- 删除: action='delete', category='...', sub_key='...', field='...'  (field可选，不填删整个sub_key)\n"
+        "- 改名: action='rename', category='project', new_name='设定', level='category'（或 level='sub_key'/'field' 加 sub_key/field 定位）\n"
+        "- 移动: action='move', category='project', sub_key='图鉴页面', to_category='design'（整组移动；加 field 则只移单条）"
     )
     segment = "memory"
     parameters = {
         "action": {
             "type": "string",
-            "enum": ["set", "get", "list", "summary", "categories", "delete"],
-            "description": "操作类型：set=写入，get=读取，list=列子目录，summary=快照，categories=列目录，delete=删除",
+            "enum": ["set", "get", "list", "summary", "categories", "delete", "rename", "move"],
+            "description": "操作类型：set=写入，get=读取，list=列子目录，summary=快照，categories=列目录，delete=删除，rename=改名，move=移动",
         },
         "category": {
             "type": "string",
@@ -55,6 +57,19 @@ class ManageRecords(ToolPlugin):
             "type": "string",
             "description": "字段值（仅 set 时使用）",
         },
+        "new_name": {
+            "type": "string",
+            "description": "新名字（仅 rename 时使用）",
+        },
+        "level": {
+            "type": "string",
+            "enum": ["category", "sub_key", "field"],
+            "description": "改名的级别（仅 rename 时使用，默认 category）",
+        },
+        "to_category": {
+            "type": "string",
+            "description": "目标目录（仅 move 时使用）",
+        },
     }
     required = ["action", "category"]
     states = ["active", "dnd", "inactive"]
@@ -65,6 +80,7 @@ class ManageRecords(ToolPlugin):
                       arguments: dict, context: dict) -> dict:
         from app.services.memory.structured_memory_service import (
             sr_set, sr_get, sr_list, sr_summary, sr_categories, sr_delete,
+            sr_rename, sr_move,
         )
 
         action = arguments["action"]
@@ -118,6 +134,23 @@ class ManageRecords(ToolPlugin):
                 return {"success": True, "deleted": result["deleted"],
                         "message": f"已删除 {result['deleted']} 条记录"}
             return {"error": True, "message": result.get("error", "删除失败")}
+
+        elif action == "rename":
+            new_name = arguments.get("new_name", "").strip()
+            level = arguments.get("level", "category").strip()
+            result = await sr_rename(db, agent_id, category, new_name, level=level, sub_key=sub_key or None, field=field)
+            if result["ok"]:
+                return {"success": True, "renamed": result["renamed"],
+                        "message": f"已改名 {result['renamed']} 条（{level}: {new_name}）"}
+            return {"error": True, "message": result.get("error", "改名失败")}
+
+        elif action == "move":
+            to_category = arguments.get("to_category", "").strip()
+            result = await sr_move(db, agent_id, category, sub_key or "", to_category, field=field)
+            if result["ok"]:
+                return {"success": True, "moved": result["moved"],
+                        "message": f"已移动 {result['moved']} 条到 {to_category}"}
+            return {"error": True, "message": result.get("error", "移动失败")}
 
         return {"error": True, "message": f"未知操作: {action}"}
 
