@@ -122,7 +122,7 @@ export default function GroupManagerModal({ worldId, isOwner, onClose }: Props) 
   const typeName = (slug: string | null) => types.find(t => t.slug === slug)?.name || (slug ? `类型#${slug}` : '未绑定')
 
   return (
-    <div className="fixed inset-0 z-50 bg-black/60 flex items-center justify-center p-4" onClick={onClose}>
+    <div className="fixed inset-0 z-[60] bg-black/60 flex items-center justify-center p-4" onClick={onClose}>
       <div className="w-full max-w-2xl bg-surface border border-border rounded-2xl max-h-[85vh] flex flex-col" onClick={e => e.stopPropagation()}>
         {/* 头部 */}
         <div className="flex items-center justify-between p-4 pb-2 shrink-0">

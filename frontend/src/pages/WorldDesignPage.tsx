@@ -790,7 +790,7 @@ export default function WorldDesignPage() {
         </div>
         )}
         {mode === 'files' && (
-        <div onMouseDown={fileResizeStart} className="w-1 shrink-0 cursor-col-resize hover:bg-primary-500/40 transition-colors relative z-[70]" />
+        <div onMouseDown={fileResizeStart} className="w-1 shrink-0 cursor-col-resize hover:bg-primary-500/40 transition-colors relative z-[55]" />
         )}
         {/* 中列：编辑 / 预览（预览模式撑满文件树+编辑区整块） */}
         <div className="flex-1 flex flex-col min-w-0" style={{ minWidth: MIN_EDITOR }}>
@@ -849,7 +849,7 @@ export default function WorldDesignPage() {
             )}
           </div>
         </div>
-        <div onMouseDown={chatResizeStart} className="w-1 shrink-0 cursor-col-resize hover:bg-primary-500/40 transition-colors relative z-[70]" />
+        <div onMouseDown={chatResizeStart} className="w-1 shrink-0 cursor-col-resize hover:bg-primary-500/40 transition-colors relative z-[55]" />
         {/* 右列：对话面板（标题已在顶部标题栏） */}
         <div ref={chatPanelRef} className="flex flex-col shrink-0 bg-surface" style={{ width: effectiveChatWidth, maxWidth: effectiveChatWidth }}>
           <div className="flex-1 min-h-0 flex flex-col">
@@ -861,7 +861,7 @@ export default function WorldDesignPage() {
 
       {/* 接口文档查看（程序员用） */}
       {docsOpen && (
-        <div className="fixed inset-0 z-50 bg-black/60 flex items-center justify-center p-4" onClick={() => setDocsOpen(false)}>
+        <div className="fixed inset-0 z-[60] bg-black/60 flex items-center justify-center p-4" onClick={() => setDocsOpen(false)}>
           <div className="w-full max-w-4xl bg-surface border border-border rounded-2xl max-h-[85vh] flex flex-col shadow-xl" onClick={(e) => e.stopPropagation()}>
             <div className="flex items-center justify-between px-4 py-3 border-b border-border shrink-0">
               <div className="flex items-center gap-2">
