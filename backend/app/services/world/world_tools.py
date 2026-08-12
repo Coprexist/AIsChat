@@ -952,8 +952,8 @@ async def _do_execute(db: AsyncSession, world, name: str, arguments: str, turn_s
             args = json.loads(arguments or "{}")
             section = str(args.get("section", "")).strip()
             if not section:
-                from app.services.world.world_api_docs import SECTIONS
-                ids = " / ".join(s["id"] for s in SECTIONS)
+                from app.services.world.world_api_docs import _discover_sections
+                ids = " / ".join(s["id"] for s in _discover_sections())
                 return {"success": False, "error": f"缺少 section 参数（可选：{ids}）"}
             from app.services.world.world_api_docs import view_section
             return {"success": True, **view_section(section)}

@@ -9,6 +9,7 @@
 需要细节时由 AI 自己选择打开哪个区，避免全量文档塞进上下文。
 """
 import logging
+import re
 from pathlib import Path
 
 logger = logging.getLogger(__name__)
@@ -17,39 +18,47 @@ logger = logging.getLogger(__name__)
 DOCS_ROOT = Path(__file__).resolve().parent / "api_docs"
 SECTIONS_DIR = DOCS_ROOT / "sections"
 
-# 分区注册表（id → 标题/文件名/区介绍）——工具 description 与 view_section 共用同一份
-SECTIONS: list[dict] = [
-    {"id": "01", "title": "世界编号变量", "file": "01-variables.md",
-     "intro": "window 注入的 WORLD_ID/GROUP_ID/USER_ID 等变量与打包原则，写页面代码前必读"},
-    {"id": "02", "title": "世界UI桥 WorldUI", "file": "02-worldui.md",
-     "intro": "控制宿主外壳：侧边栏/悬浮图标显隐"},
-    {"id": "03", "title": "文件操作", "file": "03-files.md",
-     "intro": "file_list/write/read/edit/delete 全部参数、类型白名单与越界防护"},
-    {"id": "04", "title": "世界块体系（积木）", "file": "04-blocks.md",
-     "intro": "list/view/apply_world_block 用法、现有积木（侧边栏/群聊对话窗）与侧边栏约定"},
-    {"id": "05", "title": "群聊 API", "file": "05-group-chat.md",
-     "intro": "读消息/发消息/成员列表/角色管理工具、身份与权限约定"},
-    {"id": "06", "title": "页面与资源", "file": "06-pages-assets.md",
-     "intro": "沉浸界面入口、静态资源路由与相对路径规则"},
-    {"id": "07", "title": "懒通知与世界时间", "file": "07-notices-time.md",
-     "intro": "用户改代码的通知机制、世界时间流速、运行模式（手动唤醒/群消息钩子感知）"},
-    {"id": "08", "title": "错误与安全", "file": "08-errors-security.md",
-     "intro": "错误体格式、状态码、认证与安全约定"},
-    {"id": "09", "title": "受控数据 API（世界代码）", "file": "09-world-api.md",
-     "intro": "沙箱/世界代码访问世界数据与对话状态的代理接口：WORLD_API_TOKEN 鉴权、端点、限流"},
-]
+
+def _discover_sections() -> list[dict]:
+    """动态发现分区：扫描 sections/ 目录（NN-*.md），标题/介绍从文件头解析。
+    新增分区=放一个 md 文件；改名=改 md 第一行；删除=删文件——均无需改代码/重启。
+    约定：第一行 `# NN 标题`，第二行 `> 区介绍：xxx`。"""
+    sections = []
+    if not SECTIONS_DIR.is_dir():
+        return sections
+    for p in sorted(SECTIONS_DIR.glob("[0-9][0-9]-*.md")):
+        sid = p.stem[:2]
+        title = p.stem[3:]
+        intro = ""
+        try:
+            head = p.read_text(encoding="utf-8", errors="replace")[:500]
+            m = re.search(r"^#\s*[0-9]{2}\s*(.+)$", head, re.M)
+            if m:
+                title = m.group(1).strip()
+            m2 = re.search(r"^>\s*区介绍：(.+)$", head, re.M)
+            if m2:
+                intro = m2.group(1).strip()
+        except Exception:
+            pass
+        sections.append({"id": sid, "title": title, "file": p.name, "intro": intro})
+    return sections
+
+
+# 分区注册表（id → 标题/文件名/区介绍）——工具 description 与 view_section 共用同一份；
+# 动态从 sections/ 目录发现（见 _discover_sections），增删改分区无需重启
+SECTIONS: list[dict] = _discover_sections()
 
 
 def section_intro_text() -> str:
-    """给 view_api_doc 工具 description 用的「区名 + 区介绍」文本"""
-    return "\n".join(f"{s['id']} {s['title']}：{s['intro']}" for s in SECTIONS)
+    """给 view_api_doc 工具 description 用的「区名 + 区介绍」文本（实时扫描，改文档即时生效）"""
+    return "\n".join(f"{s['id']} {s['title']}：{s['intro']}" for s in _discover_sections())
 
 
 def view_section(section_id: str) -> dict:
-    """按区号读取分区文档内容（防路径穿越：只允许注册表内 id）"""
-    sec = next((s for s in SECTIONS if s["id"] == section_id), None)
+    """按区号读取分区文档内容（防路径穿越：只允许注册表内 id；分区表实时扫描）"""
+    sec = next((s for s in _discover_sections() if s["id"] == section_id), None)
     if sec is None:
-        raise ValueError(f"未知分区: {section_id}（可选：{' / '.join(s['id'] for s in SECTIONS)}）")
+        raise ValueError(f"未知分区: {section_id}（可选：{' / '.join(s['id'] for s in _discover_sections())}）")
     path = SECTIONS_DIR / sec["file"]
     if not path.exists():
         raise FileNotFoundError(f"分区文档缺失: {sec['file']}")
