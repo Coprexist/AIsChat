@@ -56,7 +56,7 @@ async def ensure_sections_seeded(db) -> None:
     try:
         from sqlalchemy import select
         from app.models.api_doc_section import ApiDocSection
-        existing = {(await db.execute(select(ApiDocSection.id))).scalars().all()}
+        existing = set((await db.execute(select(ApiDocSection.id))).scalars().all())
         for s in _discover_sections():
             if s["id"] in existing:
                 continue
