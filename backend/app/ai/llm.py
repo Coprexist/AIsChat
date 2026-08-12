@@ -1107,12 +1107,13 @@ async def build_messages(
             if group_id:
                 bound += await find_worlds_by_entity(db, "group", group_id)
             # 绑定类型（分层注入）：skill.types 声明了该类型才注入（群绑定的类型 + agent 绑定的类型）
+            # v0.3.4: agent 绑定存 user_id（entity_id 查询必须用 user_id，不能用 agent.id）
             type_slugs: set[str] = set()
             bind_rows = (await db.execute(
                 select(WorldBinding).where(
                     WorldBinding.world_id.in_([w.id for w in bound]),
                     WorldBinding.entity_type.in_(("agent", "group")),
-                    WorldBinding.entity_id.in_([agent.id] + ([group_id] if group_id else [])),
+                    WorldBinding.entity_id.in_([agent.user_id or 0] + ([group_id] if group_id else [])),
                 )
             )).scalars().all()
             for br in bind_rows:
