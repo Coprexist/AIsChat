@@ -14,7 +14,9 @@ export function getInstanceUrl(): string {
     const stored = localStorage.getItem('instance_url')
     if (stored) return stored.replace(/\/+$/, '') // 去掉末尾斜杠
   }
-  return window.location.origin
+  // iOS Safari 个别场景（外部链接/PWA 进入）origin 可能首帧未就绪 → 回退 location.href 的 origin
+  const origin = window.location.origin || `${window.location.protocol}//${window.location.host}`
+  return origin
 }
 
 /** 获取 API 基础路径 */

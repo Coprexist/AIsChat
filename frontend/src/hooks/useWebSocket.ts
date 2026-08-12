@@ -62,9 +62,24 @@ export function useWebSocket(
     const instanceUrl = getInstanceUrl()
     const protocol = instanceUrl.startsWith('https') ? 'wss:' : 'ws:'
     const host = instanceUrl.replace(/^https?:\/\//, '')
-    const url = `${protocol}//${host}/ws?token=${token}`
+    // token 必须 URL 编码：JWT 可能含 +/= 等特殊字符，Safari 严格解析会建连失败（首次灰按钮、刷新才好的根因）
+    const url = `${protocol}//${host}/ws?token=${encodeURIComponent(token)}`
 
-    const ws = new WebSocket(url)
+    let ws: WebSocket
+    try {
+      ws = new WebSocket(url)
+    } catch (e) {
+      // URL 非法等同步异常：不崩溃，走兜底重连（否则 wsRef 为 null 永不重试，按钮一直灰）
+      // 注意：scheduleReconnect 定义在 connect 之后（TDZ），这里内联定时器，不引用它
+      console.error('⚠️ WebSocket 创建失败，稍后重试:', e)
+      setConnected(false)
+      retryCountRef.current += 1
+      const delay = Math.min(5000 * retryCountRef.current, 30000)
+      retryTimerRef.current = setTimeout(() => {
+        if (mountedRef.current) connect()
+      }, delay)
+      return () => {}
+    }
     wsRef.current = ws
 
     ws.onopen = () => {
