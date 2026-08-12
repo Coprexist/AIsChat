@@ -32,6 +32,17 @@
 
 - **前端 -1 无限值被吞**：GroupManagerModal `Number(-1) || 3` 把 -1 变 3——改为显式保留 -1
 - **主站 agent 改提示词断缓存**：personality 段从直接拼 current_system_prompt 改为 effective 快照（build_messages / build_dm_messages + executor compact 解锁）
+- **邀请 AI 进群错配成另一个 AI**（严重）：friend_service.search_entities 返回 agent.id 而 invite 链路以 user_id 为唯一标准——当 agent.id 恰好等于另一 agent 的 user_id 时（我.agent.id=40 == 化学老师.user_id=40）错配入群；修复：AI 搜索统一返回 user_id，存量群 54/55 成员与历史消息已修正
+- **世界绑定 AI 统一 user_id**（根治）：bind_entry_with_type 归一化为 user_id 存储（传 agent.id 自动转）；llm.py / response_worker / tools/base 的 find_worlds_by_entity('agent') 改用 user_id；类型分层注入的绑定查询同步修复（自查发现的漏网）
+- **iOS Safari 首登发送按钮灰**：new WebSocket 无 try-catch + token 未 URL 编码——URL 非法时同步异常导致永不重试（刷新才恢复）；修复：getWsUrl 收口编码 + try-catch 兑底重连 + connectRef 打破循环依赖（重构后 -26 行）
+- **移动端设计页底部空白**：去掉冗余 pb-14（main 已为固定导航预留）
+
+### Docs（2026-08-12 新增）
+
+- 7.6 触发与并发调度：群 AI 走红黑树（MAX_CONCURRENT=3）受排队影响；世界 AI 拉模式（HTTP 流式）不受；世界程序节流合并通道不受
+- Skill 设计准则（珑哥定）：可操作性 / 简便性 / 效果最大化——AI 用最少次调用完成用户意图 = 好 skill（含反面例子 add_item/remove_item 应合并为 give_weapon）
+- 适时拆分文件原则：文件大了/不利维护就拆成职责单一的小文件
+- 内容提炼与动态加载（6.2）、前缀版本化 mermaid（锁定/解锁）
 
 ---
 
