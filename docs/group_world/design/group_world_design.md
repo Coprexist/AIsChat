@@ -340,11 +340,12 @@ active   → sleeping（休眠：无人在线 + 空闲超时）
 - 运行期读文件（改文档即时生效，无需重启）；注册表白名单防路径穿越
 - 模式价值：文档可独立迭代（不用动代码/提示词），AI 永远拿到最新接口说明
 
-### 6.9 世界 AI 记忆（2026-08-05 补充，阶段 2.6）
+### 6.9 世界 AI 记忆（2026-08-05 补充，阶段 2.6；2026-08-12 更新）
 
 - `world_ai_memories` 专属表（world_id/title/content/embedding Vector 1536），**不占主站 rough/detail_memories**
 - 工具名与主站统一：`store_memory`（标题+内容，向量化失败降级无向量）/ `recall_memory`（向量余弦检索 → 失败文本包含回退）
-- MVP 无自动注入（AI 主动存取）；后续可加：对话开始自动 recall 注入上下文
+- `world_structured_records` 结构记忆：manage_records（set/get/list/summary/categories/delete/**rename/move**），三级「目录/子目录/字段」，user 目录约定存用户个性（偏好/风格/审美/习惯/关系）
+- ✅ **记忆地图自动注入**（2026-08-12）：新会话/clear 后（无摘要）自动注入缩进树记忆索引（build_memory_map），⭐重要/❗硬约束软锚定，详情按需 get；普通延续对话不注入（省 token + 前缀缓存稳定）
 
 ### 6.10 缓存命中统计（2026-08-05 补充，阶段 2.7）
 

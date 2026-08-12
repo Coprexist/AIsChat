@@ -192,12 +192,28 @@ flowchart TD
 flowchart TD
     Start(["对话开始"]) --> Query["查询 structured_records"]
     Query --> Check{"有数据?"}
-    Check -->|"✅ 是"| ShowTree["展示目录树 + 字段摘要"]
-    Check -->|"❌ 否"| ShowGuide["展示推荐目录 + 用法引导"]
+    Check -->|"✅ 是"| ShowTree["展示缩进树索引<br/>(只注入有内容的路径)"]
+    Check -->|"❌ 否"| ShowGuide["一行引导<br/>用 manage_records 记录"]
     ShowTree --> Inject["注入系统提示词"]
     ShowGuide --> Inject
     Inject --> LLM["LLM 上下文中可见"]
 ```
+
+**索引格式（2026-08-12 瘦身对齐世界版）**：缩进树 + 软锚定，省 token 且 LLM 解析友好：
+
+```
+## 记忆索引
+project/
+  图鉴页面/
+    进度
+  ⭐当前计划
+user/
+  ❗偏好
+```
+
+- 只注入**有内容的路径**（空目录不出现）；详细 value 不注入，`manage_records get` 按需取
+- **⭐=重要记忆 ❗=硬约束**（value 前缀标记 → 索引上提到名字前）：产生 Attention 特征峰值，引导 LLM 优先处理关键约束（软锚定）
+- 世界 AI（build_memory_map）与主站 AI（format_db_records_for_prompt）同一套格式规范
 
 **核心原则**：始终展示（空时引导），像人脑先天分区等待经验填充。
 
@@ -363,7 +379,7 @@ flowchart TB
 |------|------|
 | `store_memory` | 存储向量记忆 |
 | `recall_memory` | 召回向量记忆 |
-| `manage_records` | 管理结构记忆（set/get/list/summary/categories/delete） |
+| `manage_records` | 管理结构记忆（set/get/list/summary/categories/delete/rename/move） |
 
 ### 9.2 manage_records 接口
 
@@ -375,6 +391,10 @@ flowchart TB
 | `summary` | 生成快照摘要 |
 | `categories` | 列出所有顶层目录 |
 | `delete` | 删除（精确到 field） |
+| `rename` | 改名（level=category/sub_key/field，任一级） |
+| `move` | 移动（整组 sub_key 或单条 field 跨目录） |
+
+> 2026-08-12 新增 rename/move：AI 可以重命名记忆目录/记忆名、把记忆移动到别处，不用再 delete+set 重建（避免丢 updated_at）。
 
 ---
 
