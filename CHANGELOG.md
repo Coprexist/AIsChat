@@ -7,6 +7,28 @@
 
 ---
 
+## [v0.3.4] - 2026-08-12
+
+### Added — ✨ 前缀内容版本化（锁）+ 群类型无限 + Skill 分层注入 + 世界直开
+
+- 🔒 **前缀内容版本化（所有进前缀的内容保证缓存命中）**：用户可改提示词（world-prompt-{id}）、强注入段（forced-prompt）、昵称（world-name-{id}）、主站 agent 提示词（agent-prompt-{id}）统一走 capability_versions 版本链（known 告知 / effective 生效）——用户改提示词、系统更新强注入、改名都是正常操作，**不再断前缀缓存**；变更只动态尾部注入 changelog 告知；compact / clear（= 新对话）解锁后正式生效；锁定态尝试应用变更 → 拒绝 + 后端报错记录（guard_apply_change 防御）
+- 🔒 **强注入段从用户可改中提出**（珑哥定）：平台强约束（工具约定/能力边界/接口文档/记忆约定/UI/群类型/侧边栏/路径/编号/运行规范）不再是散装拼接，独立为 FORCED_PROMPT_SEGMENTS + `forced_prompt` 字段返回前端只读展示；群类型约定强化（写世界类型 + AI 加入类型，关键剧本角色可用角色名/职位名做类型名）；新增【AI 侧 skill】（按类型分层注入）与【入口场景响应】（私信/群聊/直进不同 index 响应）强注入段；昵称正式注入对话（之前 AI 不知道自己叫什么）
+- 🗂️ **Skill 分层注入**：manifest 支持 `types` 字段（省略/["*"] = 所有类型通用；["blacksmith"] = 仅铁匠类型可用）；`build_world_tools_for_type` 按绑定类型过滤；群 AI 能力清单按 agent/群绑定类型取并集注入（world_chat_service / llm.py 双入口）
+- ∞ **群类型 bind_limit=-1 = 无限**（不是极大值凑）：默认类型群聊和 AI 数目都无限；前端显示 ∞、满员判断跳过 -1、新建类型输入支持 -1
+- 👁️ **世界列表「打开」按钮**：/world/{id}/preview 新窗口进沉浸界面——只绑定 AI（entity_type='agent'）的世界也能直接进去看，不依赖群聊
+
+### Changed
+
+- **设置页提示词 UI 重做**（WorldCreatorConfig）：群视界机器人名字默认收起 + 🖊 图标点击可改；系统提示词默认收起 + 🖊 点击展开输入框；新增「平台强注入提示词」深灰只读展示（🔒 不可修改）；对话生命周期区块移至模型与参数上方；删除重复的 LLM 缓存命中率块
+- **群视界定义更新**（docs）：从仅聊天，到可编程、可视化、AI 可入驻的世界——造物主（世界 AI + 用户）/ 原住民（用户 + 用户的 AI）；设计文档补 8.5 群类型系统 / 8.6 世界运行不强制绑定群 / 4.3 入口场景响应 / Skill 分层注入三·六
+
+### Fixed
+
+- **前端 -1 无限值被吞**：GroupManagerModal `Number(-1) || 3` 把 -1 变 3——改为显式保留 -1
+- **主站 agent 改提示词断缓存**：personality 段从直接拼 current_system_prompt 改为 effective 快照（build_messages / build_dm_messages + executor compact 解锁）
+
+---
+
 ## [v0.3.3] - 2026-08-11
 
 ### Added — ✨ 接口文档服务 + 世界包下载/导入 + 会话体系 + 结构化记忆
