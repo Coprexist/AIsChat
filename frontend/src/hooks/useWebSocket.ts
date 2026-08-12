@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState, useCallback } from 'react'
-import { getInstanceUrl } from '../utils/platform'
+import { getWsUrl } from '../utils/platform'
 import { safeParse } from '../utils/result'
 
 export interface WebSocketMessage {
@@ -53,31 +53,51 @@ export function useWebSocket(
   const retryTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const mountedRef = useRef(true)
   const flashLockRef = useRef(false)
+  // connect 的 ref 间接引用：scheduleReconnect 与 connect 互相调用，用 ref 打破 useCallback 依赖环
+  const connectRef = useRef<() => void>(() => {})
+
+  // ── 调度重连（不直接依赖 connect，走 connectRef，避免循环依赖 + TDZ）──
+  const scheduleReconnect = useCallback(() => {
+    if (!mountedRef.current) return
+
+    // 取消已有重连定时器
+    if (retryTimerRef.current !== null) {
+      clearTimeout(retryTimerRef.current)
+      retryTimerRef.current = null
+    }
+
+    setReconnecting(true)
+    retryCountRef.current += 1
+
+    const delay = calcReconnectDelay(retryCountRef.current)
+    console.log(
+      `🔌 WebSocket 将在 ${(delay / 1000).toFixed(1)}s 后重连（第 ${retryCountRef.current} 次）`,
+    )
+
+    retryTimerRef.current = setTimeout(() => {
+      if (!mountedRef.current) return
+      connectRef.current()
+      // 如果 connect 同步失败（如 token 丢失），清除重连状态
+      if (!wsRef.current) setReconnecting(false)
+    }, delay)
+  }, [])
 
   /** 建立 WebSocket 连接，返回清理函数 */
   const connect = useCallback(() => {
     const token = localStorage.getItem('access_token')
     if (!token) return () => {}
 
-    const instanceUrl = getInstanceUrl()
-    const protocol = instanceUrl.startsWith('https') ? 'wss:' : 'ws:'
-    const host = instanceUrl.replace(/^https?:\/\//, '')
-    // token 必须 URL 编码：JWT 可能含 +/= 等特殊字符，Safari 严格解析会建连失败（首次灰按钮、刷新才好的根因）
-    const url = `${protocol}//${host}/ws?token=${encodeURIComponent(token)}`
+    // URL 构造收口 getWsUrl（内部 encodeURIComponent token——JWT 特殊字符 + Safari 严格解析 = 首登灰按钮根因）
+    const url = getWsUrl(token)
 
     let ws: WebSocket
     try {
       ws = new WebSocket(url)
     } catch (e) {
-      // URL 非法等同步异常：不崩溃，走兜底重连（否则 wsRef 为 null 永不重试，按钮一直灰）
-      // 注意：scheduleReconnect 定义在 connect 之后（TDZ），这里内联定时器，不引用它
+      // URL 非法等同步异常：不崩溃，统一走重连调度（否则 wsRef 为 null 永不重试，按钮一直灰）
       console.error('⚠️ WebSocket 创建失败，稍后重试:', e)
       setConnected(false)
-      retryCountRef.current += 1
-      const delay = Math.min(5000 * retryCountRef.current, 30000)
-      retryTimerRef.current = setTimeout(() => {
-        if (mountedRef.current) connect()
-      }, delay)
+      scheduleReconnect()
       return () => {}
     }
     wsRef.current = ws
@@ -218,55 +238,8 @@ export function useWebSocket(
     }
   }, [conversationType, conversationId])
 
-  // ── 调度重连 ──
-  const scheduleReconnect = useCallback(() => {
-    if (!mountedRef.current) return
-
-    // 取消已有重连定时器
-    if (retryTimerRef.current !== null) {
-      clearTimeout(retryTimerRef.current)
-      retryTimerRef.current = null
-    }
-
-    setReconnecting(true)
-    retryCountRef.current += 1
-
-    const delay = calcReconnectDelay(retryCountRef.current)
-    console.log(
-      `🔌 WebSocket 将在 ${(delay / 1000).toFixed(1)}s 后重连（第 ${retryCountRef.current} 次）`,
-    )
-
-    retryTimerRef.current = setTimeout(() => {
-      if (!mountedRef.current) return
-      connect()
-      // 如果 connect 同步失败（如 token 丢失），清除重连状态
-      if (!wsRef.current) setReconnecting(false)
-    }, delay)
-  }, [connect])
-
-  // ── 浏览器恢复在线时立即重连 ──
-  useEffect(() => {
-    const handleOnline = () => {
-      if (!mountedRef.current) return
-      if (
-        wsRef.current?.readyState !== WebSocket.OPEN &&
-        wsRef.current?.readyState !== WebSocket.CONNECTING
-      ) {
-        console.log('🌐 浏览器恢复在线，立即重连 WebSocket')
-        // 取消正在等待的重连定时器
-        if (retryTimerRef.current !== null) {
-          clearTimeout(retryTimerRef.current)
-          retryTimerRef.current = null
-        }
-        retryCountRef.current = 0
-        connect()
-        if (!wsRef.current) setReconnecting(false)
-      }
-    }
-
-    window.addEventListener('online', handleOnline)
-    return () => window.removeEventListener('online', handleOnline)
-  }, [connect])
+  // connect 挂到 ref（scheduleReconnect 通过 connectRef 调用，打破循环依赖）
+  connectRef.current = connect
 
   // ── 主 effect：对话参数变化时重连 ──
   useEffect(() => {

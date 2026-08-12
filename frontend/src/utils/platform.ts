@@ -24,12 +24,13 @@ export function getApiBase(): string {
   return `${getInstanceUrl()}/api`
 }
 
-/** 获取 WebSocket URL */
-export function getWsUrl(): string {
+/** 获取 WebSocket URL：token 必须 URL 编码（JWT 可能含 +/= 特殊字符，Safari 严格解析会建连失败） */
+export function getWsUrl(token?: string): string {
   const instanceUrl = getInstanceUrl()
   const protocol = instanceUrl.startsWith('https') ? 'wss' : 'ws'
   const host = instanceUrl.replace(/^https?:\/\//, '')
-  return `${protocol}://${host}/ws`
+  const tokenPart = token ? `?token=${encodeURIComponent(token)}` : ''
+  return `${protocol}://${host}/ws${tokenPart}`
 }
 
 /** 解析 WebSocket URL 为协议和主机部分（纯函数） */
