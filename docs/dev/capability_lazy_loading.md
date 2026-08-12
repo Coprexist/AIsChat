@@ -45,7 +45,7 @@
 2. ✅ 世界 skill 目录：变更检测（哈希）→ capability_versions 写新版本（含工具定义快照）——`world_chat_service`
 3. ✅ 注入：build_messages / world_chat_service 时检测落后 → 追加变更通知 system 消息 → 更新 known（同事务）
 4. ✅ compact：executor 压缩成功后 effective = latest（扩展 apply_pending_config）；世界 AI 压缩在 compact_context 工具内
-5. ⏳ 群 AI 世界能力：world_command 稳定工具（缓存友好）+ 能力清单尾部化
+5. ✅ 群 AI 世界能力：world_command 稳定工具（缓存友好）+ 能力清单尾部化
 
 ## 实现（2026-08-06 650f1cb）
 
@@ -125,7 +125,7 @@ flowchart TD
 4. ✅ `guard_apply_change`：锁定态应用变更 → 拒绝 + logger.error（防御性报错）
 5. ✅ world_chat_service：前缀组装改为 effective 快照 + 变更检测写新版本 + 尾部 changelog（世界 AI 三个源：world-prompt-{id} / forced-prompt / world-name-{id}）
 6. ✅ compact_context / clear_context：调用 apply_pending_changes 解锁（三源 + ai-skills 一起对齐）
-7. ⏳ 主站 agent 同样接入（system_prompt / 强注入段 / tools 统一）——下次做
+7. ✅ 主站 agent 同样接入（build_messages / build_dm_messages 的 personality 段走 agent-prompt-{id} 源；executor compact 解锁）——2026-08-12 已实现
 
 > 2026-08-12 已实现并通过真实 DB 端到端验证：锁定态改提示词 effective 不变 → 尾部 changelog 告知 → compact 解锁生效。
 

@@ -168,7 +168,7 @@ export default function BindGroupModal({ worldId, initialTypeSlug, initialTab = 
                   >
                     <div className="flex items-center justify-between">
                       <span className="text-sm text-textPrimary">{t.name}</span>
-                      <span className="text-[10px] text-textMuted">{t.bound_count ?? '?'}/{t.bind_limit} {tab === 'group' ? '群' : 'AI'}</span>
+                      <span className="text-[10px] text-textMuted">{t.bound_count ?? '?'}/{t.bind_limit === -1 ? '∞' : t.bind_limit} {tab === 'group' ? '群' : 'AI'}</span>
                     </div>
                     {t.description && <div className="text-xs text-textSecondary line-clamp-1 mt-0.5">{t.description}</div>}
                   </button>

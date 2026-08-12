@@ -75,7 +75,7 @@ export default function GroupManagerModal({ worldId, isOwner, onClose }: Props) 
       await api.post(`/worlds/${worldId}/group-types`, {
         types: [...current, {
           name: newType.name, description: newType.description, rules: newType.rules,
-          bind_limit: Number(newType.bind_limit) || 3,
+          bind_limit: newType.bind_limit === -1 ? -1 : (Number(newType.bind_limit) || 3),
           assistant_spec: { count: Number(newType.count) || 1, need_api: newType.need_api, default_name: newType.default_name },
         }],
       })
@@ -155,8 +155,8 @@ export default function GroupManagerModal({ worldId, isOwner, onClose }: Props) 
                 <div key={t.slug} className="rounded-xl bg-elevated/50 border border-border p-3 space-y-1.5">
                   <div className="flex items-center gap-2">
                     <span className="text-sm font-semibold text-textPrimary">{t.name}</span>
-                    <span className={`text-[10px] px-1.5 py-0.5 rounded ${t.bound_count >= t.bind_limit ? 'bg-amber-500/15 text-amber-400' : 'bg-elevated text-textMuted'}`}>
-                      绑定 {t.bound_count}/{t.bind_limit}
+                    <span className={`text-[10px] px-1.5 py-0.5 rounded ${t.bind_limit !== -1 && t.bound_count >= t.bind_limit ? 'bg-amber-500/15 text-amber-400' : 'bg-elevated text-textMuted'}`}>
+                      绑定 {t.bound_count}/{t.bind_limit === -1 ? '∞' : t.bind_limit}
                     </span>
                     <span className="text-[10px] text-textMuted">助手 {t.assistant_spec?.count ?? 1} 个{t.assistant_spec?.need_api === false ? '（无需API）' : ''}</span>
                     <div className="flex-1" />
@@ -192,7 +192,7 @@ export default function GroupManagerModal({ worldId, isOwner, onClose }: Props) 
                   <div className="text-xs font-semibold text-textPrimary flex items-center gap-1"><Plus size={12} /> 新建群类型</div>
                   <div className="grid grid-cols-2 gap-2">
                     <input value={newType.name} onChange={e => setNewType({ ...newType, name: e.target.value })} placeholder="类型名（如 冒险团/商会）" className="bg-elevated text-xs px-2 py-1.5 rounded border border-border text-textPrimary" />
-                    <input value={newType.bind_limit} onChange={e => setNewType({ ...newType, bind_limit: Number(e.target.value) })} type="number" min={1} placeholder="绑定上限" className="bg-elevated text-xs px-2 py-1.5 rounded border border-border text-textPrimary" />
+                    <input value={newType.bind_limit} onChange={e => setNewType({ ...newType, bind_limit: Number(e.target.value) })} type="number" min={-1} placeholder="绑定上限（-1=无限）" className="bg-elevated text-xs px-2 py-1.5 rounded border border-border text-textPrimary" />
                   </div>
                   <textarea value={newType.rules} onChange={e => setNewType({ ...newType, rules: e.target.value })} rows={2} placeholder="世界规则（群主可见；群助手行为继承）" className="w-full bg-elevated text-xs px-2 py-1.5 rounded border border-border resize-none text-textPrimary" />
                   <div className="grid grid-cols-3 gap-2">

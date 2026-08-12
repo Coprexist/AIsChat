@@ -146,3 +146,6 @@ data/worlds/{id}/
 5. ✅ 沙箱加固（2026-08-07：subprocess + Landlock + seccomp + 协议转发，
    文件系统锁死世界目录、禁进程/网络/危险调用；对抗性逃逸验证通过）
    - 终极隔离（容器化）后置
+6. ✅ Skill 分层注入（2026-08-12）：manifest `types` 字段（省略/["*"] = 通用，列表 = 仅这些类型可用）；
+   `build_world_tools_for_type(world_id, type_slug)` 按绑定类型过滤；
+   llm.py 群 AI 能力清单按 agent/群绑定类型取并集注入（详见三·六）
