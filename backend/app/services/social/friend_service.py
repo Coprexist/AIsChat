@@ -524,7 +524,7 @@ async def search_entities(
         owner = owner_result.scalar_one_or_none()
         is_friend = await _is_friend(db, current_user_id, "ai", agent.id)
         results.append({
-            "id": agent.id,
+            "id": agent.user_id,  # 对外统一用 User.id（AI 也是 users 表一条记录）；用 agent.id 会与另一 agent 的 user_id 撞车错配（2026-08-12 修复）
             "type": "ai",
             "name": agent.name,
             "avatar_url": agent.avatar_url,
@@ -532,6 +532,7 @@ async def search_entities(
             "is_friend": is_friend,
             "state": agent.state,
             "auto_respond_friend_request": agent.auto_respond_friend_request,
+            "user_id": agent.user_id,
         })
 
     # 限制总结果数
