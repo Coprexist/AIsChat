@@ -483,7 +483,7 @@ export default function WorldDesignPage() {
   if (!world) return <div className="p-8 text-textMuted">世界不存在</div>
 
   return (
-    <div className="h-screen bg-canvas text-textPrimary">
+    <div className="h-full bg-canvas text-textPrimary">
       {/* ═══ 移动端（<lg）：tab 切换 ── 文件（目录导航/编辑器）+ 对话（默认打开） ═══ */}
       {isMobile && <div className="flex flex-col h-full relative pb-14">
         {/* 顶栏：返回 + 世界信息 + 上传（文件 tab 时显示） */}
