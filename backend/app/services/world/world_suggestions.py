@@ -1,7 +1,7 @@
 """
 世界 AI 建议问题生成（"你可以"按钮）——从 world_chat_service 拆分
 
-三级策略（2026-08-06 珑哥定）：
+三级策略（2026-08-06 产品定）：
 1. AI 自己生成（suggest_questions 工具）→ turn_state["suggestions"]
 2. 本模块兜底：轻量 LLM 生成（用世界 AI 自己的 key）
 3. 预设：后台 system_settings.world_preset_suggestions（统一维护）随机挑 4 个

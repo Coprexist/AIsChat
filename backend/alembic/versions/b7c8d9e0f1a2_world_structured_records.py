@@ -5,7 +5,7 @@ Revises: a8b9c0d1e2f3
 Create Date: 2026-08-10
 
 背景：世界 AI 记忆（world_ai_memories）只有 title/content 平铺，且 DeepSeek 无 embedding API
-（记忆向量化永远 404 失败，只能靠文本回退）。按珑哥建议对齐主站「结构化记忆」（manage_records）：
+（记忆向量化永远 404 失败，只能靠文本回退）。按产品建议对齐主站「结构化记忆」（manage_records）：
 - 目录结构 {category}/{sub_key}/{field} → value，纯文本、不依赖 embedding
 - UNIQUE(world_id, category, sub_key, field) 实现 upsert
 - 工具名与主站一致：manage_records（世界维度命名空间）

@@ -1,7 +1,7 @@
 """
 世界代码沙箱（阶段 2.1 MVP）— subprocess + resource.rlimit + 超时强制杀进程组
 
-方案（珑哥定）：成本最低、代码最简单，快速验证"世界代码执行"核心流程。
+方案（产品定）：成本最低、代码最简单，快速验证"世界代码执行"核心流程。
 生产加固（后置）：只担心资源耗尽 → 加严配额；需强安全边界 → seccomp+Landlock（evalbox 路线）或容器。
 
 设计参考 sandtrap 的 Policy 模式：
@@ -25,15 +25,15 @@ logger = logging.getLogger(__name__)
 
 DEFAULT_MEMORY_MB = 64          # 无人/后台内存配额（sleep_memory_mb 可覆盖）
 # ⚠️ 2026-08-05 实测：24MB 下 python -I 连标准库 import 都跑不动（RLIMIT_AS 虚拟内存口径，解释器约需 ≥32MB）。
-# 珑哥拍板：多群多解释器（默认形态）→ 上限 64MB；单解释器共享场景 → 32MB（policy 硬下限）。
-DEFAULT_RUNTIME_MEMORY_MB = 128  # 有人在线内存配额（runtime_memory_mb 可覆盖）——珑哥 2026-08-05 定
+# 产品拍板：多群多解释器（默认形态）→ 上限 64MB；单解释器共享场景 → 32MB（policy 硬下限）。
+DEFAULT_RUNTIME_MEMORY_MB = 128  # 有人在线内存配额（runtime_memory_mb 可覆盖）——产品 2026-08-05 定
 DEFAULT_TIMEOUT_SECONDS = 10.0  # 默认墙钟超时
 DEFAULT_CPU_SECONDS = 5.0       # 默认 CPU 时间上限
 MAX_FSIZE_BYTES = 4 * 1024 * 1024   # 单文件写入上限 4MB（防写爆磁盘）
 MAX_NPROC = 16                  # 子进程数上限（防 fork 炸弹）
 MAX_OUTPUT_CHARS = 20000        # stdout/stderr 各截断长度
 
-# 全局沙箱并发上限（珑哥 2026-08-05 拍板方案 1：各用各的解释器 + 排队）
+# 全局沙箱并发上限（产品 2026-08-05 拍板方案 1：各用各的解释器 + 排队）
 # - 排队的是「一次代码执行任务」（短任务，有超时兜底），不是人/群
 # - 在线不占位：只有执行中的那几秒占一个槽位，跑完释放
 # - 管理员可配：环境变量 SANDBOX_MAX_CONCURRENT（默认 4，范围 1-32）
@@ -70,7 +70,7 @@ class Policy:
 def policy_for_world(world, background: bool = False) -> Policy:
     """世界配额（worlds.config 可配）：
     - 无人/后台（background=True）：内存 = sleep_memory_mb（默认 24MB）
-    - 有人/前台（background=False）：内存 = runtime_memory_mb（默认 128MB，珑哥 2026-08-05 定）
+    - 有人/前台（background=False）：内存 = runtime_memory_mb（默认 128MB，产品 2026-08-05 定）
     超时/CPU 恒生效（保护宿主不受死循环拖累）。
     """
     cfg = world.config or {}

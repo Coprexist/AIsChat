@@ -1,5 +1,5 @@
 """
-能力懒加载：skills/tools 版本化 + 增量变更注入（2026-08-06 珑哥方案）
+能力懒加载：skills/tools 版本化 + 增量变更注入（2026-08-06 产品方案）
 
 能力源：platform（内置工具）/ world-{id}（世界 skills 转出的工具定义）。
 每个 AI 两个进度（agents.cap_known_versions / cap_effective_versions，JSONB {source: version}）：
@@ -250,7 +250,7 @@ async def mark_effective_latest(db: AsyncSession, agent, sources: list[str]) -> 
 
 
 # ═══════════════════════════════════════════════════════════════
-# 前缀文本源版本化（2026-08-12 珑哥定：所有进前缀的内容必须保证缓存命中）
+# 前缀文本源版本化（2026-08-12 产品定：所有进前缀的内容必须保证缓存命中）
 # ═══════════════════════════════════════════════════════════════
 # 用户 system_prompt / 强注入段 / 昵称等文本也走 capability_versions 版本链：
 # - 变更（用户改提示词 / 系统更新强注入）→ 写新版本 + 尾部 changelog 告知，不碰前缀
@@ -318,7 +318,7 @@ async def apply_pending_changes(db: AsyncSession, holder, sources: list[str]) ->
 def guard_apply_change(sources: list[str]) -> None:
     """防御性守卫：非解锁上下文（对话进行中）尝试应用变更 → 拒绝 + 记录报错。
 
-    珑哥原话（2026-08-12）："只要有在解锁之前尝试应用变更的都拒绝并记录报错"。
+    产品原话（2026-08-12）："只要有在解锁之前尝试应用变更的都拒绝并记录报错"。
     目前代码都是动态读取拼接（不会强制修改），此守卫防止未来出现"强制修改"逻辑破坏不变式。
     """
     if not _unlock_ctx.get():

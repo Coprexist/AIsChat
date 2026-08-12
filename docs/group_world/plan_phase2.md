@@ -21,12 +21,12 @@
 
 | # | 交付 | 说明 | 依赖 |
 |---|------|------|------|
-| 2.1 | **py 沙箱** | ✅ **MVP 已实现**（2026-08-05）：`world_sandbox.py` subprocess + rlimit + 超时 killpg 强杀 + env 白名单；`POST /worlds/{id}/run`（仅创建者）。**配额语义（珑哥定义）**：无人/后台 = `sleep_memory_mb`（默认 24MB）；**有人在线 = `runtime_memory_mb`（默认 128MB，2026-08-05 定）**；超时/CPU/文件大小/进程数恒生效；RLIMIT_AS 是虚拟内存口径（实际可用堆 = 配额 - 解释器开销） | 无（最先） |
+| 2.1 | **py 沙箱** | ✅ **MVP 已实现**（2026-08-05）：`world_sandbox.py` subprocess + rlimit + 超时 killpg 强杀 + env 白名单；`POST /worlds/{id}/run`（仅创建者）。**配额语义（产品定义）**：无人/后台 = `sleep_memory_mb`（默认 24MB）；**有人在线 = `runtime_memory_mb`（默认 128MB，2026-08-05 定）**；超时/CPU/文件大小/进程数恒生效；RLIMIT_AS 是虚拟内存口径（实际可用堆 = 配额 - 解释器开销） | 无（最先） |
 | 2.2 | **触发文件** | ✅ **已实现**（2026-08-05）：世界入口 `main.py` 实现 `handle(event) -> dict`（可 async）；平台 harness 导入调用（世界代码零框架依赖，print 重定向不污染结果）；`POST /worlds/{id}/trigger` + 世界 AI 工具 `run_world_code`（code 脚本或 event 触发模式）；6 项测试全过（同步/async/异常/缺handle/缺文件/超时） | 2.1 |
 | 2.3 | **受控数据 API** | ✅ **已实现**（2026-08-05，与 2.4 一起）：`/world/{id}/api/*` 数据面（world/chat/memories/usage/groups）；每世界专属 token（懒生成存 worlds.config.api_token，沙箱 env 注入 WORLD_API_TOKEN/WORLD_API_BASE）；动态限流（基础+每人加成×活跃人数，4 个 config 字段可配）；复用 get_chat_history / world_tools._do_execute 同一份逻辑；12 项测试通过 | 2.1 |
 | 2.4 | **群聊写 API** | ✅ **已实现**（2026-08-05，与 2.3 一起）：`/world/{id}/api/group/*`（读消息/发消息/成员/改角色/踢人）；身份=世界自身（底层借世界主人权限+群角色检查）；作用域=仅绑定群；写操作独立限流 | 2.3 |
 | 2.5 | **后台常驻任务** | ✅ **已实现**（2026-08-05）：`world_resident.py` 常驻进程（handle/on_tick/on_stop + stdin 行协议）；config `resident:true`+`tick_interval` 开启；wake 启动/sleep 优雅停止/后端重启 restore；**实时状态通道**：POST /api/state（世界代码发布）+ GET /world/{id}/events（页面 SSE，零轮询）；默认不限常驻个数（预留可配）；配额 64MB（多解释器）/32MB 硬下限 | 2.1 |
-| 2.6 | **世界 AI 记忆表** | ✅ **已实现**（2026-08-05）：`world_ai_memories` 专属表（title/content/embedding Vector(1536)）+ 工具 store_memory/recall_memory（向量检索 + 文本回退）；迁移 `b3c4d5e6f7a8` **待珑哥跑** | 无 |
+| 2.6 | **世界 AI 记忆表** | ✅ **已实现**（2026-08-05）：`world_ai_memories` 专属表（title/content/embedding Vector(1536)）+ 工具 store_memory/recall_memory（向量检索 + 文本回退）；迁移 `b3c4d5e6f7a8` **待产品跑** | 无 |
 | 2.7 | **缓存命中统计** | ✅ **已实现**（2026-08-05）：`world_llm_usage` 专属表，首轮（stream_options.include_usage）/工具轮/收尾轮全部落库；`GET /worlds/{id}/usage` 返回调用次数/token/命中率；设计页配置表单展示命中率；迁移 `c4d5e6f7a8b9` | 无 |
 | 2.9 | **群消息钩子** | ✅ **已实现**（2026-08-05）：群消息 → 世界入口 `handle(event)` 异步感知（2s 节流合并，`group_trigger_interval` 可配；`source="world"` 防死循环）；唤醒改手动模式（AUTO_MANAGE=False，唤醒后保持活跃） | 2.2 |
 | 2.8 | **会话状态服务** | 状态化会话管理器（不可变追加日志 + 规范化序列化 + 缓存统计 + 压缩管理）；为世界代码提供对话状态；DeepSeek 无服务端会话，本质是"请求形状稳定 + 可观测" | 2.3 配合 |
@@ -59,7 +59,7 @@
    - 方案 A：Docker 容器（每世界一个，镜像轻量）——隔离最强，启动慢，资源重
    - 方案 B：子进程 + seccomp/rlimit（Python subprocess + 资源限制）——轻量，隔离中等
    - 方案 C：受限解释器/wasm——最安全但能力受限
-   - 倾向：MVP 用 B（快），生产用 A（稳）；**待珑哥定**
+   - 倾向：MVP 用 B（快），生产用 A（稳）；**待产品定**
 2. **触发文件约定**：入口文件/函数签名（如 `handle(event: dict) -> dict`）、生命周期（启动/每事件/定时）
 3. **配额管理**：CPU 时间片、内存上限、网络白名单（只能访问主实例 API？）、执行超时
 4. **世界代码依赖**：允许 pip 装包吗？装哪？（离线镜像？）
@@ -90,7 +90,7 @@
 - 前端：设计页（可拖拽/翻页/Markdown）、沉浸界面（独立窗口/侧边栏收起/悬浮球）、群聊全屏弹窗
 
 **已知问题/遗留**：
-- ⚠️ 后端 worker 被挂起 LLM 调用堵死世界队列（httpx 120s 超时理论上自愈，但重载杀 worker 会断；回收机制已补重载场景）——珑哥否了"加超时"方案，待定优雅解
+- ⚠️ 后端 worker 被挂起 LLM 调用堵死世界队列（httpx 120s 超时理论上自愈，但重载杀 worker 会断；回收机制已补重载场景）——产品否了"加超时"方案，待定优雅解
 - 前端 node_modules 残缺未构建验证（yarn dev 热更生效）
 - 模型偶发不收敛（重复调工具）——温和去重 + 工作流记忆已缓解，观察中
 - 世界 AI 记忆表待建（2.6）
@@ -102,7 +102,7 @@
 
 ---
 
-## 七、路线图估算（2026-08-05，珑哥两段愿景拆解）
+## 七、路线图估算（2026-08-05，产品两段愿景拆解）
 
 | 阶段 | 内容 | 预估 | 状态 |
 |---|---|---|---|
@@ -110,7 +110,7 @@
 | 2.2-2.5 | 触发文件 / 受控数据 API / 群聊写 API / 后台常驻 | 5-8 天 | 待 |
 | 群消息钩子 | 群消息 → 世界 AI 感知/响应 | 1 天 | 待 |
 | 群聊 API 注入提示词 | 世界观/工具注入（design 已有 API 设计） | 1-2 天 | 待 |
-| 文件式 skill/tool | 写在后端文件夹由实例识别提供（**2026-08-05 珑哥确认方向**：world_command 等世界能力走此机制，不平台硬编码；明日开工） | 2-3 天 | **明日开工** |
+| 文件式 skill/tool | 写在后端文件夹由实例识别提供（**2026-08-05 产品确认方向**：world_command 等世界能力走此机制，不平台硬编码；明日开工） | 2-3 天 | **明日开工** |
 | AI 绑定世界 | 跨入口一致环境（多空间模型接入，design §8.3） | 2-4 天 | 待（阶段 3） |
 | 世界线一致性 | 同代码多世界线（design §8） | 3-5 天 | 待 |
 | 商城 | 完整世界+组件块发布/搜索/一键添加+GitHub | 基础 2-3 天 / 社区 3-5 天+ | 待 |

@@ -16,7 +16,7 @@
     tileSize: 48,        // 瓦片像素
     cols: 16,
     rows: 12,
-    stepDuration: 0.16,  // 走一格耗时（秒）——按一下只移动一格（珑哥 2026-08-05）
+    stepDuration: 0.16,  // 走一格耗时（秒）——按一下只移动一格（产品 2026-08-05）
     saveKeyPrefix: 'world-adventure-v1-',
   };
 
@@ -529,7 +529,7 @@
 
   function playerGrid() {
     // 角色左上角 p（浮点格坐标），中心 = p + 0.5；floor 取所在格（round 会把
-    // 整数格 +0.5 进位到下一格，导致方向错位——2026-08-05 珑哥反馈）
+    // 整数格 +0.5 进位到下一格，导致方向错位——2026-08-05 产品反馈）
     return { c: Math.floor(state.player.x + 0.5), r: Math.floor(state.player.y + 0.5) };
   }
 

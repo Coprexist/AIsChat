@@ -702,7 +702,7 @@ async def serve_world_file(
         html = target.read_text(encoding="utf-8", errors="replace")
         return HTMLResponse(_inject_world_vars(html, world_id, creator_name, group_id, world_name, entry=entry))
     # 世界代码频繁变化：ETag 条件缓存——更新后自动拿新版（免强刷），
-    # 未更新时浏览器 304 走缓存（不重复下载）（2026-08-05 珑哥）
+    # 未更新时浏览器 304 走缓存（不重复下载）（2026-08-05 产品）
     etag = f'"{target.stat().st_mtime_ns:x}-{target.stat().st_size:x}"'
     headers = {"ETag": etag}
     if request.headers.get("If-None-Match") == etag:

@@ -5,7 +5,7 @@
 - 休眠世界：近期有活动（对话/预览）→ 唤醒 + 离线时间补偿
 - 活动信号：last_active_at（对话、预览、手动 wake 都会更新）
 
-⚠️ 手动模式（珑哥 2026-08-05 定）：AUTO_MANAGE=False 时调度器不做任何
+⚠️ 手动模式（产品 2026-08-05 定）：AUTO_MANAGE=False 时调度器不做任何
 状态切换——世界状态只由手动 wake/sleep 端点控制（唤醒后保持活跃，
 不再 10 分钟自动转回休眠）。改回 True 恢复自动休眠/唤醒。
 
@@ -24,7 +24,7 @@ logger = logging.getLogger(__name__)
 
 SCAN_INTERVAL = 60            # 扫描间隔（秒）
 INACTIVE_TIMEOUT_MIN = 10     # 活跃超时（分钟）→ 休眠
-AUTO_MANAGE = False           # 手动模式：世界状态只由手动 wake/sleep 控制（珑哥 2026-08-05 定）
+AUTO_MANAGE = False           # 手动模式：世界状态只由手动 wake/sleep 控制（产品 2026-08-05 定）
 
 
 async def sweep_worlds(db):

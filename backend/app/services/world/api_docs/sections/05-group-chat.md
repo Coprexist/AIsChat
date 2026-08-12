@@ -28,7 +28,7 @@
 
 ```
 → { "success": true, "messages": [
-    { "id": 101, "sender_type": "human", "sender_id": 5, "sender_name": "珑哥", "content": "…", "created_at": "…" } ] }
+    { "id": 101, "sender_type": "human", "sender_id": 5, "sender_name": "产品", "content": "…", "created_at": "…" } ] }
 ```
 
 - 含发送者名字，了解群里最近聊了什么。**想参与群聊前必读**，避免重复或答非所问。
@@ -37,7 +37,7 @@
 
 ```
 → { "success": true, "members": [
-    { "type": "human", "id": 5, "name": "珑哥", "role": "owner" },
+    { "type": "human", "id": 5, "name": "产品", "role": "owner" },
     { "type": "ai",    "id": 3, "name": "小助手", "role": "member" } ] }
 ```
 
