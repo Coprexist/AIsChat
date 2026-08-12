@@ -931,7 +931,19 @@ async def _do_execute(db: AsyncSession, world, name: str, arguments: str, turn_s
             block_id = str(args.get("block_id", "")).strip()
             if not block_id:
                 return {"success": False, "error": "缺少 block_id 参数"}
-            return apply_block(world.id, block_id)
+            result = apply_block(world.id, block_id)
+            # 积木更新（版本变化）→ 懒通知：下次对话注入世界 AI 上下文
+            if result.get("is_update") and result.get("version") and result.get("previous_version") and result["version"] != result["previous_version"]:
+                try:
+                    from app.services.world.world_service import add_pending_notice
+                    await add_pending_notice(
+                        db, world.id, f"blocks/{block_id}/", "积木更新",
+                        f"积木「{result.get('name', block_id)}」已更新 v{result['previous_version']} → v{result['version']}；"
+                        f"你的 DIY（blocks/{block_id}/diy/）已保留，主文件旧版备份在 .bak/ 可回滚。",
+                    )
+                except Exception:
+                    pass
+            return result
         except ValueError as e:
             return {"success": False, "error": str(e)}
 

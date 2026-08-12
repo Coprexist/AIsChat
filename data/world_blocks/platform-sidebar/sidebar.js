@@ -5,6 +5,8 @@
    结构：平台基础菜单（首页/聊天/世界列表/设置，必保留，可折叠的「平台」组，跳转主应用）
          + 世界自定义菜单（世界内跳转）
    自动：隐藏平台悬浮图标（WorldUI.hideFloatingIcon），本积木自带折叠开关
+   DIY：本积木同目录下 diy/custom.css 与 diy/custom.js 会在主文件加载后自动引入——
+        改样式/加逻辑写那里，平台更新积木不会覆盖 diy/（主文件旧版备份在 .bak/）。
 */
 (function () {
   // 平台基础菜单：四个目的地必保留，但组名/项名可自定义（样式可直接改 sidebar.css）
@@ -20,6 +22,29 @@
   var BRAND = window.SIDEBAR_BRAND || (window.WORLD_AI_NAME || "世界");
 
   var sidebarEl, toggleEl;
+
+  // ── DIY 定制加载：diy/custom.css 后置覆盖 + diy/custom.js（存在才引入；平台更新不动 diy/）──
+  function loadDiy() {
+    var script = document.currentScript;
+    if (!script || !script.src) return;
+    var base = script.src.replace(/[^/]*$/, "");
+    ["diy/custom.css", "diy/custom.js"].forEach(function (rel) {
+      fetch(base + rel).then(function (r) {
+        if (!r.ok) return;
+        if (rel.endsWith(".css")) {
+          var link = document.createElement("link");
+          link.rel = "stylesheet";
+          link.href = base + rel;
+          document.head.appendChild(link);
+        } else {
+          var s = document.createElement("script");
+          s.src = base + rel;
+          document.head.appendChild(s);
+        }
+      }).catch(function () {});
+    });
+  }
+  loadDiy();
 
   function goParent(href) {
     try {

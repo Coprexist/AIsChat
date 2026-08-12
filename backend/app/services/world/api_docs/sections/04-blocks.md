@@ -72,5 +72,7 @@ manifest.json   {id, name, description, version, files[], entry, usage}
 
 ## 5. 注意事项
 
-- **已应用过积木的世界不会自动更新**：积木文件是复制进世界目录的，平台侧升级后，旧世界需要重新 `apply_world_block`（或手动替换 `blocks/{block_id}/` 文件）。
+- **已应用过积木的世界不会自动更新**：积木文件是复制进世界目录的，平台侧升级后需重新 `apply_world_block`（管理员可用 `POST /admin/blocks/{block_id}/update` 批量更新所有使用世界）。
+- **DIY 定制约定（重要）**：积木应用后世界目录里有 `blocks/{block_id}/diy/custom.css` 与 `diy/custom.js`——**自定义样式/逻辑写这里**（自动加载，顺序在主文件之后），**不要改主文件**（`sidebar.js`/`sidebar.css` 等）：平台更新积木会**覆盖主文件但保留 diy/**，旧主文件备份在 `blocks/{block_id}/.bak/` 可回滚。
+- **积木更新通知**：积木版本变化并重新应用后，世界会收到懒通知（下次对话注入世界 AI 上下文：「积木已更新 vX → vY，你的 DIY 已保留」），AI 应在回复中向用户体现。
 - 打包导出时积木文件随世界一起走（相对路径，即插即用）。

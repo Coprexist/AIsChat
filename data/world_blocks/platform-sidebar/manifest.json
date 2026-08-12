@@ -1,12 +1,12 @@
 {
   "id": "platform-sidebar",
   "name": "平台侧边栏",
-  "description": "类平台风格的侧边导航栏：平台基础菜单（首页/聊天/世界列表/设置，必保留，可折叠组，跳转主应用）+ 世界自定义菜单；可折叠、明暗主题自适应。应用后自动隐藏平台悬浮图标。",
-  "version": "1.0.0",
+  "description": "类平台风格的侧边导航栏：平台基础菜单（首页/聊天/世界列表/设置，必保留，可折叠组，跳转主应用）+ 世界自定义菜单；可折叠、明暗主题自适应。应用后自动隐藏平台悬浮图标。支持 DIY 定制（diy/custom.css + diy/custom.js，平台更新不会覆盖）。",
+  "version": "1.1.0",
   "files": [
     "sidebar.css",
     "sidebar.js"
   ],
   "entry": "sidebar.js",
-  "usage": "世界自定义菜单：window.SIDEBAR_ITEMS = [{label, href}]；平台组名：window.SIDEBAR_PLATFORM_TITLE（默认\"平台\"）；平台项名：window.SIDEBAR_PLATFORM_LABELS = {home, chat, worlds, settings}（四项目的地固定不可删）；样式可直接改 sidebar.css"
+  "usage": "世界自定义菜单：window.SIDEBAR_ITEMS = [{label, href}]；平台组名：window.SIDEBAR_PLATFORM_TITLE（默认\"平台\"）；平台项名：window.SIDEBAR_PLATFORM_LABELS = {home, chat, worlds, settings}（四项目的地固定不可删）。\n【DIY 约定】自定义样式/逻辑写在 blocks/platform-sidebar/diy/custom.css 与 diy/custom.js（自动加载，加载顺序在主文件之后）——**不要改主文件 sidebar.css/sidebar.js**，平台更新积木会覆盖主文件但保留 diy/（旧主文件备份在 .bak/ 可回滚）。"
 }
