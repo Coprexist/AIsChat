@@ -63,6 +63,71 @@ def build_forced_prompt() -> str:
     return "".join(FORCED_PROMPT_SEGMENTS)
 
 
+def _mark(value: str) -> str:
+    """重要记忆标记（软锚定）：value 以 ⭐/❗ 开头 → 名字加对应前缀。
+
+    珑哥定：重要度覆盖整个级的记忆可直接写在该级（value 前缀标记），
+    地图生成时把标记提到名字上，产生 Attention 特征峰值。
+    """
+    v = (value or "").strip()
+    if v.startswith("❗"):
+        return "❗"
+    if v.startswith("⭐"):
+        return "⭐"
+    return ""
+
+
+async def build_memory_map(db: AsyncSession, world_id: int) -> str | None:
+    """记忆地图（缩进树）：clear/new/compact 后注入，让 AI 知道有什么记忆存档。
+
+    格式（省 token + 软锚定）：
+    【本世界记忆】\nproject/\n  图鉴页面/\n    进度\n  ⭐当前计划\nuser/\n  ⭐偏好\n详细内容用 manage_records get 按需取。
+
+    规则：只注入有内容的路径（空目录不出现）；重要记忆 ⭐ 前缀（软锚定，注意力倾斜）；
+    硬约束 ❗ 前缀；详细 value 不注入（第 4 级按需 get）。
+    """
+    from app.models.world import WorldStructuredRecord
+    from sqlalchemy import select as _sel
+
+    rows = (await db.execute(
+        _sel(WorldStructuredRecord).where(
+            WorldStructuredRecord.world_id == world_id
+        ).order_by(WorldStructuredRecord.category, WorldStructuredRecord.sub_key, WorldStructuredRecord.field)
+    )).scalars().all()
+    if not rows:
+        return None
+
+    # 分组：category → {sub_key: {field: value}}，sub_key 为空串时挂 category 下
+    cats: dict[str, dict[str, dict[str, str]]] = {}
+    for r in rows:
+        cats.setdefault(r.category, {}).setdefault(r.sub_key, {})[r.field] = r.value
+    lines = ["【本世界记忆】"]
+    for cat in sorted(cats):
+        subs = cats[cat]
+        if not subs or (len(subs) == 1 and "" in subs):
+            # 只有无 sub_key 的记录：直接列出 field（带重要标记的加前缀）
+            fields = subs.get("", {})
+            if fields:
+                lines.append(f"{cat}/")
+                for f in sorted(fields):
+                    lines.append(f"  {_mark(fields[f])}{f}")
+            continue
+        lines.append(f"{cat}/")
+        for sk in sorted(subs):
+            if sk == "":
+                continue
+            fields = {f: v for f, v in subs[sk].items() if f}
+            if fields:
+                lines.append(f"  {sk}/")
+                for f in sorted(fields):
+                    lines.append(f"    {_mark(fields[f])}{f}")
+            else:
+                lines.append(f"  {sk}")
+    lines.append("⭐=重要记忆 ❗=硬约束（详细内容用 manage_records get 按需取）")
+    return "\n".join(lines)
+
+
+
 
 def _friendly_llm_error(err) -> str:
     """把 LLM 错误转成友好提示（余额不足/鉴权/限流/服务端）"""
@@ -513,6 +578,15 @@ async def stream_world_chat(
     # 动态信息全部放末尾（每次变化，不影响前缀 cache）——与主对话同规则
     if notice_lines:
         messages.append({"role": "system", "content": "【用户手动改动的懒通知，回复中应体现你看到了】\n" + notice_lines})
+    # 记忆地图：只在上下文起点（无摘要 = 新会话/clear 后；compact 后摘要重建）注入，
+    # 让 AI 知道有什么记忆存档可查；普通延续对话不注入（省 token + 前缀缓存稳定）
+    if not summary:
+        try:
+            memory_map = await build_memory_map(db, world_id)
+            if memory_map:
+                messages.append({"role": "system", "content": memory_map})
+        except Exception:
+            pass
     if needs_compress:
         messages.append({"role": "system", "content": "⚠️ 上下文已接近上限，请调用 compact_context 工具压缩对话历史后再继续。"})
     from zoneinfo import ZoneInfo

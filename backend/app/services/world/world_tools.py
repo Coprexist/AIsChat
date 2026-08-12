@@ -302,7 +302,7 @@ WORLD_TOOLS = [
         "type": "function",
         "function": {
             "name": "manage_records",
-            "description": "目录级结构记忆（对齐主站 manage_records）。把你的结构化数据按「目录/子目录/字段」三级存到数据库（世界维度），支持精确读写、列子目录、生成摘要。与 store_memory 的区别：store_memory 存模糊印象/事实，用文本检索找回；manage_records 存结构化数据（项目进度、设定档案、知识库），用精确 key 查找。\n使用示例：\n- 写: action='set', category='project', sub_key='图鉴页面', field='进度', value='已完成收录功能，待优化筛选'\n- 读: action='get', category='project', sub_key='图鉴页面'\n- 列: action='list', category='project'\n- 快照: action='summary', category='project', sub_key='图鉴页面'\n- 目录: action='categories'\n- 删: action='delete', category='...', sub_key='...', field='...'（field 可选，不填删整个 sub_key）",
+            "description": "目录级结构记忆（对齐主站 manage_records）。把你的结构化数据按「目录/子目录/字段」三级存到数据库（世界维度），支持精确读写、列子目录、生成摘要。与 store_memory 的区别：store_memory 存模糊印象/事实，用文本检索找回；manage_records 存结构化数据（项目进度、设定档案、知识库、用户偏好），用精确 key 查找。\n约定：用户个性记忆用 user 目录（如 user/偏好/风格='简洁'，user/偏好/审美='深色'），记录这个用户的偏好/习惯/关系/关键决策习惯。\n使用示例：\n- 写: action='set', category='project', sub_key='图鉴页面', field='进度', value='已完成收录功能，待优化筛选'\n- 读: action='get', category='project', sub_key='图鉴页面'\n- 列: action='list', category='project'\n- 快照: action='summary', category='project', sub_key='图鉴页面'\n- 目录: action='categories'\n- 改名: action='rename', category='project', new_name='设定', level='category'（或 level='sub_key'/'field' 加 sub_key/field 定位）\n- 移动: action='move', category='project', sub_key='图鉴页面', to_category='design'（整组移动；加 field 则只移单条）\n- 删: action='delete', category='...', sub_key='...', field='...'（field 可选，不填删整个 sub_key）",
             "parameters": {
                 "type": "object",
                 "properties": {
@@ -1303,6 +1303,70 @@ async def _do_execute(db: AsyncSession, world, name: str, arguments: str, turn_s
                 result = await db.execute(sa_delete(WorldStructuredRecord).where(*conds))
                 await db.commit()
                 return {"success": True, "deleted": result.rowcount or 0}
+
+            if action == "rename":
+                # 改名：category / sub_key / field 任一级。
+                # 参数：category（要改的当前名）+ new_name（新名字）+ level（category|sub_key|field，默认 category）+ sub_key（level=sub_key/field 时定位）
+                new_name = str(args.get("new_name", "")).strip()
+                level = str(args.get("level", "category")).strip()
+                if not new_name:
+                    return {"success": False, "error": "rename 需要 new_name"}
+                rows = (await db.execute(sa_select(WorldStructuredRecord).where(
+                    WorldStructuredRecord.world_id == wid,
+                    WorldStructuredRecord.category == category,
+                ))).scalars().all()
+                if level == "category":
+                    for r in rows:
+                        r.category = new_name
+                elif level == "sub_key":
+                    if not sub_key:
+                        return {"success": False, "error": "rename sub_key 需要 sub_key 定位"}
+                    hit = [r for r in rows if r.sub_key == sub_key]
+                    if not hit:
+                        return {"success": False, "error": f"sub_key 不存在: {sub_key}"}
+                    for r in hit:
+                        r.sub_key = new_name
+                elif level == "field":
+                    if not sub_key or not field:
+                        return {"success": False, "error": "rename field 需要 sub_key + field 定位"}
+                    hit = [r for r in rows if r.sub_key == sub_key and r.field == field]
+                    if not hit:
+                        return {"success": False, "error": f"field 不存在: {sub_key}.{field}"}
+                    for r in hit:
+                        r.field = new_name
+                else:
+                    return {"success": False, "error": f"未知 level: {level}（category|sub_key|field）"}
+                await db.commit()
+                return {"success": True, "action": "rename", "level": level, "new_name": new_name, "renamed": len(rows)}
+
+            if action == "move":
+                # 移动：把 sub_key（整组）或 field（单条）移到另一个 category。
+                # 参数：category（当前所在目录）+ to_category（目标目录）+ sub_key（必填）+ field（可选：不填移整个 sub_key）
+                to_category = str(args.get("to_category", "")).strip()
+                if not to_category:
+                    return {"success": False, "error": "move 需要 to_category"}
+                if not sub_key:
+                    return {"success": False, "error": "move 需要 sub_key 定位"}
+                rows = (await db.execute(sa_select(WorldStructuredRecord).where(
+                    WorldStructuredRecord.world_id == wid,
+                    WorldStructuredRecord.category == category,
+                ))).scalars().all()
+                if field:
+                    hit = [r for r in rows if r.sub_key == sub_key and r.field == field]
+                    if not hit:
+                        return {"success": False, "error": f"field 不存在: {sub_key}.{field}"}
+                    for r in hit:
+                        r.category = to_category
+                    moved = len(hit)
+                else:
+                    hit = [r for r in rows if r.sub_key == sub_key]
+                    if not hit:
+                        return {"success": False, "error": f"sub_key 不存在: {sub_key}"}
+                    for r in hit:
+                        r.category = to_category
+                    moved = len(hit)
+                await db.commit()
+                return {"success": True, "action": "move", "to_category": to_category, "moved": moved}
 
             return {"success": False, "error": f"未知 action: {action}"}
         except (ValueError, TypeError, json.JSONDecodeError) as e:
