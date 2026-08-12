@@ -778,6 +778,25 @@ async def _build_cross_conversation_context(
     return []
 
 
+async def _versioned_agent_prompt(db: AsyncSession, agent, system_prompt_override: str | None) -> str | None:
+    """前缀文本版本化：personality 源 = agent-prompt-{id}（2026-08-12 珑哥定）。
+
+    用户/管理员改提示词 → 写新版本（ensure_text_source_version 哈希对比）；
+    锁定态取 effective 快照（前缀缓存稳定，变更只尾部 changelog 告知）；
+    compact/clear 解锁后生效。per-user 覆盖（system_prompt_override）不走版本化——
+    那是用户级配置不是 agent 本体，保持直接生效。
+    """
+    if system_prompt_override:
+        return system_prompt_override
+    cur = getattr(agent, "current_system_prompt", None) or ""
+    source = f"agent-prompt-{agent.id}"
+    from app.services.capability_versioning import (
+        ensure_text_source_version, get_effective_text,
+    )
+    await ensure_text_source_version(db, source, cur, f"AI{agent.id}提示词")
+    return await get_effective_text(db, agent, source, cur)
+
+
 async def build_messages(
     db: AsyncSession,
     agent,
@@ -877,13 +896,17 @@ async def build_messages(
 
     # ── 构建六段（应用管理员覆盖 + 配置驱动）──
     enabled_segments = context_config_parser.get_enabled_segments(context_config)
-    
+
+    # 前缀文本版本化：personality（用户可改提示词）走 agent-prompt-{id} 源
+    # 用户/管理员改提示词 → 写新版本 + 尾部 changelog 告知，不碰前缀；compact 后生效
+    eff_personality = await _versioned_agent_prompt(db, agent, system_prompt_override)
+
     segments = {}
     if "core_identity" in enabled_segments:
         segments["core_identity"] = overrides.get("core_identity") or CORE_IDENTITY
     
     if "personality" in enabled_segments:
-        segments["personality"] = build_personality_segment(agent, language, system_prompt_override)
+        segments["personality"] = build_personality_segment(agent, language, eff_personality)
     
     if "protocol" in enabled_segments:
         segments["protocol"] = overrides.get(f"protocol_{profile}") or protocol
@@ -1067,7 +1090,7 @@ async def build_messages(
     # 能力变更通知（懒加载：增量 changelog 追加尾部，known 更新与注入同轮；不影响前缀缓存）
     try:
         from app.services.capability_versioning import build_change_notice, SOURCE_PLATFORM
-        notice = await build_change_notice(db, agent, [SOURCE_PLATFORM])
+        notice = await build_change_notice(db, agent, [SOURCE_PLATFORM, f"agent-prompt-{agent.id}"])
         if notice:
             messages.append({"role": "system", "content": notice})
             await db.commit()
@@ -1077,11 +1100,24 @@ async def build_messages(
     # 绑定世界（群绑定 + agent 直接绑定）→ 能力清单 + 世界侧 skill 变更通知（动态尾部，缓存友好）
     if group_id or True:
         try:
-            from app.models.world import World
+            from app.models.world import World, WorldBinding
             from app.services.world.world_service import find_worlds_by_entity
             bound = await find_worlds_by_entity(db, "agent", agent.id)
             if group_id:
                 bound += await find_worlds_by_entity(db, "group", group_id)
+            # 绑定类型（分层注入）：skill.types 声明了该类型才注入（群绑定的类型 + agent 绑定的类型）
+            type_slugs: set[str] = set()
+            bind_rows = (await db.execute(
+                select(WorldBinding).where(
+                    WorldBinding.world_id.in_([w.id for w in bound]),
+                    WorldBinding.entity_type.in_(("agent", "group")),
+                    WorldBinding.entity_id.in_([agent.id] + ([group_id] if group_id else [])),
+                )
+            )).scalars().all()
+            for br in bind_rows:
+                if br.group_type_slug:
+                    type_slugs.add(br.group_type_slug)
+            from app.services.world.world_skill_runtime import build_world_tools, build_world_tools_for_type
             seen = set()
             # 同名技能跨世界统计（清单注明：可用 world_id 参数指定执行哪个世界的版本）
             name_worlds: dict[str, list[int]] = {}
@@ -1089,7 +1125,6 @@ async def build_messages(
                 if w.id in seen:
                     continue
                 seen.add(w.id)
-                from app.services.world.world_skill_runtime import build_world_tools
                 for t in build_world_tools(w.id):
                     nm = ((t or {}).get("function") or {}).get("name")
                     if nm:
@@ -1100,9 +1135,18 @@ async def build_messages(
                 if w.id in seen:
                     continue
                 seen.add(w.id)
-                # 世界侧 skills 能力清单（群 AI 可直接工具调用；世界程序命令走 world_command）
-                from app.services.world.world_skill_runtime import build_world_tools
-                skill_names = [t["function"]["name"] for t in build_world_tools(w.id)]
+                # 世界侧 skills 能力清单（按绑定类型分层注入：types 匹配的 + 通用才给）
+                # 多类型绑定 → 取并集（任一类型可用就注入）；未绑定类型 → 只给通用 skill
+                type_filter = sorted(type_slugs) if type_slugs else None
+                skill_names = []
+                if type_filter:
+                    for ts in type_filter:
+                        for t in build_world_tools_for_type(w.id, ts):
+                            nm = ((t or {}).get("function") or {}).get("name")
+                            if nm and nm not in skill_names:
+                                skill_names.append(nm)
+                else:
+                    skill_names = [t["function"]["name"] for t in build_world_tools_for_type(w.id, None)]
                 dup_note = ""
                 if dup_hint:
                     parts = [f"{nm}（世界 {'/'.join(map(str, wids))} 都有，调用时可用 world_id 参数指定目标世界）" for nm, wids in dup_hint.items()]
@@ -1200,9 +1244,11 @@ async def build_dm_messages(
         dm_protocol += MULTI_SESSION
         dm_protocol += PRIVACY_RULES
         dm_protocol += CHAT_CHAIN_RULES
+    # 前缀文本版本化（同 build_messages）：personality 走 agent-prompt-{id} 源
+    eff_personality = await _versioned_agent_prompt(db, agent, system_prompt_override)
     segments = {
         "core_identity": overrides.get("core_identity") or CORE_IDENTITY,
-        "personality": build_personality_segment(agent, language, system_prompt_override),
+        "personality": build_personality_segment(agent, language, eff_personality),
         "protocol": dm_protocol,
         "tools": await _build_tools_segment(db, agent, is_dm=True),
         "injected_skills": await _build_injected_skills(
@@ -1391,6 +1437,16 @@ async def build_dm_messages(
                 })
     except Exception as e:
         logger.warning(f"注入工具错误记录失败（非致命）: {e}")
+
+    # 能力变更通知（懒加载：增量 changelog 追加尾部，known 更新与注入同轮；不影响前缀缓存）
+    try:
+        from app.services.capability_versioning import build_change_notice, SOURCE_PLATFORM
+        notice = await build_change_notice(db, agent, [SOURCE_PLATFORM, f"agent-prompt-{agent.id}"])
+        if notice:
+            messages.append({"role": "system", "content": notice})
+            await db.commit()
+    except Exception:
+        pass
 
     # 当前时间放在最后（每次变化，放末尾不影响前缀cache）
     dm_ctx = await _build_current_context(db, agent, 0, partner_name or "私信", is_dm=True)

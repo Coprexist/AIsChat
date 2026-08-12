@@ -33,9 +33,10 @@ DEFAULT_ASSISTANT_SPEC = {"count": 1, "need_api": True, "default_name": "群助�
 
 # 默认群类型：世界还没配置 group_types.json 时兜底（开箱即用，群/AI 都可绑定；用户自定义后覆盖）
 # slug=稳定 id（绑定存 slug，改名只改 name 不影响存量绑定）
+# bind_limit=-1 = 无限（珑哥 2026-08-12 定：默认类型群聊和 AI 数目都是无限）
 DEFAULT_GROUP_TYPES = [
     {"slug": "default", "name": "默认类型", "description": "未配置群类型时的兜底类型",
-     "rules": "", "bind_limit": 10, "assistant_spec": {"count": 1, "need_api": False, "default_name": "群助手"}},
+     "rules": "", "bind_limit": -1, "assistant_spec": {"count": 1, "need_api": False, "default_name": "群助手"}},
 ]
 
 
@@ -73,16 +74,29 @@ def save_group_types(world_id: int, types: list[dict]) -> None:
 
 
 def _normalize_type(t: dict) -> dict:
-    """清洗单个类型定义：slug 从 name 生成（稳定 id），字段齐全。"""
+    """清洗单个类型定义：slug 从 name 生成（稳定 id），字段齐全。
+
+    bind_limit：-1 = 无限（珑哥 2026-08-12 定：不是极大值，用 -1 表达无限）；
+    0/负数（除 -1）→ 归 1（至少允许一个）；正整数 = 上限。
+    """
     name = str(t.get("name") or "").strip()[:50]
     slug = str(t.get("slug") or _slugify(name)).strip()[:50]
     spec = {**DEFAULT_ASSISTANT_SPEC, **(t.get("assistant_spec") or {})}
+    raw_limit = t.get("bind_limit")
+    try:
+        limit = int(raw_limit) if raw_limit is not None else 3
+    except (TypeError, ValueError):
+        limit = 3
+    if limit == -1:
+        limit = -1  # 无限
+    elif limit < 1:
+        limit = 1
     return {
         "slug": slug,
         "name": name,
         "description": str(t.get("description") or ""),
         "rules": str(t.get("rules") or ""),
-        "bind_limit": max(1, int(t.get("bind_limit") or 3)),
+        "bind_limit": limit,
         "assistant_spec": {
             "count": max(1, int(spec.get("count") or 1)),
             "need_api": bool(spec.get("need_api", True)),
@@ -178,8 +192,9 @@ async def bind_entry_with_type(
         db.add(binding)
     elif binding.group_type_slug == type_slug:
         return {"success": True, "assistants": [], "already": True}
-    if bound >= int(type_def["bind_limit"]):
-        raise ValueError(f"群类型「{type_def['name']}」已达绑定上限（{type_def['bind_limit']}）")
+    limit = int(type_def["bind_limit"])
+    if limit != -1 and bound >= limit:
+        raise ValueError(f"群类型「{type_def['name']}」已达绑定上限（{limit}）")
     binding.group_type_slug = type_slug
     await db.flush()
 

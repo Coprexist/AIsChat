@@ -3,7 +3,7 @@
  */
 import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { ChevronRight, Store, Trash2, Plus } from 'lucide-react'
+import { ChevronRight, Store, Trash2, Plus, Eye } from 'lucide-react'
 import { api } from '../api/client'
 import BindGroupModal from '../components/world/BindGroupModal'
 import PageHeader from '../components/PageHeader'
@@ -117,7 +117,7 @@ export default function WorldsPage() {
           {worlds.length === 0 && !showCreate && (
             <div className="text-center text-textMuted py-20 text-sm">
               还没有世界<br />
-              <span className="text-textSecondary text-xs">创建一个，然后绑定群聊，群成员就能"在沉浸界面打开"了</span>
+              <span className="text-textSecondary text-xs">创建后绑定群聊或 AI，就能进入沉浸界面了</span>
             </div>
           )}
 
@@ -141,6 +141,15 @@ export default function WorldsPage() {
                   <button onClick={() => openBindModal(w, 'agent')} className="text-xs px-3 py-1.5 bg-elevated hover:bg-border text-textSecondary rounded transition-colors">绑定 AI</button>
                   <button onClick={() => toggleStatus(w)} className="text-xs px-3 py-1.5 bg-elevated hover:bg-border text-textSecondary rounded transition-colors">
                     {w.status === 'active' ? '休眠' : '唤醒'}
+                  </button>
+                  <button
+                    onClick={() => window.open(`/world/${w.id}/preview`, '_blank')}
+                    className="text-xs px-3 py-1.5 bg-elevated hover:bg-border text-textSecondary rounded transition-colors"
+                    title="打开沉浸界面（无需绑定群，只绑定 AI 也能进）"
+                  >
+                    <span className="inline-flex items-center gap-1">
+                      <Eye size={13} /> 打开
+                    </span>
                   </button>
                   <button
                     onClick={() => navigate(`/worlds/${w.id}/design`)}

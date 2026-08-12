@@ -65,7 +65,7 @@ WORLD_TOOLS = [
         "type": "function",
         "function": {
             "name": "update_group_types",
-            "description": "设置本世界的群类型配置（有多少种类型的群、每种的上限和规则、群助手模板）。传完整的 types 数组（先 get_group_types 看现状再改，只改要改的字段）。\n每个类型字段：name=类型名（如 冒险团/商会）、rules=世界规则（群主可见，群助手行为继承）、bind_limit=可绑定群数上限、assistant_spec={count: 每群助手数量, need_api: 是否需API, default_name: 助手默认名}。\n例：把冒险团上限改成 5 → types 里该类型 bind_limit=5。",
+            "description": "设置本世界的群类型配置（有多少种类型的群、每种的上限和规则、群助手模板）。传完整的 types 数组（先 get_group_types 看现状再改，只改要改的字段）。\n每个类型字段：name=类型名（如 冒险团/商会，也可以是剧本角色名/职位名如 族长/骑士团长）、rules=世界规则（群主可见，群助手行为继承）、bind_limit=可绑定群数上限（-1 = 无限）、assistant_spec={count: 每群助手数量, need_api: 是否需API, default_name: 助手默认名}。\n例：把冒险团上限改成 5 → types 里该类型 bind_limit=5；改成无限 → bind_limit=-1。",
             "parameters": {
                 "type": "object",
                 "properties": {
@@ -419,7 +419,7 @@ def _tool_result_summary(name: str, result: dict) -> str:
         types = result.get("types") or []
         if not types:
             return "本世界还没有群类型配置"
-        lines = [f"{t['name']}（上限{t['bind_limit']}，已绑{t['bound_count']}群，助手{t['assistant_spec'].get('count', 1)}个"
+        lines = [f"{t['name']}（上限{'无限' if t['bind_limit'] == -1 else t['bind_limit']}，已绑{t['bound_count']}群，助手{t['assistant_spec'].get('count', 1)}个"
                  + ("，无需API" if t['assistant_spec'].get('need_api') is False else "") + "）" for t in types]
         return "群类型：" + "；".join(lines)
     if name == "update_group_types":

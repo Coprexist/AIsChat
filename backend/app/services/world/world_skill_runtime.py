@@ -73,9 +73,27 @@ class SkillDef:
     permissions: list[str] = field(default_factory=list)
     code_path: Path = None  # type: ignore[assignment]
     scope: str = "world"  # "ai" = 设计侧（造物主） | "world" = 世界侧（居民）
+    types: list[str] | None = None  # 适用类型 slug 列表（None 或 ["*"] = 所有类型通用；["blacksmith"] = 仅铁匠可用）
 
 
 # ── manifest 解析 ──
+def _parse_types(raw) -> list[str] | None:
+    """解析 manifest.types：省略/["*"]/空 = None（所有类型通用）；列表 = 仅这些类型可用。
+
+    珑哥原话（2026-08-12）："设计Skill的时候就可选这是给所有类型通用的skill还是只有哪些类型可用的skill"。
+    """
+    if raw is None:
+        return None
+    if isinstance(raw, str):
+        raw = [raw]
+    if not isinstance(raw, list):
+        return None
+    types = [str(t).strip() for t in raw if str(t).strip()]
+    if not types or "*" in types:
+        return None  # 通配 = 通用
+    return types
+
+
 def _load_manifest(dir_path: Path, scope: str) -> SkillDef | None:
     manifest_path = dir_path / "manifest.json"
     code_path = dir_path / "code.py"
@@ -94,6 +112,7 @@ def _load_manifest(dir_path: Path, scope: str) -> SkillDef | None:
             permissions=[str(p) for p in (m.get("permissions") or [])],
             code_path=code_path,
             scope=scope,
+            types=_parse_types(m.get("types")),
         )
     except (json.JSONDecodeError, OSError) as e:
         logger.warning(f"📦 skill manifest 解析失败 {manifest_path}: {e}")
@@ -156,6 +175,20 @@ def build_ai_tools() -> list[dict]:
 def build_world_tools(world_id: int) -> list[dict]:
     """世界侧（世界颁布的居民能力）→ 群 AI 的工具定义（含可选 world_id 指定参数）"""
     return _to_tools(list_world_skills(world_id), world_id=world_id)
+
+
+def build_world_tools_for_type(world_id: int, type_slug: str | None) -> list[dict]:
+    """按类型过滤的世界侧工具：skill.types 声明了该类型才注入（分层注入，2026-08-12 珑哥定）。
+
+    type_slug 为 None（未绑定类型）→ 只给通用 skill（types=None 的）；
+    type_slug 有值 → 通用 skill + 声明了该类型的 skill。
+    """
+    skills = list_world_skills(world_id)
+    if type_slug:
+        skills = [s for s in skills if s.types is None or type_slug in s.types]
+    else:
+        skills = [s for s in skills if s.types is None]
+    return _to_tools(skills, world_id=world_id)
 
 
 def find_skill(name: str, scope: str | None = None) -> SkillDef | None:
