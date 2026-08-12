@@ -1,6 +1,5 @@
 # 01 世界编号变量
-
-> 区介绍：window 注入的 `WORLD_ID / GROUP_ID / USER_ID / WORLD_AI_ID` 等变量与打包原则。**写任何世界页面代码前必读**，杜绝硬编码编号。
+> window 注入的 `WORLD_ID / GROUP_ID / USER_ID / WORLD_AI_ID` 等变量与打包原则。**写任何世界页面代码前必读**，杜绝硬编码编号。
 
 ## 1. 核心原则
 

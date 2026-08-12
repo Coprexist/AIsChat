@@ -83,6 +83,16 @@ MIGRATIONS: list[tuple[str, str]] = [
         "users.type CHECK 约束重建",
         "ALTER TABLE users ADD CONSTRAINT users_type_check CHECK (type IN ('human', 'ai', 'system'))",
     ),
+    (
+        "api_doc_sections 表",
+        """CREATE TABLE IF NOT EXISTS api_doc_sections (
+            id VARCHAR(4) PRIMARY KEY,
+            title TEXT NOT NULL DEFAULT '',
+            intro TEXT NOT NULL DEFAULT '',
+            doc_file VARCHAR(100) NOT NULL DEFAULT '',
+            updated_at TIMESTAMP DEFAULT NOW()
+        )""",
+    ),
 ]
 
 

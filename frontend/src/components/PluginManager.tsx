@@ -3,6 +3,7 @@ import { api } from '../api/client'
 import { Play, Square, CheckCircle, RefreshCw, Plug, Circle } from 'lucide-react'
 import { useT } from '../i18n/I18nContext'
 import DocExportTab from './DocExportTab'
+import ApiDocSectionsTab from './ApiDocSectionsTab'
 
 interface Plugin {
   id: string
@@ -72,6 +73,11 @@ export default function PluginManager() {
         {/* 可选能力：文档导出（pandoc）——并入插件管理 */}
         <div className="rounded-xl border border-border bg-elevated/30 p-4 mb-4">
           <DocExportTab />
+        </div>
+
+        {/* 接口文档分区管理（标题/介绍表单注入） */}
+        <div className="rounded-xl border border-border bg-elevated/30 p-4 mb-4">
+          <ApiDocSectionsTab />
         </div>
         <p className="text-sm text-textSecondary">
           管理扩展服务。启动后所有 AI 共享同一实例，无需每个 AI 单独运行。

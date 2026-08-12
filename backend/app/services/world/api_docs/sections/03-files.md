@@ -1,6 +1,5 @@
 # 03 文件操作
-
-> 区介绍：`file_list / file_write / file_read / file_edit / file_delete` 全部参数与返回、类型白名单、越界防护、读取截断规则。**建/改世界网页代码前必读**。
+> `file_list / file_write / file_read / file_edit / file_delete` 全部参数与返回、类型白名单、越界防护、读取截断规则。**建/改世界网页代码前必读**。
 
 ## 1. 概述
 

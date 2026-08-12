@@ -1,6 +1,5 @@
 # 04 世界块体系（积木）
-
-> 区介绍：`list_world_blocks / view_world_block / apply_world_block` 用法、现有积木（平台侧边栏、群聊对话窗）、**DIY 定制**与**更新机制**、侧边栏约定。
+> `list_world_blocks / view_world_block / apply_world_block` 用法、现有积木（平台侧边栏、群聊对话窗）、**DIY 定制**与**更新机制**、侧边栏约定。
 
 ## 1. 是什么
 

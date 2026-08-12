@@ -101,3 +101,5 @@ __all__ = [
     "UserGroupPreference",
     "UserDMPreference",
 ]
+
+from app.models.api_doc_section import ApiDocSection

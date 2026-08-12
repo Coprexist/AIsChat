@@ -3375,3 +3375,113 @@ async def update_world_block(
         raise HTTPException(status_code=400, detail=str(e))
     await db.commit()
     return result
+
+
+@router.post("/blocks/{block_id}/update")
+async def update_world_block(
+    block_id: str,
+    admin: dict = Depends(require_admin),
+    db: AsyncSession = Depends(get_db),
+):
+    """批量更新积木：所有已应用该积木的世界重新 apply（跳过 diy/ 用户定制），
+    并给每个世界写懒通知（下次对话注入世界 AI 上下文）。"""
+    from app.services.world.world_blocks import update_block_for_all_worlds
+    try:
+        result = await update_block_for_all_worlds(db, block_id)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    await db.commit()
+    return result
+
+
+@router.get("/api-doc-sections")
+async def list_api_doc_sections(
+    admin: dict = Depends(require_admin),
+    db: AsyncSession = Depends(get_db),
+):
+    """接口文档分区（含覆盖状态）：md 默认 + DB 覆盖，供管理表单编辑"""
+    from app.services.world.world_api_docs import _discover_sections, get_sections
+    from app.models.system_settings import SystemSettings
+    row = await db.get(SystemSettings, 1)
+    overrides = (row.api_doc_section_overrides or {}) if row else {}
+    sections = await get_sections(db)
+    for s in sections:
+        ov = overrides.get(s["id"]) or {}
+        s["default_title"] = s["title"]
+        s["default_intro"] = s["intro"]
+        s["title_overridden"] = bool(ov.get("title"))
+        s["intro_overridden"] = bool(ov.get("intro"))
+    return {"sections": sections}
+
+
+@router.put("/api-doc-sections")
+async def save_api_doc_sections(
+    body: dict,
+    admin: dict = Depends(require_admin),
+    db: AsyncSession = Depends(get_db),
+):
+    """保存接口文档分区标题/介绍覆盖（部署者/开发者表单注入，存 DB；md 默认不动）"""
+    from app.services.world.world_api_docs import _discover_sections
+    from app.models.system_settings import SystemSettings
+    valid_ids = {s["id"] for s in _discover_sections()}
+    overrides = {}
+    for sid, ov in (body.get("overrides") or {}).items():
+        if sid not in valid_ids:
+            continue
+        item = {}
+        if isinstance(ov.get("title"), str) and ov["title"].strip():
+            item["title"] = ov["title"].strip()
+        if isinstance(ov.get("intro"), str) and ov["intro"].strip():
+            item["intro"] = ov["intro"].strip()
+        if item:
+            overrides[sid] = item
+    row = await db.get(SystemSettings, 1)
+    if row is None:
+        row = SystemSettings(id=1)
+        db.add(row)
+    row.api_doc_section_overrides = overrides or None
+    await db.commit()
+    return {"saved": len(overrides), "overrides": overrides}
+
+
+@router.get("/api-doc-sections")
+async def list_api_doc_sections(
+    admin: dict = Depends(require_admin),
+    db: AsyncSession = Depends(get_db),
+):
+    """接口文档分区（DB 快照 + md 源对比状态），供管理表单编辑"""
+    from app.services.world.world_api_docs import get_sections, _discover_sections
+    sections = await get_sections(db)
+    docs = {s["id"]: s for s in _discover_sections()}
+    for s in sections:
+        d = docs.get(s["id"])
+        s["doc_title"] = d["title"] if d else None
+        s["doc_intro"] = d["intro"] if d else None
+        s["title_changed"] = bool(d and d["title"] != s["title"])
+        s["intro_changed"] = bool(d and d["intro"] != s["intro"])
+    return {"sections": sections}
+
+
+@router.post("/api-doc-sections/sync-from-docs")
+async def sync_api_doc_sections_from_docs(
+    admin: dict = Depends(require_admin),
+    db: AsyncSession = Depends(get_db),
+):
+    """「从文档中更新」：md 源 → DB 快照全量同步（新增/更新/删除，以 md 为准）"""
+    from app.services.world.world_api_docs import sync_sections_from_docs
+    result = await sync_sections_from_docs(db)
+    return result
+
+
+@router.put("/api-doc-sections")
+async def save_api_doc_sections(
+    body: dict,
+    admin: dict = Depends(require_admin),
+    db: AsyncSession = Depends(get_db),
+):
+    """保存表单：更新 DB 快照（即时生效）；write_back=true 时同步写回 md 源"""
+    from app.services.world.world_api_docs import save_sections
+    items = body.get("sections") or []
+    write_back = bool(body.get("write_back"))
+    result = await save_sections(db, items, write_back=write_back)
+    return result

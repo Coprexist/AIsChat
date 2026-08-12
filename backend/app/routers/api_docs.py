@@ -237,10 +237,13 @@ async def _install_pandoc_background() -> None:
 
 
 @router.get("")
-async def list_api_docs(current_user: dict = Depends(get_current_user)):
-    """分区列表（id / 标题 / 区介绍）"""
-    from app.services.world.world_api_docs import _discover_sections
-    return {"sections": _discover_sections()}
+async def list_api_docs(
+    current_user: dict = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """分区列表（id / 标题 / 区介绍）——md 默认 + DB 覆盖（部署者表单注入）"""
+    from app.services.world.world_api_docs import get_sections
+    return {"sections": await get_sections(db)}
 
 
 @router.get("/status")
