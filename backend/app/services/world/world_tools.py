@@ -1153,10 +1153,15 @@ async def _do_execute(db: AsyncSession, world, name: str, arguments: str, turn_s
             summaries[session_key(world)] = summary
             cfg["chat_summaries"] = summaries
             world.config = cfg
-            # 能力懒加载：压缩后 effective 对齐最新（世界 skill 工具定义直接用最新的）
+            # 能力懒加载：压缩后解锁，effective 全部对齐最新（提示词/强注入/昵称/技能变更在此生效）
             try:
-                from app.services.capability_versioning import mark_effective_latest
-                await mark_effective_latest(db, world.config, ["ai-skills"])
+                from app.services.capability_versioning import apply_pending_changes
+                await apply_pending_changes(db, world.config, [
+                    "ai-skills",
+                    f"world-prompt-{world.id}",
+                    "forced-prompt",
+                    f"world-name-{world.id}",
+                ])
             except Exception:
                 pass
             await db.flush()
@@ -1189,6 +1194,17 @@ async def _do_execute(db: AsyncSession, world, name: str, arguments: str, turn_s
             cfg["chat_summaries"] = summaries
             cfg["workflow_memory"] = None
             world.config = cfg
+            # 解锁：清空 = 新对话，前缀变更（提示词/强注入/昵称）在此生效
+            try:
+                from app.services.capability_versioning import apply_pending_changes
+                await apply_pending_changes(db, world.config, [
+                    "ai-skills",
+                    f"world-prompt-{world.id}",
+                    "forced-prompt",
+                    f"world-name-{world.id}",
+                ])
+            except Exception:
+                pass
             await db.commit()
             return {"success": True, "note": "当前会话上下文已清空（历史消息+摘要+工作流记忆），其他会话保留；长期记忆保留，请从记忆恢复工作状态。"}
         except Exception as e:

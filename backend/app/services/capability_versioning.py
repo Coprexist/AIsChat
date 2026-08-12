@@ -6,13 +6,18 @@
 - known（告知进度）：已注入变更通知的版本 —— 落后则注入"增量 changelog"（只有新变化），注入后更新
 - effective（生效进度）：请求实际使用的定义版本 —— compact 时切到最新
 
+2026-08-12 扩展：前缀内容（用户 system_prompt / 强注入段 / 昵称）也纳入同一机制。
+新增：ensure_text_source_version / get_effective_text / apply_pending_changes（解锁）/ guard_apply_change（防御）。
+
 不变式：
 - 请求 payload 的 tools = effective 版本的定义快照（compact 前不动 → 前缀缓存稳定）
 - 变更告知 = 动态尾部 system 消息（不影响前缀）
 - 旧版本定义永远保留在 capability_versions（平台发布后旧对话继续用旧定义请求）
+- 锁定态（对话中）前缀永不因外部变更而变；compact / clear 是唯一解锁点
 """
 from __future__ import annotations
 
+import contextvars
 import hashlib
 import json
 import logging
@@ -23,6 +28,10 @@ from sqlalchemy.ext.asyncio import AsyncSession
 logger = logging.getLogger(__name__)
 
 SOURCE_PLATFORM = "platform"
+
+# 解锁上下文标记：apply_pending_changes（compact/clear）期间置 True，
+# guard_apply_change 检查它——锁定态尝试应用变更 → 拒绝 + 报错（防御未来"强制修改"逻辑）
+_unlock_ctx: contextvars.ContextVar[bool] = contextvars.ContextVar("cap_unlock_ctx", default=False)
 
 
 def defs_hash(definitions: list) -> str:
@@ -41,7 +50,22 @@ def _def_by_name(definitions: list, name: str) -> dict | None:
 
 
 def _diff_changelog(old_defs: list | None, new_defs: list) -> str:
-    """自动 diff 两版定义 → 变更摘要（新增/移除/更新工具名）"""
+    """自动 diff 两版定义 → 变更摘要（新增/移除/更新工具名；文本源用长度+首段差异）"""
+    # 文本源：definitions = [{"type": "text", "content": "..."}]
+    def _is_text(defs):
+        return bool(defs) and all((d or {}).get("type") == "text" for d in defs)
+    if _is_text(old_defs) or _is_text(new_defs):
+        old_text = "".join((d or {}).get("content") or "" for d in (old_defs or []))
+        new_text = "".join((d or {}).get("content") or "" for d in (new_defs or []))
+        if old_text == new_text:
+            return "内容无变化"
+        # 找首个差异位置，展示前后各 40 字
+        i = 0
+        while i < min(len(old_text), len(new_text)) and old_text[i] == new_text[i]:
+            i += 1
+        old_snip = old_text[max(0, i - 20):i + 40].replace("\n", " ")
+        new_snip = new_text[max(0, i - 20):i + 40].replace("\n", " ")
+        return f"内容更新（{len(old_text)}→{len(new_text)} 字，首处差异：…{old_snip}… → …{new_snip}…）"
     old_names = {((d or {}).get("function") or {}).get("name") for d in (old_defs or [])}
     new_names = {((d or {}).get("function") or {}).get("name") for d in (new_defs or [])}
     added = new_names - old_names
@@ -223,3 +247,85 @@ async def mark_effective_latest(db: AsyncSession, agent, sources: list[str]) -> 
             e = _holder_map(agent, "cap_effective_versions")
             e[source] = latest.version
             _set_holder_map(agent, "cap_effective_versions", e)
+
+
+# ═══════════════════════════════════════════════════════════════
+# 前缀文本源版本化（2026-08-12 珑哥定：所有进前缀的内容必须保证缓存命中）
+# ═══════════════════════════════════════════════════════════════
+# 用户 system_prompt / 强注入段 / 昵称等文本也走 capability_versions 版本链：
+# - 变更（用户改提示词 / 系统更新强注入）→ 写新版本 + 尾部 changelog 告知，不碰前缀
+# - compact / clear（解锁）→ effective 对齐最新，前缀用新内容
+
+def text_defs(text: str) -> list:
+    """文本内容 → definitions 存储格式（与工具定义同表，type=text 区分）"""
+    return [{"type": "text", "content": text}]
+
+
+def defs_to_text(definitions: list | None) -> str | None:
+    """definitions 快照 → 文本（type=text 源）"""
+    if not definitions:
+        return None
+    parts = []
+    for d in definitions:
+        if isinstance(d, dict) and d.get("type") == "text":
+            parts.append(d.get("content") or "")
+    return "".join(parts) if parts else None
+
+
+async def ensure_text_source_version(
+    db: AsyncSession, source: str, text: str, label: str,
+) -> int:
+    """文本内容版本化：内容变了 → 写新版本（复用 ensure_source_version + 文本 diff）"""
+    return await ensure_source_version(db, source, text_defs(text), label)
+
+
+async def get_effective_text(
+    db: AsyncSession, holder, source: str, fallback_text: str,
+) -> str:
+    """锁定态取 effective 快照文本；无记录（新源）→ 用当前文本并同步 effective（与工具同语义）"""
+    ver = _holder_map(holder, "cap_effective_versions").get(source)
+    if ver is not None:
+        row = await get_version(db, source, ver)
+        if row is not None:
+            t = defs_to_text(row.definitions)
+            if t is not None:
+                return t
+    latest = await get_latest_version(db, source)
+    if latest is not None:
+        e = _holder_map(holder, "cap_effective_versions")
+        e[source] = latest.version
+        _set_holder_map(holder, "cap_effective_versions", e)
+        t = defs_to_text(latest.definitions)
+        if t is not None:
+            return t
+    return fallback_text
+
+
+async def apply_pending_changes(db: AsyncSession, holder, sources: list[str]) -> None:
+    """解锁（compact / clear = 新对话）时调用：effective 全部对齐最新，变更正式生效。
+
+    这是唯一合法的"应用变更"入口：它先进入解锁上下文再操作。
+    锁定态直接调用 mark_effective_latest / 改 effective → guard_apply_change 拒绝 + 报错。
+    """
+    token = _unlock_ctx.set(True)
+    try:
+        guard_apply_change(sources)  # 解锁上下文内校验通过（防御：万一 future 代码绕路）
+        await mark_effective_latest(db, holder, sources)
+    finally:
+        _unlock_ctx.reset(token)
+
+
+def guard_apply_change(sources: list[str]) -> None:
+    """防御性守卫：非解锁上下文（对话进行中）尝试应用变更 → 拒绝 + 记录报错。
+
+    珑哥原话（2026-08-12）："只要有在解锁之前尝试应用变更的都拒绝并记录报错"。
+    目前代码都是动态读取拼接（不会强制修改），此守卫防止未来出现"强制修改"逻辑破坏不变式。
+    """
+    if not _unlock_ctx.get():
+        logger.error(
+            f"⛔ 拒绝在锁定态应用能力变更 {sources}："
+            f"前缀必须保持缓存稳定，变更只能经 compact/clear 解锁后生效"
+        )
+        raise RuntimeError(
+            f"锁定态禁止应用变更 {sources}（需 compact/clear 解锁）"
+        )

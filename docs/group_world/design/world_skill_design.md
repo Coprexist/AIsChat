@@ -57,6 +57,46 @@ ctx 只包含 `manifest.permissions` **声明过**的能力——没声明的根
 | `group:send` | `ctx.group.send()` | 发消息到绑定群（以世界创建者身份） |
 | （无） | `ctx.log()` | 平台日志（无需声明） |
 
+## 三·六、Skill 分层注入（按 AI 类型分发，2026-08-12 珑哥定）
+
+> 珑哥原话："我们后端要考虑给Skill做分层注入的。例如只通过群聊进入世界的默认到一个AI类型过去，然后给不同类型的AI发不同的skill。所以设计Skill的时候就可选这是给所有类型通用的skill还是只有哪些类型可用的skill。"
+
+**背景**：世界有群类型体系（group_types.json，群聊和 AI 都按类型入场），skill 也应**按类型分层注入**——不是所有居民拿到同一套技能。
+
+### 分层规则
+
+1. **入口默认类型**：通过群聊进入世界的实体 → 默认落到该群绑定的 AI 类型；AI 直接绑定世界 → 落到自己绑定的类型
+2. **按类型发 skill**：每个类型收到的 skill = 声明了"本类型可用"的 skill + 通用 skill
+3. **skill 适用性声明**（manifest 新增字段）：
+
+```json
+{
+  "name": "forge_weapon",
+  "description": "打造武器（仅铁匠可用）",
+  "arguments": { "type": "object", "properties": {} },
+  "permissions": ["data:read", "data:write"],
+  "types": ["blacksmith"]        // 仅 blacksmith 类型可用
+}
+```
+
+| types 字段 | 含义 |
+|-----------|------|
+| `["*"]` 或省略 | **所有类型通用** |
+| `["blacksmith", "merchant"]` | 仅这些类型可用 |
+
+### 注入链路
+
+```
+skill manifest.types 声明
+        ↓
+群/AI 绑定类型（group_types.json slug）
+        ↓
+匹配：types 含 * 或 含该类型 slug → 注入该居民工具集
+```
+
+- 与能力懒加载（capability_versioning）叠加：类型变更/绑定变更 → 增量 changelog 告知，compact 后 effective 切换
+- 世界 AI 设计世界时：为关键角色/职位创建类型 + 配套 skill（如 铁匠类型 + forge_weapon）
+
 ## 三·五、代码/数据分离（世界发布打包）
 
 世界文件夹约定（2026-08-06 珑哥定）：

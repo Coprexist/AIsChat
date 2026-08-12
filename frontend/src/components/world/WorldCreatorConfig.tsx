@@ -4,13 +4,14 @@
  * 2026-08-10：改为 Modal 弹窗（原内联展开），对齐 GroupManagerModal 风格
  */
 import { useEffect, useState } from 'react'
-import { Save, X, Settings, Brain, SlidersHorizontal, History } from 'lucide-react'
+import { Save, X, Settings, Brain, SlidersHorizontal, History, Pencil, ChevronDown, ChevronUp, Lock } from 'lucide-react'
 import { api } from '../../api/client'
 
 export interface WorldCreator {
   id: string
   name: string
   system_prompt: string
+  forced_prompt: string
   model: string | null
   temperature: number
   top_p: number
@@ -46,6 +47,10 @@ export default function WorldCreatorConfig({ wid, creator, usageStats, onSaved, 
     max_tool_rounds: creator.max_tool_rounds ?? 50,
   })
   const [saving, setSaving] = useState(false)
+  // 收起态：名字/提示词默认收起，🖊 点击展开输入框；强注入段默认收起，点开只读展示
+  const [editingName, setEditingName] = useState(false)
+  const [editingPrompt, setEditingPrompt] = useState(false)
+  const [showForced, setShowForced] = useState(false)
   // 会话生命周期设置（/new 自动开、空闲压缩、保留天数）
   const [settings, setSettings] = useState<{ auto_new_enabled: boolean; auto_new_time: string; compact_idle_hours: number; retention_days: number } | null>(null)
   const [settingsSaving, setSettingsSaving] = useState(false)
@@ -125,6 +130,111 @@ export default function WorldCreatorConfig({ wid, creator, usageStats, onSaved, 
 
         {/* 表单体 */}
         <div className="flex-1 overflow-y-auto px-4 py-3 space-y-3">
+          {/* 用量（置顶：一眼看到成本/缓存） */}
+          {usageStats && (
+            <div className="bg-elevated/40 rounded-xl p-3">
+              <div className="flex items-center justify-between">
+                <div>
+                  <div className="text-[10px] text-textSecondary uppercase tracking-wide font-medium">LLM 缓存命中率</div>
+                  <div className="text-[10px] text-textMuted mt-0.5">{usageStats.total_calls} 次调用 · prompt {usageStats.prompt_tokens} / 缓存 {usageStats.cached_tokens} tok</div>
+                </div>
+                <div className="text-lg font-bold text-mint-400">{usageStats.cache_hit_rate_pct}%</div>
+              </div>
+            </div>
+          )}
+
+          {/* 身份：名字默认收起，🖊 点击可改 */}
+          <div className="bg-elevated/40 rounded-xl p-3 space-y-2.5">
+            <div className="flex items-center gap-1.5 text-[10px] font-medium text-textSecondary uppercase tracking-wide">
+              <Settings size={11} className="text-primary-400" /> 身份
+            </div>
+            <div>
+              <div className="flex items-center gap-2">
+                <div className="flex-1 min-w-0">
+                  <div className="text-xs text-textSecondary truncate">{form.name.trim() || '（未命名）'}</div>
+                  <div className="text-[10px] text-textMuted mt-0.5">群视界机器人的名字</div>
+                </div>
+                <button
+                  onClick={() => setEditingName((v) => !v)}
+                  className="p-1.5 text-textMuted hover:text-textPrimary hover:bg-border rounded-lg transition-colors shrink-0"
+                  title={editingName ? '收起' : '修改名字'}
+                >
+                  {editingName ? <ChevronUp size={15} /> : <Pencil size={15} />}
+                </button>
+              </div>
+              {editingName && (
+                <input
+                  autoFocus
+                  value={form.name}
+                  onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))}
+                  className={`${fieldInput} mt-2`}
+                  placeholder="如：星野镇的镇守者"
+                />
+              )}
+            </div>
+          </div>
+
+          {/* 人设与行为：提示词默认收起；展开显示强注入（深灰只读）+ 可改输入（🖊 点击） */}
+          <div className="bg-elevated/40 rounded-xl p-3 space-y-2.5">
+            <div className="flex items-center gap-1.5 text-[10px] font-medium text-textSecondary uppercase tracking-wide">
+              <Brain size={11} className="text-primary-400" /> 人设与行为
+            </div>
+
+            {/* 可改的系统提示词（默认收起，🖊 点击展开输入框） */}
+            <div>
+              <div className="flex items-center gap-2">
+                <div className="flex-1 min-w-0">
+                  <div className="text-xs text-textSecondary truncate">系统提示词（角色人设）</div>
+                  <div className="text-[10px] text-textMuted mt-0.5 truncate">
+                    {form.system_prompt.trim() ? form.system_prompt.trim().slice(0, 60) + '…' : '（未设置，使用默认人设）'}
+                  </div>
+                </div>
+                <button
+                  onClick={() => setEditingPrompt((v) => !v)}
+                  className="p-1.5 text-textMuted hover:text-textPrimary hover:bg-border rounded-lg transition-colors shrink-0"
+                  title={editingPrompt ? '收起' : '编辑系统提示词'}
+                >
+                  {editingPrompt ? <ChevronUp size={15} /> : <Pencil size={15} />}
+                </button>
+              </div>
+              {editingPrompt && (
+                <textarea
+                  autoFocus
+                  value={form.system_prompt}
+                  onChange={(e) => setForm((f) => ({ ...f, system_prompt: e.target.value }))}
+                  rows={7}
+                  className={`${fieldInput} resize-none font-mono text-xs leading-relaxed mt-2`}
+                  placeholder="定义这个世界 AI 的身份、目标和行为准则…"
+                />
+              )}
+            </div>
+
+            {/* 强注入段（平台强约束，只读深灰展示，不可改） */}
+            <div>
+              <div className="flex items-center gap-2">
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center gap-1 text-xs text-textSecondary">
+                    <Lock size={11} className="text-textMuted shrink-0" />
+                    <span className="truncate">平台强注入提示词（不可修改）</span>
+                  </div>
+                  <div className="text-[10px] text-textMuted mt-0.5">工具约定 / 能力边界 / 记忆约定 / 运行规范等，每次对话自动附带</div>
+                </div>
+                <button
+                  onClick={() => setShowForced((v) => !v)}
+                  className="p-1.5 text-textMuted hover:text-textPrimary hover:bg-border rounded-lg transition-colors shrink-0"
+                  title={showForced ? '收起' : '展开查看'}
+                >
+                  {showForced ? <ChevronUp size={15} /> : <ChevronDown size={15} />}
+                </button>
+              </div>
+              {showForced && (
+                <pre className="mt-2 max-h-56 overflow-y-auto bg-elevated/60 border border-border rounded-lg p-2.5 text-[10px] leading-relaxed text-textMuted whitespace-pre-wrap font-mono select-text">
+                  {creator.forced_prompt || '（无）'}
+                </pre>
+              )}
+            </div>
+          </div>
+
           {/* 对话生命周期（/new 自动开、空闲压缩、保留天数） */}
           {settings && (
             <div className="bg-elevated/40 rounded-xl p-3 space-y-2.5">
@@ -191,52 +301,6 @@ export default function WorldCreatorConfig({ wid, creator, usageStats, onSaved, 
             </div>
           )}
 
-          {/* 用量（置顶：一眼看到成本/缓存） */}
-          {usageStats && (
-            <div className="bg-elevated/40 rounded-xl p-3">
-              <div className="flex items-center justify-between">
-                <div>
-                  <div className="text-[10px] text-textSecondary uppercase tracking-wide font-medium">LLM 缓存命中率</div>
-                  <div className="text-[10px] text-textMuted mt-0.5">{usageStats.total_calls} 次调用 · prompt {usageStats.prompt_tokens} / 缓存 {usageStats.cached_tokens} tok</div>
-                </div>
-                <div className="text-lg font-bold text-mint-400">{usageStats.cache_hit_rate_pct}%</div>
-              </div>
-            </div>
-          )}
-
-          {/* 身份 */}
-          <div className="bg-elevated/40 rounded-xl p-3 space-y-2.5">
-            <div className="flex items-center gap-1.5 text-[10px] font-medium text-textSecondary uppercase tracking-wide">
-              <Settings size={11} className="text-primary-400" /> 身份
-            </div>
-            <div>
-              <div className={fieldLabel}>名字</div>
-              <input
-                value={form.name}
-                onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))}
-                className={fieldInput}
-                placeholder="如：星野镇的镇守者"
-              />
-            </div>
-          </div>
-
-          {/* 人设 */}
-          <div className="bg-elevated/40 rounded-xl p-3 space-y-2.5">
-            <div className="flex items-center gap-1.5 text-[10px] font-medium text-textSecondary uppercase tracking-wide">
-              <Brain size={11} className="text-primary-400" /> 人设与行为
-            </div>
-            <div>
-              <div className={fieldLabel}>系统提示词（世界观、性格、能力边界）</div>
-              <textarea
-                value={form.system_prompt}
-                onChange={(e) => setForm((f) => ({ ...f, system_prompt: e.target.value }))}
-                rows={7}
-                className={`${fieldInput} resize-none font-mono text-xs leading-relaxed`}
-                placeholder="定义这个世界 AI 的身份、目标和行为准则…"
-              />
-            </div>
-          </div>
-
           {/* 模型 */}
           <div className="bg-elevated/40 rounded-xl p-3 space-y-2.5">
             <div className="flex items-center gap-1.5 text-[10px] font-medium text-textSecondary uppercase tracking-wide">
@@ -292,19 +356,6 @@ export default function WorldCreatorConfig({ wid, creator, usageStats, onSaved, 
               />
             </div>
           </div>
-
-          {/* 用量 */}
-          {usageStats && (
-            <div className="bg-elevated/40 rounded-xl p-3">
-              <div className="flex items-center justify-between">
-                <div>
-                  <div className="text-[10px] text-textSecondary uppercase tracking-wide font-medium">LLM 缓存命中率</div>
-                  <div className="text-[10px] text-textMuted mt-0.5">{usageStats.total_calls} 次调用 · prompt {usageStats.prompt_tokens} / 缓存 {usageStats.cached_tokens} tok</div>
-                </div>
-                <div className="text-lg font-bold text-mint-400">{usageStats.cache_hit_rate_pct}%</div>
-              </div>
-            </div>
-          )}
         </div>
 
         {/* 底部操作 */}

@@ -147,10 +147,12 @@ async def get_world(db: AsyncSession, world_id: int) -> dict | None:
 
 def world_ai_to_dict(world_id: int, wai) -> dict:
     """世界 AI 摘要（无 agent_id/user_id——它不是 agent）"""
+    from app.services.world.world_chat_service import build_forced_prompt
     return {
         "id": f"world-{world_id}",
         "name": wai.name or "群视界机器人",
         "system_prompt": wai.system_prompt or "",
+        "forced_prompt": build_forced_prompt(),  # 强注入段（只读展示，不可改）
         "model": wai.model,
         "temperature": wai.temperature if wai.temperature is not None else 0.8,
         "top_p": wai.top_p if wai.top_p is not None else 0.9,

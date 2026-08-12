@@ -54,3 +54,83 @@
 - `app/services/capability_versioning.py`：ensure_source_version（diff 自动 changelog）/ get_effective_definitions（快照回退）/ build_change_notice（增量注入）/ mark_effective_latest
 - 已接：平台源（群 AI/DM 对话 tools + 变更通知 + compact 切换）、世界源（世界 AI 工具集 + 变更通知 + compact_context 切换）
 - 验证：幂等 / 增量注入（known=v2 只注入 v3）/ effective 快照（旧定义请求）/ compact 切最新 / dict holder 全过
+
+---
+
+# 前缀内容版本化 + 锁定/解锁（2026-08-12 珑哥定，扩展）
+
+> 珑哥原话："用户每次都改提示词呢？缓存一个没触发，直接就不玩了，用户也不知道为什么，因为改提示词本来就是正常现象。所以肯定所有的一切放在前面的都必须保证缓存命中。"
+>
+> "包括系统更新也是正常内容和操作，不应该断缓存。"
+
+## 核心原则
+
+**所有进前缀的内容必须保证缓存命中**——不只是 skill/tools，还包括：
+
+| 前缀内容 | 变更来源 | 是否常见 |
+|---------|---------|---------|
+| 用户可改 system_prompt（世界 AI 人设） | 用户设计页修改 | **常见（正常操作）** |
+| 强注入提示词段（工具约定/能力边界/运行规范） | 系统版本更新 | 低频但正常 |
+| skill/tools 定义 | 造物主颁布 / 平台发布 | 常见 |
+| 昵称等配置 | 用户修改 | 常见 |
+
+**变更 = 正常内容，不是异常**。用户改提示词、系统更新、造物主改技能，都是产品的正常操作；
+如果这些操作导致缓存断，用户会"不知道为什么不玩了"——所以必须统一懒加载。
+
+## 机制：统一 known/effective + 锁定/解锁
+
+### 状态语义
+
+- **锁定态（对话进行中）**：前缀 = effective 版本快照（缓存稳定）；任何外部变更 → 只写新版本 + 动态尾部注入 changelog 告知，**不碰前缀**
+- **解锁态（compact / clear 之后 = 新对话）**：上下文重建（缓存本来就断）→ effective 对齐最新 → 前缀用新内容。**变更在这里应用**
+
+```mermaid
+flowchart TD
+    subgraph 锁定态["🔒 锁定态（对话进行中）"]
+        A1["前缀 = effective 快照<br/>（缓存稳定）"]
+        A2["外部变更发生<br/>改提示词 / 系统更新 / 技能变更"]
+        A3["写新版本 capability_versions<br/>+ changelog"]
+        A4["动态尾部注入 changelog 告知<br/>（不碰前缀）"]
+        A1 --> A2 --> A3 --> A4
+    end
+
+    subgraph 解锁态["🔓 解锁态（compact / clear = 新对话）"]
+        B1["上下文重建<br/>（缓存本来就断）"]
+        B2["effective 对齐最新版本"]
+        B3["前缀用新内容<br/>变更正式生效"]
+        B1 --> B2 --> B3
+    end
+
+    A4 -. "compact / clear" .-> B1
+```
+
+### 不变式
+
+1. **锁定态前缀永不因变更而变**——用户改提示词、系统更新强注入、造物主改技能，全都只进 changelog 尾部
+2. **变更告知 = 动态尾部 system 消息**（不影响前缀）
+3. **尝试在锁定态应用变更（改 effective）→ 拒绝 + 后端报错记录**（防御：防止未来出现"强制修改"逻辑破坏不变式）
+4. **compact / clear 是唯一解锁点**——恰好是变更应用的时刻（上下文已重建）
+
+### 为什么 compact/clear 是天然解锁点
+
+- compact：上下文压缩 → 前缀必然重建 → 用最新版本零成本
+- clear：清空上下文 → 全新对话 → 用最新版本零成本
+- 平时锁定：动态注入告知（AI 知道有变化，按新变化行动），但请求 payload 前缀保持旧快照 → 缓存命中
+
+## 落地清单
+
+1. ✅ `ensure_text_source_version`：文本内容版本化（复用 capability_versions 表，definitions 存文本/字典）——用户 system_prompt、强注入段、昵称都作为源
+2. ✅ `get_effective_text`：锁定态取 effective 快照文本（替代实时拼接）
+3. ✅ `apply_pending_changes`：解锁时应用（compact/clear 调，对齐 latest，带守卫）
+4. ✅ `guard_apply_change`：锁定态应用变更 → 拒绝 + logger.error（防御性报错）
+5. ✅ world_chat_service：前缀组装改为 effective 快照 + 变更检测写新版本 + 尾部 changelog（世界 AI 三个源：world-prompt-{id} / forced-prompt / world-name-{id}）
+6. ✅ compact_context / clear_context：调用 apply_pending_changes 解锁（三源 + ai-skills 一起对齐）
+7. ⏳ 主站 agent 同样接入（system_prompt / 强注入段 / tools 统一）——下次做
+
+> 2026-08-12 已实现并通过真实 DB 端到端验证：锁定态改提示词 effective 不变 → 尾部 changelog 告知 → compact 解锁生效。
+
+## 与现有机制的合并
+
+- skill/tools 已走 capability_versioning（known/effective）——**同一套机制扩展到文本内容**，不另起炉灶
+- `pending_system_prompt`（主站 AI 自改暂存）→ 语义并入"锁定态写新版本 + 解锁时应用"，统一为源版本化
+- holder 泛化已支持（agent 对象 / worlds.config dict）——世界 AI 与群 AI 同一套代码路径

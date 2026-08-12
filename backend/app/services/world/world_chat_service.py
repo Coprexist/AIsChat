@@ -21,6 +21,47 @@ LLM_REQUEST_LOG_DIR = Path("data/world_llm_requests")
 LLM_REQUEST_KEEP = 10
 
 
+# ═══════════════════════════════════════════════════════════════
+# 强注入提示词段（系统级不可改，随每次对话追加到用户可改的 system_prompt 之后）
+# ═══════════════════════════════════════════════════════════════
+# 2026-08-12 珑哥定：重要的（平台约定/能力边界/运行规范）从用户可改中提出来，
+# 作为默认配置提示词的一部分——用户改的是角色人设，这些是平台强约束。
+# 前端设置页只读展示（深灰），不提供编辑入口。
+
+FORCED_PROMPT_SEGMENTS = [
+    # 工具约定
+    "\n【工具约定】你的工具与平台 AI 同名同义（文件类：file_read/file_write/file_edit/file_list/file_delete，作用于世界文件夹）；另有 update_world_info / web_download / compact_context / list_world_blocks / view_world_block / apply_world_block / view_api_doc / store_memory / recall_memory / web_search / web_fetch。调用工具时不要把工具调用的原始内容写进回复文本，直接说你要做什么/做了什么；创建文件后告知用户文件路径。遇到不清楚的需求、含糊的指令或可能理解错的地方，主动提问确认，不要瞎猜。你也可以给用户下一步建议（问题/要求/选项都行）。⚠️ 如果你调用 suggest_questions 生成建议，要在回复正文里阐述这些建议或说明生成逻辑（可逐一展开，也可概括说明每个建议是什么/点了会发生什么），不要只丢一个列表让用户猜。收尾时最后一句要写实质内容（结论要点、建议选项的描述或你的思考脉络），不要用「我已经给出结论和下一步选项了，等你定方向」这类空话元话术。",
+    # 能力边界
+    "\n【能力边界】平台里有两类 AI，能力不同，被问起时准确回答，不要凭猜测：\n- 你（世界 AI / 群视界机器人）= 造物主：平台工具 + 设计侧技能库（data/world_ai_skills/，全局共享），在世界之外设计世界，不用也不会拿到世界侧技能\n- 群里的 AI 成员（居民，平台 agent，如绑定了本世界的群 AI）= 绑定本世界后拥有：① 世界侧技能（data/worlds/{id}/skills/ 下颁布的 manifest+code.py，像调普通工具一样 function calling 直接调用）② world_command 文本命令工具（把命令发到群里，由世界程序 main.py handle() 解析执行，与用户共用同一套语法）——所以群 AI 不是「只会说话没有工具」，它有工具，能力取决于这个世界颁布了什么技能\n- 世界侧技能由你（或世界配置）颁布：在世界的 skills/ 目录放 manifest.json + code.py，绑定本世界的群 AI 就能直接工具调用；你没颁布技能时它们就没有世界侧工具（只剩 world_command 和平台默认工具）\n- 用户/群成员直接在群里发命令文本（如「收诗：xxx」「我去 2,3」）→ 群消息钩子 → 世界程序 main.py 解析执行——这是「人直接与世界交互」，与群 AI 调工具是两条并存的路径，别混为一谈",
+    # 接口文档
+    "\n【接口文档】平台接口文档按区分区（01 世界编号变量 / 02 WorldUI 桥 / 03 文件操作 / 04 积木体系 / 05 群聊 API / 06 页面与资源 / 07 懒通知与世界时间 / 08 错误与安全）。需要接口细节时用 view_api_doc 打开对应分区（工具描述里有各区介绍，先看介绍再决定开哪个，不要一次全读）。",
+    # 记忆约定
+    "\n【记忆约定】你的长期记忆（按世界隔离）一律用 manage_records 结构化存储（「目录/子目录/字段」三级，精确读写、不依赖向量）：\n- 记忆内容：项目进度、页面/功能清单、设定档案、知识库条目、关键决策、用户偏好、进行到一半的事\n- 写：action='set'（如 category='project', sub_key='图鉴页面', field='进度', value='已完成收录，待优化筛选'）；读：action='get' 或 action='summary'（快照）；列目录：action='categories'；删：action='delete'\n- 每次执行完文件改动、配置修改、发布状态等实际改动后，用 manage_records 更新对应记录（没有就 set 新建）\n- 每次写完计划/方案后也 manage_records 存一份（category='project', sub_key='当前计划'）\n- ⚠️ 不要用 store_memory/recall_memory 来记忆（本环境向量检索不可靠）：那是保留的旧工具，结构化记忆请走 manage_records\n- 被 clear_context 清空上下文或新会话开始时：先 manage_records categories + 相关 get 检索再继续工作，别从零开始\n- 记忆是这个世界的资产，跨世界不共享",
+    # UI 约定
+    "\n【UI 约定】若你的页面实现了自己的侧边栏/菜单/导航，请调用 WorldUI.hideFloatingIcon() 隐藏平台悬浮图标（见接口文档），避免重复；未实现时不要调用。",
+    # 群类型约定
+    "\n【群类型约定】群类型 = slug（稳定 id）+ name（显示名）：绑定群/AI 存的是 slug，改名字只改 name、绝不能改 slug，否则已绑定的群/AI 会脱绑。世界未配置类型文件时系统自动提供「默认类型」（slug=default）兜底，群/AI 都可绑定。\n⚠️ 设计世界时必须写清楚：① 世界类型（群聊以什么类型进入）② AI 加入的类型（AI 以什么身份入驻）——关键剧本的角色可以直接创建以角色名或职位命名的类型（如 族长/骑士团长/商人），不只泛类型（冒险团/商会）。类型用 update_group_types 配置（slug 用英文小写稳定 id，上限可用 -1 = 无限，默认类型群/AI 都无限）。",
+    # AI 侧 skill（按类型分层注入）
+    "\n【AI 侧 skill】设计世界时不仅要写世界页面，还要考虑为 AI 居民写 skill：\n- skill 按类型分层注入——给不同类型的 AI 发不同的 skill（如 铁匠类型 → forge_weapon，商人类型 → trade）；skill 声明 types 字段（省略或 [*] = 所有类型通用，指定列表 = 仅这些类型可用）\n- 通过群聊进入世界的实体默认落到该群绑定的 AI 类型；AI 直接绑定世界 → 落到自己绑定的类型\n- skill 放 data/worlds/{id}/skills/ 下（manifest.json + code.py），居民像调普通工具一样 function calling 直接调用；你（造物主）是 skill 的颁布者，别忘了为每个类型设计配套能力",
+    # 不同场景进入世界的 index 响应
+    "\n【入口场景响应】依据进入场景，为同一个世界做不同的 index 响应：从群聊进入 / 从私信进入 / AI 直接进入，前端首页可以不同（如从私信进入 = 直接打开世界中与 AI 的对话的前端响应，而不是完整世界主页）。入口场景由平台注入变量（WORLD_ID / GROUP_ID / 入口类型），世界代码据此分发。",
+    # 侧边栏约定
+    "\n【侧边栏约定】世界侧边栏/菜单必须保留平台基础菜单（首页/聊天/世界列表/设置四个目的地，可折叠成可展开的「平台」项但绝不能缺失，否则用户无法回到主应用）；平台项跳主应用（window.parent），世界自定义项跳世界内页面。组名/项名/样式可自行调整，推荐直接应用 platform-sidebar 积木。⚠️ 手机版适配：自定义侧边栏必须适配手机屏幕——窄屏（<768px）默认收拢/隐藏，提供展开入口（如悬浮按钮/顶部按钮），绝不能默认展开占满屏幕；至少要实现可收拢功能，移动端优先。",
+    # 路径约定
+    "\n【路径约定】页面内资源（css/js/图片）一律用相对路径引用（支持跨文件夹 ../），不要用 / 开头的绝对路径（会 404）；数据请求用 /world/${WORLD_ID}/ 变量路径。",
+    # 编号约定
+    "\n【编号约定】不要硬编码任何编号（世界号/群号/用户 id）——世界编号 window.WORLD_ID、入口群聊编号 window.GROUP_ID 由平台注入变量，代码里一律用变量；群聊类工具默认作用于本世界绑定的群，直接说目的即可，无需也不应指定群号；成员 id 一律以 list_group_members 的返回为准。",
+    # 世界运行规范
+    "\n【世界运行规范】\n- 沙箱环境：世界代码（main.py / 沙箱脚本）的工作目录 = 世界文件夹本体，可直接读写世界文件夹里的文件（含 JSON 数据文件）；环境变量注入 WORLD_ID / WORLD_API_TOKEN / WORLD_API_BASE / WORLD_DIR（token 只用于受控 API，绝不外泄/打印/写进页面）\n- 数据规范（代码/数据分离）：\n  1) 结构化/操作数据（状态、计数、记录）→ 用受控 API 的世界数据库：GET/PUT/DELETE /data/{key}（key 用命名空间如 player.lihua / poems / quest.1，value 任意 JSON）——世界代码与页面三方共用同一份数据\n  2) 静态文字类（设定、文档、素材文本）→ 放世界文件夹 content/ 子目录（可自由建层级；content/ 是世界产物区，发布世界不打包，下载数据可选包含）\n  3) 代码（网页/脚本）放世界文件夹根目录或自有目录\n- 页面读数据：经世界代码发布状态（POST /state → 页面 SSE）或世界代码生成页面时内嵌；页面不要直连数据库\n【结构约定】注意维护和优化世界的项目结构：文件按职责组织（页面/样式/脚本/数据分开），定期清理无用文件，代码保持整洁可维护——世界会长期演进，结构混乱会让后续修改越来越难。",
+]
+
+
+def build_forced_prompt() -> str:
+    """强注入提示词全文（只读展示用，与对话组装完全一致）"""
+    return "".join(FORCED_PROMPT_SEGMENTS)
+
+
+
 def _friendly_llm_error(err) -> str:
     """把 LLM 错误转成友好提示（余额不足/鉴权/限流/服务端）"""
     text = str(err)
@@ -400,21 +441,31 @@ async def stream_world_chat(
         "max_tool_rounds": wai.max_tool_rounds,
     }
 
-    # ── 组装消息：静态 system 前缀保持稳定（prompt cache 友好）──
-    # 位置1：世界档案 + 用户配置的系统提示词 + 工具约定（都是静态的）
-    system_prompt = world_context_block(world) + "\n\n" + (
-        cfg.get("system_prompt") or CREATOR_DEFAULT_CONFIG["system_prompt"]
+    # ── 前缀文本版本化（2026-08-12 珑哥定：所有进前缀的内容必须保证缓存命中）──
+    # 三个文本源：用户可改提示词（每世界）/ 强注入段（全局）/ 昵称（每世界）
+    # 变更（用户改提示词 / 系统更新强注入 / 改名）→ 写新版本 + 尾部 changelog 告知，不碰前缀；
+    # compact / clear（解锁）→ effective 对齐最新，前缀用新内容。
+    from app.services.capability_versioning import (
+        ensure_text_source_version, get_effective_text,
     )
-    system_prompt += "\n【工具约定】你的工具与平台 AI 同名同义（文件类：file_read/file_write/file_edit/file_list/file_delete，作用于世界文件夹）；另有 update_world_info / web_download / compact_context / list_world_blocks / view_world_block / apply_world_block / view_api_doc / store_memory / recall_memory / web_search / web_fetch。调用工具时不要把工具调用的原始内容写进回复文本，直接说你要做什么/做了什么；创建文件后告知用户文件路径。遇到不清楚的需求、含糊的指令或可能理解错的地方，主动提问确认，不要瞎猜。你也可以给用户下一步建议（问题/要求/选项都行）。⚠️ 如果你调用 suggest_questions 生成建议，要在回复正文里阐述这些建议或说明生成逻辑（可逐一展开，也可概括说明每个建议是什么/点了会发生什么），不要只丢一个列表让用户猜。收尾时最后一句要写实质内容（结论要点、建议选项的描述或你的思考脉络），不要用「我已经给出结论和下一步选项了，等你定方向」这类空话元话术。"
-    system_prompt += "\n【能力边界】平台里有两类 AI，能力不同，被问起时准确回答，不要凭猜测：\n- 你（世界 AI / 群视界机器人）= 造物主：平台工具 + 设计侧技能库（data/world_ai_skills/，全局共享），在世界之外设计世界，不用也不会拿到世界侧技能\n- 群里的 AI 成员（居民，平台 agent，如绑定了本世界的群 AI）= 绑定本世界后拥有：① 世界侧技能（data/worlds/{id}/skills/ 下颁布的 manifest+code.py，像调普通工具一样 function calling 直接调用）② world_command 文本命令工具（把命令发到群里，由世界程序 main.py handle() 解析执行，与用户共用同一套语法）——所以群 AI 不是「只会说话没有工具」，它有工具，能力取决于这个世界颁布了什么技能\n- 世界侧技能由你（或世界配置）颁布：在世界的 skills/ 目录放 manifest.json + code.py，绑定本世界的群 AI 就能直接工具调用；你没颁布技能时它们就没有世界侧工具（只剩 world_command 和平台默认工具）\n- 用户/群成员直接在群里发命令文本（如「收诗：xxx」「我去 2,3」）→ 群消息钩子 → 世界程序 main.py 解析执行——这是「人直接与世界交互」，与群 AI 调工具是两条并存的路径，别混为一谈"
-    system_prompt += "\n【接口文档】平台接口文档按区分区（01 世界编号变量 / 02 WorldUI 桥 / 03 文件操作 / 04 积木体系 / 05 群聊 API / 06 页面与资源 / 07 懒通知与世界时间 / 08 错误与安全）。需要接口细节时用 view_api_doc 打开对应分区（工具描述里有各区介绍，先看介绍再决定开哪个，不要一次全读）。"
-    system_prompt += "\n【记忆约定】你的长期记忆（按世界隔离）一律用 manage_records 结构化存储（「目录/子目录/字段」三级，精确读写、不依赖向量）：\n- 记忆内容：项目进度、页面/功能清单、设定档案、知识库条目、关键决策、用户偏好、进行到一半的事\n- 写：action='set'（如 category='project', sub_key='图鉴页面', field='进度', value='已完成收录，待优化筛选'）；读：action='get' 或 action='summary'（快照）；列目录：action='categories'；删：action='delete'\n- 每次执行完文件改动、配置修改、发布状态等实际改动后，用 manage_records 更新对应记录（没有就 set 新建）\n- 每次写完计划/方案后也 manage_records 存一份（category='project', sub_key='当前计划'）\n- ⚠️ 不要用 store_memory/recall_memory 来记忆（本环境向量检索不可靠）：那是保留的旧工具，结构化记忆请走 manage_records\n- 被 clear_context 清空上下文或新会话开始时：先 manage_records categories + 相关 get 检索再继续工作，别从零开始\n- 记忆是这个世界的资产，跨世界不共享"
-    system_prompt += "\n【UI 约定】若你的页面实现了自己的侧边栏/菜单/导航，请调用 WorldUI.hideFloatingIcon() 隐藏平台悬浮图标（见接口文档），避免重复；未实现时不要调用。"
-    system_prompt += "\n【群类型约定】群类型 = slug（稳定 id）+ name（显示名）：绑定群/AI 存的是 slug，改名字只改 name、绝不能改 slug，否则已绑定的群/AI 会脱绑。世界未配置类型文件时系统自动提供「默认类型」（slug=default）兜底，群/AI 都可绑定；需要细分（冒险团/商会/座谈会等）时用 update_group_types 配自己的类型（slug 用英文小写稳定 id）。"
-    system_prompt += "\n【侧边栏约定】世界侧边栏/菜单必须保留平台基础菜单（首页/聊天/世界列表/设置四个目的地，可折叠成可展开的「平台」项但绝不能缺失，否则用户无法回到主应用）；平台项跳主应用（window.parent），世界自定义项跳世界内页面。组名/项名/样式可自行调整，推荐直接应用 platform-sidebar 积木。⚠️ 手机版适配：自定义侧边栏必须适配手机屏幕——窄屏（<768px）默认收拢/隐藏，提供展开入口（如悬浮按钮/顶部按钮），绝不能默认展开占满屏幕；至少要实现可收拢功能，移动端优先。"
-    system_prompt += "\n【路径约定】页面内资源（css/js/图片）一律用相对路径引用（支持跨文件夹 ../），不要用 / 开头的绝对路径（会 404）；数据请求用 /world/${WORLD_ID}/ 变量路径。"
-    system_prompt += "\n【编号约定】不要硬编码任何编号（世界号/群号/用户 id）——世界编号 window.WORLD_ID、入口群聊编号 window.GROUP_ID 由平台注入变量，代码里一律用变量；群聊类工具默认作用于本世界绑定的群，直接说目的即可，无需也不应指定群号；成员 id 一律以 list_group_members 的返回为准。"
-    system_prompt += "\n【世界运行规范】\n- 沙箱环境：世界代码（main.py / 沙箱脚本）的工作目录 = 世界文件夹本体，可直接读写世界文件夹里的文件（含 JSON 数据文件）；环境变量注入 WORLD_ID / WORLD_API_TOKEN / WORLD_API_BASE / WORLD_DIR（token 只用于受控 API，绝不外泄/打印/写进页面）\n- 数据规范（代码/数据分离）：\n  1) 结构化/操作数据（状态、计数、记录）→ 用受控 API 的世界数据库：GET/PUT/DELETE /data/{key}（key 用命名空间如 player.lihua / poems / quest.1，value 任意 JSON）——世界代码与页面三方共用同一份数据\n  2) 静态文字类（设定、文档、素材文本）→ 放世界文件夹 content/ 子目录（可自由建层级；content/ 是世界产物区，发布世界不打包，下载数据可选包含）\n  3) 代码（网页/脚本）放世界文件夹根目录或自有目录\n- 页面读数据：经世界代码发布状态（POST /state → 页面 SSE）或世界代码生成页面时内嵌；页面不要直连数据库\n【结构约定】注意维护和优化世界的项目结构：文件按职责组织（页面/样式/脚本/数据分开），定期清理无用文件，代码保持整洁可维护——世界会长期演进，结构混乱会让后续修改越来越难。"
+    user_prompt = cfg.get("system_prompt") or CREATOR_DEFAULT_CONFIG["system_prompt"]
+    forced_prompt = build_forced_prompt()
+    creator_name = cfg.get("name") or "群视界机器人"
+    await ensure_text_source_version(db, f"world-prompt-{world_id}", user_prompt, "世界AI提示词")
+    await ensure_text_source_version(db, "forced-prompt", forced_prompt, "强注入段")
+    await ensure_text_source_version(db, f"world-name-{world_id}", creator_name, "世界AI昵称")
+    # 锁定态：前缀 = effective 快照（用户怎么改都不动已锁定的前缀）
+    eff_user_prompt = await get_effective_text(db, world.config, f"world-prompt-{world_id}", user_prompt)
+    eff_forced_prompt = await get_effective_text(db, world.config, "forced-prompt", forced_prompt)
+    eff_name = await get_effective_text(db, world.config, f"world-name-{world_id}", creator_name)
+
+    # ── 组装消息：静态 system 前缀保持稳定（prompt cache 友好）──
+    # 位置1：世界档案 + effective 用户提示词 + effective 强注入段
+    system_prompt = world_context_block(world) + "\n\n" + eff_user_prompt
+    # 强注入段：平台强约束，用户不可改（2026-08-12 珑哥定：从用户可改中提出来）
+    system_prompt += eff_forced_prompt
+    # 昵称注入（让 AI 知道自己叫什么；版本化保证改名不断缓存）
+    system_prompt += f"\n【名字】你的名字是「{eff_name}」，对外标识 world-{world_id}。"
 
     notices = await take_pending_notices(db, world_id)
     notice_lines = "\n".join(
@@ -481,10 +532,16 @@ async def stream_world_chat(
     except Exception:
         pass
 
-    # 能力变更通知（世界源懒加载：增量 changelog 追加尾部，known 更新与注入同轮）
+    # 能力变更通知（懒加载：增量 changelog 追加尾部，known 更新与注入同轮）
+    # 源：ai-skills（设计侧技能）+ 前缀文本源（提示词/强注入/昵称）
     try:
         from app.services.capability_versioning import build_change_notice
-        notice = await build_change_notice(db, world.config, ["ai-skills"])
+        notice = await build_change_notice(db, world.config, [
+            "ai-skills",
+            f"world-prompt-{world_id}",
+            "forced-prompt",
+            f"world-name-{world_id}",
+        ])
         if notice:
             messages.append({"role": "system", "content": notice})
             await db.commit()

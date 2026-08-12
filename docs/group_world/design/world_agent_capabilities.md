@@ -68,6 +68,16 @@ AI 调 `world_command("旅人移动到 2,3")` → 以 AI 身份发群消息 → 
 - 变更（绑定/skill 增删/平台发布）→ capability_versioning：known 增量告知 + compact 后 effective 切新
 - 未绑定世界的 AI：无世界能力工具；绑定后按版本化流程注入
 
+**Skill 分层注入（2026-08-12 珑哥定）**：居民工具集再按**绑定类型**过滤——
+skill manifest 可声明 `types`（适用类型列表，省略或 `["*"]` = 所有类型通用），
+注入时只给匹配类型的居民发对应 skill（详见 world_skill_design.md 三·六）。
+
+```
+群 AI 工具集 = 默认平台工具 + 世界侧 skills（effective 快照）∩ 该 AI 绑定类型的 skills
+```
+
+- 通过群聊进入世界的实体 → 默认落到该群绑定的 AI 类型；AI 直接绑定世界 → 落到自己绑定的类型
+
 ## 五、实现清单
 
 1. ✅ world_command 工具（路径 B，已落地）
