@@ -165,7 +165,19 @@ async def bind_entry_with_type(
 
     - group：按模板自动创建群助手（幂等）
     - agent：AI 直接绑定世界（个人专属能力），只绑定 + 类型标记，不建助手
+    - ⚠️ AI 一律按 user_id 存（2026-08-12 珑哥定：全平台 AI 对外标识统一 user_id，
+      杜绝 agent.id 与另一 agent 的 user_id 撞车）——传入 agent.id 自动转 user_id
     """
+    from app.models.agent import Agent as AgentModel
+    if entity_type == "agent":
+        agent_row = (await db.execute(
+            select(AgentModel).where(AgentModel.user_id == entity_id)
+        )).scalar_one_or_none()
+        if agent_row is None:
+            agent_row = await db.get(AgentModel, entity_id)
+        if agent_row is None or not agent_row.user_id:
+            raise ValueError(f"AI 不存在（{entity_id}）")
+        entity_id = agent_row.user_id
     if entity_type not in ("group", "agent"):
         raise ValueError(f"仅支持绑定 group/agent，收到 {entity_type}")
     await _require_world_owner(db, world_id, owner_id)

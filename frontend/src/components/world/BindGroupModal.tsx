@@ -41,9 +41,11 @@ export default function BindGroupModal({ worldId, initialTypeSlug, initialTab = 
   const [tab, setTab] = useState<BindTab>(initialTab)
   const [types, setTypes] = useState<GroupType[]>([])
   const [groups, setGroups] = useState<GroupItem[]>([])
-  const [agents, setAgents] = useState<{ id: number; name: string; owner_id?: number }[]>([])
+  const [agents, setAgents] = useState<{ id: number; name: string; owner_id?: number; user_id?: number }[]>([])
   const [boundGroupIds, setBoundGroupIds] = useState<Set<number>>(new Set())
+  // AI 绑定统一用 user_id（2026-08-12 珑哥定：全平台 AI 对外标识一律 user_id，杜绝与 agent.id 撞车）
   const [boundAgentIds, setBoundAgentIds] = useState<Set<number>>(new Set())
+  const [agentUserIdByAgentId, setAgentUserIdByAgentId] = useState<Map<number, number>>(new Map())
   const [typeSlug, setTypeSlug] = useState<string>(initialTypeSlug || '')
   const [selected, setSelected] = useState<Set<number>>(new Set())
   const [msg, setMsg] = useState('')
@@ -60,12 +62,18 @@ export default function BindGroupModal({ worldId, initialTypeSlug, initialTab = 
           api.get<{ types: GroupType[] }>(`/worlds/${worldId}/group-types?entity_type=${tab}`),
           api.get<GroupItem[]>('/groups'),
           api.get<{ bindings: { entity_type: string; entity_id: number }[] }>(`/worlds/${worldId}`),
-          api.get<{ id: number; name: string; owner_id?: number }[]>('/agents'),
+          api.get<{ id: number; name: string; owner_id?: number; user_id?: number }[]>('/agents'),
         ])
         if (cancelled) return
         setTypes(t.types || [])
         setGroups(g || [])
         setAgents(Array.isArray(a) ? a : [])
+        // AI 映射：agent.id → user_id（绑定用 user_id）
+        const uidMap = new Map<number, number>()
+        for (const ag of (Array.isArray(a) ? a : [])) {
+          if (ag.user_id) uidMap.set(ag.id, ag.user_id)
+        }
+        setAgentUserIdByAgentId(uidMap)
         setBoundGroupIds(new Set((w.bindings || []).filter((b) => b.entity_type === 'group').map((b) => b.entity_id)))
         setBoundAgentIds(new Set((w.bindings || []).filter((b) => b.entity_type === 'agent').map((b) => b.entity_id)))
       } catch { /* 失败静默，弹窗可关 */ }
@@ -102,8 +110,12 @@ export default function BindGroupModal({ worldId, initialTypeSlug, initialTab = 
     setBinding(true)
     setMsg('')
     try {
+      // AI 绑定统一用 user_id（agent.id → user_id 映射；后端也做归一化防御）
+      const idsToSubmit = tab === 'agent'
+        ? [...selected].map((id) => agentUserIdByAgentId.get(id) ?? id)
+        : [...selected]
       const r = await api.post<{ bound: number; failed: number; results: { entity_id: number; success: boolean; error?: string }[] }>(
-        `/worlds/${worldId}/bind-entries`, { entity_type: tab, type_slug: typeSlug, entity_ids: [...selected] },
+        `/worlds/${worldId}/bind-entries`, { entity_type: tab, type_slug: typeSlug, entity_ids: idsToSubmit },
       )
       // 绑定成功的群从勾选移除 + 标记已绑
       const done = new Set((r.results || []).filter((x) => x.success).map((x) => x.entity_id))
@@ -186,7 +198,9 @@ export default function BindGroupModal({ worldId, initialTypeSlug, initialTab = 
               ) : (
                 <div className="space-y-1">
                   {candidates.map((g: any) => {
-                    const isBound = boundIds.has(g.id)
+                    // AI 绑定按 user_id 判断（boundAgentIds 存 user_id）
+                    const gid = tab === 'agent' ? (agentUserIdByAgentId.get(g.id) ?? g.id) : g.id
+                    const isBound = boundIds.has(gid)
                     const isSelected = selected.has(g.id)
                     return (
                       <label
@@ -196,13 +210,13 @@ export default function BindGroupModal({ worldId, initialTypeSlug, initialTab = 
                         <input
                           type="checkbox"
                           checked={isSelected}
-                          disabled={binding}
+                          disabled={binding || isBound}
                           onChange={() => toggle(g.id)}
                           className="accent-primary-500 shrink-0"
                         />
                         <span className="truncate flex-1 text-sm text-textPrimary">{g.name}</span>
                         <span className="shrink-0 text-[10px] text-textMuted">#{g.id}</span>
-                        {isBound && <span className="shrink-0 text-[10px] text-textMuted">已绑定{currentType && boundGroupIds.has(g.id) ? '' : ''}</span>}
+                        {isBound && <span className="shrink-0 text-[10px] text-textMuted">已绑定</span>}
                       </label>
                     )
                   })}

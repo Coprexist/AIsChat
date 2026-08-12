@@ -1102,7 +1102,8 @@ async def build_messages(
         try:
             from app.models.world import World, WorldBinding
             from app.services.world.world_service import find_worlds_by_entity
-            bound = await find_worlds_by_entity(db, "agent", agent.id)
+            # v0.3.4: 世界绑定 AI 统一存 user_id（2026-08-12 珑哥定）
+            bound = await find_worlds_by_entity(db, "agent", agent.user_id or 0)
             if group_id:
                 bound += await find_worlds_by_entity(db, "group", group_id)
             # 绑定类型（分层注入）：skill.types 声明了该类型才注入（群绑定的类型 + agent 绑定的类型）

@@ -630,7 +630,7 @@ async def _maybe_trigger_ai_reply(
         from app.services.world.world_service import find_worlds_by_entity
         from app.services.world.world_skill_runtime import build_world_tools
         from app.services.capability_versioning import ensure_world_version, get_effective_definitions as _get_eff
-        agent_worlds = await find_worlds_by_entity(db, "agent", agent.id)
+        agent_worlds = await find_worlds_by_entity(db, "agent", agent.user_id or 0)
         group_worlds = await find_worlds_by_entity(db, "group", group_id) if group_id is not None else []
         # 优先级：当前群绑定世界 > agent 直接绑定（同名时保留群绑定版本）
         ordered = [*group_worlds, *agent_worlds]
