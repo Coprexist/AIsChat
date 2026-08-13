@@ -73,23 +73,36 @@ class TurnBroadcast:
         self.turn_id = turn_id
         self.subscribers: set[asyncio.Queue] = set()
         self.ended = False
+        # 插入消息 turn 的代理：订阅/广播/结束转发到活跃 turn（2026-08-13 产品定，
+        # 让前端订阅插入 turn 时能收到当前轮流事件——含 [INSERT] 回执和后续内容）
+        self.proxy: "TurnBroadcast | None" = None
 
     def subscribe(self) -> asyncio.Queue:
+        if self.proxy is not None:
+            return self.proxy.subscribe()
         q: asyncio.Queue = asyncio.Queue()
         self.subscribers.add(q)
         return q
 
     def unsubscribe(self, q: asyncio.Queue) -> None:
+        if self.proxy is not None:
+            self.proxy.unsubscribe(q)
+            return
         self.subscribers.discard(q)
 
     async def broadcast(self, event: str) -> None:
+        if self.proxy is not None:
+            await self.proxy.broadcast(event)
+            return
         if self.ended:
             return
         for q in list(self.subscribers):
             q.put_nowait(event)
 
     def end(self) -> None:
-        """轮次结束：通知所有订阅者"""
+        """轮次结束：通知所有订阅者（代理 turn 由活跃 turn 的 end 统一收尾）"""
+        if self.proxy is not None:
+            return
         self.ended = True
         for q in list(self.subscribers):
             q.put_nowait("data: [DONE]\n\n")
@@ -150,7 +163,10 @@ class WorldTurnWorker:
                     pass
                 if tb:
                     tb.end()
+                    # 清理本 turn + 代理到它的插入 turn（插入消息广播随活跃 turn 收尾）
                     self.turns.pop(item["turn_id"], None)
+                    for _tid in [t for t, _tb in self.turns.items() if _tb.proxy is tb]:
+                        self.turns.pop(_tid, None)
 
     def enqueue(self, user_id: int, message: str | list[str]) -> str:
         """消息入队（支持批量：排队消息一起发给 AI），返回 turn_id（订阅直播用）。
@@ -160,12 +176,16 @@ class WorldTurnWorker:
         """
         messages = message if isinstance(message, list) else [message]
         turn_id = uuid.uuid4().hex[:12]
-        # 判定是否插入：先基于已有 turns（不含本次新建的），避免自误判 busy
-        busy = any(not tb.ended for tb in self.turns.values())
+        # 判定是否插入：基于已有 turns（不含本次新建的），排除代理 turn（插入消息的广播，无独立生命周期）
+        busy = any(not tb.ended and tb.proxy is None for tb in self.turns.values())
         all_commands = all(str(m).lstrip().startswith("/") for m in messages)
         if not all_commands and busy:
             # 有正在执行的轮次 + 含普通消息 → 走插入通道（工具轮下一轮 LLM 调用前注入）
-            # 插入消息无独立轮次：不进 turns（不广播独立 turn，内容随当前轮 yield），不影响 busy 判定
+            # 插入消息的广播代理到当前活跃 turn（前端订阅插入 turn = 收到当前轮流事件含 [INSERT] 回执）
+            active_tb = next((tb for tb in self.turns.values() if not tb.ended), None)
+            tb = TurnBroadcast(turn_id)
+            tb.proxy = active_tb
+            self.turns[turn_id] = tb
             self._inserts.append({"user_id": user_id, "messages": messages})
             return turn_id
         self.turns[turn_id] = TurnBroadcast(turn_id)

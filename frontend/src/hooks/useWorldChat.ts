@@ -336,6 +336,18 @@ export function useWorldChat({ wid, onRefresh, onMsg }: UseWorldChatOptions) {
             try { setSuggestions(JSON.parse(payload.slice(9))) } catch { /* ignore */ }
             continue
           }
+          if (payload.startsWith('[INSERT]')) {
+            // 排队消息已由后端插入当前工具轮（真正发出去了）：移除对应排队项 + 气泡去 pending 标记
+            try {
+              const ins = JSON.parse(payload.slice(8))
+              const insContent = ins.content
+              setPendingItems((items) => items.filter((i) => i.text !== insContent))
+              setChatMsgs((msgs) => msgs.map((m) =>
+                m.role === 'user' && m.content === insContent ? { ...m, pending: false } : m,
+              ))
+            } catch { /* ignore */ }
+            continue
+          }
           if (payload.startsWith('[ERROR]')) throw new Error(payload.slice(7))
           if (payload.startsWith('[TOOL]')) {
             try {

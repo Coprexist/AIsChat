@@ -834,10 +834,14 @@ async def stream_world_chat(
                                 _m_text = str(_m).strip()
                                 if not _m_text:
                                     continue
-                                db.add(WorldChatMessage(
+                                _wm_row = WorldChatMessage(
                                     world_id=world_id, user_id=_it["user_id"],
                                     role="user", content=_m_text, session_id=sid_db,
-                                ))
+                                )
+                                db.add(_wm_row)
+                                await db.flush()
+                                # 事件：通知前端已插入（含消息 id 供气泡匹配）——前端移除排队项、去 pending 标记
+                                yield f"data: [INSERT]{json.dumps({'msg_id': _wm_row.id, 'content': _m_text}, ensure_ascii=False)}\n\n"
                                 messages.append({"role": "user", "content": _m_text})
                                 yield f"data: {_m_text.replace(chr(10), '{NL}')}\n\n"
                         if insert_items:
