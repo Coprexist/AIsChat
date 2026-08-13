@@ -18,6 +18,35 @@ function toolIcon(content: string) {
   return <Wrench size={12} />
 }
 
+/** 工具气泡（2026-08-13）：running/update 单行状态；done 的 summary 过长时默认 2 行 + 展开 */
+function ToolBubble({ label, error, icon }: { label: string; error?: boolean; icon: React.ReactNode }) {
+  const [expanded, setExpanded] = useState(false)
+  const long = label.length > 90  // 超长才折叠（短摘要直接显示）
+  const collapsible = long && !expanded
+  return (
+    <div
+      className={`world-msg max-w-[90%] mx-auto text-[11px] text-center rounded-lg ${error ? 'text-rose-400 bg-rose-500/10 border border-rose-500/20' : 'text-mint-400 bg-mint-400/10 border border-mint-400/20'}`}
+    >
+      <div
+        className={`flex items-center justify-center gap-1.5 py-1 px-2 ${collapsible ? 'cursor-pointer select-none' : ''}`}
+        onClick={() => collapsible && setExpanded(true)}
+      >
+        <span className="shrink-0">{icon}</span>
+        {collapsible ? (
+          <span className="min-w-0">
+            <span className="line-clamp-2 text-left block">{label}</span>
+            <span className="inline-flex items-center gap-0.5 text-[10px] opacity-70">
+              <ChevronDown size={10} /> 展开
+            </span>
+          </span>
+        ) : (
+          <span className="min-w-0 whitespace-pre-wrap">{label}</span>
+        )}
+      </div>
+    </div>
+  )
+}
+
 /** 思考气泡（2026-08-13）：独立展示，默认 2 行 + 底部渐变淡化，点击展开看全部 */
 function ReasoningBubble({ text }: { text: string }) {
   const [expanded, setExpanded] = useState(false)
@@ -173,10 +202,12 @@ const WorldChatPanel = memo(forwardRef<WorldChatHandle, WorldChatPanelProps>(({ 
         }
       }
       return (
-        <div key={m.id} className={`world-msg flex items-center justify-center gap-1.5 text-[11px] text-center py-1 px-2 rounded-lg max-w-[90%] mx-auto ${m.error ? 'text-rose-400 bg-rose-500/10 border border-rose-500/20' : 'text-mint-400 bg-mint-400/10 border border-mint-400/20'}`}>
-          <span className="shrink-0">{toolIcon(m.content)}</span>
-          <span className="min-w-0">{label}</span>
-        </div>
+        <ToolBubble
+          key={m.id}
+          label={label}
+          error={m.error}
+          icon={toolIcon(m.content)}
+        />
       )
     }
 
