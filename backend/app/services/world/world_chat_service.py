@@ -617,37 +617,23 @@ async def _stream_llm_once(
 async def _inject_pending_user_messages(
     db: AsyncSession, world_id: int, messages: list, sid_db: str | None,
 ):
-    """把排队中的普通消息注入当前工具轮（每轮 LLM 调用前调用）。
+    """把插入中的普通消息拼进工具轮上下文（每轮 LLM 调用前调用）。
 
-    产品定（2026-08-13）：AI 工具轮进行中用户发的普通消息不打断循环，
-    在下一轮 LLM 调用前自然注入（drain → 落库 → 发事件 → 拼进上下文）。
-    协议：先 [INSERTED]{count} 信号（清前端排队弹窗，不计入历史），
-    再逐条 [INSERT]{msg_id, content}（已落库、记入历史，前端画真实气泡）。
-    无排队消息时生成器直接结束（零开销）。
+    2026-08-13 产品定（改）：用户发消息的瞬间已由 world_turn._publish_insert
+    **立即落库 + 广播** [INSERTED]/[INSERT]（气泡马上画入，不等下一轮）；
+    这里只负责把消息拼进 AI 上下文（drain 后追加 user 消息）。
+    无排队消息时直接返回（零开销）。
     """
-    from app.models.world import WorldChatMessage
     from app.services.world.world_turn import get_world_worker
     insert_items = await get_world_worker(world_id).drain_inserts()
     if not insert_items:
         return
-    # 信号先行：前端按 FIFO 从排队弹窗移除 count 条
-    total = sum(len(_it["messages"]) for _it in insert_items)
-    yield f"data: [INSERTED]{json.dumps({'count': total}, ensure_ascii=False)}\n\n"
-    # 逐条落库 + 发事件 + 拼进上下文（AI 下一轮思考可见）
     for _it in insert_items:
         for _m in _it["messages"]:
             _m_text = str(_m).strip()
             if not _m_text:
                 continue
-            _wm = WorldChatMessage(
-                world_id=world_id, user_id=_it["user_id"],
-                role="user", content=_m_text, session_id=sid_db,
-            )
-            db.add(_wm)
-            await db.flush()
-            yield f"data: [INSERT]{json.dumps({'msg_id': _wm.id, 'content': _m_text}, ensure_ascii=False)}\n\n"
             messages.append({"role": "user", "content": _m_text})
-    await db.commit()
 
 
 async def _execute_tool_round(
@@ -1204,12 +1190,11 @@ async def stream_world_chat(
                 max_rounds = max(1, min(max_rounds, 200))
                 final = ""
                 for _r in range(max_rounds):
-                    # 排队消息注入（无则零开销）：AI 工具轮进行中用户发的普通消息在下一轮自然拼进上下文
+                    # 插入消息拼进上下文（气泡/落库已即时完成；无则零开销）
                     try:
-                        async for event in _inject_pending_user_messages(db, world_id, messages, sid_db):
-                            yield event
+                        await _inject_pending_user_messages(db, world_id, messages, sid_db)
                     except Exception as e:
-                        logger.warning(f"🌐 世界 #{world_id} 排队消息注入失败（非致命）: {e}")
+                        logger.warning(f"🌐 世界 #{world_id} 插入消息注入失败（非致命）: {e}")
                     # 执行本轮所有工具调用（执行→注入→落库→[TOOL] 事件）
                     async for event in _execute_tool_round(db, world, world_id, tool_call_acc, messages, turn_state, sid_db):
                         yield event

@@ -49,6 +49,39 @@ GET /world/${WORLD_ID}/api/state      # 阶段 2：世界受控数据 API
 
 阶段 1 数据以文件（json/md）形式放在世界文件夹，页面 `fetch` 相对路径读取；阶段 2 提供受控数据 API 与 py 沙箱。
 
+## 4.1 页面事件通道（页面 → 世界程序，静默命令，产品 2026-08-13 定）
+
+页面操作**不要发群消息**——用事件通道直连世界程序，不产生群聊消息、不进群聊（避免刷屏）：
+
+```
+POST /world/${WORLD_ID}/api/event
+Authorization: Bearer <用户登录 token>
+```
+
+请求体：
+```jsonc
+{
+  "type": "page_command",          // 事件类型（世界程序 handle 里判断）
+  "group_id": 57,                   // 可选：默认第一个绑定群
+  "payload": { "command": "我去 2,3" }  // 任意结构；服务端自动注入 user_id / user_name
+}
+```
+
+- 鉴权：主站登录用户（页面宿主已注入 token）；要求是绑定群成员或世界创建者。
+- 世界程序 `handle(event)` 收到：`{"type": "page_command", "source": "page", "payload": {..., "user_id": 1, "user_name": "xxx"}, "group_id": 57, "group_type": {...}}`。
+- handle 返回 dict → 同步回页面（`{success: true, result: ...}`）；常驻世界则入队（`{success: true, queued: true}`）。
+- **不产生群消息**：世界程序要回复用户，用 `publish`（SSE 状态）回页面；只有真正需要别人在群里看到的内容才用群消息 API。
+- 事件类型建议：`page_command`（操作命令，payload.command 复用群命令语法，世界程序同一套 dispatch 解析）。
+
+页面示例（替代原来发群消息的 sendCommand）：
+```js
+fetch('/world/' + window.WORLD_ID + '/api/event', {
+  method: 'POST',
+  headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + localStorage.getItem('access_token') },
+  body: JSON.stringify({ type: 'page_command', payload: { command: '我去 2,3' } })
+})
+```
+
 ## 5. 打包导出
 
 - 一键打包：`GET /worlds/{world_id}/export` 返回 zip（代码 + 数据）。

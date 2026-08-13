@@ -255,6 +255,71 @@ async def world_api_store_memory(
     return {"ok": True, "title": title, "embedded": result.get("embedded", False)}
 
 
+@router.post("/{world_id}/api/event")
+async def world_api_event(
+    world_id: int,
+    body: dict,
+    current_user: dict = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """页面 → 世界程序静默命令通道（产品 2026-08-13 定）。
+
+    页面操作（移动/攻击/开宝箱等）直接触发世界程序 handle(event)，
+    **不产生群消息、不进群聊**（解决页面操作刷屏群聊问题）。
+    鉴权：主站登录用户（页面宿主注入的 user token）+ 群绑定/成员校验；
+    事件结构：{type, payload, group_id?}，source=page 标记，
+    服务端注入 user_id/user_name（不信任页面自报身份）。
+    """
+    from app.models.world import World, WorldBinding
+    from sqlalchemy import text as _t
+
+    world = await db.get(World, world_id)
+    if world is None:
+        raise HTTPException(status_code=404, detail="世界不存在")
+    _rate_limit_write(world)
+
+    # 群作用域：缺省第一个绑定群；显式传的必须属于本世界绑定
+    gid = await _check_bound_group(db, world, body.get("group_id"))
+    # 成员校验：世界 owner 或群成员（human）
+    uid = current_user["user_id"]
+    is_owner = world.owner_id == uid
+    if not is_owner:
+        row = (await db.execute(_t(
+            "SELECT 1 FROM group_members WHERE group_id=:g AND member_id=:u AND member_type='human' LIMIT 1"
+        ), {"g": gid, "u": uid})).first()
+        if row is None:
+            raise HTTPException(status_code=403, detail="你不在该群成员中，无法向世界发命令")
+
+    event_type = str(body.get("type") or "").strip()
+    payload = dict(body.get("payload") or {})
+    if not event_type:
+        raise HTTPException(status_code=422, detail="type 必填（如 page_command）")
+    # 服务端注入身份（不信任页面自报）
+    payload.setdefault("user_id", uid)
+    payload.setdefault("user_name", current_user.get("username") or f"#{uid}")
+
+    event = {"type": event_type, "source": "page", "payload": payload, "group_id": gid}
+    try:
+        from app.services.world.group_type_service import get_group_type_for_group
+        event["group_type"] = await get_group_type_for_group(db, world_id, gid)
+    except Exception:
+        pass
+
+    # 常驻世界 → 投递常驻进程；否则临时触发（同步等结果，handle 返回可回页面）
+    from app.services.world.world_resident import manager
+    if manager.is_resident(world) and await manager.dispatch(world.id, event):
+        return {"success": True, "queued": True, "event_type": event_type}
+    from app.services.world.world_sandbox import run_world_trigger
+    from app.routers.world_proxy import ensure_world_api_token
+    await ensure_world_api_token(db, world)
+    await db.commit()
+    result = await run_world_trigger(world, event=event, background=False)
+    if not result.get("success"):
+        return {"success": False, "reason": result.get("reason", "世界程序未处理"),
+                "stdout": (result.get("stdout") or "")[-200:]}
+    return {"success": True, "result": result.get("result")}
+
+
 @router.get("/{world_id}/api/usage")
 async def world_api_usage(
     world_id: int,

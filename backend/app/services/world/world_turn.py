@@ -171,21 +171,22 @@ class WorldTurnWorker:
                     self.turns.pop(item["turn_id"], None)
                     for _tid in [t for t, _tb in self.turns.items() if _tb.proxy is tb]:
                         self.turns.pop(_tid, None)
-                    # ⚠️ 2026-08-13 修复：活跃 turn 结束时，残留的插入消息（工具轮已退出没 drain 的）
-                    # 落库 + 广播 [INSERTED]/[INSERT]——否则消息卡在 _inserts，AI 下个 turn 才看到
-                    # 但前端没订阅那个 turn → 气泡不显示。这里补发，前端立即收到。
+                    # 兜底：_publish_insert 未完成（轮次先结束）的插入消息补落库 + 广播
+                    # （已落库的 msg_ids 非空则跳过，避免重复）
                     try:
                         if self._inserts:
                             async with async_session() as _db:
-                                from app.models.world import WorldChatMessage
+                                from app.models.world import World, WorldChatMessage
                                 from app.services.world.world_chat_service import session_id_for_db
                                 world_row = await _db.get(World, self.world_id)
                                 sid = session_id_for_db(world_row) if world_row else None
                                 pending = self._inserts
                                 self._inserts = []
-                                total = sum(len(i["messages"]) for i in pending)
-                                await tb.broadcast(f"data: [INSERTED]{json.dumps({'count': total})}\n\n")
                                 for _it in pending:
+                                    if len(_it.get("msg_ids") or []) == len([m for m in _it["messages"] if str(m).strip()]):
+                                        continue  # 已由 _publish_insert 落库
+                                    total = len(_it["messages"])
+                                    await tb.broadcast(f"data: [INSERTED]{json.dumps({'count': total})}\n\n")
                                     for _m in _it["messages"]:
                                         _t = str(_m).strip()
                                         if not _t:
@@ -219,7 +220,13 @@ class WorldTurnWorker:
             tb = TurnBroadcast(turn_id)
             tb.proxy = active_tb
             self.turns[turn_id] = tb
-            self._inserts.append({"user_id": user_id, "messages": messages})
+            self._inserts.append({"user_id": user_id, "messages": messages, "msg_ids": []})
+            # 2026-08-13 产品定（改）：用户发消息**立即**落库 + 广播 [INSERTED]/[INSERT]
+            # （气泡马上画入，不等下一轮 LLM 调用）；_inserts 仅作上下文注入用。
+            try:
+                asyncio.create_task(self._publish_insert(world_id, tb, user_id, messages))
+            except Exception:
+                pass
             return turn_id
         self.turns[turn_id] = TurnBroadcast(turn_id)
         self.msg_queue.put_nowait({
@@ -227,6 +234,39 @@ class WorldTurnWorker:
             "message": messages,
         })
         return turn_id
+
+    async def _publish_insert(self, world_id: int, tb: TurnBroadcast, user_id: int, messages: list) -> None:
+        """插入消息即时落库 + 广播（2026-08-13 产品定改：发消息立即插入，不等下一轮）。
+        先 [INSERTED] 信号清前端排队弹窗，再逐条落库 + [INSERT] 画真实气泡；
+        落库 id 回填 _inserts（供 drain 时跳过重复落库）。"""
+        try:
+            await tb.broadcast(f"data: [INSERTED]{json.dumps({'count': len(messages)}, ensure_ascii=False)}\n\n")
+            async with async_session() as _db:
+                from app.models.world import World, WorldChatMessage
+                from app.services.world.world_chat_service import session_id_for_db
+                world_row = await _db.get(World, world_id)
+                sid = session_id_for_db(world_row) if world_row else None
+                ids: list[int] = []
+                for _m in messages:
+                    _t = str(_m).strip()
+                    if not _t:
+                        continue
+                    wm = WorldChatMessage(
+                        world_id=world_id, user_id=user_id, role="user",
+                        content=_t, session_id=sid,
+                    )
+                    _db.add(wm)
+                    await _db.flush()
+                    ids.append(wm.id)
+                    await tb.broadcast(f"data: [INSERT]{json.dumps({'msg_id': wm.id, 'content': _t}, ensure_ascii=False)}\n\n")
+                await _db.commit()
+                async with self._inserts_lock:
+                    for _it in self._inserts:
+                        if _it["user_id"] == user_id and _it["messages"] == messages:
+                            _it["msg_ids"] = ids
+                            break
+        except Exception as e:
+            logger.warning(f"🌐 世界 #{world_id} 插入消息即时落库失败（非致命）: {e}")
 
     async def drain_inserts(self, user_id: int | None = None) -> list[dict]:
         """取走待插入的普通消息（工具轮每轮调用前调用；user_id=None 取全部）"""
