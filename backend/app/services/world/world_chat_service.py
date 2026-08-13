@@ -8,6 +8,7 @@
 import asyncio
 import json
 import logging
+import uuid
 from datetime import datetime
 from pathlib import Path
 
@@ -923,7 +924,7 @@ async def stream_world_chat(
         if note is not None:
             db.add(WorldChatMessage(world_id=world_id, user_id=None, role="tool", content=note, session_id=sid_db))
             await db.commit()
-            yield f"data: [TOOL]{json.dumps({'name': cmd_text, 'success': True, 'summary': note}, ensure_ascii=False)}\n\n"
+            yield f"data: [TOOL_UPDATE]{json.dumps({'tool_id': f't_{uuid.uuid4().hex[:8]}', 'status': 'done', 'name': cmd_text.lstrip('/'), 'success': True, 'summary': note}, ensure_ascii=False)}\n\n"
             yield "data: [DONE]\n\n"
             return
         # note 为 None = 非注册命令：继续走 LLM（未知斜杠当普通消息处理）
@@ -1072,6 +1073,7 @@ async def stream_world_chat(
                 # 若清空则落库无思考（刷新后「思考过程」丢失）——保留首轮思考作兜底
                 # full_reasoning = ""
                 # 第一轮流式里收集到的 tool_calls（重构为 API 格式；content 用空串而非 None，避免部分接口/思考模式异常）
+                # ⚠️ DeepSeek thinking 模式：首轮 assistant 也要回传 reasoning_content（2026-08-13 修复）
                 messages.append({
                     "role": "assistant",
                     "content": "",
@@ -1083,6 +1085,7 @@ async def stream_world_chat(
                         }
                         for idx, acc in sorted(tool_call_acc.items())
                     ],
+                    **({"reasoning_content": full_reasoning} if full_reasoning else {}),
                 })
                 # 工具循环上限：creator_config.max_tool_rounds（默认 50，设计页可改）
                 max_rounds = int(cfg.get("max_tool_rounds") or DEFAULT_MAX_TOOL_ROUNDS)
@@ -1141,7 +1144,13 @@ async def stream_world_chat(
                         if content:
                             yield f"data: {content.replace(chr(10), '{NL}')}\n\n"
                     # 模型还要继续调工具：记录真实 tool_calls，进入下一轮
-                    messages.append({"role": "assistant", "content": content or "", "tool_calls": tcs})
+                    # ⚠️ DeepSeek thinking 模式硬性要求：assistant 消息必须回传 reasoning_content，
+                    # 否则 400 invalid_request_error（2026-08-13 修复）
+                    messages.append({
+                        "role": "assistant", "content": content or "",
+                        "tool_calls": tcs,
+                        **({"reasoning_content": reasoning} if reasoning else {}),
+                    })
                     tool_call_acc = {
                         i: {"id": tc.get("id", ""), "name": tc["function"]["name"], "arguments": tc["function"].get("arguments") or ""}
                         for i, tc in enumerate(tcs)

@@ -424,6 +424,8 @@ export function useWorldChat({ wid, onRefresh, onMsg }: UseWorldChatOptions) {
           }
           if (payload.startsWith('[REASONING]')) {
             reasoning += payload.slice(11).replace(/\{NL\}/g, '\n')
+          } else if (payload.startsWith('[TOOL]')) {
+            // 旧格式工具事件（无 _UPDATE）已废弃：忽略，不当作正文显示（2026-08-13）
           } else {
             full += payload.replace(/\{NL\}/g, '\n')
           }
