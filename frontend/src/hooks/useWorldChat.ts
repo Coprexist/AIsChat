@@ -14,6 +14,8 @@ export interface ChatMsg {
   error?: boolean
   /** 排队中（AI 处理时发送，尚未真正发出；流结束后自动发送并刷新为正式消息） */
   pending?: boolean
+  /** 思考折叠预览（创建时前两行快照——折叠区固定显示，不随流式更新跳动；2026-08-13） */
+  reasoning_preview?: string
   created_at?: string
   /** 工具状态事件（2026-08-13）：tool_id 定位气泡，多状态原地更新 */
   tool_id?: string
@@ -348,11 +350,11 @@ export function useWorldChat({ wid, onRefresh, onMsg }: UseWorldChatOptions) {
         contentTargetId = -(++msgSeqRef.current)
         updateBubble(contentTargetId, { content: full })
       }
-      // 思考气泡（首次思考到达时创建；独立 id）
+      // 思考气泡（首次思考到达时创建；独立 id；preview=创建时前两行快照，折叠展示用）
       const ensureReasoningBubble = () => {
         if (reasoningTargetId !== null) return
         reasoningTargetId = -(++msgSeqRef.current)
-        updateBubble(reasoningTargetId, { reasoning })
+        updateBubble(reasoningTargetId, { reasoning, reasoning_preview: reasoning.split('\n').slice(0, 2).join('\n') })
       }
       // rAF 节流渲染（每帧最多一次函数式更新）
       let renderPending = false

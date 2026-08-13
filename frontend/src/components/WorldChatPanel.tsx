@@ -64,23 +64,11 @@ function ToolBubble({ label, error, icon }: { label: string; error?: boolean; ic
 }
 
 /** 思考气泡（2026-08-13）：独立展示，默认 2 行 + 底部渐变淡化，点击展开看全部 */
-function ReasoningBubble({ text }: { text: string }) {
+function ReasoningBubble({ text, preview }: { text: string; preview?: string }) {
   const [expanded, setExpanded] = useState(false)
   const t = useT()
-  // 折叠快照：进入折叠态时取一次前两行，流式更新不动它（否则思考逐字增长，折叠区一直跳）
-  // 展开看完整内容；再次折叠时重新取（此时内容已稳定）
-  const snapshotRef = useRef<string | null>(null)
-  const [snapshot, setSnapshot] = useState<string | null>(null)
-  useEffect(() => {
-    if (!expanded) {
-      if (snapshotRef.current === null) {
-        snapshotRef.current = text.split('\n').slice(0, 2).join('\n')
-        setSnapshot(snapshotRef.current)
-      }
-    } else {
-      snapshotRef.current = null
-    }
-  }, [expanded, text])
+  // 折叠显示 preview（消息创建时的前两行快照，由 useWorldChat 固定）——
+  // 组件即使重挂载也稳定；不再依赖组件内 state 快照（会被重挂载重置）
   return (
     <div
       className="world-msg max-w-[90%] mx-auto cursor-pointer select-none text-[11px] text-textMuted bg-elevated/40 border border-border/50 rounded-lg overflow-hidden"
@@ -95,8 +83,7 @@ function ReasoningBubble({ text }: { text: string }) {
         <div className="px-2 py-1.5 whitespace-pre-wrap max-h-72 overflow-y-auto">{text}</div>
       ) : (
         <div className="relative">
-          {/* 折叠：固定快照（最久的两行，流式期间不跳）；展开/收起切换后重新取 */}
-          <div className="px-2 py-1.5 whitespace-pre-wrap">{snapshot ?? text.split('\n').slice(0, 2).join('\n')}</div>
+          <div className="px-2 py-1.5 whitespace-pre-wrap">{preview || text.split('\n').slice(0, 2).join('\n')}</div>
           <div className="absolute inset-x-0 bottom-0 h-6 bg-gradient-to-t from-elevated/90 to-transparent pointer-events-none" />
         </div>
       )}
@@ -242,7 +229,7 @@ const WorldChatPanel = memo(forwardRef<WorldChatHandle, WorldChatPanelProps>(({ 
     // 思考独立气泡（2026-08-13）：只有思考没正文（note 且 content 空）——
     // 默认显示 2 行 + 底部渐变淡化，点击展开看全部
     if (m.role === 'note' && !m.content && m.reasoning) {
-      return <ReasoningBubble key={m.id} text={m.reasoning} />
+      return <ReasoningBubble key={m.id} text={m.reasoning} preview={m.reasoning_preview} />
     }
 
     return (
