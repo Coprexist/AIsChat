@@ -146,11 +146,31 @@ WORLD_TOOLS = [
         "type": "function",
         "function": {
             "name": "file_read",
-            "description": "读取世界文件内容（编辑前确认内容用；长文件截断显示）。",
+            "description": "读取世界文件内容（编辑前确认内容用）。大文件支持按行分页：offset=起始行号（1-based，默认1），limit=读多少行（不填读到底）；返回 total_lines/start_line/end_line/truncated。建议：先 file_grep 定位行号，再分段读对应区间，不要整文件全读浪费上下文。",
             "parameters": {
                 "type": "object",
-                "properties": {"path": {"type": "string", "description": "相对路径"}},
+                "properties": {
+                    "path": {"type": "string", "description": "相对路径"},
+                    "offset": {"type": "integer", "description": "起始行号（1-based，默认 1）"},
+                    "limit": {"type": "integer", "description": "读取行数（不填读到底）"},
+                },
                 "required": ["path"],
+            },
+        },
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "file_grep",
+            "description": "按关键词/正则搜索世界文件内容，返回命中行+行号（轻量定位，不用整文件全读）。找到位置后配合 file_read(offset,limit) 读对应段落。",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "path": {"type": "string", "description": "相对路径"},
+                    "pattern": {"type": "string", "description": "关键词或正则表达式（正则非法时按普通子串匹配）"},
+                    "max_hits": {"type": "integer", "description": "最多返回几条命中（默认 30）"},
+                },
+                "required": ["path", "pattern"],
             },
         },
     },
@@ -450,8 +470,20 @@ def _tool_result_summary(name: str, result: dict) -> str:
             if result.get("binary"):
                 return f"{result.get('path')}（二进制文件）"
             c = result.get("content") or ""
+            if result.get("start_line"):
+                return f"已读取 {result.get('path')} 第{result.get('start_line')}-{result.get('end_line')}行（共{result.get('total_lines')}行，{len(c)}字符）" + ("，已截断" if result.get("truncated") else "")
             return f"已读取 {result.get('path')}（{len(c)} 字符）"
         return f"读取失败：{result.get('error', '未知错误')}"
+    if name == "file_grep":
+        if ok:
+            hits = result.get("hits") or []
+            if result.get("binary"):
+                return f"{result.get('path')}（二进制文件，无法搜索）"
+            if not hits:
+                return f"在 {result.get('path')} 未找到「{result.get('pattern')}」"
+            first = f"{hits[0]['line']}:{hits[0]['content'][:40]}" if hits else ""
+            return f"在 {result.get('path')} 找到 {result.get('total_hits')} 处「{result.get('pattern')}」：{first}…"
+        return f"搜索失败：{result.get('error', '未知错误')}"
     if name == "compact_context":
         if ok:
             return (
@@ -1104,13 +1136,44 @@ async def _do_execute(db: AsyncSession, world, name: str, arguments: str, turn_s
             if not path:
                 return {"success": False, "error": "缺少 path 参数"}
             from app.services.world.world_file_service import read_file
-            existing = read_file(world.id, path)
+            # 2026-08-13：支持按行分页（offset/limit）——大文件先 grep 定位再分段读
+            offset = args.get("offset")
+            limit = args.get("limit")
+            try:
+                offset = int(offset) if offset is not None else None
+                limit = int(limit) if limit is not None else None
+            except (TypeError, ValueError):
+                return {"success": False, "error": "offset/limit 必须是整数"}
+            existing = read_file(world.id, path, offset=offset, limit=limit)
             if existing.get("binary"):
                 return {"success": True, "path": path, "binary": True, "note": "二进制文件，内容不返回"}
             content = existing.get("content") or ""
             if len(content) > 6000:
-                content = content[:6000] + "\n…（内容较长已截断，如需修改请用 edit_world_file 定位）"
-            return {"success": True, "path": path, "content": content}
+                content = content[:6000] + "\n…（内容较长已截断，可用 file_read offset/limit 分段读）"
+            meta = {k: existing[k] for k in ("total_lines", "start_line", "end_line", "truncated") if k in existing}
+            return {"success": True, "path": path, "content": content, **meta}
+        except (ValueError, FileNotFoundError, json.JSONDecodeError) as e:
+            return {"success": False, "error": str(e)}
+    if name == "file_grep":
+        try:
+            args = json.loads(arguments or "{}")
+            path = str(args.get("path", "")).strip()
+            pattern = str(args.get("pattern", "")).strip()
+            if not path or not pattern:
+                return {"success": False, "error": "缺少 path 或 pattern 参数"}
+            max_hits = args.get("max_hits")
+            try:
+                max_hits = int(max_hits) if max_hits is not None else 30
+            except (TypeError, ValueError):
+                max_hits = 30
+            from app.services.world.world_file_service import grep_file
+            result = grep_file(world.id, path, pattern, max_hits=max_hits)
+            if result.get("binary"):
+                return {"success": True, "path": path, "binary": True, "note": "二进制文件，无法搜索"}
+            hits = result.get("hits") or []
+            if not hits:
+                return {"success": True, "path": path, "pattern": pattern, "hits": [], "total_hits": 0, "note": f"未找到匹配「{pattern}」"}
+            return {"success": True, "path": path, "pattern": pattern, "hits": hits, "total_hits": len(hits)}
         except (ValueError, FileNotFoundError, json.JSONDecodeError) as e:
             return {"success": False, "error": str(e)}
     if name == "compact_context":

@@ -72,17 +72,61 @@ def list_files(world_id: int, prefix: str = "") -> list[dict]:
     return result
 
 
-def read_file(world_id: int, rel_path: str) -> dict:
-    """读文件（文本按 utf-8，二进制返回大小）"""
+def read_file(world_id: int, rel_path: str, offset: int | None = None, limit: int | None = None) -> dict:
+    """读文件（文本按 utf-8，二进制返回大小）。
+
+    offset/limit：按行分页读（1-based 行号）——大文件不用全读，
+    先 file_grep 定位行号再读对应段落（2026-08-13 产品定，对齐 OpenClaw read 工具）。
+    """
     target = _safe_path(world_id, rel_path)
     if not target.is_file():
         raise FileNotFoundError(f"文件不存在: {rel_path}")
     data = target.read_bytes()
     try:
         text = data.decode("utf-8")
-        return {"path": rel_path, "content": text, "binary": False, "size": len(data)}
     except UnicodeDecodeError:
         return {"path": rel_path, "binary": True, "size": len(data), "content": None}
+    if offset is not None or limit is not None:
+        lines = text.split("\n")
+        total = len(lines)
+        start = max(1, offset or 1)
+        end = total if limit is None else min(total, start + limit - 1)
+        start = min(start, total + 1)  # offset 超界 → 空段
+        slice_lines = lines[start - 1:end]
+        content = "\n".join(slice_lines)
+        return {
+            "path": rel_path, "content": content, "binary": False, "size": len(data),
+            "total_lines": total, "start_line": start, "end_line": end,
+            "truncated": end < total,
+        }
+    return {"path": rel_path, "content": text, "binary": False, "size": len(data), "total_lines": len(text.split("\n"))}
+
+
+def grep_file(world_id: int, rel_path: str, pattern: str, max_hits: int = 30) -> dict:
+    """按关键词/正则搜文件内容，返回命中行 + 行号（轻量定位，2026-08-13 新增）。
+
+    对齐 OpenClaw 的 grep 用法：先定位再按需读，不用整文件全读。
+    """
+    import re as _re
+    target = _safe_path(world_id, rel_path)
+    if not target.is_file():
+        raise FileNotFoundError(f"文件不存在: {rel_path}")
+    try:
+        text = target.read_text(encoding="utf-8")
+    except UnicodeDecodeError:
+        return {"path": rel_path, "binary": True, "hits": [], "total_hits": 0}
+    try:
+        rx = _re.compile(pattern)
+    except _re.error:
+        # 非正则 → 当普通子串（大小写不敏感）
+        rx = _re.compile(_re.escape(pattern), _re.IGNORECASE)
+    hits = []
+    for i, line in enumerate(text.split("\n"), start=1):
+        if rx.search(line):
+            hits.append({"line": i, "content": line[:300]})
+            if len(hits) >= max_hits:
+                break
+    return {"path": rel_path, "hits": hits, "total_hits": len(hits), "max_hits": max_hits}
 
 
 def write_file(world_id: int, rel_path: str, content: str) -> dict:
