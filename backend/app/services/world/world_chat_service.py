@@ -417,15 +417,17 @@ async def _save_note_separated(
     （思考塞 details 里），思考折叠/独立展示失效。
     """
     from app.models.world import WorldChatMessage
-    if content:
-        db.add(WorldChatMessage(
-            world_id=world_id, user_id=None, role="note",
-            content=content[:4000], reasoning=None, session_id=session_id,
-        ))
+    # 顺序对齐流式：思考先落库、正文后落库（思考气泡在正文上方）——
+    # 否则刷新后正文 note id < 思考 note id，渲染顺序反了
     if reasoning:
         db.add(WorldChatMessage(
             world_id=world_id, user_id=None, role="note",
             content="", reasoning=reasoning, session_id=session_id,
+        ))
+    if content:
+        db.add(WorldChatMessage(
+            world_id=world_id, user_id=None, role="note",
+            content=content[:4000], reasoning=None, session_id=session_id,
         ))
     await db.commit()
 
