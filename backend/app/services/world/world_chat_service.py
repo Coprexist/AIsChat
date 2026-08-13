@@ -231,14 +231,17 @@ async def _record_usage(db, world_id: int, turn_id: str, round_no, model: str, u
 
 
 def world_context_block(world) -> str:
-    """世界档案：注入给世界 AI 的自身信息（名字/简介/状态/时间）"""
+    """世界档案：注入给世界 AI 的自身信息（名字/简介/状态）——⚠️ 不含世界时间！
+
+    世界时间是动态的（每次对话 apply_time_compensation 都变），放这里会破坏
+    DeepSeek 前缀缓存（system 第一句就变 → 全 miss）。世界时间放 messages 尾部。
+    """
     return (
         "【你的世界档案】\n"
         f"- 世界名：{world.name}\n"
         f"- 简介：{world.description or '（无）'}\n"
         f"- 状态：{world.status}\n"
         f"- 时间流速：{world.time_flow_rate}x\n"
-        f"- 世界时间：{world.world_time.isoformat() if world.world_time else '未开始'}\n"
         f"- 你的身份：world-{world.id}\n"
         "你可以用 update_world_info 工具修改世界名/简介。"
     )
@@ -900,6 +903,9 @@ async def _prepare_world_chat(
     from zoneinfo import ZoneInfo
     tz = ZoneInfo(settings.display_timezone)
     messages.append({"role": "system", "content": f"## 当前时间\n{datetime.now(tz).strftime(f'%Y-%m-%d %H:%M {tz.key}')}\n"})
+    # 世界时间（2026-08-13 从前缀移到这里）：每次对话 apply_time_compensation 都变，
+    # 放前缀会破坏 DeepSeek 缓存；放尾部动态区不影响前缀命中
+    messages.append({"role": "system", "content": f"## 世界时间\n{world.world_time.isoformat() if world.world_time else '未开始'}\n"})
 
     # 世界内访客（身份系统 identity_index 快照）→ AI 知道谁在玩这个世界
     try:
