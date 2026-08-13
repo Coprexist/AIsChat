@@ -10,6 +10,10 @@ export default defineConfig({
     alias: {
       '@': path.resolve(__dirname, './src'),
     },
+    // rehype-katex 自带嵌套 katex（它声明 ^0.16.0，顶层是 0.17.0 → npm 重复安装），
+    // 导致 mhchem 注册的实例 ≠ rehype-katex 使用的实例（\ce 永远未定义）。
+    // dedupe 强制所有 'katex' 解析到顶层单实例（KaTeX 官方推荐，对 npm install 复现同样生效）
+    dedupe: ['katex'],
   },
   optimizeDeps: {
     // katex 与 mhchem 一起预构建：mhchem 的 \ce 宏必须注册到 rehype-katex 使用的
