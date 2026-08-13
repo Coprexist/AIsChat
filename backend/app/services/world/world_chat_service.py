@@ -214,7 +214,7 @@ async def _record_usage(db, world_id: int, turn_id: str, round_no, model: str, u
             prompt_tokens=int(usage.get("prompt_tokens") or 0),
             completion_tokens=int(usage.get("completion_tokens") or 0),
             reasoning_tokens=int(usage.get("reasoning_tokens") or 0),
-            cached_tokens=int(usage.get("cached_tokens") or 0),
+            cached_tokens=_extract_cached_tokens(usage),
         ))
         await db.flush()
         # 个人 API 用量：记账人 = 世界 AI 表单的世界主人（user_id 直记，查询时虚拟聚合「群视界 agent」）
@@ -230,6 +230,20 @@ async def _record_usage(db, world_id: int, turn_id: str, round_no, model: str, u
                 )
     except Exception as e:
         logger.warning(f"🌐 世界 #{world_id} 用量记录失败: {e}")
+
+
+def _extract_cached_tokens(usage: dict | None) -> int:
+    """提取缓存命中 token：DeepSeek 各接口返回位置不一——
+    顶层 cached_tokens（首轮）｜prompt_tokens_details.cached_tokens（工具轮）｜
+    prompt_cache_hit_tokens（兼容）；2026-08-13 修复（之前只读顶层 → 工具轮全记 0）。"""
+    if not usage:
+        return 0
+    v = usage.get("cached_tokens")
+    if v is None:
+        v = (usage.get("prompt_tokens_details") or {}).get("cached_tokens")
+    if v is None:
+        v = usage.get("prompt_cache_hit_tokens")
+    return int(v or 0)
 
 
 def world_context_block(world) -> str:
