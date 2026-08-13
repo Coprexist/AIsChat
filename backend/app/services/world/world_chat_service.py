@@ -596,34 +596,49 @@ async def _inject_pending_user_messages(
     await db.commit()
 
 
-async def stream_world_chat(
-    db: AsyncSession,
-    world_id: int,
-    user_id: int,
-    message: str | list[str],
-    turn_id: str = "",
+async def _execute_tool_round(
+    db: AsyncSession, world, world_id: int, tool_call_acc: dict,
+    messages: list, turn_state: dict, sid_db: str | None,
 ):
-    """世界 AI 对话（SSE 流式，参考大同差异分析流式实现）。
+    """执行本轮所有工具调用：执行 → 摘要 → 注入上下文 → 落库 → [TOOL] 事件。
 
-    事件格式（text/event-stream）：
-      data: <内容增量>          — 正文逐 token
-      data: [REASONING]<增量>   — 思考内容逐 token（开启 thinking 时）
-      data: [ERROR]<信息>       — 错误
-      data: [DONE]              — 结束
-    内容里的换行用 {NL} 占位（SSE 行内不能有裸换行），前端还原。
-    用户消息先落库；AI 回复流结束后落库（客户端中断也尽量保存已生成部分）。
+    工具轮循环内的单轮执行单元（2026-08-13 拆分，降低 stream_world_chat 体量）。
     """
     import json
+    from app.models.world import WorldChatMessage
+    from app.services.world.world_tools import _execute_world_tool, _tool_result_summary
+    for idx, acc in sorted(tool_call_acc.items()):
+        result = await _execute_world_tool(db, world, acc["name"], acc["arguments"], turn_state)
+        summary = _tool_result_summary(acc["name"], result)
+        turn_state["tools_done"].append(summary)
+        messages.append({
+            "role": "tool",
+            "tool_call_id": acc["id"] or f"call_{idx}",
+            "content": json.dumps(result, ensure_ascii=False),
+        })
+        db.add(WorldChatMessage(
+            world_id=world_id, user_id=None, role="tool",
+            content=summary, session_id=sid_db,
+        ))
+        yield f"data: [TOOL]{json.dumps({'name': acc['name'], 'success': bool(result.get('success')), 'summary': summary}, ensure_ascii=False)}\n\n"
+        await db.commit()
 
-    import httpx
+
+async def _prepare_world_chat(
+    db: AsyncSession, world_id: int, user_id: int, message: str | list[str],
+) -> dict | None:
+    """世界 AI 对话的准备阶段：世界加载/凭证/前缀/历史/消息列表/命令识别。
+
+    返回上下文 dict（供 stream_world_chat 编排）；世界不存在返回 None。
+    斜杠命令不在这里执行（需 yield SSE），只识别 cmd_text 供主编排处理。
+    """
+    import httpx  # noqa: F401（_stream_llm_once 用，保留模块级导入习惯）
     from app.config import settings
-    from app.models.world import World, WorldChatMessage
+    from app.models.world import World
 
     world = await db.get(World, world_id)
     if world is None:
-        yield "data: [ERROR]世界不存在\n\n"
-        yield "data: [DONE]\n\n"
-        return
+        return None
 
     # 对话 = 活跃信号：唤醒 + 离线时间补偿（让 AI 看到的世界时间准确）
     from app.services.world.world_service import apply_time_compensation
@@ -662,8 +677,7 @@ async def stream_world_chat(
 
     # ── 前缀文本版本化（2026-08-12 产品定：所有进前缀的内容必须保证缓存命中）──
     # 三个文本源：用户可改提示词（每世界）/ 强注入段（全局）/ 昵称（每世界）
-    # 变更（用户改提示词 / 系统更新强注入 / 改名）→ 写新版本 + 尾部 changelog 告知，不碰前缀；
-    # compact / clear（解锁）→ effective 对齐最新，前缀用新内容。
+    # 变更 → 写新版本 + 尾部 changelog 告知，不碰前缀；compact / clear 解锁后生效
     from app.services.capability_versioning import (
         ensure_text_source_version, get_effective_text,
     )
@@ -673,17 +687,13 @@ async def stream_world_chat(
     await ensure_text_source_version(db, f"world-prompt-{world_id}", user_prompt, "世界AI提示词")
     await ensure_text_source_version(db, "forced-prompt", forced_prompt, "强注入段")
     await ensure_text_source_version(db, f"world-name-{world_id}", creator_name, "世界AI昵称")
-    # 锁定态：前缀 = effective 快照（用户怎么改都不动已锁定的前缀）
     eff_user_prompt = await get_effective_text(db, world.config, f"world-prompt-{world_id}", user_prompt)
     eff_forced_prompt = await get_effective_text(db, world.config, "forced-prompt", forced_prompt)
     eff_name = await get_effective_text(db, world.config, f"world-name-{world_id}", creator_name)
 
     # ── 组装消息：静态 system 前缀保持稳定（prompt cache 友好）──
-    # 位置1：世界档案 + effective 用户提示词 + effective 强注入段
     system_prompt = world_context_block(world) + "\n\n" + eff_user_prompt
-    # 强注入段：平台强约束，用户不可改（2026-08-12 产品定：从用户可改中提出来）
-    system_prompt += eff_forced_prompt
-    # 昵称注入（让 AI 知道自己叫什么；版本化保证改名不断缓存）
+    system_prompt += eff_forced_prompt  # 强注入段：平台强约束，用户不可改
     system_prompt += f"\n【名字】你的名字是「{eff_name}」，对外标识 world-{world_id}。"
 
     notices = await take_pending_notices(db, world_id)
@@ -692,7 +702,7 @@ async def stream_world_chat(
         for n in notices
     ) if notices else ""
 
-    # ── 上下文：有压缩摘要则 摘要+最近 N 条，否则最近 30 条；接近上限时提示 AI 调 compact（与主对话一致）──
+    # ── 上下文：有压缩摘要则 摘要+最近 N 条，否则最近 30 条；接近上限时提示 AI 调 compact ──
     sid_db = session_id_for_db(world)  # 落库用 session_id（默认会话 None）
     summaries = (world.config or {}).get("chat_summaries") or {}
     summary = summaries.get(session_key(world)) or ""
@@ -730,8 +740,7 @@ async def stream_world_chat(
     # 动态信息全部放末尾（每次变化，不影响前缀 cache）——与主对话同规则
     if notice_lines:
         messages.append({"role": "system", "content": "【用户手动改动的懒通知，回复中应体现你看到了】\n" + notice_lines})
-    # 记忆地图：只在上下文起点（无摘要 = 新会话/clear 后；compact 后摘要重建）注入，
-    # 让 AI 知道有什么记忆存档可查；普通延续对话不注入（省 token + 前缀缓存稳定）
+    # 记忆地图：只在上下文起点（无摘要 = 新会话/clear 后）注入
     if not summary:
         try:
             memory_map = await build_memory_map(db, world_id)
@@ -761,7 +770,6 @@ async def stream_world_chat(
         pass
 
     # 能力变更通知（懒加载：增量 changelog 追加尾部，known 更新与注入同轮）
-    # 源：ai-skills（设计侧技能）+ 前缀文本源（提示词/强注入/昵称）
     try:
         from app.services.capability_versioning import build_change_notice
         notice = await build_change_notice(db, world.config, [
@@ -776,7 +784,8 @@ async def stream_world_chat(
     except Exception:
         pass
 
-    # ── 落库：用户消息（批量 = 排队消息一起发，逐条气泡；先提交，即使流失败也不丢）──
+    # 落库用户消息（批量 = 排队消息一起发，逐条气泡；先提交，即使流失败也不丢）
+    from app.models.world import WorldChatMessage
     for m in msg_list:
         db.add(WorldChatMessage(world_id=world_id, user_id=user_id, role="user", content=m, session_id=sid_db))
     try:
@@ -784,7 +793,70 @@ async def stream_world_chat(
     except Exception as e:
         logger.warning(f"🌐 世界 #{world_id} 用户消息落库失败: {e}")
 
-    # ── 用户斜杠命令（不走 LLM，仅单条）：命令注册表在 world_chat_commands（/clear /compact /new /sessions /use /pin /unpin）──
+    # 世界 AI（造物主）工具 = 平台内置 + 设计侧 skills（world_ai_skills/ 全局库；世界侧居民能力不注入）
+    from app.services.world.world_tools import WORLD_TOOLS
+    from app.services.world.world_skill_runtime import build_ai_tools
+    from app.services.capability_versioning import ensure_source_version, get_effective_definitions
+    skill_tools = build_ai_tools()
+    if skill_tools:
+        await ensure_source_version(db, "ai-skills", skill_tools, "设计侧能力")
+    effective_skill_tools = await get_effective_definitions(db, world.config, "ai-skills", skill_tools)
+    tools_for_world = [*WORLD_TOOLS, *effective_skill_tools]
+
+    # 凭证 + 模型
+    api_key, api_base = await _resolve_world_credentials(db, world)
+    model = cfg.get("model") or settings.default_chat_model
+    thinking = bool(cfg.get("thinking", False))
+
+    cmd_text = msg_list[0] if len(msg_list) == 1 else ""
+    return {
+        "world": world, "wai": wai, "cfg": cfg,
+        "api_key": api_key, "api_base": api_base, "model": model, "thinking": thinking,
+        "tools_for_world": tools_for_world, "messages": messages, "msg_list": msg_list,
+        "sid_db": sid_db, "cmd_text": cmd_text,
+    }
+
+
+async def stream_world_chat(
+    db: AsyncSession,
+    world_id: int,
+    user_id: int,
+    message: str | list[str],
+    turn_id: str = "",
+):
+    """世界 AI 对话（SSE 流式，参考大同差异分析流式实现）。
+
+    事件格式（text/event-stream）：
+      data: <内容增量>          — 正文逐 token
+      data: [REASONING]<增量>   — 思考内容逐 token（开启 thinking 时）
+      data: [ERROR]<信息>       — 错误
+      data: [DONE]              — 结束
+    内容里的换行用 {NL} 占位（SSE 行内不能有裸换行），前端还原。
+    用户消息先落库；AI 回复流结束后落库（客户端中断也尽量保存已生成部分）。
+
+    编排：准备（_prepare_world_chat）→ 命令/首轮流式 → 工具轮（_run_tool_loop）→ 建议。
+    """
+    import json
+
+    import httpx  # 首轮流式（client.stream）用
+    from app.models.world import WorldChatMessage
+
+    ctx = await _prepare_world_chat(db, world_id, user_id, message)
+    if ctx is None:
+        yield "data: [ERROR]世界不存在\n\n"
+        yield "data: [DONE]\n\n"
+        return
+    world = ctx["world"]
+    cfg = ctx["cfg"]
+    api_key, api_base = ctx["api_key"], ctx["api_base"]
+    model, thinking = ctx["model"], ctx["thinking"]
+    tools_for_world = ctx["tools_for_world"]
+    messages = ctx["messages"]
+    msg_list = ctx["msg_list"]
+    sid_db = ctx["sid_db"]
+    cmd_text = ctx["cmd_text"]
+
+    # ── 用户斜杠命令（不走 LLM，仅单条）    # ── 用户斜杠命令（不走 LLM，仅单条）：命令注册表在 world_chat_commands（/clear /compact /new /sessions /use /pin /unpin）──
     cmd_text = msg_list[0] if len(msg_list) == 1 else ""
     if cmd_text.startswith("/"):
         try:
@@ -803,23 +875,7 @@ async def stream_world_chat(
             return
         # note 为 None = 非注册命令：继续走 LLM（未知斜杠当普通消息处理）
 
-    from app.services.world.world_tools import WORLD_TOOLS
-    from app.services.world.world_skill_runtime import build_ai_tools
-    from app.services.capability_versioning import ensure_source_version, get_effective_definitions
-
-    # 世界 AI（造物主）工具 = 平台内置 + 设计侧 skills（world_ai_skills/ 全局库；世界侧居民能力不注入）
-    # 版本源 ai-skills（全局共享）：设计侧变更 → 版本化懒加载（通知 + compact 生效）
-    skill_tools = build_ai_tools()
-    if skill_tools:
-        await ensure_source_version(db, "ai-skills", skill_tools, "设计侧能力")
-    effective_skill_tools = await get_effective_definitions(db, world.config, "ai-skills", skill_tools)
-    tools_for_world = [*WORLD_TOOLS, *effective_skill_tools]
-
     # ── 请求 DeepSeek（stream=true，透传 SSE）──
-    api_key, api_base = await _resolve_world_credentials(db, world)
-    model = cfg.get("model") or settings.default_chat_model
-    thinking = bool(cfg.get("thinking", False))
-
     payload: dict = {
         "model": model,
         "messages": messages,
@@ -986,19 +1042,9 @@ async def stream_world_chat(
                             yield event
                     except Exception as e:
                         logger.warning(f"🌐 世界 #{world_id} 排队消息注入失败（非致命）: {e}")
-                    # 执行本轮所有工具调用
-                    for idx, acc in sorted(tool_call_acc.items()):
-                        result = await _execute_world_tool(db, world, acc["name"], acc["arguments"], turn_state)
-                        summary = _tool_result_summary(acc["name"], result)
-                        turn_state["tools_done"].append(summary)
-                        messages.append({
-                            "role": "tool",
-                        "tool_call_id": acc["id"] or f"call_{idx}",
-                        "content": json.dumps(result, ensure_ascii=False),
-                    })
-                    db.add(WorldChatMessage(world_id=world_id, user_id=None, role="tool", content=summary, session_id=sid_db))
-                    yield f"data: [TOOL]{json.dumps({'name': acc['name'], 'success': bool(result.get('success')), 'summary': summary}, ensure_ascii=False)}\n\n"
-                    await db.commit()
+                    # 执行本轮所有工具调用（执行→注入→落库→[TOOL] 事件）
+                    async for event in _execute_tool_round(db, world, world_id, tool_call_acc, messages, turn_state, sid_db):
+                        yield event
 
                     # 下一轮：继续带 tools，直到模型不再调用（同时捕获思考内容）
                     # 最后 3 轮：提醒尽快收尾总结
