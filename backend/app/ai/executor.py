@@ -380,6 +380,27 @@ async def _tool_call_loop(
     # AI 尚未在本次循环中发过消息 → 压缩只应在空闲强制时触发，保中间结果
     _has_sent_message = False
 
+    # ── 空闲强制压缩（2026-08-13 前移）：在第一次 LLM 调用之前检查 12h 空闲。
+    # 之前放在工具循环内（调用成功后），key 失效等早期失败时根本执行不到——
+    # 12 天没聊的对话带着全量历史硬跑，且 key 修复前永远不压缩。前移后即使本次失败，
+    # 下次重试时上下文已瘦身。
+    try:
+        from app.services.memory.context_compression_service import (
+            should_compress, inline_compress, get_compression_threshold,
+        )
+        stale = _is_conversation_idle(messages, hours=12)
+        if stale and not getattr(_context, "_precompressed", False):
+            messages, compress_stats = inline_compress(messages)
+            if compress_stats.get("compressed"):
+                _auto_compressed = True
+                _context["_precompressed"] = True
+                logger.info(
+                    f"AI {agent.name}({agent.id}) 空闲>12h 首次调用前内联压缩: "
+                    f"{compress_stats.get('before_tokens')}→{compress_stats.get('after_tokens')} tok"
+                )
+    except Exception as e:
+        logger.warning(f"调用前空闲压缩跳过（非致命）: {e}")
+
     loop_idx = 0
     while loop_idx < max_loops + _reminder_extra:
         # ── v0.1.5: 带分类重试的 LLM 调用 ──
@@ -1035,25 +1056,57 @@ async def _save_conversation_log_safe(
 # ============================================================
 
 def _is_conversation_idle(messages: list[dict], hours: int = 12) -> bool:
-    """检查对话最后一条消息是否超过指定小时数——缓存大概率已过期，应强制压缩"""
+    """检查对话是否闲置——缓存大概率已过期，应强制压缩。
+
+    两种判定（2026-08-13 补：对话跨度）：
+    1. 最后一条消息距现在超过 N 小时（原逻辑：长时间没对话）
+    2. 对话跨度超过 N 小时（首条 user 消息到最后一条，跨天堆积也触发）——
+       修复场景：12 天没对话但今天刚发消息，历史堆积 138 条不压缩，直接带全量硬跑
+    """
     now = datetime.now(timezone.utc).replace(tzinfo=None)
+
+    def _parse_ts(content: str):
+        m2 = re.search(r'\[([A-Za-z_]+) (\d{2}-\d{2} \d{2}:\d{2})\]', content)
+        if not m2:
+            return None
+        time_str = m2.group(2)
+        for offset in (0, -1):
+            try:
+                year = now.year + offset
+                msg_time = datetime.strptime(f"{year}-{time_str}", "%Y-%m-%d %H:%M")
+                if msg_time > now:
+                    continue
+                return msg_time
+            except ValueError:
+                pass
+        return None
+
+    first_ts = None
+    for m in messages:
+        content = m.get("content", "")
+        if not isinstance(content, str):
+            continue
+        ts = _parse_ts(content)
+        if ts is not None:
+            first_ts = ts
+            break
+
+    last_ts = None
     for m in reversed(messages):
         content = m.get("content", "")
         if not isinstance(content, str):
             continue
-        # 匹配 "[Shanghai 07-11 23:01]" 格式的时间戳（无年份）
-        m2 = re.search(r'\[([A-Za-z_]+) (\d{2}-\d{2} \d{2}:\d{2})\]', content)
-        if m2:
-            time_str = m2.group(2)
-            for offset in (0, -1):
-                try:
-                    year = now.year + offset
-                    msg_time = datetime.strptime(f"{year}-{time_str}", "%Y-%m-%d %H:%M")
-                    if msg_time > now:
-                        continue  # 解析到未来（跨年边界/时钟偏差）→ 试去年/放弃
-                    idle_seconds = (now - msg_time).total_seconds()
-                    return idle_seconds > hours * 3600
-                except ValueError:
-                    pass
-        break  # 只看最后一条消息
+        ts = _parse_ts(content)
+        if ts is not None:
+            last_ts = ts
+            break
+
+    # 判定 1：最后消息距今超过 N 小时
+    if last_ts is not None and (now - last_ts).total_seconds() > hours * 3600:
+        return True
+    # 判定 2：对话跨度超过 N 小时（历史堆积跨天也压缩）
+    if first_ts is not None and last_ts is not None:
+        span = (last_ts - first_ts).total_seconds()
+        if span > hours * 3600:
+            return True
     return False
