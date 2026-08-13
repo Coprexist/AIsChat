@@ -223,6 +223,16 @@ def apply_isolate(*, world_dir: str | None = None, read_dirs: list[str] | None =
                     read_dirs.append(p)
         except Exception:  # noqa: BLE001
             pass
+        # ⚠️ 2026-08-13 修复：还要授权动态链接库目录（只读）——Python 运行时
+        # dlopen 系统库（如 urllib → libz.so.1）时 Landlock 已生效，若 /lib、/usr/lib
+        # 不在授权列表 → EACCES → 'libz.so.1: cannot open shared object file'。
+        # 系统库是公开代码无敏感信息，只读授权风险可忽略（与 stdlib 同理）。
+        try:
+            for lib_dir in ("/lib", "/usr/lib", "/usr/local/lib"):
+                if os.path.isdir(lib_dir) and lib_dir not in read_dirs:
+                    read_dirs.append(lib_dir)
+        except Exception:  # noqa: BLE001
+            pass
     landlock_ok = False
     if read_dirs or write_dirs:
         try:
