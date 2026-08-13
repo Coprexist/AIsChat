@@ -824,6 +824,26 @@ async def stream_world_chat(
                 max_rounds = max(1, min(max_rounds, 200))
                 final = ""
                 for _r in range(max_rounds):
+                    # ── 普通消息插入（产品定：非命令消息工具轮中直接注入下一轮）──
+                    # 每轮 LLM 调用前检查插入通道；插入的消息落库为 user 消息并注入 messages
+                    try:
+                        from app.services.world.world_turn import get_world_worker
+                        insert_items = await get_world_worker(world_id).drain_inserts()
+                        for _it in insert_items:
+                            for _m in _it["messages"]:
+                                _m_text = str(_m).strip()
+                                if not _m_text:
+                                    continue
+                                db.add(WorldChatMessage(
+                                    world_id=world_id, user_id=_it["user_id"],
+                                    role="user", content=_m_text, session_id=sid_db,
+                                ))
+                                messages.append({"role": "user", "content": _m_text})
+                                yield f"data: {_m_text.replace(chr(10), '{NL}')}\n\n"
+                        if insert_items:
+                            await db.commit()
+                    except Exception:
+                        pass
                     # 执行本轮所有工具调用
                     for idx, acc in sorted(tool_call_acc.items()):
                         result = await _execute_world_tool(db, world, acc["name"], acc["arguments"], turn_state)

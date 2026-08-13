@@ -102,6 +102,10 @@ class WorldTurnWorker:
         self.world_id = world_id
         self.msg_queue: asyncio.Queue = asyncio.Queue()
         self.turns: dict[str, TurnBroadcast] = {}
+        # 普通消息插入通道：AI 工具轮进行中时，非命令消息直接注入下一轮 LLM 调用
+        # （产品定：只有命令（/compact 等）需要等当前轮次结束再发送）
+        self._inserts: list[dict] = []
+        self._inserts_lock = asyncio.Lock()
         self.task = asyncio.create_task(self._run(), name=f"world-turn-{world_id}")
 
     async def _run(self) -> None:
@@ -149,14 +153,37 @@ class WorldTurnWorker:
                     self.turns.pop(item["turn_id"], None)
 
     def enqueue(self, user_id: int, message: str | list[str]) -> str:
-        """消息入队（支持批量：排队消息一起发给 AI），返回 turn_id（订阅直播用）"""
+        """消息入队（支持批量：排队消息一起发给 AI），返回 turn_id（订阅直播用）。
+
+        产品定（2026-08-13）：非命令消息在 AI 工具轮进行中时**直接插入下一轮**（
+        不排队等待）；只有命令（/ 开头，如 /compact /clear）需要当前轮次结束后再发送。
+        """
+        messages = message if isinstance(message, list) else [message]
         turn_id = uuid.uuid4().hex[:12]
+        # 判定是否插入：先基于已有 turns（不含本次新建的），避免自误判 busy
+        busy = any(not tb.ended for tb in self.turns.values())
+        all_commands = all(str(m).lstrip().startswith("/") for m in messages)
+        if not all_commands and busy:
+            # 有正在执行的轮次 + 含普通消息 → 走插入通道（工具轮下一轮 LLM 调用前注入）
+            # 插入消息无独立轮次：不进 turns（不广播独立 turn，内容随当前轮 yield），不影响 busy 判定
+            self._inserts.append({"user_id": user_id, "messages": messages})
+            return turn_id
         self.turns[turn_id] = TurnBroadcast(turn_id)
         self.msg_queue.put_nowait({
             "turn_id": turn_id, "user_id": user_id,
-            "message": message if isinstance(message, list) else [message],
+            "message": messages,
         })
         return turn_id
+
+    async def drain_inserts(self, user_id: int | None = None) -> list[dict]:
+        """取走待插入的普通消息（工具轮每轮调用前调用；user_id=None 取全部）"""
+        async with self._inserts_lock:
+            if user_id is None:
+                items, self._inserts = self._inserts, []
+            else:
+                items = [i for i in self._inserts if i["user_id"] == user_id]
+                self._inserts = [i for i in self._inserts if i["user_id"] != user_id]
+        return items
 
     @property
     def queue_size(self) -> int:
