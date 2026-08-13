@@ -245,15 +245,15 @@ export function useWorldChat({ wid, onRefresh, onMsg }: UseWorldChatOptions) {
   }, [chatMsgs.length])
 
   // 新消息到达时，如果不在底部，增加未读计数（历史加载时不增加）
-  useEffect(() => {
-    if (loadingHistoryRef.current) return  // 历史加载，不增加未读
+  // ⚠️ 2026-08-13 修复：原来依赖 chatMsgs 变化——流式每 chunk 更新都触发（思考气泡逐字、
+  // 正文逐字），一秒加几十个未读。改为只在「完整 AI 回复」或「插入消息」到达时计数一次。
+  // 实际计数点：subscribeTurnStream 收到 [DONE] 后（完整一轮）+
+  // 轮询恢复发现新消息时（check 兜底）——见下方计数组件。
+  const countUnreadIfAway = useCallback(() => {
+    if (loadingHistoryRef.current) return
     if (!isAtBottomRef.current && chatMsgs.length > 0) {
-      const lastMsg = chatMsgs[chatMsgs.length - 1]
-      // 如果最后一条是 AI 或系统消息（不是用户自己刚发的），增加未读
-      if (lastMsg && lastMsg.role !== 'user' && !lastMsg.pending) {
-        unreadCountRef.current += 1
-        setUnreadCount(unreadCountRef.current)
-      }
+      unreadCountRef.current += 1
+      setUnreadCount(unreadCountRef.current)
     }
   }, [chatMsgs])
 
@@ -276,7 +276,19 @@ export function useWorldChat({ wid, onRefresh, onMsg }: UseWorldChatOptions) {
   const prevLenRef = useRef(0)
   const loadedOnceRef = useRef(false)
   useEffect(() => {
-    if (!isAtBottomRef.current || chatMsgs.length === 0) return
+    if (chatMsgs.length === 0) return
+    // ⚠️ 2026-08-13 修复：滚动前实时读取位置（不依赖可能延迟的 isAtBottomRef）——
+    // 用户往上翻后 rAF 节流未及更新 ref，AI 新消息到达会误滚到底部。
+    const el = listElsRef.current.find((x) => x.isConnected)
+    if (!el) return
+    const canScroll = el.scrollHeight - el.clientHeight > 4
+    const atBottomNow = canScroll
+      ? el.scrollHeight - el.scrollTop - el.clientHeight < 80
+      : window.scrollY < 80
+    if (!atBottomNow) {
+      // 用户不在底部：不滚动，未读由 countUnreadIfAway 计数
+      return
+    }
     const first = !loadedOnceRef.current
     loadedOnceRef.current = true
     const lenChanged = chatMsgs.length !== prevLenRef.current
@@ -362,7 +374,12 @@ export function useWorldChat({ wid, onRefresh, onMsg }: UseWorldChatOptions) {
         for (const line of lines) {
           if (!line.startsWith('data: ')) continue
           const payload = line.slice(6)
-          if (payload === '[DONE]') { gotDone = true; break }
+          if (payload === '[DONE]') {
+            gotDone = true
+            // 完整一轮结束：若用户不在底部，未读 +1（不是每 chunk 都加）
+            window.setTimeout(() => countUnreadIfAway(), 0)
+            break
+          }
           if (payload.startsWith('[SUGGEST]')) {
             try { setSuggestions(JSON.parse(payload.slice(9))) } catch { /* ignore */ }
             continue
