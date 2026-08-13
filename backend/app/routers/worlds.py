@@ -15,6 +15,9 @@ from app.utils.auth import get_current_user
 
 logger = logging.getLogger(__name__)
 
+# 随世界打包携带的运行配置白名单（world_decision_skill.md §3.2；导入只补缺失键，不覆盖宿主设置）
+_WORLD_META_CONFIG_KEYS = {"group_trigger_mode"}
+
 router = APIRouter(prefix="/worlds", tags=["群视界"])
 
 
@@ -1008,6 +1011,20 @@ async def import_zip(
     try:
         data = await file.read()
         result = fs_import(world_id, data, exclude_content=exclude_content)
+        # 随包配置合并：只补缺失键，不覆盖宿主已有设置（world_decision_skill.md §3.2）
+        meta_cfg = ((result.get("meta") or {}).get("config") or {})
+        if meta_cfg:
+            w = await db.get(World, world_id)
+            if w is not None:
+                cfg = dict(w.config or {})
+                changed = False
+                for k, v in meta_cfg.items():
+                    if k in _WORLD_META_CONFIG_KEYS and k not in cfg:
+                        cfg[k] = v
+                        changed = True
+                if changed:
+                    w.config = cfg
+                    await db.commit()
         return result
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
@@ -1103,7 +1120,13 @@ async def export_zip(
     await _require_owner(db, world_id, current_user["user_id"])
     from fastapi.responses import Response
     from app.services.world.world_file_service import export_zip as fs_export
-    data = fs_export(world_id, include_content=include_content)
+    # 随包携带运行配置（白名单，见 world_decision_skill.md §3.2）
+    from app.models.world import World as _World
+    w = await db.get(_World, world_id)
+    meta = None
+    if w is not None and (w.config or {}):
+        meta = {"config": {k: v for k, v in w.config.items() if k in _WORLD_META_CONFIG_KEYS}}
+    data = fs_export(world_id, include_content=include_content, meta=meta)
     return Response(
         content=data,
         media_type="application/zip",

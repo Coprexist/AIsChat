@@ -8,6 +8,7 @@ import logging
 import os
 import re
 import shutil
+import json
 from pathlib import Path
 
 logger = logging.getLogger(__name__)
@@ -180,6 +181,7 @@ def import_zip(world_id: int, zip_bytes: bytes, exclude_content: bool = True) ->
     base = _world_dir(world_id)
     count = 0
     skipped_content = 0
+    meta: dict | None = None
     try:
         with zipfile.ZipFile(io.BytesIO(zip_bytes)) as zf:
             for info in zf.infolist():
@@ -188,6 +190,13 @@ def import_zip(world_id: int, zip_bytes: bytes, exclude_content: bool = True) ->
                 if name.startswith("/") or ".." in name.split("/"):
                     continue
                 if info.is_dir():
+                    continue
+                # 虚拟元数据条目：读回不落盘（随包配置载体）
+                if name == "world_meta.json":
+                    try:
+                        meta = json.loads(zf.read(info).decode("utf-8"))
+                    except Exception:
+                        meta = None
                     continue
                 if exclude_content and name.startswith("content/"):
                     skipped_content += 1
@@ -206,15 +215,18 @@ def import_zip(world_id: int, zip_bytes: bytes, exclude_content: bool = True) ->
                 count += 1
     except zipfile.BadZipFile:
         raise ValueError("无效的 zip 文件")
-    logger.info(f"🌐 世界 #{world_id} zip 导入 {count} 个文件（跳过数据文件 {skipped_content}）")
-    return {"imported": count, "skipped_content": skipped_content}
+    logger.info(f"🌐 世界 #{world_id} zip 导入 {count} 个文件（跳过数据文件 {skipped_content}，meta={'y' if meta else 'n'}）")
+    return {"imported": count, "skipped_content": skipped_content, "meta": meta}
 
 
-def export_zip(world_id: int, include_content: bool = True) -> bytes:
+def export_zip(world_id: int, include_content: bool = True, meta: dict | None = None) -> bytes:
     """打包世界文件为 zip。代码/数据分离：
     include_content=True（默认）包含 content/ 产物区（静态文字数据，世界自己的产物）；
-    False 只打包代码区（世界根目录 + skills 等），供世界发布用。"""
+    False 只打包代码区（世界根目录 + skills 等），供世界发布用。
+    meta 非空时以虚拟条目 world_meta.json 写入 zip（不落盘，世界目录零污染），
+    用于携带运行配置（如 group_trigger_mode）随包分发——导入端读回合并。"""
     import io
+    import json
     import zipfile
 
     base = _world_dir(world_id)
@@ -226,5 +238,7 @@ def export_zip(world_id: int, include_content: bool = True) -> bytes:
                 if not include_content and rel.startswith("content/"):
                     continue
                 zf.write(p, rel)
-    logger.info(f"🌐 世界 #{world_id} 打包导出 {len(buf.getvalue())}B (include_content={include_content})")
+        if meta:
+            zf.writestr("world_meta.json", json.dumps(meta, ensure_ascii=False, indent=2))
+    logger.info(f"🌐 世界 #{world_id} 打包导出 {len(buf.getvalue())}B (include_content={include_content}, meta={'y' if meta else 'n'})")
     return buf.getvalue()

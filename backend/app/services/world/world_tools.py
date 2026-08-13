@@ -177,6 +177,20 @@ WORLD_TOOLS = [
     {
         "type": "function",
         "function": {
+            "name": "update_trigger_mode",
+            "description": "设置本世界在绑定群里的 AI 触发模式（world_decision_skill.md §3）：mention_only=只有 @ 本世界 AI（或 @all/群公告）才唤醒 AI 本体，其余群消息不触发（默认，安静且省调用——日常事件由世界程序/决策逻辑处理）；all=所有群消息都进入 AI 判断（活跃互动世界用）。世界希望安静/省成本时调成 mention_only，需要频繁互动时调回 all。",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "mode": {"type": "string", "enum": ["mention_only", "all"], "description": "mention_only 或 all"},
+                },
+                "required": ["mode"],
+            },
+        },
+    },
+    {
+        "type": "function",
+        "function": {
             "name": "file_edit",
             "description": "增量编辑世界文件（查找替换/行后插入/删除行），比全量重写省 token。编辑前建议先 file_read 确认内容。多次插入时从最大行号开始往小插。",
             "parameters": {
@@ -732,6 +746,18 @@ async def _do_execute(db: AsyncSession, world, name: str, arguments: str, turn_s
             return {"success": True, "name": updated["name"], "description": updated["description"]}
         except ValueError as e:
             return {"success": False, "error": str(e)}
+
+    if name == "update_trigger_mode":
+        try:
+            args = json.loads(arguments or "{}")
+        except json.JSONDecodeError:
+            return {"success": False, "error": "参数解析失败"}
+        mode = str(args.get("mode") or "").strip()
+        if mode not in ("mention_only", "all"):
+            return {"success": False, "error": "mode 必须是 mention_only 或 all"}
+        from app.services.world.world_service import update_world
+        await update_world(db, world.id, world.owner_id, config={"group_trigger_mode": mode})
+        return {"success": True, "group_trigger_mode": mode}
 
     from app.services.world.world_file_service import delete_file, list_files, write_file
 

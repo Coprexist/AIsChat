@@ -341,6 +341,25 @@ async def _process_group_event(db, event: dict):
         f"触发 {len(candidates)} 个 AI: {candidates}"
     )
 
+    # 群视界触发模式：群绑定世界时读取（默认 mention_only → 非 @ 消息不唤醒 LLM 本体；
+    # 世界程序感知通道不受影响，见 docs/group_world/design/world_decision_skill.md §3）
+    world_trigger_mode: str | None = None
+    try:
+        from app.models.world import WorldBinding, World as WorldModel
+        wb_rows = (await db.execute(
+            select(WorldBinding).where(
+                WorldBinding.entity_type == "group",
+                WorldBinding.entity_id == group_id,
+            )
+        )).scalars().all()
+        if wb_rows:
+            w = await db.get(WorldModel, wb_rows[0].world_id)
+            if w is not None:
+                world_trigger_mode = (w.config or {}).get("group_trigger_mode", "mention_only")
+                logger.info(f"🔕 群 {group_id} 绑定世界 #{wb_rows[0].world_id}，触发模式={world_trigger_mode}")
+    except Exception as e:
+        logger.warning(f"群视界触发模式读取失败（非致命）: {e}")
+
     next_depth = chain_depth + 1
     from app.ai.chat_chain import chat_chain_manager
 
@@ -374,6 +393,7 @@ async def _process_group_event(db, event: dict):
                             sender_type=sender_type,
                             sender_id=sender_id,
                             message_type=event.get("message_type", "normal"),
+                            world_trigger_mode=world_trigger_mode,
                         )
                 except Exception as e:
                     logger.error(f"AI {aid} 触发异常 (group={group_id}): {e}", exc_info=True)
@@ -419,6 +439,7 @@ async def _maybe_trigger_ai_reply(
     sender_type: str = "human",
     sender_id: int | None = None,
     message_type: str = "normal",
+    world_trigger_mode: str | None = None,
 ):
     """检查单个 AI 是否应该回复，如果是则调用 LLM 生成回复"""
     from app.services.agent.agent_service import get_agent
@@ -466,6 +487,12 @@ async def _maybe_trigger_ai_reply(
     # v0.2.1: 检测 DND 穿透条件
     is_at_all = any(tag in content for tag in ("@all", "@everyone", "@全体"))
     is_announcement = message_type == "announcement"
+
+    # 群视界触发模式拦截：mention_only 时非 @ 消息不唤醒 LLM 本体
+    # （会话帧维护已在上方完成，「有人找过」照常记录；世界程序感知通道不受影响）
+    if world_trigger_mode == "mention_only" and not is_mentioned and not is_at_all and not is_announcement:
+        logger.info(f"🔕 群 {group_id} 群视界 mention_only，非 @ 消息不触发 {agent.name}(id={resolved_agent_id})")
+        return
     # v2.0.6: 检查发送者是否为特别关心好友
     is_priority_friend = False
     if sender_type == "human" and sender_id:

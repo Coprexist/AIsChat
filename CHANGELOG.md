@@ -7,6 +7,14 @@
 
 ---
 
+### Added — 🎯 群视界触发模式（mention_only）+ 决策技能设计（2026-08-13 晚，产品定）
+
+- **群消息非 @ 不触发 AI**（所有绑定群视界的群，暂时统一）：AI 不可能一直触发——大量群事件应由决策程序/世界程序处理，只有关键时刻（@AI / @all / 群公告）才唤醒 LLM 本体。实现：`response_worker` 触发群助手前查群绑定世界 + `worlds.config.group_trigger_mode`（默认 `mention_only`；`all` 恢复旧行为）；拦截不影响世界程序感知通道（`world_event_hook` 照常喂事件，即「决策程序代替 AI」的雏形）；未绑定群视界的普通群零开销
+- **配置 AI 可改、可随包分发**：世界 AI 工具集新增 `update_trigger_mode`（mention_only ↔ all，AI 自主决定本世界活跃度）；`export_zip` 附虚拟条目 `world_meta.json`（config 白名单快照，不落盘零污染）→ `import_zip` 读回合并——分享/发布世界时触发模式跟着走，导入只补缺失键、不覆盖宿主已有设置
+- **决策技能设计文档**：`docs/group_world/design/world_decision_skill.md`——阶段一（触发模式）已落地；阶段二（决策技能）设计定稿：预置情景列表（群消息/成员进出/好友申请/定时/世界事件/命令）+ 决策技能结构（`when` 条件 DSL + `do` 动作 + `notify` 是否唤醒本体）+ 决策引擎（事件→技能匹配→程序化处理 or 唤醒 LLM）
+
+---
+
 ### Fixed — 🔔 系统通知链路 + ⚙️ 12h 空闲压缩（2026-08-13 补，用户 API Key 失效场景暴露）
 
 - **系统通知静默丢失（三层 bug）**：AI 的 API Key 失效（401）时，降级通知和最终错误通知都没送达用户——
