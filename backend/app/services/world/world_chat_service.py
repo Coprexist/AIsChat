@@ -562,6 +562,14 @@ async def _stream_llm_once(
             }
             for key, acc in sorted(tool_call_acc.items())
         ]
+    # DeepSeek DSML/XML 兜底（2026-08-13）：模型有时把工具调用输出成 XML 文本
+    # （<invoke name=...><parameter name=...>），标准解析拿不到 → 从完整 content 里解析
+    if not result.get("tool_calls") and result.get("content"):
+        dsml_calls = _parse_dsml_tool_calls(result["content"])
+        if dsml_calls:
+            result["tool_calls"] = dsml_calls
+            # XML 已解析为工具调用，正文不再当作回复内容
+            result["content"] = ""
     if out is not None:
         out.clear()
         out.update(result)
@@ -665,6 +673,51 @@ async def _execute_tool_round(
             ))
         await db.commit()
 
+
+
+
+def _parse_dsml_tool_calls(text: str) -> list[dict] | None:
+    """解析 DeepSeek DSML/XML 工具调用（模型有时把工具调用输出成 XML 文本而非标准 JSON）。
+
+    支持两种格式（2026-08-13）：
+      <invoke name="file_read"><parameter name="path">js/game.js</parameter></invoke>
+      <tool_call><name>file_read</name><parameters>{"path": "x"}</parameters></tool_call>
+    返回标准 tool_calls 列表；未检测到 XML 返回 None（调用方继续走标准解析）。
+    """
+    import re as _re
+    if "<invoke" not in text and "<tool_call" not in text and "DSML" not in text:
+        return None
+    results = []
+    # 格式1：<invoke name="x"><parameter name="k">v</parameter>...</invoke>
+    for m in _re.finditer(r'<invoke\s+name=["\']([^"\'\s]+)["\']>(.*?)</invoke>', text, _re.S):
+        name, body = m.group(1), m.group(2)
+        params = {}
+        for p in _re.finditer(r'<parameter\s+name=["\']([^"\'\s]+)["\']>(.*?)</parameter>', body, _re.S):
+            params[p.group(1)] = p.group(2).strip()
+        if name:
+            results.append({"id": f"call_{len(results)}", "type": "function",
+                            "function": {"name": name, "arguments": _json_safe_dump(params)}})
+    # 格式2：<tool_call><name>x</name><parameters>{...}</parameters></tool_call>
+    for m in _re.finditer(r'<tool_call>(.*?)</tool_call>', text, _re.S):
+        body = m.group(1)
+        nm = _re.search(r'<name>(.*?)</name>', body, _re.S)
+        pm = _re.search(r'<parameters>(.*?)</parameters>', body, _re.S)
+        if nm:
+            name = nm.group(1).strip()
+            args = pm.group(1).strip() if pm else "{}"
+            if name:
+                results.append({"id": f"call_{len(results)}", "type": "function",
+                                "function": {"name": name, "arguments": args}})
+    return results or None
+
+
+def _json_safe_dump(obj) -> str:
+    """dict → JSON 字符串（失败回退 repr）"""
+    import json as _json
+    try:
+        return _json.dumps(obj, ensure_ascii=False)
+    except Exception:
+        return "{}"
 
 def _args_summary(arguments: str) -> str:
     """工具参数摘要（展示用）：取 path/code/event 等关键字段，避免全量刷屏"""
@@ -1062,6 +1115,16 @@ async def stream_world_chat(
     # ── 工具调用：多轮循环（list → write → …，最多 5 轮防死循环）──
     # 每轮：执行工具 → [TOOL] 事件显示 + 注入 AI → 继续带 tools 调 LLM，直到模型不再调工具
     # 收尾保障：工具场景的 AI 回复落库放 finally——客户端中断（流 aclose）也强制收尾，保证历史闭环
+    # DeepSeek DSML/XML 兜底（2026-08-13）：首轮 content 里若有 XML 工具调用文本，解析为 tool_calls
+    if not tool_call_acc and full_content:
+        dsml_calls = _parse_dsml_tool_calls(full_content)
+        if dsml_calls:
+            tool_call_acc = {
+                f"idx_{i}": {"id": tc["id"], "name": tc["function"]["name"], "arguments": tc["function"].get("arguments") or "{}", "index": i}
+                for i, tc in enumerate(dsml_calls)
+            }
+            full_content = ""  # XML 已解析，正文不再透传
+
     had_error = False
     turn_error = None
     if tool_call_acc:
