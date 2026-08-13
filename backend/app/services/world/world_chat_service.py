@@ -758,14 +758,18 @@ async def stream_world_chat(
                             if rt:
                                 full_reasoning += rt
                                 yield f"data: [REASONING]{rt.replace(chr(10), '{NL}')}\n\n"
-                            # 工具调用（function calling 分片到达，按 index 累加）
+                            # 工具调用（function calling 分片到达）
+                            # ⚠️ 并行调用修复（2026-08-13）：DeepSeek 并行 tool_calls 的 index 可能重复（都=0），
+                            # 按 index 累加会把两个调用的 arguments 拼串 → JSON 损坏/字段丢失。
+                            # 优先用 id（call_00/call_01 唯一）区分，id 缺失才退回 index。
                             tcs = delta.get("tool_calls")
                             if tcs:
                                 for item in tcs:
-                                    idx = item.get("index", 0)
-                                    acc = tool_call_acc.setdefault(idx, {"id": "", "name": "", "arguments": ""})
-                                    if item.get("id"):
-                                        acc["id"] = item["id"]
+                                    cid = item.get("id") or ""
+                                    key = cid if cid else f"idx_{item.get('index', 0)}"
+                                    acc = tool_call_acc.setdefault(key, {"id": "", "name": "", "arguments": "", "index": item.get("index", 0)})
+                                    if cid:
+                                        acc["id"] = cid
                                     fn = item.get("function") or {}
                                     if fn.get("name"):
                                         acc["name"] = fn["name"]
