@@ -67,12 +67,20 @@ function ToolBubble({ label, error, icon }: { label: string; error?: boolean; ic
 function ReasoningBubble({ text, preview }: { text: string; preview?: string }) {
   const [expanded, setExpanded] = useState(false)
   const t = useT()
-  // 折叠显示 preview（消息创建时的前两行快照，由 useWorldChat 固定）——
-  // 组件即使重挂载也稳定；不再依赖组件内 state 快照（会被重挂载重置）
+  const bodyRef = useRef<HTMLDivElement>(null)
+  // 展开时滚动到气泡顶部（内容开头）——否则视口停在底部，用户看到的是末尾，误以为折叠没消失
+  const handleToggle = () => {
+    setExpanded((v) => {
+      if (!v) {
+        requestAnimationFrame(() => bodyRef.current?.scrollTo({ top: 0 }))
+      }
+      return !v
+    })
+  }
   return (
     <div
       className="world-msg max-w-[90%] mx-auto cursor-pointer select-none text-[11px] text-textMuted bg-elevated/40 border border-border/50 rounded-lg overflow-hidden"
-      onClick={() => setExpanded((v) => !v)}
+      onClick={handleToggle}
     >
       <div className="flex items-center gap-1 px-2 py-1 border-b border-border/30">
         <Brain size={11} className="shrink-0 text-textMuted" />
@@ -80,7 +88,7 @@ function ReasoningBubble({ text, preview }: { text: string; preview?: string }) 
         <ChevronDown size={11} className={`ml-auto shrink-0 transition-transform ${expanded ? 'rotate-180' : ''}`} />
       </div>
       {expanded ? (
-        <div className="px-2 py-1.5 whitespace-pre-wrap max-h-72 overflow-y-auto">{text}</div>
+        <div ref={bodyRef} className="px-2 py-1.5 whitespace-pre-wrap max-h-72 overflow-y-auto">{text}</div>
       ) : (
         <div className="relative">
           <div className="px-2 py-1.5 whitespace-pre-wrap">{preview || text.split('\n').slice(0, 2).join('\n')}</div>

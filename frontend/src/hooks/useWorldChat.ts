@@ -348,13 +348,30 @@ export function useWorldChat({ wid, onRefresh, onMsg }: UseWorldChatOptions) {
           return [...msgs, { id, role: 'ai' as const, content: '', ...patch }]
         })
       }
+      // 更新思考 + 折叠 preview：preview 凑满两行即固定（流式期间不跳，展开后是完整内容）
+      const updateBubbleReasoning = (id: number, reasoningText: string) => {
+        setChatMsgs((msgs) => {
+          const idx = msgs.findIndex((m) => m.id === id)
+          if (idx < 0) return msgs
+          const m = msgs[idx]
+          const prevLines = (m.reasoning_preview || '').split('\n')
+          const previewFixed = prevLines.length >= 2 && !!prevLines[0]
+          const preview = previewFixed
+            ? m.reasoning_preview
+            : reasoningText.split('\n').slice(0, 2).join('\n')
+          if (m.reasoning === reasoningText && m.reasoning_preview === preview) return msgs
+          const next = msgs.slice()
+          next[idx] = { ...m, reasoning: reasoningText, reasoning_preview: preview }
+          return next
+        })
+      }
       // 正文气泡（首次正文到达时创建；id 顺序递增保证时间线）
       const ensureContentBubble = () => {
         if (contentTargetId !== null) return
         contentTargetId = -(++msgSeqRef.current)
         updateBubble(contentTargetId, { content: full })
       }
-      // 思考气泡（首次思考到达时创建；独立 id；preview=创建时前两行快照，折叠展示用）
+      // 思考气泡（首次思考到达时创建；独立 id；preview=折叠展示的前两行快照）
       const ensureReasoningBubble = () => {
         if (reasoningTargetId !== null) return
         reasoningTargetId = -(++msgSeqRef.current)
@@ -368,7 +385,7 @@ export function useWorldChat({ wid, onRefresh, onMsg }: UseWorldChatOptions) {
         requestAnimationFrame(() => {
           renderPending = false
           if (contentTargetId !== null) updateBubble(contentTargetId, { content: full })
-          if (reasoningTargetId !== null) updateBubble(reasoningTargetId, { reasoning })
+          if (reasoningTargetId !== null) updateBubbleReasoning(reasoningTargetId, reasoning)
         })
       }
       while (true) {
@@ -416,7 +433,7 @@ export function useWorldChat({ wid, onRefresh, onMsg }: UseWorldChatOptions) {
               const tId = tu.tool_id
               // 先把当前正文/思考气泡同步封存（函数式更新：存在则更新；即使创建未提交也会带内容创建，不丢）
               if (contentTargetId !== null) updateBubble(contentTargetId, { content: full })
-              if (reasoningTargetId !== null) updateBubble(reasoningTargetId, { reasoning })
+              if (reasoningTargetId !== null) updateBubbleReasoning(reasoningTargetId, reasoning)
               // 后续内容开新气泡；full/reasoning 重置避免拼接
               contentTargetId = null
               reasoningTargetId = null
