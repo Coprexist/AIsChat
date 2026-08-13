@@ -400,6 +400,7 @@ async def get_chat_history(db: AsyncSession, world_id: int, limit: int = 30, bef
             "role": m.role,
             "content": m.content,
             "reasoning": m.reasoning if m.role in ("ai", "note") else None,
+            "is_error": bool(m.is_error) if m.role == "tool" else None,
             "created_at": m.created_at.isoformat() if m.created_at else None,
         }
         for m in reversed(result.scalars().all())
@@ -668,10 +669,12 @@ async def _execute_tool_round(
         )).scalar_one_or_none()
         if existing is not None:
             existing.content = summary
+            existing.is_error = not bool(result.get("success"))
         else:
             db.add(WorldChatMessage(
                 world_id=world_id, user_id=None, role="tool",
                 content=summary, session_id=sid_db, tool_id=tool_id,
+                is_error=not bool(result.get("success")),
             ))
         await db.commit()
 

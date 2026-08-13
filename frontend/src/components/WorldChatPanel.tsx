@@ -220,7 +220,7 @@ const WorldChatPanel = memo(forwardRef<WorldChatHandle, WorldChatPanelProps>(({ 
         <ToolBubble
           key={m.id}
           label={label}
-          error={m.error}
+          error={m.error ?? m.is_error}
           icon={toolIcon(m.content)}
         />
       )

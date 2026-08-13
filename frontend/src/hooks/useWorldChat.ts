@@ -22,6 +22,8 @@ export interface ChatMsg {
   tool_name?: string
   tool_status?: 'running' | 'update' | 'done'
   tool_args?: string
+  /** 工具执行失败（落库后刷新保持红色；2026-08-13） */
+  is_error?: boolean
 }
 
 // SSE 事件前缀（与后端 world_chat_service 的 yield 格式一一对应；解析用常量避免魔法数字）
@@ -210,10 +212,9 @@ export function useWorldChat({ wid, onRefresh, onMsg }: UseWorldChatOptions) {
     const el = listElsRef.current.find((x) => x.isConnected)
     if (!el) return
     if (el.scrollTop < 30) loadOlderRef.current()
+    // 只看列表元素滚动位置（不用 window.scrollY——列表占满视口时恒 0，误判在底部）
     const listCanScroll = el.scrollHeight - el.clientHeight > 4
-    const atBottom = listCanScroll
-      ? el.scrollHeight - el.scrollTop - el.clientHeight < 80
-      : window.scrollY < 80
+    const atBottom = el.scrollHeight - el.scrollTop - el.clientHeight < 80
     isAtBottomRef.current = atBottom
     setIsAtBottom(atBottom)
     chatCanScrollRef.current = listCanScroll
@@ -283,10 +284,9 @@ export function useWorldChat({ wid, onRefresh, onMsg }: UseWorldChatOptions) {
     // 用户往上翻后 rAF 节流未及更新 ref，AI 新消息到达会误滚到底部。
     const el = listElsRef.current.find((x) => x.isConnected)
     if (!el) return
-    const canScroll = el.scrollHeight - el.clientHeight > 4
-    const atBottomNow = canScroll
-      ? el.scrollHeight - el.scrollTop - el.clientHeight < 80
-      : window.scrollY < 80
+    // ⚠️ 2026-08-13 修复2：只看列表元素本身的滚动位置（不用 window.scrollY）——
+    // 列表占满视口时 window.scrollY 恒 0，误判"在底部"导致每次新消息都跳底。
+    const atBottomNow = el.scrollHeight - el.scrollTop - el.clientHeight < 80
     if (!atBottomNow) {
       // 用户不在底部：不滚动，未读由 countUnreadIfAway 计数
       return
