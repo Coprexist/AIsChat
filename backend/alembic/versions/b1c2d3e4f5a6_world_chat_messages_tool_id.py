@@ -4,8 +4,8 @@
 2026-08-13 新增：AI 调用工具时先发 running 状态（正在执行 XX），
 完成后同 id 发 done——前端按 tool_id 定位气泡原地更新。
 
-Revision ID: a1b2c3d4e5f6
-Revises: fbb403b42c46
+Revision ID: b1c2d3e4f5a6
+Revises: c8d9e0f1a2b3
 Create Date: 2026-08-13 17:20:00
 
 """
@@ -15,8 +15,8 @@ from alembic import op
 import sqlalchemy as sa
 
 # revision identifiers, used by Alembic.
-revision: str = 'a1b2c3d4e5f6'
-down_revision: Union[str, None] = 'fbb403b42c46'
+revision: str = 'b1c2d3e4f5a6'
+down_revision: Union[str, None] = 'c8d9e0f1a2b3'
 branch_labels: Union[str, Sequence[str], None] = None
 depends_on: Union[str, Sequence[str], None] = None
 
