@@ -18,29 +18,45 @@ function toolIcon(content: string) {
   return <Wrench size={12} />
 }
 
-/** 工具气泡（2026-08-13）：running/update 单行状态；done 的 summary 过长时默认 2 行 + 展开 */
+/** 工具气泡（2026-08-13）：running/update 单行状态；done 的 summary 过长时默认 2 行 + 展开/收起 */
 function ToolBubble({ label, error, icon }: { label: string; error?: boolean; icon: React.ReactNode }) {
   const [expanded, setExpanded] = useState(false)
-  const long = label.length > 90  // 超长才折叠（短摘要直接显示）
+  // 长判定：字符多或有换行（多行摘要）才折叠
+  const long = label.length > 90 || label.includes('\n')
   const collapsible = long && !expanded
   return (
-    <div
-      className={`world-msg max-w-[90%] mx-auto text-[11px] text-center rounded-lg ${error ? 'text-rose-400 bg-rose-500/10 border border-rose-500/20' : 'text-mint-400 bg-mint-400/10 border border-mint-400/20'}`}
-    >
+    <div className={`world-msg max-w-[90%] mx-auto text-[11px] rounded-lg overflow-hidden ${error ? 'text-rose-400 bg-rose-500/10 border border-rose-500/20' : 'text-mint-400 bg-mint-400/10 border border-mint-400/20'}`}>
       <div
-        className={`flex items-center justify-center gap-1.5 py-1 px-2 ${collapsible ? 'cursor-pointer select-none' : ''}`}
+        className={`px-2 py-1 text-center ${collapsible ? 'cursor-pointer select-none' : ''}`}
         onClick={() => collapsible && setExpanded(true)}
       >
-        <span className="shrink-0">{icon}</span>
         {collapsible ? (
-          <span className="min-w-0">
-            <span className="line-clamp-2 text-left block">{label}</span>
+          <div>
+            {/* 折叠：2 行 + 渐变淡化，与思考气泡一致 */}
+            <div className="relative">
+              <div className="flex items-start justify-center gap-1.5">
+                <span className="shrink-0 mt-0.5">{icon}</span>
+                <span className="min-w-0 line-clamp-2 text-left whitespace-pre-wrap">{label}</span>
+              </div>
+              <div className="absolute inset-x-0 bottom-0 h-5 bg-gradient-to-t from-mint-400/10 to-transparent pointer-events-none" />
+            </div>
             <span className="inline-flex items-center gap-0.5 text-[10px] opacity-70">
               <ChevronDown size={10} /> 展开
             </span>
-          </span>
+          </div>
         ) : (
-          <span className="min-w-0 whitespace-pre-wrap">{label}</span>
+          <div className="flex items-start justify-center gap-1.5">
+            <span className="shrink-0 mt-0.5">{icon}</span>
+            <span className="min-w-0 whitespace-pre-wrap text-left">{label}</span>
+            {long && (
+              <button
+                className="shrink-0 text-[10px] opacity-70 hover:opacity-100 flex items-center gap-0.5"
+                onClick={(e) => { e.stopPropagation(); setExpanded(false) }}
+              >
+                <ChevronDown size={10} className="rotate-180" /> 收起
+              </button>
+            )}
+          </div>
         )}
       </div>
     </div>

@@ -518,14 +518,14 @@ async def _stream_llm_once(
                                     result["usage"] = j["usage"]
                                 continue
                             delta = choices[0].get("delta") or {}
-                            t = delta.get("content")
-                            if t:
-                                result["content"] += t
-                                yield f"data: {t.replace(chr(10), '{NL}')}\n\n"
                             rt = delta.get("reasoning_content")
                             if rt:
                                 result["reasoning_content"] += rt
                                 yield f"data: [REASONING]{rt.replace(chr(10), '{NL}')}\n\n"
+                            t = delta.get("content")
+                            if t:
+                                result["content"] += t
+                                yield f"data: {t.replace(chr(10), '{NL}')}\n\n"
                             tcs = delta.get("tool_calls")
                             if tcs:
                                 for item in tcs:
@@ -1013,13 +1013,14 @@ async def stream_world_chat(
                             delta = choices[0].get("delta") or {}
                             t = delta.get("content")
                             # 出现工具调用后正文不再透传（模型可能把工具调用写成文本；最终以工具执行后的第二轮为准）
-                            if t and not tool_call_acc:
-                                full_content += t
-                                yield f"data: {t.replace(chr(10), '{NL}')}\n\n"
                             rt = delta.get("reasoning_content")
                             if rt:
                                 full_reasoning += rt
                                 yield f"data: [REASONING]{rt.replace(chr(10), '{NL}')}\n\n"
+                            t = delta.get("content")
+                            if t and not tool_call_acc:
+                                full_content += t
+                                yield f"data: {t.replace(chr(10), '{NL}')}\n\n"
                             # 工具调用（function calling 分片到达）
                             # ⚠️ 并行调用修复（2026-08-13）：DeepSeek 并行 tool_calls 的 index 可能重复（都=0），
                             # 按 index 累加会把两个调用的 arguments 拼串 → JSON 损坏/字段丢失。
@@ -1121,9 +1122,8 @@ async def stream_world_chat(
                     reasoning = (resp or {}).get("reasoning_content") or ""
                     tcs = (resp or {}).get("tool_calls")
                     if reasoning:
+                        # 思考已在 _stream_llm_once 流式逐 chunk yield（[REASONING] 分片），此处只记录不重复发
                         full_reasoning = reasoning
-                        # 工具轮思考也流式显示给用户（刷新后仍可从历史看到）
-                        yield f"data: [REASONING]{reasoning.replace(chr(10), '{NL}')}\n\n"
                     if not tcs:
                         # 收尾轮：正文作为最终回复（finally 落库 ai），不进 note
                         final = content
