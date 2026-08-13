@@ -17,6 +17,22 @@ export interface ChatMsg {
   created_at?: string
 }
 
+// SSE 事件前缀（与后端 world_chat_service 的 yield 格式一一对应；解析用常量避免魔法数字）
+const EV = {
+  INSERTED: '[INSERTED]',  // 信号：排队消息已插入（不计历史）→ 清排队弹窗
+  INSERT: '[INSERT]',      // 消息：已落库（记历史）→ 画用户气泡
+} as const
+
+/** 解析 `[PREFIX]{json}` 事件体；前缀不匹配/JSON 坏返回 null */
+function parseEvent<T>(payload: string, prefix: string): T | null {
+  if (!payload.startsWith(prefix)) return null
+  try {
+    return JSON.parse(payload.slice(prefix.length)) as T
+  } catch {
+    return null
+  }
+}
+
 // 斜杠命令列表（输入 / 弹出，像 @ 提及；仅世界设计页——主站保持人性化不加）
 export const WORLD_COMMANDS = [
   { cmd: '/new', desc: '开新对话（旧对话保存，可切回）' },
@@ -339,25 +355,21 @@ export function useWorldChat({ wid, onRefresh, onMsg }: UseWorldChatOptions) {
             try { setSuggestions(JSON.parse(payload.slice(9))) } catch { /* ignore */ }
             continue
           }
-          if (payload.startsWith('[INSERTED]')) {
+          if (payload.startsWith(EV.INSERTED)) {
             // 信号（不计入历史）：后端已把排队消息真正插入工具轮（FIFO）——
             // 从排队弹窗移除 count 条成功的消息，弹窗只留还没发出的
-            try {
-              const sig = JSON.parse(payload.slice(10))
-              const n = sig.count || 0
-              setPendingItems((items) => items.slice(n))
-            } catch { /* ignore */ }
+            const sig = parseEvent<{ count?: number }>(payload, EV.INSERTED)
+            if (sig) setPendingItems((items) => items.slice(sig.count || 0))
             continue
           }
-          if (payload.startsWith('[INSERT]')) {
+          if (payload.startsWith(EV.INSERT)) {
             // 排队消息已插入工具轮并落库（记入历史）：画用户气泡（用真实 msg_id，
             // 与历史一致，loadChat 后不会重复/错位）
-            try {
-              const ins = JSON.parse(payload.slice(8))
-              const insContent = ins.content
-              setChatMsgs((msgs) => [...msgs, { id: ins.msg_id, role: 'user', content: insContent }])
+            const ins = parseEvent<{ msg_id: number; content: string }>(payload, EV.INSERT)
+            if (ins) {
+              setChatMsgs((msgs) => [...msgs, { id: ins.msg_id, role: 'user', content: ins.content }])
               requestAnimationFrame(() => forceScrollToBottomRef.current?.())
-            } catch { /* ignore */ }
+            }
             continue
           }
           if (payload.startsWith('[ERROR]')) throw new Error(payload.slice(7))
