@@ -24,7 +24,7 @@ from pathlib import Path
 from sqlalchemy import select, func
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.models.world import World, WorldAgent, WorldBinding
+from app.models.world import World, WorldAgent, WorldBinding, GroupAssistant
 
 logger = logging.getLogger(__name__)
 
@@ -216,17 +216,17 @@ async def bind_entry_with_type(
         spec = type_def["assistant_spec"]
         count = int(spec["count"])
         existing = (await db.execute(
-            select(WorldAgent).where(
-                WorldAgent.world_id == world_id,
-                WorldAgent.group_id == entity_id,
-                WorldAgent.group_type_slug == type_slug,
+            select(GroupAssistant).where(
+                GroupAssistant.world_id == world_id,
+                GroupAssistant.group_id == entity_id,
+                GroupAssistant.group_type_slug == type_slug,
             )
         )).scalars().all()
         world = await db.get(World, world_id)
         for i in range(len(existing), count):
-            agent_id = await _create_group_assistant(db, world, entity_id, type_slug, spec, i)
-            if agent_id:
-                created.append(agent_id)
+            ga_id = await _create_group_assistant(db, world, entity_id, type_slug, spec, i)
+            if ga_id:
+                created.append(ga_id)
     await db.commit()
     logger.info(f"🔗 世界 #{world_id} {entity_type} {entity_id} 绑定类型「{type_def['name']}」，创建 {len(created)} 个群助手")
     return {"success": True, "assistants": created}
@@ -251,32 +251,27 @@ async def _create_group_assistant(
     db: AsyncSession, world: World, group_id: int, type_slug: str,
     spec: dict, index: int,
 ) -> int | None:
-    """创建单个群助手：agent + 入群 + 世界登记（嵌套事务，失败不影响外层）。"""
+    """创建单个群助手：直接建 group_assistants 实体（不 create_agent、不入群成员、
+    不建 WorldAgent——与群视界 AI 同形态：无账号、无好友）。"""
     try:
         async with db.begin_nested():
-            from app.services.agent.agent_service import create_agent
-            from app.chat.message import add_member
-            from sqlalchemy import text as _t
-
-            owner_row = (await db.execute(_t(
-                "SELECT member_id FROM group_members WHERE group_id=:g AND member_type='human' AND role='owner' LIMIT 1"
-            ), {"g": group_id})).first()
-            owner_id = int(owner_row[0]) if owner_row else world.owner_id
-
             base_name = str(spec.get("default_name") or "群助手").strip()[:30]
             name = f"{base_name}{index + 1}" if int(spec.get("count") or 1) > 1 else base_name
-            agent = await create_agent(
-                db, owner_id=owner_id, name=name,
-                system_prompt=f"你是群「{group_id}」的助手，由世界「{world.name}」统一调度管理。\n\n类型：{type_slug}",
-                hide_ai_identity=False, is_ai_editable=False,
+            ga = GroupAssistant(
+                group_id=group_id,
+                world_id=world.id,
+                group_type_slug=type_slug,
+                name=name,
+                system_prompt=(
+                    f"你是群「{group_id}」的助手，由世界「{world.name}」统一调度管理。\n\n"
+                    f"类型：{type_slug}"
+                ),
+                config={},
             )
-            await add_member(db, group_id, "ai", agent.id, role="member")
-            db.add(WorldAgent(world_id=world.id, agent_id=agent.id, role="assistant",
-                              group_id=group_id, group_type_slug=type_slug,
-                              config={"name": name}))
+            db.add(ga)
             await db.flush()
-            logger.info(f"🤖 群 {group_id} 创建群助手「{name}」(agent {agent.id})")
-            return agent.id
+            logger.info(f"🤖 群 {group_id} 创建群助手「{name}」(group_assistant {ga.id})")
+            return ga.id
     except Exception as e:
         logger.warning(f"创建群助手失败（group {group_id}）: {e}")
         return None
@@ -286,92 +281,87 @@ async def _create_group_assistant(
 # 群助手 API 配置（群主）
 # ═══════════════════════════════════════════════════════════════
 
-async def _get_assistant(db: AsyncSession, world_id: int, agent_id: int) -> WorldAgent:
-    wa = (await db.execute(
-        select(WorldAgent).where(WorldAgent.world_id == world_id, WorldAgent.agent_id == agent_id)
+async def _get_assistant(db: AsyncSession, world_id: int, assistant_id: int) -> GroupAssistant:
+    ga = (await db.execute(
+        select(GroupAssistant).where(GroupAssistant.world_id == world_id, GroupAssistant.id == assistant_id)
     )).scalar_one_or_none()
-    if wa is None:
+    if ga is None:
         raise ValueError("群助手不存在")
-    return wa
+    return ga
 
 
-async def _require_group_owner(db: AsyncSession, world_id: int, operator_id: int, agent_id: int) -> WorldAgent:
-    wa = await _get_assistant(db, world_id, agent_id)
+async def _require_group_owner(db: AsyncSession, world_id: int, operator_id: int, assistant_id: int) -> GroupAssistant:
+    ga = await _get_assistant(db, world_id, assistant_id)
     from sqlalchemy import text as _t
     owner_row = (await db.execute(_t(
         "SELECT member_id FROM group_members WHERE group_id=:g AND member_type='human' AND role='owner' LIMIT 1"
-    ), {"g": wa.group_id})).first()
+    ), {"g": ga.group_id})).first()
     group_owner = int(owner_row[0]) if owner_row else 0
     if operator_id != group_owner:
         raise ValueError("仅群主可配置群助手 API")
-    return wa
+    return ga
 
 
 async def set_assistant_api(
-    db: AsyncSession, world_id: int, operator_id: int, agent_id: int,
+    db: AsyncSession, world_id: int, operator_id: int, assistant_id: int,
     api_key: str | None = None, api_base_url: str | None = None,
 ) -> dict:
     """群主为群助手设置 API（自定义 key，加密存储）。"""
-    await _require_group_owner(db, world_id, operator_id, agent_id)
+    ga = await _require_group_owner(db, world_id, operator_id, assistant_id)
     from app.utils.crypto import encrypt_api_key
-    from sqlalchemy import text as _u
     if api_key:
-        await db.execute(_u("UPDATE agents SET api_key_encrypted=:k, api_base_url=:b WHERE id=:aid"),
-                         {"k": encrypt_api_key(api_key), "b": api_base_url, "aid": agent_id})
+        ga.api_key_encrypted = encrypt_api_key(api_key)
+        ga.api_base_url = api_base_url
     elif api_base_url:
-        await db.execute(_u("UPDATE agents SET api_base_url=:b WHERE id=:aid"),
-                         {"b": api_base_url, "aid": agent_id})
+        ga.api_base_url = api_base_url
     await db.commit()
-    return {"success": True, "agent_id": agent_id, "configured": bool(api_key)}
+    return {"success": True, "assistant_id": assistant_id, "configured": bool(api_key)}
 
 
-async def apply_global_api(db: AsyncSession, world_id: int, operator_id: int, agent_id: int) -> dict:
+async def apply_global_api(db: AsyncSession, world_id: int, operator_id: int, assistant_id: int) -> dict:
     """一键应用群主的默认全局 API。"""
-    wa = await _require_group_owner(db, world_id, operator_id, agent_id)
+    ga = await _require_group_owner(db, world_id, operator_id, assistant_id)
     from sqlalchemy import text as _t
     owner_row = (await db.execute(_t(
         "SELECT member_id FROM group_members WHERE group_id=:g AND member_type='human' AND role='owner' LIMIT 1"
-    ), {"g": wa.group_id})).first()
+    ), {"g": ga.group_id})).first()
     group_owner = int(owner_row[0]) if owner_row else 0
     from app.models.user import User
     user = await db.get(User, group_owner)
     if not user or not user.api_key_encrypted:
         raise ValueError("你还没有配置全局 API（在「我的」页设置）")
-    from sqlalchemy import text as _u
-    await db.execute(_u("UPDATE agents SET api_key_encrypted=:k, api_base_url=:b WHERE id=:aid"),
-                     {"k": user.api_key_encrypted, "b": user.api_base_url, "aid": agent_id})
+    ga.api_key_encrypted = user.api_key_encrypted
+    ga.api_base_url = user.api_base_url
     await db.commit()
-    return {"success": True, "agent_id": agent_id, "configured": True, "source": "global"}
+    return {"success": True, "assistant_id": assistant_id, "configured": True, "source": "global"}
 
 
-async def clear_assistant_api(db: AsyncSession, world_id: int, operator_id: int, agent_id: int) -> dict:
-    """清除群助手 API（回落系统默认）。"""
-    await _require_group_owner(db, world_id, operator_id, agent_id)
-    from sqlalchemy import text as _u
-    await db.execute(_u("UPDATE agents SET api_key_encrypted=NULL, api_base_url=NULL WHERE id=:aid"),
-                     {"aid": agent_id})
+async def clear_assistant_api(db: AsyncSession, world_id: int, operator_id: int, assistant_id: int) -> dict:
+    """清除群助手 API（回落世界/系统默认）。"""
+    await _require_group_owner(db, world_id, operator_id, assistant_id)
+    ga = await _get_assistant(db, world_id, assistant_id)
+    ga.api_key_encrypted = None
+    ga.api_base_url = None
     await db.commit()
-    return {"success": True, "agent_id": agent_id, "configured": False}
+    return {"success": True, "assistant_id": assistant_id, "configured": False}
 
 
-async def assistant_api_status(db: AsyncSession, world_id: int, agent_id: int) -> dict:
+async def assistant_api_status(db: AsyncSession, world_id: int, assistant_id: int) -> dict:
     """群助手 API 状态（不回显 key）。"""
-    wa = await _get_assistant(db, world_id, agent_id)
-    from app.models.agent import Agent
+    ga = await _get_assistant(db, world_id, assistant_id)
     from app.models.user import User
     from sqlalchemy import text as _t
-    agent = await db.get(Agent, agent_id)
     owner_row = (await db.execute(_t(
         "SELECT member_id FROM group_members WHERE group_id=:g AND member_type='human' AND role='owner' LIMIT 1"
-    ), {"g": wa.group_id})).first()
+    ), {"g": ga.group_id})).first()
     group_owner = int(owner_row[0]) if owner_row else 0
     user = await db.get(User, group_owner) if group_owner else None
     return {
         "success": True,
-        "agent_id": agent_id,
-        "configured": bool(agent and agent.api_key_encrypted),
+        "assistant_id": assistant_id,
+        "configured": bool(ga.api_key_encrypted),
         "has_global": bool(user and user.api_key_encrypted),
-        "name": agent.name if agent else None,
+        "name": ga.name,
     }
 
 

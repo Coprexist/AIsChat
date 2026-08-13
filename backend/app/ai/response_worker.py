@@ -415,10 +415,127 @@ async def _process_group_event(db, event: dict):
         },
     }))
 
+    # 群助手触发（独立实体，非 agent——与群视界 AI 同形态，产品 2026-08-13 定）：
+    # 群绑定的世界助手按类型模板自动创建，存 group_assistants 表，不入群成员表。
+    # 群助手自己的消息（sender_id < 0）不触发，防自触发循环。
+    if not (sender_type == "ai" and (sender_id or 0) < 0):
+        try:
+            from app.models.world import GroupAssistant
+            ga_rows = (await db.execute(
+                select(GroupAssistant).where(GroupAssistant.group_id == group_id)
+            )).scalars().all()
+            for ga in ga_rows:
+                asyncio.create_task(_trigger_group_assistant(
+                    ga.id, group_id, content, message_id,
+                    sender_type=sender_type, sender_id=sender_id,
+                ))
+        except Exception as e:
+            logger.warning(f"群助手触发编排失败: {e}")
+
 
 # ============================================================
 # 编排：群聊回复触发
 # ============================================================
+
+# ============================================================
+# 群助手触发（独立实体路径，不走 agent 体系）
+# ============================================================
+
+async def _trigger_group_assistant(
+    assistant_id: int, group_id: int, content: str, trigger_message_id: int,
+    sender_type: str = "human", sender_id: int | None = None,
+):
+    """群助手独立实体触发：@ 才唤醒（默认 mention_only），简化 LLM 链路——
+    system_prompt + 最近群消息 → chat_completion → 发群消息 + 用量记账。
+    与群视界 AI 同形态：无账号、无好友、不入群成员表。"""
+    try:
+        async with async_session() as db:
+            from app.models.world import GroupAssistant, World
+            from app.config import settings
+            from app.utils.crypto import decrypt_api_key
+
+            ga = await db.get(GroupAssistant, assistant_id)
+            if ga is None:
+                return
+            world = await db.get(World, ga.world_id)
+
+            # 触发模式：世界配置 group_trigger_mode（默认 mention_only → 非 @ 不唤醒）
+            mode = (world.config or {}).get("group_trigger_mode", "mention_only") if world else "mention_only"
+            is_mentioned = _check_mention(content, ga.name)
+            is_at_all = any(tag in content for tag in ("@all", "@everyone", "@全体"))
+            if mode == "mention_only" and not is_mentioned and not is_at_all:
+                logger.info(f"🔕 群 {group_id} 群助手「{ga.name}」mention_only，非 @ 不触发")
+                return
+
+            # 构建消息：system_prompt + 最近群消息
+            from app.chat.message import get_recent_messages
+            history = await get_recent_messages(db, group_id, limit=20)
+            messages: list[dict] = [{"role": "system", "content": ga.system_prompt or f"你是群助手「{ga.name}」，服务本群。"}]
+            for m in reversed(history):  # 正序
+                if not m.content:
+                    continue
+                if m.sender_type == "human":
+                    messages.append({"role": "user", "content": m.content})
+                elif m.sender_type == "ai":
+                    messages.append({"role": "assistant", "content": m.content})
+            messages.append({"role": "user", "content": content})
+
+            # API key 回落链：助手自定义 → 群主全局 → 系统默认（None 交给 chat_completion）
+            api_key = decrypt_api_key(ga.api_key_encrypted) if ga.api_key_encrypted else None
+            api_base = ga.api_base_url
+            if not api_key:
+                try:
+                    from sqlalchemy import text as _t
+                    from app.models.user import User
+                    owner_row = (await db.execute(_t(
+                        "SELECT member_id FROM group_members WHERE group_id=:g AND member_type='human' AND role='owner' LIMIT 1"
+                    ), {"g": group_id})).first()
+                    owner_id = int(owner_row[0]) if owner_row else (world.owner_id if world else None)
+                    if owner_id:
+                        u = await db.get(User, owner_id)
+                        if u and u.api_key_encrypted:
+                            api_key = decrypt_api_key(u.api_key_encrypted)
+                            api_base = u.api_base_url
+                except Exception:
+                    pass
+
+            model = ga.model or settings.default_chat_model
+            from app.ai.llm import chat_completion
+            resp = await chat_completion(
+                messages=messages, model=model,
+                api_base_url=api_base or "", api_key=api_key,
+                temperature=0.8, top_p=0.9, stream=False, db=db,
+            )
+            reply = ((resp or {}).get("content") or "").strip()
+            if not reply:
+                logger.info(f"群助手「{ga.name}」无回复内容，跳过")
+                return
+
+            # 发群消息（sender_id 用负值避免与 user_id 冲突；source=world 防触发世界程序循环）
+            from app.chat.message import create_message as _cm
+            from app.routers.ws import manager
+            msg = await _cm(db, group_id, "ai", -ga.id, reply, source="world", allow_non_member=True)
+            await db.flush()
+            try:
+                await manager.broadcast_to_group(group_id, {"type": "message", "data": {"id": msg.id, "content": reply}})
+            except Exception:
+                pass
+
+            # 用量记账：agent_id=-2 虚拟聚合「群助手」，记账人 = 世界主人
+            try:
+                from app.services.content.conversation_log_service import save_conversation_log
+                await save_conversation_log(
+                    db, agent_id=-2, messages=messages + [{"role": "assistant", "content": reply}],
+                    conversation_type="group", group_id=group_id,
+                    token_usage=(resp or {}).get("usage"), has_output=True, model=model,
+                    user_id=world.owner_id if world else None,
+                )
+            except Exception:
+                pass
+            logger.info(f"🤖 群助手「{ga.name}」(ga {ga.id}) 回复群 {group_id}: {reply[:60]}")
+    except Exception as e:
+        logger.error(f"群助手 {assistant_id} 触发异常: {e}", exc_info=True)
+
 
 async def _recheck_state_before_run(db, agent) -> bool:
     """执行前复查状态：入口快照可能已过期（skill 评估/建消息等耗时操作期间可能被封禁）。

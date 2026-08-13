@@ -311,6 +311,15 @@ async def get_messages(
                     avatar_map[uid] = a[1] or uavatar or ''
                     state_map[uid] = a[2]
 
+        # 群助手（独立实体，sender_id 为负值 = -group_assistant.id，产品 2026-08-13 定）
+        ga_ids = {-sid for sid in all_ids if sid < 0}
+        if ga_ids:
+            from app.models.world import GroupAssistant
+            ga_result = await db.execute(select(GroupAssistant.id, GroupAssistant.name).where(GroupAssistant.id.in_(ga_ids)))
+            for gid, gname in ga_result.all():
+                name_map[-gid] = gname
+                avatar_map[-gid] = ''
+
 
     return [
         message_to_dict(m, sender_name=name_map.get(m.sender_id), sender_avatar_url=avatar_map.get(m.sender_id), sender_state=state_map.get(m.sender_id))

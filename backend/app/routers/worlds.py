@@ -374,25 +374,24 @@ async def list_assistants(
     current_user: dict = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
-    """世界视角：列出该世界所有群助手（含 API 状态，不回显 key）"""
+    """世界视角：列出该世界所有群助手（独立实体，含 API 状态，不回显 key）"""
     from app.services.world.group_type_service import assistant_api_status
-    from app.models.world import WorldAgent
+    from app.models.world import GroupAssistant
     rows = (await db.execute(
-        select(WorldAgent).where(
-            WorldAgent.world_id == world_id, WorldAgent.role == "assistant")
-        .order_by(WorldAgent.id)
+        select(GroupAssistant).where(GroupAssistant.world_id == world_id)
+        .order_by(GroupAssistant.id)
     )).scalars().all()
     items = []
-    for wa in rows:
-        st = await assistant_api_status(db, world_id, wa.agent_id)
-        items.append({"id": wa.agent_id, "group_id": wa.group_id,
-                      "group_type_slug": wa.group_type_slug, **st})
+    for ga in rows:
+        st = await assistant_api_status(db, world_id, ga.id)
+        items.append({"id": ga.id, "group_id": ga.group_id,
+                      "group_type_slug": ga.group_type_slug, **st})
     return {"assistants": items}
 
 
-@router.put("/{world_id}/assistants/{agent_id}/api")
+@router.put("/{world_id}/assistants/{assistant_id}/api")
 async def set_assistant_api(
-    world_id: int, agent_id: int,
+    world_id: int, assistant_id: int,
     req: dict,
     current_user: dict = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
@@ -401,7 +400,7 @@ async def set_assistant_api(
     from app.services.world.group_type_service import set_assistant_api as _set
     try:
         return await _set(
-            db, world_id, current_user["user_id"], agent_id,
+            db, world_id, current_user["user_id"], assistant_id,
             api_key=str(req.get("api_key") or "") or None,
             api_base_url=str(req.get("api_base_url") or "") or None,
         )
@@ -409,30 +408,30 @@ async def set_assistant_api(
         raise HTTPException(status_code=400, detail=str(e))
 
 
-@router.post("/{world_id}/assistants/{agent_id}/apply-global")
+@router.post("/{world_id}/assistants/{assistant_id}/apply-global")
 async def apply_global_api(
-    world_id: int, agent_id: int,
+    world_id: int, assistant_id: int,
     current_user: dict = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
     """一键应用群主的默认全局 API"""
     from app.services.world.group_type_service import apply_global_api as _apply
     try:
-        return await _apply(db, world_id, current_user["user_id"], agent_id)
+        return await _apply(db, world_id, current_user["user_id"], assistant_id)
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
 
 
-@router.delete("/{world_id}/assistants/{agent_id}/api")
+@router.delete("/{world_id}/assistants/{assistant_id}/api")
 async def clear_assistant_api(
-    world_id: int, agent_id: int,
+    world_id: int, assistant_id: int,
     current_user: dict = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
-    """清除群助手 API（回落系统默认）"""
+    """清除群助手 API（回落世界/系统默认）"""
     from app.services.world.group_type_service import clear_assistant_api as _clear
     try:
-        return await _clear(db, world_id, current_user["user_id"], agent_id)
+        return await _clear(db, world_id, current_user["user_id"], assistant_id)
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
 

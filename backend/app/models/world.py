@@ -58,6 +58,33 @@ class WorldBinding(Base):
     )
 
 
+class GroupAssistant(Base):
+    """群助手 — 独立实体（不是 agents 表行，产品 2026-08-13 定）
+
+    与群视界 AI 同形态：无账号、无好友、不入群成员表、不占 agent 体系；
+    绑定群视界群时按群类型模板自动创建，每群每助手一行。
+    身份 = group-assistant-{id}，随绑定存在而存在。
+    """
+    __tablename__ = "group_assistants"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    group_id = Column(Integer, ForeignKey("groups.id", ondelete="CASCADE"), nullable=False, comment="所属群")
+    world_id = Column(Integer, ForeignKey("worlds.id", ondelete="CASCADE"), nullable=False, comment="所属世界")
+    group_type_slug = Column(String(50), nullable=True, comment="类型 slug（定义在 group_types.json）")
+    name = Column(String(50), nullable=False, comment="助手名（如 冒险团团长，模板 default_name）")
+    system_prompt = Column(Text, default="", comment="助手系统提示（模板生成）")
+    model = Column(String(50), nullable=True, comment="模型（空 = 世界/默认）")
+    api_key_encrypted = Column(Text, nullable=True, comment="群主填的自定义 key（Fernet 加密）")
+    api_base_url = Column(Text, nullable=True, comment="自定义 API 地址")
+    config = Column(JSONB, default=dict, comment="扩展配置")
+    created_at = Column(DateTime, server_default=func.now())
+
+    __table_args__ = (
+        Index("ix_group_assistants_group", "group_id"),
+        Index("ix_group_assistants_world", "world_id"),
+    )
+
+
 class WorldAgent(Base):
     """世界居民 AI（resident）— 现有 agent 体系里的 AI 入驻世界。
 
