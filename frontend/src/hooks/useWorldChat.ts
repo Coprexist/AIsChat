@@ -493,10 +493,11 @@ export function useWorldChat({ wid, onRefresh, onMsg }: UseWorldChatOptions) {
               const done = await subscribeTurnStream(s.turn_id)
               if (cancelled) return
               if (done) {
-                // 直播正常结束：拉权威历史收尾
+                // 直播正常结束：拉权威历史收尾 + 刷新用量（缓存命中率）
                 chatProcessingRef.current = false
                 setChatProcessing(false)
                 loadChat()
+                onRefreshRef.current()
                 return
               }
             } catch { /* 直播失败/中断：继续轮询兜底 */ }
@@ -507,6 +508,7 @@ export function useWorldChat({ wid, onRefresh, onMsg }: UseWorldChatOptions) {
             chatProcessingRef.current = false
             setChatProcessing(false)
             loadChat()  // 处理完成：拉最新历史（含 AI 回复）
+            onRefreshRef.current()  // 刷新用量（缓存命中率）——普通对话也要更新，不只工具场景
           }
         }
       } catch { /* 失败静默重试 */ if (!cancelled) timer = window.setTimeout(check, 8000) }
