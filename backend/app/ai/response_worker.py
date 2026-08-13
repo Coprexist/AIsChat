@@ -463,6 +463,39 @@ async def _trigger_group_assistant(
             mode = (world.config or {}).get("group_trigger_mode", "mention_only") if world else "mention_only"
             is_mentioned = _check_mention(content, ga.name)
             is_at_all = any(tag in content for tag in ("@all", "@everyone", "@全体"))
+
+            # 决策技能优先（AI 自写规则，产品 2026-08-13 定）：命中且 notify=false →
+            # 程序化处理（reply 代发到群），不唤醒 LLM 本体
+            try:
+                from app.services.world.decision_skill import run_decision_engine, build_group_message_ctx
+                sender_name = "群成员"
+                if sender_id is not None:
+                    from app.models.user import User as _U
+                    _sr = (await db.execute(select(_U.username).where(_U.id == sender_id))).first()
+                    sender_name = _sr[0] if _sr else f"用户{sender_id}"
+                dec = await run_decision_engine(
+                    db, "group_assistant", ga.id, world, "group_message",
+                    build_group_message_ctx(
+                        content, sender_id, sender_name, sender_type, group_id,
+                        is_mention=is_mentioned, is_at_all=is_at_all,
+                    ),
+                )
+                if dec.get("hit") and dec.get("handled"):
+                    if dec.get("reply"):
+                        from app.chat.message import create_message as _cm
+                        from app.routers.ws import manager
+                        msg = await _cm(db, group_id, "ai", -ga.id, dec["reply"],
+                                        source="world", allow_non_member=True)
+                        await db.flush()
+                        try:
+                            await manager.broadcast_to_group(group_id, {"type": "message", "data": {"id": msg.id, "content": dec["reply"]}})
+                        except Exception:
+                            pass
+                    logger.info(f"🎲 群助手「{ga.name}」决策技能命中，程序化处理（不唤醒 LLM）")
+                    return
+            except Exception as e:
+                logger.warning(f"🎲 群助手决策引擎异常（ga {ga.id}）: {e}")
+
             if mode == "mention_only" and not is_mentioned and not is_at_all:
                 logger.info(f"🔕 群 {group_id} 群助手「{ga.name}」mention_only，非 @ 不触发")
                 return
@@ -501,14 +534,27 @@ async def _trigger_group_assistant(
 
             model = ga.model or settings.default_chat_model
             from app.ai.llm import chat_completion
+            # 决策技能工具（群助手自配置：list/write/delete_decision_skill）
+            from app.services.world.decision_skill import DECISION_TOOLS
             resp = await chat_completion(
                 messages=messages, model=model,
                 api_base_url=api_base or "", api_key=api_key,
                 temperature=0.8, top_p=0.9, stream=False, db=db,
+                tools=DECISION_TOOLS,
             )
+            # 决策工具调用执行（自配置决策技能；仅工具调用时不回复，静默）
+            for _tc in (resp or {}).get("tool_calls") or []:
+                _fn = _tc.get("function") or {}
+                _name = _fn.get("name") or ""
+                if _name in ("list_decision_skills", "write_decision_skill", "delete_decision_skill"):
+                    from app.tools.decision import handle_decision_tool
+                    try:
+                        await handle_decision_tool(db, "group_assistant", ga.id, _name, _fn.get("arguments") or "{}")
+                    except Exception as e:
+                        logger.warning(f"🎲 群助手决策工具执行失败: {e}")
             reply = ((resp or {}).get("content") or "").strip()
             if not reply:
-                logger.info(f"群助手「{ga.name}」无回复内容，跳过")
+                logger.info(f"群助手「{ga.name}」仅工具调用（决策技能配置），不回复")
                 return
 
             # 发群消息（sender_id 用负值避免与 user_id 冲突；source=world 防触发世界程序循环）
@@ -604,6 +650,38 @@ async def _maybe_trigger_ai_reply(
     # v0.2.1: 检测 DND 穿透条件
     is_at_all = any(tag in content for tag in ("@all", "@everyone", "@全体"))
     is_announcement = message_type == "announcement"
+
+    # 决策技能（入驻 AI 自写规则，产品 2026-08-13 定）：命中且 notify=false →
+    # 程序化处理（reply 代发到群），不唤醒 LLM 本体；未命中/notify=true → 继续
+    # ⚠️ 优先于 mention_only 触发模式（AI 自写规则 > 平台默认兜底）
+    try:
+        from app.services.world.decision_skill import run_decision_engine, build_group_message_ctx
+        from app.services.world.world_service import find_worlds_by_entity
+        _worlds = await find_worlds_by_entity(db, "agent", agent.user_id or 0)
+        _gworlds = await find_worlds_by_entity(db, "group", group_id) if group_id else []
+        _w = (_gworlds or _worlds or [None])[0]
+        if _w is not None:
+            dec = await run_decision_engine(
+                db, "agent", resolved_agent_id, _w, "group_message",
+                build_group_message_ctx(
+                    content, sender_id, sender_name, sender_type, group_id,
+                    is_mention=is_mentioned, is_at_all=is_at_all,
+                ),
+            )
+            if dec.get("hit") and dec.get("handled"):
+                if dec.get("reply"):
+                    try:
+                        from app.chat.message import create_message as _cm
+                        from app.routers.ws import manager
+                        msg = await _cm(db, group_id, "ai", agent.user_id or 0, dec["reply"])
+                        await db.flush()
+                        await manager.broadcast_to_group(group_id, {"type": "message", "data": {"id": msg.id, "content": dec["reply"]}})
+                    except Exception:
+                        pass
+                logger.info(f"🎲 AI {agent.name}(id={resolved_agent_id}) 决策技能命中，程序化处理（不唤醒 LLM）")
+                return
+    except Exception as e:
+        logger.warning(f"🎲 AI {agent.name} 决策引擎异常: {e}")
 
     # 群视界触发模式拦截：mention_only 时非 @ 消息不唤醒 LLM 本体
     # （会话帧维护已在上方完成，「有人找过」照常记录；世界程序感知通道不受影响）
