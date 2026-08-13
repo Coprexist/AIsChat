@@ -166,7 +166,11 @@ export function useWorldChat({ wid, onRefresh, onMsg }: UseWorldChatOptions) {
       } else {
         setChatMsgs(r.messages || [])
         // 在底部（跟随模式）才滚到消息末尾；用户往上翻时不打扰
-        if (isAtBottomRef.current) {
+        // ⚠️ 2026-08-13 修复：实时读位置（isAtBottomRef 由 rAF 节流更新可能延迟——
+        // 用户刚往上翻时 ref 还是 true，工具 done 后 loadChat 误滚到底部）
+        const el = listElsRef.current.find((x) => x.isConnected)
+        const atBottomNow = el ? el.scrollHeight - el.scrollTop - el.clientHeight < 80 : false
+        if (atBottomNow) {
           forceScrollToBottom()
         }
       }
