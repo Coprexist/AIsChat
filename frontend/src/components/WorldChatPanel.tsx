@@ -338,7 +338,7 @@ const WorldChatPanel = memo(forwardRef<WorldChatHandle, WorldChatPanelProps>(({ 
         {chat.pendingItems.length > 0 && (
           <div className="absolute bottom-full left-3 right-3 mb-1 max-h-32 overflow-y-auto rounded-xl bg-elevated border border-border shadow-xl z-50">
             <div className="px-3 py-1.5 text-[10px] text-textMuted border-b border-border">
-              AI 处理中，以下 {chat.pendingItems.length} 条将按顺序执行（普通消息一起发，命令逐个执行）
+              AI 处理中，以下 {chat.pendingItems.length} 条排队（普通消息将插入下一轮 AI 思考，命令等本轮结束执行）
             </div>
             {chat.pendingItems.map((it, i) => (
               <div key={i} className="flex items-center gap-2 px-3 py-1.5 text-xs border-b border-border/40 last:border-b-0">

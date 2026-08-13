@@ -946,9 +946,17 @@ async def stream_world_chat(
                 for _r in range(max_rounds):
                     # ── 普通消息插入（产品定：非命令消息工具轮中直接注入下一轮）──
                     # 每轮 LLM 调用前检查插入通道；插入的消息落库为 user 消息并注入 messages
+                    # 协议（2026-08-13 产品定）：
+                    #   1) 先发 [INSERTED]{count} 信号（不计入历史）→ 前端清理排队弹窗中已成功的消息
+                    #   2) 再逐条发 [INSERT]{msg_id, content}（已落库、记入历史）→ 前端画用户气泡（真实 id）
+                    #   3) 断联后 loadChat 拉历史 → 中途发的消息在正确位置（已落库）
                     try:
                         from app.services.world.world_turn import get_world_worker
                         insert_items = await get_world_worker(world_id).drain_inserts()
+                        if insert_items:
+                            total = sum(len(_it["messages"]) for _it in insert_items)
+                            # 信号先行（不计入历史）：前端据此清理排队弹窗
+                            yield f"data: [INSERTED]{json.dumps({'count': total}, ensure_ascii=False)}\n\n"
                         for _it in insert_items:
                             for _m in _it["messages"]:
                                 _m_text = str(_m).strip()
@@ -960,10 +968,9 @@ async def stream_world_chat(
                                 )
                                 db.add(_wm_row)
                                 await db.flush()
-                                # 事件：通知前端已插入（含消息 id 供气泡匹配）——前端移除排队项、去 pending 标记
+                                # 消息事件：带真实 id（已落库，历史/渲染一致）；前端画气泡用此 id
                                 yield f"data: [INSERT]{json.dumps({'msg_id': _wm_row.id, 'content': _m_text}, ensure_ascii=False)}\n\n"
                                 messages.append({"role": "user", "content": _m_text})
-                                yield f"data: {_m_text.replace(chr(10), '{NL}')}\n\n"
                         if insert_items:
                             await db.commit()
                     except Exception:

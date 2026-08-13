@@ -81,6 +81,8 @@ export function useWorldChat({ wid, onRefresh, onMsg }: UseWorldChatOptions) {
   const [sessionList, setSessionList] = useState<{ id: string; last_active_at?: string; pinned?: boolean }[]>([])
   const currentSessionRef = useRef(currentSession)
   currentSessionRef.current = currentSession
+  // 供 WS 回调（onMessage 闭包）引用组件级滚动函数——[INSERT] 插入消息后滚到底部
+  const forceScrollToBottomRef = useRef<() => void>(() => {})
   const sessionListRef = useRef(sessionList)
   sessionListRef.current = sessionList
   const chatProcessingRef = useRef(false)
@@ -247,6 +249,7 @@ export function useWorldChat({ wid, onRefresh, onMsg }: UseWorldChatOptions) {
     }
     requestAnimationFrame(() => requestAnimationFrame(settle))
   }, [eachList])
+  forceScrollToBottomRef.current = forceScrollToBottom
 
   // 新消息到达：跟随模式（在底部）自动滚到最新——首次瞬时（等布局稳定），后续新消息平滑，流式内容更新瞬时
   const prevLenRef = useRef(0)
@@ -336,27 +339,24 @@ export function useWorldChat({ wid, onRefresh, onMsg }: UseWorldChatOptions) {
             try { setSuggestions(JSON.parse(payload.slice(9))) } catch { /* ignore */ }
             continue
           }
+          if (payload.startsWith('[INSERTED]')) {
+            // 信号（不计入历史）：后端已把排队消息真正插入工具轮（FIFO）——
+            // 从排队弹窗移除 count 条成功的消息，弹窗只留还没发出的
+            try {
+              const sig = JSON.parse(payload.slice(10))
+              const n = sig.count || 0
+              setPendingItems((items) => items.slice(n))
+            } catch { /* ignore */ }
+            continue
+          }
           if (payload.startsWith('[INSERT]')) {
-            // 排队消息已由后端插入当前工具轮（真正发出去了）：移除对应排队项 + 气泡去 pending 标记
-            // 按 FIFO 移除第一条匹配的（避免相同内容多条时全删；后端插入通道也是 FIFO）
+            // 排队消息已插入工具轮并落库（记入历史）：画用户气泡（用真实 msg_id，
+            // 与历史一致，loadChat 后不会重复/错位）
             try {
               const ins = JSON.parse(payload.slice(8))
               const insContent = ins.content
-              setPendingItems((items) => {
-                const idx = items.findIndex((i) => i.text === insContent)
-                if (idx === -1) return items
-                return items.filter((_, j) => j !== idx)
-              })
-              setChatMsgs((msgs) => {
-                let removed = false
-                return msgs.map((m) => {
-                  if (!removed && m.role === 'user' && m.pending && m.content === insContent) {
-                    removed = true
-                    return { ...m, pending: false }
-                  }
-                  return m
-                })
-              })
+              setChatMsgs((msgs) => [...msgs, { id: ins.msg_id, role: 'user', content: insContent }])
+              requestAnimationFrame(() => forceScrollToBottomRef.current?.())
             } catch { /* ignore */ }
             continue
           }
@@ -522,10 +522,9 @@ export function useWorldChat({ wid, onRefresh, onMsg }: UseWorldChatOptions) {
   const submitText = (text: string) => {
     const t = text.trim()
     if (!t) return
-    // AI 忙（本条发送中 / 后台轮次执行中）：进队列——普通消息等流结束一起发；/ 命令等流结束按顺序逐个执行
+    // AI 忙（本条发送中 / 后台轮次执行中）：进队列——不画占位气泡（位置不对，
+    // 且会被 loadChat 冲掉），只显示在排队弹窗；真正插入后（[INSERT] 回执）才进对话流
     if (chatSending || chatProcessing) {
-      // 排队：消息直接画进对话流（用户气泡 + 排队中标记），流结束后一起发送——输入框上方不再弹列表
-      setChatMsgs((msgs) => [...msgs, { id: -(++msgSeqRef.current), role: 'user', content: t, pending: true }])
       setPendingItems((items) => [...items, { kind: t.startsWith('/') ? 'cmd' : 'msg', text: t }])
       setChatInput('')
       setCmdActive(false)
