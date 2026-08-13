@@ -487,6 +487,7 @@ async def _stream_llm_once(
         out.clear()
         out.update(result)
     tool_call_acc: dict = {}
+    index_to_id: dict[int, str] = {}  # index → id 桥（arguments 无 id 分片定位用）
     try:
         async with httpx.AsyncClient(timeout=300.0) as client:
             async with client.stream("POST", f"{api_base}/v1/chat/completions", json=payload, headers=headers) as resp:
@@ -530,10 +531,14 @@ async def _stream_llm_once(
                             if tcs:
                                 for item in tcs:
                                     cid = item.get("id") or ""
-                                    key = cid if cid else f"idx_{item.get('index', 0)}"
-                                    acc = tool_call_acc.setdefault(key, {"id": "", "name": "", "arguments": "", "index": item.get("index", 0)})
+                                    idx = item.get("index", 0)
+                                    # ⚠️ DeepSeek 流式坑（2026-08-13）：name 分片带 id、arguments 分片常不带 id——
+                                    # 优雅解：id 主 key（区分并行，index 重复不怕）+ index 桥（无 id 分片定位）。
+                                    key = cid or index_to_id.get(idx) or f"idx_{idx}"
+                                    acc = tool_call_acc.setdefault(key, {"id": "", "name": "", "arguments": "", "index": idx})
                                     if cid:
                                         acc["id"] = cid
+                                        index_to_id[idx] = cid
                                     fn = item.get("function") or {}
                                     if fn.get("name"):
                                         acc["name"] = fn["name"]
@@ -969,7 +974,9 @@ async def stream_world_chat(
 
     full_content, full_reasoning = "", ""
     first_usage: dict | None = None  # 2.7：首轮 usage（流结束块捕获）
-    tool_call_acc: dict[int, dict] = {}  # index → {id, name, arguments}
+    tool_call_acc: dict = {}  # id → {id, name, arguments}
+    index_to_id: dict[int, str] = {}  # index → id 桥（arguments 无 id 分片定位用）
+    index_to_id: dict[int, str] = {}  # index → id 桥
     try:
         _log_llm_request(world_id, turn_id, 0, model, thinking, messages)
         async with httpx.AsyncClient(timeout=300.0) as client:
@@ -1029,10 +1036,12 @@ async def stream_world_chat(
                                 for item in tcs:
                                     cid = item.get("id") or ""
                                     idx = item.get("index", 0)
-                                    key = f"idx_{idx}"
+                                    # ⚠️ DeepSeek 流式坑：name 带 id、arguments 常不带 id——id 主 key + index 桥
+                                    key = cid or index_to_id.get(idx) or f"idx_{idx}"
                                     acc = tool_call_acc.setdefault(key, {"id": "", "name": "", "arguments": "", "index": idx})
                                     if cid:
                                         acc["id"] = cid
+                                        index_to_id[idx] = cid
                                     fn = item.get("function") or {}
                                     if fn.get("name"):
                                         acc["name"] = fn["name"]
