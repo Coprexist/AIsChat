@@ -9,6 +9,9 @@ import ErrorBoundary from './components/ErrorBoundary'
 import { setupDemo } from './demo/demoSetup'
 import './index.css'
 import 'katex/dist/katex.min.css'
+// mhchem 化学式扩展（\ce / \pu）——side-effect 注册到 katex 实例，须在渲染前加载；
+// 与 katex 一起走 vite 预构建（optimizeDeps.include）保证单实例
+import 'katex/dist/contrib/mhchem.mjs'
 
 const isDemo = window.location.pathname.includes('/AIsChat/') || window.location.hostname === 'coprexist.github.io'
 
