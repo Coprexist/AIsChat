@@ -7,9 +7,7 @@
 
 ---
 
-## [v0.3.5] - 2026-08-13
-
-### Fixed — 🔔 系统通知链路 + ⚙️ 12h 空闲压缩（用户 API Key 失效场景暴露）
+### Fixed — 🔔 系统通知链路 + ⚙️ 12h 空闲压缩（2026-08-13 补，用户 API Key 失效场景暴露）
 
 - **系统通知静默丢失（三层 bug）**：AI 的 API Key 失效（401）时，降级通知和最终错误通知都没送达用户——
   ① `get_or_create_dm_session` 返回 dict 但 executor 用 `.session_id` 访问（AttributeError）
@@ -22,13 +20,6 @@
   **修复**：压缩前移到首次 LLM 调用前 + 增加"对话跨度"判定（首条→最后消息 > 12h 也压缩），
   效果：137→22 条（-83% token）；当天对话不误压缩
 - **12h 空闲压缩优先级**（产品定）：API 通 → LLM 总结压缩（保要点）；API 不通/总结失败 → 内联截断兜底
-
-### Changed
-
-- 对外公开内容清理：文档/代码/积木/Release 中的个人称呼统一为「产品」（git 26 文件 + 积木库 + Release notes）
-
----
-## [v0.3.4] - 2026-08-12
 
 ### Added — ✨ 前缀内容版本化（锁）+ 群类型无限 + Skill 分层注入 + 世界直开
 
@@ -50,13 +41,6 @@
 - 🧠 **记忆管理增强（世界 + 主站对齐）**：manage_records / sr_* 新增 `rename`（category/sub_key/field 任一级改名）与 `move`（整组或单条跨目录移动）动作；记忆工具描述补 `user` 个性分类约定（偏好/风格/审美/习惯/关系）；新增 `build_memory_map` 缩进树记忆地图（只注入有内容的路径，空目录不出现），新会话/clear 后自动注入、普通延续对话不注入（省 token + 缓存稳定）；⭐（重要）/❗（硬约束）软锚定——value 前缀标记在地图上提到名字前，产生 Attention 特征峰值引导 LLM 优先处理；主站 format_db_records_for_prompt 重写（瘦身 + 软锚定 + 去 emoji），两套记忆行为统一
 
 ### Fixed
-
-- **前端 -1 无限值被吞**：GroupManagerModal `Number(-1) || 3` 把 -1 变 3——改为显式保留 -1
-- **主站 agent 改提示词断缓存**：personality 段从直接拼 current_system_prompt 改为 effective 快照（build_messages / build_dm_messages + executor compact 解锁）
-- **邀请 AI 进群错配成另一个 AI**（严重）：friend_service.search_entities 返回 agent.id 而 invite 链路以 user_id 为唯一标准——当 agent.id 恰好等于另一 agent 的 user_id 时（我.agent.id=40 == 化学老师.user_id=40）错配入群；修复：AI 搜索统一返回 user_id，存量群 54/55 成员与历史消息已修正
-- **世界绑定 AI 统一 user_id**（根治）：bind_entry_with_type 归一化为 user_id 存储（传 agent.id 自动转）；llm.py / response_worker / tools/base 的 find_worlds_by_entity('agent') 改用 user_id；类型分层注入的绑定查询同步修复（自查发现的漏网）
-- **iOS Safari 首登发送按钮灰**：new WebSocket 无 try-catch + token 未 URL 编码——URL 非法时同步异常导致永不重试（刷新才恢复）；修复：getWsUrl 收口编码 + try-catch 兑底重连 + connectRef 打破循环依赖（重构后 -26 行）
-- **移动端设计页底部空白**：去掉冗余 pb-14（main 已为固定导航预留）
 
 ### Docs（2026-08-12 新增）
 
