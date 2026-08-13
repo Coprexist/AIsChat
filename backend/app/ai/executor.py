@@ -130,31 +130,23 @@ async def _send_system_error(
             logger.warning(f"AI {agent.name}({agent.id}) 无 owner，无法发送系统通知")
             return
 
-        dm_session = await chat_api.get_or_create_dm_session(db, SYSTEM_USER_ID, owner_id)
-        dm_sid = dm_session.session_id
+        dm_session = await chat_api.get_or_create_dm_session(db, SYSTEM_USER_ID, owner_id, skip_friendship_check=True)
+        dm_sid = dm_session["session_id"]  # 返回 dict；skip_friendship_check=True：系统通知不受好友关系限制（2026-08-13 修复）
 
-        # 直接写入 DM 消息（sender_id=0 = 系统用户）
-        dm_msg = DMMessage(
-            session_id=dm_sid,
-            sender_id=SYSTEM_USER_ID,
-            content=content,
+        # 复用 send_dm_message：统一处理 last_message 更新/未读标记（2026-08-13 重构，不再手动复制）
+        dm_msg = await chat_api.send_dm_message(
+            db, dm_sid, SYSTEM_USER_ID, content,
+            skip_friendship_check=True,
+            message_type="system",
         )
-        db.add(dm_msg)
-        await db.commit()
-        await db.refresh(dm_msg)
 
         # WebSocket 推送
         try:
             await chat_api.broadcast_to_dm(dm_sid, {
                 "type": "new_dm_message",
                 "message": {
-                    "id": dm_msg.id,
-                    "session_id": dm_sid,
-                    "sender_id": SYSTEM_USER_ID,
+                    **dm_msg,
                     "sender_name": "系统通知",
-                    "sender_avatar_url": None,
-                    "content": content,
-                    "created_at": dm_msg.created_at.isoformat() if dm_msg.created_at else None,
                     "is_system": True,
                 },
             })
@@ -173,27 +165,20 @@ async def _send_system_error_notification(db, agent, content: str) -> None:
         owner_id = agent.owner_id
         if not owner_id:
             return
-        dm_session = await chat_api.get_or_create_dm_session(db, SYSTEM_USER_ID, owner_id)
-        dm_sid = dm_session.session_id
-        dm_msg = DMMessage(
-            session_id=dm_sid,
-            sender_id=SYSTEM_USER_ID,
-            content=content,
+        dm_session = await chat_api.get_or_create_dm_session(db, SYSTEM_USER_ID, owner_id, skip_friendship_check=True)
+        dm_sid = dm_session["session_id"]  # 返回 dict；skip_friendship_check=True：系统通知不受好友关系限制（2026-08-13 修复）
+        # 复用 send_dm_message：统一处理 last_message 更新/未读标记（2026-08-13 重构）
+        dm_msg = await chat_api.send_dm_message(
+            db, dm_sid, SYSTEM_USER_ID, content,
+            skip_friendship_check=True,
+            message_type="system",
         )
-        db.add(dm_msg)
-        await db.commit()
-        await db.refresh(dm_msg)
         try:
             await chat_api.broadcast_to_dm(dm_sid, {
                 "type": "new_dm_message",
                 "message": {
-                    "id": dm_msg.id,
-                    "session_id": dm_sid,
-                    "sender_id": SYSTEM_USER_ID,
+                    **dm_msg,
                     "sender_name": "系统通知",
-                    "sender_avatar_url": None,
-                    "content": content,
-                    "created_at": dm_msg.created_at.isoformat() if dm_msg.created_at else None,
                     "is_system": True,
                 },
             })

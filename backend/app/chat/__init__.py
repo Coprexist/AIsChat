@@ -110,12 +110,17 @@ class ChatApi(BaseChatApi):
     # ── 私信 ──
 
     async def send_dm_message(self, db, session_id, sender_id, content,
-                               reply_to=None, attachments=None):
+                               reply_to=None, attachments=None,
+                               skip_friendship_check=False, message_type="normal"):
         return await send_dm_message(db, session_id, sender_id, content,
-                                      reply_to=reply_to, attachments=attachments)
+                                      reply_to=reply_to, attachments=attachments,
+                                      skip_friendship_check=skip_friendship_check,
+                                      message_type=message_type)
 
-    async def get_or_create_dm_session(self, db, current_user_id, target_user_id):
-        return await get_or_create_dm_session(db, current_user_id, target_user_id)
+    async def get_or_create_dm_session(self, db, current_user_id, target_user_id,
+                                        skip_friendship_check=False):
+        return await get_or_create_dm_session(db, current_user_id, target_user_id,
+                                               skip_friendship_check=skip_friendship_check)
 
     async def get_dm_messages(self, db, session_id, user_id, limit=50,
                                before_id=None, after_id=None):
