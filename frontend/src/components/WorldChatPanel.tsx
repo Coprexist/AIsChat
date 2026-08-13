@@ -64,11 +64,15 @@ function ToolBubble({ label, error, icon }: { label: string; error?: boolean; ic
 }
 
 /** 思考气泡（2026-08-13）：独立展示，默认 2 行 + 底部渐变淡化，点击展开看全部 */
-function ReasoningBubble({ text, preview }: { text: string; preview?: string }) {
+function ReasoningBubble({ text }: { text: string }) {
   const [expanded, setExpanded] = useState(false)
   const t = useT()
   const bodyRef = useRef<HTMLDivElement>(null)
-  // 展开时滚动到气泡顶部（内容开头）——否则视口停在底部，用户看到的是末尾，误以为折叠没消失
+  // 折叠：JS 截断只渲染前两行（超出的不渲染，省性能）——流式时没到两行正常增长，
+  // 一旦超过两行就固定显示前两行（新内容在第 3 行起不渲染，自然静止）
+  const lines = text.split('\n')
+  const collapsedText = lines.length > 2 ? lines.slice(0, 2).join('\n') : text
+  // 展开时滚动到气泡顶部（内容开头）
   const handleToggle = () => {
     setExpanded((v) => {
       if (!v) {
@@ -91,8 +95,10 @@ function ReasoningBubble({ text, preview }: { text: string; preview?: string }) 
         <div ref={bodyRef} className="px-2 py-1.5 whitespace-pre-wrap max-h-72 overflow-y-auto">{text}</div>
       ) : (
         <div className="relative">
-          <div className="px-2 py-1.5 whitespace-pre-wrap">{preview || text.split('\n').slice(0, 2).join('\n')}</div>
-          <div className="absolute inset-x-0 bottom-0 h-6 bg-gradient-to-t from-elevated/90 to-transparent pointer-events-none" />
+          <div className="px-2 py-1.5 whitespace-pre-wrap">{collapsedText}</div>
+          {lines.length > 2 && (
+            <div className="absolute inset-x-0 bottom-0 h-6 bg-gradient-to-t from-elevated/90 to-transparent pointer-events-none" />
+          )}
         </div>
       )}
     </div>
@@ -244,7 +250,7 @@ const WorldChatPanel = memo(forwardRef<WorldChatHandle, WorldChatPanelProps>(({ 
     // 思考独立气泡（2026-08-13）：只有思考没正文（note 且 content 空）——
     // 默认显示 2 行 + 底部渐变淡化，点击展开看全部
     if (m.role === 'note' && !m.content && m.reasoning) {
-      return <ReasoningBubble key={m.id} text={m.reasoning} preview={m.reasoning_preview} />
+      return <ReasoningBubble key={m.id} text={m.reasoning} />
     }
 
     return (

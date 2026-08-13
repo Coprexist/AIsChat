@@ -14,8 +14,6 @@ export interface ChatMsg {
   error?: boolean
   /** 排队中（AI 处理时发送，尚未真正发出；流结束后自动发送并刷新为正式消息） */
   pending?: boolean
-  /** 思考折叠预览（创建时前两行快照——折叠区固定显示，不随流式更新跳动；2026-08-13） */
-  reasoning_preview?: string
   created_at?: string
   /** 工具状态事件（2026-08-13）：tool_id 定位气泡，多状态原地更新 */
   tool_id?: string
@@ -348,22 +346,9 @@ export function useWorldChat({ wid, onRefresh, onMsg }: UseWorldChatOptions) {
           return [...msgs, { id, role: 'ai' as const, content: '', ...patch }]
         })
       }
-      // 更新思考 + 折叠 preview：preview 固定（流式期间不跳，展开后是完整内容）
-      // 固定条件：满两行 OR 长度达阈值（思考可能一大段无换行——只等两行会永不固定，一直显示最新）
+      // 更新思考（2026-08-13 简化：不维护 preview——折叠截断在渲染层做，一个对象）
       const updateBubbleReasoning = (id: number, reasoningText: string) => {
-        setChatMsgs((msgs) => {
-          const idx = msgs.findIndex((m) => m.id === id)
-          if (idx < 0) return msgs
-          const m = msgs[idx]
-          const prev = m.reasoning_preview || ''
-          const prevLines = prev.split('\n')
-          const fixed = (prevLines.length >= 2 && !!prevLines[0]) || prev.length >= 60
-          const preview = fixed ? prev : reasoningText.split('\n').slice(0, 2).join('\n')
-          if (m.reasoning === reasoningText && m.reasoning_preview === preview) return msgs
-          const next = msgs.slice()
-          next[idx] = { ...m, reasoning: reasoningText, reasoning_preview: preview }
-          return next
-        })
+        updateBubble(id, { reasoning: reasoningText })
       }
       // 正文气泡（首次正文到达时创建；id 顺序递增保证时间线）
       const ensureContentBubble = () => {
@@ -371,11 +356,11 @@ export function useWorldChat({ wid, onRefresh, onMsg }: UseWorldChatOptions) {
         contentTargetId = -(++msgSeqRef.current)
         updateBubble(contentTargetId, { content: full })
       }
-      // 思考气泡（首次思考到达时创建；独立 id；preview=折叠展示的前两行快照）
+      // 思考气泡（首次思考到达时创建；独立 id）
       const ensureReasoningBubble = () => {
         if (reasoningTargetId !== null) return
         reasoningTargetId = -(++msgSeqRef.current)
-        updateBubble(reasoningTargetId, { reasoning, reasoning_preview: reasoning.split('\n').slice(0, 2).join('\n') })
+        updateBubble(reasoningTargetId, { reasoning })
       }
       // rAF 节流渲染（每帧最多一次函数式更新）
       let renderPending = false
