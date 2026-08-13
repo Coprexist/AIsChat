@@ -3,19 +3,29 @@
 本 CHANGELOG 遵循 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.0.0/) 规范，
 版本号遵守 [语义化版本](https://semver.org/lang/zh-CN/)。
 
-> **当前阶段**：v0.3 正式版 — 补丁版本号（第三位）递增。
+> **当前阶段**：v0.3.5 正式版 — 补丁版本号（第三位）递增。
 
 ---
 
-### Added — 🎯 群视界触发模式（mention_only）+ 决策技能设计（2026-08-13 晚，产品定）
+## [v0.3.5] - 2026-08-13
+
+### Added — 🎯 群视界触发模式（mention_only）+ 决策技能设计（产品定）
 
 - **群消息非 @ 不触发 AI**（所有绑定群视界的群，暂时统一）：AI 不可能一直触发——大量群事件应由决策程序/世界程序处理，只有关键时刻（@AI / @all / 群公告）才唤醒 LLM 本体。实现：`response_worker` 触发群助手前查群绑定世界 + `worlds.config.group_trigger_mode`（默认 `mention_only`；`all` 恢复旧行为）；拦截不影响世界程序感知通道（`world_event_hook` 照常喂事件，即「决策程序代替 AI」的雏形）；未绑定群视界的普通群零开销
 - **配置 AI 可改、可随包分发**：世界 AI 工具集新增 `update_trigger_mode`（mention_only ↔ all，AI 自主决定本世界活跃度）；`export_zip` 附虚拟条目 `world_meta.json`（config 白名单快照，不落盘零污染）→ `import_zip` 读回合并——分享/发布世界时触发模式跟着走，导入只补缺失键、不覆盖宿主已有设置
-- **决策技能设计文档**：`docs/group_world/design/world_decision_skill.md`——阶段一（触发模式）已落地；阶段二（决策技能）设计定稿：预置情景列表（群消息/成员进出/好友申请/定时/世界事件/命令）+ 决策技能结构（`when` 条件 DSL + `do` 动作 + `notify` 是否唤醒本体）+ 决策引擎（事件→技能匹配→程序化处理 or 唤醒 LLM）
+- **决策技能设计文档**：`docs/group_world/design/world_decision_skill.md`——阶段一（触发模式）已落地；阶段二（决策技能）设计定稿：预置情景列表（群消息/成员进出/好友申请/定时/世界事件/命令）+ 决策技能结构（`when` 条件 DSL + `do` 动作 + `notify` 是否唤醒本体）+ 决策引擎（事件→技能匹配→程序化处理 or 唤醒 LLM）；条件 DSL 支持**递归逻辑树**（and/or/not 自由组装 + 字段运算 contains/starts_with/matches/比较）
+
+### Fixed — 🧮 化学公式渲染（KaTeX \ce / mhchem 三连，产品实测暴露）
+
+- **公式节点被 sanitize 剥掉**：`rehype-sanitize` 跑在 `rehype-katex` 前，defaultSchema 无 `math`/`math-inline` → `$...$` 公式变成裸 LaTeX 文本。修复：白名单补两节点（所有渲染入口走共享组件，单点生效）
+- **KaTeX 不内置 mhchem**：`\ce` 是未定义命令——错误回退把 `\ce` 标红、花括号当分组吞掉、`->` 变数学减号 `−>`（即 "\ceCu+Cl2−>[点燃]CuCl2" 乱码的真相）。修复：加载 `katex/dist/contrib/mhchem.mjs`（side-effect 注册 \ce/\pu）
+- **katex 双实例（真凶）**：rehype-katex 依赖 `katex ^0.16.0` 而顶层是 0.17.0 → npm 嵌套安装 0.16.47 → mhchem 注册到顶层实例、rehype-katex 用嵌套实例，\ce 永远未定义。修复：vite `resolve.dedupe: ['katex']` 强制单实例（KaTeX 官方推荐，对后人 npm install 复现同样生效）+ `optimizeDeps.include` 预构建；模块级验证 rehype-katex 与 mhchem 同源同 chunk
 
 ---
 
-### Fixed — 🔔 系统通知链路 + ⚙️ 12h 空闲压缩（2026-08-13 补，用户 API Key 失效场景暴露）
+## [v0.3.4] - 2026-08-12 ~ 08-13
+
+### Fixed — 🔔 系统通知链路 + ⚙️ 12h 空闲压缩（用户 API Key 失效场景暴露）
 
 - **系统通知静默丢失（三层 bug）**：AI 的 API Key 失效（401）时，降级通知和最终错误通知都没送达用户——
   ① `get_or_create_dm_session` 返回 dict 但 executor 用 `.session_id` 访问（AttributeError）
@@ -67,7 +77,14 @@
 
 - 🧠 **记忆管理增强（世界 + 主站对齐）**：manage_records / sr_* 新增 `rename`（category/sub_key/field 任一级改名）与 `move`（整组或单条跨目录移动）动作；记忆工具描述补 `user` 个性分类约定（偏好/风格/审美/习惯/关系）；新增 `build_memory_map` 缩进树记忆地图（只注入有内容的路径，空目录不出现），新会话/clear 后自动注入、普通延续对话不注入（省 token + 缓存稳定）；⭐（重要）/❗（硬约束）软锚定——value 前缀标记在地图上提到名字前，产生 Attention 特征峰值引导 LLM 优先处理；主站 format_db_records_for_prompt 重写（瘦身 + 软锚定 + 去 emoji），两套记忆行为统一
 
-### Fixed
+### Fixed — ⚡ LLM 缓存命中率修复系列（世界 AI 工具轮 + 前缀稳定）
+
+- **工具轮 payload 漏 max_tokens**：首轮手写流式带 `max_tokens: 64000`，`_stream_llm_once`（工具轮）漏了 → DeepSeek 前缀缓存 key 不同 → 工具轮永远 miss 首轮缓存（命中率 99%→0%）。修复：补 `max_tokens` 对齐首轮
+- **payload 字段顺序敏感**：字段顺序不一致也会让缓存 key 不同 → 工具轮 payload 字段顺序对齐首轮（彻底排除顺序敏感）
+- **世界时间在 system 前缀内**：活跃对话每轮时间变化 → 前缀 hash 变 → 缓存全 miss。修复：世界时间移出 system 前缀
+- **usage 收集依赖 choices**：DeepSeek usage 块可能带非空 choices → 用量/缓存统计漏记。修复：fetch `j.get("usage")` 独立于 choices 判断（命中率统计 110→118 次）
+- **命中率不随对话刷新**：普通对话（非工具场景）完成后不更新缓存统计 → 前端累计命中率越看越低。修复：普通对话完成也刷新
+- **思考折叠收尾**：preview 凑满两行即固定（无换行长思考也固定，不再显示最新）；折叠简化为渲染层截断（一个对象，收起只渲染前两行）；残留插入消息在 turn 结束时补发（前端气泡不再丢失）
 
 ### Docs（2026-08-12 新增）
 

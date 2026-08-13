@@ -458,6 +458,14 @@ active   → sleeping（休眠：无人在线 + 空闲超时）
 - **file_read 分页**：offset/limit 按行分页读（返回 total_lines/start_line/end_line/truncated）
 - 强注入段【文件查询】引导 AI：grep 定位 → 分段读 → 精确编辑
 
+### 7.9 触发模式与决策技能（2026-08-13 产品定，v0.3.5）
+
+**定位**：AI 不可能一直触发——大量群事件应由决策程序/世界程序处理，只有关键时刻（@AI / @all / 群公告）才唤醒 LLM 本体。
+
+- **触发模式**（阶段一，已落地）：`worlds.config.group_trigger_mode`——`mention_only`（默认：群消息除非 @ 世界 AI/@all/群公告，否则不唤醒 LLM 本体）｜`all`（旧行为：所有消息都进 AI 决策）；拦截点在 `response_worker._process_group_event`（触发群助手前查群绑定世界，未绑定群零开销）；**世界程序感知通道不受影响**（`world_event_hook` 照常喂事件 = 决策程序代替 AI 的雏形）；会话帧维护照常（「有人找过」记录）
+- **配置 AI 可改、可随包分发**：世界 AI 工具 `update_trigger_mode`（mention_only ↔ all，AI 自主决定本世界活跃度）；`export_zip` 附虚拟条目 `world_meta.json`（config 白名单快照，不落盘零污染）→ `import_zip` 读回合并——分享/发布世界时触发模式跟着走，导入只补缺失键、不覆盖宿主已有设置
+- **决策技能**（阶段二，设计定稿待实现，详见 `world_decision_skill.md`）：预置情景列表（group_message/member_join/member_leave/friend_request/scheduled/world_event/command）+ 决策技能结构（`when` 条件 DSL 递归逻辑树 and/or/not + 字段运算 contains/starts_with/matches/比较；`do` = run_script/call_tool/reply_template；`notify` = 是否唤醒本体）+ 决策引擎（事件→技能匹配→程序化处理 or 唤醒 LLM）
+
 ---
 
 ## 八、世界线一致性
