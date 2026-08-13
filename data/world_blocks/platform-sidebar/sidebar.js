@@ -56,7 +56,8 @@
 
   function build() {
     sidebarEl = document.createElement("aside");
-    sidebarEl.className = "sidebar-block";
+    // 2026-08-13：侧边导航栏默认收起（桌面端+移动端一致）——用户点击展开入口才显示
+    sidebarEl.className = "sidebar-block collapsed";
 
     var brand = document.createElement("div");
     brand.className = "sb-brand";
@@ -116,7 +117,7 @@
 
     toggleEl = document.createElement("button");
     toggleEl.className = "sb-toggle";
-    toggleEl.textContent = "«";
+    toggleEl.textContent = "»";  // 默认收起态：显示展开箭头
     toggleEl.title = "切换侧边栏";
     toggleEl.addEventListener("click", function () { setCollapsed(!sidebarEl.classList.contains("collapsed")); });
 
