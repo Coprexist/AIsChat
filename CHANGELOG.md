@@ -7,6 +7,27 @@
 
 ---
 
+## [v0.3.5] - 2026-08-13
+
+### Fixed — 🔔 系统通知链路 + ⚙️ 12h 空闲压缩（用户 API Key 失效场景暴露）
+
+- **系统通知静默丢失（三层 bug）**：AI 的 API Key 失效（401）时，降级通知和最终错误通知都没送达用户——
+  ① `get_or_create_dm_session` 返回 dict 但 executor 用 `.session_id` 访问（AttributeError）
+  ② 系统用户 0 与用户非好友，新建 0_X 会话被 `_require_friendship` 拦截
+  ③ 通知直接写 DMMessage 不更新会话 last_message → 侧边栏预览/排序不刷新
+  **修复**：通知复用 `send_dm_message(skip_friendship_check=True, message_type='system')`（统一处理 last_message/未读标记），
+  chat_api 包装方法补齐透传（原来 skip_friendship_check/message_type 被吞）
+- **12h 空闲压缩不触发**：原逻辑在工具循环内（LLM 调用成功后）——key 失效等早期失败根本执行不到，
+  且判定只看"最后消息距今"（12 天没聊但今天刚发消息时历史堆积不压缩）
+  **修复**：压缩前移到首次 LLM 调用前 + 增加"对话跨度"判定（首条→最后消息 > 12h 也压缩），
+  效果：137→22 条（-83% token）；当天对话不误压缩
+- **12h 空闲压缩优先级**（产品定）：API 通 → LLM 总结压缩（保要点）；API 不通/总结失败 → 内联截断兜底
+
+### Changed
+
+- 对外公开内容清理：文档/代码/积木/Release 中的个人称呼统一为「产品」（git 26 文件 + 积木库 + Release notes）
+
+---
 ## [v0.3.4] - 2026-08-12
 
 ### Added — ✨ 前缀内容版本化（锁）+ 群类型无限 + Skill 分层注入 + 世界直开
