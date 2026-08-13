@@ -573,7 +573,9 @@ async def _stream_llm_once(
     if out is not None:
         out.clear()
         out.update(result)
-    yield f"data: [DONE]\n\n"
+    # 注意：不在这里 yield [DONE]——它是单次 LLM 调用，[DONE] 只由 stream_world_chat
+    # 主流程在整轮对话结束时发（2026-08-13 修复：否则工具轮每轮发 [DONE]，
+    # 前端收到就退出订阅，第二轮之后的内容不显示）
 
 
 async def _inject_pending_user_messages(

@@ -67,7 +67,6 @@ function ToolBubble({ label, error, icon }: { label: string; error?: boolean; ic
 function ReasoningBubble({ text }: { text: string }) {
   const [expanded, setExpanded] = useState(false)
   const t = useT()
-  const collapsed = !expanded
   return (
     <div
       className="world-msg max-w-[90%] mx-auto cursor-pointer select-none text-[11px] text-textMuted bg-elevated/40 border border-border/50 rounded-lg overflow-hidden"
@@ -76,7 +75,6 @@ function ReasoningBubble({ text }: { text: string }) {
       <div className="flex items-center gap-1 px-2 py-1 border-b border-border/30">
         <Brain size={11} className="shrink-0 text-textMuted" />
         <span className="shrink-0 text-[10px] text-textMuted">{t('world.reasoning') || '思考'}</span>
-        {collapsed && <span className="truncate text-[10px] opacity-60">{text.replace(/\s+/g, ' ').slice(0, 60)}…</span>}
         <ChevronDown size={11} className={`ml-auto shrink-0 transition-transform ${expanded ? 'rotate-180' : ''}`} />
       </div>
       {expanded ? (
