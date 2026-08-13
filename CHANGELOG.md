@@ -9,6 +9,12 @@
 
 ## [v0.3.5] - 2026-08-13
 
+### Added — 🎛️ 决策技能机制（阶段二核心闭环，产品 2026-08-13 定）
+
+- **AI 自配置决策技能**：入驻 AI（agent 居民）/ 群助手各自持有自己的决策技能——「遇到什么情景我干什么、什么情景才唤醒我本体」；世界体系提供 list/write/delete_decision_skill 工具（ToolRegistry 插件，所有 AI 可自配置）
+- **技能结构**：`{name, when:{event, conditions}, do, notify}`——条件 DSL 递归逻辑树（and/or/not 自由组装 + 字段运算 contains/starts_with/matches/数值比较）；do 三选一（reply_template 零成本 / call_tool 平台工具 / run_script 沙箱脚本）；notify=true=命中后仍唤醒本体，false=程序处理完即止
+- **决策引擎**：群触发链路优先匹配（AI 自写规则 > mention_only 平台默认兜底）——命中且 notify=false → 程序化处理（reply 代发群，不唤醒 LLM）；未命中才走触发模式；群助手 LLM 调用带决策工具（仅工具调用时静默不回复）
+- 情景：group_message 已接入；member_join/leave、friend_request、scheduled 引擎通用、事件钩子后续接
 ### Added — 🎯 群视界触发模式（mention_only）+ 决策技能设计（产品定）
 
 - **群消息非 @ 不触发 AI**（所有绑定群视界的群，暂时统一）：AI 不可能一直触发——大量群事件应由决策程序/世界程序处理，只有关键时刻（＠AI / ＠all / 群公告）才唤醒 LLM 本体。实现：`response_worker` 触发群助手前查群绑定世界 + `worlds.config.group_trigger_mode`（默认 `mention_only`；`all` 恢复旧行为）；拦截不影响世界程序感知通道（`world_event_hook` 照常喂事件，即「决策程序代替 AI」的雏形）；未绑定群视界的普通群零开销

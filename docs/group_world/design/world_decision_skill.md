@@ -157,9 +157,11 @@
 - [ ] `export_zip` / `import_zip` 附 `world_meta.json`（config 白名单快照随包）
 - [ ] CHANGELOG 补记
 
-阶段二（待排期）：
-- [ ] 预置情景列表落库/配置化
-- [ ] 决策技能模型（`type="decision"` 技能结构 + 校验）
-- [ ] 决策引擎（事件路由 + 条件 DSL 解析）
-- [ ] `write_decision_skill` / `update_decision_skills` 工具
-- [ ] 决策执行沙箱接线 + 限额 + 日志
+阶段二（决策技能）——核心闭环已落地（2026-08-13）：
+- [x] 预置情景列表（group_message 已接入；member_join/leave、friend_request、scheduled 引擎通用、事件钩子陆续接）
+- [x] 决策技能模型（type=decision：when 条件 DSL + do 三动作 + notify）——存 agent_skills / group_assistants.config
+- [x] 决策引擎（事件→技能匹配→程序化处理 or 唤醒 LLM；优先于 mention_only 触发模式）
+- [x] `write_decision_skill` / `list_decision_skills` / `delete_decision_skill` 工具（ToolRegistry 插件，AI 自配置；群助手独立入口）
+- [x] do 执行（reply_template 零成本 / call_tool 平台工具 / run_script 沙箱复用 skill_sandbox）
+- [ ] 决策执行限额/日志（目前依赖世界沙箱配额，独立限额与审计待补）
+- [ ] 其余情景事件钩子（member_join/leave、friend_request、scheduled）
