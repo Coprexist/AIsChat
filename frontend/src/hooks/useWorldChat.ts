@@ -348,17 +348,17 @@ export function useWorldChat({ wid, onRefresh, onMsg }: UseWorldChatOptions) {
           return [...msgs, { id, role: 'ai' as const, content: '', ...patch }]
         })
       }
-      // 更新思考 + 折叠 preview：preview 凑满两行即固定（流式期间不跳，展开后是完整内容）
+      // 更新思考 + 折叠 preview：preview 固定（流式期间不跳，展开后是完整内容）
+      // 固定条件：满两行 OR 长度达阈值（思考可能一大段无换行——只等两行会永不固定，一直显示最新）
       const updateBubbleReasoning = (id: number, reasoningText: string) => {
         setChatMsgs((msgs) => {
           const idx = msgs.findIndex((m) => m.id === id)
           if (idx < 0) return msgs
           const m = msgs[idx]
-          const prevLines = (m.reasoning_preview || '').split('\n')
-          const previewFixed = prevLines.length >= 2 && !!prevLines[0]
-          const preview = previewFixed
-            ? m.reasoning_preview
-            : reasoningText.split('\n').slice(0, 2).join('\n')
+          const prev = m.reasoning_preview || ''
+          const prevLines = prev.split('\n')
+          const fixed = (prevLines.length >= 2 && !!prevLines[0]) || prev.length >= 60
+          const preview = fixed ? prev : reasoningText.split('\n').slice(0, 2).join('\n')
           if (m.reasoning === reasoningText && m.reasoning_preview === preview) return msgs
           const next = msgs.slice()
           next[idx] = { ...m, reasoning: reasoningText, reasoning_preview: preview }
