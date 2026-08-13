@@ -338,13 +338,25 @@ export function useWorldChat({ wid, onRefresh, onMsg }: UseWorldChatOptions) {
           }
           if (payload.startsWith('[INSERT]')) {
             // 排队消息已由后端插入当前工具轮（真正发出去了）：移除对应排队项 + 气泡去 pending 标记
+            // 按 FIFO 移除第一条匹配的（避免相同内容多条时全删；后端插入通道也是 FIFO）
             try {
               const ins = JSON.parse(payload.slice(8))
               const insContent = ins.content
-              setPendingItems((items) => items.filter((i) => i.text !== insContent))
-              setChatMsgs((msgs) => msgs.map((m) =>
-                m.role === 'user' && m.content === insContent ? { ...m, pending: false } : m,
-              ))
+              setPendingItems((items) => {
+                const idx = items.findIndex((i) => i.text === insContent)
+                if (idx === -1) return items
+                return items.filter((_, j) => j !== idx)
+              })
+              setChatMsgs((msgs) => {
+                let removed = false
+                return msgs.map((m) => {
+                  if (!removed && m.role === 'user' && m.pending && m.content === insContent) {
+                    removed = true
+                    return { ...m, pending: false }
+                  }
+                  return m
+                })
+              })
             } catch { /* ignore */ }
             continue
           }
