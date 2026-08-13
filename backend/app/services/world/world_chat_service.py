@@ -444,6 +444,122 @@ async def _resolve_world_credentials(db: AsyncSession, world) -> tuple[str | Non
     return api_key, api_base
 
 
+async def _stream_llm_once(
+    world_id: int, turn_id: str, round_no: int,
+    model: str, thinking: bool, api_base: str, api_key: str | None,
+    messages: list, tools, cfg: dict,
+    out: dict | None = None,
+):
+    """单次 LLM 流式调用：逐 chunk yield SSE 事件（正文/思考），并收集完整结果。
+
+    2026-08-13 修复：工具轮（round 2+）之前复用 chat_completion（聚合式）——
+    正文/思考要等整次调用结束才一次性出现，没有流式效果。
+    提取首轮的手写流式解析为公共生成器，工具轮也走它。
+
+    用法：
+        out = {}
+        async for event in _stream_llm_once(..., out=out):
+            yield event          # 外层再转发（或丢弃）
+        # 之后 out 里是完整 content/reasoning_content/tool_calls/usage
+    """
+    import httpx
+    _log_llm_request(world_id, turn_id, round_no, model, thinking, messages)
+    # 构造 payload（与首轮一致：stream + include_usage）
+    payload = {
+        "model": model,
+        "messages": messages,
+        "stream": True,
+        "stream_options": {"include_usage": True},
+        "temperature": cfg.get("temperature", 0.8),
+        "top_p": cfg.get("top_p", 0.9),
+    }
+    if thinking:
+        payload["thinking"] = {"type": "enabled"}
+    if tools:
+        payload["tools"] = tools
+    headers = {"Authorization": f"Bearer {api_key}", "Content-Type": "application/json"} if api_key else {"Content-Type": "application/json"}
+
+    result: dict = {"content": "", "reasoning_content": "", "tool_calls": None, "usage": None}
+    if out is not None:
+        out.clear()
+        out.update(result)
+    tool_call_acc: dict = {}
+    try:
+        async with httpx.AsyncClient(timeout=300.0) as client:
+            async with client.stream("POST", f"{api_base}/v1/chat/completions", json=payload, headers=headers) as resp:
+                if resp.status_code != 200:
+                    err = (await resp.aread()).decode(errors="replace")[:300]
+                    yield f"data: [ERROR]{_friendly_llm_error(f'{resp.status_code}: {err}')}\n\n"
+                    return
+                buffer = ""
+                done = False
+                async for chunk in resp.aiter_bytes():
+                    if not chunk:
+                        continue
+                    buffer += chunk.decode("utf-8", errors="replace")
+                    while "\n" in buffer:
+                        pos = buffer.find("\n")
+                        line = buffer[:pos]
+                        buffer = buffer[pos + 1:]
+                        if not line.strip() or not line.startswith("data: "):
+                            continue
+                        p = line[6:]
+                        if p == "[DONE]":
+                            done = True
+                            break
+                        try:
+                            j = json.loads(p)
+                            choices = j.get("choices") or []
+                            if not choices:
+                                if j.get("usage"):
+                                    result["usage"] = j["usage"]
+                                continue
+                            delta = choices[0].get("delta") or {}
+                            t = delta.get("content")
+                            if t:
+                                result["content"] += t
+                                yield f"data: {t.replace(chr(10), '{NL}')}\n\n"
+                            rt = delta.get("reasoning_content")
+                            if rt:
+                                result["reasoning_content"] += rt
+                                yield f"data: [REASONING]{rt.replace(chr(10), '{NL}')}\n\n"
+                            tcs = delta.get("tool_calls")
+                            if tcs:
+                                for item in tcs:
+                                    cid = item.get("id") or ""
+                                    key = cid if cid else f"idx_{item.get('index', 0)}"
+                                    acc = tool_call_acc.setdefault(key, {"id": "", "name": "", "arguments": "", "index": item.get("index", 0)})
+                                    if cid:
+                                        acc["id"] = cid
+                                    fn = item.get("function") or {}
+                                    if fn.get("name"):
+                                        acc["name"] = fn["name"]
+                                    if fn.get("arguments"):
+                                        acc["arguments"] += fn["arguments"]
+                        except (json.JSONDecodeError, UnicodeDecodeError):
+                            buffer = line + "\n" + buffer
+                            break
+                    if done:
+                        break
+    except Exception as e:
+        logger.warning(f"🌐 世界 #{world_id} 流式对话异常: {e}")
+        yield f"data: [ERROR]{str(e)[:200]}\n\n"
+        return
+    if tool_call_acc:
+        result["tool_calls"] = [
+            {
+                "id": acc["id"] or f"call_{key}",
+                "type": "function",
+                "function": {"name": acc["name"], "arguments": acc["arguments"] or "{}"},
+            }
+            for key, acc in sorted(tool_call_acc.items())
+        ]
+    if out is not None:
+        out.clear()
+        out.update(result)
+    yield f"data: [DONE]\n\n"
+
+
 async def stream_world_chat(
     db: AsyncSession,
     world_id: int,
@@ -871,7 +987,14 @@ async def stream_world_chat(
                     remaining = max_rounds - _r
                     if remaining <= 3:
                         messages.append({"role": "system", "content": f"⚠️ 你还有最后 {remaining} 轮工具调用机会，请尽快结束当前工作并给出总结！"})
-                    resp = await _llm(messages, tools_for_world, _r + 1)
+                    # 2026-08-13：工具轮流式化——逐 chunk 转发正文/思考（之前等整次调用结束一次性出）
+                    out: dict = {}
+                    async for event in _stream_llm_once(
+                        world_id, turn_id, _r + 1, model, thinking, api_base, api_key,
+                        messages, tools_for_world, cfg, out=out,
+                    ):
+                        yield event
+                    resp = out
                     await _record_usage(db, world_id, turn_id, str(_r + 1), model, (resp or {}).get("usage"), messages)
                     content = (resp or {}).get("content") or ""
                     reasoning = (resp or {}).get("reasoning_content") or ""
@@ -912,7 +1035,14 @@ async def stream_world_chat(
                 # 强制收尾轮：不带 tools，保证必有最终回复（含思考捕获）
                 if not final:
                     _log_llm_request(world_id, turn_id, "final", model, thinking, messages)
-                    resp_final = await _llm(messages, None, "final")
+                    # 2026-08-13：收尾轮流式化（之前等整次结束一次性出）
+                    out_f: dict = {}
+                    async for event in _stream_llm_once(
+                        world_id, turn_id, "final", model, thinking, api_base, api_key,
+                        messages, None, cfg, out=out_f,
+                    ):
+                        yield event
+                    resp_final = out_f
                     await _record_usage(db, world_id, turn_id, "final", model, (resp_final or {}).get("usage"), messages)
                     final = (resp_final or {}).get("content") or "（工具执行完成）"
                     fr = (resp_final or {}).get("reasoning_content") or ""
