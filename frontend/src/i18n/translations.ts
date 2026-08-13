@@ -5,8 +5,12 @@
  */
 
 import type { Lang } from './languages'
+import { toolZh, toolEn, toolJa } from './tool'
 
 export type TranslationDict = Record<string, string | Record<string, unknown>>
+
+/** 命名空间字典：ns → 扁平 key 字典（common/tool/… 每分区一个） */
+export type NamespacedDict = Record<string, TranslationDict>
 
 const zh: TranslationDict = {
   // ======================== 导航 / Navigation ========================
@@ -5350,20 +5354,39 @@ const ja: TranslationDict = {
   'settings.buildFactoryDownloadLink': 'ダウンロードリンク',
 };
 
-export const translations: Record<Lang, TranslationDict> = { zh, en, ja }
+export const translations: Record<Lang, NamespacedDict> = {
+  zh: { common: zh, tool: toolZh },
+  en: { common: en, tool: toolEn },
+  ja: { common: ja, tool: toolJa },
+}
+
+/** 插值：'正在{name}…' + { name: '读取文件' } → '正在读取文件…' */
+function interpolate(tpl: string, vars?: Record<string, string | number>): string {
+  if (!vars) return tpl
+  return tpl.replace(/\{([a-zA-Z_]+)\}/g, (_, k) => (vars[k] != null ? String(vars[k]) : `{${k}}`))
+}
 
 /**
- * 扁平字典直接查找：key 形如 'nav.chat'
+ * 命名空间查找：key 形如 'nav.chat'（common 分区）或 'tool:toolName.file_read'（tool 分区）。
+ * 查找链：指定 ns → 当前语言 → zh 同 ns → 返回 path。vars 用于 {var} 插值。
  */
 export function getTranslation(
   lang: Lang,
-  path: string
+  path: string,
+  vars?: Record<string, string | number>
 ): string {
-  const dict = translations[lang] || translations.zh
-  const val = (dict as Record<string, unknown>)[path]
-  if (typeof val === 'string') return val
-  // fallback to zh
-  const fb = (translations.zh as Record<string, unknown>)[path]
-  if (typeof fb === 'string') return fb
+  // 拆命名空间：'tool:key' → ns=tool, key=key；无前缀 → common
+  const sep = path.indexOf(':')
+  const ns = sep > 0 ? path.slice(0, sep) : 'common'
+  const key = sep > 0 ? path.slice(sep + 1) : path
+
+  const bundle = translations[lang] || translations.zh
+  const dict = bundle[ns] || bundle.common
+  const val = dict[key]
+  if (typeof val === 'string') return interpolate(val, vars)
+  // fallback：zh 同 ns → common → 原样
+  const fbDict = (translations.zh[ns] || translations.zh.common)
+  const fb = fbDict[key]
+  if (typeof fb === 'string') return interpolate(fb, vars)
   return path
 }

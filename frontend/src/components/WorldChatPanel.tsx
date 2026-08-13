@@ -2,6 +2,7 @@ import { memo, useState, useRef, useCallback, useMemo, forwardRef, useImperative
 import { Send, Plus, X, ChevronRight, Brain, ArrowDown, FileText, Search, Globe, Terminal, Package, Clock, Wrench, Eraser, Pin, ChevronDown } from 'lucide-react'
 import MarkdownContent from './shared/MarkdownContent'
 import { useWorldChat, WORLD_COMMANDS } from '../hooks/useWorldChat'
+import { useT } from '../i18n/I18nContext'
 
 // 工具气泡图标：按摘要内容关键词映射（后端文本不带 emoji，图标由前端渲染）
 function toolIcon(content: string) {
@@ -41,6 +42,7 @@ interface WorldChatPanelProps {
  * - 打字/消息更新仅重渲染此组件，不触发父组件
  */
 const WorldChatPanel = memo(forwardRef<WorldChatHandle, WorldChatPanelProps>(({ wid, onRefresh, onMsg, onUnreadCountChange }, ref) => {
+  const t = useT()
   // ── 内部管理所有聊天状态 ──
   const chat = useWorldChat({ wid, onRefresh, onMsg })
 
@@ -126,10 +128,25 @@ const WorldChatPanel = memo(forwardRef<WorldChatHandle, WorldChatPanelProps>(({ 
     const isLastAi = m.role === 'ai' && m.id === lastAiMsgId
 
     if (m.role === 'tool') {
+      // 工具状态气泡：running（正在执行 XX）→ update（进度）→ done（完成）
+      // 结构化字段走 i18n（tool:toolName.{name} + tool:tool.{status} 模板插值）；旧格式直接显示 content
+      let label = m.content
+      if (m.tool_name) {
+        const nameKey = `tool:toolName.${m.tool_name}`
+        const nameLabel = t(nameKey)
+        const toolName = nameLabel !== nameKey ? nameLabel : m.tool_name
+        if (m.tool_status === 'running') {
+          label = t('tool:tool.running', { name: `${toolName}${m.tool_args ? `：${m.tool_args}` : ''}` })
+        } else if (m.tool_status === 'update') {
+          label = m.content || t('tool:tool.update', { summary: `${toolName}…` })
+        } else {
+          label = m.content || t('tool:tool.done', { summary: `${toolName} ${m.error ? '执行失败' : '执行完成'}` })
+        }
+      }
       return (
         <div key={m.id} className={`world-msg flex items-center justify-center gap-1.5 text-[11px] text-center py-1 px-2 rounded-lg max-w-[90%] mx-auto ${m.error ? 'text-rose-400 bg-rose-500/10 border border-rose-500/20' : 'text-mint-400 bg-mint-400/10 border border-mint-400/20'}`}>
           <span className="shrink-0">{toolIcon(m.content)}</span>
-          <span className="min-w-0">{m.content}</span>
+          <span className="min-w-0">{label}</span>
         </div>
       )
     }

@@ -15,6 +15,11 @@ export interface ChatMsg {
   /** 排队中（AI 处理时发送，尚未真正发出；流结束后自动发送并刷新为正式消息） */
   pending?: boolean
   created_at?: string
+  /** 工具状态事件（2026-08-13）：tool_id 定位气泡，多状态原地更新 */
+  tool_id?: string
+  tool_name?: string
+  tool_status?: 'running' | 'update' | 'done'
+  tool_args?: string
 }
 
 // SSE 事件前缀（与后端 world_chat_service 的 yield 格式一一对应；解析用常量避免魔法数字）
@@ -373,29 +378,47 @@ export function useWorldChat({ wid, onRefresh, onMsg }: UseWorldChatOptions) {
             continue
           }
           if (payload.startsWith('[ERROR]')) throw new Error(payload.slice(7))
-          if (payload.startsWith('[TOOL]')) {
+          if (payload.startsWith('[TOOL_UPDATE]')) {
+            // 工具状态事件（2026-08-13：同 tool_id 多状态更新）——
+            // running（正在执行 XX）→ update（进度）→ done（完成，同 id 原地更新气泡）
             try {
-              const t = JSON.parse(payload.slice(6))
+              const tu = JSON.parse(payload.slice(13))
+              const tId = tu.tool_id
               // 先把当前叙述气泡同步封存（函数式更新：存在则更新；即使创建未提交也会带内容创建，不丢）
               if (streamTargetId !== null) {
                 updateBubble(streamTargetId, full, reasoning)
               }
               // 后续内容开新气泡；full/reasoning 重置避免拼接
-              // renderPending 也要重置：否则 [TOOL] 前排队的 rAF 会因 streamTargetId=null 空转 return，
-              // 之后紧跟的 [REASONING]/正文触发 scheduleRender 时被 renderPending=true 挡住不排队 → 新气泡永不渲染（三个点）
               streamTargetId = null
               full = ''
               reasoning = ''
               renderPending = false
-              setChatMsgs((msgs) => [...msgs, {
-                id: -(++msgSeqRef.current),
-                role: 'tool',
-                content: t.summary || `${t.name} ${t.success ? '执行成功' : '执行失败'}`,
-                error: !t.success,
-              }])
-              // 工具执行完 → 世界文件/配置可能被改 → 节流刷新（文件树动态更新；400ms 内多个工具合并一次）
-              if (refreshTimerRef.current) clearTimeout(refreshTimerRef.current)
-              refreshTimerRef.current = window.setTimeout(() => onRefreshRef.current(), 400)
+              if (tId) {
+                // 按 tool_id 定位：有则更新（status 变化原地替换），无则创建
+                const base = {
+                  role: 'tool' as const, tool_id: tId,
+                  tool_name: tu.name, tool_status: tu.status as any,
+                  tool_args: tu.args_summary,
+                  error: tu.status === 'done' ? !tu.success : false,
+                }
+                setChatMsgs((msgs) => {
+                  const idx = msgs.findIndex((m) => m.role === 'tool' && m.tool_id === tId)
+                  if (idx >= 0) {
+                    const next = msgs.slice()
+                    next[idx] = { ...next[idx], ...base, content: tu.summary || next[idx].content }
+                    return next
+                  }
+                  return [...msgs, { id: -(++msgSeqRef.current), ...base, content: tu.summary || '' }]
+                })
+              } else {
+                // 无 tool_id（旧格式兜底）：独立气泡
+                setChatMsgs((msgs) => [...msgs, { id: -(++msgSeqRef.current), role: 'tool', content: tu.summary || tu.name, error: tu.status === 'done' ? !tu.success : false }])
+              }
+              // 工具完成 → 世界文件/配置可能被改 → 节流刷新（文件树动态更新；400ms 内多个工具合并一次）
+              if (tu.status === 'done') {
+                if (refreshTimerRef.current) clearTimeout(refreshTimerRef.current)
+                refreshTimerRef.current = window.setTimeout(() => onRefreshRef.current(), 400)
+              }
             } catch { /* 解析失败忽略 */ }
             continue
           }

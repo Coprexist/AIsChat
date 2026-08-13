@@ -5,7 +5,7 @@ import { type Lang, DEFAULT_LANG, isValidLang } from './languages'
 
 interface I18nContextType {
   lang: Lang
-  t: (path: string) => string
+  t: (path: string, vars?: Record<string, string | number>) => string
 }
 
 const I18nContext = createContext<I18nContextType>({
@@ -67,7 +67,7 @@ export function I18nProvider({ children }: { children: ReactNode }) {
   }, [user?.language])
 
   const t = useCallback(
-    (path: string) => getTranslation(lang, path),
+    (path: string, vars?: Record<string, string | number>) => getTranslation(lang, path, vars),
     [lang]
   )
 

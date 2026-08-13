@@ -95,6 +95,7 @@ class WorldChatMessage(Base):
     role = Column(String(10), nullable=False, comment="user | ai | tool | note")
     content = Column(Text, nullable=False)
     reasoning = Column(Text, nullable=True, comment="AI 思考过程（thinking 模式产生，展示用，不进上下文）")
+    tool_id = Column(String(32), nullable=True, index=True, comment="工具执行 id（同 id 多状态更新，历史只留最终态；2026-08-13 新增）")
 
     created_at = Column(DateTime, server_default=func.now())
 

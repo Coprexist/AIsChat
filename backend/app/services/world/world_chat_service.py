@@ -602,15 +602,35 @@ async def _execute_tool_round(
     db: AsyncSession, world, world_id: int, tool_call_acc: dict,
     messages: list, turn_state: dict, sid_db: str | None,
 ):
-    """执行本轮所有工具调用：执行 → 摘要 → 注入上下文 → 落库 → [TOOL] 事件。
+    """执行本轮所有工具调用：执行 → 摘要 → 注入上下文 → 落库 → 状态事件。
 
-    工具轮循环内的单轮执行单元（2026-08-13 拆分，降低 stream_world_chat 体量）。
+    工具轮循环内的单轮执行单元（2026-08-13 拆分；同日升级为多状态事件）：
+    - 执行前 yield [TOOL_UPDATE]{tool_id, status:running}（前端显示"正在执行 XX"）
+    - 工具内部可 yield 进度（on_progress → status:update，如 运行代码/编译/执行中）
+    - 执行后 yield 同 id [TOOL_UPDATE]{status:done}（前端按 id 原地更新气泡）
+    - 落库：同 tool_id 更新最后一条（历史只留最终态）
     """
     import json
+    import uuid
     from app.models.world import WorldChatMessage
     from app.services.world.world_tools import _execute_world_tool, _tool_result_summary
     for idx, acc in sorted(tool_call_acc.items()):
-        result = await _execute_world_tool(db, world, acc["name"], acc["arguments"], turn_state)
+        tool_id = f"t_{uuid.uuid4().hex[:8]}"
+        args_summary = _args_summary(acc.get("arguments") or "")
+        # ① 执行前：running 状态（前端创建/更新气泡：正在执行 XX）
+        yield f"data: [TOOL_UPDATE]{json.dumps({'tool_id': tool_id, 'status': 'running', 'name': acc['name'], 'args_summary': args_summary}, ensure_ascii=False)}\n\n"
+        # ② 工具内部进度事件（耗时工具如 run_world_code 分阶段 yield update）
+        progress_events: list[str] = []
+        async def _on_progress(note: str) -> None:
+            progress_events.append(note)
+        try:
+            result = await _execute_world_tool(
+                db, world, acc["name"], acc["arguments"], turn_state,
+                on_progress=_on_progress,
+            )
+        except TypeError:
+            # 兼容：工具签名未支持 on_progress
+            result = await _execute_world_tool(db, world, acc["name"], acc["arguments"], turn_state)
         summary = _tool_result_summary(acc["name"], result)
         turn_state["tools_done"].append(summary)
         messages.append({
@@ -618,12 +638,43 @@ async def _execute_tool_round(
             "tool_call_id": acc["id"] or f"call_{idx}",
             "content": json.dumps(result, ensure_ascii=False),
         })
-        db.add(WorldChatMessage(
-            world_id=world_id, user_id=None, role="tool",
-            content=summary, session_id=sid_db,
-        ))
-        yield f"data: [TOOL]{json.dumps({'name': acc['name'], 'success': bool(result.get('success')), 'summary': summary}, ensure_ascii=False)}\n\n"
+        # ③ 进度事件转发（同 tool_id，status=update）
+        for note in progress_events:
+            yield f"data: [TOOL_UPDATE]{json.dumps({'tool_id': tool_id, 'status': 'update', 'name': acc['name'], 'summary': note}, ensure_ascii=False)}\n\n"
+        # ④ 执行后：done（同 tool_id，前端原地更新）
+        yield f"data: [TOOL_UPDATE]{json.dumps({'tool_id': tool_id, 'status': 'done', 'name': acc['name'], 'success': bool(result.get('success')), 'summary': summary}, ensure_ascii=False)}\n\n"
+        # ⑤ 落库：同 tool_id 更新最后一条（历史只留最终态）；无 tool_id 旧字段则新增
+        existing = (await db.execute(
+            select(WorldChatMessage).where(
+                WorldChatMessage.world_id == world_id,
+                WorldChatMessage.tool_id == tool_id,
+            ).order_by(WorldChatMessage.id.desc()).limit(1)
+        )).scalar_one_or_none()
+        if existing is not None:
+            existing.content = summary
+        else:
+            db.add(WorldChatMessage(
+                world_id=world_id, user_id=None, role="tool",
+                content=summary, session_id=sid_db, tool_id=tool_id,
+            ))
         await db.commit()
+
+
+def _args_summary(arguments: str) -> str:
+    """工具参数摘要（展示用）：取 path/code/event 等关键字段，避免全量刷屏"""
+    import json
+    try:
+        args = json.loads(arguments or "{}")
+    except (json.JSONDecodeError, TypeError):
+        return ""
+    if not isinstance(args, dict):
+        return ""
+    for key in ("path", "code", "event", "name", "query"):
+        v = args.get(key)
+        if v:
+            s = str(v).strip()
+            return s[:80] + ("…" if len(s) > 80 else "")
+    return ""
 
 
 async def _prepare_world_chat(

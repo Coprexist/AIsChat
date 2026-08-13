@@ -681,8 +681,11 @@ async def _web_download(world, arguments: str) -> dict:
         return {"success": False, "error": f"下载失败：{str(e)[:120]}"}
 
 
-async def _do_execute(db: AsyncSession, world, name: str, arguments: str, turn_state: dict | None = None) -> dict:
-    """实际执行世界 AI 的工具调用（以世界主人身份写操作；文件走隔离目录+白名单）"""
+async def _do_execute(db: AsyncSession, world, name: str, arguments: str, turn_state: dict | None = None, on_progress=None) -> dict:
+    """实际执行世界 AI 的工具调用（以世界主人身份写操作；文件走隔离目录+白名单）
+
+    on_progress：耗时工具分阶段回调（async (note) -> None），转发为 [TOOL_UPDATE] update 事件。
+    """
     import json
 
     if name == "web_download":
@@ -1092,11 +1095,18 @@ async def _do_execute(db: AsyncSession, world, name: str, arguments: str, turn_s
             await ensure_world_api_token(db, world)
             await db.commit()
             from app.services.world.world_sandbox import run_world_code as _run_code, run_world_trigger as _run_trigger
+            # 分阶段进度（2026-08-13：耗时工具多状态——创建→运行→返回）
+            if on_progress:
+                await on_progress("正在创建脚本…")
             if args.get("event") is not None:
                 entry = str(args.get("entry") or "main.py").strip()
+                if on_progress:
+                    await on_progress("触发世界入口执行中…")
                 return await _run_trigger(world, event=args.get("event"), entry=entry)
             code = args.get("code")
             entry = str(args.get("entry") or "").strip() or None
+            if on_progress:
+                await on_progress("脚本运行中…")
             return await _run_code(world, code=code if isinstance(code, str) else None, entry=entry)
         except (ValueError, TypeError, json.JSONDecodeError) as e:
             return {"success": False, "error": str(e)}
@@ -1446,14 +1456,16 @@ async def _do_execute(db: AsyncSession, world, name: str, arguments: str, turn_s
 
 async def _execute_world_tool(
     db: AsyncSession, world, name: str, arguments: str, turn_state: dict | None = None,
+    on_progress=None,
 ) -> dict:
     """温和去重包装：5 分钟内重复调用且结果与上次完全一致才提示跳过。
 
     list_world_files 可能是 AI 在验证写入结果——结果变了不算重复；
     超过 5 分钟（如用户手动改了文件）允许重跑。
+    on_progress：耗时工具分阶段回调（async (note) -> None），转发为 [TOOL_UPDATE] update 事件。
     """
     import time as _time
-    result = await _do_execute(db, world, name, arguments, turn_state)
+    result = await _do_execute(db, world, name, arguments, turn_state, on_progress=on_progress)
     if turn_state is not None:
         executed = turn_state.setdefault("executed", {})
         key = f"{name}|{arguments}"
