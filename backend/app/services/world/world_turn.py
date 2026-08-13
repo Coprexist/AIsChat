@@ -59,6 +59,9 @@ async def recover_orphaned_turn(world_id: int) -> None:
                     "interrupted_at": datetime.now(timezone.utc).replace(tzinfo=None).isoformat(),
                     "tools_done": tools_done,
                 }
+                # ⚠️ 2026-08-13 修复：必须清除 active_turn——否则 status 接口
+                # 一直看到残留标记返回 processing=true，前端"永远处理中"卡死。
+                cfg.pop("active_turn", None)
                 world.config = cfg
             await db.commit()
             logger.info(f"🌐 世界 #{world_id} 回收未闭合轮次（已强制收尾 + 存工作流记忆）")
