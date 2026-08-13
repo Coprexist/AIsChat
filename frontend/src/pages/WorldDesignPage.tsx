@@ -474,6 +474,7 @@ export default function WorldDesignPage() {
         onRefresh={load}
         onMsg={setMsg}
         onUnreadCountChange={setChatUnreadCount}
+        creatorName={world?.creator?.name}
       />
     </>
     )

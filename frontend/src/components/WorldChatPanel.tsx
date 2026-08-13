@@ -104,6 +104,8 @@ interface WorldChatPanelProps {
   onMsg: (msg: string) => void
   /** 未读计数变化回调（父组件需要响应式更新标题栏徽章等） */
   onUnreadCountChange?: (count: number) => void
+  /** 群视界机器人昵称（气泡标签用；缺省回退「世界 AI」） */
+  creatorName?: string
 }
 
 /**
@@ -114,7 +116,7 @@ interface WorldChatPanelProps {
  * - 通过 onUnreadCountChange 回调通知父组件未读变化
  * - 打字/消息更新仅重渲染此组件，不触发父组件
  */
-const WorldChatPanel = memo(forwardRef<WorldChatHandle, WorldChatPanelProps>(({ wid, onRefresh, onMsg, onUnreadCountChange }, ref) => {
+const WorldChatPanel = memo(forwardRef<WorldChatHandle, WorldChatPanelProps>(({ wid, onRefresh, onMsg, onUnreadCountChange, creatorName }, ref) => {
   const t = useT()
   // ── 内部管理所有聊天状态 ──
   const chat = useWorldChat({ wid, onRefresh, onMsg })
@@ -197,8 +199,13 @@ const WorldChatPanel = memo(forwardRef<WorldChatHandle, WorldChatPanelProps>(({ 
   }, [chat])
 
   // ── 渲染消息列表 ──
-  const renderMessage = (m: typeof chat.chatMsgs[number]) => {
+  const renderMessage = (m: typeof chat.chatMsgs[number], msgIndex: number) => {
     const isLastAi = m.role === 'ai' && m.id === lastAiMsgId
+    // 正文上方紧跟思考气泡（上一条 note 且无正文）→ 省略「世界 AI」标签（思考已标识 AI 身份）
+    const prevIsReasoning = msgIndex > 0
+      && chat.chatMsgs[msgIndex - 1].role === 'note'
+      && !chat.chatMsgs[msgIndex - 1].content
+      && !!chat.chatMsgs[msgIndex - 1].reasoning
 
     if (m.role === 'tool') {
       // 工具状态气泡：running（正在执行 XX）→ update（进度）→ done（完成）
@@ -235,7 +242,7 @@ const WorldChatPanel = memo(forwardRef<WorldChatHandle, WorldChatPanelProps>(({ 
     return (
       <div key={m.id} className="space-y-2">
         <div className={`world-msg text-sm max-w-[90%] p-2 rounded-lg ${m.error ? 'bg-rose-500/10 border border-rose-500/30 text-rose-400' : m.role === 'user' ? 'bg-primary-500/20 ml-auto' : 'bg-elevated/80'}`}>
-          <div className="text-[10px] text-textMuted mb-0.5">{m.error ? '错误' : m.role === 'user' ? (m.pending ? '我（排队中，发送后生效）' : '我') : '世界 AI'}</div>
+          <div className="text-[10px] text-textMuted mb-0.5">{m.error ? '错误' : m.role === 'user' ? (m.pending ? '我（排队中，发送后生效）' : '我') : (prevIsReasoning ? '' : (creatorName || '世界 AI'))}</div>
           {!m.error && (m.role === 'ai' || m.role === 'note') && !!m.reasoning && (
             <details className="group/details mb-1.5">
               <summary className="flex items-center gap-1 text-[10px] text-textMuted cursor-pointer select-none hover:text-textSecondary list-none [&::-webkit-details-marker]:hidden">
@@ -365,7 +372,7 @@ const WorldChatPanel = memo(forwardRef<WorldChatHandle, WorldChatPanelProps>(({ 
       {/* 消息列表 */}
       <div ref={chat.chatListRef} className="flex-1 overflow-y-auto p-3 space-y-2 relative">
         {chat.chatLoadingOlder && <div className="text-[10px] text-textMuted text-center py-1">加载更早消息…</div>}
-        {chat.chatMsgs.length === 0 ? renderEmptySuggestions() : chat.chatMsgs.map(renderMessage)}
+        {chat.chatMsgs.length === 0 ? renderEmptySuggestions() : chat.chatMsgs.map((m, i) => renderMessage(m, i))}
 
         {/* 回到底部 / 新消息按钮：不在底部（或未读>0，或列表不可滚动时给入口）才显示；可滚动且在底部隐藏
             sticky 固定在聊天列表视口右下角（输入区正上方）：列表滚动时不动，不随消息内容滚 */}
