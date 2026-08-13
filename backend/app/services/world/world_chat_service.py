@@ -1022,15 +1022,15 @@ async def stream_world_chat(
                                 full_content += t
                                 yield f"data: {t.replace(chr(10), '{NL}')}\n\n"
                             # 工具调用（function calling 分片到达）
-                            # ⚠️ 并行调用修复（2026-08-13）：DeepSeek 并行 tool_calls 的 index 可能重复（都=0），
-                            # 按 index 累加会把两个调用的 arguments 拼串 → JSON 损坏/字段丢失。
-                            # 优先用 id（call_00/call_01 唯一）区分，id 缺失才退回 index。
+                            # ⚠️ DeepSeek 流式坑（2026-08-13）：name 分片带 id、arguments 分片常不带 id——
+                            # 统一按 index 聚合（同一 index 的 name/arguments 分片拼一起；id 只作最终输出）。
                             tcs = delta.get("tool_calls")
                             if tcs:
                                 for item in tcs:
                                     cid = item.get("id") or ""
-                                    key = cid if cid else f"idx_{item.get('index', 0)}"
-                                    acc = tool_call_acc.setdefault(key, {"id": "", "name": "", "arguments": "", "index": item.get("index", 0)})
+                                    idx = item.get("index", 0)
+                                    key = f"idx_{idx}"
+                                    acc = tool_call_acc.setdefault(key, {"id": "", "name": "", "arguments": "", "index": idx})
                                     if cid:
                                         acc["id"] = cid
                                     fn = item.get("function") or {}
