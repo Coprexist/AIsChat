@@ -9,6 +9,7 @@ POST /worlds/{id}/chat          → enqueue，返回 turn_id
 GET  /worlds/{id}/chat/stream   → 订阅指定 turn 的实时事件
 """
 import asyncio
+import json
 import logging
 import uuid
 from datetime import datetime, timezone
@@ -170,6 +171,35 @@ class WorldTurnWorker:
                     self.turns.pop(item["turn_id"], None)
                     for _tid in [t for t, _tb in self.turns.items() if _tb.proxy is tb]:
                         self.turns.pop(_tid, None)
+                    # ⚠️ 2026-08-13 修复：活跃 turn 结束时，残留的插入消息（工具轮已退出没 drain 的）
+                    # 落库 + 广播 [INSERTED]/[INSERT]——否则消息卡在 _inserts，AI 下个 turn 才看到
+                    # 但前端没订阅那个 turn → 气泡不显示。这里补发，前端立即收到。
+                    try:
+                        if self._inserts:
+                            async with async_session() as _db:
+                                from app.models.world import WorldChatMessage
+                                from app.services.world.world_chat_service import session_id_for_db
+                                world_row = await _db.get(World, self.world_id)
+                                sid = session_id_for_db(world_row) if world_row else None
+                                pending = self._inserts
+                                self._inserts = []
+                                total = sum(len(i["messages"]) for i in pending)
+                                await tb.broadcast(f"data: [INSERTED]{json.dumps({'count': total})}\n\n")
+                                for _it in pending:
+                                    for _m in _it["messages"]:
+                                        _t = str(_m).strip()
+                                        if not _t:
+                                            continue
+                                        wm = WorldChatMessage(
+                                            world_id=self.world_id, user_id=_it["user_id"],
+                                            role="user", content=_t, session_id=sid,
+                                        )
+                                        _db.add(wm)
+                                        await _db.flush()
+                                        await tb.broadcast(f"data: [INSERT]{json.dumps({'msg_id': wm.id, 'content': _t}, ensure_ascii=False)}\n\n")
+                                await _db.commit()
+                    except Exception as e:
+                        logger.warning(f"🌐 世界 #{self.world_id} 残留插入消息补发失败（非致命）: {e}")
 
     def enqueue(self, user_id: int, message: str | list[str]) -> str:
         """消息入队（支持批量：排队消息一起发给 AI），返回 turn_id（订阅直播用）。
