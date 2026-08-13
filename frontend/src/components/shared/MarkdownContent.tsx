@@ -48,7 +48,7 @@ export default function MarkdownContent({ content, isMine = false }: { content: 
   return (
     <Markdown
       children={colorize(content, isMine)}
-      remarkPlugins={[remarkGfm, remarkMath, remarkBreaks, remarkInlineCode]}
+      remarkPlugins={[[remarkGfm, { singleTilde: false }], remarkMath, remarkBreaks, remarkInlineCode]}
       rehypePlugins={[rehypeRaw, [rehypeSanitize, {
         ...defaultSchema,
         tagNames: [...(defaultSchema.tagNames || []), 'inlinecode'],

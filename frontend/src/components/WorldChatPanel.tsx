@@ -81,8 +81,9 @@ function ReasoningBubble({ text }: { text: string }) {
         <div className="px-2 py-1.5 whitespace-pre-wrap max-h-72 overflow-y-auto">{text}</div>
       ) : (
         <div className="relative">
-          <div className="px-2 py-1.5 whitespace-pre-wrap line-clamp-2">{text}</div>
-          {/* 底部渐变淡化（截断提示） */}
+          {/* 折叠：JS 取最前两行（不用 line-clamp——流式更新时它不稳定且会显示最新）；
+              最久的内容才是有价值的上下文线索 */}
+          <div className="px-2 py-1.5 whitespace-pre-wrap">{text.split('\n').slice(0, 2).join('\n')}</div>
           <div className="absolute inset-x-0 bottom-0 h-6 bg-gradient-to-t from-elevated/90 to-transparent pointer-events-none" />
         </div>
       )}
