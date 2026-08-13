@@ -425,10 +425,15 @@ export default function WorldDesignPage() {
   const chatHandleRef = useRef<WorldChatHandle>(null)
   const [chatUnreadCount, setChatUnreadCount] = useState(0)
 
-  // world 加载完成 → 聊天面板渲染 → 确保在底部
+  // world 首次加载完成 → 聊天面板渲染 → 确保在底部（2026-08-13 修复：只在首次滚——
+  // 之前依赖 [world]，工具 done 后 onRefresh→load→setWorld 每次都触发，
+  // 把用户从任意位置无条件拉到底部）
+  const worldLoadedRef = useRef(false)
   useEffect(() => {
-    if (world) chatHandleRef.current?.forceScrollToBottom()
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    if (world && !worldLoadedRef.current) {
+      worldLoadedRef.current = true
+      chatHandleRef.current?.forceScrollToBottom()
+    }
   }, [world])
 
   // ── 聊天面板内容（桌面右栏 / 移动端对话 tab 共用） ──
