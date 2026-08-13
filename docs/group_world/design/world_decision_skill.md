@@ -100,9 +100,12 @@
   "name": "quiet_group_auto_reply",
   "when": {
     "event": "group_message",
-    "conditions": {                 // 条件树（DSL，全部满足才命中）
-      "is_mention": false,
-      "content_contains": ["签到", "打卡"]
+    "conditions": {                 // 条件树（DSL，递归组合，见下）
+      "and": [
+        { "is_mention": false },
+        { "content_contains": ["签到", "打卡"] },
+        { "not": { "content_contains": "停止" } }
+      ]
     }
   },
   "do": {
@@ -114,7 +117,17 @@
 }
 ```
 
-- `when`：事件类型 + 条件 DSL（`event` 字段引用、`content_contains`、`is_mention`、`group_type` 等；组合用 `all`/`any`）。
+- `when`：事件类型 + 条件 DSL。
+- `conditions` **逻辑自由组装**：递归条件树，节点支持：
+  - `and: [cond, ...]` / `or: [cond, ...]`（数组内全部/任一满足）
+  - `not: cond`（取反）
+  - 叶子条件 = 字段运算（引用事件上下文字段）：
+    - `"字段": 值` 简写（等于）
+    - `"字段_contains": "子串"` / `"字段_starts_with": "前缀"` / `"字段_matches": "正则"`
+    - `"字段_gt/lt/gte/lte": 数值`（比较）
+    - 保留字段：`is_mention` / `is_at_all` / `sender_type` / `group_type` / `content` / `sender_id` 等
+  - 例：`or: [{content_contains: "天气"}, {and: [{content_contains: "签到"}, {not: {is_mention: true}}]}]`
+  - 进阶（后续）：表达式字符串模式（`(content contains '天气' or group_type == '冒险团') and not is_mention`），白名单解析器，供高级场景；初期以条件树为准。
 - `do`：三选一——`run_script`（沙箱 Python，能力最全）/ `call_tool`（平台工具，如 `world_data_put`）/ `reply_template`（固定回复，零成本）。
 - `notify`：关键语义——**"什么情景才触发我"**。`notify: true` 的情景命中后仍唤醒 LLM 本体（AI 声明"这种时候必须我来"）；`false` 则程序处理完即止。
 - AI 自写：提供 `write_decision_skill` / `update_decision_skills` 工具，AI 自己生成、迭代自己的决策技能（走 `capability_versioning` 版本化，前缀缓存稳定）。

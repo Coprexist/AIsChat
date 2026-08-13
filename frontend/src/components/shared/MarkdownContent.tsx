@@ -51,7 +51,7 @@ export default function MarkdownContent({ content, isMine = false }: { content: 
       remarkPlugins={[[remarkGfm, { singleTilde: false }], remarkMath, remarkBreaks, remarkInlineCode]}
       rehypePlugins={[rehypeRaw, [rehypeSanitize, {
         ...defaultSchema,
-        tagNames: [...(defaultSchema.tagNames || []), 'inlinecode'],
+        tagNames: [...(defaultSchema.tagNames || []), 'inlinecode', 'math', 'math-inline'],
         attributes: {
           ...defaultSchema.attributes,
           a: [...(defaultSchema.attributes?.a || ['href']), 'class', 'target', 'rel'],
