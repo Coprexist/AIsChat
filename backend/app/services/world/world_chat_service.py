@@ -539,10 +539,12 @@ async def _stream_llm_once(
                             break
                         try:
                             j = json.loads(p)
+                            # ⚠️ 2026-08-13 修复：usage 收集独立于 choices——DeepSeek 的 usage 块
+                            # 可能带空 choices（[]）也可能带非空 choices，只要消息有 usage 就收
+                            if j.get("usage"):
+                                result["usage"] = j["usage"]
                             choices = j.get("choices") or []
                             if not choices:
-                                if j.get("usage"):
-                                    result["usage"] = j["usage"]
                                 continue
                             delta = choices[0].get("delta") or {}
                             rt = delta.get("reasoning_content")
@@ -1089,16 +1091,16 @@ async def stream_world_chat(
                             break
                         try:
                             j = json.loads(p)
+                            # ⚠️ 2026-08-13 修复：usage 收集独立于 choices（同上）
+                            if j.get("usage"):
+                                u = dict(j["usage"])
+                                pd = u.pop("prompt_tokens_details", None) or {}
+                                cd = u.pop("completion_tokens_details", None) or {}
+                                u["cached_tokens"] = pd.get("cached_tokens", 0)
+                                u["reasoning_tokens"] = cd.get("reasoning_tokens", 0)
+                                first_usage = u
                             choices = j.get("choices") or []
                             if not choices:
-                                # 流结束的 usage 块（stream_options.include_usage）
-                                if j.get("usage"):
-                                    u = dict(j["usage"])
-                                    pd = u.pop("prompt_tokens_details", None) or {}
-                                    cd = u.pop("completion_tokens_details", None) or {}
-                                    u["cached_tokens"] = pd.get("cached_tokens", 0)
-                                    u["reasoning_tokens"] = cd.get("reasoning_tokens", 0)
-                                    first_usage = u
                                 continue
                             delta = choices[0].get("delta") or {}
                             t = delta.get("content")
