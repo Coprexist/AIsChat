@@ -407,6 +407,29 @@ async def get_chat_history(db: AsyncSession, world_id: int, limit: int = 30, bef
     ]
 
 
+async def _save_note_separated(
+    db: AsyncSession, world_id: int, content: str, reasoning: str, session_id: str | None,
+) -> None:
+    """落库中间轮 note：正文/思考拆成两条独立 note（2026-08-13）。
+
+    流式事件里正文和思考是独立气泡（contentTargetId/reasoningTargetId），
+    落库也必须拆开——否则刷新后 loadChat 拿到合并 note，前端渲染成普通气泡
+    （思考塞 details 里），思考折叠/独立展示失效。
+    """
+    from app.models.world import WorldChatMessage
+    if content:
+        db.add(WorldChatMessage(
+            world_id=world_id, user_id=None, role="note",
+            content=content[:4000], reasoning=None, session_id=session_id,
+        ))
+    if reasoning:
+        db.add(WorldChatMessage(
+            world_id=world_id, user_id=None, role="note",
+            content="", reasoning=reasoning, session_id=session_id,
+        ))
+    await db.commit()
+
+
 async def _save_ai_reply(db: AsyncSession, world, content: str, reasoning: str, session_id: str | None = None) -> None:
     """落库 AI 回复（含思考过程）；内容为空则跳过"""
     from app.services.world.world_service import _now
@@ -1138,14 +1161,9 @@ async def stream_world_chat(
                 from app.ai.llm import chat_completion
                 from app.services.world.world_tools import _execute_world_tool, _tool_result_summary
                 # 第一轮过渡叙述 + 对应思考过程：给用户看（role=note，不进 AI 上下文）
-                # 2026-08-13：正文/思考独立展示——无正文存空串（不占位），思考独立渲染
+                # 2026-08-13：正文/思考拆两条独立 note（刷新后思考独立气泡，折叠生效）
                 if full_content or full_reasoning:
-                    db.add(WorldChatMessage(
-                        world_id=world_id, user_id=None, role="note",
-                        content=full_content or "", reasoning=full_reasoning or None,
-                        session_id=sid_db,
-                    ))
-                    await db.commit()
+                    await _save_note_separated(db, world_id, full_content, full_reasoning or "", sid_db)
                 # 第一轮正文重置（最终以收尾轮为准）
                 full_content = ""
                 # 首轮思考保留：后续轮有思考会覆盖；但工具轮 DeepSeek 常不输出 reasoning_content，
@@ -1206,18 +1224,12 @@ async def stream_world_chat(
                         final = content
                         break
                     # 中间轮（还要继续调工具）：正文也流式展示 + 落库 note（历史可见、不进 AI 上下文）——
-                    # 2026-08-13：正文/思考独立展示——无正文存空串（不占位），思考独立渲染
+                    # 2026-08-13：正文/思考拆两条独立 note（刷新后思考独立气泡，折叠生效）
                     if content or reasoning:
                         # 中间轮思考也要落库（对齐首轮 note：reasoning 字段），否则刷新后「工具调用的思考」丢失
                         if content:
                             full_content = content
-                        db.add(WorldChatMessage(
-                            world_id=world_id, user_id=None, role="note",
-                            content=(content or "")[:4000],
-                            reasoning=reasoning or None,
-                            session_id=sid_db,
-                        ))
-                        await db.commit()
+                        await _save_note_separated(db, world_id, content or "", reasoning or "", sid_db)
                         if content:
                             yield f"data: {content.replace(chr(10), '{NL}')}\n\n"
                     # 模型还要继续调工具：记录真实 tool_calls，进入下一轮
