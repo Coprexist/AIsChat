@@ -493,17 +493,17 @@ async def _stream_llm_once(
     """
     import httpx
     _log_llm_request(world_id, turn_id, round_no, model, thinking, messages)
-    # 构造 payload（与首轮完全一致——⚠️ max_tokens 必须同值，否则 DeepSeek 前缀缓存
-    # key 不同 → 工具轮永远 miss 首轮缓存。2026-08-13 修复：昨天工具轮走 chat_completion
-    # 带 max_tokens，今天改 _stream_llm_once 漏了 → cached_tokens 从 99% 掉到 0）
+    # 构造 payload（与首轮完全一致——字段+顺序都要相同！DeepSeek 前缀缓存 key
+    # 若基于序列化字符串，顺序不同也 miss。2026-08-13 修复：昨天 chat_completion 与
+    # 首轮同构所以命中；今天 _stream_llm_once 顺序/字段有差异 → 工具轮全 miss）
     payload = {
         "model": model,
         "messages": messages,
-        "stream": True,
-        "stream_options": {"include_usage": True},
         "temperature": cfg.get("temperature", 0.8),
         "top_p": cfg.get("top_p", 0.9),
         "max_tokens": 64000,
+        "stream": True,
+        "stream_options": {"include_usage": True},
     }
     if thinking:
         payload["thinking"] = {"type": "enabled"}
