@@ -9,12 +9,38 @@
 
 ## [v0.3.5] - 2026-08-13
 
-### Added — 🎛️ 决策技能机制（阶段二核心闭环，产品 2026-08-13 定）
+### Added — 🎛️ 决策技能机制（阶段二核心闭环，产品定）
 
 - **AI 自配置决策技能**：入驻 AI（agent 居民）/ 群助手各自持有自己的决策技能——「遇到什么情景我干什么、什么情景才唤醒我本体」；世界体系提供 list/write/delete_decision_skill 工具（ToolRegistry 插件，所有 AI 可自配置）
 - **技能结构**：`{name, when:{event, conditions}, do, notify}`——条件 DSL 递归逻辑树（and/or/not 自由组装 + 字段运算 contains/starts_with/matches/数值比较）；do 三选一（reply_template 零成本 / call_tool 平台工具 / run_script 沙箱脚本）；notify=true=命中后仍唤醒本体，false=程序处理完即止
 - **决策引擎**：群触发链路优先匹配（AI 自写规则 > mention_only 平台默认兜底）——命中且 notify=false → 程序化处理（reply 代发群，不唤醒 LLM）；未命中才走触发模式；群助手 LLM 调用带决策工具（仅工具调用时静默不回复）
 - 情景：group_message 已接入；member_join/leave、friend_request、scheduled 引擎通用、事件钩子后续接
+
+### Added — 🎯 群助手独立实体（不走 agents 表，产品定）
+
+- **群助手 ≠ agent**：新表 `group_assistants`（group_id/world_id/group_type_slug/name/system_prompt/model/api_key 加密/config）——每群每助手一行；绑定群时按类型模板直接建实体，不再 create_agent/入群成员表/WorldAgent 登记，与群视界 AI 同形态（无账号、无好友）
+- **触发链路改造**：`response_worker` 查 group_assistants → 独立 LLM 路径（system_prompt+群历史→chat_completion→发群消息 source=world 防循环→用量记账 agent_id=-2 虚拟聚合）；sender_id 用 -ga.id 负值避免与 user_id 冲突；群助手自己的消息不触发防自循环；群消息列表显示助手名
+- **历史数据迁移**：agent 41「冒险团团长」→ group_assistant 1（7 条历史消息 sender 69→-1；清理 friendships/group_members/agents/users，备份在 backend/backup/）
+- **群助手也可以是纯后端程序**：世界程序 main.py handle 直接接群消息处理（不依赖 LLM）
+
+### Added — 🖥️ 页面静默事件通道（页面 → 世界程序，产品定）
+
+- **`POST /world/{id}/api/event`**：页面操作（移动/攻击/开宝箱等）直接触发世界程序 handle(event)，**不产生群消息、不进群聊**（解决页面操作刷屏：30 步 = 30 条群消息）——用户登录鉴权 + 群绑定/成员校验 + 写限流；服务端注入 user_id/user_name（不信任页面自报）；常驻世界入队 / 临时触发同步返回 handle 结果
+- **接口文档 06 补 4.1 章节**（世界 AI/页面代码可直接用）；世界 39 改造补丁（main.py 支持 page_command + game.js sendCommand 改走事件通道，数据区 root 属主待应用）
+- 配套【消息同步纪律】强注入段：非必要消息不同步到群，前端能展示的一律不发群
+
+### Changed — ⚡ 插入消息立即落库显示（产品定改）
+
+- 之前：工具轮进行中发的普通消息**等下一轮 LLM 调用前**才落库+画气泡 → 用户感觉"没插进去"
+- 现在：发消息**瞬间**立即落库 + 广播 [INSERTED]/[INSERT]（气泡马上画入、排队弹窗秒清）；`_inserts` 仅作上下文注入；轮次结束兜底补发未落库项（已落库跳过防重复）
+
+### Fixed — 📊 LLM 缓存命中统计（显示 0% 实为提取 bug）
+
+- 根因：DeepSeek 首轮 usage 顶层有 `cached_tokens`，**工具轮**只有 `prompt_tokens_details.cached_tokens` / `prompt_cache_hit_tokens` → `_record_usage` 只读顶层 → world_llm_usage 工具轮全记 0 → 前端统计 0%
+- 修复：`_extract_cached_tokens` 三层 fallback；历史 27 条记录按 conversation_log 原始 usage 同秒重算（实际命中率 99%+，如 51730→51584）
+
+---
+
 ### Added — 🎯 群视界触发模式（mention_only）+ 决策技能设计（产品定）
 
 - **群消息非 @ 不触发 AI**（所有绑定群视界的群，暂时统一）：AI 不可能一直触发——大量群事件应由决策程序/世界程序处理，只有关键时刻（＠AI / ＠all / 群公告）才唤醒 LLM 本体。实现：`response_worker` 触发群助手前查群绑定世界 + `worlds.config.group_trigger_mode`（默认 `mention_only`；`all` 恢复旧行为）；拦截不影响世界程序感知通道（`world_event_hook` 照常喂事件，即「决策程序代替 AI」的雏形）；未绑定群视界的普通群零开销

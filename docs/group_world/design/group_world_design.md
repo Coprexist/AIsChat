@@ -466,6 +466,30 @@ active   → sleeping（休眠：无人在线 + 空闲超时）
 - **配置 AI 可改、可随包分发**：世界 AI 工具 `update_trigger_mode`（mention_only ↔ all，AI 自主决定本世界活跃度）；`export_zip` 附虚拟条目 `world_meta.json`（config 白名单快照，不落盘零污染）→ `import_zip` 读回合并——分享/发布世界时触发模式跟着走，导入只补缺失键、不覆盖宿主已有设置
 - **决策技能**（阶段二，设计定稿待实现，详见 `world_decision_skill.md`）：预置情景列表（group_message/member_join/member_leave/friend_request/scheduled/world_event/command）+ 决策技能结构（`when` 条件 DSL 递归逻辑树 and/or/not + 字段运算 contains/starts_with/matches/比较；`do` = run_script/call_tool/reply_template；`notify` = 是否唤醒本体）+ 决策引擎（事件→技能匹配→程序化处理 or 唤醒 LLM）
 
+### 7.10 群助手独立实体（2026-08-13 产品定，v0.3.5）
+
+**群助手 ≠ agent**：新表 `group_assistants`（group_id/world_id/group_type_slug/name/system_prompt/model/api_key 加密/config），每群每助手一行；绑定群时按类型模板直接建实体，**不再 create_agent / 入群成员表 / WorldAgent 登记**——与群视界 AI 同形态：无账号、无好友。
+
+- 触发：`response_worker` 查 group_assistants → 独立 LLM 路径（system_prompt + 群历史 → chat_completion → 发群消息 source=world 防循环 → 用量记账 agent_id=-2 虚拟聚合，记账人 = 世界主人）；sender_id 用 `-ga.id` 负值避免与 user_id 冲突；群助手自己的消息不触发（防自触发循环）
+- 群消息列表：sender_id<0 → 查 group_assistants 显示助手名
+- 历史迁移：旧 agent 41「冒险团团长」→ group_assistant 1（消息/好友/成员/agents/users 清理，备份 backend/backup/）
+- **群助手也可以是纯后端程序**：世界程序 main.py handle 直接接群消息处理（不依赖 LLM）——页面静默通道 + 世界程序回复能力已具备
+
+### 7.11 页面静默事件通道（2026-08-13 产品定，v0.3.5）
+
+页面操作**不要发群消息**（否则刷屏：30 步 = 30 条群消息）——用事件通道直连世界程序：
+
+```
+POST /world/{id}/api/event     # 用户登录鉴权 + 群绑定/成员校验 + 写限流
+{"type": "page_command", "group_id": 57, "payload": {"command": "我去 2,3"}}
+```
+
+- 事件 `{type, source:"page", payload, group_id, group_type}`，服务端注入 user_id/user_name（不信任页面自报）
+- 常驻世界入队（queued）/ 临时触发同步返回 handle 结果
+- **不产生群消息**：世界程序回复用 publish(SSE) 回页面；只有真正需要别人在群里看到的才用群消息 API
+- 接口文档 06 分区 4.1（世界 AI/页面代码可直接读）；世界 39 改造补丁：main.py handle 支持 page_command（payload.command 复用群命令语法走同一套 dispatch）+ game.js sendCommand 改走事件通道
+- 配套【消息同步纪律】强注入段：非必要消息不同步到群，前端能展示的一律不发群
+
 ---
 
 ## 八、世界线一致性
