@@ -384,20 +384,44 @@ async def _tool_call_loop(
     # 之前放在工具循环内（调用成功后），key 失效等早期失败时根本执行不到——
     # 12 天没聊的对话带着全量历史硬跑，且 key 修复前永远不压缩。前移后即使本次失败，
     # 下次重试时上下文已瘦身。
+    # 优先级（2026-08-13 产品定）：API 通 → LLM 总结压缩（保留要点）；API 不通 → 内联截断兜底
     try:
         from app.services.memory.context_compression_service import (
-            should_compress, inline_compress, get_compression_threshold,
+            inline_compress, compress_messages,
         )
         stale = _is_conversation_idle(messages, hours=12)
         if stale and not getattr(_context, "_precompressed", False):
-            messages, compress_stats = inline_compress(messages)
-            if compress_stats.get("compressed"):
+            compressed_ok = False
+            # 优先 LLM 总结压缩（保留关键信息，适合继续对话的场景）
+            if api_key:
+                try:
+                    messages, compress_stats = await compress_messages(
+                        messages,
+                        api_base_url=api_base_url,
+                        api_key=api_key,
+                        model=model,
+                        user_id=str(agent.id),
+                    )
+                    if compress_stats.get("compressed"):
+                        compressed_ok = True
+                        logger.info(
+                            f"AI {agent.name}({agent.id}) 空闲>12h LLM 总结压缩: "
+                            f"{compress_stats.get('before_tokens')}→{compress_stats.get('after_tokens')} tok"
+                        )
+                except Exception as e:
+                    logger.warning(f"空闲 LLM 压缩失败，回退内联截断: {e}")
+            # API 不可用或总结失败 → 内联截断兜底
+            if not compressed_ok:
+                messages, compress_stats = inline_compress(messages)
+                if compress_stats.get("compressed"):
+                    compressed_ok = True
+                    logger.info(
+                        f"AI {agent.name}({agent.id}) 空闲>12h 内联截断(API不可用): "
+                        f"{compress_stats.get('before_tokens')}→{compress_stats.get('after_tokens')} tok"
+                    )
+            if compressed_ok:
                 _auto_compressed = True
                 _context["_precompressed"] = True
-                logger.info(
-                    f"AI {agent.name}({agent.id}) 空闲>12h 首次调用前内联压缩: "
-                    f"{compress_stats.get('before_tokens')}→{compress_stats.get('after_tokens')} tok"
-                )
     except Exception as e:
         logger.warning(f"调用前空闲压缩跳过（非致命）: {e}")
 
