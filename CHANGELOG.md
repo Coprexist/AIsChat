@@ -21,6 +21,25 @@
   效果：137→22 条（-83% token）；当天对话不误压缩
 - **12h 空闲压缩优先级**（产品定）：API 通 → LLM 总结压缩（保要点）；API 不通/总结失败 → 内联截断兜底
 
+### Added — 🛠️ 世界 AI 工具链升级（2026-08-13 下午，AI 工具调用体验 + 前端展示）
+
+- **普通消息插入工具轮**（产品定）：AI 工具轮进行中用户发普通消息→不打断，在下一轮 LLM 调用前自然注入（drain → 落库 → 发事件 → 拼上下文）；只有命令（/compact 等）等整轮结束。两段式协议：[INSERTED] 信号清排队弹窗 + [INSERT] 真实 id 画气泡（断联后 loadChat 位置正确）
+- **工具轮+收尾轮流式化**：正文/思考逐 chunk 显示（不再等整次调用结束一次性出）
+- **工具状态事件 [TOOL_UPDATE]**：同 tool_id 多状态气泡（running 正在执行 XX → update 进度 → done 完成原地更新）；run_world_code 分阶段（创建脚本→运行中→返回结果）；落库按 tool_id 去重只留最终态；WorldChatMessage 加 tool_id 列
+- **思考/正文独立气泡**：思考用思考 id、正文用正文 id（顺序递增）；无正文不占位（去「（…）」）；思考默认 2 行+渐变淡化+点击展开；工具长摘要折叠+展开/收起
+- **file_grep + file_read 分页**：AI 看文件先 grep 定位（命中行+行号）再 offset/limit 分段读，不再整文件全读（对齐 OpenClaw read 设计）
+- **i18n 命名空间化**（对齐 i18next）：新增 i18n/tool.ts 独立分区（zh/en/ja），translations 两级结构 {lang:{common,tool}}，getTranslation 支持 'ns:key' + {var} 插值；现有 t('xxx') 完全兼容；未来分区同模式加文件、支持 addResourceBundle 补充
+- **stream_world_chat 大函数拆分**：545→370 行（_prepare_world_chat/_execute_tool_round/_inject_pending_user_messages 收口）
+
+### Fixed（2026-08-13 下午，AI 工具调用连环失败系列）
+
+- **DeepSeek 流式分片**：name 分片带 id、arguments 分片不带 id → 按 id 区分导致分离。修复：id 主 key + index 桥（index_to_id），两者结合不再二选一
+- **DeepSeek DSML/XML 格式**：模型有时把工具调用输出成 XML 文本（<invoke name=...><parameter name=...>）而非标准 JSON——参数全丢、AI 连环失败（20+ 次）。修复：_parse_dsml_tool_calls 兼容两种 XML 格式
+- **工具轮 [DONE] 误发**：_stream_llm_once 每轮 yield [DONE] → 前端收到即退出订阅，第二轮之后不显示。修复：[DONE] 只由主流程整轮结束时发
+- **工具轮 400**：thinking 模式 assistant 消息必须回传 reasoning_content（首轮+后续轮都补）
+- **单波浪线被当删除线**：remark-gfm 默认 singleTilde=true（GitHub 非标准扩展）→ '1~2和2~3' 被渲染成删除线。修复：singleTilde:false，只有 ~~ 才是删除线（全局共享组件单点修复）
+- **迁移 revision 撞号**：a1b2c3d4e5f6 已被占用 → 改为 b1c2d3e4f5a6
+
 ### Added — ✨ 前缀内容版本化（锁）+ 群类型无限 + Skill 分层注入 + 世界直开
 
 - 🔒 **前缀内容版本化（所有进前缀的内容保证缓存命中）**：用户可改提示词（world-prompt-{id}）、强注入段（forced-prompt）、昵称（world-name-{id}）、主站 agent 提示词（agent-prompt-{id}）统一走 capability_versions 版本链（known 告知 / effective 生效）——用户改提示词、系统更新强注入、改名都是正常操作，**不再断前缀缓存**；变更只动态尾部注入 changelog 告知；compact / clear（= 新对话）解锁后正式生效；锁定态尝试应用变更 → 拒绝 + 后端报错记录（guard_apply_change 防御）

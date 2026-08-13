@@ -429,6 +429,35 @@ active   → sleeping（休眠：无人在线 + 空闲超时）
 
 **已知特点（待产品确认是否符合设计）**：世界 AI 是拉模式——群里有新消息时它不会像群 AI 那样自动触发回复，只有用户进入世界聊天界面才回复。如果希望世界 AI 在群里也能被消息自动触发（推模式），则需要接入并发调度（考虑排队影响）。
 
+### 7.7 消息插入 + 工具状态事件 + 流式协议（2026-08-13 产品定）
+
+**普通消息插入工具轮**：AI 工具轮进行中用户发普通消息→不打断循环，在下一轮 LLM 调用前自然注入（drain → 落库 → 拼上下文）；只有命令（/ 开头）等当前轮次结束再执行。前端两段式协议：
+
+```
+[INSERTED]{"count": N}   ← 信号（不计入历史）：前端按 FIFO 清排队弹窗
+[INSERT]{"msg_id", "content"}  ← 消息（已落库、记入历史）：前端画用户气泡（真实 id）
+```
+
+**工具状态事件**（同 tool_id 多状态，气泡原地更新）：
+
+```
+[TOOL_UPDATE]{"tool_id", "status":"running", "name", "args_summary"}   ← 执行前：正在执行 XX
+[TOOL_UPDATE]{"tool_id", "status":"update", "name", "summary"}       ← 进度（耗时工具如 run_world_code 分阶段）
+[TOOL_UPDATE]{"tool_id", "status":"done", "name", "success", "summary"} ← 完成：同 id 更新
+```
+
+- 落库按 tool_id 更新最后一条（历史只留最终态）；WorldChatMessage.tool_id 列
+- **思考/正文独立气泡**：思考用思考 id、正文用正文 id（顺序递增）；无正文不占位；思考默认 2 行+渐变淡化+点击展开；工具长摘要折叠+展开/收起
+- **工具轮事件流式化**：正文/思考逐 chunk yield；[DONE] 只由主流程整轮结束时发（工具轮不误发，否则前端提前退出订阅）
+- **DeepSeek 兼容**：分片解析用 id 主 key + index 桥（name 带 id、arguments 不带 id）；DSML/XML 工具调用（<invoke>/<tool_call>）自动解析为标准 tool_calls
+- **i18n 命名空间化**：translations 两级结构 {lang:{common,tool}}，'ns:key' 前缀 + {var} 插值；工具名/状态文案独立 tool.ts 分区（zh/en/ja），未来支持 addResourceBundle 补充
+
+### 7.8 文件查询（2026-08-13 产品定，对齐 OpenClaw read 设计）
+
+- **file_grep**：按关键词/正则搜世界文件，返回命中行+行号（正则非法按普通子串）——先定位再按需读，不整文件全读
+- **file_read 分页**：offset/limit 按行分页读（返回 total_lines/start_line/end_line/truncated）
+- 强注入段【文件查询】引导 AI：grep 定位 → 分段读 → 精确编辑
+
 ---
 
 ## 八、世界线一致性
