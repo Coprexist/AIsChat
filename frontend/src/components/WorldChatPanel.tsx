@@ -67,6 +67,20 @@ function ToolBubble({ label, error, icon }: { label: string; error?: boolean; ic
 function ReasoningBubble({ text }: { text: string }) {
   const [expanded, setExpanded] = useState(false)
   const t = useT()
+  // 折叠快照：进入折叠态时取一次前两行，流式更新不动它（否则思考逐字增长，折叠区一直跳）
+  // 展开看完整内容；再次折叠时重新取（此时内容已稳定）
+  const snapshotRef = useRef<string | null>(null)
+  const [snapshot, setSnapshot] = useState<string | null>(null)
+  useEffect(() => {
+    if (!expanded) {
+      if (snapshotRef.current === null) {
+        snapshotRef.current = text.split('\n').slice(0, 2).join('\n')
+        setSnapshot(snapshotRef.current)
+      }
+    } else {
+      snapshotRef.current = null
+    }
+  }, [expanded, text])
   return (
     <div
       className="world-msg max-w-[90%] mx-auto cursor-pointer select-none text-[11px] text-textMuted bg-elevated/40 border border-border/50 rounded-lg overflow-hidden"
@@ -81,9 +95,8 @@ function ReasoningBubble({ text }: { text: string }) {
         <div className="px-2 py-1.5 whitespace-pre-wrap max-h-72 overflow-y-auto">{text}</div>
       ) : (
         <div className="relative">
-          {/* 折叠：JS 取最前两行（不用 line-clamp——流式更新时它不稳定且会显示最新）；
-              最久的内容才是有价值的上下文线索 */}
-          <div className="px-2 py-1.5 whitespace-pre-wrap">{text.split('\n').slice(0, 2).join('\n')}</div>
+          {/* 折叠：固定快照（最久的两行，流式期间不跳）；展开/收起切换后重新取 */}
+          <div className="px-2 py-1.5 whitespace-pre-wrap">{snapshot ?? text.split('\n').slice(0, 2).join('\n')}</div>
           <div className="absolute inset-x-0 bottom-0 h-6 bg-gradient-to-t from-elevated/90 to-transparent pointer-events-none" />
         </div>
       )}
