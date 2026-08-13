@@ -38,6 +38,7 @@ export const toolZh: TranslationDict = {
   'tool.running': '正在{name}…',
   'tool.update': '{summary}',
   'tool.done': '{summary}',
+  'world.reasoning': '思考',
 }
 
 export const toolEn: TranslationDict = {
@@ -66,6 +67,7 @@ export const toolEn: TranslationDict = {
   'tool.running': 'Running {name}…',
   'tool.update': '{summary}',
   'tool.done': '{summary}',
+  'world.reasoning': 'Thinking',
 }
 
 export const toolJa: TranslationDict = {
@@ -94,4 +96,5 @@ export const toolJa: TranslationDict = {
   'tool.running': '{name}を実行中…',
   'tool.update': '{summary}',
   'tool.done': '{summary}',
+  'world.reasoning': '思考',
 }

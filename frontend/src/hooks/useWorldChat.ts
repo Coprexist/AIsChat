@@ -300,7 +300,10 @@ export function useWorldChat({ wid, onRefresh, onMsg }: UseWorldChatOptions) {
   const subscribeTurnStream = useCallback(async (turnId: string): Promise<boolean> => {
     let full = ''
     let reasoning = ''
-    let streamTargetId: number | null = null  // 当前流式气泡（[TOOL] 后封存、开新气泡）
+    // 2026-08-13：正文/思考独立气泡（顺序递增 id）——思考一个气泡、正文一个气泡，
+    // 没有正文就没有正文气泡（不再用占位）；[TOOL_UPDATE] 后都封存开新
+    let contentTargetId: number | null = null
+    let reasoningTargetId: number | null = null
     const base = (localStorage.getItem('instance_url') || '').replace(/\/+$/, '') + '/api'
     const authHeaders = {
       'Authorization': `Bearer ${localStorage.getItem('access_token')}`,
@@ -316,24 +319,28 @@ export function useWorldChat({ wid, onRefresh, onMsg }: UseWorldChatOptions) {
       // 流式气泡：函数式更新（存在则更新、不存在则创建），同一 id 永不重复——
       // ⚠️ 根本修复：React 18 setState 异步提交，气泡创建未提交时 msgs.map 找不到 id → 更新被吞 → 气泡永远空。
       // 用函数式 setState：无论提交时序，最终 state 里气泡必带最新内容（创建即带内容，更新不丢）。
-      const updateBubble = (id: number, content: string, reasoning: string) => {
+      const updateBubble = (id: number, patch: Partial<ChatMsg>) => {
         setChatMsgs((msgs) => {
           const idx = msgs.findIndex((m) => m.id === id)
           if (idx >= 0) {
-            if (msgs[idx].content === content && msgs[idx].reasoning === reasoning) return msgs
             const next = msgs.slice()
-            next[idx] = { ...next[idx], content, reasoning }
+            next[idx] = { ...next[idx], ...patch }
             return next
           }
-          return [...msgs, { id, role: 'ai' as const, content, reasoning }]
+          return [...msgs, { id, role: 'ai' as const, content: '', ...patch }]
         })
       }
-      // 首次内容/思考到达时开气泡（不在发消息时预建，避免空气泡）
-      const ensureBubble = () => {
-        if (streamTargetId !== null) return
-        const id = -(++msgSeqRef.current)
-        streamTargetId = id
-        updateBubble(id, full, reasoning)
+      // 正文气泡（首次正文到达时创建；id 顺序递增保证时间线）
+      const ensureContentBubble = () => {
+        if (contentTargetId !== null) return
+        contentTargetId = -(++msgSeqRef.current)
+        updateBubble(contentTargetId, { content: full })
+      }
+      // 思考气泡（首次思考到达时创建；独立 id）
+      const ensureReasoningBubble = () => {
+        if (reasoningTargetId !== null) return
+        reasoningTargetId = -(++msgSeqRef.current)
+        updateBubble(reasoningTargetId, { reasoning })
       }
       // rAF 节流渲染（每帧最多一次函数式更新）
       let renderPending = false
@@ -342,8 +349,8 @@ export function useWorldChat({ wid, onRefresh, onMsg }: UseWorldChatOptions) {
         renderPending = true
         requestAnimationFrame(() => {
           renderPending = false
-          if (streamTargetId === null) return
-          updateBubble(streamTargetId, full, reasoning)
+          if (contentTargetId !== null) updateBubble(contentTargetId, { content: full })
+          if (reasoningTargetId !== null) updateBubble(reasoningTargetId, { reasoning })
         })
       }
       while (true) {
@@ -384,12 +391,12 @@ export function useWorldChat({ wid, onRefresh, onMsg }: UseWorldChatOptions) {
             try {
               const tu = JSON.parse(payload.slice(13))
               const tId = tu.tool_id
-              // 先把当前叙述气泡同步封存（函数式更新：存在则更新；即使创建未提交也会带内容创建，不丢）
-              if (streamTargetId !== null) {
-                updateBubble(streamTargetId, full, reasoning)
-              }
+              // 先把当前正文/思考气泡同步封存（函数式更新：存在则更新；即使创建未提交也会带内容创建，不丢）
+              if (contentTargetId !== null) updateBubble(contentTargetId, { content: full })
+              if (reasoningTargetId !== null) updateBubble(reasoningTargetId, { reasoning })
               // 后续内容开新气泡；full/reasoning 重置避免拼接
-              streamTargetId = null
+              contentTargetId = null
+              reasoningTargetId = null
               full = ''
               reasoning = ''
               renderPending = false
@@ -424,12 +431,13 @@ export function useWorldChat({ wid, onRefresh, onMsg }: UseWorldChatOptions) {
           }
           if (payload.startsWith('[REASONING]')) {
             reasoning += payload.slice(11).replace(/\{NL\}/g, '\n')
+            ensureReasoningBubble()
           } else if (payload.startsWith('[TOOL]')) {
             // 旧格式工具事件（无 _UPDATE）已废弃：忽略，不当作正文显示（2026-08-13）
           } else {
             full += payload.replace(/\{NL\}/g, '\n')
+            ensureContentBubble()
           }
-          ensureBubble()
           scheduleRender()
         }
         if (gotDone) break

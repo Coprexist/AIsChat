@@ -18,6 +18,35 @@ function toolIcon(content: string) {
   return <Wrench size={12} />
 }
 
+/** 思考气泡（2026-08-13）：独立展示，默认 2 行 + 底部渐变淡化，点击展开看全部 */
+function ReasoningBubble({ text }: { text: string }) {
+  const [expanded, setExpanded] = useState(false)
+  const t = useT()
+  const collapsed = !expanded
+  return (
+    <div
+      className="world-msg max-w-[90%] mx-auto cursor-pointer select-none text-[11px] text-textMuted bg-elevated/40 border border-border/50 rounded-lg overflow-hidden"
+      onClick={() => setExpanded((v) => !v)}
+    >
+      <div className="flex items-center gap-1 px-2 py-1 border-b border-border/30">
+        <Brain size={11} className="shrink-0 text-textMuted" />
+        <span className="shrink-0 text-[10px] text-textMuted">{t('world.reasoning') || '思考'}</span>
+        {collapsed && <span className="truncate text-[10px] opacity-60">{text.replace(/\s+/g, ' ').slice(0, 60)}…</span>}
+        <ChevronDown size={11} className={`ml-auto shrink-0 transition-transform ${expanded ? 'rotate-180' : ''}`} />
+      </div>
+      {expanded ? (
+        <div className="px-2 py-1.5 whitespace-pre-wrap max-h-72 overflow-y-auto">{text}</div>
+      ) : (
+        <div className="relative">
+          <div className="px-2 py-1.5 whitespace-pre-wrap line-clamp-2">{text}</div>
+          {/* 底部渐变淡化（截断提示） */}
+          <div className="absolute inset-x-0 bottom-0 h-6 bg-gradient-to-t from-elevated/90 to-transparent pointer-events-none" />
+        </div>
+      )}
+    </div>
+  )
+}
+
 export interface WorldChatHandle {
   forceScrollToBottom: () => void
   unreadCount: number
@@ -149,6 +178,12 @@ const WorldChatPanel = memo(forwardRef<WorldChatHandle, WorldChatPanelProps>(({ 
           <span className="min-w-0">{label}</span>
         </div>
       )
+    }
+
+    // 思考独立气泡（2026-08-13）：只有思考没正文（note 且 content 空）——
+    // 默认显示 2 行 + 底部渐变淡化，点击展开看全部
+    if (m.role === 'note' && !m.content && m.reasoning) {
+      return <ReasoningBubble key={m.id} text={m.reasoning} />
     }
 
     return (

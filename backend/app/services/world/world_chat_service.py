@@ -1060,10 +1060,11 @@ async def stream_world_chat(
                 from app.ai.llm import chat_completion
                 from app.services.world.world_tools import _execute_world_tool, _tool_result_summary
                 # 第一轮过渡叙述 + 对应思考过程：给用户看（role=note，不进 AI 上下文）
+                # 2026-08-13：正文/思考独立展示——无正文存空串（不占位），思考独立渲染
                 if full_content or full_reasoning:
                     db.add(WorldChatMessage(
                         world_id=world_id, user_id=None, role="note",
-                        content=full_content or "（…）", reasoning=full_reasoning or None,
+                        content=full_content or "", reasoning=full_reasoning or None,
                         session_id=sid_db,
                     ))
                     await db.commit()
@@ -1128,15 +1129,14 @@ async def stream_world_chat(
                         final = content
                         break
                     # 中间轮（还要继续调工具）：正文也流式展示 + 落库 note（历史可见、不进 AI 上下文）——
-                    # 此前只覆盖 full_content 变量被吞掉，用户只能看到首轮和收尾轮两句话
+                    # 2026-08-13：正文/思考独立展示——无正文存空串（不占位），思考独立渲染
                     if content or reasoning:
-                        # 中间轮思考也要落库（对齐首轮 note：reasoning 字段），否则刷新后「工具调用的思考」丢失；
-                        # 只有思考没正文时也用「（…）」占位，避免历史里空气泡
+                        # 中间轮思考也要落库（对齐首轮 note：reasoning 字段），否则刷新后「工具调用的思考」丢失
                         if content:
                             full_content = content
                         db.add(WorldChatMessage(
                             world_id=world_id, user_id=None, role="note",
-                            content=(content or "（…）")[:4000],
+                            content=(content or "")[:4000],
                             reasoning=reasoning or None,
                             session_id=sid_db,
                         ))
