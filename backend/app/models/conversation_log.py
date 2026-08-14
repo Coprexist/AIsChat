@@ -1,11 +1,11 @@
-"""
+﻿"""
 AI 对话日志模型
 存储 AI 每次 LLM 完整对话，供管理员和授权用户查看
 """
 from sqlalchemy import (
     Column, Integer, String, Boolean, Text, DateTime, ForeignKey, func,
 )
-from sqlalchemy.dialects.postgresql import JSONB
+from app.db_providers import json_column
 from app.database import Base
 
 
@@ -43,10 +43,10 @@ class ConversationLog(Base):
     conversation_type = Column(String(10), nullable=False, default="group")  # group | dm
 
     # 完整的 messages 数组（JSONB）
-    messages = Column(JSONB, nullable=False)
+    messages = Column(json_column(), nullable=False)
     # 统计信息
     message_count = Column(Integer, default=0)  # messages 数组长度
-    token_usage = Column(JSONB, nullable=True)  # {prompt_tokens, completion_tokens, total_tokens}
+    token_usage = Column(json_column(), nullable=True)  # {prompt_tokens, completion_tokens, total_tokens}
     # 是否有实际产出（AI 说了话或调了工具）
     has_output = Column(Boolean, default=False)
     # 使用的模型

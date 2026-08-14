@@ -1,11 +1,11 @@
-"""
+﻿"""
 文件元数据 + 引用追踪 + 协作模式模型
 """
 from sqlalchemy import (
     Column, Integer, String, BigInteger, DateTime, ForeignKey, func, CheckConstraint,
     UniqueConstraint, Index,
 )
-from sqlalchemy.dialects.postgresql import JSONB
+from app.db_providers import json_column
 from app.database import Base
 
 
@@ -20,7 +20,7 @@ class FileMetadata(Base):
     size = Column(BigInteger)
     mime_type = Column(String(100))
     content_hash = Column(String(64))  # SHA-256 哈希，用于文件去重
-    permissions = Column(JSONB)
+    permissions = Column(json_column())
     # 协作模式: solo(仅自己) | shared(指定协作者) | open(全群可见)
     collaboration_mode = Column(String(10), default="solo", nullable=False)
     created_at = Column(DateTime, server_default=func.now())

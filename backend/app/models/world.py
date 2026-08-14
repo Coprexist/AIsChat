@@ -7,8 +7,7 @@
 from sqlalchemy import (
     Column, Integer, String, Text, DateTime, Float, Boolean, ForeignKey, UniqueConstraint, func, Index, text,
 )
-from sqlalchemy.dialects.postgresql import JSONB
-from pgvector.sqlalchemy import Vector
+from app.db_providers import vector_column, json_column
 from app.database import Base
 
 
@@ -30,11 +29,11 @@ class World(Base):
     world_time = Column(DateTime, nullable=True, comment="当前世界时间（懒计算后写入）")
     last_active_at = Column(DateTime, nullable=True, comment="上次活跃时刻（离线补偿基准）")
 
-    config = Column(JSONB, default=dict, comment="sleep_memory_mb / cpu_quota / runtime_memory_mb 等")
+    config = Column(json_column(), default=dict, comment="sleep_memory_mb / cpu_quota / runtime_memory_mb 等")
 
     # 群视界机器人（世界 AI）：就是世界的配置，不是 agent、无账号
-    creator_config = Column(JSONB, default=dict, comment="群视界机器人配置 {name, system_prompt, model, temperature, top_p, tools}")
-    creator_notices = Column(JSONB, default=list, comment="代码改动懒通知 [{file, location, summary, at}]（用户改代码→下次对话附送）")
+    creator_config = Column(json_column(), default=dict, comment="群视界机器人配置 {name, system_prompt, model, temperature, top_p, tools}")
+    creator_notices = Column(json_column(), default=list, comment="代码改动懒通知 [{file, location, summary, at}]（用户改代码→下次对话附送）")
 
     created_at = Column(DateTime, server_default=func.now())
     updated_at = Column(DateTime, server_default=func.now(), onupdate=func.now())
@@ -76,7 +75,7 @@ class GroupAssistant(Base):
     model = Column(String(50), nullable=True, comment="模型（空 = 世界/默认）")
     api_key_encrypted = Column(Text, nullable=True, comment="群主填的自定义 key（Fernet 加密）")
     api_base_url = Column(Text, nullable=True, comment="自定义 API 地址")
-    config = Column(JSONB, default=dict, comment="扩展配置")
+    config = Column(json_column(), default=dict, comment="扩展配置")
     created_at = Column(DateTime, server_default=func.now())
 
     __table_args__ = (
@@ -100,9 +99,9 @@ class WorldAgent(Base):
     group_type_slug = Column(String(50), nullable=True, comment="群助手所属类型 slug")
 
     # 代码改动懒通知：用户手动改代码后记录，下次与 creator 对话时附送
-    pending_notices = Column(JSONB, default=list, comment="[{file, location, summary, at}]")
+    pending_notices = Column(json_column(), default=list, comment="[{file, location, summary, at}]")
 
-    config = Column(JSONB, default=dict, comment="角色设定 / NPC 绑定位置等")
+    config = Column(json_column(), default=dict, comment="角色设定 / NPC 绑定位置等")
 
     created_at = Column(DateTime, server_default=func.now())
 
@@ -158,7 +157,7 @@ class WorldAIMemory(Base):
     world_id = Column(Integer, ForeignKey("worlds.id", ondelete="CASCADE"), nullable=False, comment="所属世界")
     title = Column(String(200), nullable=False, comment="记忆标题（简短概括）")
     content = Column(Text, nullable=False, comment="记忆详细内容")
-    embedding = Column(Vector(1536), nullable=True, comment="内容向量（检索用，维度与主站一致）")
+    embedding = Column(vector_column(1536), nullable=True, comment="内容向量（检索用，维度与主站一致）")
 
     created_at = Column(DateTime, server_default=func.now())
     updated_at = Column(DateTime, server_default=func.now(), onupdate=func.now())
@@ -204,7 +203,7 @@ class WorldData(Base):
     id = Column(Integer, primary_key=True, autoincrement=True)
     world_id = Column(Integer, ForeignKey("worlds.id", ondelete="CASCADE"), nullable=False, comment="所属世界")
     key = Column(String(200), nullable=False, comment="数据键（如 player.position / npc.lihua.relation）")
-    value = Column(JSONB, nullable=False, server_default=text("'{}'::jsonb"), comment="数据值（任意 JSON）")
+    value = Column(json_column(), nullable=False, server_default=text("'{}'"), comment="数据值（任意 JSON）")
 
     created_at = Column(DateTime, server_default=func.now())
     updated_at = Column(DateTime, server_default=func.now(), onupdate=func.now())
@@ -247,7 +246,7 @@ class WorldMarketItem(Base):
     kind = Column(String(20), default="world", nullable=False, comment="world=完整世界 | block=积木组件（后置）")
     title = Column(String(100), nullable=False, comment="商品标题")
     description = Column(Text, default="", comment="商品描述")
-    tags = Column(JSONB, default=list, comment="标签数组，如 [\"2d冒险\",\"卡牌\"]")
+    tags = Column(json_column(), default=list, comment="标签数组，如 [\"2d冒险\",\"卡牌\"]")
     author_id = Column(Integer, ForeignKey("users.id"), nullable=False, comment="发布者")
     author_name = Column(String(50), default="", comment="发布者名（冗余，列表免 join）")
     source_world_id = Column(Integer, nullable=True, comment="发布来源世界（kind=world 时）")

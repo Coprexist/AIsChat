@@ -1,8 +1,8 @@
-"""
+﻿"""
 用户模型
 """
 from sqlalchemy import Column, Integer, String, Boolean, Text, DateTime, func, BigInteger
-from sqlalchemy.dialects.postgresql import JSONB
+from app.db_providers import json_column
 from app.database import Base
 
 
@@ -60,7 +60,7 @@ class User(Base):
     language = Column(String(10), default="zh")
 
     # 界面偏好（JSONB：chat_style, mobile_layout 等）
-    ui_prefs = Column(JSONB, default=dict)
+    ui_prefs = Column(json_column(), default=dict)
 
     # 个人资料
     avatar_url = Column(Text, nullable=True)

@@ -1,8 +1,8 @@
-"""
+﻿"""
 审计日志模型 — 企业级操作记录，含哈希链防篡改
 """
 from sqlalchemy import Column, Integer, String, Boolean, Text, DateTime, func
-from sqlalchemy.dialects.postgresql import JSONB
+from app.db_providers import json_column
 from app.database import Base
 
 
@@ -21,11 +21,11 @@ class SystemLog(Base):
     success = Column(Boolean, nullable=False, default=True, comment="操作成功/失败")
     error_message = Column(Text, nullable=True, comment="失败原因")
     ip_address = Column(String(45), nullable=True, comment="客户端 IP（IPv4/IPv6）")
-    old_value = Column(JSONB, nullable=True, comment="变更前值")
-    new_value = Column(JSONB, nullable=True, comment="变更后值")
+    old_value = Column(json_column(), nullable=True, comment="变更前值")
+    new_value = Column(json_column(), nullable=True, comment="变更后值")
 
     # 额外上下文
-    details = Column(JSONB, nullable=True, comment="其他上下文")
+    details = Column(json_column(), nullable=True, comment="其他上下文")
 
     # 哈希链防篡改
     prev_hash = Column(String(64), nullable=True, comment="上一条日志的 SHA256")

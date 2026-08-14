@@ -1,8 +1,8 @@
-"""
+﻿"""
 触发器模型 — AI 的事件触发器
 """
 from sqlalchemy import Column, Integer, String, Boolean, DateTime, ForeignKey, func, Text
-from sqlalchemy.dialects.postgresql import JSONB
+from app.db_providers import json_column
 from app.database import Base
 
 
@@ -21,7 +21,7 @@ class AgentTrigger(Base):
     max_fires = Column(Integer, default=-1)  # -1 = 无限制
     fire_count = Column(Integer, default=0)
     
-    condition = Column(JSONB, default=dict)
+    condition = Column(json_column(), default=dict)
     
     created_at = Column(DateTime, server_default=func.now())
     updated_at = Column(DateTime, server_default=func.now(), onupdate=func.now())

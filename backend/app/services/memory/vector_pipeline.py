@@ -94,6 +94,14 @@ async def hybrid_search(
     返回: [{"message_id": int, "content": str, "vector_score": float, "bm25_score": float, "combined_score": float, "sender_type": str, "sender_name": str, ...}]
     """
     from app.utils.embedding import get_embedding
+    from app.db_providers import get_provider
+
+    provider = get_provider()
+
+    # ═══ 后端不支持 SQL 向量检索时（SQLite P0）：文本 + 时间衰减降级 ═══
+    if not provider.supports_sql_vector_search:
+        logger.debug(f"存储后端 {provider.name} 不支持向量加速，使用文本检索降级")
+        return await _hybrid_search_text_fallback(db, group_id, query_text, top_k)
 
     # 向量化查询
     try:
@@ -108,40 +116,13 @@ async def hybrid_search(
     bm25_weight = settings.bm25_weight
     time_weight = settings.time_decay_weight
 
-    sql = text(f"""
-        SELECT
-            gme.message_id,
-            gme.content,
-            gme.created_at,
-            m.sender_type,
-            m.sender_id,
-            1 - (gme.embedding <=> :query_emb) AS vector_score,
-            COALESCE(
-                ts_rank(
-                    to_tsvector('simple', gme.content),
-                    plainto_tsquery('simple', :query_text)
-                ), 0
-            ) AS bm25_score,
-            EXTRACT(EPOCH FROM (NOW() - gme.created_at)) / 86400.0 AS age_days,
-            (
-                {vector_weight} * (1 - (gme.embedding <=> :query_emb)) +
-                {bm25_weight} * COALESCE(
-                    ts_rank(
-                        to_tsvector('simple', gme.content),
-                        plainto_tsquery('simple', :query_text)
-                    ), 0
-                ) +
-                {time_weight} * (1.0 - LEAST(
-                    EXTRACT(EPOCH FROM (NOW() - gme.created_at)) / 86400.0 / 30.0, 1.0
-                ))
-            ) AS combined_score
-        FROM group_message_embeddings gme
-        JOIN messages m ON gme.message_id = m.id
-        WHERE gme.group_id = :group_id
-          AND gme.embedding IS NOT NULL
-        ORDER BY combined_score DESC
-        LIMIT :top_k
-    """)
+    vector_expr = provider.vector_similarity_expr("gme.embedding", "query_emb")
+    sql = text(provider.hybrid_search_sql().format(
+        vector_expr=vector_expr,
+        vector_weight=vector_weight,
+        bm25_weight=bm25_weight,
+        time_weight=time_weight,
+    ))
 
     result = await db.execute(sql, {
         "query_emb": embedding_str,
@@ -157,6 +138,78 @@ async def hybrid_search(
             "vector_score": round(float(row.vector_score), 4) if row.vector_score else 0,
             "bm25_score": round(float(row.bm25_score), 4) if row.bm25_score else 0,
             "combined_score": round(float(row.combined_score), 4) if row.combined_score else 0,
+            "sender_type": row.sender_type,
+            "sender_id": row.sender_id,
+        }
+        for row in result
+    ]
+
+
+async def _hybrid_search_text_fallback(
+    db,
+    group_id: int,
+    query_text: str,
+    top_k: int = 10,
+) -> list[dict]:
+    """
+    混合检索降级实现（SQLite P0）：关键词 LIKE + 时间衰减。
+
+    无向量相似度，纯文本匹配排序——保证功能可用，向量精度由 P1 的
+    sqlite-vec 补齐。
+    """
+    # 提取关键词（复用 memory_service 的分词策略）
+    import re
+    parts = [query_text.strip()]
+    tokens = re.split(r'[,，。！？、\s\n.!?;；：:()（）""''""【】\[\]]+', query_text)
+    for t in tokens:
+        t = t.strip()
+        if len(t) >= 1 and t not in parts:
+            parts.append(t)
+
+    conditions = []
+    params: dict = {}
+    for i, kw in enumerate(parts[:8]):
+        param_key = f"kw{i}"
+        conditions.append(f"gme.content LIKE :{param_key}")
+        params[param_key] = f"%{kw}%"
+
+    if not conditions:
+        return []
+
+    sql = text(f"""
+        SELECT
+            gme.message_id,
+            gme.content,
+            gme.created_at,
+            m.sender_type,
+            m.sender_id,
+            0.0 AS vector_score,
+            0.0 AS bm25_score,
+            0.0 AS age_days,
+            1.0 AS combined_score
+        FROM group_message_embeddings gme
+        JOIN messages m ON gme.message_id = m.id
+        WHERE gme.group_id = :group_id
+          AND ({ " OR ".join(conditions) })
+        ORDER BY gme.created_at DESC
+        LIMIT :top_k
+    """)
+    params["group_id"] = group_id
+    params["top_k"] = top_k
+
+    try:
+        result = await db.execute(sql, params)
+    except Exception as e:
+        logger.warning(f"文本降级检索失败: {e}")
+        return []
+
+    return [
+        {
+            "message_id": row.message_id,
+            "content": row.content,
+            "vector_score": 0.0,
+            "bm25_score": 0.0,
+            "combined_score": 0.0,
             "sender_type": row.sender_type,
             "sender_id": row.sender_id,
         }

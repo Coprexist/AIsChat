@@ -5,8 +5,7 @@ from sqlalchemy import (
     Column, Integer, String, Boolean, Text, DateTime, ForeignKey, func,
     CheckConstraint,
 )
-from sqlalchemy.dialects.postgresql import JSONB
-from pgvector.sqlalchemy import Vector
+from app.db_providers import vector_column, json_column
 from app.database import Base
 
 
@@ -22,7 +21,7 @@ class Message(Base):
     reply_to = Column(Integer, nullable=True)
     source_public_id = Column(String(50), nullable=True)  # 远程消息来源实例公网 ID（NULL=本地）
     sender_avatar_url = Column(Text, nullable=True, default='')  # 联邦消息的发送者头像 URL（本地消息为 NULL）
-    attachments = Column(JSONB, nullable=True)  # [{file_id, path, name, size, mime_type}, ...]
+    attachments = Column(json_column(), nullable=True)  # [{file_id, path, name, size, mime_type}, ...]
     created_at = Column(DateTime, server_default=func.now())
 
     __table_args__ = (
@@ -53,6 +52,6 @@ class GroupMessageEmbedding(Base):
     group_id = Column(Integer, ForeignKey("groups.id", ondelete="CASCADE"), nullable=False)
     message_id = Column(Integer, ForeignKey("messages.id", ondelete="CASCADE"), nullable=False)
     content = Column(Text, nullable=False)
-    embedding = Column(Vector(1536))  # 嵌入向量，维度运行时自动检测
+    embedding = Column(vector_column(1536))  # 嵌入向量，维度运行时自动检测
     created_at = Column(DateTime, server_default=func.now())
-    metadata_ = Column("metadata", JSONB)
+    metadata_ = Column("metadata", json_column())

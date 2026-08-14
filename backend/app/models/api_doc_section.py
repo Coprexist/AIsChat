@@ -1,4 +1,4 @@
-"""
+﻿"""
 接口文档分区快照表 — 运行时权威值（md 文件是源，DB 是快照）
 
 md（随 git）──「从文档中更新」──▶ 本表（运行时读取，快且可表单编辑）
@@ -6,7 +6,7 @@ md（随 git）──「从文档中更新」──▶ 本表（运行时读取�
                    表单保存勾选「同步更新文档」──▶ 写回 md
 """
 from sqlalchemy import Column, String, Text, DateTime, func
-from sqlalchemy.dialects.postgresql import JSONB
+from app.db_providers import json_column
 from app.database import Base
 
 

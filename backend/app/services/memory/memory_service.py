@@ -46,13 +46,14 @@ async def _text_search_memories(
         if len(t) >= 1 and t not in parts:
             parts.append(t)
 
-    # 构建 ILIKE 条件（取前 8 个关键词避免 SQL 过长）
+    # 构建 LIKE 条件（取前 8 个关键词避免 SQL 过长）
+    # 用 LOWER() 包裹实现大小写不敏感（PostgreSQL ILIKE 的通用替代，SQLite 亦兼容）
     conditions = []
     params: dict = {}
     for i, kw in enumerate(parts[:8]):
         param_key = f"kw{i}"
         conditions.append(
-            f"(rm.title ILIKE :{param_key} OR dm.content ILIKE :{param_key})"
+            f"(LOWER(rm.title) LIKE LOWER(:{param_key}) OR LOWER(dm.content) LIKE LOWER(:{param_key}))"
         )
         params[param_key] = f"%{kw}%"
 
@@ -148,89 +149,96 @@ async def recall_relevant_memories(
     返回: [{id, title, content, scope, similarity}]
     """
     from app.utils.embedding import get_embedding
+    from app.db_providers import get_provider
 
+    provider = get_provider()
     memories: list[dict] = []
 
-    # ═══ 第一轮：向量搜索 ═══
-    try:
-        query_embedding = await get_embedding(query, api_base_url=api_base_url, api_key=api_key)
-        embedding_str = f"[{','.join(map(str, query_embedding))}]"
+    # ═══ 第一轮：向量搜索（仅当后端支持 SQL 内向量运算，如 pgvector） ═══
+    if provider.supports_sql_vector_search:
+        try:
+            query_embedding = await get_embedding(query, api_base_url=api_base_url, api_key=api_key)
+            embedding_str = f"[{','.join(map(str, query_embedding))}]"
 
-        # v0.1.3: 构建 user_id 过滤条件
-        if ai_type == "resonance":
-            user_filter = "AND rm.user_id IS NULL"
-        elif user_id is not None:
-            user_filter = "AND (rm.user_id = :user_id OR rm.user_id IS NULL)"
-        else:
-            user_filter = ""
+            # v0.1.3: 构建 user_id 过滤条件
+            if ai_type == "resonance":
+                user_filter = "AND rm.user_id IS NULL"
+            elif user_id is not None:
+                user_filter = "AND (rm.user_id = :user_id OR rm.user_id IS NULL)"
+            else:
+                user_filter = ""
 
-        if group_id:
-            sql = text(f"""
-                SELECT rm.id, rm.title, rm.scope,
-                       1 - (rm.embedding <=> :embedding) AS similarity,
-                       dm.content
-                FROM rough_memories rm
-                LEFT JOIN detail_memories dm ON dm.rough_id = rm.id
-                WHERE rm.embedding IS NOT NULL
-                  AND 1 - (rm.embedding <=> :embedding) > :threshold
-                  {user_filter}
-                  AND (
-                      (rm.owner_type = 'ai' AND rm.owner_id = :agent_id AND rm.scope = 'private')
-                      OR
-                      (rm.scope = 'group' AND rm.group_id = :group_id)
-                  )
-                ORDER BY rm.embedding <=> :embedding
-                LIMIT :top_k
-            """)
-            params = {
-                "embedding": embedding_str,
-                "agent_id": agent_id,
-                "group_id": group_id,
-                "threshold": similarity_threshold,
-                "top_k": top_k,
-            }
-            if user_id is not None and ai_type != "resonance":
-                params["user_id"] = user_id
-            result = await db.execute(sql, params)
-        else:
-            sql = text(f"""
-                SELECT rm.id, rm.title, rm.scope,
-                       1 - (rm.embedding <=> :embedding) AS similarity,
-                       dm.content
-                FROM rough_memories rm
-                LEFT JOIN detail_memories dm ON dm.rough_id = rm.id
-                WHERE rm.owner_type = 'ai'
-                  AND rm.owner_id = :agent_id
-                  {user_filter}
-                  AND rm.embedding IS NOT NULL
-                  AND 1 - (rm.embedding <=> :embedding) > :threshold
-                ORDER BY rm.embedding <=> :embedding
-                LIMIT :top_k
-            """)
-            params = {
-                "embedding": embedding_str,
-                "agent_id": agent_id,
-                "threshold": similarity_threshold,
-                "top_k": top_k,
-            }
-            if user_id is not None and ai_type != "resonance":
-                params["user_id"] = user_id
-            result = await db.execute(sql, params)
+            if group_id:
+                sql = text(f"""
+                    SELECT rm.id, rm.title, rm.scope,
+                            {provider.vector_similarity_expr("rm.embedding", "embedding")} AS similarity,
+                           dm.content
+                    FROM rough_memories rm
+                    LEFT JOIN detail_memories dm ON dm.rough_id = rm.id
+                    WHERE rm.embedding IS NOT NULL
+                      AND {provider.vector_similarity_expr("rm.embedding", "embedding")} > :threshold
+                      {user_filter}
+                      AND (
+                          (rm.owner_type = 'ai' AND rm.owner_id = :agent_id AND rm.scope = 'private')
+                          OR
+                          (rm.scope = 'group' AND rm.group_id = :group_id)
+                      )
+                    ORDER BY {provider.vector_similarity_expr("rm.embedding", "embedding")} DESC
+                    LIMIT :top_k
+                """)
+                params = {
+                    "embedding": embedding_str,
+                    "agent_id": agent_id,
+                    "group_id": group_id,
+                    "threshold": similarity_threshold,
+                    "top_k": top_k,
+                }
+                if user_id is not None and ai_type != "resonance":
+                    params["user_id"] = user_id
+                result = await db.execute(sql, params)
+            else:
+                sql = text(f"""
+                    SELECT rm.id, rm.title, rm.scope,
+                            {provider.vector_similarity_expr("rm.embedding", "embedding")} AS similarity,
+                           dm.content
+                    FROM rough_memories rm
+                    LEFT JOIN detail_memories dm ON dm.rough_id = rm.id
+                    WHERE rm.owner_type = 'ai'
+                      AND rm.owner_id = :agent_id
+                      {user_filter}
+                      AND rm.embedding IS NOT NULL
+                      AND {provider.vector_similarity_expr("rm.embedding", "embedding")} > :threshold
+                    ORDER BY {provider.vector_similarity_expr("rm.embedding", "embedding")} DESC
+                    LIMIT :top_k
+                """)
+                params = {
+                    "embedding": embedding_str,
+                    "agent_id": agent_id,
+                    "threshold": similarity_threshold,
+                    "top_k": top_k,
+                }
+                if user_id is not None and ai_type != "resonance":
+                    params["user_id"] = user_id
+                result = await db.execute(sql, params)
 
-        for row in result:
-            memories.append({
-                "id": row.id,
-                "title": row.title,
-                "scope": row.scope,
-                "similarity": round(float(row.similarity), 4),
-                "content": row.content or "",
-            })
+            for row in result:
+                memories.append({
+                    "id": row.id,
+                    "title": row.title,
+                    "scope": row.scope,
+                    "similarity": round(float(row.similarity), 4),
+                    "content": row.content or "",
+                })
 
-        if memories:
-            logger.info(f"🔍 向量搜索为 AI agent_id={agent_id} 找到 {len(memories)} 条相关记忆")
+            if memories:
+                logger.info(f"🔍 向量搜索为 AI agent_id={agent_id} 找到 {len(memories)} 条相关记忆")
 
-    except Exception as e:
-        logger.warning(f"记忆检索向量化失败，回退到文本搜索: {e}")
+        except Exception as e:
+            logger.warning(f"记忆检索向量化失败，回退到文本搜索: {e}")
+    else:
+        logger.debug(
+            f"存储后端 {provider.name} 不支持 SQL 向量检索，直接使用文本搜索"
+        )
 
     # ═══ 第二轮：文本关键词回退（向量搜索为空或失败时） ═══
     if not memories:

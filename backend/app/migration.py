@@ -43,9 +43,38 @@ def _run_alembic_migrations():
         logger.warning(f"  ⚠️ Alembic 迁移执行失败（非致命）: {e}")
 
 
+async def _run_sqlite_create_all(provider) -> None:
+    """
+    SQLite 后端建表：全新库用 ORM metadata.create_all 直接建表。
+
+    说明：
+    - SQLite 是单文件新库，不存在"老部署增量迁移"问题，
+      PG 的 2946 行增量迁移脚本（ALTER TABLE / pg_class / NOW()）全部跳过。
+    - create_all 由 SQLAlchemy 按方言编译，自动适配 SQLite。
+    - 幂等：已存在的表自动跳过。
+    """
+    logger.info(f"🗄️  存储后端 {provider.name}：使用 ORM create_all 建表")
+    try:
+        from app.database import engine, Base
+        import app.models  # 触发全部模型注册到 Base.metadata
+
+        async with engine.begin() as conn:
+            await conn.run_sync(Base.metadata.create_all)
+        logger.info("✅ SQLite 建表完成")
+    except Exception as e:
+        logger.error(f"❌ SQLite 建表失败: {e}", exc_info=True)
+        raise
+
+
 async def run_migrations():
     """执行所有必要的迁移（幂等）"""
     logger.info("🔧 检查并执行数据库迁移...")
+
+    # ── SQLite 后端：全新库直接建表，跳过 PG 专属增量迁移 ──
+    from app.db_providers import get_provider
+    provider = get_provider()
+    if provider.name != "postgres":
+        return await _run_sqlite_create_all(provider)
 
     # 先执行 Alembic 版本化迁移（新增变更走 Alembic）
     _run_alembic_migrations()

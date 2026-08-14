@@ -1,11 +1,11 @@
-"""
+﻿"""
 AI 代理模型
 """
 from sqlalchemy import (
     Column, Integer, String, Boolean, Float, Text, DateTime,
     ForeignKey, UniqueConstraint, func,
 )
-from sqlalchemy.dialects.postgresql import JSONB
+from app.db_providers import json_column
 from app.database import Base
 
 
@@ -27,8 +27,8 @@ class Agent(Base):
     current_system_prompt = Column(Text)
     pending_system_prompt = Column(Text, nullable=True)  # AI自修改暂存，压缩时切到current
     # 能力懒加载版本（2026-08-06）：{source: version}
-    cap_known_versions = Column(JSONB, default=dict, comment="能力源告知进度（已注入变更通知的版本）")
-    cap_effective_versions = Column(JSONB, default=dict, comment="能力源生效进度（请求实际使用的工具定义版本，compact 时更新）")
+    cap_known_versions = Column(json_column(), default=dict, comment="能力源告知进度（已注入变更通知的版本）")
+    cap_effective_versions = Column(json_column(), default=dict, comment="能力源生效进度（请求实际使用的工具定义版本，compact 时更新）")
     current_temperature = Column(Float)
     current_top_p = Column(Float)
     current_presence_penalty = Column(Float)
@@ -114,11 +114,11 @@ class Agent(Base):
 
     # AI↔AI 私信限额（2026-08-09）：创建者在配置页设置，0=不启用该维度
     # 格式: {"send": {"daily": 20, "weekly": 0, "creator_chat": 0}, "receive": {...}}
-    dm_quota_config = Column(JSONB, default=dict, comment="AI↔AI 私信限额配置: send/receive 各含 daily/weekly/creator_chat 上限（0=不限）")
+    dm_quota_config = Column(json_column(), default=dict, comment="AI↔AI 私信限额配置: send/receive 各含 daily/weekly/creator_chat 上限（0=不限）")
     # 格式: {"send": {"daily_count": 0, "weekly_count": 0, "creator_chat_count": 0, "daily_anchor": "2026-08-09", "weekly_anchor": "2026-08-04"}, "receive": {...}}
-    dm_quota_state = Column(JSONB, default=dict, comment="AI↔AI 私信限额计数（日历周期自动重置；创建者发消息时 creator_chat 计数清零）")
+    dm_quota_state = Column(json_column(), default=dict, comment="AI↔AI 私信限额计数（日历周期自动重置；创建者发消息时 creator_chat 计数清零）")
     # ── 配额白名单 (v1.1.0): JSONB 数组 [{type:"group"|"user", id:int}, ...] ──
-    quota_whitelist = Column(JSONB, default=list, comment="不消耗配额的白名单实体列表")
+    quota_whitelist = Column(json_column(), default=list, comment="不消耗配额的白名单实体列表")
     # ── 群主支付 (v1.1.0): 群聊 AI 消息默认由群主付费 ──
     group_owner_pays = Column(Boolean, default=True, comment="群聊中 AI 消息是否由群主付费")
 
@@ -149,7 +149,7 @@ class Agent(Base):
 
     # 状态栈 — AI 跨任务上下文追踪（v0.2.1）
     # JSONB 数组，每个元素 {id, type, context_ref, why, doing, todo, plan, journal, created_at, status}
-    state_stack = Column(JSONB, default=list)
+    state_stack = Column(json_column(), default=list)
 
     # 情感向量化（v0.3.2）：勾选后情感用 Plutchik 8 轴向量（更拟人）；不勾退回文字心情描述
     emotion_vectorized = Column(Boolean, default=False)
@@ -239,7 +239,7 @@ class CapabilityVersion(Base):
     version = Column(Integer, nullable=False, comment="版本号（每源内递增）")
     content_hash = Column(String(64), nullable=False, comment="源内容哈希（检测变更）")
     changelog = Column(Text, default="", comment="本版本变更摘要（增量注入用）")
-    definitions = Column(JSONB, nullable=True, comment="工具定义快照（platform=内置全部；world=skills 转出）")
+    definitions = Column(json_column(), nullable=True, comment="工具定义快照（platform=内置全部；world=skills 转出）")
     created_at = Column(DateTime, server_default=func.now())
 
     __table_args__ = (

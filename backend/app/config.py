@@ -11,6 +11,14 @@ class Settings(BaseSettings):
     """全局应用配置"""
 
     # 数据库
+    # 存储后端: postgres | sqlite | pglite（规划中）
+    db_backend: str = os.getenv("DB_BACKEND", "postgres").lower()
+
+    # SQLite 数据文件路径（db_backend=sqlite 时使用）
+    sqlite_db_path: str = os.getenv(
+        "SQLITE_DB_PATH", "./data/aischat.db"
+    )
+
     database_url: str = os.getenv(
         "DATABASE_URL",
         "postgresql+asyncpg://ai_chat:change_me@localhost:5432/ai_group_chat",

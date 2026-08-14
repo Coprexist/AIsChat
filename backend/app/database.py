@@ -1,17 +1,21 @@
 """
 数据库连接管理模块
-使用 SQLAlchemy 2.0 异步引擎 + pgvector
+使用 SQLAlchemy 2.0 异步引擎，存储后端由 DB_BACKEND 选择（postgres | sqlite）。
 """
 from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine, async_sessionmaker
 from sqlalchemy.orm import DeclarativeBase
 from app.config import settings
+from app.db_providers import get_provider
 import logging
 
 logger = logging.getLogger(__name__)
 
+# 当前生效的存储后端
+provider = get_provider()
+
 # 异步引擎
 engine = create_async_engine(
-    settings.database_url,
+    provider.async_engine_url(),
     pool_size=10,
     max_overflow=40,
     pool_pre_ping=True,
