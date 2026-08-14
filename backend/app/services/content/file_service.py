@@ -12,6 +12,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, delete as sa_delete, and_, func, text
 from app.models.file import FileMetadata, FileReference, FileCollaborator
 from app.config import settings
+from app.db_providers import get_provider
 
 logger = logging.getLogger(__name__)
 
@@ -167,16 +168,28 @@ async def _file_attached_to_visible_message(
     pattern = json.dumps([{"file_id": file_id}])
 
     # 1) 群聊消息：请求者是否为消息所在群的成员
-    check_group = text("""
+    #    附件 JSON 数组包含匹配（Postgres: @> JSONB；SQLite: json_each 遍历）
+    provider = get_provider()
+    if provider.name == "postgres":
+        attachment_cond = "m.attachments @> CAST(:pattern AS JSONB)"
+        attachment_params = {"pattern": pattern}
+    else:
+        attachment_cond = (
+            "EXISTS (SELECT 1 FROM json_each(m.attachments) je "
+            "WHERE json_extract(je.value, '$.file_id') = :file_id)"
+        )
+        attachment_params = {"file_id": file_id}
+
+    check_group = text(f"""
         SELECT 1 FROM messages m
         JOIN group_members gm ON m.group_id = gm.group_id
-        WHERE m.attachments @> CAST(:pattern AS JSONB)
+        WHERE {attachment_cond}
           AND gm.member_type = :req_type
           AND gm.member_id = :req_id
         LIMIT 1
     """)
     r = await db.execute(check_group, {
-        "pattern": pattern,
+        **attachment_params,
         "req_type": requester_type,
         "req_id": requester_id,
     })

@@ -14,13 +14,20 @@ logger = logging.getLogger(__name__)
 provider = get_provider()
 
 # 异步引擎
-engine = create_async_engine(
-    provider.async_engine_url(),
-    pool_size=10,
-    max_overflow=40,
-    pool_pre_ping=True,
-    echo=False,
-)
+# 注意：SQLite(aiosqlite) 使用 NullPool，不接受 pool_size/max_overflow/pool_pre_ping 参数
+if provider.name == "postgres":
+    engine = create_async_engine(
+        provider.async_engine_url(),
+        pool_size=10,
+        max_overflow=40,
+        pool_pre_ping=True,
+        echo=False,
+    )
+else:
+    engine = create_async_engine(
+        provider.async_engine_url(),
+        echo=False,
+    )
 
 # 会话工厂
 async_session = async_sessionmaker(
