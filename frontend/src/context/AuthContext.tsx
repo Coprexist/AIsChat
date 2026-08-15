@@ -2,6 +2,7 @@ import { createContext, useContext, useState, useEffect, useCallback, useMemo } 
 import { api } from '../api/client'
 import { cacheLangForUnauth } from '../i18n/I18nContext'
 import { type Lang, isValidLang, DEFAULT_LANG } from '../i18n/languages'
+import { applyUserTheme, THEME_COLORS_PREF_KEY } from '../utils/userTheme'
 
 interface User {
   id: number
@@ -66,7 +67,7 @@ function buildUserFromData(data: any): User {
     api_key_last4: '',
     timezone: 'Asia/Shanghai',
     language: isValidLang(data.language) ? data.language : DEFAULT_LANG,
-    ui_prefs: {} as Record<string, any>,
+    ui_prefs: data.ui_prefs ?? {} as Record<string, any>,
     agent_bundle_credit: 0,
     file_quota_mb: 100,
     platform_gifted_credit: 0,
@@ -96,6 +97,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         localStorage.removeItem('user_info')
       }
     } catch { /* 存储不可用时忽略 */ }
+  }, [user])
+
+  // 用户主题色应用：登录/刷新/登出时把 ui_prefs.theme_colors 覆盖到 CSS 变量
+  useEffect(() => {
+    applyUserTheme(user?.ui_prefs?.[THEME_COLORS_PREF_KEY])
   }, [user])
 
   const refreshUser = useCallback(async () => {

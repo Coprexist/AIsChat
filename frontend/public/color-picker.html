@@ -1,0 +1,449 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
+<title>AIsChat 主题选色表单</title>
+<style>
+  :root {
+    --canvas: #f8fafc;
+    --surface: #ffffff;
+    --elevated: #f1f5f9;
+    --border: #cbd5e1;
+    --text: #111827;
+    --text-sec: #4b5563;
+    --text-mut: #6b7280;
+    --primary: #8b5cf6;
+    --primary-deep: #7c3aed;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC", "Microsoft YaHei", sans-serif;
+    background: var(--canvas);
+    color: var(--text);
+    padding: 20px 16px 60px;
+    line-height: 1.5;
+  }
+  .wrap { max-width: 640px; margin: 0 auto; }
+
+  /* 头部 */
+  .header { margin-bottom: 20px; }
+  .header h1 { font-size: 20px; font-weight: 700; letter-spacing: -0.02em; }
+  .header p { font-size: 13px; color: var(--text-sec); margin-top: 6px; }
+  .header .tip {
+    margin-top: 10px; padding: 10px 12px; border-radius: 10px;
+    background: #f5f3ff; border: 1px solid #ddd6fe; color: #6d28d9; font-size: 12.5px;
+  }
+
+  /* 预览卡 */
+  .preview {
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: 14px; padding: 16px; margin-bottom: 18px;
+  }
+  .preview-title { font-size: 12px; color: var(--text-mut); font-weight: 600; margin-bottom: 10px; letter-spacing: 0.04em; }
+  .preview-row { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; }
+  .pv-btn {
+    display: inline-flex; align-items: center; justify-content: center;
+    height: 40px; padding: 0 18px; border-radius: 10px; border: none;
+    font-size: 14px; font-weight: 500; color: #fff; cursor: pointer;
+  }
+  .pv-btn.secondary {
+    background: var(--elevated); color: var(--text-sec);
+    border: 1px solid var(--border);
+  }
+  .pv-badge {
+    display: inline-flex; align-items: center; height: 24px; padding: 0 10px;
+    border-radius: 999px; font-size: 11px; font-weight: 500;
+  }
+  .pv-text { font-size: 13px; }
+  .pv-text b { color: var(--pv-primary-400); font-weight: 600; }
+
+  /* 分组 */
+  .group {
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: 14px; padding: 16px; margin-bottom: 14px;
+  }
+  .group-head { display: flex; align-items: baseline; justify-content: space-between; margin-bottom: 4px; }
+  .group-name { font-size: 15px; font-weight: 700; }
+  .group-desc { font-size: 12px; color: var(--text-mut); }
+  .group .current-note { font-size: 11.5px; color: var(--text-mut); margin-top: 2px; margin-bottom: 10px; }
+
+  .field { margin-top: 12px; }
+  .field-label {
+    display: flex; align-items: center; gap: 8px;
+    font-size: 12.5px; font-weight: 600; color: var(--text-sec); margin-bottom: 7px;
+  }
+  .field-label .now {
+    font-size: 11px; font-weight: 400; color: var(--text-mut);
+    display: inline-flex; align-items: center; gap: 5px;
+  }
+  .field-label .now .chip {
+    width: 14px; height: 14px; border-radius: 4px; border: 1px solid rgba(0,0,0,0.15);
+    display: inline-block;
+  }
+  .swatches { display: flex; flex-wrap: wrap; gap: 8px; }
+  .swatch {
+    width: 46px; height: 46px; border-radius: 10px; cursor: pointer;
+    border: 2px solid transparent; position: relative;
+    transition: transform .12s ease, border-color .12s ease;
+    box-shadow: 0 1px 2px rgba(0,0,0,0.08);
+  }
+  .swatch:hover { transform: scale(1.08); }
+  .swatch.sel { border-color: #111827; box-shadow: 0 0 0 3px rgba(17,24,39,0.12); }
+  .swatch .hex {
+    position: absolute; bottom: -18px; left: 0; right: 0;
+    text-align: center; font-size: 9.5px; color: var(--text-mut);
+    font-family: ui-monospace, monospace;
+  }
+  .swatch-row { margin-bottom: 26px; }
+
+  /* 深色主题提示 */
+  .dark-note {
+    background: #fefce8; border: 1px solid #fde68a; color: #854d0e;
+    border-radius: 10px; padding: 10px 12px; font-size: 12.5px; margin-bottom: 14px;
+  }
+
+  /* 结果 */
+  .result {
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: 14px; padding: 16px;
+  }
+  .result textarea {
+    width: 100%; min-height: 160px; border: 1px solid var(--border); border-radius: 10px;
+    padding: 10px; font-family: ui-monospace, monospace; font-size: 12px;
+    resize: vertical; background: var(--canvas); color: var(--text);
+  }
+  .result-actions { display: flex; gap: 10px; margin-top: 10px; }
+  .gen-btn {
+    flex: 1; height: 44px; border-radius: 10px; border: none;
+    background: var(--primary); color: #fff; font-size: 14px; font-weight: 600; cursor: pointer;
+  }
+  .gen-btn:active { transform: scale(0.98); }
+  .copy-btn {
+    flex: 1; height: 44px; border-radius: 10px;
+    background: var(--surface); color: var(--text-sec);
+    border: 1px solid var(--border); font-size: 14px; font-weight: 600; cursor: pointer;
+  }
+  .copy-btn:active { transform: scale(0.98); }
+  .copied { position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%);
+    background: #111827; color: #fff; padding: 8px 16px; border-radius: 999px;
+    font-size: 13px; opacity: 0; transition: opacity .25s; pointer-events: none; z-index: 99; }
+  .copied.show { opacity: 1; }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <div class="header">
+    <h1>AIsChat 主题选色表单</h1>
+    <p>点选每个类型色的色块（有实时预览），选完点「生成结果」，把 JSON 发给我即可。</p>
+    <div class="tip">当前问题：浅色主题按钮紫 #8B5CF6 偏深发闷。下表每个类型色给几个候选，选一个你看着舒服的。同类型内 400（文字/图标）和 500（按钮）建议选同色系相邻深浅，保持协调。</div>
+  </div>
+
+  <!-- 实时预览 -->
+  <div class="preview">
+    <div class="preview-title">实时预览（跟随下方选择变化）</div>
+    <div class="preview-row">
+      <button class="pv-btn" id="pv-primary" style="background:#8b5cf6">主按钮</button>
+      <button class="pv-btn secondary" id="pv-secondary">次级按钮</button>
+      <span class="pv-badge" id="pv-badge" style="background:#8b5cf6;color:#fff">徽章</span>
+    </div>
+    <div class="preview-row" style="margin-top:12px">
+      <span class="pv-text">强调文字 <b id="pv-text">这是主色文字</b> · 普通文字</span>
+    </div>
+    <div class="preview-row" style="margin-top:12px">
+      <span class="pv-badge" id="pv-accent" style="background:#f59e0b;color:#111827">琥珀状态</span>
+      <span class="pv-badge" id="pv-mint" style="background:#10b981;color:#fff">在线</span>
+      <span class="pv-badge" id="pv-rose" style="background:#c9364f;color:#fff">危险</span>
+    </div>
+  </div>
+
+  <!-- 组1：primary 紫 -->
+  <div class="group">
+    <div class="group-head">
+      <span class="group-name">主色 primary（紫）</span>
+      <span class="group-desc">品牌色 · 按钮/强调/链接</span>
+    </div>
+    <div class="current-note">当前：400=#8B5CF6（文字）· 500=#8B5CF6（按钮）· 600=#7C3AED（hover）</div>
+
+    <div class="field">
+      <div class="field-label">
+        primary-400 <span style="font-weight:400;color:var(--text-mut)">强调文字 / 图标 / 链接</span>
+        <span class="now"><span class="chip" style="background:#8b5cf6"></span><span id="cur-p400">#8B5CF6</span></span>
+      </div>
+      <div class="swatches" data-var="p400"></div>
+    </div>
+
+    <div class="field">
+      <div class="field-label">
+        primary-500 <span style="font-weight:400;color:var(--text-mut)">主按钮背景（白字）</span>
+        <span class="now"><span class="chip" style="background:#8b5cf6"></span><span id="cur-p500">#8B5CF6</span></span>
+      </div>
+      <div class="swatches" data-var="p500"></div>
+    </div>
+
+    <div class="field">
+      <div class="field-label">
+        primary-600 <span style="font-weight:400;color:var(--text-mut)">按钮 hover 加深</span>
+        <span class="now"><span class="chip" style="background:#7c3aed"></span><span id="cur-p600">#6D28D9</span></span>
+      </div>
+      <div class="swatches" data-var="p600"></div>
+    </div>
+  </div>
+
+  <!-- 组2：accent 金 -->
+  <div class="group">
+    <div class="group-head">
+      <span class="group-name">琥珀金 accent</span>
+      <span class="group-desc">状态变更 / 通知 / 高亮</span>
+    </div>
+    <div class="current-note">当前：400=#F59E0B · 500=#D97706</div>
+
+    <div class="field">
+      <div class="field-label">
+        accent-400 <span style="font-weight:400;color:var(--text-mut)">状态文字 / 图标 / 徽章</span>
+        <span class="now"><span class="chip" style="background:#f59e0b"></span><span id="cur-a400">#FBBF24</span></span>
+      </div>
+      <div class="swatches" data-var="a400"></div>
+    </div>
+
+    <div class="field">
+      <div class="field-label">
+        accent-500 <span style="font-weight:400;color:var(--text-mut)">实底按钮 / hover</span>
+        <span class="now"><span class="chip" style="background:#d97706"></span><span id="cur-a500">#D97706</span></span>
+      </div>
+      <div class="swatches" data-var="a500"></div>
+    </div>
+  </div>
+
+  <!-- 组3：mint 绿 -->
+  <div class="group">
+    <div class="group-head">
+      <span class="group-name">活跃绿 mint</span>
+      <span class="group-desc">在线 / 成功 / 已保存</span>
+    </div>
+    <div class="current-note">当前：400=#10B981 · 500=#059669</div>
+
+    <div class="field">
+      <div class="field-label">
+        mint-400 <span style="font-weight:400;color:var(--text-mut)">在线状态 / 成功文字</span>
+        <span class="now"><span class="chip" style="background:#10b981"></span><span id="cur-m400">#22C55E</span></span>
+      </div>
+      <div class="swatches" data-var="m400"></div>
+    </div>
+
+    <div class="field">
+      <div class="field-label">
+        mint-500 <span style="font-weight:400;color:var(--text-mut)">实底按钮 / hover</span>
+        <span class="now"><span class="chip" style="background:#059669"></span><span id="cur-m500">#059669</span></span>
+      </div>
+      <div class="swatches" data-var="m500"></div>
+    </div>
+  </div>
+
+  <!-- 组4：rose 玫红 -->
+  <div class="group">
+    <div class="group-head">
+      <span class="group-name">危险玫红 rose</span>
+      <span class="group-desc">删除 / 错误 / 勿扰</span>
+    </div>
+    <div class="current-note">当前：400=#C9364F · 500=#A8283F</div>
+
+    <div class="field">
+      <div class="field-label">
+        rose-400 <span style="font-weight:400;color:var(--text-mut)">危险文字 / 删除链接</span>
+        <span class="now"><span class="chip" style="background:#c9364f"></span><span id="cur-r400">#E84A69</span></span>
+      </div>
+      <div class="swatches" data-var="r400"></div>
+    </div>
+
+    <div class="field">
+      <div class="field-label">
+        rose-500 <span style="font-weight:400;color:var(--text-mut)">危险按钮（白字）</span>
+        <span class="now"><span class="chip" style="background:#a8283f"></span><span id="cur-r500">#E11D48</span></span>
+      </div>
+      <div class="swatches" data-var="r500"></div>
+    </div>
+  </div>
+
+  <div class="dark-note">说明：以上为浅色主题选色。深色主题保持现有亮紫/亮玫红系（深底发光），如也想调深色主题的某个颜色，在结果 JSON 里告诉我（比如「深色 primary-400 换 #B8A5FB」）。</div>
+
+  <!-- 结果 -->
+  <div class="result">
+    <div class="preview-title">生成结果</div>
+    <textarea id="out" readonly placeholder="点「生成结果」后这里会出现 JSON…"></textarea>
+    <div class="result-actions">
+      <button class="gen-btn" id="gen">生成结果</button>
+      <button class="copy-btn" id="copy">复制</button>
+    </div>
+  </div>
+
+</div>
+<div class="copied" id="copied">已复制</div>
+
+<script>
+(function () {
+  'use strict';
+
+  // 每个类型色变量的候选色板
+  var CANDIDATES = {
+    p400: [
+      { hex: '#8B5CF6', note: 'violet-500 当前' },
+      { hex: '#7C3AED', note: 'violet-600' },
+      { hex: '#A78BFA', note: 'violet-400 亮' },
+      { hex: '#9B7BFA', note: '偏亮紫' },
+      { hex: '#7E69EA', note: '柔和紫' },
+      { hex: '#6D28D9', note: 'violet-700' },
+    ],
+    p500: [
+      { hex: '#8B5CF6', note: '当前' },
+      { hex: '#7C3AED', note: 'violet-600' },
+      { hex: '#A78BFA', note: '更亮' },
+      { hex: '#9B7BFA', note: '明亮紫' },
+      { hex: '#7E69EA', note: '柔和' },
+      { hex: '#6D28D9', note: '深紫' },
+    ],
+    p600: [
+      { hex: '#7C3AED', note: '当前' },
+      { hex: '#6D28D9', note: 'violet-700' },
+      { hex: '#8B5CF6', note: '浅一档' },
+      { hex: '#5B21B6', note: 'violet-800' },
+    ],
+    a400: [
+      { hex: '#F59E0B', note: 'amber-500 当前' },
+      { hex: '#FBBF24', note: 'amber-400 亮' },
+      { hex: '#F0A020', note: '暖金' },
+      { hex: '#E8972C', note: '柔和金' },
+      { hex: '#D97706', note: 'amber-600' },
+      { hex: '#FACC15', note: '鲜黄' },
+    ],
+    a500: [
+      { hex: '#D97706', note: '当前' },
+      { hex: '#F59E0B', note: 'amber-500' },
+      { hex: '#E8972C', note: '柔和' },
+      { hex: '#B45309', note: 'amber-700' },
+      { hex: '#C2710A', note: '深金' },
+    ],
+    m400: [
+      { hex: '#10B981', note: 'emerald-500 当前' },
+      { hex: '#34D399', note: 'emerald-400 亮' },
+      { hex: '#14B8A6', note: 'teal-500' },
+      { hex: '#22C55E', note: 'green-500' },
+      { hex: '#059669', note: 'emerald-600' },
+      { hex: '#2DD4BF', note: 'teal-400' },
+    ],
+    m500: [
+      { hex: '#059669', note: '当前' },
+      { hex: '#10B981', note: 'emerald-500' },
+      { hex: '#047857', note: 'emerald-700' },
+      { hex: '#0D9488', note: 'teal-600' },
+    ],
+    r400: [
+      { hex: '#C9364F', note: '当前玫红' },
+      { hex: '#E84A69', note: '亮玫红' },
+      { hex: '#DC2626', note: 'red-600 正红' },
+      { hex: '#E11D48', note: 'rose-600' },
+      { hex: '#F26D8D', note: '亮粉' },
+      { hex: '#A8283F', note: '深玫红' },
+    ],
+    r500: [
+      { hex: '#A8283F', note: '当前' },
+      { hex: '#E11D48', note: 'rose-600' },
+      { hex: '#BE123C', note: 'rose-700' },
+      { hex: '#DC2626', note: 'red-600' },
+      { hex: '#C9364F', note: '玫红' },
+    ],
+  };
+
+  // 当前选中值（默认 = 现有主题）
+  var sel = {
+    p400: '#8B5CF6', p500: '#8B5CF6', p600: '#6D28D9',
+    a400: '#FBBF24', a500: '#D97706',
+    m400: '#22C55E', m500: '#059669',
+    r400: '#E84A69', r500: '#E11D48',
+  };
+
+  var curLabel = {
+    p400: 'cur-p400', p500: 'cur-p500', p600: 'cur-p600',
+    a400: 'cur-a400', a500: 'cur-a500',
+    m400: 'cur-m400', m500: 'cur-m500',
+    r400: 'cur-r400', r500: 'cur-r500',
+  };
+
+  function render() {
+    // 预览
+    var p500 = sel.p500, p400 = sel.p400, p600 = sel.p600;
+    document.getElementById('pv-primary').style.background = p500;
+    document.getElementById('pv-primary').onmouseenter = function () { this.style.background = p600; };
+    document.getElementById('pv-primary').onmouseleave = function () { this.style.background = p500; };
+    document.getElementById('pv-badge').style.background = p500;
+    document.getElementById('pv-text').style.color = p400;
+    document.getElementById('pv-accent').style.background = sel.a400;
+    document.getElementById('pv-mint').style.background = sel.m400;
+    document.getElementById('pv-rose').style.background = sel.r400;
+    document.getElementById('pv-rose').style.color = '#fff';
+  }
+
+  // 渲染所有色板
+  Object.keys(CANDIDATES).forEach(function (key) {
+    var box = document.querySelector('[data-var="' + key + '"]');
+    if (!box) return;
+    CANDIDATES[key].forEach(function (c) {
+      var el = document.createElement('div');
+      el.className = 'swatch' + (sel[key].toUpperCase() === c.hex.toUpperCase() ? ' sel' : '');
+      el.style.background = c.hex;
+      el.title = c.hex + ' ' + (c.note || '');
+      el.innerHTML = '<span class="hex">' + c.hex.replace('#', '') + '</span>';
+      el.addEventListener('click', function () {
+        sel[key] = c.hex;
+        box.querySelectorAll('.swatch').forEach(function (s) { s.classList.remove('sel'); });
+        el.classList.add('sel');
+        document.getElementById(curLabel[key]).textContent = c.hex.toUpperCase();
+        document.getElementById(curLabel[key]).previousElementSibling.style.background = c.hex;
+        render();
+      });
+      box.appendChild(el);
+    });
+  });
+
+  render();
+
+  // 生成结果
+  function hexToRgb(hex) {
+    var h = hex.replace('#', '');
+    return parseInt(h.slice(0,2),16) + ' ' + parseInt(h.slice(2,4),16) + ' ' + parseInt(h.slice(4,6),16);
+  }
+
+  document.getElementById('gen').addEventListener('click', function () {
+    var lines = [];
+    lines.push('/* 浅色主题（:root）——按你的选择替换 */');
+    lines.push('--tw-primary-400: ' + hexToRgb(sel.p400) + ';  /* ' + sel.p400 + ' */');
+    lines.push('--tw-primary-500: ' + hexToRgb(sel.p500) + ';  /* ' + sel.p500 + ' */');
+    lines.push('--tw-primary-600: ' + hexToRgb(sel.p600) + ';  /* ' + sel.p600 + ' */');
+    lines.push('--tw-accent-400: ' + hexToRgb(sel.a400) + ';   /* ' + sel.a400 + ' */');
+    lines.push('--tw-accent-500: ' + hexToRgb(sel.a500) + ';   /* ' + sel.a500 + ' */');
+    lines.push('--tw-mint-400: ' + hexToRgb(sel.m400) + ';     /* ' + sel.m400 + ' */');
+    lines.push('--tw-mint-500: ' + hexToRgb(sel.m500) + ';     /* ' + sel.m500 + ' */');
+    lines.push('--tw-rose-400: ' + hexToRgb(sel.r400) + ';     /* ' + sel.r400 + ' */');
+    lines.push('--tw-rose-500: ' + hexToRgb(sel.r500) + ';     /* ' + sel.r500 + ' */');
+    document.getElementById('out').value = lines.join('\n');
+  });
+
+  // 复制
+  document.getElementById('copy').addEventListener('click', function () {
+    var ta = document.getElementById('out');
+    if (!ta.value) { document.getElementById('gen').click(); }
+    ta.select();
+    try { document.execCommand('copy'); } catch (e) {}
+    if (navigator.clipboard) {
+      navigator.clipboard.writeText(ta.value).catch(function () {});
+    }
+    var tip = document.getElementById('copied');
+    tip.classList.add('show');
+    setTimeout(function () { tip.classList.remove('show'); }, 1500);
+  });
+
+})();
+</script>
+</body>
+</html>

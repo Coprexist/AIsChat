@@ -5,6 +5,7 @@ import { useTheme } from '../context/ThemeContext'
 import { useT } from '../i18n/I18nContext'
 import Toggle from '../components/Toggle'
 import MagicVisionFilter from '../components/MagicVisionFilter.tsx'
+import ThemeCustomizer from '../components/ThemeCustomizer'
 import { normalizePrefs, defaultPrefs, loadFromStorage, saveToStorage, apply } from '../utils/cssFilters'
 import type { MagicVisionPrefs } from '../utils/cssFilters'
 import { useResizableSidebar } from '../hooks/useResizableSidebar'
@@ -960,6 +961,9 @@ export default function SettingsPage() {
           </div>
           <Toggle checked={theme === 'dark'} onChange={() => toggleTheme()} />
         </div>
+
+        {/* 主题定制 - 个性化主色 */}
+        <ThemeCustomizer />
 
         {/* 魔视界 - CSS 滤镜 */}
         <MagicVisionFilter

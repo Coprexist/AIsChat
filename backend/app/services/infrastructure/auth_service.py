@@ -213,6 +213,7 @@ async def login_user(
         "language": getattr(user, "language", "zh") or "zh",
         "email": getattr(user, "email", None),
         "email_verified": getattr(user, "email_verified", False),
+        "ui_prefs": getattr(user, "ui_prefs", None) or {},
     }
 
 
