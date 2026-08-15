@@ -138,34 +138,34 @@ export default function WorldsPage() {
                 </div>
                 {/* 操作按钮：手机上换行成两行，桌面保持一行横排 */}
                 <div className="flex items-center gap-2 shrink-0 flex-wrap">
-                  <button onClick={() => openBindModal(w, 'group')} className="text-xs px-3 py-1.5 bg-elevated hover:bg-border text-textSecondary rounded transition-colors">绑定群</button>
-                  <button onClick={() => openBindModal(w, 'agent')} className="text-xs px-3 py-1.5 bg-elevated hover:bg-border text-textSecondary rounded transition-colors">绑定 AI</button>
-                  <button onClick={() => toggleStatus(w)} className="text-xs px-3 py-1.5 bg-elevated hover:bg-border text-textSecondary rounded transition-colors">
+                  <button onClick={() => openBindModal(w, 'group')} className="text-xs px-3 py-1.5 bg-elevated hover:bg-border text-textSecondary rounded transition-colors leading-none">绑定群</button>
+                  <button onClick={() => openBindModal(w, 'agent')} className="text-xs px-3 py-1.5 bg-elevated hover:bg-border text-textSecondary rounded transition-colors leading-none">绑定 AI</button>
+                  <button onClick={() => toggleStatus(w)} className="text-xs px-3 py-1.5 bg-elevated hover:bg-border text-textSecondary rounded transition-colors leading-none">
                     {w.status === 'active' ? '休眠' : '唤醒'}
                   </button>
                   <button
                     onClick={() => window.open(`/world/${w.id}/preview`, '_blank')}
-                    className="text-xs px-3 py-1.5 bg-elevated hover:bg-border text-textSecondary rounded transition-colors"
+                    className="text-xs px-3 py-1.5 bg-elevated hover:bg-border text-textSecondary rounded transition-colors leading-none"
                     title="打开沉浸界面（无需绑定群，只绑定 AI 也能进）"
                   >
                     <span className="inline-flex items-center gap-1">
-                      <Eye size={13} /> 打开
+                      <Eye size={13} className="shrink-0" /> 打开
                     </span>
                   </button>
                   <button
                     onClick={() => navigate(`/worlds/${w.id}/design`)}
-                    className="text-xs px-3 py-1.5 bg-primary-500 hover:bg-primary-400 text-white rounded transition-colors"
+                    className="text-xs px-3 py-1.5 bg-primary-500 hover:bg-primary-400 text-white rounded transition-colors leading-none"
                   >
                     <span className="inline-flex items-center gap-0.5">
-                      设计页 <ChevronRight size={13} />
+                      设计页 <ChevronRight size={13} className="shrink-0" />
                     </span>
                   </button>
                   <button
                     onClick={() => deleteWorld(w)}
-                    className="text-xs px-2.5 py-1.5 bg-elevated border border-red-500/40 text-red-400 rounded hover:bg-red-500/15 transition-colors"
+                    className="text-xs px-2.5 py-1.5 bg-elevated border border-red-500/40 text-red-400 rounded hover:bg-red-500/15 transition-colors leading-none"
                     title="删除世界（含文件与数据，不可恢复）"
                   >
-                    <Trash2 size={13} />
+                    <Trash2 size={13} className="shrink-0" />
                   </button>
                 </div>
               </div>
