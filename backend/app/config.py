@@ -39,9 +39,23 @@ class Settings(BaseSettings):
     )
     default_chat_model: str = "deepseek-v4-flash"
     default_work_model: str = "deepseek-v4-pro"
-    # DeepSeek 不提供 embedding API，默认用 OpenAI 兼容模型
-    # 设为空字符串可禁用向量检索（纯文本搜索降级）
-    default_embedding_model: str = os.getenv("EMBEDDING_MODEL", "text-embedding-3-small")
+
+    # ── Embedding 提供方插件化（独立于 chat，未来转 JS 契约不变）──
+    # 后端: disabled | ollama | api | local
+    #   disabled = 不启用向量（默认，纯文本检索，行为与现状一致）
+    #   ollama   = 本地/远程 Ollama 实例（有 Ollama 直接复用）
+    #   api      = 任意 OpenAI 兼容 /v1/embeddings（OpenAI/硅基流动/智谱/阿里云）
+    #   local    = fastembed 本地模型（离线可用，pip install fastembed）
+    embedding_backend: str = os.getenv("EMBEDDING_BACKEND", "disabled").lower()
+    # 端点（ollama/api 共用）：Ollama 填 http://127.0.0.1:11434，API 填 https://host/v1
+    embedding_base_url: str = os.getenv("EMBEDDING_BASE_URL", "")
+    embedding_api_key: str = os.getenv("EMBEDDING_API_KEY", "")
+    # 模型：ollama 默认 nomic-embed-text；local 默认 bge-small-zh；api 需显式指定
+    embedding_model: str = os.getenv("EMBEDDING_MODEL", "")
+    # 旧配置兼容别名（显式直连自定义端点时使用的模型名）
+    default_embedding_model: str = os.getenv(
+        "EMBEDDING_MODEL", "text-embedding-3-small"
+    )
 
     @property
     def is_deepseek_api(self) -> bool:
