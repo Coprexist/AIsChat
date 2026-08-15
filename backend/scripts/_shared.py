@@ -81,17 +81,22 @@ async def backfill_table(
     provider,
     batch_size: int = 50,
     concurrency: int = 8,
+    target_col: str = "embedding_tmp",
 ) -> tuple[int, int]:
     """
-    并发回填某表的 embedding_tmp（只填 NULL，幂等可重入）。
+    并发回填某表的向量列（只填 NULL，幂等可重入）。
+
+    target_col:
+      - "embedding_tmp": 维度迁移用（新列，原 embedding 保留）
+      - "embedding":     日常回填用（给 embedding IS NULL 的记忆补向量）
 
     返回 (成功数, 失败数)。失败行保持 NULL，不阻塞（可重跑续传）。
     """
     def fetch_batch():
-        # WHERE 放子查询内（FROM 是原表，可引用 embedding_tmp），外层只做排序分页
+        # WHERE 放子查询内（FROM 是原表，可引用目标列），外层只做排序分页
         return conn.fetch(
             f"SELECT {id_col} AS id, text FROM ("
-            f"  {text_sql} WHERE embedding_tmp IS NULL"
+            f"  {text_sql} WHERE {target_col} IS NULL"
             f") sub ORDER BY {id_col} LIMIT {batch_size}"
         )
     done = failed = 0
@@ -104,7 +109,7 @@ async def backfill_table(
         for r, vec in zip(rows, results):
             if vec:
                 await conn.execute(
-                    f"UPDATE {table} SET embedding_tmp = $1::vector WHERE {id_col} = $2",
+                    f"UPDATE {table} SET {target_col} = $1::vector WHERE {id_col} = $2",
                     vec_to_text(vec),
                     r["id"],
                 )
