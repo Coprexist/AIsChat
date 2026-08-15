@@ -14,8 +14,8 @@
   --tw-accent-400: 251 191 36;      /* #FBBF24 */
   --tw-canvas: 248 250 252;        /* slate-50 */
   --tw-surface: 255 255 255;       /* white */
-  --tw-elevated: 255 255 255;      /* white */
-  --tw-border: 226 232 240;        /* slate-200 */
+  --tw-elevated: 241 245 249;      /* slate-100 —— 比背景深一档，按钮/卡片有可见底色 */
+  --tw-border: 203 213 225;        /* slate-300 —— 描边可见，次级按钮与背景可区分 */
   /* 文本色 — 浅色主题 */
   --tw-text-primary: 17 24 39;     /* gray-900 */
   --tw-text-secondary: 75 85 99;   /* gray-600 */
@@ -422,3 +422,13 @@
   to { opacity: 1; transform: none; }
 }
 .world-msg { animation: world-msg-in 0.25s ease-out; }
+
+/* ────────────────────────────────────────────────
+   浅色主题次级元素边界增强（2026-08-15）
+   浅色主题下 elevated/border 与背景几乎同色，导致大量
+   bg-elevated 按钮/标签与背景分不开。此处统一补一层
+   极淡描边 + 极轻阴影建立边界（仅浅色主题，深色不受影响）。
+   ──────────────────────────────────────────────── */
+:root:not(.dark) .bg-elevated {
+  box-shadow: inset 0 0 0 1px rgb(var(--tw-border) / 0.45);
+}

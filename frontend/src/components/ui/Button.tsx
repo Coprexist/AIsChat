@@ -28,7 +28,8 @@ interface ButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
 const VARIANT_CLASSES: Record<Variant, string> = {
   primary: 'bg-primary-500 hover:bg-primary-400 text-white shadow-sm',
   accent: 'bg-accent-500 hover:bg-accent-400 text-white shadow-sm',
-  outline: 'border border-border text-textSecondary hover:bg-canvas',
+  // outline = 浅底 + 深描边 + 轻阴影（浅色主题下靠描边+阴影建立边界，不只靠底色）
+  outline: 'bg-elevated border border-border text-textSecondary hover:bg-border/70 hover:text-textPrimary shadow-sm',
   ghost: 'text-textSecondary hover:bg-canvas',
   danger: 'bg-rose-500 hover:bg-rose-400 text-white',
   success: 'bg-mint-400 hover:bg-mint-300 text-gray-900',

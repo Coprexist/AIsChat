@@ -478,10 +478,10 @@ export default function MarketPage() {
 
       {/* 搜索 / 刷新 */}
       <div className="px-4 pt-2 pb-2 bg-canvas shrink-0">
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 flex-wrap">
           {tab === 'local' ? (
             <>
-              <div className="relative flex-1">
+              <div className="relative flex-1 min-w-[140px]">
                 <Search size={13} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-textMuted" />
                 <input
                   value={q}
@@ -496,7 +496,7 @@ export default function MarketPage() {
                 onChange={(e) => setTag(e.target.value)}
                 onKeyDown={(e) => { if (e.key === 'Enter') loadLocal() }}
                 placeholder="标签，如 2d冒险"
-                className="w-36 bg-elevated text-sm px-3 py-1.5 rounded-lg border border-border outline-none focus:border-primary-500/50 text-textPrimary shrink-0"
+                className="w-32 sm:w-36 bg-elevated text-sm px-3 py-1.5 rounded-lg border border-border outline-none focus:border-primary-500/50 text-textPrimary shrink-0"
               />
               <button onClick={loadLocal} className="text-xs px-3 py-1.5 rounded-lg bg-elevated hover:bg-border text-textSecondary transition-colors shrink-0">
                 搜索
