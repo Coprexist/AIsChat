@@ -99,12 +99,12 @@ async def lifespan(app: FastAPI):
     from app.migration import run_migrations
     await run_migrations()
 
-    # 加载 DB 覆盖配置（管理员前端图形化修改的 embedding 配置，覆盖 env）
+    # 加载 DB 覆盖配置（管理员前端图形化修改的配置组，覆盖 env）
     try:
         from app.database import async_session
-        from app.services.infrastructure.embedding_config_service import load_db_config
+        from app.services.infrastructure.app_config_service import load_all_configs
         async with async_session() as cfg_db:
-            await load_db_config(cfg_db)
+            await load_all_configs(cfg_db)
     except Exception as e:
         logger.warning(f"⚠️ 加载 DB 配置覆盖失败（使用 env 配置）: {e}")
 

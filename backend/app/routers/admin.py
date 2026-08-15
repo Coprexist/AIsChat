@@ -3503,3 +3503,70 @@ async def test_embedding_config(
     if not vec:
         raise HTTPException(status_code=502, detail="Embedding 调用失败，请检查端点/模型/密钥")
     return {"dimension": len(vec), "provider": provider.name}
+
+
+# ═══════════════════════════════════════════════════════════════
+# 通用配置组 API（第二批：任意配置组前端图形化）
+# ═══════════════════════════════════════════════════════════════
+
+@router.get("/configs")
+async def list_config_groups(
+    admin: dict = Depends(require_admin),
+):
+    """列出所有可前端修改的配置组及其 schema（前端按 type 自动渲染表单）"""
+    from app.services.infrastructure.app_config_service import CONFIG_GROUPS
+    return {
+        "groups": [
+            {
+                "key": key,
+                "label": schema["label"],
+                "fields": schema["fields"],
+            }
+            for key, schema in CONFIG_GROUPS.items()
+        ]
+    }
+
+
+@router.get("/configs/{group}")
+async def get_config_group(
+    group: str,
+    admin: dict = Depends(require_admin),
+    db: AsyncSession = Depends(get_db),
+):
+    """获取某配置组当前生效配置（DB 覆盖 + env 兜底，敏感字段脱敏）"""
+    from app.services.infrastructure.app_config_service import get_effective_config
+    try:
+        return await get_effective_config(db, group)
+    except ValueError as e:
+        raise HTTPException(status_code=404, detail=str(e))
+
+
+@router.put("/configs/{group}")
+async def save_config_group(
+    group: str,
+    body: dict,
+    admin: dict = Depends(require_admin),
+    db: AsyncSession = Depends(get_db),
+):
+    """保存某配置组（DB 持久化 + 缓存热更新；敏感字段加密存储）"""
+    from app.services.infrastructure.app_config_service import save_group_config
+    try:
+        saved = await save_group_config(db, group, body)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    return {"message": "已保存", "config": saved}
+
+
+@router.delete("/configs/{group}")
+async def reset_config_group(
+    group: str,
+    admin: dict = Depends(require_admin),
+    db: AsyncSession = Depends(get_db),
+):
+    """恢复某配置组默认：清除 DB 覆盖，回到环境变量配置"""
+    from app.services.infrastructure.app_config_service import clear_group_config
+    try:
+        await clear_group_config(db, group)
+    except ValueError as e:
+        raise HTTPException(status_code=404, detail=str(e))
+    return {"message": "已恢复默认（回到环境变量配置）"}
