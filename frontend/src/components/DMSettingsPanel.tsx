@@ -173,7 +173,7 @@ export default function DMSettingsPanel({ sessionId, partner, myDndUntil, onClos
                 <button
                   onClick={handleCancelDnd}
                   disabled={loading}
-                  className="w-full px-4 py-2.5 bg-primary-500 text-white rounded-lg text-sm font-medium hover:bg-primary-400 disabled:opacity-50 transition-colors"
+                  className="w-full px-4 py-2.5 bg-primary-500 text-white rounded-lg text-sm font-medium hover:bg-primary-600 disabled:opacity-50 transition-colors"
                 >
                   {t('dmSettings.cancelDnd')}
                 </button>
@@ -209,7 +209,7 @@ export default function DMSettingsPanel({ sessionId, partner, myDndUntil, onClos
                   <button
                     onClick={handleCustomDnd}
                     disabled={loading || !customMinutes.trim()}
-                    className="px-3 py-2 bg-primary-500 text-white rounded-lg text-xs font-medium hover:bg-primary-400 disabled:opacity-50 transition-colors shrink-0"
+                    className="px-3 py-2 bg-primary-500 text-white rounded-lg text-xs font-medium hover:bg-primary-600 disabled:opacity-50 transition-colors shrink-0"
                   >
                     {t('common.set')}
                   </button>
@@ -300,7 +300,7 @@ export default function DMSettingsPanel({ sessionId, partner, myDndUntil, onClos
               <button
                 onClick={handleExportChat}
                 disabled={exporting}
-                className="w-full flex items-center justify-center gap-2 px-4 py-2.5 bg-primary-500 text-white rounded-lg hover:bg-primary-400 disabled:opacity-40 text-sm font-medium transition-all"
+                className="w-full flex items-center justify-center gap-2 px-4 py-2.5 bg-primary-500 text-white rounded-lg hover:bg-primary-600 disabled:opacity-40 text-sm font-medium transition-all"
               >
                 <Download size={16} />
                 {exporting ? t('common.exporting') : t('dmSettings.downloadExport')}

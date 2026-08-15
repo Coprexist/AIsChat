@@ -612,7 +612,7 @@ export default function SetupPage() {
                           : 'bg-canvas border-border text-textSecondary hover:text-textPrimary hover:border-primary-500/30'
                       }`}
                     >
-                      {p.name}{p.is_default ? <Star size={10} className="fill-current text-amber-400" /> : null}
+                      {p.name}{p.is_default ? <Star size={10} className="fill-current text-accent-400" /> : null}
                     </button>
                   ))}
                 </div>
@@ -649,7 +649,7 @@ export default function SetupPage() {
                   href={getApiKeyUrl(apiBaseUrl)}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="inline-flex items-center gap-1 text-[11px] text-primary-400 hover:text-primary-300 underline underline-offset-2 mt-1.5"
+                  className="inline-flex items-center gap-1 text-[11px] text-primary-400 hover:text-primary-500 dark:hover:text-primary-300 underline underline-offset-2 mt-1.5"
                 >
                   {t('setup.getApiKey') || '获取 API Key'}
                   <ExternalLink size={11} />
@@ -693,7 +693,7 @@ export default function SetupPage() {
               <p className="text-xs text-textMuted mb-5">{t('setup.aiCreateHintDesc') || '使用完整创建体验，预设档位、详细参数一应俱全'}</p>
               <button
                 onClick={() => setShowCreateModal(true)}
-                className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-primary-500 hover:bg-primary-400 text-white text-sm font-semibold transition-all shadow-lg shadow-primary-500/20"
+                className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-primary-500 hover:bg-primary-600 text-white text-sm font-semibold transition-all shadow-lg shadow-primary-500/20"
               >
                 <Sparkles size={16} />
                 {t('setup.aiCreateButton') || '创建 AI'}
@@ -918,7 +918,7 @@ export default function SetupPage() {
                 <button
                   onClick={handleNext}
                   disabled={saving}
-                  className="flex items-center gap-1.5 px-5 py-2 rounded-xl bg-primary-500 hover:bg-primary-400 disabled:opacity-40 disabled:cursor-not-allowed text-white text-sm font-semibold transition-all shadow-lg shadow-primary-500/20"
+                  className="flex items-center gap-1.5 px-5 py-2 rounded-xl bg-primary-500 hover:bg-primary-600 disabled:opacity-40 disabled:cursor-not-allowed text-white text-sm font-semibold transition-all shadow-lg shadow-primary-500/20"
                 >
                   {saving ? (
                     <span className="inline-flex items-center gap-2">

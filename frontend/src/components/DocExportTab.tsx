@@ -59,9 +59,9 @@ export default function DocExportTab() {
 
       {/* 状态卡 */}
       {!status && (
-        <div className="rounded-xl border border-amber-500/30 bg-amber-500/10 p-4 text-xs text-amber-400">
+        <div className="rounded-xl border border-accent-500/30 bg-accent-500/10 p-4 text-xs text-accent-400">
           状态加载失败——后端可能未重启（新接口 /kb/status 未生效）。
-          <button onClick={load} className="ml-2 text-primary-400 hover:text-primary-300 transition-colors">重试</button>
+          <button onClick={load} className="ml-2 text-primary-400 hover:text-primary-500 dark:hover:text-primary-300 transition-colors">重试</button>
         </div>
       )}
       {status && (
@@ -70,7 +70,7 @@ export default function DocExportTab() {
           <FileText size={16} className="text-primary-400 shrink-0" />
           <span className="text-sm text-textPrimary">pandoc 状态</span>
           {status?.installing || installing ? (
-            <span className="inline-flex items-center gap-1 text-xs text-amber-400"><Loader2 size={12} className="animate-spin" /> 安装中…（apt 下载可能需要几分钟）</span>
+            <span className="inline-flex items-center gap-1 text-xs text-accent-400"><Loader2 size={12} className="animate-spin" /> 安装中…（apt 下载可能需要几分钟）</span>
           ) : status?.docx_available ? (
             <span className="inline-flex items-center gap-1 text-xs text-mint-400"><CheckCircle2 size={12} /> 已安装，docx 导出可用</span>
           ) : (
@@ -80,7 +80,7 @@ export default function DocExportTab() {
         {status?.install_error && (
           <div className="mt-2 text-xs text-rose-400">{status.install_error}</div>
         )}
-        {msg && <div className="mt-2 text-xs text-amber-400">{msg}</div>}
+        {msg && <div className="mt-2 text-xs text-accent-400">{msg}</div>}
       </div>
       )}
 
@@ -89,7 +89,7 @@ export default function DocExportTab() {
         <button
           onClick={doInstall}
           disabled={installing || status.installing}
-          className="inline-flex items-center gap-1.5 px-4 py-2 text-sm bg-primary-500 hover:bg-primary-400 text-white rounded-lg transition-colors disabled:opacity-40"
+          className="inline-flex items-center gap-1.5 px-4 py-2 text-sm bg-primary-500 hover:bg-primary-600 text-white rounded-lg transition-colors disabled:opacity-40"
         >
           {installing || status.installing ? <Loader2 size={14} className="animate-spin" /> : <PackagePlus size={14} />}
           {installing || status.installing ? '安装中…' : '安装 pandoc'}

@@ -81,7 +81,7 @@ export default function ApiKeyPoolTab() {
       <div className="flex items-center justify-between">
         <div>
           <h3 className="text-sm font-semibold text-textPrimary flex items-center gap-2">
-            <Key size={16} className="text-amber-400" /> {t('admin.apiKeyPool')}
+            <Key size={16} className="text-accent-400" /> {t('admin.apiKeyPool')}
           </h3>
           <p className="text-xs text-textMuted mt-0.5">
             {t('admin.apiKeyPoolDesc')}
@@ -89,7 +89,7 @@ export default function ApiKeyPoolTab() {
         </div>
         <button
           onClick={() => setShowAdd(true)}
-          className="flex items-center gap-1.5 px-3 py-1.5 bg-primary-500 text-white rounded-xl hover:bg-primary-400 text-xs font-medium transition-colors"
+          className="flex items-center gap-1.5 px-3 py-1.5 bg-primary-500 text-white rounded-xl hover:bg-primary-600 text-xs font-medium transition-colors"
         >
           <Plus size={14} /> {t('admin.addKey')}
         </button>
@@ -103,7 +103,7 @@ export default function ApiKeyPoolTab() {
           <p className="text-xs text-textMuted mt-1">{t('admin.noKeysDesc')}</p>
           <button
             onClick={() => setShowAdd(true)}
-            className="mt-4 px-4 py-2 bg-primary-500 text-white rounded-xl hover:bg-primary-400 text-sm font-medium transition-colors"
+            className="mt-4 px-4 py-2 bg-primary-500 text-white rounded-xl hover:bg-primary-600 text-sm font-medium transition-colors"
           >
             {t('admin.addFirstKey')}
           </button>
@@ -220,7 +220,7 @@ function AddPoolKeyModal({ onClose, onSaved }: { onClose: () => void; onSaved: (
         onClick={(e) => e.stopPropagation()}
       >
         <h3 className="text-lg font-semibold mb-1 text-textPrimary flex items-center gap-2">
-          <Key size={18} className="text-amber-400" /> {t('admin.addApiKeyModal')}
+          <Key size={18} className="text-accent-400" /> {t('admin.addApiKeyModal')}
         </h3>
         <p className="text-xs text-textMuted mb-4">
           {t('admin.addKeyEncryptNote')}
@@ -252,7 +252,7 @@ function AddPoolKeyModal({ onClose, onSaved }: { onClose: () => void; onSaved: (
                   href={getApiKeyUrl(apiBaseUrl)}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="text-[10px] text-primary-400 hover:text-primary-300 underline underline-offset-2 font-normal"
+                  className="text-[10px] text-primary-400 hover:text-primary-500 dark:hover:text-primary-300 underline underline-offset-2 font-normal"
                 >
                   获取 API Key →
                 </a>
@@ -290,7 +290,7 @@ function AddPoolKeyModal({ onClose, onSaved }: { onClose: () => void; onSaved: (
             {t('common.cancel')}
           </button>
           <button onClick={handleSave} disabled={!name.trim() || !apiKey.trim() || loading}
-            className="flex-1 py-2.5 text-sm bg-primary-500 text-white rounded-xl hover:bg-primary-400 disabled:opacity-30 font-medium transition-all shadow-lg shadow-primary-500/20">
+            className="flex-1 py-2.5 text-sm bg-primary-500 text-white rounded-xl hover:bg-primary-600 disabled:opacity-30 font-medium transition-all shadow-lg shadow-primary-500/20">
             {loading ? t('admin.adding') : t('admin.add')}
           </button>
         </div>
@@ -365,7 +365,7 @@ function KeyStatsModal({ keyId, onClose }: { keyId: number; onClose: () => void 
                 <div className="text-xs text-textMuted mt-1">{t('admin.keyStatsTotalReqs')}</div>
               </div>
               <div className="bg-canvas rounded-xl border border-border p-3 text-center">
-                <div className="text-2xl font-bold text-amber-400">{(stats.overview.total_tokens / 1000).toFixed(0)}K</div>
+                <div className="text-2xl font-bold text-accent-400">{(stats.overview.total_tokens / 1000).toFixed(0)}K</div>
                 <div className="text-xs text-textMuted mt-1">{t('admin.keyStatsTotalTokens')}</div>
               </div>
               <div className="bg-canvas rounded-xl border border-border p-3 text-center">

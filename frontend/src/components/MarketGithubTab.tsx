@@ -117,7 +117,7 @@ export default function MarketGithubTab() {
         <div>
           <label className="flex items-center gap-1.5 text-xs text-textSecondary mb-1.5">
             <Key size={11} /> 系统 Token（classic 或 fine-grained，需仓库写权限）
-            <ExternalLinkSafe href="https://github.com/settings/tokens/new" className="text-[10px] text-primary-400 hover:text-primary-300 transition-colors shrink-0 ml-auto">去 GitHub 生成 token →</ExternalLinkSafe>
+            <ExternalLinkSafe href="https://github.com/settings/tokens/new" className="text-[10px] text-primary-400 hover:text-primary-500 dark:hover:text-primary-300 transition-colors shrink-0 ml-auto">去 GitHub 生成 token →</ExternalLinkSafe>
           </label>
           <input
             type="password"
@@ -145,7 +145,7 @@ export default function MarketGithubTab() {
           <button
             onClick={doSave}
             disabled={saving || loading}
-            className="inline-flex items-center gap-1.5 text-xs px-4 py-2 rounded-lg bg-primary-500 hover:bg-primary-400 text-white transition-colors disabled:opacity-40"
+            className="inline-flex items-center gap-1.5 text-xs px-4 py-2 rounded-lg bg-primary-500 hover:bg-primary-600 text-white transition-colors disabled:opacity-40"
           >
             {saving ? <RefreshCw size={12} className="animate-spin" /> : <Save size={12} />} {saving ? '保存中…' : '保存配置'}
           </button>

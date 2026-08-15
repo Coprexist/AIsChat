@@ -499,7 +499,7 @@ export default function WorldDesignPage() {
             世界
           </button>
           <span className="font-semibold truncate">{world.name}</span>
-          <span className={`hidden sm:inline-flex text-xs px-2 py-0.5 rounded-full shrink-0 ${world.status === 'active' ? 'bg-green-500/20 text-green-400' : 'bg-elevated text-textMuted'}`}>
+          <span className={`hidden sm:inline-flex text-xs px-2 py-0.5 rounded-full shrink-0 ${world.status === 'active' ? 'bg-mint-500/20 text-mint-400' : 'bg-elevated text-textMuted'}`}>
             {world.status === 'active' ? '活跃' : '休眠'}
           </span>
           <div className="flex-1" />
@@ -512,7 +512,7 @@ export default function WorldDesignPage() {
           <button onClick={() => setWorldImportOpen(true)} className="shrink-0 p-1.5 text-textMuted hover:text-textPrimary transition-colors" title="导入世界包（zip 批量导入，不动数据文件）">
             <FolderInput size={14} />
           </button>
-          <button onClick={publishToMarket} className="shrink-0 inline-flex items-center gap-1 text-xs text-primary-400 hover:text-primary-300 transition-colors px-2 py-1 whitespace-nowrap" title="发布到世界商城">
+          <button onClick={publishToMarket} className="shrink-0 inline-flex items-center gap-1 text-xs text-primary-400 hover:text-primary-500 dark:hover:text-primary-300 transition-colors px-2 py-1 whitespace-nowrap" title="发布到世界商城">
             <Upload size={13} /> 发布
           </button>
           <button onClick={() => setGroupManagerOpen(true)} className="shrink-0 p-1.5 text-textMuted hover:text-textPrimary transition-colors" title="群类型与群助手">
@@ -520,7 +520,7 @@ export default function WorldDesignPage() {
           </button>
           {mobileTab === 'files' && (
             <div className="relative shrink-0">
-              <button onClick={() => setUploadMenuOpen((v) => !v)} className="inline-flex items-center gap-1 text-xs text-primary-400 hover:text-primary-300 transition-colors px-2 py-1 whitespace-nowrap" title="上传文件">
+              <button onClick={() => setUploadMenuOpen((v) => !v)} className="inline-flex items-center gap-1 text-xs text-primary-400 hover:text-primary-500 dark:hover:text-primary-300 transition-colors px-2 py-1 whitespace-nowrap" title="上传文件">
                 <Upload size={14} />
                 上传
               </button>
@@ -569,10 +569,10 @@ export default function WorldDesignPage() {
           <div className="flex-1 flex flex-col min-h-0">
             <div className="px-3 py-1.5 text-xs text-textSecondary bg-surface/60 border-b border-border flex items-center gap-2">
               <span className="truncate flex-1">世界预览（/world/{wid}/preview）</span>
-              <button onClick={() => setPreviewKey((k) => k + 1)} className="inline-flex items-center gap-1 text-primary-400 hover:text-primary-300 transition-colors shrink-0" title="刷新预览"><RefreshCw size={12} /> 刷新</button>
+              <button onClick={() => setPreviewKey((k) => k + 1)} className="inline-flex items-center gap-1 text-primary-400 hover:text-primary-500 dark:hover:text-primary-300 transition-colors shrink-0" title="刷新预览"><RefreshCw size={12} /> 刷新</button>
               <button
                 onClick={() => { if (!tryOpenWorldWindow(wid)) navigate(`/world-view/${wid}`) }}
-                className="inline-flex items-center gap-1 text-primary-400 hover:text-primary-300 transition-colors shrink-0"
+                className="inline-flex items-center gap-1 text-primary-400 hover:text-primary-500 dark:hover:text-primary-300 transition-colors shrink-0"
                 title="在沉浸界面新窗口打开（WebView 下自动应用内跳转）"
               ><ExternalLink size={12} /> 沉浸窗口</button>
             </div>
@@ -586,7 +586,7 @@ export default function WorldDesignPage() {
         ) : mobileView === 'file' ? (
           <div className="flex-1 flex flex-col min-h-0">
             <div className="px-3 py-1.5 text-xs text-textSecondary bg-surface/60 border-b border-border flex items-center gap-2">
-              <button onClick={() => setMobileView('dirs')} className="inline-flex items-center gap-0.5 text-primary-400 hover:text-primary-300 transition-colors shrink-0">
+              <button onClick={() => setMobileView('dirs')} className="inline-flex items-center gap-0.5 text-primary-400 hover:text-primary-500 dark:hover:text-primary-300 transition-colors shrink-0">
                 <ChevronLeft size={13} />
                 返回
               </button>
@@ -594,14 +594,14 @@ export default function WorldDesignPage() {
               {canRender && (
                 <button
                   onClick={() => setViewMode((v) => (v === 'render' ? 'edit' : 'render'))}
-                  className="text-primary-400 hover:text-primary-300 transition-colors shrink-0"
+                  className="text-primary-400 hover:text-primary-500 dark:hover:text-primary-300 transition-colors shrink-0"
                   title={viewMode === 'render' ? '切到原文/编辑' : '切到渲染视图'}
                 >
                   {viewMode === 'render' ? (isMdFile ? '查看原文' : '编辑') : '渲染'}
                 </button>
               )}
               {viewMode !== 'render' && (
-                <button onClick={saveFile} disabled={saving} className="text-primary-400 hover:text-primary-300 transition-colors shrink-0">
+                <button onClick={saveFile} disabled={saving} className="text-primary-400 hover:text-primary-500 dark:hover:text-primary-300 transition-colors shrink-0">
                   {saving ? '保存中...' : (<span className="inline-flex items-center gap-1"><Save size={12} /> 保存</span>)}
                 </button>
               )}
@@ -711,7 +711,7 @@ export default function WorldDesignPage() {
                 ))}
               </div>
               <div className="p-3 border-t border-border">
-                <button onClick={mobileUploadToNavDir} className="w-full py-2.5 text-sm bg-primary-500 hover:bg-primary-400 text-white rounded-lg transition-colors">
+                <button onClick={mobileUploadToNavDir} className="w-full py-2.5 text-sm bg-primary-500 hover:bg-primary-600 text-white rounded-lg transition-colors">
                   上传到此位置（{uploadNavDir || '/'}）
                 </button>
               </div>
@@ -729,7 +729,7 @@ export default function WorldDesignPage() {
             世界列表
           </button>
           <span className="font-semibold">{world.name}</span>
-          <span className={`text-xs px-2 py-0.5 rounded-full ${world.status === 'active' ? 'bg-green-500/20 text-green-400' : 'bg-elevated text-textMuted'}`}>
+          <span className={`text-xs px-2 py-0.5 rounded-full ${world.status === 'active' ? 'bg-mint-500/20 text-mint-400' : 'bg-elevated text-textMuted'}`}>
             {world.status === 'active' ? '活跃' : '休眠'}
           </span>
           <span className="text-xs text-textMuted">流速 x{world.time_flow_rate}</span>
@@ -750,7 +750,7 @@ export default function WorldDesignPage() {
           <button onClick={() => setGroupManagerOpen(true)} className="p-1.5 text-textMuted hover:text-textPrimary transition-colors" title="群类型与群助手">
             <MoreHorizontal size={16} />
           </button>
-          {msg && <span className="text-xs text-amber-400">{msg}</span>}
+          {msg && <span className="text-xs text-accent-400">{msg}</span>}
         </div>
         {/* 标题栏：文件（居中于文件树+编辑区整块） | 对话（右列上方）；内容行手柄贯穿 */}
         <div className="flex items-stretch bg-surface border-b border-border">
@@ -779,11 +779,11 @@ export default function WorldDesignPage() {
             <div className="flex items-center justify-between mb-2 px-1">
               <span className="text-xs font-medium text-textSecondary">文件</span>
               <span className="flex items-center gap-2">
-                <button onClick={() => fileInputRef.current?.click()} className="inline-flex items-center gap-0.5 text-xs text-primary-400 hover:text-primary-300 transition-colors" title="上传文件（先选位置）">
+                <button onClick={() => fileInputRef.current?.click()} className="inline-flex items-center gap-0.5 text-xs text-primary-400 hover:text-primary-500 dark:hover:text-primary-300 transition-colors" title="上传文件（先选位置）">
                   <Upload size={12} />
                   上传
                 </button>
-                <button onClick={createFile} className="inline-flex items-center gap-0.5 text-xs text-primary-400 hover:text-primary-300 transition-colors" title="新建文件">
+                <button onClick={createFile} className="inline-flex items-center gap-0.5 text-xs text-primary-400 hover:text-primary-500 dark:hover:text-primary-300 transition-colors" title="新建文件">
                   <Plus size={12} />
                   新建
                 </button>
@@ -810,7 +810,7 @@ export default function WorldDesignPage() {
                       {canRender && (
                         <button
                           onClick={() => setViewMode((v) => (v === 'render' ? 'edit' : 'render'))}
-                          className="text-primary-400 hover:text-primary-300 transition-colors"
+                          className="text-primary-400 hover:text-primary-500 dark:hover:text-primary-300 transition-colors"
                           title={viewMode === 'render' ? '切到原文/编辑' : '切到渲染视图'}
                         >
                           {viewMode === 'render' ? (isMdFile ? (
@@ -823,7 +823,7 @@ export default function WorldDesignPage() {
                         </button>
                       )}
                       {viewMode !== 'render' && (
-                        <button onClick={saveFile} disabled={saving} className="text-primary-400 hover:text-primary-300 transition-colors">
+                        <button onClick={saveFile} disabled={saving} className="text-primary-400 hover:text-primary-500 dark:hover:text-primary-300 transition-colors">
                           {saving ? '保存中...' : (<span className="inline-flex items-center gap-1"><Save size={12} /> 保存</span>)}
                         </button>
                       )}
@@ -836,10 +836,10 @@ export default function WorldDesignPage() {
               <div className="h-full flex flex-col">
                 <div className="px-3 py-1.5 text-xs text-textSecondary bg-surface/60 border-b border-border flex items-center gap-2">
                   <span className="truncate flex-1">世界预览（/world/{wid}/preview）</span>
-                  <button onClick={() => setPreviewKey((k) => k + 1)} className="inline-flex items-center gap-1 text-primary-400 hover:text-primary-300 transition-colors shrink-0" title="刷新预览"><RefreshCw size={12} /> 刷新</button>
+                  <button onClick={() => setPreviewKey((k) => k + 1)} className="inline-flex items-center gap-1 text-primary-400 hover:text-primary-500 dark:hover:text-primary-300 transition-colors shrink-0" title="刷新预览"><RefreshCw size={12} /> 刷新</button>
                   <button
                     onClick={() => { if (!tryOpenWorldWindow(wid)) navigate(`/world-view/${wid}`) }}
-                    className="inline-flex items-center gap-1 text-primary-400 hover:text-primary-300 transition-colors shrink-0"
+                    className="inline-flex items-center gap-1 text-primary-400 hover:text-primary-500 dark:hover:text-primary-300 transition-colors shrink-0"
                     title="在沉浸界面新窗口打开（WebView 下自动应用内跳转）"
                   >
                     <ExternalLink size={12} /> 沉浸窗口
@@ -951,7 +951,7 @@ export default function WorldDesignPage() {
               )}
             </div>
             {!docxAvailable && isAdminUser && (
-              <div className="mt-3 text-[10px] text-amber-400/90 leading-relaxed">
+              <div className="mt-3 text-[10px] text-accent-400/90 leading-relaxed">
                 如需下载为 docx（Word），请前往管理页安装 pandoc 插件后重启后端。
               </div>
             )}

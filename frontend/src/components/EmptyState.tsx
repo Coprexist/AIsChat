@@ -16,7 +16,7 @@ export default function EmptyState({ icon: Icon = Inbox, title, description, act
       {title && <p className="text-sm font-medium text-textSecondary mb-1">{title}</p>}
       {description && <p className="text-xs text-textMuted text-center max-w-xs leading-relaxed">{description}</p>}
       {action && (
-        <button onClick={action.onClick} className="mt-3 px-4 py-1.5 rounded-lg bg-primary-500 text-white text-xs font-medium hover:bg-primary-400 transition-colors">
+        <button onClick={action.onClick} className="mt-3 px-4 py-1.5 rounded-lg bg-primary-500 text-white text-xs font-medium hover:bg-primary-600 transition-colors">
           {action.label}
         </button>
       )}

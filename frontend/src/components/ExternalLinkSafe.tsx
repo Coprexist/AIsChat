@@ -59,8 +59,8 @@ export default function ExternalLinkSafe({ href, children, className, skipConfir
           >
             <div className="p-5">
               <div className="flex items-center gap-3 mb-4">
-                <div className="w-10 h-10 rounded-full bg-amber-400/10 flex items-center justify-center shrink-0">
-                  <ShieldAlert size={20} className="text-amber-400" />
+                <div className="w-10 h-10 rounded-full bg-accent-400/10 flex items-center justify-center shrink-0">
+                  <ShieldAlert size={20} className="text-accent-400" />
                 </div>
                 <div>
                   <h3 className="text-sm font-semibold text-textPrimary">{t('externalLink.title')}</h3>

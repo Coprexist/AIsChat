@@ -10,8 +10,6 @@
    ============================================================ */
 :root {
   /* 结构色 — 浅色主题 */
-  --tw-primary-400: 167 139 250;   /* #A78BFA */
-  --tw-accent-400: 251 191 36;      /* #FBBF24 */
   --tw-canvas: 248 250 252;        /* slate-50 */
   --tw-surface: 255 255 255;       /* white */
   --tw-elevated: 241 245 249;      /* slate-100 —— 比背景深一档，按钮/卡片有可见底色 */
@@ -20,18 +18,66 @@
   --tw-text-primary: 17 24 39;     /* gray-900 */
   --tw-text-secondary: 75 85 99;   /* gray-600 */
   --tw-text-muted: 107 114 128;    /* gray-500 */
-  
-/* 彩色文字适配深/浅背景：加一层极细半透明描边保证可读 */
 
-/* 滚动条 */
+  /* 主题色 — 浅色主题（整体深一档：白底对比度达标，不发虚） */
+  --tw-primary-50: 245 243 255;    /* #F5F3FF */
+  --tw-primary-100: 237 233 254;   /* #EDE9FE */
+  --tw-primary-200: 221 214 254;   /* #DDD6FE */
+  --tw-primary-300: 167 139 250;   /* #A78BFA —— 浅紫（badge/装饰） */
+  --tw-primary-400: 139 92 246;    /* #8B5CF6 —— 强调文字/图标（对比 4.6:1） */
+  --tw-primary-500: 124 58 237;    /* #7C3AED —— 按钮主色（白字 5.7:1） */
+  --tw-primary-600: 109 40 217;    /* #6D28D9 —— hover 加深 */
+  --tw-primary-700: 91 33 182;     /* #5B21B6 */
+  --tw-primary-800: 76 29 149;     /* #4C1D95 */
+  --tw-primary-900: 46 16 101;     /* #2E1065 */
+
+  /* 琥珀金 — 浅色主题（深一档，白底可读） */
+  --tw-accent-50: 255 251 235;     /* #FFFBEB */
+  --tw-accent-100: 254 243 199;    /* #FEF3C7 */
+  --tw-accent-200: 253 230 138;    /* #FDE68A */
+  --tw-accent-300: 251 191 36;     /* #FBBF24 */
+  --tw-accent-400: 245 158 11;     /* #F59E0B —— 琥珀金（状态变更/通知） */
+  --tw-accent-500: 217 119 6;      /* #D97706 */
+  --tw-accent-600: 180 83 9;       /* #B45309 */
+  --tw-accent-700: 146 64 14;      /* #92400E */
+
+  /* 在线/活跃绿 — 浅色主题（深一档） */
+  --tw-mint-50: 236 253 245;       /* #ECFDF5 */
+  --tw-mint-100: 209 250 229;      /* #D1FAE5 */
+  --tw-mint-200: 167 243 208;      /* #A7F3D0 */
+  --tw-mint-300: 110 231 183;      /* #6EE7B7 */
+  --tw-mint-400: 16 185 129;       /* #10B981 —— 在线/活跃绿 */
+  --tw-mint-500: 5 150 105;        /* #059669 —— 按钮/hover */
+  --tw-mint-600: 4 120 87;         /* #047857 —— hover 加深 */
+  --tw-mint-700: 6 95 70;          /* #065F46 */
+  --tw-mint-800: 6 78 59;          /* #064E3B */
+  --tw-mint-900: 5 46 42;          /* #052E2A */
+
+  /* 勿扰/危险红 — 浅色主题（暗玫红：降饱和、调亮度，与紫金品牌协调不刺眼） */
+  --tw-rose-50: 253 242 244;       /* #FDF2F4 */
+  --tw-rose-100: 251 228 232;      /* #FBE4E8 */
+  --tw-rose-200: 246 201 209;      /* #F6C9D1 */
+  --tw-rose-300: 240 160 176;      /* #F0A0B0 */
+  --tw-rose-400: 201 54 79;        /* #C9364F —— 危险文字/图标（柔和玫红，白底对比 5.1:1） */
+  --tw-rose-500: 168 40 63;        /* #A8283F —— 危险按钮（白字对比 7:1） */
+  --tw-rose-600: 138 31 51;        /* #8A1F33 —— hover 加深 */
+  --tw-rose-700: 110 24 40;        /* #6E1828 */
+  --tw-rose-800: 84 18 30;         /* #54121E */
+  --tw-rose-900: 56 12 20;         /* #380C14 */
+
+  /* 自己的消息气泡 — 浅色主题（品牌紫 #8B5CF6 底 + 白字） */
+  --tw-bubble: 139 92 246;         /* #8B5CF6 */
+  --tw-bubble-ink: 255 255 255;    /* #FFFFFF */
+
+  /* 彩色文字适配深/浅背景：加一层极细半透明描边保证可读 */
+
+  /* 滚动条 */
   --tw-scrollbar-thumb: 203 213 225;  /* slate-300 */
   --tw-scrollbar-thumb-hover: 148 163 184; /* slate-400 */
 }
 
 .dark {
   /* 结构色 — 深邃紫金深色主题 */
-  --tw-primary-400: 167 139 250;   /* #A78BFA */
-  --tw-accent-400: 251 191 36;      /* #FBBF24 */
   --tw-canvas: 12 10 20;           /* #0C0A14 */
   --tw-surface: 21 18 35;          /* #151223 */
   --tw-elevated: 30 26 48;         /* #1E1A30 */
@@ -40,7 +86,57 @@
   --tw-text-primary: 237 233 246;  /* #EDE9F6 */
   --tw-text-secondary: 156 163 175;/* #9CA3B0 */
   --tw-text-muted: 107 114 128;    /* #6B7280 */
-  
+
+  /* 主题色 — 深色主题（保持亮紫发光感） */
+  --tw-primary-50: 245 243 255;    /* #F5F3FF */
+  --tw-primary-100: 237 233 254;   /* #EDE9FE */
+  --tw-primary-200: 221 214 254;   /* #DDD6FE */
+  --tw-primary-300: 196 181 253;   /* #C4B5FD */
+  --tw-primary-400: 167 139 250;   /* #A78BFA —— 强调文字/图标（深底发光） */
+  --tw-primary-500: 139 92 246;    /* #8B5CF6 —— 按钮主色 */
+  --tw-primary-600: 124 58 237;    /* #7C3AED —— hover 加深 */
+  --tw-primary-700: 109 40 217;    /* #6D28D9 */
+  --tw-primary-800: 91 33 182;     /* #5B21B6 */
+  --tw-primary-900: 76 29 149;     /* #4C1D95 */
+
+  /* 琥珀金 — 深色主题 */
+  --tw-accent-50: 255 251 235;     /* #FFFBEB */
+  --tw-accent-100: 254 243 199;    /* #FEF3C7 */
+  --tw-accent-200: 253 230 138;    /* #FDE68A */
+  --tw-accent-300: 252 211 77;     /* #FCD34D */
+  --tw-accent-400: 251 191 36;     /* #FBBF24 —— 琥珀金（状态变更/通知） */
+  --tw-accent-500: 245 158 11;     /* #F59E0B */
+  --tw-accent-600: 217 119 6;      /* #D97706 */
+  --tw-accent-700: 180 83 9;       /* #B45309 */
+
+  /* 在线/活跃绿 — 深色主题（亮绿，深底可读） */
+  --tw-mint-50: 236 253 245;       /* #ECFDF5 */
+  --tw-mint-100: 209 250 229;      /* #D1FAE5 */
+  --tw-mint-200: 167 243 208;      /* #A7F3D0 */
+  --tw-mint-300: 110 231 183;      /* #6EE7B7 */
+  --tw-mint-400: 52 211 153;       /* #34D399 —— 在线/活跃绿 */
+  --tw-mint-500: 16 185 129;       /* #10B981 —— 按钮/hover */
+  --tw-mint-600: 5 150 105;        /* #059669 —— hover 加深 */
+  --tw-mint-700: 4 120 87;         /* #047857 */
+  --tw-mint-800: 6 95 70;          /* #065F46 */
+  --tw-mint-900: 6 78 59;          /* #064E3B */
+
+  /* 勿扰/危险红 — 深色主题（亮玫红，深底可读且不刺眼） */
+  --tw-rose-50: 253 242 244;       /* #FDF2F4 */
+  --tw-rose-100: 251 228 232;      /* #FBE4E8 */
+  --tw-rose-200: 246 201 209;      /* #F6C9D1 */
+  --tw-rose-300: 245 165 183;      /* #F5A5B7 */
+  --tw-rose-400: 242 109 141;      /* #F26D8D —— 危险文字/图标（深底亮玫红） */
+  --tw-rose-500: 232 74 105;       /* #E84A69 —— 危险按钮 */
+  --tw-rose-600: 214 54 85;        /* #D63655 —— hover 加深 */
+  --tw-rose-700: 178 44 70;        /* #B22C46 */
+  --tw-rose-800: 140 34 54;        /* #8C2236 */
+  --tw-rose-900: 90 22 34;         /* #5A1622 */
+
+  /* 自己的消息气泡 — 深色主题（深紫 #5a3a99 底 + 白字） */
+  --tw-bubble: 90 58 153;          /* #5A3A99 */
+  --tw-bubble-ink: 255 255 255;    /* #FFFFFF */
+
 /* 彩色文字适配深/浅背景：加一层极细半透明描边保证可读 */
 
 /* 滚动条 */
@@ -460,15 +556,15 @@
 .btn-md { height: 2.5rem; padding: 0 1rem; font-size: 0.875rem; gap: 0.5rem; }
 .btn-lg { height: 3rem; padding: 0 1.25rem; font-size: 1rem; gap: 0.5rem; }
 
-/* 变体 */
-.btn-primary { background: rgb(var(--tw-primary-400)); color: #fff; }
-.btn-primary:hover { background: rgb(var(--tw-primary-300, 196 181 253)); }
+/* 变体 — hover 一律加深（浅色深一档后对比自然） */
+.btn-primary { background: rgb(var(--tw-primary-500)); color: #fff; }
+.btn-primary:hover { background: rgb(var(--tw-primary-600)); }
 .btn-accent { background: rgb(var(--tw-accent-400)); color: rgb(var(--tw-text-primary)); }
-.btn-accent:hover { background: rgb(var(--tw-accent-300, 253 186 116)); }
+.btn-accent:hover { background: rgb(var(--tw-accent-500)); }
 .btn-secondary { background: rgb(var(--tw-elevated)); color: rgb(var(--tw-text-secondary));
   border: 1px solid rgb(var(--tw-border)); box-shadow: 0 1px 2px rgb(0 0 0 / .05); }
 .btn-secondary:hover { background: rgb(var(--tw-border)); color: rgb(var(--tw-text-primary)); }
 .btn-ghost { color: rgb(var(--tw-text-secondary)); }
 .btn-ghost:hover { background: rgb(var(--tw-canvas)); color: rgb(var(--tw-text-primary)); }
-.btn-danger { background: rgb(244 63 94); color: #fff; }
-.btn-danger:hover { background: rgb(251 113 133); }
+.btn-danger { background: rgb(var(--tw-rose-500)); color: #fff; }
+.btn-danger:hover { background: rgb(var(--tw-rose-600)); }

@@ -234,7 +234,7 @@ export default function BindGroupModal({ worldId, initialTypeSlug, initialTab = 
           <button
             onClick={doBind}
             disabled={!typeSlug || selected.size === 0 || binding}
-            className="inline-flex items-center gap-1.5 px-4 py-2 text-sm bg-primary-500 hover:bg-primary-400 text-white rounded-lg transition-colors disabled:opacity-40"
+            className="inline-flex items-center gap-1.5 px-4 py-2 text-sm bg-primary-500 hover:bg-primary-600 text-white rounded-lg transition-colors disabled:opacity-40"
           >
             {binding ? <Loader2 size={14} className="animate-spin" /> : <Link2 size={14} />}
             绑定 {selected.size > 0 ? `${selected.size} 个${tab === 'group' ? '群' : 'AI'}` : ''}

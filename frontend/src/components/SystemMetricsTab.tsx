@@ -150,7 +150,7 @@ export default function SystemMetricsTab() {
                         <td className="py-1.5 px-3 text-right">{stats.latency?.count || 0}</td>
                         <td className="py-1.5 px-3 text-right">{stats.latency?.avg?.toFixed(2) || '-'}s</td>
                         <td className="py-1.5 px-3 text-right">
-                          <span className={stats.error > 0 ? 'text-rose-400' : 'text-emerald-400'}>
+                          <span className={stats.error > 0 ? 'text-rose-400' : 'text-mint-400'}>
                             {rate}
                           </span>
                         </td>
@@ -187,9 +187,9 @@ function MetricCard({ icon: Icon, label, value, color }: {
 }) {
   const colorMap: Record<string, string> = {
     primary: 'bg-primary-500/10 text-primary-400',
-    mint: 'bg-emerald-400/10 text-emerald-400',
+    mint: 'bg-mint-400/10 text-mint-400',
     rose: 'bg-rose-400/10 text-rose-400',
-    amber: 'bg-amber-400/10 text-amber-400',
+    amber: 'bg-accent-400/10 text-accent-400',
   }
   return (
     <div className="bg-surface rounded-xl border border-border p-4 text-center">

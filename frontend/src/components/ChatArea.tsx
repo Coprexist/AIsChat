@@ -148,7 +148,7 @@ export default function ChatArea({ groupId, dmSessionId }: ChatAreaProps) {
             {groups.length === 0 ? (
               <button
                 onClick={(e) => { e.stopPropagation(); setShowCreateGroup(true) }}
-                className="mt-5 px-5 py-2.5 bg-primary-500 text-white rounded-xl hover:bg-primary-400 text-sm font-medium transition-all shadow-lg shadow-primary-500/20"
+                className="mt-5 px-5 py-2.5 bg-primary-500 text-white rounded-xl hover:bg-primary-600 text-sm font-medium transition-all shadow-lg shadow-primary-500/20"
               >
                 {t('chat.createFirstGroup')}
               </button>
@@ -464,7 +464,7 @@ function CreateGroupModal({
           <button
             onClick={handleCreate}
             disabled={!canCreate}
-            className="flex-1 py-2.5 text-sm bg-primary-500 text-white rounded-xl hover:bg-primary-400 disabled:opacity-30 font-medium transition-all shadow-lg shadow-primary-500/20"
+            className="flex-1 py-2.5 text-sm bg-primary-500 text-white rounded-xl hover:bg-primary-600 disabled:opacity-30 font-medium transition-all shadow-lg shadow-primary-500/20"
           >
             {loading ? t('chat.creating') : t('chat.create')}
           </button>
@@ -819,7 +819,7 @@ function InviteMemberModal({
           <button
             onClick={handleInviteSelected}
             disabled={selected.size === 0 || loading}
-            className="flex-1 py-2.5 text-sm bg-primary-500 text-white rounded-xl hover:bg-primary-400 disabled:opacity-30 font-medium transition-all shadow-lg shadow-primary-500/20"
+            className="flex-1 py-2.5 text-sm bg-primary-500 text-white rounded-xl hover:bg-primary-600 disabled:opacity-30 font-medium transition-all shadow-lg shadow-primary-500/20"
           >
             {loading ? t('chat.inviting') : t('chat.inviteCount').replace('{count}', String(selected.size))}
           </button>

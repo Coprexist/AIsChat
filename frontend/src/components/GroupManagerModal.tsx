@@ -145,7 +145,7 @@ export default function GroupManagerModal({ worldId, isOwner, onClose }: Props) 
           </div>
         </div>
 
-        {msg && <div className="px-4 pt-2 text-xs text-amber-400">{msg}</div>}
+        {msg && <div className="px-4 pt-2 text-xs text-accent-400">{msg}</div>}
 
         <div className="flex-1 overflow-y-auto p-4 space-y-3">
           {tab === 'types' ? (
@@ -155,7 +155,7 @@ export default function GroupManagerModal({ worldId, isOwner, onClose }: Props) 
                 <div key={t.slug} className="rounded-xl bg-elevated/50 border border-border p-3 space-y-1.5">
                   <div className="flex items-center gap-2">
                     <span className="text-sm font-semibold text-textPrimary">{t.name}</span>
-                    <span className={`text-[10px] px-1.5 py-0.5 rounded ${t.bind_limit !== -1 && t.bound_count >= t.bind_limit ? 'bg-amber-500/15 text-amber-400' : 'bg-elevated text-textMuted'}`}>
+                    <span className={`text-[10px] px-1.5 py-0.5 rounded ${t.bind_limit !== -1 && t.bound_count >= t.bind_limit ? 'bg-accent-500/15 text-accent-400' : 'bg-elevated text-textMuted'}`}>
                       绑定 {t.bound_count}/{t.bind_limit === -1 ? '∞' : t.bind_limit}
                     </span>
                     <span className="text-[10px] text-textMuted">助手 {t.assistant_spec?.count ?? 1} 个{t.assistant_spec?.need_api === false ? '（无需API）' : ''}</span>
@@ -219,7 +219,7 @@ export default function GroupManagerModal({ worldId, isOwner, onClose }: Props) 
                   <div className="flex items-center gap-2">
                     <span className="text-sm font-semibold text-textPrimary">{a.name}</span>
                     <span className="text-[10px] text-textMuted">群#{a.group_id} · {typeName(a.group_type_slug)}</span>
-                    <span className={`text-[10px] px-1.5 py-0.5 rounded ${a.configured ? 'bg-mint-500/15 text-mint-400' : 'bg-amber-500/15 text-amber-400'}`}>
+                    <span className={`text-[10px] px-1.5 py-0.5 rounded ${a.configured ? 'bg-mint-500/15 text-mint-400' : 'bg-accent-500/15 text-accent-400'}`}>
                       {a.configured ? '已配置 API' : '未配置 API'}
                     </span>
                     <div className="flex-1" />
@@ -263,7 +263,7 @@ export default function GroupManagerModal({ worldId, isOwner, onClose }: Props) 
 
         <div className="p-3 pt-0 shrink-0 flex items-center justify-between text-[10px] text-textMuted">
           <span>群助手归属群，不占个人额度；API 加密存储，世界打包不含 key</span>
-          <button onClick={() => { load() }} className="inline-flex items-center gap-1 text-primary-400 hover:text-primary-300">
+          <button onClick={() => { load() }} className="inline-flex items-center gap-1 text-primary-400 hover:text-primary-500 dark:hover:text-primary-300">
             <RefreshCw size={10} /> 刷新
           </button>
         </div>

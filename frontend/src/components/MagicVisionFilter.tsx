@@ -174,7 +174,7 @@ export default function MagicVisionFilter({ value, onChange }: Props) {
             </button>
             <div className="flex-1" />
             <button onClick={handleApply} disabled={!anyActive || saving}
-              className="flex items-center gap-1 px-4 py-1.5 text-xs rounded-lg bg-accent-500 hover:bg-accent-400 text-white font-medium transition-colors disabled:opacity-40 disabled:cursor-not-allowed">
+              className="flex items-center gap-1 px-4 py-1.5 text-xs rounded-lg bg-accent-500 hover:bg-accent-600 text-white font-medium transition-colors disabled:opacity-40 disabled:cursor-not-allowed">
               {saving ? '保存中…' : '应用'}
             </button>
           </div>

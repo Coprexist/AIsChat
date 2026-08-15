@@ -57,7 +57,7 @@ export default function CleanupTab() {
         <button
           onClick={handleRun}
           disabled={running}
-          className="px-5 py-2.5 bg-primary-500 text-white rounded-xl hover:bg-primary-400 disabled:opacity-40 disabled:cursor-not-allowed text-sm font-medium transition-colors inline-flex items-center gap-2"
+          className="px-5 py-2.5 bg-primary-500 text-white rounded-xl hover:bg-primary-600 disabled:opacity-40 disabled:cursor-not-allowed text-sm font-medium transition-colors inline-flex items-center gap-2"
         >
           {running ? (
             <>
@@ -103,7 +103,7 @@ export default function CleanupTab() {
 
             <div className="bg-canvas rounded-xl border border-border p-4">
               <div className="flex items-center gap-2 mb-2">
-                <FileX2 size={16} className="text-amber-400" />
+                <FileX2 size={16} className="text-accent-400" />
                 <span className="text-xs text-textMuted">{t('admin.cleanupOrphansDeleted')}</span>
               </div>
               <p className="text-2xl font-bold text-textPrimary">{stats.orphan_cleaned ?? 0}</p>

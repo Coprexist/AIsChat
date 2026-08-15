@@ -80,7 +80,7 @@ function ToolRegistryTab() {
   }, [data, filterSegment, filterState])
 
   if (loading) return <div className="p-6 text-textSecondary text-sm">加载中...</div>
-  if (!data) return <div className="p-6 text-red-500 text-sm">加载失败</div>
+  if (!data) return <div className="p-6 text-rose-500 text-sm">加载失败</div>
 
   const stateOptions = ['all', 'active', 'dnd', 'inactive', 'blocked']
 
@@ -99,13 +99,13 @@ function ToolRegistryTab() {
       {/* 浏览器服务状态提示 */}
       <div className={`rounded-lg border px-3.5 py-2.5 text-xs flex items-center gap-2 ${
         browserStatus === 'running'
-          ? 'bg-emerald-500/10 border-emerald-500/20 text-emerald-600 dark:text-emerald-400'
+          ? 'bg-mint-500/10 border-mint-500/20 text-mint-600 dark:text-mint-400'
           : browserStatus === 'loading'
-            ? 'bg-amber-500/10 border-amber-500/20 text-amber-600 dark:text-amber-400'
+            ? 'bg-accent-500/10 border-accent-500/20 text-accent-600 dark:text-accent-400'
             : 'bg-rose-500/10 border-rose-500/20 text-rose-600 dark:text-rose-400'
       }`}>
         <span className={`w-2 h-2 rounded-full shrink-0 ${
-          browserStatus === 'running' ? 'bg-emerald-500' : browserStatus === 'loading' ? 'bg-amber-500 animate-pulse' : 'bg-rose-500'
+          browserStatus === 'running' ? 'bg-mint-500' : browserStatus === 'loading' ? 'bg-accent-500 animate-pulse' : 'bg-rose-500'
         }`} />
         <span>
           {browserStatus === 'running'
@@ -283,7 +283,7 @@ function SkillManagementTab() {
                   </td>
                   <td className="px-3 py-2.5">
                     <span className={`text-xs px-2 py-0.5 rounded ${skill.is_enabled
-                      ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400'
+                      ? 'bg-mint-100 text-mint-700 dark:bg-mint-900/30 dark:text-mint-400'
                       : 'bg-slate-100 text-slate-500 dark:bg-slate-800 dark:text-slate-500'
                     }`}>
                       {skill.is_enabled ? '已启用' : '已禁用'}
@@ -298,8 +298,8 @@ function SkillManagementTab() {
                     <button
                       onClick={() => handleToggle(skill.id, skill.is_enabled)}
                       className={`text-xs px-2.5 py-1 rounded-lg border transition-colors ${skill.is_enabled
-                        ? 'border-red-200 text-red-600 hover:bg-red-50 dark:border-red-800 dark:text-red-400'
-                        : 'border-emerald-200 text-emerald-600 hover:bg-emerald-50 dark:border-emerald-800 dark:text-emerald-400'
+                        ? 'border-rose-200 text-rose-600 hover:bg-rose-50 dark:border-rose-800 dark:text-rose-400'
+                        : 'border-mint-200 text-mint-600 hover:bg-mint-50 dark:border-mint-800 dark:text-mint-400'
                       }`}
                     >
                       {skill.is_enabled ? '禁用' : '启用'}

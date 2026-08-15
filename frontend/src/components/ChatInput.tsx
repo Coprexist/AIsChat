@@ -167,7 +167,7 @@ const ChatInputFunc = ({ conversationType, conversationId, t, onSend, onSendFile
       <button
         onClick={doSend}
         disabled={(!value.trim() && !hasAttachments) || !connected}
-        className="p-2.5 rounded-xl bg-primary-500 text-white hover:bg-primary-400 disabled:opacity-40 disabled:cursor-not-allowed transition-all shrink-0"
+        className="p-2.5 rounded-xl bg-primary-500 text-white hover:bg-primary-600 disabled:opacity-40 disabled:cursor-not-allowed transition-all shrink-0"
         title={t('chat.send')}
       >
         <Send size={16} />

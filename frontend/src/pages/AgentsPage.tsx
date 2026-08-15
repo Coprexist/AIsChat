@@ -139,7 +139,7 @@ export default function AgentsPage() {
           </button>
           <button
             onClick={() => setShowCreate(true)}
-            className="flex items-center gap-1.5 px-2.5 md:px-3 py-1.5 md:py-2 bg-primary-500 text-white rounded-lg hover:bg-primary-400 text-xs font-medium transition-all shadow-lg shadow-primary-500/20"
+            className="flex items-center gap-1.5 px-2.5 md:px-3 py-1.5 md:py-2 bg-primary-500 text-white rounded-lg hover:bg-primary-600 text-xs font-medium transition-all shadow-lg shadow-primary-500/20"
           >
             <Plus size={13} />
             <span className="inline">{t('agents.create')}</span>
@@ -723,7 +723,7 @@ function EditAgentModal({ agent, onClose, onUpdated }: {
 
         {/* ── 预设切换预览确认 ── */}
         {presetPreview && (
-          <div className="mb-4 bg-amber-500/5 border border-amber-500/20 rounded-xl p-4">
+          <div className="mb-4 bg-accent-500/5 border border-accent-500/20 rounded-xl p-4">
             <h4 className="text-sm font-semibold text-textPrimary mb-2">{t('agents.presetConfirmTitle')}</h4>
             <p className="text-xs text-textSecondary mb-3">
               {t('agents.presetFrom')} <b>{presetPreview.old_profile}</b> {t('agents.presetTo')}{' '}
@@ -758,7 +758,7 @@ function EditAgentModal({ agent, onClose, onUpdated }: {
                 {t('agents.cancel')}
               </button>
               <button onClick={confirmApplyPreset} disabled={applyingPreset}
-                className="flex-1 py-1.5 text-xs bg-primary-500 text-white rounded-lg hover:bg-primary-400 disabled:opacity-30 transition-all">
+                className="flex-1 py-1.5 text-xs bg-primary-500 text-white rounded-lg hover:bg-primary-600 disabled:opacity-30 transition-all">
                 {applyingPreset ? t('agents.applying') : t('agents.confirmSwitch')}
               </button>
             </div>
@@ -772,7 +772,7 @@ function EditAgentModal({ agent, onClose, onUpdated }: {
           <button
             onClick={handleSave}
             disabled={loading}
-            className="flex-1 py-2.5 text-sm bg-primary-500 text-white rounded-xl hover:bg-primary-400 disabled:opacity-30 font-medium transition-all shadow-lg shadow-primary-500/20"
+            className="flex-1 py-2.5 text-sm bg-primary-500 text-white rounded-xl hover:bg-primary-600 disabled:opacity-30 font-medium transition-all shadow-lg shadow-primary-500/20"
           >
             {loading ? t('agents.saving') : t('agents.saveChanges')}
           </button>
@@ -979,7 +979,7 @@ function StateModal({ agent, onClose, onUpdated }: {
           <button
             onClick={handleSwitch}
             disabled={loading || targetState === agent.state}
-            className="flex-1 py-2.5 text-sm bg-primary-500 text-white rounded-xl hover:bg-primary-400 disabled:opacity-30 font-medium transition-all shadow-lg shadow-primary-500/20"
+            className="flex-1 py-2.5 text-sm bg-primary-500 text-white rounded-xl hover:bg-primary-600 disabled:opacity-30 font-medium transition-all shadow-lg shadow-primary-500/20"
           >
             {loading ? t('agents.switchingState') : t('agents.switchState')}
           </button>
@@ -1088,7 +1088,7 @@ function ImportSoulModal({ onClose, onImported }: { onClose: () => void; onImpor
           <button
             onClick={handleImport}
             disabled={!file || loading}
-            className="flex-1 py-2.5 text-sm bg-primary-500 text-white rounded-xl hover:bg-primary-400 disabled:opacity-30 font-medium transition-all shadow-lg shadow-primary-500/20"
+            className="flex-1 py-2.5 text-sm bg-primary-500 text-white rounded-xl hover:bg-primary-600 disabled:opacity-30 font-medium transition-all shadow-lg shadow-primary-500/20"
           >
             {loading ? t('agents.importing') : t('agents.importButton')}
           </button>

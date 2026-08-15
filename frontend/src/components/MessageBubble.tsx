@@ -70,7 +70,7 @@ function fileIconColor(mimeType: string): string {
   if (mimeType.startsWith('image/')) return 'text-mint-400'
   if (mimeType.startsWith('video/')) return 'text-rose-400'
   if (mimeType.includes('pdf')) return 'text-rose-400'
-  if (mimeType.includes('zip') || mimeType.includes('tar') || mimeType.includes('gz')) return 'text-amber-400'
+  if (mimeType.includes('zip') || mimeType.includes('tar') || mimeType.includes('gz')) return 'text-accent-400'
   return 'text-primary-400'
 }
 
@@ -124,13 +124,14 @@ const MessageBubble = memo(function MessageBubble({
 
   // 气泡样式拆两层：背景层（上色+圆角边框+阴影，参与魔视界旋转）与内容层（文字颜色+布局）
   // 背景层 absolute inset-0 铺满外层，尺寸由内容层撑起，圆角边框天然对齐
+  // 自己的气泡：浅色主题 #8B5CF6 / 深色主题 #5a3a99（--tw-bubble 变量，日夜自动切换，不随按钮色漂移）
   const bubbleBg = isMine
-    ? 'bg-primary-500 dark:bg-[#5a3a99] rounded-2xl rounded-tr-md shadow-lg shadow-primary-500/15'
+    ? 'bg-bubble rounded-2xl rounded-tr-md shadow-[0_2px_12px_rgba(139,92,246,0.18)]'
     : senderType === 'system'
       ? 'bg-rose-50 dark:bg-rose-900/20 rounded-2xl rounded-tl-md border border-rose-200 dark:border-rose-800'
       : 'bg-surface rounded-2xl rounded-tl-md border border-border'
   const bubbleText = isMine
-    ? 'text-white'
+    ? 'text-bubbleInk'
     : senderType === 'system'
       ? 'text-rose-900 dark:text-rose-300'
       : 'text-textPrimary'
@@ -217,7 +218,7 @@ const MessageBubble = memo(function MessageBubble({
                   scrollToInContainer(list, target, { smooth: true, offset: -list.clientHeight / 2 })
                 }
               }}>
-              <div className="w-0.5 h-full min-h-[1.5em] bg-primary-400 rounded-full shrink-0" />
+              <div className={`w-0.5 h-full min-h-[1.5em] rounded-full shrink-0 ${isMine ? 'bg-white/40' : 'bg-primary-400'}`} />
               <div className="text-[11px] leading-relaxed line-clamp-2">
                 <span className={`font-medium ${isMine ? 'text-white/80' : 'text-primary-400'}`}>@{replyTo.sender}</span>
                 <span className={`${isMine ? 'text-white/50' : 'text-textMuted'}`}> {replyTo.content}</span>
@@ -249,7 +250,7 @@ const MessageBubble = memo(function MessageBubble({
                   <button key={fid} onClick={() => setPreviewFile({ file_id: fid, name: fname, size: fsize, mime_type: fmime })}
                     className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs transition-colors ${isMine ? 'bg-white/10 hover:bg-white/20 text-white/90' : 'bg-canvas hover:bg-elevated text-textSecondary hover:text-textPrimary border border-border'}`}
                     title={`${fname} (${formatFileSize(fsize)})`}>
-                    <FileIcon size={12} className={fileIconColor(fmime)} />
+                    <FileIcon size={12} className={isMine ? 'text-white/80' : fileIconColor(fmime)} />
                     <span className="max-w-[100px] truncate">{fname}</span>
                     <span className="text-[10px] opacity-60">{formatFileSize(fsize)}</span>
                     <Download size={11} className="opacity-60" />

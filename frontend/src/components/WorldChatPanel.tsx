@@ -289,13 +289,13 @@ const WorldChatPanel = memo(forwardRef<WorldChatHandle, WorldChatPanelProps>(({ 
             <div className="flex items-stretch rounded-lg bg-elevated border border-border overflow-hidden w-full">
               <button
                 onClick={() => handleSubmit('继续')}
-                className="flex-1 min-w-0 px-2.5 py-1.5 text-left text-xs text-textSecondary hover:bg-primary-500/20 hover:text-primary-300 transition-colors truncate"
+                className="flex-1 min-w-0 px-2.5 py-1.5 text-left text-xs text-textSecondary hover:bg-primary-500/20 hover:text-primary-500 dark:hover:text-primary-300 transition-colors truncate"
                 title="继续之前的工作"
               >继续之前的工作</button>
               <div className="w-px bg-border shrink-0" />
               <button
                 onClick={(e) => { e.stopPropagation(); handleSubmit('继续') }}
-                className="px-2 flex items-center text-textMuted hover:text-primary-300 hover:bg-primary-500/20 transition-colors shrink-0"
+                className="px-2 flex items-center text-textMuted hover:text-primary-500 dark:hover:text-primary-300 hover:bg-primary-500/20 transition-colors shrink-0"
                 title="发送"
               ><Send size={11} /></button>
             </div>
@@ -310,19 +310,19 @@ const WorldChatPanel = memo(forwardRef<WorldChatHandle, WorldChatPanelProps>(({ 
               <div key={i} className="flex items-stretch rounded-lg bg-elevated border border-border overflow-hidden w-full">
                 <button
                   onClick={() => handleSubmit(q)}
-                  className="flex-1 min-w-0 px-2.5 py-1.5 text-left text-xs text-textSecondary hover:bg-primary-500/20 hover:text-primary-300 transition-colors truncate"
+                  className="flex-1 min-w-0 px-2.5 py-1.5 text-left text-xs text-textSecondary hover:bg-primary-500/20 hover:text-primary-500 dark:hover:text-primary-300 transition-colors truncate"
                   title={q}
                 >{q}</button>
                 <div className="w-px bg-border shrink-0" />
                 <button
                   onClick={(e) => { e.stopPropagation(); handleSubmit(q) }}
-                  className="px-2 flex items-center text-textMuted hover:text-primary-300 hover:bg-primary-500/20 transition-colors shrink-0"
+                  className="px-2 flex items-center text-textMuted hover:text-primary-500 dark:hover:text-primary-300 hover:bg-primary-500/20 transition-colors shrink-0"
                   title="发送这条"
                 ><Send size={11} /></button>
                 <div className="w-px bg-border shrink-0" />
                 <button
                   onClick={(e) => { e.stopPropagation(); handleInsertSuggestion(q) }}
-                  className="px-2 flex items-center text-textMuted hover:text-primary-300 hover:bg-primary-500/20 transition-colors shrink-0"
+                  className="px-2 flex items-center text-textMuted hover:text-primary-500 dark:hover:text-primary-300 hover:bg-primary-500/20 transition-colors shrink-0"
                   title="插入到输入框（追加，不覆盖）"
                 ><Plus size={12} /></button>
               </div>
@@ -343,19 +343,19 @@ const WorldChatPanel = memo(forwardRef<WorldChatHandle, WorldChatPanelProps>(({ 
             <div key={i} className="flex items-stretch rounded-lg bg-elevated border border-border overflow-hidden w-full">
               <button
                 onClick={() => handleSubmit(q)}
-                className="flex-1 min-w-0 px-2.5 py-1.5 text-left text-xs text-textSecondary hover:bg-primary-500/20 hover:text-primary-300 transition-colors truncate"
+                className="flex-1 min-w-0 px-2.5 py-1.5 text-left text-xs text-textSecondary hover:bg-primary-500/20 hover:text-primary-500 dark:hover:text-primary-300 transition-colors truncate"
                 title={q}
               >{q}</button>
               <div className="w-px bg-border shrink-0" />
               <button
                 onClick={(e) => { e.stopPropagation(); handleSubmit(q) }}
-                className="px-2 flex items-center text-textMuted hover:text-primary-300 hover:bg-primary-500/20 transition-colors shrink-0"
+                className="px-2 flex items-center text-textMuted hover:text-primary-500 dark:hover:text-primary-300 hover:bg-primary-500/20 transition-colors shrink-0"
                 title="发送这条"
               ><Send size={11} /></button>
               <div className="w-px bg-border shrink-0" />
               <button
                 onClick={(e) => { e.stopPropagation(); handleInsertSuggestion(q) }}
-                className="px-2 flex items-center text-textMuted hover:text-primary-300 hover:bg-primary-500/20 transition-colors shrink-0"
+                className="px-2 flex items-center text-textMuted hover:text-primary-500 dark:hover:text-primary-300 hover:bg-primary-500/20 transition-colors shrink-0"
                 title="插入到输入框（追加，不覆盖）"
               ><Plus size={12} /></button>
             </div>
@@ -396,7 +396,7 @@ const WorldChatPanel = memo(forwardRef<WorldChatHandle, WorldChatPanelProps>(({ 
               onClick={() => chat.scrollToBottom(true)}
               className={`pointer-events-auto flex items-center justify-center gap-1 px-3 h-8 rounded-full shadow-lg transition-all ${
                 chat.unreadCount > 0
-                  ? 'bg-rose-500 hover:bg-rose-400 text-white border border-rose-400 animate-bounce'
+                  ? 'bg-rose-500 hover:bg-rose-600 text-white border border-rose-400 animate-bounce'
                   : 'bg-elevated border border-border text-textSecondary hover:text-textPrimary hover:bg-surface'
               }`}
               title="回到底部"
@@ -419,7 +419,7 @@ const WorldChatPanel = memo(forwardRef<WorldChatHandle, WorldChatPanelProps>(({ 
         <span className="truncate font-mono max-w-[180px] shrink-0" title={chat.currentSession}>{chat.currentSession === 'default' ? '默认会话' : chat.currentSession}</span>
         <button
           onClick={async () => { const p = await chat.togglePin(); if (!p && onMsg) onMsg('已取消收藏（收藏的会话不会被自动清理）') }}
-          className={`shrink-0 p-1 rounded transition-colors ${chat.sessionList.find((s) => s.id === chat.currentSession)?.pinned ? 'text-amber-400 bg-amber-400/10' : 'hover:bg-elevated hover:text-textSecondary'}`}
+          className={`shrink-0 p-1 rounded transition-colors ${chat.sessionList.find((s) => s.id === chat.currentSession)?.pinned ? 'text-accent-400 bg-accent-400/10' : 'hover:bg-elevated hover:text-textSecondary'}`}
           title={chat.sessionList.find((s) => s.id === chat.currentSession)?.pinned ? '取消收藏' : '收藏此会话（不被自动清理）'}
         >
           <Pin size={11} className={chat.sessionList.find((s) => s.id === chat.currentSession)?.pinned ? 'fill-current' : ''} />
@@ -436,7 +436,7 @@ const WorldChatPanel = memo(forwardRef<WorldChatHandle, WorldChatPanelProps>(({ 
         ><ChevronDown size={11} /> 会话列表（{chat.sessionList.length}）</button>
         {sessionOpen && chat.sessionList.length > 0 && (
           <div className="absolute bottom-full right-3 mb-1 w-72 max-h-56 overflow-y-auto rounded-xl bg-elevated border border-border shadow-xl z-50">
-            <div className="px-3 py-1.5 text-[10px] text-textMuted border-b border-border flex items-center gap-1">会话列表（点击切换；<Pin size={9} className="text-amber-400 fill-current" />=已收藏，不会被自动清理）</div>
+            <div className="px-3 py-1.5 text-[10px] text-textMuted border-b border-border flex items-center gap-1">会话列表（点击切换；<Pin size={9} className="text-accent-400 fill-current" />=已收藏，不会被自动清理）</div>
             {chat.sessionList.map((s) => (
               <button
                 key={s.id}
@@ -444,7 +444,7 @@ const WorldChatPanel = memo(forwardRef<WorldChatHandle, WorldChatPanelProps>(({ 
                 className={`w-full flex items-center gap-1.5 px-3 py-1.5 text-[11px] text-left border-b border-border/40 last:border-b-0 transition-colors ${s.id === chat.currentSession ? 'bg-primary-500/15 text-primary-300' : 'hover:bg-surface text-textSecondary'}`}
               >
                 <span className="truncate flex-1 font-mono" title={s.id}>{s.id === 'default' ? '默认会话' : s.id}</span>
-                <span className="shrink-0 flex items-center gap-1 text-textMuted">{s.pinned ? <Pin size={10} className="text-amber-400 fill-current" /> : ''}{s.id === chat.currentSession ? '当前' : ''}</span>
+                <span className="shrink-0 flex items-center gap-1 text-textMuted">{s.pinned ? <Pin size={10} className="text-accent-400 fill-current" /> : ''}{s.id === chat.currentSession ? '当前' : ''}</span>
               </button>
             ))}
           </div>
@@ -506,7 +506,7 @@ const WorldChatPanel = memo(forwardRef<WorldChatHandle, WorldChatPanelProps>(({ 
         <button
           onClick={() => { const t = localInputRef.current.trim(); if (t) handleSubmit(t) }}
           disabled={!localInput.trim()}
-          className="w-full mt-2 py-1.5 text-sm bg-primary-500 hover:bg-primary-400 text-white rounded transition-colors disabled:opacity-40"
+          className="w-full mt-2 py-1.5 text-sm bg-primary-500 hover:bg-primary-600 text-white rounded transition-colors disabled:opacity-40"
         >
           {(chat.chatSending || chat.chatProcessing) ? '排队发送' : (chat.chatSending ? '思考中...' : '发送')}
         </button>

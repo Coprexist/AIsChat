@@ -148,7 +148,7 @@ export default function InstanceSetupPage() {
             <button
               onClick={handleSave}
               disabled={saving || testResult !== 'success'}
-              className="flex-1 flex items-center justify-center gap-2 py-2.5 rounded-xl bg-primary-500 hover:bg-primary-400 disabled:opacity-30 text-white text-sm font-medium transition-all"
+              className="flex-1 flex items-center justify-center gap-2 py-2.5 rounded-xl bg-primary-500 hover:bg-primary-600 disabled:opacity-30 text-white text-sm font-medium transition-all"
             >
               {saving ? (
                 <Loader2 size={16} className="animate-spin" />

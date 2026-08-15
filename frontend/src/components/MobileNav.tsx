@@ -45,7 +45,7 @@ export default function MobileNav({ closeDrawer }: MobileNavProps) {
               <div className="relative">
                 <item.icon size={isCompact ? 20 : 22} strokeWidth={active ? 2.5 : 2} />
                 {item.path === '/friends' && pendingRequests > 0 && (
-                  <span className="absolute -top-1 -right-1.5 w-2.5 h-2.5 rounded-full bg-red-500 border-2 border-surface" />
+                  <span className="absolute -top-1 -right-1.5 w-2.5 h-2.5 rounded-full bg-rose-500 border-2 border-surface" />
                 )}
                 {active && (
                   <div className="absolute rounded-full ai-pulse-active opacity-50" style={{ inset: isCompact ? '-3px' : '-6px' }} />

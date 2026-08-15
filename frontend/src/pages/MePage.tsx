@@ -314,7 +314,7 @@ export default function MePage() {
             <div className="flex items-center gap-2">
               <h2 className="text-lg font-semibold text-textPrimary truncate">{user.username}</h2>
               {user.role === 'admin' && (
-                <span className="shrink-0 text-[10px] px-2 py-0.5 rounded-full bg-amber-500/10 text-amber-400 font-medium">{t('me.adminBadge')}</span>
+                <span className="shrink-0 text-[10px] px-2 py-0.5 rounded-full bg-accent-500/10 text-accent-400 font-medium">{t('me.adminBadge')}</span>
               )}
             </div>
             <div className="flex items-center gap-3 mt-1 text-xs text-textMuted">
@@ -344,7 +344,7 @@ export default function MePage() {
                     {user.email_verified ? (
                       <span className="text-[10px] text-mint-400 bg-mint-500/10 px-1.5 py-0.5 rounded-full">{t('auth.emailVerified')}</span>
                     ) : (
-                      <span className="text-[10px] text-amber-400 bg-amber-500/10 px-1.5 py-0.5 rounded-full">{t('auth.emailNotVerified')}</span>
+                      <span className="text-[10px] text-accent-400 bg-accent-500/10 px-1.5 py-0.5 rounded-full">{t('auth.emailNotVerified')}</span>
                     )}
                   </>
                 ) : (
@@ -359,7 +359,7 @@ export default function MePage() {
                 {user?.email && (
                   <button
                     onClick={handleRemoveEmail}
-                    className="text-[10px] text-rose-400 hover:text-rose-500 transition-colors"
+                    className="text-[10px] text-rose-400 hover:text-rose-500 dark:hover:text-rose-300 transition-colors"
                   >
                     {t('auth.removeEmail')}
                   </button>
@@ -388,7 +388,7 @@ export default function MePage() {
                 {ghBind.bound && (
                   <button
                     onClick={doUnbindGithub}
-                    className="text-[10px] text-rose-400 hover:text-rose-500 transition-colors"
+                    className="text-[10px] text-rose-400 hover:text-rose-500 dark:hover:text-rose-300 transition-colors"
                   >
                     解绑
                   </button>
@@ -416,10 +416,10 @@ export default function MePage() {
             onClick={() => navigate('/friends')}
           />
           <StatCard
-            icon={<MessageSquare size={18} className="text-amber-400" />}
+            icon={<MessageSquare size={18} className="text-accent-400" />}
             value={stats?.group_count ?? '...'}
             label={t('me.groupCountCard')}
-            bg="bg-amber-500/5"
+            bg="bg-accent-500/5"
             onClick={() => navigate('/chat')}
           />
           <StatCard
@@ -492,7 +492,7 @@ export default function MePage() {
             {[
               { key: 'me.totalTokens', value: fmtTokenNum(totalTokens, lang), icon: Activity, color: 'text-primary-400' },
               { key: 'me.calls', value: totalCalls, icon: BarChart3, color: 'text-mint-400' },
-              { key: 'me.cacheHitRate', value: `${cacheRate}%`, icon: FileText, color: 'text-amber-400' },
+              { key: 'me.cacheHitRate', value: `${cacheRate}%`, icon: FileText, color: 'text-accent-400' },
               { key: 'me.thinkingTokens', value: fmtTokenNum(totalReasoning, lang), icon: Activity, color: 'text-accent-400' },
             ].map(item => (
               <div key={item.key} className="bg-canvas rounded-xl p-3 text-center">
@@ -519,14 +519,14 @@ export default function MePage() {
           <div className="space-y-2">
             <div className="flex items-center justify-between text-xs text-textMuted">
               <span>{t('me.used')} {storage.total_used >= 1048576 ? `${(storage.total_used / 1048576).toFixed(1)}MB` : `${(storage.total_used / 1024).toFixed(0)}KB`}</span>
-              <span className={storage.usage_percent > 90 ? 'text-rose-400 font-medium' : storage.usage_percent > 70 ? 'text-amber-400 font-medium' : ''}>
+              <span className={storage.usage_percent > 90 ? 'text-rose-400 font-medium' : storage.usage_percent > 70 ? 'text-accent-400 font-medium' : ''}>
                 {storage.usage_percent}%
               </span>
             </div>
             <div className="w-full h-2 bg-canvas rounded-full overflow-hidden">
               <div
                 className={`h-full rounded-full transition-all duration-500 ${
-                  storage.usage_percent > 90 ? 'bg-rose-400' : storage.usage_percent > 70 ? 'bg-amber-400' : 'bg-primary-400'
+                  storage.usage_percent > 90 ? 'bg-rose-400' : storage.usage_percent > 70 ? 'bg-accent-400' : 'bg-primary-400'
                 }`}
                 style={{ width: `${Math.min(storage.usage_percent, 100)}%` }}
               />
@@ -560,7 +560,7 @@ export default function MePage() {
           <button
             onClick={handleRedeem}
             disabled={redeeming || !redeemCode.trim()}
-            className="px-4 py-2 rounded-xl bg-primary-500 text-white hover:bg-primary-400 disabled:opacity-40 text-sm font-medium transition-colors"
+            className="px-4 py-2 rounded-xl bg-primary-500 text-white hover:bg-primary-600 disabled:opacity-40 text-sm font-medium transition-colors"
           >
             {redeeming ? <Loader2 size={14} className="animate-spin" /> : t('me.redeemButton')}
           </button>
@@ -579,7 +579,7 @@ export default function MePage() {
             to="/admin"
             className="flex items-center gap-3 px-5 py-3 hover:bg-elevated transition-colors"
           >
-            <Shield size={16} className="text-amber-400 shrink-0" />
+            <Shield size={16} className="text-accent-400 shrink-0" />
             <div className="flex-1 min-w-0">
               <div className="text-sm text-textPrimary">{t('me.managementSection')}</div>
               <div className="text-xs text-textMuted">{t('me.managementDesc')}</div>
@@ -716,7 +716,7 @@ export default function MePage() {
               <button
                 onClick={handleSaveProfile}
                 disabled={editSaving}
-                className="w-full py-2.5 rounded-xl bg-primary-500 text-white hover:bg-primary-400 disabled:opacity-40 text-sm font-medium transition-colors flex items-center justify-center gap-2"
+                className="w-full py-2.5 rounded-xl bg-primary-500 text-white hover:bg-primary-600 disabled:opacity-40 text-sm font-medium transition-colors flex items-center justify-center gap-2"
               >
                 {editSaving ? <Loader2 size={14} className="animate-spin" /> : <Check size={14} />}
                 {editSaving ? t('me.savingProfile') : t('me.saveButton')}
@@ -783,7 +783,7 @@ export default function MePage() {
                 <button
                   onClick={handleConfirmBind}
                   disabled={!bindEmail || !bindCode || bindLoading}
-                  className="flex-1 py-2 text-sm rounded-xl bg-primary-500 hover:bg-primary-400 disabled:opacity-30 text-white font-medium transition-colors"
+                  className="flex-1 py-2 text-sm rounded-xl bg-primary-500 hover:bg-primary-600 disabled:opacity-30 text-white font-medium transition-colors"
                 >
                   {bindLoading ? t('auth.verifying') : t('common.confirm')}
                 </button>
@@ -803,7 +803,7 @@ export default function MePage() {
               <div>
                 <div className="flex items-center justify-between mb-1">
                   <label className="block text-xs text-textSecondary">GitHub Token（classic 或 fine-grained，需仓库写权限）</label>
-                  <ExternalLinkSafe href="https://github.com/settings/tokens/new" className="text-[10px] text-primary-400 hover:text-primary-300 transition-colors shrink-0">去 GitHub 生成 token →</ExternalLinkSafe>
+                  <ExternalLinkSafe href="https://github.com/settings/tokens/new" className="text-[10px] text-primary-400 hover:text-primary-500 dark:hover:text-primary-300 transition-colors shrink-0">去 GitHub 生成 token →</ExternalLinkSafe>
                 </div>
                 <input
                   type="password"
@@ -827,7 +827,7 @@ export default function MePage() {
                 <button
                   onClick={doBindGithub}
                   disabled={!ghToken.trim() || ghBinding}
-                  className="flex-1 py-2 text-sm rounded-xl bg-primary-500 hover:bg-primary-400 disabled:opacity-30 text-white font-medium transition-colors"
+                  className="flex-1 py-2 text-sm rounded-xl bg-primary-500 hover:bg-primary-600 disabled:opacity-30 text-white font-medium transition-colors"
                 >
                   {ghBinding ? '绑定中…' : '绑定'}
                 </button>

@@ -229,7 +229,7 @@ export default function AvatarPickerModal({
               {/* 返回按钮 */}
               <button
                 onClick={() => setStep('pick')}
-                className="mb-3 text-xs text-primary-400 hover:text-primary-300 transition-colors"
+                className="mb-3 text-xs text-primary-400 hover:text-primary-500 dark:hover:text-primary-300 transition-colors"
               >
                 ← {t('common.back')}
               </button>

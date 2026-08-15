@@ -136,7 +136,7 @@ export default function AdminPage() {
             </Link>
             <Link
               to={ADMIN_MANUAL_URL}
-              className="inline-flex items-center gap-1 text-amber-400 hover:text-amber-500 dark:hover:text-amber-300 transition-colors"
+              className="inline-flex items-center gap-1 text-accent-400 hover:text-accent-500 dark:hover:text-accent-300 transition-colors"
             >
               <BookOpen size={13} /> {t('nav.adminManual')}
             </Link>
@@ -258,12 +258,12 @@ function OverviewTab() {
       <div className="bg-surface rounded-xl border border-border p-4 space-y-3">
         <div className="flex items-center justify-between flex-wrap gap-2">
           <div className="flex items-center gap-3">
-            <Wrench size={18} className={(mt.hard || mt.soft) ? 'text-amber-400' : 'text-mint-400'} />
+            <Wrench size={18} className={(mt.hard || mt.soft) ? 'text-accent-400' : 'text-mint-400'} />
             <span className="text-sm font-medium text-textPrimary">{t('admin.maintenanceMode')}</span>
             <span className={`text-[11px] px-2 py-0.5 rounded-full ${
-              mt.auto ? 'bg-amber-500/15 text-amber-400' :
+              mt.auto ? 'bg-accent-500/15 text-accent-400' :
               mt.hard ? 'bg-rose-500/15 text-rose-400' :
-              mt.soft ? 'bg-amber-500/15 text-amber-400' :
+              mt.soft ? 'bg-accent-500/15 text-accent-400' :
               'bg-mint-500/15 text-mint-400'
             }`}>
               {mt.auto ? '启动中' :
@@ -275,20 +275,20 @@ function OverviewTab() {
           <div className="flex gap-2">
             <button onClick={toggleHard} title="用户看到弹窗或顶栏，API 全部返回 503"
               className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-colors ${
-                mt.hard ? 'bg-mint-500 hover:bg-mint-400 text-white' : 'bg-rose-500/10 hover:bg-rose-500/20 text-rose-400 border border-rose-500/30'
+                mt.hard ? 'bg-mint-500 hover:bg-mint-600 text-white' : 'bg-rose-500/10 hover:bg-rose-500/20 text-rose-400 border border-rose-500/30'
               }`}>
               {mt.hard ? '恢复服务' : '暂停服务'}
             </button>
             <button onClick={toggleSoft} title="用户看到顶栏或弹窗提示，API 正常运行"
               className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-colors ${
-                mt.soft ? 'bg-mint-500 hover:bg-mint-400 text-white' : 'bg-amber-500/10 hover:bg-amber-500/20 text-amber-400 border border-amber-500/30'
+                mt.soft ? 'bg-mint-500 hover:bg-mint-600 text-white' : 'bg-accent-500/10 hover:bg-accent-500/20 text-accent-400 border border-accent-500/30'
               }`}>
               {mt.soft ? '取消提示' : '温馨提示'}
             </button>
           </div>
         </div>
         <div className="flex items-center gap-1.5 text-[11px] text-textMuted">
-          <div className={`w-1.5 h-1.5 rounded-full ${mt.auto ? 'bg-amber-400 animate-pulse' : mt.hard ? 'bg-rose-400' : mt.soft ? 'bg-amber-400' : 'bg-mint-400'}`} />
+          <div className={`w-1.5 h-1.5 rounded-full ${mt.auto ? 'bg-accent-400 animate-pulse' : mt.hard ? 'bg-rose-400' : mt.soft ? 'bg-accent-400' : 'bg-mint-400'}`} />
           {mt.auto ? '服务启动中，自动暂停' :
            mt.hard ? '🔴 已暂停——所有用户看到维护提示，API 不可用' :
            mt.soft ? '🟡 温馨提示中——用户看到提示条，API 正常' :
@@ -581,14 +581,14 @@ function UsersTab() {
                           await api.put(`/admin/users/${u.id}/role`, { role: 'user' })
                           setPage(page)
                         }}
-                        className="text-xs text-rose-400 hover:text-rose-500"
+                        className="text-xs text-rose-400 hover:text-rose-500 dark:hover:text-rose-300"
                       >
                         {t('admin.demote')}
                       </button>
                     )}
                     <button
                       onClick={() => setResetTarget(u)}
-                      className="text-xs text-amber-400 hover:text-amber-500 dark:hover:text-amber-300"
+                      className="text-xs text-accent-400 hover:text-accent-500 dark:hover:text-accent-300"
                     >
                       {t('admin.resetPassword')}
                     </button>
@@ -713,7 +713,7 @@ function GroupsTab() {
                       setData(newData)
                     }
                   }}
-                  className="text-xs text-rose-400 hover:text-rose-500"
+                  className="text-xs text-rose-400 hover:text-rose-500 dark:hover:text-rose-300"
                 >
                   {t('admin.dismiss')}
                 </button>
@@ -811,7 +811,7 @@ function CodesTab() {
           <button
             onClick={handleGenerate}
             disabled={generating || quota < 1 || days < 1}
-            className="px-4 py-1.5 bg-primary-500 text-white rounded-xl hover:bg-primary-400 disabled:opacity-40 disabled:cursor-not-allowed text-sm font-medium transition-colors"
+            className="px-4 py-1.5 bg-primary-500 text-white rounded-xl hover:bg-primary-600 disabled:opacity-40 disabled:cursor-not-allowed text-sm font-medium transition-colors"
           >
             {generating ? t('admin.generating') : t('admin.generate')}
           </button>
@@ -862,7 +862,7 @@ function CodesTab() {
                 <tr key={c.code} className="border-b border-border/50">
                   <td className="py-2 px-3 font-mono text-xs text-textPrimary">
                     {c.code}
-                    {c.is_api_pool && <span className="ml-1 px-1 py-0.5 bg-amber-400/10 text-amber-400 rounded text-[10px]">{t('admin.pool')}</span>}
+                    {c.is_api_pool && <span className="ml-1 px-1 py-0.5 bg-accent-400/10 text-accent-400 rounded text-[10px]">{t('admin.pool')}</span>}
                   </td>
                   <td className="py-2 px-3 text-xs text-textSecondary">{CODE_TYPES[c.code_type] || c.code_type || t('admin.codeTypeDefault')}</td>
                   <td className="py-2 px-3 text-textPrimary">{c.quota_amount}{(c.code_type === 'file_size' || c.code_type === 'file_quota') ? ' MB' : ''}</td>
@@ -1101,7 +1101,7 @@ function BackupTab() {
             <button
               onClick={handleBackup}
               disabled={downloading}
-              className="shrink-0 px-4 py-2 bg-primary-500 text-white rounded-xl hover:bg-primary-400 disabled:opacity-40 text-sm font-medium transition-colors"
+              className="shrink-0 px-4 py-2 bg-primary-500 text-white rounded-xl hover:bg-primary-600 disabled:opacity-40 text-sm font-medium transition-colors"
             >
               {downloading ? t('admin.exporting') : t('admin.downloadDbOnly')}
             </button>
@@ -1366,7 +1366,7 @@ function OpenCLIConfigSection() {
             className="w-24 px-2 py-1.5 border border-border bg-canvas rounded-xl text-sm text-textPrimary" />
         </div>
         <button onClick={handleSave} disabled={saving}
-          className="px-4 py-2 bg-primary-500 text-white rounded-xl hover:bg-primary-400 text-sm">
+          className="px-4 py-2 bg-primary-500 text-white rounded-xl hover:bg-primary-600 text-sm">
           {saving ? t('admin.saving') : t('admin.save')}
         </button>
       </div>
@@ -1554,7 +1554,7 @@ function OpenCLICommandsSection() {
             <div key={cat} className="mb-3 last:mb-0">
               <div className="flex items-center gap-2 mb-2">
                 <span className="text-xs font-semibold text-textSecondary uppercase tracking-wider">{cat}</span>
-                <span className={`text-xs px-1.5 py-0.5 rounded-full ${allAdded ? 'bg-mint-400/10 text-mint-400' : 'bg-amber-400/10 text-amber-400'}`}>
+                <span className={`text-xs px-1.5 py-0.5 rounded-full ${allAdded ? 'bg-mint-400/10 text-mint-400' : 'bg-accent-400/10 text-accent-400'}`}>
                   {allAdded ? t('admin.allAdded') : `${catPresets.filter(p => isPresetAdded(p.pattern, p.is_regex)).length}/${catPresets.length}`}
                 </span>
               </div>
@@ -1583,7 +1583,7 @@ function OpenCLICommandsSection() {
                           className={`shrink-0 px-2.5 py-1 rounded-lg text-xs font-medium transition-colors ${
                             added
                               ? 'bg-mint-400/10 text-mint-400 cursor-default'
-                              : 'bg-primary-500 text-white hover:bg-primary-400'
+                              : 'bg-primary-500 text-white hover:bg-primary-600'
                           }`}
                         >
                           {added ? status : '+ ' + t('admin.addCmd')}
@@ -1621,7 +1621,7 @@ function OpenCLICommandsSection() {
               placeholder={t('common.optional')} />
           </div>
           <button onClick={handleAdd}
-            className="px-3 py-1.5 bg-primary-500 text-white rounded-xl hover:bg-primary-400 text-sm">
+            className="px-3 py-1.5 bg-primary-500 text-white rounded-xl hover:bg-primary-600 text-sm">
             {t('admin.addCmd')}
           </button>
         </div>
@@ -1667,7 +1667,7 @@ function OpenCLICommandsSection() {
                       {c.enabled ? t('common.disabled') : t('common.enabled')}
                     </button>
                     <button onClick={() => handleDelete(c.id)}
-                      className="text-xs text-rose-400 hover:text-rose-500">
+                      className="text-xs text-rose-400 hover:text-rose-500 dark:hover:text-rose-300">
                       {t('common.delete')}
                     </button>
                   </td>
@@ -1890,13 +1890,13 @@ function SystemSettingsTab() {
           <button
             onClick={handlePlatformCreditSave}
             disabled={saving || platformCredit === (config?.default_platform_credit || 0)}
-            className="px-3 py-2 bg-primary-500 text-white rounded-xl hover:bg-primary-400 text-sm disabled:opacity-40 transition-colors"
+            className="px-3 py-2 bg-primary-500 text-white rounded-xl hover:bg-primary-600 text-sm disabled:opacity-40 transition-colors"
           >
             {t('settings.save')}
           </button>
         </div>
         {!hasActiveKeys && (
-          <p className="text-xs text-amber-400 mt-1.5">{t('admin.platformCreditNoActiveKey')}</p>
+          <p className="text-xs text-accent-400 mt-1.5">{t('admin.platformCreditNoActiveKey')}</p>
         )}
       </div>
 
@@ -1932,7 +1932,7 @@ function SystemSettingsTab() {
               handleSave('file_quota', fileQuota)
             }}
             disabled={saving || fileQuota === (config?.default_file_quota_mb ?? 100)}
-            className="px-3 py-2 bg-primary-500 text-white rounded-xl hover:bg-primary-400 text-sm disabled:opacity-40 transition-colors"
+            className="px-3 py-2 bg-primary-500 text-white rounded-xl hover:bg-primary-600 text-sm disabled:opacity-40 transition-colors"
           >
             {t('settings.save')}
           </button>
@@ -1958,7 +1958,7 @@ function SystemSettingsTab() {
               finally { setSaving(false) }
             }}
             disabled={saving}
-            className="px-3 py-2 bg-primary-500 text-white rounded-xl hover:bg-primary-400 text-sm disabled:opacity-40 transition-colors"
+            className="px-3 py-2 bg-primary-500 text-white rounded-xl hover:bg-primary-600 text-sm disabled:opacity-40 transition-colors"
           >{t('settings.save')}</button>
         </div>
       </div>
@@ -1982,7 +1982,7 @@ function SystemSettingsTab() {
               finally { setSaving(false) }
             }}
             disabled={saving}
-            className="px-3 py-2 bg-primary-500 text-white rounded-xl hover:bg-primary-400 text-sm disabled:opacity-40 transition-colors"
+            className="px-3 py-2 bg-primary-500 text-white rounded-xl hover:bg-primary-600 text-sm disabled:opacity-40 transition-colors"
           >{t('settings.save')}</button>
         </div>
       </div>
@@ -2014,7 +2014,7 @@ function SystemSettingsTab() {
           <span className="text-xs text-textMuted">天</span>
           <button onClick={() => handleSave('audit_retention', auditRetention)}
             disabled={saving || auditRetention === (config?.audit_log_retention_days ?? 90)}
-            className="px-3 py-2 bg-primary-500 text-white rounded-xl hover:bg-primary-400 text-sm disabled:opacity-40 transition-colors"
+            className="px-3 py-2 bg-primary-500 text-white rounded-xl hover:bg-primary-600 text-sm disabled:opacity-40 transition-colors"
           >{t('settings.save')}</button>
         </div>
       </div>
@@ -2029,7 +2029,7 @@ function SystemSettingsTab() {
           <span className="text-xs text-textMuted">天{messageRetention === 0 ? '（永久）' : ''}</span>
           <button onClick={() => handleSave('message_retention', messageRetention)}
             disabled={saving || messageRetention === (config?.message_retention_days ?? 0)}
-            className="px-3 py-2 bg-primary-500 text-white rounded-xl hover:bg-primary-400 text-sm disabled:opacity-40 transition-colors"
+            className="px-3 py-2 bg-primary-500 text-white rounded-xl hover:bg-primary-600 text-sm disabled:opacity-40 transition-colors"
           >{t('settings.save')}</button>
         </div>
       </div>
@@ -2056,7 +2056,7 @@ function SystemSettingsTab() {
           <span className="text-xs text-textMuted">份（超出自动清除最旧备份）</span>
           <button onClick={() => handleSave('daily_backup_keep', dailyBackupKeep)}
             disabled={saving || dailyBackupKeep === (config?.daily_backup_keep ?? 7)}
-            className="px-3 py-2 bg-primary-500 text-white rounded-xl hover:bg-primary-400 text-sm disabled:opacity-40 transition-colors"
+            className="px-3 py-2 bg-primary-500 text-white rounded-xl hover:bg-primary-600 text-sm disabled:opacity-40 transition-colors"
           >{t('settings.save')}</button>
         </div>
       </div>
@@ -2097,7 +2097,7 @@ function SystemSettingsTab() {
           <button
             onClick={() => handleSave('geoip_url', geoipUrl)}
             disabled={saving}
-            className="px-3 py-2 bg-primary-500 text-white rounded-xl hover:bg-primary-400 text-sm disabled:opacity-40 transition-colors"
+            className="px-3 py-2 bg-primary-500 text-white rounded-xl hover:bg-primary-600 text-sm disabled:opacity-40 transition-colors"
           >{t('settings.save')}</button>
         </div>
       </div>
@@ -2115,7 +2115,7 @@ function SystemSettingsTab() {
           <button
             onClick={() => handleSave('concurrent_ai_limit', defaultConcurrentAiLimit)}
             disabled={saving || defaultConcurrentAiLimit === (config?.default_concurrent_ai_limit ?? 3)}
-            className="px-3 py-2 bg-primary-500 text-white rounded-xl hover:bg-primary-400 text-sm disabled:opacity-40 transition-colors"
+            className="px-3 py-2 bg-primary-500 text-white rounded-xl hover:bg-primary-600 text-sm disabled:opacity-40 transition-colors"
           >{t('settings.save')}</button>
         </div>
       </div>
@@ -2139,7 +2139,7 @@ function SystemSettingsTab() {
               finally { setBulking(false) }
             }}
             disabled={bulking}
-            className="px-3 py-2 bg-amber-500 text-white rounded-xl hover:bg-amber-400 text-sm disabled:opacity-40 transition-colors"
+            className="px-3 py-2 bg-accent-500 text-white rounded-xl hover:bg-accent-400 text-sm disabled:opacity-40 transition-colors"
           >{bulking ? '执行中...' : '批量应用'}</button>
         </div>
       </div>

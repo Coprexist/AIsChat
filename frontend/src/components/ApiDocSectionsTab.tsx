@@ -90,7 +90,7 @@ export default function ApiDocSectionsTab() {
                   className="flex-1 bg-transparent text-sm text-textPrimary border border-border rounded-lg px-2 py-1 focus:border-primary-500/50 focus:outline-none"
                   placeholder="标题"
                 />
-                {s.title_changed && <span className="shrink-0 text-[10px] text-amber-400">已改（与文档不同）</span>}
+                {s.title_changed && <span className="shrink-0 text-[10px] text-accent-400">已改（与文档不同）</span>}
               </div>
               <textarea
                 value={s.intro}
@@ -99,7 +99,7 @@ export default function ApiDocSectionsTab() {
                 className="w-full bg-transparent text-xs text-textSecondary border border-border rounded-lg px-2 py-1.5 focus:border-primary-500/50 focus:outline-none resize-none"
                 placeholder="区介绍"
               />
-              {s.intro_changed && <div className="text-[10px] text-amber-400 -mt-1">介绍与文档不同</div>}
+              {s.intro_changed && <div className="text-[10px] text-accent-400 -mt-1">介绍与文档不同</div>}
             </div>
           ))}
         </div>
@@ -109,7 +109,7 @@ export default function ApiDocSectionsTab() {
         <button
           onClick={save}
           disabled={saving}
-          className="inline-flex items-center gap-1.5 text-xs px-3 py-2 rounded-lg bg-primary-500 hover:bg-primary-400 text-white transition-colors disabled:opacity-50"
+          className="inline-flex items-center gap-1.5 text-xs px-3 py-2 rounded-lg bg-primary-500 hover:bg-primary-600 text-white transition-colors disabled:opacity-50"
         >
           <Save size={13} /> {saving ? '保存中…' : '保存'}
         </button>
@@ -127,7 +127,7 @@ export default function ApiDocSectionsTab() {
         </button>
       </div>
 
-      {msg && <div className="inline-flex items-center gap-1 text-xs text-green-400"><CheckCircle2 size={12} /> {msg}</div>}
+      {msg && <div className="inline-flex items-center gap-1 text-xs text-mint-400"><CheckCircle2 size={12} /> {msg}</div>}
       <div className="flex items-center gap-1 text-[10px] text-textMuted"><BookOpen size={11} /> 变更即时生效：管理页/设计页的接口文档列表读取 DB 快照</div>
     </div>
   )

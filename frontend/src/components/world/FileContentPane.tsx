@@ -12,7 +12,7 @@ export function fileTypeIcon(name: string) {
   if (['png', 'jpg', 'jpeg', 'gif', 'webp', 'svg', 'ico', 'bmp'].includes(ext)) return <FileImage size={13} className="text-mint-400 shrink-0" />
   if (['mp3', 'wav', 'ogg'].includes(ext)) return <FileAudio size={13} className="text-primary-400 shrink-0" />
   if (['mp4', 'webm'].includes(ext)) return <FileVideo size={13} className="text-rose-400 shrink-0" />
-  if (['json'].includes(ext)) return <FileJson size={13} className="text-amber-400 shrink-0" />
+  if (['json'].includes(ext)) return <FileJson size={13} className="text-accent-400 shrink-0" />
   if (['md', 'txt'].includes(ext)) return <FileText size={13} className="text-textSecondary shrink-0" />
   if (['html', 'htm', 'css', 'js', 'ts', 'jsx', 'tsx', 'py', 'xml', 'yaml', 'yml', 'sh'].includes(ext)) return <FileCode size={13} className="text-primary-400 shrink-0" />
   return <File size={13} className="text-textMuted shrink-0" />

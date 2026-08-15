@@ -975,7 +975,7 @@ export default function ChatView({ conversationType, conversationId }: ChatViewP
     <div className="flex-1 flex flex-col min-w-0 overflow-hidden relative">
       {/* 重连提示条 */}
       {reconnecting && (
-        <div className="absolute top-0 left-0 right-0 z-50 flex items-center justify-center gap-2 bg-amber-500/15 border-b border-amber-500/20 text-amber-400 px-4 py-1.5 text-xs font-medium backdrop-blur-sm">
+        <div className="absolute top-0 left-0 right-0 z-50 flex items-center justify-center gap-2 bg-accent-500/15 border-b border-accent-500/20 text-accent-400 px-4 py-1.5 text-xs font-medium backdrop-blur-sm">
           <Loader2 size={12} className="animate-spin" />
           {t('chat.reconnecting')}
         </div>
@@ -1029,7 +1029,7 @@ export default function ChatView({ conversationType, conversationId }: ChatViewP
             <div className="space-y-2.5">
               <button
                 onClick={openImmersive}
-                className="w-full inline-flex items-center justify-center gap-1.5 py-3 bg-primary-500 hover:bg-primary-400 text-white rounded-xl font-medium transition-colors"
+                className="w-full inline-flex items-center justify-center gap-1.5 py-3 bg-primary-500 hover:bg-primary-600 text-white rounded-xl font-medium transition-colors"
               >
                 <Gamepad2 size={14} /> 在沉浸界面打开
               </button>

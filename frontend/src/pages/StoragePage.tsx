@@ -109,7 +109,7 @@ export default function StoragePage() {
           <div className="w-full h-2 bg-canvas rounded-full overflow-hidden mb-2">
             <div
               className={`h-full rounded-full transition-all duration-500 ${
-                storage.usage_percent > 90 ? 'bg-rose-400' : storage.usage_percent > 70 ? 'bg-amber-400' : 'bg-primary-400'
+                storage.usage_percent > 90 ? 'bg-rose-400' : storage.usage_percent > 70 ? 'bg-accent-400' : 'bg-primary-400'
               }`}
               style={{ width: `${Math.min(storage.usage_percent, 100)}%` }}
             />
@@ -128,7 +128,7 @@ export default function StoragePage() {
       <div className="flex items-center gap-2">
         <button
           onClick={() => fileInputRef.current?.click()}
-          className="text-xs px-4 py-2 bg-primary-500 text-white rounded-lg hover:bg-primary-400 transition-colors"
+          className="text-xs px-4 py-2 bg-primary-500 text-white rounded-lg hover:bg-primary-600 transition-colors"
         >
           上传文件
         </button>

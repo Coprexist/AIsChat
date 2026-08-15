@@ -118,7 +118,7 @@ export default function MarketPublishPage() {
               <span className={`text-xs ${syncGithub ? 'text-primary-300' : 'text-textMuted'}`}>{syncGithub ? '已勾选' : '未勾选'}</span>
             </button>
             {syncGithub && !githubConfigured && (
-              <div className="text-[11px] text-amber-400 bg-amber-500/10 rounded-lg px-3 py-2">
+              <div className="text-[11px] text-accent-400 bg-accent-500/10 rounded-lg px-3 py-2">
                 后台尚未配置 GitHub 仓库/Token——站内发布仍会成功，同步会失败。请管理员在商城页「GitHub 设置」里配置。
               </div>
             )}
@@ -126,7 +126,7 @@ export default function MarketPublishPage() {
             <button
               onClick={doPublish}
               disabled={publishing || myWorlds.length === 0}
-              className="w-full py-2.5 text-sm bg-primary-500 hover:bg-primary-400 text-white rounded-lg transition-colors disabled:opacity-40 inline-flex items-center justify-center gap-1.5"
+              className="w-full py-2.5 text-sm bg-primary-500 hover:bg-primary-600 text-white rounded-lg transition-colors disabled:opacity-40 inline-flex items-center justify-center gap-1.5"
             >
               <Upload size={14} /> {publishing ? '发布中…' : '发布'}
             </button>

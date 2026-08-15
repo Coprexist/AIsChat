@@ -22,35 +22,56 @@ export default {
         textPrimary: 'rgb(var(--tw-text-primary) / <alpha-value>)',
         textSecondary: 'rgb(var(--tw-text-secondary) / <alpha-value>)',
         textMuted: 'rgb(var(--tw-text-muted) / <alpha-value>)',
-        // 主题色（深浅通用）
+        // 自己的消息气泡（日夜两套主题变量）
+        bubble: 'rgb(var(--tw-bubble) / <alpha-value>)',
+        bubbleInk: 'rgb(var(--tw-bubble-ink) / <alpha-value>)',
+        // 主题色 —— CSS 变量驱动（index.css :root/.dark 各配一套）
+        // 浅色主题整体深一档（对比度达标，不发虚）；深色主题保持亮紫发光感
         primary: {
-          50:  '#F8F6FF',
-          100: '#EDE9FE',
-          200: '#DDD6FE',
-          300: '#C4B5FD',
-          400: '#A78BFA',         // 主色
-          500: '#8B5CF6',
-          600: '#7C3AED',
-          700: '#6D28D9',
-          800: '#5B21B6',
-          900: '#4C1D95',
+          50:  'rgb(var(--tw-primary-50) / <alpha-value>)',
+          100: 'rgb(var(--tw-primary-100) / <alpha-value>)',
+          200: 'rgb(var(--tw-primary-200) / <alpha-value>)',
+          300: 'rgb(var(--tw-primary-300) / <alpha-value>)',
+          400: 'rgb(var(--tw-primary-400) / <alpha-value>)',   // 强调文字/图标
+          500: 'rgb(var(--tw-primary-500) / <alpha-value>)',   // 按钮主色
+          600: 'rgb(var(--tw-primary-600) / <alpha-value>)',   // hover 加深
+          700: 'rgb(var(--tw-primary-700) / <alpha-value>)',
+          800: 'rgb(var(--tw-primary-800) / <alpha-value>)',
+          900: 'rgb(var(--tw-primary-900) / <alpha-value>)',
         },
         accent: {
-          50:  '#FFF7ED',
-          100: '#FFEDD5',
-          200: '#FED7AA',
-          300: '#FDBA74',
-          400: '#FBBF24',         // 琥珀金（状态变更/通知）
-          500: '#F59E0B',
-          600: '#D97706',
-          700: '#B45309',
+          50:  'rgb(var(--tw-accent-50) / <alpha-value>)',
+          100: 'rgb(var(--tw-accent-100) / <alpha-value>)',
+          200: 'rgb(var(--tw-accent-200) / <alpha-value>)',
+          300: 'rgb(var(--tw-accent-300) / <alpha-value>)',
+          400: 'rgb(var(--tw-accent-400) / <alpha-value>)',   // 琥珀金（状态变更/通知）
+          500: 'rgb(var(--tw-accent-500) / <alpha-value>)',
+          600: 'rgb(var(--tw-accent-600) / <alpha-value>)',
+          700: 'rgb(var(--tw-accent-700) / <alpha-value>)',
         },
         mint: {
-          400: '#34D399',         // 在线/活跃绿
-          500: '#10B981',
+          50:  'rgb(var(--tw-mint-50) / <alpha-value>)',
+          100: 'rgb(var(--tw-mint-100) / <alpha-value>)',
+          200: 'rgb(var(--tw-mint-200) / <alpha-value>)',
+          300: 'rgb(var(--tw-mint-300) / <alpha-value>)',
+          400: 'rgb(var(--tw-mint-400) / <alpha-value>)',     // 在线/活跃绿
+          500: 'rgb(var(--tw-mint-500) / <alpha-value>)',
+          600: 'rgb(var(--tw-mint-600) / <alpha-value>)',     // hover 加深
+          700: 'rgb(var(--tw-mint-700) / <alpha-value>)',
+          800: 'rgb(var(--tw-mint-800) / <alpha-value>)',
+          900: 'rgb(var(--tw-mint-900) / <alpha-value>)',
         },
         rose: {
-          400: '#FB7185',         // 勿扰/危险红
+          50:  'rgb(var(--tw-rose-50) / <alpha-value>)',
+          100: 'rgb(var(--tw-rose-100) / <alpha-value>)',
+          200: 'rgb(var(--tw-rose-200) / <alpha-value>)',
+          300: 'rgb(var(--tw-rose-300) / <alpha-value>)',
+          400: 'rgb(var(--tw-rose-400) / <alpha-value>)',     // 勿扰/危险文字
+          500: 'rgb(var(--tw-rose-500) / <alpha-value>)',     // 危险按钮
+          600: 'rgb(var(--tw-rose-600) / <alpha-value>)',     // hover 加深
+          700: 'rgb(var(--tw-rose-700) / <alpha-value>)',
+          800: 'rgb(var(--tw-rose-800) / <alpha-value>)',
+          900: 'rgb(var(--tw-rose-900) / <alpha-value>)',
         },
       },
       animation: {

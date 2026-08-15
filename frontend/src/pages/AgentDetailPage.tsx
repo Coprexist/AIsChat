@@ -132,8 +132,8 @@ interface WorkspaceFiles {
 function VectorMemoryCard({ mem, t: _t }: { mem: MemoryItem; t: any }) {
   const [showFull, setShowFull] = useState(false)
   const scopeColor: Record<string, string> = {
-    private: 'bg-violet-500/10 text-violet-400 border-violet-500/20',
-    group: 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20',
+    private: 'bg-primary-500/10 text-primary-400 border-primary-500/20',
+    group: 'bg-mint-500/10 text-mint-400 border-mint-500/20',
     cross_user: 'bg-sky-500/10 text-sky-400 border-sky-500/20',
   }
   const scopeLabel: Record<string, string> = {
@@ -748,7 +748,7 @@ export default function AgentDetailPage() {
             {/* 完整设置入口 */}
             <button
               onClick={() => setShowFullSettings(true)}
-              className="w-full flex items-center justify-center gap-2 py-2.5 rounded-xl border-2 border-dashed border-primary-400/50 bg-primary-500/5 hover:bg-primary-500/10 text-primary-400 hover:text-primary-300 text-sm font-medium transition-colors"
+              className="w-full flex items-center justify-center gap-2 py-2.5 rounded-xl border-2 border-dashed border-primary-400/50 bg-primary-500/5 hover:bg-primary-500/10 text-primary-400 hover:text-primary-500 dark:hover:text-primary-300 text-sm font-medium transition-colors"
             >
               <Settings size={16} />
               {t('agentDetail.fullSettings')}
@@ -1088,11 +1088,11 @@ export default function AgentDetailPage() {
                   {tokenMasked ? `Token: ${tokenMasked}` : t('agentDetail.generateToken')}
                 </button>
                 {token && (
-                  <div className="w-full flex items-center gap-2 mt-2 p-2 rounded-lg bg-amber-400/5 border border-amber-400/20">
-                    <code className="text-xs text-amber-400 flex-1 break-all">{token}</code>
+                  <div className="w-full flex items-center gap-2 mt-2 p-2 rounded-lg bg-accent-400/5 border border-accent-400/20">
+                    <code className="text-xs text-accent-400 flex-1 break-all">{token}</code>
                     <button
                       onClick={() => { navigator.clipboard.writeText(token); setToken(null) }}
-                      className="text-xs text-amber-400 hover:text-amber-500 dark:hover:text-amber-300"
+                      className="text-xs text-accent-400 hover:text-accent-500 dark:hover:text-accent-300"
                     >
                       {t('agentDetail.copyOnce')}
                     </button>
@@ -1124,7 +1124,7 @@ export default function AgentDetailPage() {
                     </span>
                     <span className={`font-medium ${
                       storage.usage_percent > 90 ? 'text-rose-400' :
-                      storage.usage_percent > 70 ? 'text-amber-400' :
+                      storage.usage_percent > 70 ? 'text-accent-400' :
                       'text-mint-400'
                     }`}>
                       {storage.usage_percent}%
@@ -1134,7 +1134,7 @@ export default function AgentDetailPage() {
                     <div
                       className={`h-full rounded-full transition-all duration-500 ${
                         storage.usage_percent > 90 ? 'bg-rose-400' :
-                        storage.usage_percent > 70 ? 'bg-amber-400' :
+                        storage.usage_percent > 70 ? 'bg-accent-400' :
                         'bg-mint-400'
                       }`}
                       style={{ width: `${Math.min(storage.usage_percent, 100)}%` }}
@@ -1235,7 +1235,7 @@ export default function AgentDetailPage() {
                           </span>
                         )}
                         {log.thinking_enabled && (
-                          <span className="text-xs px-1.5 py-0.5 rounded bg-amber-500/10 text-amber-400">
+                          <span className="text-xs px-1.5 py-0.5 rounded bg-accent-500/10 text-accent-400">
                             {t('agentDetail.logThinking')}
                           </span>
                         )}
@@ -1309,7 +1309,7 @@ export default function AgentDetailPage() {
                         msg.role === 'system' ? 'bg-canvas text-textMuted italic' :
                         msg.role === 'user' ? 'bg-primary-500/10 text-primary-600 dark:text-primary-300' :
                         msg.role === 'assistant' ? 'bg-mint-500/10 text-mint-500 dark:text-mint-400' :
-                        'bg-amber-500/10 text-accent-600 dark:text-accent-300'
+                        'bg-accent-500/10 text-accent-600 dark:text-accent-300'
                       }`}>
                         <span className="font-medium">{msg.role}</span>
                         {msg.reasoning_content && (
@@ -1428,7 +1428,7 @@ export default function AgentDetailPage() {
                           <div className="flex gap-1 mt-0.5">
                             {c.can_edit && <span className="text-[10px] px-1.5 py-0.5 rounded bg-mint-400/10 text-mint-400 border border-mint-400/20">{t('agentDetail.permEdit')}</span>}
                             {c.can_delete && <span className="text-[10px] px-1.5 py-0.5 rounded bg-rose-400/10 text-rose-400 border border-rose-400/20">{t('agentDetail.permDelete')}</span>}
-                            {c.can_manage_collaborators && <span className="text-[10px] px-1.5 py-0.5 rounded bg-amber-400/10 text-accent-400 border border-amber-400/20">{t('agentDetail.permManageCollaborators')}</span>}
+                            {c.can_manage_collaborators && <span className="text-[10px] px-1.5 py-0.5 rounded bg-accent-400/10 text-accent-400 border border-accent-400/20">{t('agentDetail.permManageCollaborators')}</span>}
                           </div>
                         </div>
                       </div>
@@ -1637,12 +1637,12 @@ export default function AgentDetailPage() {
                 </div>
               ) : deleteFileRefs && deleteFileRefs.reference_count > 0 ? (
                 <>
-                  <p className="text-amber-400 font-medium mb-2">
+                  <p className="text-accent-400 font-medium mb-2">
                     {t('agentDetail.fileReferencedBy').replace('{count}', String(deleteFileRefs.reference_count))}
                   </p>
                   <div className="space-y-1 max-h-32 overflow-y-auto">
                     {deleteFileRefs.references.map((ref, i) => (
-                      <div key={i} className="text-textMuted pl-2 border-l-2 border-amber-500/30">
+                      <div key={i} className="text-textMuted pl-2 border-l-2 border-accent-500/30">
                         {ref.display}
                       </div>
                     ))}

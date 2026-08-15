@@ -198,7 +198,7 @@ export default function ProviderPresetSelector() {
                     onClick={() => isOpen ? setExpanded(null) : startEdit(p, idx)}
                     className="flex items-center gap-2 text-sm font-medium text-textPrimary hover:text-primary-500 transition-colors"
                   >
-                    {p.is_default && <Star size={14} className="text-amber-400 fill-amber-400" />}
+                    {p.is_default && <Star size={14} className="text-accent-400 fill-accent-400" />}
                     {p.name}
                     <span className="text-xs text-textMuted">({p.provider})</span>
                     {p.thinking_supported && (
@@ -207,7 +207,7 @@ export default function ProviderPresetSelector() {
                   </button>
                   <div className="flex items-center gap-2">
                     {p.is_default && (
-                      <span className="text-xs text-amber-400 bg-amber-500/10 px-2 py-0.5 rounded-full">
+                      <span className="text-xs text-accent-400 bg-accent-500/10 px-2 py-0.5 rounded-full">
                         {t('admin.defaultProvider') || '默认'}
                       </span>
                     )}
@@ -291,7 +291,7 @@ export default function ProviderPresetSelector() {
               onClick={() => startAdd('manual')}
               className={`px-3 py-1.5 text-xs rounded-lg font-medium transition-colors border ${
                 newPreset === 'manual'
-                  ? 'bg-amber-500/15 border-amber-500/40 text-amber-500'
+                  ? 'bg-accent-500/15 border-accent-500/40 text-accent-500'
                   : 'bg-canvas border-border text-textMuted hover:text-textSecondary'
               }`}
             >
@@ -461,7 +461,7 @@ function ProviderEditForm({
         <button
           onClick={onSave}
           disabled={saving || !editName.trim()}
-          className="px-4 py-2 text-sm rounded-lg bg-primary-500 hover:bg-primary-400 disabled:opacity-30 text-white font-medium transition-colors flex items-center gap-1.5"
+          className="px-4 py-2 text-sm rounded-lg bg-primary-500 hover:bg-primary-600 disabled:opacity-30 text-white font-medium transition-colors flex items-center gap-1.5"
         >
           {saving ? <Loader2 size={14} className="animate-spin" /> : <Check size={14} />}
           {saving ? t('common.saving') : t('common.save')}

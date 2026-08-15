@@ -15,7 +15,7 @@ export default function NotFoundPage() {
         </p>
         <button
           onClick={() => navigate('/')}
-          className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-primary-500 text-white hover:bg-primary-400 transition-colors text-sm font-medium"
+          className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-primary-500 text-white hover:bg-primary-600 transition-colors text-sm font-medium"
         >
           {t('notFound.backHome') || '返回首页'}
         </button>

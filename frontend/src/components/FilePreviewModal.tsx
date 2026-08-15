@@ -394,7 +394,7 @@ export default function FilePreviewModal({ fileId, fileName, fileSize, mimeType,
 
       <button
         onClick={handleDownload}
-        className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-primary-500 text-white text-xs font-medium hover:bg-primary-400 transition-colors"
+        className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-primary-500 text-white text-xs font-medium hover:bg-primary-600 transition-colors"
         title={t('common.download')}
       >
         <Download size={14} />

@@ -494,7 +494,7 @@ export default function SettingsPage() {
           <button
             onClick={handleRedeem}
             disabled={redeeming || !redeemCode.trim()}
-            className="flex items-center gap-1 px-4 py-2 rounded-xl bg-primary-500 text-white text-sm font-medium hover:bg-primary-400 disabled:opacity-40 transition-colors shrink-0"
+            className="flex items-center gap-1 px-4 py-2 rounded-xl bg-primary-500 text-white text-sm font-medium hover:bg-primary-600 disabled:opacity-40 transition-colors shrink-0"
           >
             {redeeming ? <Loader2 size={14} className="animate-spin" /> : <Plus size={14} />}
             {t('me.redeem')}
@@ -521,7 +521,7 @@ export default function SettingsPage() {
               {user.email_verified ? (
                 <span className="text-[10px] text-mint-400 bg-mint-500/10 px-1.5 py-0.5 rounded-full">{t('auth.emailVerified')}</span>
               ) : (
-                <span className="text-[10px] text-amber-400 bg-amber-500/10 px-1.5 py-0.5 rounded-full">{t('auth.emailNotVerified')}</span>
+                <span className="text-[10px] text-accent-400 bg-accent-500/10 px-1.5 py-0.5 rounded-full">{t('auth.emailNotVerified')}</span>
               )}
             </div>
             <p className="text-xs text-textMuted">{t('auth.emailVerified') ? t('settings.emailVerifiedDesc') : t('settings.emailNotVerifiedDesc')}</p>
@@ -547,7 +547,7 @@ export default function SettingsPage() {
             <p className="text-xs text-textMuted">{t('settings.emailNotSetDesc')}</p>
             <button
               onClick={() => { setShowBindEmail(true); setBindEmail(''); setBindCode(''); setBindCodeSent(false); setBindError('') }}
-              className="px-3 py-1.5 text-xs rounded-lg bg-primary-500 hover:bg-primary-400 text-white font-medium transition-colors"
+              className="px-3 py-1.5 text-xs rounded-lg bg-primary-500 hover:bg-primary-600 text-white font-medium transition-colors"
             >
               {t('auth.bindEmailTitle')}
             </button>
@@ -578,7 +578,7 @@ export default function SettingsPage() {
                         : 'bg-canvas border-border text-textSecondary hover:text-textPrimary hover:border-primary-500/30'
                     }`}
                   >
-                    {p.name}{p.is_default ? <Star size={10} className="fill-current text-amber-400" /> : null}
+                    {p.name}{p.is_default ? <Star size={10} className="fill-current text-accent-400" /> : null}
                   </button>
                 ))}
               </div>
@@ -606,7 +606,7 @@ export default function SettingsPage() {
                   href={getApiKeyUrl(apiBaseUrl)}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="text-[10px] text-primary-400 hover:text-primary-300 underline underline-offset-2 font-normal"
+                  className="text-[10px] text-primary-400 hover:text-primary-500 dark:hover:text-primary-300 underline underline-offset-2 font-normal"
                 >
                   获取 API Key →
                 </a>
@@ -762,7 +762,7 @@ export default function SettingsPage() {
                           <button
                             onClick={() => handleSaveAgentApi(agent.id)}
                             disabled={agentApiSaving}
-                            className="w-full py-1.5 rounded-lg bg-primary-500 text-white text-xs font-medium hover:bg-primary-400 disabled:opacity-40 transition-colors"
+                            className="w-full py-1.5 rounded-lg bg-primary-500 text-white text-xs font-medium hover:bg-primary-600 disabled:opacity-40 transition-colors"
                           >
                             {agentApiSaving ? t('settings.agentApiSaving') : t('common.save')}
                           </button>
@@ -1117,7 +1117,7 @@ export default function SettingsPage() {
                             setInstallingEnv(false)
                           }}
                           disabled={installingEnv}
-                          className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-primary-500 text-white text-xs font-medium hover:bg-primary-400 disabled:opacity-30 transition-colors"
+                          className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-primary-500 text-white text-xs font-medium hover:bg-primary-600 disabled:opacity-30 transition-colors"
                         >
                           {installingEnv ? <Loader2 size={12} className="animate-spin" /> : <Wrench size={12} />}
                           {installingEnv ? t('settings.buildFactoryInstalling') : t('settings.buildFactoryInstall')}
@@ -1157,7 +1157,7 @@ export default function SettingsPage() {
                                 title={available ? '' : t('settings.buildFactoryCrossPlatformHint')}
                                 className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-colors ${
                                   available
-                                    ? 'bg-primary-500 text-white hover:bg-primary-400'
+                                    ? 'bg-primary-500 text-white hover:bg-primary-600'
                                     : 'bg-border/20 text-textMuted cursor-not-allowed'
                                 }`}
                               >
@@ -1226,7 +1226,7 @@ export default function SettingsPage() {
       <button
         onClick={handleSave}
         disabled={saving}
-        className="flex items-center gap-2 px-5 py-2.5 bg-primary-500 text-white rounded-xl hover:bg-primary-400 disabled:opacity-30 text-sm font-medium transition-all shadow-lg shadow-primary-500/20"
+        className="flex items-center gap-2 px-5 py-2.5 bg-primary-500 text-white rounded-xl hover:bg-primary-600 disabled:opacity-30 text-sm font-medium transition-all shadow-lg shadow-primary-500/20"
       >
         <Save size={16} />
         {saving ? t('settings.saving') : t('settings.save')}
@@ -1418,7 +1418,7 @@ export default function SettingsPage() {
                 <button
                   onClick={handleBind}
                   disabled={!bindEmail || !bindCode || bindLoading}
-                  className="flex-1 py-2 text-sm bg-primary-500 text-white rounded-xl hover:bg-primary-400 disabled:opacity-30 font-medium transition-all"
+                  className="flex-1 py-2 text-sm bg-primary-500 text-white rounded-xl hover:bg-primary-600 disabled:opacity-30 font-medium transition-all"
                 >
                   {bindLoading ? t('common.saving') : t('common.confirm')}
                 </button>

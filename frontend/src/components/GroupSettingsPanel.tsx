@@ -91,7 +91,7 @@ function FederationShareSection({ groupId }: { groupId: number }) {
       </div>
 
       {!myDisplayName && loaded && (
-        <div className="bg-amber-400/10 text-amber-400 rounded-lg px-3 py-2 text-xs">
+        <div className="bg-accent-400/10 text-accent-400 rounded-lg px-3 py-2 text-xs">
           {t('groupSettings.federationNoDisplayName')}
         </div>
       )}
@@ -501,7 +501,7 @@ export default function GroupSettingsPanel({ group, onClose, onUpdate, onLeave }
                     <button
                       onClick={() => saveSettings({ name })}
                       disabled={saving || name === group.name}
-                      className="px-3 py-2 bg-primary-500 text-white rounded-lg text-xs font-medium hover:bg-primary-400 disabled:opacity-50 transition-colors"
+                      className="px-3 py-2 bg-primary-500 text-white rounded-lg text-xs font-medium hover:bg-primary-600 disabled:opacity-50 transition-colors"
                     >
                       {t('common.save')}
                     </button>
@@ -525,7 +525,7 @@ export default function GroupSettingsPanel({ group, onClose, onUpdate, onLeave }
                       <button
                         onClick={() => saveSettings({ announcement })}
                         disabled={saving}
-                        className="px-3 py-1.5 bg-primary-500 text-white rounded-lg text-xs font-medium hover:bg-primary-400 disabled:opacity-50 transition-colors"
+                        className="px-3 py-1.5 bg-primary-500 text-white rounded-lg text-xs font-medium hover:bg-primary-600 disabled:opacity-50 transition-colors"
                       >
                         {t('groupSettings.updateAnnouncement')}
                       </button>
@@ -694,7 +694,7 @@ export default function GroupSettingsPanel({ group, onClose, onUpdate, onLeave }
                     </div>
                     <button
                       onClick={handleCancelDnd}
-                      className="w-full px-4 py-2.5 bg-primary-500 text-white rounded-lg text-sm font-medium hover:bg-primary-400 transition-colors"
+                      className="w-full px-4 py-2.5 bg-primary-500 text-white rounded-lg text-sm font-medium hover:bg-primary-600 transition-colors"
                     >
                       {t('groupSettings.dndCancel')}
                     </button>
@@ -735,7 +735,7 @@ export default function GroupSettingsPanel({ group, onClose, onUpdate, onLeave }
                       <button
                         onClick={handleCustomDnd}
                         disabled={!customDndMinutes.trim()}
-                        className="px-3 py-2 bg-primary-500 text-white rounded-lg text-xs font-medium hover:bg-primary-400 disabled:opacity-50 transition-colors shrink-0"
+                        className="px-3 py-2 bg-primary-500 text-white rounded-lg text-xs font-medium hover:bg-primary-600 disabled:opacity-50 transition-colors shrink-0"
                       >
                         {t('common.set')}
                       </button>
@@ -770,7 +770,7 @@ export default function GroupSettingsPanel({ group, onClose, onUpdate, onLeave }
                       onUpdate({ is_paused: (r as any).is_paused } as Partial<GroupSettings>)
                     } catch (e: any) { setError(e?.detail || "操作失败") } finally { setPausing(false) }
                   }}
-                  className={`w-full flex items-center justify-center gap-2 px-4 py-2.5 rounded-lg text-sm font-medium transition-colors disabled:opacity-50 ${group?.is_paused ? "bg-mint-400/10 text-mint-400 hover:bg-mint-400/20" : "bg-amber-400/10 text-amber-400 hover:bg-amber-400/20"}`}
+                  className={`w-full flex items-center justify-center gap-2 px-4 py-2.5 rounded-lg text-sm font-medium transition-colors disabled:opacity-50 ${group?.is_paused ? "bg-mint-400/10 text-mint-400 hover:bg-mint-400/20" : "bg-accent-400/10 text-accent-400 hover:bg-accent-400/20"}`}
                 >
                   {pausing ? <Loader2 size={16} className="animate-spin" /> : <Pause size={16} />}
                   {group?.is_paused ? "恢复对话" : "暂停对话"}
@@ -851,7 +851,7 @@ export default function GroupSettingsPanel({ group, onClose, onUpdate, onLeave }
               {isOwner && (
                 <button
                   onClick={handleDisband}
-                  className="w-full flex items-center justify-center gap-2 px-4 py-2.5 bg-red-600/15 text-red-500 rounded-lg text-sm font-medium hover:bg-red-600/25 transition-colors border border-red-500/20"
+                  className="w-full flex items-center justify-center gap-2 px-4 py-2.5 bg-rose-500/10 text-rose-500 rounded-lg text-sm font-medium hover:bg-rose-500/20 transition-colors border border-rose-500/20"
                 >
                   {t('groupSettings.disbandGroup')}
                 </button>
@@ -892,7 +892,7 @@ export default function GroupSettingsPanel({ group, onClose, onUpdate, onLeave }
                         <div className="text-sm text-textPrimary truncate flex items-center gap-1.5">
                           {m.name}
                           {m.role === 'owner' && (
-                            <span className="text-[10px] text-amber-400 font-medium flex items-center gap-0.5"><Crown size={10} />{t('groupSettings.roleOwner')}</span>
+                            <span className="text-[10px] text-accent-400 font-medium flex items-center gap-0.5"><Crown size={10} />{t('groupSettings.roleOwner')}</span>
                           )}
                           {m.type === 'ai' && (
                             <span className="text-[10px] text-primary-400 font-medium">{t('chatlist.ai')}</span>
@@ -1023,7 +1023,7 @@ export default function GroupSettingsPanel({ group, onClose, onUpdate, onLeave }
                       speak_limit_window_seconds: speakWindow,
                     })}
                     disabled={saving}
-                    className="w-full px-4 py-2.5 bg-primary-500 text-white rounded-lg text-sm font-medium hover:bg-primary-400 disabled:opacity-50 transition-colors"
+                    className="w-full px-4 py-2.5 bg-primary-500 text-white rounded-lg text-sm font-medium hover:bg-primary-600 disabled:opacity-50 transition-colors"
                   >
                     {saving ? t('common.saving') : t('groupSettings.saveSpeakLimit')}
                   </button>
@@ -1081,7 +1081,7 @@ export default function GroupSettingsPanel({ group, onClose, onUpdate, onLeave }
               <button
                 onClick={handleExportChat}
                 disabled={exporting}
-                className="w-full flex items-center justify-center gap-2 px-4 py-2.5 bg-primary-500 text-white rounded-xl hover:bg-primary-400 disabled:opacity-40 text-sm font-medium transition-all"
+                className="w-full flex items-center justify-center gap-2 px-4 py-2.5 bg-primary-500 text-white rounded-xl hover:bg-primary-600 disabled:opacity-40 text-sm font-medium transition-all"
               >
                 <Download size={16} />
                 {exporting ? t('common.exporting') : t('groupSettings.downloadExport')}

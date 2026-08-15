@@ -87,8 +87,8 @@ export default function PluginManager() {
       {message && (
         <div className={`p-3 rounded-lg text-sm ${
           message.type === 'success'
-            ? 'bg-emerald-50 dark:bg-emerald-900/20 text-emerald-700 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-800'
-            : 'bg-red-50 dark:bg-red-900/20 text-red-700 dark:text-red-400 border border-red-200 dark:border-red-800'
+            ? 'bg-mint-50 dark:bg-mint-900/20 text-mint-700 dark:text-mint-400 border border-mint-200 dark:border-mint-800'
+            : 'bg-rose-50 dark:bg-rose-900/20 text-rose-700 dark:text-rose-400 border border-rose-200 dark:border-rose-800'
         }`}>
           {message.text}
         </div>
@@ -107,7 +107,7 @@ export default function PluginManager() {
                   <h3 className="font-medium text-textPrimary">{plugin.name}</h3>
                   {plugin.installed && (
                     plugin.running ? (
-                      <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-medium bg-emerald-100 dark:bg-emerald-900/30 text-emerald-700 dark:text-emerald-400">
+                      <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-medium bg-mint-100 dark:bg-mint-900/30 text-mint-700 dark:text-mint-400">
                         <CheckCircle size={11} /> 运行中 :{plugin.port}
                       </span>
                     ) : (
@@ -117,7 +117,7 @@ export default function PluginManager() {
                     )
                   )}
                   {!plugin.installed && (
-                    <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-medium bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-400">
+                    <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-medium bg-rose-100 dark:bg-rose-900/30 text-rose-700 dark:text-rose-400">
                       未安装
                     </span>
                   )}
@@ -130,8 +130,8 @@ export default function PluginManager() {
                   disabled={toggling === plugin.id}
                   className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium transition-colors shrink-0 ${
                     plugin.running
-                      ? 'bg-red-50 dark:bg-red-900/20 text-red-600 dark:text-red-400 hover:bg-red-100 dark:hover:bg-red-900/40 border border-red-200 dark:border-red-800'
-                      : 'bg-emerald-500 text-white hover:bg-emerald-600'
+                      ? 'bg-rose-50 dark:bg-rose-900/20 text-rose-600 dark:text-rose-400 hover:bg-rose-100 dark:hover:bg-rose-900/40 border border-rose-200 dark:border-rose-800'
+                      : 'bg-mint-500 text-white hover:bg-mint-600'
                   } disabled:opacity-50`}
                 >
                   {toggling === plugin.id ? (

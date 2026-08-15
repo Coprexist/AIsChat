@@ -137,7 +137,7 @@ export default function DemoChat() {
             onKeyDown={e => e.key === 'Enter' && saveKey()}
           />
           <button onClick={saveKey} disabled={!keyInput.trim()}
-            className="px-3 py-1 text-xs rounded-lg bg-accent-500 hover:bg-accent-400 text-white font-medium disabled:opacity-40 transition-colors">
+            className="px-3 py-1 text-xs rounded-lg bg-accent-500 hover:bg-accent-600 text-white font-medium disabled:opacity-40 transition-colors">
             确认
           </button>
         </div>
@@ -147,7 +147,7 @@ export default function DemoChat() {
             <Key size={12} className="text-mint-400" />
             API Key 已设置
           </div>
-          <button onClick={clearKey} className="flex items-center gap-1 text-xs text-rose-400 hover:text-rose-300">
+          <button onClick={clearKey} className="flex items-center gap-1 text-xs text-rose-400 hover:text-rose-500 dark:hover:text-rose-300">
             <Trash2 size={12} /> 清除 Key
           </button>
         </div>
@@ -189,7 +189,7 @@ export default function DemoChat() {
             className="flex-1 px-3.5 py-2.5 rounded-xl border border-border bg-canvas text-sm text-textPrimary placeholder:text-textMuted resize-none outline-none focus:ring-2 focus:ring-primary-500/50"
           />
           <button onClick={send} disabled={!input.trim() || !apiKey || loading}
-            className="p-2.5 rounded-xl bg-primary-500 hover:bg-primary-400 text-white disabled:opacity-40 disabled:cursor-not-allowed transition-colors">
+            className="p-2.5 rounded-xl bg-primary-500 hover:bg-primary-600 text-white disabled:opacity-40 disabled:cursor-not-allowed transition-colors">
             <Send size={16} />
           </button>
         </div>

@@ -58,8 +58,8 @@ export default function BalancePromptModal() {
         onClick={e => e.stopPropagation()}
       >
         <div className="flex items-start gap-3 mb-4">
-          <div className="w-10 h-10 rounded-full bg-amber-500/10 flex items-center justify-center shrink-0">
-            <AlertTriangle size={20} className="text-amber-400" />
+          <div className="w-10 h-10 rounded-full bg-accent-500/10 flex items-center justify-center shrink-0">
+            <AlertTriangle size={20} className="text-accent-400" />
           </div>
           <div className="flex-1 min-w-0">
             <h3 className="text-sm font-semibold text-textPrimary">{t('balance.title')}</h3>
@@ -81,7 +81,7 @@ export default function BalancePromptModal() {
           <button
             onClick={handleConfirm}
             disabled={loading}
-            className="flex-1 flex items-center justify-center gap-2 py-2.5 rounded-xl bg-primary-500 text-white hover:bg-primary-400 disabled:opacity-40 text-sm font-medium transition-colors"
+            className="flex-1 flex items-center justify-center gap-2 py-2.5 rounded-xl bg-primary-500 text-white hover:bg-primary-600 disabled:opacity-40 text-sm font-medium transition-colors"
           >
             <Key size={14} />
             {loading ? '...' : t('balance.useOwnKey')}

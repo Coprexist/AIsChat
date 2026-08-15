@@ -202,7 +202,7 @@ export default function ProfileCard({ entityType, entityId, entityName, state, a
               <span>{t('profileCard.registeredOn')}: {new Date(createdAt).toLocaleDateString('zh-CN')}</span>
             )}
             {isActive ? (
-              <span className="text-green-500">{t('dm.online')}</span>
+              <span className="text-mint-500">{t('dm.online')}</span>
             ) : profile?.last_active_at ? (
               <span>{t('dm.lastActive')} {formatMessageTime(profile.last_active_at, lang)}</span>
             ) : null}
@@ -219,7 +219,7 @@ export default function ProfileCard({ entityType, entityId, entityName, state, a
               disabled={togglingPriority}
               className={`w-full flex items-center justify-center gap-2 py-2 rounded-xl border text-sm font-medium transition-colors ${
                 isPriority
-                  ? 'bg-amber-400/10 border-amber-400/30 text-amber-400 hover:bg-amber-400/20'
+                  ? 'bg-accent-400/10 border-accent-400/30 text-accent-400 hover:bg-accent-400/20'
                   : 'bg-canvas border-border text-textSecondary hover:bg-elevated'
               }`}
             >
@@ -275,7 +275,7 @@ export default function ProfileCard({ entityType, entityId, entityName, state, a
           <button
             onClick={handleSendDM}
             disabled={sending}
-            className="w-full flex items-center justify-center gap-2 py-2.5 rounded-xl bg-primary-500 text-white hover:bg-primary-400 disabled:opacity-30 transition-all text-sm font-medium shadow-lg shadow-primary-500/20"
+            className="w-full flex items-center justify-center gap-2 py-2.5 rounded-xl bg-primary-500 text-white hover:bg-primary-600 disabled:opacity-30 transition-all text-sm font-medium shadow-lg shadow-primary-500/20"
           >
             <MessageSquare size={16} />
             {sending ? t('profileCard.sending') : isFriend ? t('profileCard.sendDM') : t('profileCard.sendDM')}

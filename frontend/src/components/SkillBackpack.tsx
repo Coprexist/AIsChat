@@ -74,7 +74,7 @@ export default function SkillBackpack({ agentId, className = '' }: Props) {
     return <div className={`text-center py-8 text-textSecondary text-sm ${className}`}>加载中...</div>
   }
   if (!data || segments.length === 0) {
-    return <div className={`text-center py-8 text-red-500 text-sm ${className}`}>加载失败</div>
+    return <div className={`text-center py-8 text-rose-500 text-sm ${className}`}>加载失败</div>
   }
 
   const expandedSeg = expandedSegment ? segments.find(s => s.name === expandedSegment) : null
@@ -162,7 +162,7 @@ export default function SkillBackpack({ agentId, className = '' }: Props) {
                   {tool.available_in_current_state !== undefined && (
                     <span className={`text-[10px] px-1.5 py-0.5 rounded ${
                       tool.available_in_current_state
-                        ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400'
+                        ? 'bg-mint-100 text-mint-700 dark:bg-mint-900/30 dark:text-mint-400'
                         : 'bg-slate-100 text-slate-500 dark:bg-slate-800 dark:text-slate-400'
                     }`}>
                       {tool.available_in_current_state ? t('backpack.availableNow') : t('backpack.unavailableNow')}

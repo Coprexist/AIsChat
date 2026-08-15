@@ -240,7 +240,7 @@ export default function ForwardFileModal({ file, onClose }: ForwardFileModalProp
           <button
             onClick={handleSend}
             disabled={selected.size === 0 || sending || done}
-            className="flex items-center gap-1.5 px-4 py-1.5 rounded-lg bg-primary-500 text-white text-xs font-medium hover:bg-primary-400 disabled:opacity-40 transition-colors"
+            className="flex items-center gap-1.5 px-4 py-1.5 rounded-lg bg-primary-500 text-white text-xs font-medium hover:bg-primary-600 disabled:opacity-40 transition-colors"
           >
             {sending ? (
               <Loader2 size={14} className="animate-spin" />

@@ -91,7 +91,7 @@ export default function Sidebar({ mobile, onClose, translucent }: { mobile?: boo
               <item.icon size={18} />
               <span>{t(item.i18nKey)}</span>
               {item.path === '/friends' && pendingRequests > 0 && (
-                <span className="ml-auto w-2 h-2 rounded-full bg-red-500" />
+                <span className="ml-auto w-2 h-2 rounded-full bg-rose-500" />
               )}
             </NavLink>
           ))}
@@ -134,7 +134,7 @@ export default function Sidebar({ mobile, onClose, translucent }: { mobile?: boo
               <span className="relative">
                 <item.icon size={18} />
                 {item.path === '/friends' && pendingRequests > 0 && (
-                  <span className="absolute -top-1 -right-1.5 w-2 h-2 rounded-full bg-red-500" />
+                  <span className="absolute -top-1 -right-1.5 w-2 h-2 rounded-full bg-rose-500" />
                 )}
               </span>
             </NavLink>

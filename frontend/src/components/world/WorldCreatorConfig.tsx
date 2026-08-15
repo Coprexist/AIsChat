@@ -332,7 +332,7 @@ export default function WorldCreatorConfig({ wid, creator, usageStats, onSaved, 
             <div className="flex items-center justify-between bg-elevated/60 rounded-lg p-2.5">
               <div>
                 <div className="text-xs text-textSecondary">深度思考（推理模式）</div>
-                <div className="text-[10px] text-amber-400/90 mt-0.5">推理 token 单独计费，费用显著增加</div>
+                <div className="text-[10px] text-accent-400/90 mt-0.5">推理 token 单独计费，费用显著增加</div>
               </div>
               <input
                 type="checkbox"
@@ -363,7 +363,7 @@ export default function WorldCreatorConfig({ wid, creator, usageStats, onSaved, 
           <button
             onClick={save}
             disabled={saving}
-            className="w-full py-2 text-sm bg-primary-500 hover:bg-primary-400 text-white rounded-lg transition-colors disabled:opacity-40"
+            className="w-full py-2 text-sm bg-primary-500 hover:bg-primary-600 text-white rounded-lg transition-colors disabled:opacity-40"
           >
             {saving ? '保存中...' : (<span className="inline-flex items-center justify-center gap-1.5"><Save size={14} /> 保存配置</span>)}
           </button>

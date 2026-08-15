@@ -24,7 +24,7 @@ export default class ErrorBoundary extends Component<Props, State> {
             <div className="flex items-center justify-center gap-3">
               <button
                 onClick={() => window.location.reload()}
-                className="px-5 py-2.5 rounded-xl bg-primary-500 text-white hover:bg-primary-400 transition-colors text-sm font-medium"
+                className="px-5 py-2.5 rounded-xl bg-primary-500 text-white hover:bg-primary-600 transition-colors text-sm font-medium"
               >
                 刷新页面
               </button>

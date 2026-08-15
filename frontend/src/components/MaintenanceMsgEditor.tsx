@@ -197,7 +197,7 @@ export default function MaintenanceMsgEditor() {
         {/* 软维护 */}
         <div className="bg-surface rounded-xl border border-border p-4 space-y-3">
           <div className="flex items-center gap-1.5 text-xs font-semibold text-textPrimary">
-            <span className="w-2 h-2 rounded-full bg-amber-400" />
+            <span className="w-2 h-2 rounded-full bg-accent-400" />
             📢 温馨提示
             <span className="text-textMuted font-normal text-[10px] ml-1">——用户看到顶栏/弹窗提示，API 正常运行</span>
           </div>
@@ -247,7 +247,7 @@ export default function MaintenanceMsgEditor() {
       {/* ── 保存 ── */}
       <div className="flex items-center gap-3 bg-surface rounded-xl border border-border px-4 py-3">
         <button onClick={save} disabled={saving}
-          className="flex items-center gap-1.5 px-5 py-2 rounded-lg bg-primary-500 text-white text-xs font-medium hover:bg-primary-400 disabled:opacity-50 transition-colors">
+          className="flex items-center gap-1.5 px-5 py-2 rounded-lg bg-primary-500 text-white text-xs font-medium hover:bg-primary-600 disabled:opacity-50 transition-colors">
           <Save size={14} />{saving ? '保存中···' : '保存'}
         </button>
         {saved && <span className="text-xs text-mint-400"><Check size={12} className="inline text-mint-400" /> 已保存</span>}

@@ -86,14 +86,14 @@ export default function WorldsPage() {
         >
           <Store size={14} /> 商城
         </button>
-        <button onClick={() => setShowCreate(!showCreate)} className="px-3 py-1.5 bg-primary-500 hover:bg-primary-400 text-white rounded-lg text-xs inline-flex items-center gap-1 transition-colors">
+        <button onClick={() => setShowCreate(!showCreate)} className="px-3 py-1.5 bg-primary-500 hover:bg-primary-600 text-white rounded-lg text-xs inline-flex items-center gap-1 transition-colors">
           <Plus size={14} />创建世界
         </button>
       </PageHeader>
 
       <div className="flex-1 overflow-y-auto">
         <div className="max-w-3xl mx-auto p-4 sm:p-6">
-          {msg && <div className="text-sm text-amber-400 mb-4">{msg}</div>}
+          {msg && <div className="text-sm text-accent-400 mb-4">{msg}</div>}
 
           {showCreate && (
             <div className="bg-surface border border-border rounded-lg p-4 mb-6 space-y-3">
@@ -110,7 +110,7 @@ export default function WorldsPage() {
                 rows={2}
                 className="w-full bg-elevated text-textPrimary px-3 py-2 rounded text-sm outline-none resize-none border border-border focus:border-primary-500/50"
               />
-              <button onClick={create} className="px-4 py-2 bg-primary-500 hover:bg-primary-400 text-white rounded-lg text-sm transition-colors">创建并进入设计页</button>
+              <button onClick={create} className="px-4 py-2 bg-primary-500 hover:bg-primary-600 text-white rounded-lg text-sm transition-colors">创建并进入设计页</button>
             </div>
           )}
 
@@ -127,7 +127,7 @@ export default function WorldsPage() {
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-2 flex-wrap">
                     <span className="font-medium text-textPrimary truncate">{w.name}</span>
-                    <span className={`text-[10px] px-2 py-0.5 rounded-full shrink-0 ${w.status === 'active' ? 'bg-green-500/20 text-green-400' : 'bg-elevated text-textMuted'}`}>
+                    <span className={`text-[10px] px-2 py-0.5 rounded-full shrink-0 ${w.status === 'active' ? 'bg-mint-500/20 text-mint-400' : 'bg-elevated text-textMuted'}`}>
                       {w.status === 'active' ? '活跃' : '休眠'}
                     </span>
                   </div>

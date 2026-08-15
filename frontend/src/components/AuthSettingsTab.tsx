@@ -451,7 +451,7 @@ export default function AuthSettingsTab() {
           <button
             onClick={handleSaveSmtp}
             disabled={smtpSaving || smtpConfigs.length < 1}
-            className="px-4 py-2 text-sm rounded-lg bg-primary-500 hover:bg-primary-400 disabled:opacity-30 text-white font-medium transition-colors"
+            className="px-4 py-2 text-sm rounded-lg bg-primary-500 hover:bg-primary-600 disabled:opacity-30 text-white font-medium transition-colors"
           >
             {smtpSaving ? t('common.saving') : t('common.save')}
           </button>
@@ -461,7 +461,7 @@ export default function AuthSettingsTab() {
       {/* ── 邮件模板编辑（v1.1.0: 预设选择）── */}
       <section className="bg-surface border border-border rounded-xl p-5">
         <h3 className="text-sm font-semibold text-textPrimary flex items-center gap-2 mb-4">
-          <Mail size={16} className="text-amber-400" />
+          <Mail size={16} className="text-accent-400" />
           {t('admin.emailTemplates')}
         </h3>
 
@@ -571,7 +571,7 @@ export default function AuthSettingsTab() {
                   <button
                     onClick={handleSaveTemplates}
                     disabled={tplSaving}
-                    className="px-4 py-1.5 text-xs rounded-lg bg-primary-500 hover:bg-primary-400 disabled:opacity-30 text-white font-medium transition-colors"
+                    className="px-4 py-1.5 text-xs rounded-lg bg-primary-500 hover:bg-primary-600 disabled:opacity-30 text-white font-medium transition-colors"
                   >
                     {tplSaving ? t('common.saving') : t('admin.emailTemplatesSave')}
                   </button>
@@ -593,7 +593,7 @@ export default function AuthSettingsTab() {
                 </p>
                 <button
                   onClick={() => setShowPreview(true)}
-                  className="text-xs text-primary-400 hover:text-primary-300 underline underline-offset-2"
+                  className="text-xs text-primary-400 hover:text-primary-500 dark:hover:text-primary-300 underline underline-offset-2"
                 >
                   {t('admin.emailTemplateViewPreview') || '查看预览'}
                 </button>
@@ -664,7 +664,7 @@ export default function AuthSettingsTab() {
       {/* ── 认证设置 ── */}
       <section className="bg-surface border border-border rounded-xl p-5">
         <h3 className="text-sm font-semibold text-textPrimary flex items-center gap-2 mb-4">
-          <Shield size={16} className="text-amber-400" />
+          <Shield size={16} className="text-accent-400" />
           {t('admin.auth')}
         </h3>
 
@@ -674,7 +674,7 @@ export default function AuthSettingsTab() {
             <span className="text-sm text-textPrimary">{t('admin.requireEmailVerification')}</span>
             <p className="text-xs text-textMuted mt-0.5">{t('admin.requireEmailVerificationDesc')}</p>
             {!settings?.smtp_configured && (
-              <p className="text-xs text-amber-400 mt-1">{t('admin.requireEmailVerificationWarning')}</p>
+              <p className="text-xs text-accent-400 mt-1">{t('admin.requireEmailVerificationWarning')}</p>
             )}
           </div>
           <button
@@ -715,7 +715,7 @@ export default function AuthSettingsTab() {
         <button
           onClick={handleSaveAuth}
           disabled={authSaving || providers.length < 1}
-          className="mt-3 px-4 py-2 text-sm rounded-lg bg-primary-500 hover:bg-primary-400 disabled:opacity-30 text-white font-medium transition-colors"
+          className="mt-3 px-4 py-2 text-sm rounded-lg bg-primary-500 hover:bg-primary-600 disabled:opacity-30 text-white font-medium transition-colors"
         >
           {authSaving ? t('common.saving') : t('common.save')}
         </button>

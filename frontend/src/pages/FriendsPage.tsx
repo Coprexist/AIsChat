@@ -350,7 +350,7 @@ export default function FriendsPage() {
                           · {f.status_text}
                         </span>
                       )}
-                      {f.is_priority && <Star size={10} className="text-amber-400 fill-amber-400 shrink-0" />}
+                      {f.is_priority && <Star size={10} className="text-accent-400 fill-accent-400 shrink-0" />}
                       {stateIcon(f.state)}
                     </div>
                     <span className="text-xs text-textMuted">
@@ -392,7 +392,7 @@ export default function FriendsPage() {
                             {req.message || t('friends.defaultRequestMessage')}
                           </span>
                           {req.auto_respond_friend_request && (
-                            <span className="inline-block mt-0.5 text-[10px] text-amber-400 bg-amber-400/10 px-1.5 py-0.5 rounded">
+                            <span className="inline-block mt-0.5 text-[10px] text-accent-400 bg-accent-400/10 px-1.5 py-0.5 rounded">
                               {t('friends.autoRespondWarning')}
                             </span>
                           )}

@@ -381,7 +381,7 @@ export default function LoginPage() {
               <button
                 type="submit"
                 disabled={loading || (isLogin && loginMethod === 'direct' && (!username || !password)) || (isLogin && loginMethod === 'email_code' && (!email || !code)) || (isRegister && !username)}
-                className="w-full py-2.5 bg-primary-500 hover:bg-primary-400 disabled:opacity-30 disabled:cursor-not-allowed text-white rounded-xl font-semibold text-sm transition-all duration-200 shadow-lg shadow-primary-500/20 hover:shadow-primary-400/30 mt-2"
+                className="w-full py-2.5 bg-primary-500 hover:bg-primary-600 disabled:opacity-30 disabled:cursor-not-allowed text-white rounded-xl font-semibold text-sm transition-all duration-200 shadow-lg shadow-primary-500/20 hover:shadow-primary-400/30 mt-2"
               >
                 {loading ? (
                   <span className="inline-flex items-center gap-2">

@@ -232,7 +232,7 @@ export default function ConversationLogTab() {
               <button
                 onClick={saveConfig}
                 disabled={configSaving}
-                className="flex items-center gap-2 px-4 py-2 rounded-lg bg-primary-500 text-white hover:bg-primary-400 disabled:opacity-40 text-sm font-medium transition-colors"
+                className="flex items-center gap-2 px-4 py-2 rounded-lg bg-primary-500 text-white hover:bg-primary-600 disabled:opacity-40 text-sm font-medium transition-colors"
               >
                 <Save size={14} /> {configSaving ? t('common.saving') : t('admin.saveConfig')}
               </button>
@@ -329,7 +329,7 @@ export default function ConversationLogTab() {
                 <button
                   onClick={saveAgentSettings}
                   disabled={agentSaving}
-                  className="flex items-center gap-2 px-4 py-2 rounded-lg bg-primary-500 text-white hover:bg-primary-400 disabled:opacity-40 text-sm font-medium transition-colors"
+                  className="flex items-center gap-2 px-4 py-2 rounded-lg bg-primary-500 text-white hover:bg-primary-600 disabled:opacity-40 text-sm font-medium transition-colors"
                 >
                   <Save size={14} /> {agentSaving ? t('common.saving') : t('admin.saveSettings')}
                 </button>
@@ -374,7 +374,7 @@ export default function ConversationLogTab() {
             <button
               onClick={loadLogs}
               disabled={!viewAgentId || logsLoading}
-              className="px-4 py-2 rounded-lg bg-primary-500 text-white hover:bg-primary-400 disabled:opacity-40 text-sm font-medium transition-colors shrink-0"
+              className="px-4 py-2 rounded-lg bg-primary-500 text-white hover:bg-primary-600 disabled:opacity-40 text-sm font-medium transition-colors shrink-0"
             >
               {logsLoading ? <Loader2 className="animate-spin" size={14} /> : t('common.load')}
             </button>
@@ -394,7 +394,7 @@ export default function ConversationLogTab() {
                       <div className="flex items-center gap-2">
                         <span className="text-xs font-mono text-textMuted">#{log.id}</span>
                         <span className={`text-xs px-1.5 py-0.5 rounded ${
-                          log.conversation_type === 'group' ? 'bg-blue-400/10 text-blue-400' : 'bg-purple-400/10 text-purple-400'
+                          log.conversation_type === 'group' ? 'bg-blue-400/10 text-blue-400' : 'bg-primary-400/10 text-primary-400'
                         }`}>
                           {log.conversation_type === 'group' ? t('admin.groupChat') : log.conversation_type === 'dm' ? t('admin.directMessage') : log.conversation_type}
                         </span>

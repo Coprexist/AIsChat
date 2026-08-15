@@ -291,7 +291,7 @@ export default function MarketPage() {
       return <span className="inline-flex items-center gap-1 text-[10px] px-1.5 py-0.5 rounded bg-mint-500/15 text-mint-400"><CheckCircle2 size={9} /> 已同步</span>
     }
     if (item.sync_state === 'stale') {
-      return <span className="inline-flex items-center gap-1 text-[10px] px-1.5 py-0.5 rounded bg-amber-500/15 text-amber-400"><RefreshCw size={9} /> 同步过（有改动）</span>
+      return <span className="inline-flex items-center gap-1 text-[10px] px-1.5 py-0.5 rounded bg-accent-500/15 text-accent-400"><RefreshCw size={9} /> 同步过（有改动）</span>
     }
     return null
   }
@@ -399,7 +399,7 @@ export default function MarketPage() {
               <button
                 onClick={() => { doImport(it); setDetail(null) }}
                 disabled={importingId === it.id}
-                className="flex-1 inline-flex items-center justify-center gap-1 text-xs px-3 py-2 rounded-lg bg-primary-500 text-white hover:bg-primary-400 transition-colors disabled:opacity-40"
+                className="flex-1 inline-flex items-center justify-center gap-1 text-xs px-3 py-2 rounded-lg bg-primary-500 text-white hover:bg-primary-600 transition-colors disabled:opacity-40"
               >
                 <Download size={12} /> {importingId === it.id ? '导入中…' : '导入到我的世界'}
               </button>
@@ -408,7 +408,7 @@ export default function MarketPage() {
               <button
                 onClick={() => { doImport(it); setDetail(null) }}
                 disabled={importingId === it.id}
-                className="flex-1 inline-flex items-center justify-center gap-1 text-xs px-3 py-2 rounded-lg bg-primary-500 text-white hover:bg-primary-400 transition-colors disabled:opacity-40"
+                className="flex-1 inline-flex items-center justify-center gap-1 text-xs px-3 py-2 rounded-lg bg-primary-500 text-white hover:bg-primary-600 transition-colors disabled:opacity-40"
               >
                 <Download size={12} /> {importingId === it.id ? '导入中…' : '一键导入'}
               </button>
@@ -425,7 +425,7 @@ export default function MarketPage() {
       <PageHeader title="世界商城" subtitle="本地发布 / GitHub 资源共享" onBack={() => navigate(-1)}>
         <button
           onClick={openPublish}
-          className="inline-flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-lg bg-primary-500 hover:bg-primary-400 text-white transition-colors shrink-0"
+          className="inline-flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-lg bg-primary-500 hover:bg-primary-600 text-white transition-colors shrink-0"
         >
           <Upload size={13} /> 发布世界
         </button>
@@ -456,7 +456,7 @@ export default function MarketPage() {
           {bindState?.bound ? (
             <>
               <span className="text-textSecondary">GitHub：<span className="text-primary-400 font-semibold">@{bindState.username}</span>（同步以你的身份推送）</span>
-              <button onClick={() => navigate('/me?bind=github')} className="ml-auto text-[10px] text-primary-400 hover:text-primary-300 transition-colors shrink-0">更换</button>
+              <button onClick={() => navigate('/me?bind=github')} className="ml-auto text-[10px] text-primary-400 hover:text-primary-500 dark:hover:text-primary-300 transition-colors shrink-0">更换</button>
               <button onClick={doUnbind} className="inline-flex items-center gap-1 text-[10px] px-2 py-1 rounded bg-elevated text-textMuted hover:text-rose-400 transition-colors shrink-0">
                 <Unlink size={10} /> 解绑
               </button>
@@ -525,7 +525,7 @@ export default function MarketPage() {
             </>
           )}
         </div>
-        {msg && <div className="text-xs text-amber-400 mt-2">{msg}</div>}
+        {msg && <div className="text-xs text-accent-400 mt-2">{msg}</div>}
       </div>
 
       {/* 列表 */}
@@ -593,7 +593,7 @@ export default function MarketPage() {
                     <span className="text-[10px] text-textMuted space-x-2">
                       <span>本地 {item.downloads} 次导入</span>
                       {item.github_downloads != null && <span>云端 {item.github_downloads} 次</span>}
-                      {item.sync_state === 'stale' && <span className="text-amber-400/80">云端 {fmtDate(item.github_updated_at)}</span>}
+                      {item.sync_state === 'stale' && <span className="text-accent-400/80">云端 {fmtDate(item.github_updated_at)}</span>}
                     </span>
                     {myId !== null && item.author_id === myId && (
                       <button
@@ -741,7 +741,7 @@ export default function MarketPage() {
             <button
               onClick={doEdit}
               disabled={editing}
-              className="w-full py-2 text-sm bg-primary-500 hover:bg-primary-400 text-white rounded-lg transition-colors disabled:opacity-40"
+              className="w-full py-2 text-sm bg-primary-500 hover:bg-primary-600 text-white rounded-lg transition-colors disabled:opacity-40"
             >
               {editing ? '保存中…' : '保存'}
             </button>

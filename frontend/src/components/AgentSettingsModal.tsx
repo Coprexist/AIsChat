@@ -94,8 +94,8 @@ const PRESET_DEFAULTS: Record<string, Record<string, any>> = {
 
 const PROFILE_OPTIONS = [
   { value: 'chat', label: 'agentDetail.profileChat', desc: 'agentDetail.profileChatDesc', color: 'bg-blue-500/10 text-blue-400 border-blue-400/30' },
-  { value: 'immersive', label: 'agentDetail.profileImmersive', desc: 'agentDetail.profileImmersiveDesc', color: 'bg-amber-500/10 text-amber-400 border-amber-400/30' },
-  { value: 'digital_life', label: 'agentDetail.profileDigitalLife', desc: 'agentDetail.profileDigitalLifeDesc', color: 'bg-violet-500/10 text-violet-400 border-violet-400/30' },
+  { value: 'immersive', label: 'agentDetail.profileImmersive', desc: 'agentDetail.profileImmersiveDesc', color: 'bg-accent-500/10 text-accent-400 border-accent-400/30' },
+  { value: 'digital_life', label: 'agentDetail.profileDigitalLife', desc: 'agentDetail.profileDigitalLifeDesc', color: 'bg-primary-500/10 text-primary-400 border-primary-400/30' },
 ]
 
 /** API Key 获取链接 */
@@ -107,7 +107,7 @@ function ApiKeyGetLink({ providers }: { providers?: ProviderItem[] }) {
       href={defaultProvider.api_key_url}
       target="_blank"
       rel="noopener noreferrer"
-      className="text-[10px] text-primary-400 hover:text-primary-300 underline underline-offset-2 font-normal"
+      className="text-[10px] text-primary-400 hover:text-primary-500 dark:hover:text-primary-300 underline underline-offset-2 font-normal"
     >
       获取 API Key →
     </a>
@@ -756,7 +756,7 @@ export default function AgentSettingsModal({
                       placeholder={t('modal.detailSettingsRedeemPlaceholder')} />
                   </div>
                   <button onClick={handleRedeem} disabled={redeeming || !redeemCode.trim()}
-                    className="flex items-center gap-1 px-4 py-2 rounded-lg bg-primary-500 text-white text-sm font-medium hover:bg-primary-400 disabled:opacity-40 transition-colors shrink-0"
+                    className="flex items-center gap-1 px-4 py-2 rounded-lg bg-primary-500 text-white text-sm font-medium hover:bg-primary-600 disabled:opacity-40 transition-colors shrink-0"
                   >
                     {redeeming ? <Loader2 size={14} className="animate-spin" /> : <span>{t('me.redeem')}</span>}
                   </button>
@@ -794,7 +794,7 @@ export default function AgentSettingsModal({
             {t('common.cancel')}
           </button>
           <button onClick={handleSave} disabled={saving}
-            className="flex-1 py-2.5 text-sm bg-primary-500 text-white rounded-xl hover:bg-primary-400 font-medium transition-all shadow-lg shadow-primary-500/20 disabled:opacity-50"
+            className="flex-1 py-2.5 text-sm bg-primary-500 text-white rounded-xl hover:bg-primary-600 font-medium transition-all shadow-lg shadow-primary-500/20 disabled:opacity-50"
           >
             {saving ? <Loader2 size={16} className="animate-spin mx-auto" /> : t('common.save')}
           </button>
