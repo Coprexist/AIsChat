@@ -6,6 +6,7 @@ import { AuthProvider } from './context/AuthContext'
 import { ThemeProvider } from './context/ThemeContext'
 import { I18nProvider } from './i18n/I18nContext'
 import ErrorBoundary from './components/ErrorBoundary'
+import { ConfirmDialogHost } from './components/ui'
 import { setupDemo } from './demo/demoSetup'
 import './index.css'
 import 'katex/dist/katex.min.css'
@@ -27,6 +28,7 @@ if (isDemo) {
           <AuthProvider>
             <I18nProvider>
               <RouterProvider router={demoRouter} />
+              <ConfirmDialogHost />
             </I18nProvider>
           </AuthProvider>
         </ThemeProvider>
@@ -41,6 +43,7 @@ if (isDemo) {
           <AuthProvider>
             <I18nProvider>
               <RouterProvider router={router} />
+              <ConfirmDialogHost />
             </I18nProvider>
           </AuthProvider>
         </ThemeProvider>

@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { Loader2, Check, X, RotateCcw, Settings2, Brain, Plug } from 'lucide-react'
 import { api } from '../api/client'
 import { useT } from '../i18n/I18nContext'
+import { Button, Card, Select } from './ui'
 
 /**
  * 通用配置组卡片（管理员图形化修改任意配置组）
@@ -128,13 +129,11 @@ export default function ConfigGroupCard({ groupKey }: { groupKey: string }) {
   const secretPlaceholder = tr('secretPlaceholder')
 
   return (
-    <section className="bg-surface border border-border rounded-xl p-5 space-y-4">
-      <h3 className="text-sm font-semibold text-textPrimary flex items-center gap-2">
-        <Icon size={16} className="text-accent-400" />
-        {tr(group.label_key)}
-      </h3>
-      {group.hint_key && <p className="text-xs text-textMuted">{tr(group.hint_key)}</p>}
-
+    <Card
+      title={tr(group.label_key)}
+      icon={<Icon size={16} className="text-accent-400" />}
+      hint={group.hint_key ? tr(group.hint_key) : undefined}
+    >
       {/* 字段表单（按 schema 自动渲染） */}
       {Object.entries(group.fields as Record<string, any>).map(([key, field]) => (
         <div key={key}>
@@ -151,15 +150,14 @@ export default function ConfigGroupCard({ groupKey }: { groupKey: string }) {
           </label>
 
           {field.type === 'select' ? (
-            <select
+            <Select
               value={values[key] ?? ''}
               onChange={(e) => setValues({ ...values, [key]: e.target.value })}
-              className="w-full px-3.5 py-2.5 rounded-xl border border-border bg-canvas text-sm text-textPrimary"
-            >
-              {(field.options || []).map((opt: any) => (
-                <option key={opt.value} value={opt.value}>{tr(opt.label_key)}</option>
-              ))}
-            </select>
+              options={(field.options || []).map((opt: any) => ({
+                value: opt.value,
+                label: tr(opt.label_key),
+              }))}
+            />
           ) : field.type === 'number' || field.type === 'float' ? (
             <input
               type="number"
@@ -200,35 +198,26 @@ export default function ConfigGroupCard({ groupKey }: { groupKey: string }) {
         </p>
       )}
 
-      {/* 操作按钮 */}
+      {/* 操作按钮（统一 Button 组件） */}
       <div className="flex items-center gap-2 pt-1">
         {groupKey === 'embedding' && (
-          <button
-            onClick={handleTest}
-            disabled={saving}
-            className="px-4 py-2.5 rounded-xl border border-border text-sm text-textSecondary hover:bg-canvas disabled:opacity-50"
-          >
-            <Plug size={14} className="inline mr-1" />
+          <Button variant="outline" onClick={handleTest} disabled={saving} icon={<Plug size={14} />}>
             {tr('test')}
-          </button>
+          </Button>
         )}
-        <button
+        <Button
+          variant="accent"
           onClick={handleSave}
           disabled={saving}
-          className="flex-1 flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl bg-accent-500 hover:bg-accent-600 text-white text-sm font-medium disabled:opacity-50"
+          loading={saving}
+          className="flex-1"
         >
-          {saving ? <Loader2 size={16} className="animate-spin" /> : saved ? <Check size={16} /> : null}
           {saved ? tr('saved') : tr('save')}
-        </button>
-        <button
-          onClick={handleReset}
-          disabled={saving}
-          className="px-4 py-2.5 rounded-xl border border-border text-sm text-textSecondary hover:bg-canvas disabled:opacity-50"
-          title={tr('reset')}
-        >
+        </Button>
+        <Button variant="outline" onClick={handleReset} disabled={saving} title={tr('reset')}>
           <RotateCcw size={16} />
-        </button>
+        </Button>
       </div>
-    </section>
+    </Card>
   )
 }
