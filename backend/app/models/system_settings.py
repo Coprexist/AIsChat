@@ -1,4 +1,4 @@
-﻿"""
+"""
 平台全局系统设置 — 单行表（id=1）
 """
 from sqlalchemy import Column, Integer, String, Boolean, DateTime, ForeignKey, func
@@ -31,6 +31,9 @@ class SystemSettings(Base):
 
     # v0.2.0 LLM 厂商配置
     provider_config = Column(json_column(), nullable=True, comment="LLM 厂商预设：{provider, base_url, chat_model, work_model, embedding_model, model_options}")
+    # v0.3.6 Embedding 提供方配置（DB 覆盖 env，管理员前端可视化修改）
+    # 结构: {backend, base_url, api_key_encrypted, model, dimension, enabled}
+    embedding_config = Column(json_column(), nullable=True, comment="Embedding 提供方配置（覆盖 EMBEDDING_* 环境变量）")
     require_email_verification = Column(Boolean, default=False, comment="注册是否必须验证邮箱（默认关闭）")
     login_providers = Column(json_column(), default=lambda: ["direct"], comment="可用登录方式: direct/email_code/wechat/qq")
     registration_enabled = Column(Boolean, default=True, comment="是否开放注册通道（默认开启）")

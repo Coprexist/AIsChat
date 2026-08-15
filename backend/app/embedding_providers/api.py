@@ -23,16 +23,32 @@ class OpenAICompatProvider(EmbeddingProvider):
 
     def __init__(
         self,
-        base_url: str,
-        model: str,
-        api_key: str = "",
+        base_url: str | None = None,
+        model: str | None = None,
+        api_key: str | None = None,
         timeout: float = 30.0,
     ):
-        self.base_url = (base_url or "").rstrip("/")
-        self.model = model
-        self.api_key = api_key or ""
+        # 支持显式传入（测试用）；默认从 settings 动态读取（含 DB 覆盖，热更新）
+        self._base_url = base_url
+        self._model = model
+        self._api_key = api_key
         self.timeout = timeout
         self._dimension: int | None = None
+
+    @property
+    def base_url(self) -> str:
+        from app.config import settings as _s
+        return (self._base_url or _s.embedding_base_url or "").rstrip("/")
+
+    @property
+    def model(self) -> str:
+        from app.config import settings as _s
+        return self._model or _s.embedding_model or "text-embedding-3-small"
+
+    @property
+    def api_key(self) -> str:
+        from app.config import settings as _s
+        return self._api_key if self._api_key is not None else (_s.embedding_api_key or "")
 
     def _embeddings_url(self) -> str:
         # 接受 "https://host/v1" 或完整 "/v1/embeddings" 路径

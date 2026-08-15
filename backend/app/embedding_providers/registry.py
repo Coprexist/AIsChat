@@ -3,17 +3,26 @@ Embedding 提供方注册表（Registry）
 
 按 settings.embedding_backend 选择当前生效的 Provider。
 新增提供方只需在 PROVIDERS 里登记——业务代码零改动（同 db_providers）。
+
+热更新支持：Provider 的 base_url/model/api_key 从 settings 动态读取
+（settings 已接入 DBConfigSource，DB 覆盖 env），保存配置后无需重启，
+下次 embed 自动用新配置。
 """
 
 import logging
 
-from app.config import settings
 from app.embedding_providers.base import EmbeddingProvider
 
 logger = logging.getLogger(__name__)
 
 # 已注册的 Provider（按名登记，懒加载）
 _PROVIDERS: dict[str, EmbeddingProvider] = {}
+
+
+def _current_settings():
+    """动态获取当前 settings（每次读取最新引用，支持 DB 覆盖热更新）"""
+    from app.config import settings
+    return settings
 
 
 def _register_all() -> None:
@@ -25,30 +34,22 @@ def _register_all() -> None:
     from app.embedding_providers.local import LocalProvider
     from app.embedding_providers.disabled import disabled_provider
 
-    # 按后端补默认模型（配置未显式指定时）
-    base_url = settings.embedding_base_url
-    model = settings.embedding_model
-
-    _PROVIDERS["ollama"] = OllamaProvider(
-        base_url=base_url or "http://127.0.0.1:11434",
-        model=model or "nomic-embed-text",
-    )
-    _PROVIDERS["api"] = OpenAICompatProvider(
-        base_url=base_url,
-        model=model or "text-embedding-3-small",
-        api_key=settings.embedding_api_key,
-    )
-    _PROVIDERS["local"] = LocalProvider(model=model or "BAAI/bge-small-zh-v1.5")
+    # Provider 实例只做一次注册；其 base_url/model/api_key 在 embed() 时
+    # 通过 self.settings 动态读取（含 DB 覆盖），支持运行时热更新。
+    _PROVIDERS["ollama"] = OllamaProvider()
+    _PROVIDERS["api"] = OpenAICompatProvider()
+    _PROVIDERS["local"] = LocalProvider()
     _PROVIDERS["disabled"] = disabled_provider
 
 
 def get_embedding_provider(name: str | None = None) -> EmbeddingProvider:
     """获取当前生效的 Embedding Provider。
 
-    未指定 name 时按 settings.embedding_backend 选择；
+    未指定 name 时按 settings.embedding_backend 选择（DB 覆盖 > env > 默认）；
     未知后端回退到 disabled（纯文本检索）并告警。
     """
     _register_all()
+    settings = _current_settings()
     selected = (name or settings.embedding_backend or "disabled").lower()
     provider = _PROVIDERS.get(selected)
     if provider is None:

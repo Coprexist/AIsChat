@@ -19,12 +19,25 @@ class OllamaProvider(EmbeddingProvider):
     name = "ollama"
     requires_service = True
 
-    def __init__(self, base_url: str, model: str, timeout: float = 30.0):
-        self.base_url = (base_url or "").rstrip("/")
-        self.model = model
+    def __init__(self, base_url: str | None = None, model: str | None = None,
+                 timeout: float = 30.0):
+        # 支持显式传入（测试用）；默认从 settings 动态读取（含 DB 覆盖，热更新）
+        self._base_url = base_url
+        self._model = model
         self.timeout = timeout
         # 首次成功 embed 后缓存维度
         self._dimension: int | None = None
+
+    @property
+    def base_url(self) -> str:
+        from app.config import settings as _s
+        return (self._base_url or _s.embedding_base_url or
+                "http://127.0.0.1:11434").rstrip("/")
+
+    @property
+    def model(self) -> str:
+        from app.config import settings as _s
+        return self._model or _s.embedding_model or "nomic-embed-text"
 
     def _embeddings_url(self) -> str:
         return f"{self.base_url}/api/embeddings"

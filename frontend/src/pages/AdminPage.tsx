@@ -20,6 +20,7 @@ import PluginManager from '../components/PluginManager'
 import MaintenanceMsgEditor from '../components/MaintenanceMsgEditor'
 import CleanupTab from '../components/CleanupTab'
 import MarketGithubTab from '../components/MarketGithubTab'
+import EmbeddingConfigCard from '../components/EmbeddingConfigCard'
 
 type Tab = 'overview' | 'users' | 'agents' | 'groups' | 'codes' | 'logs' | 'opencli' | 'backup' | 'federation' | 'convlog' | 'usage' | 'metrics' | 'apipool' | 'system' | 'prompt' | 'tools' | 'auth' | 'plugins' | 'cleanup' | 'market'
 type TabCategory = string
@@ -1867,6 +1868,9 @@ function SystemSettingsTab() {
           ))}
         </select>
       </div>
+
+      {/* Embedding 向量配置（管理员图形化修改，DB 覆盖 env） */}
+      <EmbeddingConfigCard />
 
       {/* 平台赠送额度 */}
       <div>

@@ -152,6 +152,29 @@ class Settings(BaseSettings):
         env_file = ".env"
         extra = "allow"
 
+    @classmethod
+    def settings_customise_sources(
+        cls,
+        settings_cls,
+        init_settings,
+        env_settings,
+        dotenv_settings,
+        file_secret_settings,
+    ):
+        """配置分层：init > DB 覆盖 > env > dotenv > secrets（pydantic-settings 官方机制）
+
+        DB 覆盖来自 system_settings（管理员前端图形化修改），
+        未覆盖的字段自动落到 env/默认——两种部署方式兼容。
+        """
+        from app.db_config_source import DBConfigSource
+        return (
+            init_settings,
+            DBConfigSource(settings_cls),
+            env_settings,
+            dotenv_settings,
+            file_secret_settings,
+        )
+
 
 settings = Settings()
 

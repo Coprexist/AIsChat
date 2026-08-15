@@ -17,12 +17,13 @@ logger = logging.getLogger(__name__)
 # 延迟加载的 fastembed 实例（单例，避免重复加载模型）
 _TextEmbedding = None
 _embedder_instance = None
+_embedder_model = None
 
 
 def _get_embedder(model: str):
-    """懒加载 fastembed.TextEmbedding（同步，仅首次慢）"""
-    global _TextEmbedding, _embedder_instance
-    if _embedder_instance is not None:
+    """懒加载 fastembed.TextEmbedding（同步，仅首次慢）；换模型时重载"""
+    global _TextEmbedding, _embedder_instance, _embedder_model
+    if _embedder_instance is not None and _embedder_model == model:
         return _embedder_instance
     try:
         from fastembed import TextEmbedding
@@ -35,6 +36,7 @@ def _get_embedder(model: str):
     _TextEmbedding = TextEmbedding
     try:
         _embedder_instance = TextEmbedding(model_name=model)
+        _embedder_model = model
         logger.info(f"[embedding:local] fastembed 加载完成: {model}")
     except Exception as e:
         logger.warning(f"[embedding:local] 模型加载失败: {e}")
@@ -46,9 +48,14 @@ class LocalProvider(EmbeddingProvider):
     name = "local"
     requires_service = False
 
-    def __init__(self, model: str = "BAAI/bge-small-zh-v1.5"):
-        self.model = model
+    def __init__(self, model: str | None = None):
+        self._model = model
         self._dimension: int | None = None
+
+    @property
+    def model(self) -> str:
+        from app.config import settings as _s
+        return self._model or _s.embedding_model or "BAAI/bge-small-zh-v1.5"
 
     def is_available(self) -> bool:
         try:

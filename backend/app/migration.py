@@ -107,6 +107,7 @@ async def run_migrations():
             await _migrate_others_chat_controls(db)  # v0.1.8 对话权限 + 限额控制（必须在 select(Agent) 之前）
             await _migrate_email_verification(db)  # v0.2.0 邮箱认证（必须在 select(Agent) 之前）
             await _migrate_provider_config(db)      # v0.2.0 LLM 厂商预设
+            await _migrate_embedding_config(db)     # v0.3.6 Embedding 提供方配置（DB 覆盖 env）
             await _migrate_smtp_configs_array(db)      # v0.2.0 多 SMTP 容灾：单对象 → 数组
             await _migrate_email_templates(db)          # v0.2.0 自定义邮件模板列
             await _migrate_auto_dnd_fields(db)         # v0.2.0+ 自动免打扰配置字段
@@ -2577,6 +2578,19 @@ async def _migrate_provider_config(db):
         await db.commit()
     else:
         logger.info("  ⏭ system_settings.provider_config 已存在，跳过")
+
+
+async def _migrate_embedding_config(db):
+    """v0.3.6: Embedding 提供方配置 — system_settings 表 +embedding_config JSONB
+
+    管理员前端图形化修改 embedding 配置（DB 覆盖 EMBEDDING_* 环境变量）。
+    """
+    if not await _column_exists(db, "system_settings", "embedding_config"):
+        logger.info("  🧠 添加 system_settings.embedding_config 列")
+        await db.execute(text("ALTER TABLE system_settings ADD COLUMN embedding_config JSONB"))
+        await db.commit()
+    else:
+        logger.info("  ⏭ system_settings.embedding_config 已存在，跳过")
 
 
 async def _migrate_system_user(db):

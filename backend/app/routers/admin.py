@@ -3435,3 +3435,71 @@ async def save_api_doc_sections(
     write_back = bool(body.get("write_back"))
     result = await save_sections(db, items, write_back=write_back)
     return result
+
+
+# ═══════════════════════════════════════════════════════════════
+# Embedding 提供方配置（DB 覆盖 env，前端图形化修改）
+# ═══════════════════════════════════════════════════════════════
+
+from pydantic import BaseModel as _BaseModel  # noqa: E402
+
+
+class EmbeddingConfigBody(_BaseModel):
+    """可前端修改的 embedding 配置（api_key 为明文提交，服务端加密存储）"""
+    embedding_backend: str | None = None
+    embedding_base_url: str | None = None
+    embedding_api_key: str | None = None
+    embedding_model: str | None = None
+    embedding_dimension: int | None = None
+
+
+@router.get("/embedding-config")
+async def get_embedding_config(
+    admin: dict = Depends(require_admin),
+    db: AsyncSession = Depends(get_db),
+):
+    """获取当前生效的 embedding 配置（DB 覆盖 + env 兜底，api_key 脱敏）"""
+    from app.services.infrastructure.embedding_config_service import get_effective_config
+    return await get_effective_config(db)
+
+
+@router.put("/embedding-config")
+async def save_embedding_config(
+    body: EmbeddingConfigBody,
+    admin: dict = Depends(require_admin),
+    db: AsyncSession = Depends(get_db),
+):
+    """保存 embedding 配置（DB 持久化 + 缓存热更新，api_key 加密存储）"""
+    from app.services.infrastructure.embedding_config_service import save_db_config
+    values = body.model_dump(exclude_none=True)
+    try:
+        saved = await save_db_config(db, values)
+    except ValueError as e:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
+    return {"message": "已保存", "config": saved}
+
+
+@router.delete("/embedding-config")
+async def reset_embedding_config(
+    admin: dict = Depends(require_admin),
+    db: AsyncSession = Depends(get_db),
+):
+    """恢复默认：清除 DB 覆盖，回到环境变量配置"""
+    from app.services.infrastructure.embedding_config_service import clear_db_config
+    await clear_db_config(db)
+    return {"message": "已恢复默认（回到环境变量配置）"}
+
+
+@router.post("/embedding-config/test")
+async def test_embedding_config(
+    admin: dict = Depends(require_admin),
+):
+    """测试当前 embedding 配置：实际调一次 embed，返回维度"""
+    from app.embedding_providers import get_embedding_provider
+    provider = get_embedding_provider()
+    if not provider.is_available():
+        raise HTTPException(status_code=400, detail="当前配置不完整（缺 base_url/model）")
+    vec = await provider.embed("连接测试")
+    if not vec:
+        raise HTTPException(status_code=502, detail="Embedding 调用失败，请检查端点/模型/密钥")
+    return {"dimension": len(vec), "provider": provider.name}
