@@ -59,6 +59,7 @@ async def load_db_config(db: AsyncSession) -> None:
         except Exception as e:
             logger.warning(f"解密 embedding api_key 失败: {e}")
     set_db_overrides(cfg)
+    _refresh_settings()  # 重建 settings 实例，让 DB 覆盖对全局读取生效（启动加载路径）
     logger.info(f"🗄️ 已从 DB 加载 embedding 配置覆盖: {list(cfg.keys())}")
 
 
