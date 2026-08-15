@@ -6,6 +6,7 @@
 
 import type { Lang } from './languages'
 import { toolZh, toolEn, toolJa } from './tool'
+import { adminConfigZh, adminConfigEn, adminConfigJa } from './admin_config'
 
 export type TranslationDict = Record<string, string | Record<string, unknown>>
 
@@ -1099,7 +1100,7 @@ const zh: TranslationDict = {
   // ======================== 管理员 - 维护模式 / 概览 ========================
   'admin.maintenanceMode': '维护模式',
   'admin.maintenanceStatusPaused': '🔒 暂停服务',
-  'admin.maintenanceStatusTip': '⚠️ 维护提示',
+  'admin.maintenanceStatusTip': '维护提示',
   'admin.maintenanceStatusNormal': '正常',
   'admin.maintenanceResumeService': '恢复服务',
   'admin.maintenancePauseService': '暂停服务',
@@ -2697,7 +2698,7 @@ const en: TranslationDict = {
   // ======================== Admin - Maintenance / Overview ========================
   'admin.maintenanceMode': 'Maintenance Mode',
   'admin.maintenanceStatusPaused': '🔒 Service Paused',
-  'admin.maintenanceStatusTip': '⚠️ Maintenance Notice',
+  'admin.maintenanceStatusTip': 'Maintenance Notice',
   'admin.maintenanceStatusNormal': 'Normal',
   'admin.maintenanceResumeService': 'Resume Service',
   'admin.maintenancePauseService': 'Pause Service',
@@ -4459,7 +4460,7 @@ const ja: TranslationDict = {
   // ======================== 管理者 - メンテナンス / 概要 ========================
   'admin.maintenanceMode': 'メンテナンスモード',
   'admin.maintenanceStatusPaused': '🔒 サービス停止中',
-  'admin.maintenanceStatusTip': '⚠️ メンテナンス通知',
+  'admin.maintenanceStatusTip': 'メンテナンス通知',
   'admin.maintenanceStatusNormal': '正常',
   'admin.maintenanceResumeService': 'サービス再開',
   'admin.maintenancePauseService': 'サービス停止',
@@ -5355,9 +5356,9 @@ const ja: TranslationDict = {
 };
 
 export const translations: Record<Lang, NamespacedDict> = {
-  zh: { common: zh, tool: toolZh },
-  en: { common: en, tool: toolEn },
-  ja: { common: ja, tool: toolJa },
+  zh: { common: zh, tool: toolZh, adminConfig: adminConfigZh },
+  en: { common: en, tool: toolEn, adminConfig: adminConfigEn },
+  ja: { common: ja, tool: toolJa, adminConfig: adminConfigJa },
 }
 
 /** 插值：'正在{name}…' + { name: '读取文件' } → '正在读取文件…' */

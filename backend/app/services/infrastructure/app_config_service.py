@@ -47,39 +47,40 @@ def _refresh_settings() -> None:
 FIELD_TYPES = ("select", "number", "float", "text", "secret", "boolean")
 
 #: 说明文案用「」包裹中文引号，避免与 Python 字符串界定符冲突
+#: 字段的 label/hint 下发 i18n key（前端 t() 翻译，多语言友好）
 CONFIG_GROUPS: dict[str, dict] = {
     # ── Embedding 提供方配置（已上线）──
     "embedding": {
         "column": "embedding_config",
-        "label": "Embedding 向量配置",
-        "hint": "控制 AI 记忆的「语义搜索」能力。改这里不需要懂代码——选一个后端、填地址、保存即可。",
+        "label_key": "configGroup.embeddingLabel",
+        "hint_key": "configGroup.embeddingHint",
         "fields": {
             "embedding_backend": {
                 "type": "select",
-                "label": "后端类型",
-                "hint": "选择用谁来生成「向量」（记忆搜索的钥匙）。不启用 = 只用文字匹配，记忆功能正常但搜得没那么准。",
+                "label_key": "configGroup.embeddingBackend",
+                "hint_key": "configGroup.embeddingBackendHint",
                 "options": [
-                    {"value": "disabled", "label": "不启用（纯文本检索）"},
-                    {"value": "ollama", "label": "Ollama（本地）"},
-                    {"value": "api", "label": "OpenAI 兼容 API"},
-                    {"value": "local", "label": "本地模型（fastembed）"},
+                    {"value": "disabled", "label_key": "configGroup.backendDisabled"},
+                    {"value": "ollama", "label_key": "configGroup.backendOllama"},
+                    {"value": "api", "label_key": "configGroup.backendApi"},
+                    {"value": "local", "label_key": "configGroup.backendLocal"},
                 ],
             },
             "embedding_base_url": {
-                "type": "text", "label": "API 地址 (Base URL)",
-                "hint": "向量服务在哪。Ollama 填 http://127.0.0.1:11434（本机）；用厂商 API 填 https://地址/v1。",
+                "type": "text", "label_key": "configGroup.embeddingBaseUrl",
+                "hint_key": "configGroup.embeddingBaseUrlHint",
             },
             "embedding_api_key": {
-                "type": "secret", "label": "API Key",
-                "hint": "只有用「OpenAI 兼容 API」才需要。Ollama 和本地模型不用填。密钥加密保存，不会明文显示。",
+                "type": "secret", "label_key": "configGroup.embeddingApiKey",
+                "hint_key": "configGroup.embeddingApiKeyHint",
             },
             "embedding_model": {
-                "type": "text", "label": "模型",
-                "hint": "具体用哪个模型。Ollama 常用 nomic-embed-text；不知道填什么就留空用默认。",
+                "type": "text", "label_key": "configGroup.embeddingModel",
+                "hint_key": "configGroup.embeddingModelHint",
             },
             "embedding_dimension": {
-                "type": "number", "label": "向量维度",
-                "hint": "数字越大搜得越准、越占空间；越小越快越省。需与模型匹配（nomic-embed-text=768）。改这里一般不用动。",
+                "type": "number", "label_key": "configGroup.embeddingDimension",
+                "hint_key": "configGroup.embeddingDimensionHint",
             },
         },
         "encrypted": ["embedding_api_key"],  # 加密存储的字段（缓存里放明文）
@@ -87,32 +88,35 @@ CONFIG_GROUPS: dict[str, dict] = {
     # ── 运行时参数（第二批：检索调参 + 时区 + 摘要 TTL）──
     "runtime": {
         "column": "runtime_config",
-        "label": "运行时参数",
-        "hint": "调整 AI 检索记忆和展示时间的细节。这些是「锦上添花」的选项，不调也完全能用。",
+        "label_key": "configGroup.runtimeLabel",
+        "hint_key": "configGroup.runtimeHint",
         "fields": {
             "default_top_k": {
-                "type": "number", "label": "默认检索条数 (top_k)",
-                "hint": "AI 每次从记忆里翻出几条来参考。条数多 = 参考更全面但更费 token；少 = 更快更省。",
+                "type": "number", "label_key": "configGroup.topK",
+                "hint_key": "configGroup.topKHint",
             },
             "vector_weight": {
-                "type": "float", "label": "向量权重", "step": 0.05, "min": 0, "max": 1,
-                "hint": "检索时「意思相近」的结果占多大比重。调高 = 更看重语义相似。",
+                "type": "float", "label_key": "configGroup.vectorWeight",
+                "step": 0.05, "min": 0, "max": 1,
+                "hint_key": "configGroup.vectorWeightHint",
             },
             "bm25_weight": {
-                "type": "float", "label": "BM25 权重", "step": 0.05, "min": 0, "max": 1,
-                "hint": "检索时「字面相同」的结果占多大比重。调高 = 更看重关键词完全一致。",
+                "type": "float", "label_key": "configGroup.bm25Weight",
+                "step": 0.05, "min": 0, "max": 1,
+                "hint_key": "configGroup.bm25WeightHint",
             },
             "time_decay_weight": {
-                "type": "float", "label": "时间衰减权重", "step": 0.05, "min": 0, "max": 1,
-                "hint": "最近的记忆占多大比重。调高 = 更优先最近的事。",
+                "type": "float", "label_key": "configGroup.timeDecayWeight",
+                "step": 0.05, "min": 0, "max": 1,
+                "hint_key": "configGroup.timeDecayWeightHint",
             },
             "display_timezone": {
-                "type": "text", "label": "显示时区",
-                "hint": "AI 看到的时间用哪个时区，如 Asia/Shanghai（中国）或 UTC。",
+                "type": "text", "label_key": "configGroup.displayTimezone",
+                "hint_key": "configGroup.displayTimezoneHint",
             },
             "summary_cache_ttl": {
-                "type": "number", "label": "摘要缓存 TTL（秒）",
-                "hint": "对话摘要缓存多久。600 = 10 分钟。调大省 token，调小更实时。",
+                "type": "number", "label_key": "configGroup.summaryCacheTtl",
+                "hint_key": "configGroup.summaryCacheTtlHint",
             },
         },
         "encrypted": [],

@@ -3519,7 +3519,8 @@ async def list_config_groups(
         "groups": [
             {
                 "key": key,
-                "label": schema["label"],
+                "label_key": schema.get("label_key", ""),
+                "hint_key": schema.get("hint_key", ""),
                 "fields": schema["fields"],
             }
             for key, schema in CONFIG_GROUPS.items()
