@@ -1,5 +1,5 @@
 """
-recall_memory 工具 — AI 检索相关记忆（向量搜索 + 文本关键词回退）
+recall_memory 工具 — AI 检索相关记忆（关键词优先 + 向量补位，对齐 dsh-mneme）
 """
 import logging
 from sqlalchemy import text
@@ -25,6 +25,10 @@ class RecallMemory(ToolPlugin):
 
     async def execute(self, db: AsyncSession, agent_id: int, group_id: int | None,
                       arguments: dict, context: dict) -> dict:
+        from app.services.memory.memory_service import (
+            _text_search_memories,
+            merge_keyword_and_vector,
+        )
         from app.utils.embedding import get_embedding
 
         query = arguments["query"]
@@ -35,10 +39,16 @@ class RecallMemory(ToolPlugin):
         api_key = context.get("api_key")
         api_base = context.get("api_base_url", "https://api.deepseek.com")
 
-        memories: list[dict] = []
-        embedding_failed = False
+        # ═══ 第一轮：关键词搜索（总是执行，字面词命中优先） ═══
+        keyword_memories = await _text_search_memories(
+            db, agent_id, query, top_k=top_k,
+            group_id=mem_group_id if scope == "group" else None,
+            scope=scope,
+        )
 
-        # ═══ 第一轮：向量搜索 ═══
+        # ═══ 第二轮：向量补位（可用时） ═══
+        vector_memories: list[dict] = []
+        embedding_failed = False
         try:
             query_embedding = await get_embedding(query, api_base_url=api_base, api_key=api_key)
             embedding_str = f"[{','.join(map(str, query_embedding))}]"
@@ -64,7 +74,7 @@ class RecallMemory(ToolPlugin):
 
             result = await db.execute(sql, params)
             for row in result:
-                memories.append({
+                vector_memories.append({
                     "id": row.id, "title": row.title, "scope": row.scope,
                     "similarity": round(float(row.similarity), 4) if row.similarity else None,
                     "content": (row.content[:200] + "...") if row.content and len(row.content) > 200
@@ -72,31 +82,18 @@ class RecallMemory(ToolPlugin):
                     "source": "vector",
                 })
         except Exception as e:
-            logger.warning(f"recall_memory 向量搜索失败，回退到文本搜索: {e}")
+            logger.warning(f"recall_memory 向量搜索失败（仅用关键词结果）: {e}")
             embedding_failed = True
 
-        # ═══ 第二轮：文本关键词回退 ═══
-        if embedding_failed or not memories:
-            from app.services.memory.memory_service import _text_search_memories
-            text_results = await _text_search_memories(
-                db, agent_id, query, top_k=top_k,
-                group_id=mem_group_id if scope == "group" else None,
-                scope=scope,
-            )
-            vector_ids = {m["id"] for m in memories}
-            for tr in text_results:
-                if tr["id"] not in vector_ids:
-                    tr["similarity"] = None
-                    tr["content"] = (tr["content"][:200] + "...") if len(tr.get("content", "") or "") > 200 else (tr.get("content", "") or "")
-                    tr["source"] = "text"
-                    memories.append(tr)
+        # ═══ 合并：关键词优先 + 向量补位（去重、回填向量分） ═══
+        memories, mode = merge_keyword_and_vector(keyword_memories, vector_memories, top_k)
 
         if not memories:
             extra = "（Embedding API 不可用，已尝试关键词搜索）" if embedding_failed else ""
             return {"memories": [], "message": f"未找到相关记忆{extra}"}
 
-        result = {"memories": memories}
-        if embedding_failed:
+        result = {"memories": memories, "mode": mode}
+        if mode == "keyword" and embedding_failed:
             result["notice"] = "⚠️ Embedding API 当前不可用，以上结果为关键词文本匹配（非向量语义搜索）。记忆功能正常但精度略降。"
         return result
 

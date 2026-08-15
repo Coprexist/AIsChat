@@ -157,14 +157,9 @@ async def _hybrid_search_text_fallback(
     无向量相似度，纯文本匹配排序——保证功能可用，向量精度由 P1 的
     sqlite-vec 补齐。
     """
-    # 提取关键词（复用 memory_service 的分词策略）
-    import re
-    parts = [query_text.strip()]
-    tokens = re.split(r'[,，。！？、\s\n.!?;；：:()（）""''""【】\[\]]+', query_text)
-    for t in tokens:
-        t = t.strip()
-        if len(t) >= 1 and t not in parts:
-            parts.append(t)
+    # 提取关键词（复用 memory_service 的 ngram 分词策略，中文友好）
+    from app.services.memory.memory_service import extract_keywords
+    parts = extract_keywords(query_text)
 
     conditions = []
     params: dict = {}

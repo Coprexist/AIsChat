@@ -10,6 +10,96 @@ from sqlalchemy import text
 logger = logging.getLogger(__name__)
 
 
+def merge_keyword_and_vector(
+    keyword_results: list[dict],
+    vector_results: list[dict],
+    top_k: int,
+) -> tuple[list[dict], str]:
+    """
+    关键词命中优先 + 向量补位合并（对齐 dsh-mneme 的搜索哲学）。
+
+    - 关键词结果【总是】排最前：它们是用户查询的字面词，精确命中优先级最高
+    - 向量结果填剩余槽位（按相似度排序），与关键词结果去重
+    - 返回 (合并结果, mode)；mode 用于元信息展示：
+      "keyword" = 仅关键词（向量不可用/失败/未启用）
+      "vector"  = 关键词 + 向量补位（两者共存）
+
+    设计说明：向量是"增强"而非"替代"——字面词命中不因语义分数略低而丢失。
+    """
+    merged: list[dict] = []
+    seen: set[int] = set()
+
+    # 1. 关键词命中优先（用户的字面词）
+    for m in keyword_results:
+        if len(merged) >= top_k:
+            break
+        if m["id"] not in seen:
+            seen.add(m["id"])
+            m["source"] = "text"
+            # 关键词结果无向量分；若同一记忆有向量分，保留它（合并时回填）
+            m.setdefault("similarity", None)
+            merged.append(m)
+
+    # 2. 向量补位（去重）
+    for m in vector_results:
+        if len(merged) >= top_k:
+            break
+        if m["id"] not in seen:
+            seen.add(m["id"])
+            m["source"] = "vector"
+            merged.append(m)
+
+    # 3. 同一条记忆既命中关键词又命中向量 → 回填真实向量分（O(n) dict 查找）
+    vec_by_id = {m["id"]: m for m in vector_results}
+    for m in merged:
+        if m["source"] == "text" and m["id"] in vec_by_id:
+            m["similarity"] = vec_by_id[m["id"]].get("similarity", m.get("similarity"))
+
+    mode = "vector" if vector_results else "keyword"
+    return merged, mode
+
+
+def extract_keywords(query: str, max_parts: int = 8) -> list[str]:
+    """
+    中文友好的关键词提取（ngram 滑窗）。
+
+    策略（修复中文无分词时整段 LIKE 失效的问题）：
+    1. 按中英文标点/空格拆成片段
+    2. 长度 ≤ 2 的短片段原样保留（英文词 / 双字中文词）
+    3. 纯英文/数字/混合片段：不 ngram，原样保留（BAAI → BAAI，不做 BA/AA 碎片）
+    4. 长中文片段：整段 + 2~3 字 ngram 滑窗（「化学掌握情况」→ 化学/掌握/情况）
+    5. 去重、去单字噪音、截断到 max_parts
+
+    无第三方依赖（不引 jieba），SQLite/PG 通用。
+    """
+    parts: list[str] = []
+    tokens = re.split(r'[,，。！？、\s\n.!?;；：:()（）""''""【】\[\]]+', query)
+    for t in tokens:
+        t = t.strip()
+        if not t:
+            continue
+        if len(t) <= 2:
+            # 短片段直接保留（英文词 / 双字中文词）
+            if t not in parts:
+                parts.append(t)
+            continue
+        if t.isascii():
+            # 纯英文/数字/混合：本身就是词，不 ngram
+            if t not in parts:
+                parts.append(t)
+            continue
+        # 长中文片段：整段 + 2-gram 滑窗（3-gram 对 LIKE 召回贡献小，砍掉）
+        if t not in parts:
+            parts.append(t)
+        for i in range(len(t) - 1):
+            gram = t[i:i + 2]
+            if gram not in parts:
+                parts.append(gram)
+    # 去单字噪音（单个中文字符命中价值低，且会拖慢 LIKE）
+    filtered = [p for p in parts if len(p) >= 2 or p.isascii()]
+    return filtered[:max_parts]
+
+
 async def _text_search_memories(
     db: AsyncSession,
     agent_id: int,
@@ -23,11 +113,8 @@ async def _text_search_memories(
     """
     文本关键词回退搜索（当 embedding 不可用或记忆向量为 NULL 时使用）。
 
-    使用 PostgreSQL ILIKE 进行全文模糊匹配，支持中英文混合关键词。
-    关键词提取策略：
-    1. 全文作为整体匹配
-    2. 按中英文标点/空格拆分后的各个片段
-    3. 取长度 ≥ 1 的片段去重
+    使用 LIKE 全文模糊匹配，支持中英文混合关键词。
+    关键词提取：extract_keywords() — 标点拆分 + ngram 滑窗（中文友好）。
 
     scope 参数：
     - None：检索私有 + 群共享（auto-injection 用）
@@ -37,14 +124,8 @@ async def _text_search_memories(
     v0.1.3: user_id 过滤 — 通用/半通用 AI 仅检索该用户的记忆，
     共振 AI 检索 user_id IS NULL（全部记忆）。
     """
-    # 提取关键词：全文 + 拆分片段
-    parts = [query.strip()]
-    # 按中英文标点和空格拆分
-    tokens = re.split(r'[,，。！？、\s\n.!?;；：:()（）""''""【】\[\]]+', query)
-    for t in tokens:
-        t = t.strip()
-        if len(t) >= 1 and t not in parts:
-            parts.append(t)
+    # 提取关键词：标点拆分 + ngram 滑窗（中文友好）
+    parts = extract_keywords(query)
 
     # 构建 LIKE 条件（取前 8 个关键词避免 SQL 过长）
     # 用 LOWER() 包裹实现大小写不敏感（PostgreSQL ILIKE 的通用替代，SQLite 亦兼容）
@@ -90,14 +171,19 @@ async def _text_search_memories(
 
     where_clause = " AND ".join(where_parts)
 
+    # 排序：标题命中优先（对齐 dsh-mneme），再按时间倒序
+    # kw0 = 整段查询词，title LIKE 命中排最前（用户/AI 的原文词在标题里 = 高相关）
     sql = text(f"""
         SELECT rm.id, rm.title, rm.scope, 0.0 AS similarity, dm.content
         FROM rough_memories rm
         LEFT JOIN detail_memories dm ON dm.rough_id = rm.id
         WHERE {where_clause}
-        ORDER BY rm.created_at DESC
+        ORDER BY
+            CASE WHEN LOWER(rm.title) LIKE LOWER(:kw0) THEN 0 ELSE 1 END,
+            rm.created_at DESC
         LIMIT :top_k
     """)
+    params["kw0"] = f"%{parts[0]}%"
     params["top_k"] = top_k
 
     result = await db.execute(sql, params)
@@ -131,30 +217,36 @@ async def recall_relevant_memories(
     ai_type: str = "resonance",
 ) -> list[dict]:
     """
-    检索与当前对话相关的记忆（向量相似度搜索 + 文本关键词回退）。
+    检索与当前对话相关的记忆（关键词优先 + 向量补位，对齐 dsh-mneme）。
 
     检索范围：
     - 该 AI 的私有记忆（scope='private'）
     - 群共享记忆（scope='group'，群内任何 AI 存储的）
 
-    策略：
-    1. 优先向量搜索（按余弦相似度排序）
-    2. 向量搜索失败或无结果时，自动回退到文本 ILIKE 搜索
-    3. 文本搜索可以找到 embedding=NULL 的记忆
+    策略（v0.1.9 对齐 dsh-mneme 合并哲学）：
+    1. 关键词命中【总是】计算（ILIKE，可命中 embedding=NULL 的记忆）→ 排最前
+    2. 向量搜索可用时，结果去重后补位剩余槽位（按相似度排序）
+    3. 向量不可用/失败 → 仅关键词结果（无感降级）
 
     v0.1.3: user_id + ai_type 参数支持 per-user 记忆隔离。
     共振 AI 检索所有记忆（user_id IS NULL），
     通用/半通用 AI 仅检索该用户的记忆。
 
-    返回: [{id, title, content, scope, similarity}]
+    返回: [{id, title, content, scope, similarity, source}]
     """
     from app.utils.embedding import get_embedding
     from app.db_providers import get_provider
 
     provider = get_provider()
-    memories: list[dict] = []
 
-    # ═══ 第一轮：向量搜索（仅当后端支持 SQL 内向量运算，如 pgvector） ═══
+    # ═══ 第一轮：关键词搜索（总是执行，字面词命中优先） ═══
+    keyword_memories = await _text_search_memories(
+        db, agent_id, query, top_k=top_k, group_id=group_id,
+        user_id=user_id, ai_type=ai_type,
+    )
+
+    # ═══ 第二轮：向量补位（仅当后端支持 SQL 向量运算） ═══
+    vector_memories: list[dict] = []
     if provider.supports_sql_vector_search:
         try:
             query_embedding = await get_embedding(query, api_base_url=api_base_url, api_key=api_key)
@@ -222,30 +314,23 @@ async def recall_relevant_memories(
                 result = await db.execute(sql, params)
 
             for row in result:
-                memories.append({
+                vector_memories.append({
                     "id": row.id,
                     "title": row.title,
                     "scope": row.scope,
                     "similarity": round(float(row.similarity), 4),
                     "content": row.content or "",
+                    "source": "vector",
                 })
 
-            if memories:
-                logger.info(f"🔍 向量搜索为 AI agent_id={agent_id} 找到 {len(memories)} 条相关记忆")
+            if vector_memories:
+                logger.info(f"🔍 向量补位为 AI agent_id={agent_id} 找到 {len(vector_memories)} 条相关记忆")
 
         except Exception as e:
-            logger.warning(f"记忆检索向量化失败，回退到文本搜索: {e}")
-    else:
-        logger.debug(
-            f"存储后端 {provider.name} 不支持 SQL 向量检索，直接使用文本搜索"
-        )
+            logger.warning(f"记忆检索向量化失败（仅用关键词结果）: {e}")
 
-    # ═══ 第二轮：文本关键词回退（向量搜索为空或失败时） ═══
-    if not memories:
-        memories = await _text_search_memories(
-            db, agent_id, query, top_k=top_k, group_id=group_id,
-            user_id=user_id, ai_type=ai_type,
-        )
+    # ═══ 合并：关键词优先 + 向量补位 ═══
+    memories, _mode = merge_keyword_and_vector(keyword_memories, vector_memories, top_k)
 
     return memories
 
