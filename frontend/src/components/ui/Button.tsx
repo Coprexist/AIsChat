@@ -36,9 +36,10 @@ const VARIANT_CLASSES: Record<Variant, string> = {
 }
 
 const SIZE_CLASSES: Record<Size, string> = {
-  sm: 'px-2.5 py-1.5 text-xs rounded-lg gap-1.5',
-  md: 'px-4 py-2.5 text-sm rounded-xl gap-2',
-  lg: 'px-5 py-3 text-base rounded-xl gap-2',
+  // 固定高度 h-* + leading-none：有/无图标、任何图标尺寸都严格等高
+  sm: 'h-8 px-3 text-xs rounded-lg gap-1.5 leading-none',
+  md: 'h-10 px-4 text-sm rounded-xl gap-2 leading-none',
+  lg: 'h-12 px-5 text-base rounded-xl gap-2 leading-none',
 }
 
 export default function Button({
