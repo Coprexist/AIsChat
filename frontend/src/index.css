@@ -446,7 +446,7 @@
   align-items: center;
   justify-content: center;
   font-weight: 500;
-  border-radius: 0.75rem; /* rounded-xl */
+  border-radius: 0.5rem; /* rounded-lg —— 更利落，对齐群视界顶部按钮 */
   transition: background-color .15s ease, color .15s ease, border-color .15s ease;
   white-space: nowrap;
   cursor: pointer;
