@@ -8,7 +8,6 @@ import asyncio
 import asyncpg
 import os
 import sys
-import re
 
 
 # ═══════════════════════════════════════════════════════════════
@@ -100,31 +99,14 @@ MIGRATIONS: list[tuple[str, str]] = [
 # 纯函数：解析连接信息
 # ═══════════════════════════════════════════════════════════════
 
-def parse_db_url(url: str) -> dict[str, str | int]:
-    """解析 postgresql://user:pass@host:port/dbname → 连接参数字典（纯函数）"""
-    m = re.match(r'postgresql(?:://|\+asyncpg://)([^:]+):([^@]+)@([^:]+):(\d+)/(.+)', url)
-    if not m:
-        raise ValueError(f"无法解析数据库 URL: {url}")
-    return {
-        "user": m.group(1),
-        "password": m.group(2),
-        "host": m.group(3),
-        "port": int(m.group(4)),
-        "database": m.group(5),
-    }
+# 向量表清单 / 维度查询 / URL 解析集中在 scripts/_shared.py
+# （与 migrate_embedding_dimension.py 共用，避免重复实现）
+from scripts._shared import VECTOR_TABLES, get_embedding_dim, parse_db_url  # noqa: E402
 
 
 # ═══════════════════════════════════════════════════════════════
 # 编排器
 # ═══════════════════════════════════════════════════════════════
-
-# 含向量列的 4 张表（维度对齐的目标）
-VECTOR_TABLES = [
-    "rough_memories",
-    "detail_memories",
-    "world_ai_memories",
-    "group_message_embeddings",
-]
 
 
 async def _align_embedding_dimension(conn) -> None:
@@ -136,9 +118,9 @@ async def _align_embedding_dimension(conn) -> None:
 
     策略：
     - 配置维度 = 列维度 → 跳过
-    - 配置维度 ≠ 列维度 且 表为空 → 自动 ALTER（毫秒级，零数据风险）
-    - 配置维度 ≠ 列维度 且 表有数据 → 跳过 + 明确告警
-      （有数据需先清理/重生成向量，避免静默失败）
+    - 配置维度 ≠ 列维度 且 无向量数据 → 自动 ALTER（毫秒级，零数据风险）
+    - 配置维度 ≠ 列维度 且 已有向量数据 → 跳过 + 明确告警
+      （有向量数据需用 scripts/migrate_embedding_dimension.py 安全迁移）
     - SQLite 后端（URL 非 postgresql）→ 跳过（JsonVectorType 维度无关）
     """
     target = os.getenv("EMBEDDING_DIMENSION", "1536")
@@ -151,31 +133,19 @@ async def _align_embedding_dimension(conn) -> None:
         print(f"  ⚠️ EMBEDDING_DIMENSION 非法值 '{target}'，跳过维度对齐")
         return
 
-    for table in VECTOR_TABLES:
+    for t in VECTOR_TABLES:
+        table = t["table"]
         try:
-            row = await conn.fetchrow(
-                "SELECT format_type(a.atttypid, a.atttypmod) AS t "
-                "FROM pg_attribute a JOIN pg_class c ON a.attrelid = c.oid "
-                "WHERE c.relname = $1 AND a.attname = 'embedding'",
-                table,
-            )
+            cur_dim = await get_embedding_dim(conn, table)
         except Exception as e:
             print(f"  ⚠️ {table} 查询列类型失败: {e}")
             continue
-        if not row or not row["t"]:
+        if cur_dim is None:
             continue  # 表/列不存在（SQLite 或未建表）
-
-        cur = row["t"]
-        m = re.search(r'vector\((\d+)\)', cur)
-        if not m:
-            print(f"  ℹ️ {table}.embedding 非 vector 列（{cur}），跳过")
-            continue
-        cur_dim = int(m.group(1))
         if cur_dim == dim:
             continue
 
-        # 维度不一致：检查表是否为空 / 是否全部无向量
-        # （embedding 全 NULL 时 ALTER 同样零风险——没有数据需要维度转换）
+        # 维度不一致：检查是否无向量数据（NULL 时 ALTER 零风险）
         try:
             cnt = await conn.fetchval(f"SELECT count(*) FROM {table}")
             with_vec = await conn.fetchval(
@@ -194,7 +164,8 @@ async def _align_embedding_dimension(conn) -> None:
             print(
                 f"  ⚠️ {table}.embedding 维度 vector({cur_dim}) ≠ 配置 {dim}，"
                 f"且已有 {with_vec} 条带向量数据——跳过。"
-                f"请重新生成向量后重启，或调整 EMBEDDING_DIMENSION"
+                f"请用 scripts/migrate_embedding_dimension.py 安全迁移，"
+                f"或调整 EMBEDDING_DIMENSION"
             )
 
 
