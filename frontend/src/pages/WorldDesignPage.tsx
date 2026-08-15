@@ -868,7 +868,7 @@ export default function WorldDesignPage() {
       {/* 接口文档查看（程序员用）——手机全屏，桌面居中双栏 */}
       {docsOpen && (
         <div className="fixed inset-0 z-[60] bg-black/60 flex items-end md:items-center justify-center" onClick={() => setDocsOpen(false)}>
-          <div className="w-full md:max-w-4xl bg-surface border-t md:border border-border md:rounded-2xl rounded-none h-full md:h-auto md:max-h-[85vh] flex flex-col shadow-xl" onClick={(e) => e.stopPropagation()}>
+          <div className="w-full md:max-w-4xl bg-surface border-t md:border border-border md:rounded-2xl rounded-none h-[92dvh] md:h-auto md:max-h-[85vh] flex flex-col shadow-xl overflow-hidden" onClick={(e) => e.stopPropagation()}>
             <div className="flex items-center justify-between px-4 py-3 border-b border-border shrink-0">
               <div className="flex items-center gap-2 min-w-0">
                 <BookOpen size={15} className="text-primary-400 shrink-0" />
@@ -892,7 +892,7 @@ export default function WorldDesignPage() {
                 ))}
               </div>
               {/* 内容 */}
-              <div className="flex-1 flex flex-col min-w-0">
+              <div className="flex-1 flex flex-col min-w-0 min-h-0">
                 <div className="flex items-center gap-2 px-4 py-2 border-b border-border shrink-0 flex-wrap">
                   <span className="text-xs text-textSecondary truncate flex-1 min-w-0">
                     {docsSections.find((s) => s.id === docsActive)?.title || '接口文档'}
