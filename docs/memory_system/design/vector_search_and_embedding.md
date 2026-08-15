@@ -150,6 +150,28 @@ DB 覆盖（前端图形化修改） > 环境变量（.env） > 代码默认值�
 | DELETE | `/admin/embedding-config` | 恢复默认 |
 | POST | `/admin/embedding-config/test` | 测试连接 |
 
+### 4.4 通用配置组机制（加配置 = 加声明）
+
+「前端图形化改配置」已泛化为**多配置组机制**（`app_config_service.py`）：
+
+```
+CONFIG_GROUPS = {
+    "embedding": { "column": "embedding_config", "fields": {...} },  # 已上线
+    "runtime":   { "column": "runtime_config",   "fields": {...} },  # 检索参数/时区/摘要 TTL
+}
+```
+
+- 每个组 = `system_settings` 一个 JSONB 列 + 字段 schema 声明
+- **加第三批配置 = 在 CONFIG_GROUPS 加一个声明**，前后端自动支持（零新代码）
+- 通用 API：`GET /admin/configs`（schema）/ `GET|PUT|DELETE /admin/configs/{group}`
+- 通用组件 `ConfigGroupCard`：读 schema 自动渲染表单，**每个字段带"是什么 + 为什么改"说明**（小白友好）
+
+### 4.5 i18n 规范（新增文案必须遵守）
+
+1. **翻译禁 emoji**：`✅❌⚠️` 等不出现在 i18n 字典——图标由前端统一渲染（lucide Check/X/Loader2 + 状态色）
+2. **新增前端文案必须走 i18n**：分区文件（`tool.ts`/`admin_config.ts` 模式）+ 三语 zh/en/ja，禁止硬编码中文
+3. **后端 schema 只下发 i18n key**（`label_key`/`hint_key`），前端 `t()` 翻译
+
 ---
 
 ## 五、记忆检索策略（对齐 dsh-mneme）

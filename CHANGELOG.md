@@ -30,6 +30,20 @@
 - 管理 API：`GET/PUT/DELETE /admin/embedding-config` + `POST test`（实际调 embed 验维度）
 - 前端：系统设置页新增 **Embedding 向量配置卡片**（后端类型/端点/模型/维度表单 + 测试连接 + 保存生效 + 恢复默认）
 
+### Added — ⚙️ 通用配置组机制（第二批前端化：runtime 参数）
+
+- **`app_config_service` 泛化**：多配置组机制——每个组 = `system_settings` 一个 JSONB 列 + schema 声明；**加一组配置 = 加一个声明，前后端自动支持**（CONFIG_GROUPS 注册表）
+- **通用 API**：`GET /admin/configs`（返回 schema）/ `GET|PUT|DELETE /admin/configs/{group}`
+- **新增 runtime 组**（`runtime_config` 列，Alembic `e6f7a8b9c0d2`）：检索参数（default_top_k / vector_weight / bm25_weight / time_decay_weight）+ 显示时区 + 摘要缓存 TTL
+- **前端 ConfigGroupCard**：读 schema 自动渲染表单（select/number/float/text/secret）+ 来源标注（界面改/环境变量）+ 保存热更新 + 恢复默认
+- **小白友好**：每个字段带"是什么 + 为什么改"说明文案；手写 EmbeddingConfigCard 删除，由通用卡片替代（保留测试连接专属能力）
+
+### Changed — 🌐 i18n 规范（翻译禁 emoji，文案走命名空间）
+
+- **新增 `admin_config.ts` 分区**（对齐 tool.ts 模式）：`configGroup.*` 三语 zh/en/ja——UI 按钮/字段标签/说明 hint 全部 i18n 化，禁止硬编码中文
+- **后端 schema 只下发 i18n key**（`label_key`/`hint_key`），前端 `t()` 翻译，多语言友好
+- **翻译禁 emoji**：`✅❌⚠️` 等从字典移除，图标由前端统一渲染（lucide Check/X/Loader2 + 状态色）；清理主字典 3 处历史遗留 emoji
+
 ### Changed — 🔍 记忆检索对齐 dsh-mneme（关键词优先 + 向量补位）
 
 - `merge_keyword_and_vector()`：关键词命中总是排最前（字面词精确性最高）+ 向量结果去重补位；重叠条目回填真实向量分（O(n) dict）；`mode` 元信息（keyword/vector）
