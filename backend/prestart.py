@@ -118,6 +118,86 @@ def parse_db_url(url: str) -> dict[str, str | int]:
 # 编排器
 # ═══════════════════════════════════════════════════════════════
 
+# 含向量列的 4 张表（维度对齐的目标）
+VECTOR_TABLES = [
+    "rough_memories",
+    "detail_memories",
+    "world_ai_memories",
+    "group_message_embeddings",
+]
+
+
+async def _align_embedding_dimension(conn) -> None:
+    """
+    把 PG 向量列维度对齐到 EMBEDDING_DIMENSION（用户自选）。
+
+    背景：pgvector 列维度建表时固定（vector(N)），换 embedding 模型
+    （如 nomic-embed-text=768 / text-embedding-3-small=1536）需改列。
+
+    策略：
+    - 配置维度 = 列维度 → 跳过
+    - 配置维度 ≠ 列维度 且 表为空 → 自动 ALTER（毫秒级，零数据风险）
+    - 配置维度 ≠ 列维度 且 表有数据 → 跳过 + 明确告警
+      （有数据需先清理/重生成向量，避免静默失败）
+    - SQLite 后端（URL 非 postgresql）→ 跳过（JsonVectorType 维度无关）
+    """
+    target = os.getenv("EMBEDDING_DIMENSION", "1536")
+    try:
+        dim = int(target)
+    except ValueError:
+        print(f"  ⚠️ EMBEDDING_DIMENSION 非法值 '{target}'，跳过维度对齐")
+        return
+    if dim <= 0:
+        print(f"  ⚠️ EMBEDDING_DIMENSION 非法值 '{target}'，跳过维度对齐")
+        return
+
+    for table in VECTOR_TABLES:
+        try:
+            row = await conn.fetchrow(
+                "SELECT format_type(a.atttypid, a.atttypmod) AS t "
+                "FROM pg_attribute a JOIN pg_class c ON a.attrelid = c.oid "
+                "WHERE c.relname = $1 AND a.attname = 'embedding'",
+                table,
+            )
+        except Exception as e:
+            print(f"  ⚠️ {table} 查询列类型失败: {e}")
+            continue
+        if not row or not row["t"]:
+            continue  # 表/列不存在（SQLite 或未建表）
+
+        cur = row["t"]
+        m = re.search(r'vector\((\d+)\)', cur)
+        if not m:
+            print(f"  ℹ️ {table}.embedding 非 vector 列（{cur}），跳过")
+            continue
+        cur_dim = int(m.group(1))
+        if cur_dim == dim:
+            continue
+
+        # 维度不一致：检查表是否为空 / 是否全部无向量
+        # （embedding 全 NULL 时 ALTER 同样零风险——没有数据需要维度转换）
+        try:
+            cnt = await conn.fetchval(f"SELECT count(*) FROM {table}")
+            with_vec = await conn.fetchval(
+                f"SELECT count(*) FROM {table} WHERE embedding IS NOT NULL"
+            )
+        except Exception:
+            cnt, with_vec = -1, -1
+
+        if cnt == 0 or with_vec == 0:
+            await conn.execute(
+                f"ALTER TABLE {table} ALTER COLUMN embedding TYPE vector({dim})"
+            )
+            print(f"  ✅ {table}.embedding: vector({cur_dim}) → vector({dim})"
+                  f"（{cnt} 行，无向量数据，自动对齐）")
+        else:
+            print(
+                f"  ⚠️ {table}.embedding 维度 vector({cur_dim}) ≠ 配置 {dim}，"
+                f"且已有 {with_vec} 条带向量数据——跳过。"
+                f"请重新生成向量后重启，或调整 EMBEDDING_DIMENSION"
+            )
+
+
 async def run():
     url = os.getenv("DATABASE_URL") or os.getenv("DATABASE_URL_SYNC", "")
     if not url:
@@ -139,6 +219,9 @@ async def run():
                 print(f"  ✅ {name}")
             except Exception as e:
                 print(f"  ❌ {name} 失败: {e}")
+
+        # ── Embedding 维度对齐（用户自选 EMBEDDING_DIMENSION）──
+        await _align_embedding_dimension(conn)
     finally:
         await conn.close()
 

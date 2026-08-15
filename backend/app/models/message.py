@@ -5,6 +5,7 @@ from sqlalchemy import (
     Column, Integer, String, Boolean, Text, DateTime, ForeignKey, func,
     CheckConstraint,
 )
+from app.config import settings
 from app.db_providers import vector_column, json_column
 from app.database import Base
 
@@ -52,6 +53,6 @@ class GroupMessageEmbedding(Base):
     group_id = Column(Integer, ForeignKey("groups.id", ondelete="CASCADE"), nullable=False)
     message_id = Column(Integer, ForeignKey("messages.id", ondelete="CASCADE"), nullable=False)
     content = Column(Text, nullable=False)
-    embedding = Column(vector_column(1536))  # 嵌入向量，维度运行时自动检测
+    embedding = Column(vector_column(settings.embedding_dimension))  # 嵌入向量，维度随配置
     created_at = Column(DateTime, server_default=func.now())
     metadata_ = Column("metadata", json_column())

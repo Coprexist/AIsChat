@@ -7,6 +7,7 @@
 from sqlalchemy import (
     Column, Integer, String, Text, DateTime, Float, Boolean, ForeignKey, UniqueConstraint, func, Index, text,
 )
+from app.config import settings
 from app.db_providers import vector_column, json_column
 from app.database import Base
 
@@ -157,7 +158,7 @@ class WorldAIMemory(Base):
     world_id = Column(Integer, ForeignKey("worlds.id", ondelete="CASCADE"), nullable=False, comment="所属世界")
     title = Column(String(200), nullable=False, comment="记忆标题（简短概括）")
     content = Column(Text, nullable=False, comment="记忆详细内容")
-    embedding = Column(vector_column(1536), nullable=True, comment="内容向量（检索用，维度与主站一致）")
+    embedding = Column(vector_column(settings.embedding_dimension), nullable=True, comment="内容向量（检索用，维度随配置）")
 
     created_at = Column(DateTime, server_default=func.now())
     updated_at = Column(DateTime, server_default=func.now(), onupdate=func.now())

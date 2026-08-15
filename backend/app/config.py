@@ -52,6 +52,11 @@ class Settings(BaseSettings):
     embedding_api_key: str = os.getenv("EMBEDDING_API_KEY", "")
     # 模型：ollama 默认 nomic-embed-text；local 默认 bge-small-zh；api 需显式指定
     embedding_model: str = os.getenv("EMBEDDING_MODEL", "")
+    # 向量维度（用户自选：存储速度 vs 检索质量的取舍）
+    #   - 与模型匹配：nomic-embed-text=768 / text-embedding-3-small=1536 / bge-large-zh=1024
+    #   - 默认 1536（兼容现状）；prestart 启动时自动把 PG 列对齐到此值（表空毫秒级）
+    #   - SQLite 后端忽略（JsonVectorType 存 JSON 数组，维度无关）
+    embedding_dimension: int = int(os.getenv("EMBEDDING_DIMENSION", "1536"))
     # 旧配置兼容别名（显式直连自定义端点时使用的模型名）
     default_embedding_model: str = os.getenv(
         "EMBEDDING_MODEL", "text-embedding-3-small"
