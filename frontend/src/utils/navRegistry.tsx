@@ -8,8 +8,7 @@
  *   import { mainNavItems, type NavItem } from '../utils/navRegistry'
  */
 import type { LucideIcon } from 'lucide-react'
-import { MessageCircle, Users, Bot, User } from 'lucide-react'
-import { Globe, Store } from 'lucide-react'
+import { MessageCircle, Users, Bot, User, Globe } from 'lucide-react'
 
 export interface NavItem {
   /** 路由路径 */
@@ -30,13 +29,12 @@ export interface NavItem {
  * 主导航项（显示在 Sidebar 和 MobileNav 底部标签栏）
  *
  * 添加新导航项只需在数组中追加一项。
- * 注意：MobileNav 只显示前 4 项（底部标签栏空间有限）。
- * 如需在 MobileNav 中显示更多，需修改 MobileNav 组件布局。
+ * 注意：世界商城（/market）不在主导航——入口在世界列表页内，
+ * 避免侧边栏/手机底部占用主要位置。
  */
 export const mainNavItems: NavItem[] = [
   { path: '/chat', i18nKey: 'nav.chat', icon: MessageCircle, matchSubPaths: true },
   { path: '/worlds', i18nKey: 'nav.worlds', icon: Globe },
-  { path: '/market', i18nKey: 'nav.market', icon: Store },
   { path: '/friends', i18nKey: 'nav.friends', icon: Users },
   { path: '/agents', i18nKey: 'nav.ai', icon: Bot },
   { path: '/me', i18nKey: 'nav.me', icon: User },

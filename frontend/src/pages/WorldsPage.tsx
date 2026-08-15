@@ -92,7 +92,7 @@ export default function WorldsPage() {
       </PageHeader>
 
       <div className="flex-1 overflow-y-auto">
-        <div className="max-w-3xl mx-auto p-6">
+        <div className="max-w-3xl mx-auto p-4 sm:p-6">
           {msg && <div className="text-sm text-amber-400 mb-4">{msg}</div>}
 
           {showCreate && (
@@ -123,20 +123,21 @@ export default function WorldsPage() {
 
           <div className="space-y-3">
             {worlds.map((w) => (
-              <div key={w.id} className="bg-surface border border-border rounded-lg p-4 flex items-center gap-4 hover:border-primary-500/40 transition-colors">
+              <div key={w.id} className="bg-surface border border-border rounded-lg p-4 flex flex-col sm:flex-row sm:items-center gap-3 sm:gap-4 hover:border-primary-500/40 transition-colors">
                 <div className="flex-1 min-w-0">
-                  <div className="flex items-center gap-2">
+                  <div className="flex items-center gap-2 flex-wrap">
                     <span className="font-medium text-textPrimary truncate">{w.name}</span>
                     <span className={`text-[10px] px-2 py-0.5 rounded-full shrink-0 ${w.status === 'active' ? 'bg-green-500/20 text-green-400' : 'bg-elevated text-textMuted'}`}>
                       {w.status === 'active' ? '活跃' : '休眠'}
                     </span>
                   </div>
                   {w.description && <div className="text-xs text-textSecondary truncate mt-0.5">{w.description}</div>}
-                  <div className="text-[10px] text-textMuted mt-1">
+                  <div className="text-[10px] text-textMuted mt-1 truncate">
                     入口: {w.bindings?.length ? w.bindings.map((b) => `${b.entity_type}#${b.entity_id}`).join(', ') : '未绑定'}
                   </div>
                 </div>
-                <div className="flex items-center gap-2 shrink-0">
+                {/* 操作按钮：手机上换行成两行，桌面保持一行横排 */}
+                <div className="flex items-center gap-2 shrink-0 flex-wrap">
                   <button onClick={() => openBindModal(w, 'group')} className="text-xs px-3 py-1.5 bg-elevated hover:bg-border text-textSecondary rounded transition-colors">绑定群</button>
                   <button onClick={() => openBindModal(w, 'agent')} className="text-xs px-3 py-1.5 bg-elevated hover:bg-border text-textSecondary rounded transition-colors">绑定 AI</button>
                   <button onClick={() => toggleStatus(w)} className="text-xs px-3 py-1.5 bg-elevated hover:bg-border text-textSecondary rounded transition-colors">
