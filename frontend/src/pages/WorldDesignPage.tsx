@@ -865,50 +865,50 @@ export default function WorldDesignPage() {
         </div>
       </div>}
 
-      {/* 接口文档查看（程序员用） */}
+      {/* 接口文档查看（程序员用）——手机全屏，桌面居中双栏 */}
       {docsOpen && (
-        <div className="fixed inset-0 z-[60] bg-black/60 flex items-center justify-center p-4" onClick={() => setDocsOpen(false)}>
-          <div className="w-full max-w-4xl bg-surface border border-border rounded-2xl max-h-[85vh] flex flex-col shadow-xl" onClick={(e) => e.stopPropagation()}>
+        <div className="fixed inset-0 z-[60] bg-black/60 flex items-end md:items-center justify-center" onClick={() => setDocsOpen(false)}>
+          <div className="w-full max-w-full md:max-w-4xl bg-surface border-t md:border border-border md:rounded-2xl rounded-none max-h-[92vh] md:max-h-[85vh] flex flex-col shadow-xl" onClick={(e) => e.stopPropagation()}>
             <div className="flex items-center justify-between px-4 py-3 border-b border-border shrink-0">
-              <div className="flex items-center gap-2">
-                <BookOpen size={15} className="text-primary-400" />
-                <span className="text-sm font-semibold text-textPrimary">世界 API 接口文档</span>
-                <span className="text-[10px] text-textMuted">发给世界 AI 的 md（view_api_doc 同源）</span>
+              <div className="flex items-center gap-2 min-w-0">
+                <BookOpen size={15} className="text-primary-400 shrink-0" />
+                <span className="text-sm font-semibold text-textPrimary truncate">世界 API 接口文档</span>
+                <span className="text-[10px] text-textMuted hidden sm:inline">发给世界 AI 的 md（view_api_doc 同源）</span>
               </div>
-              <button onClick={() => setDocsOpen(false)} className="p-1 text-textMuted hover:text-textPrimary transition-colors" title="关闭"><X size={16} /></button>
+              <button onClick={() => setDocsOpen(false)} className="p-1 text-textMuted hover:text-textPrimary transition-colors shrink-0" title="关闭"><X size={16} /></button>
             </div>
-            <div className="flex flex-1 min-h-0">
-              {/* 分区列表 */}
-              <div className="w-52 shrink-0 border-r border-border overflow-y-auto p-2 space-y-1">
+            <div className="flex flex-1 min-h-0 flex-col md:flex-row">
+              {/* 分区列表：手机顶部横向滚动条，桌面左侧栏 */}
+              <div className="shrink-0 md:w-52 md:border-r md:border-border overflow-x-auto md:overflow-y-auto p-2 space-y-1 flex md:flex-col gap-1">
                 {docsSections.map((sec) => (
                   <button
                     key={sec.id}
                     onClick={() => selectDoc(sec.id)}
-                    className={`w-full text-left px-2.5 py-2 rounded-lg transition-colors ${docsActive === sec.id ? 'bg-primary-500/15 text-primary-300' : 'hover:bg-elevated text-textSecondary'}`}
+                    className={`md:w-full text-left px-2.5 py-2 rounded-lg transition-colors shrink-0 md:shrink md:flex-1 ${docsActive === sec.id ? 'bg-primary-500/15 text-primary-300' : 'hover:bg-elevated text-textSecondary'}`}
                   >
-                    <div className="text-xs font-medium">{sec.id} {sec.title}</div>
-                    <div className="text-[10px] text-textMuted line-clamp-2 mt-0.5">{sec.intro}</div>
+                    <div className="text-xs font-medium whitespace-nowrap md:whitespace-normal">{sec.id} {sec.title}</div>
+                    <div className="text-[10px] text-textMuted line-clamp-2 mt-0.5 hidden md:block">{sec.intro}</div>
                   </button>
                 ))}
               </div>
               {/* 内容 */}
               <div className="flex-1 flex flex-col min-w-0">
-                <div className="flex items-center gap-2 px-4 py-2 border-b border-border shrink-0">
-                  <span className="text-xs text-textSecondary truncate flex-1">
+                <div className="flex items-center gap-2 px-4 py-2 border-b border-border shrink-0 flex-wrap">
+                  <span className="text-xs text-textSecondary truncate flex-1 min-w-0">
                     {docsSections.find((s) => s.id === docsActive)?.title || '接口文档'}
                   </span>
                   <button
                     onClick={() => setDownloadTarget({ scope: 'section', title: '下载此分区' })}
                     disabled={!docsContent || docsLoading}
-                    className="inline-flex items-center gap-1 text-[11px] px-2 py-1 rounded bg-elevated text-textSecondary hover:text-textPrimary transition-colors disabled:opacity-40 shrink-0"
+                    className="btn btn-sm btn-secondary shrink-0"
                   >
-                    <Download size={11} /> 下载此分区
+                    <Download size={12} /> 下载此分区
                   </button>
                   <button
                     onClick={() => setDownloadTarget({ scope: 'all', title: '下载全部' })}
-                    className="inline-flex items-center gap-1 text-[11px] px-2 py-1 rounded bg-elevated text-textSecondary hover:text-textPrimary transition-colors shrink-0"
+                    className="btn btn-sm btn-secondary shrink-0"
                   >
-                    <Download size={11} /> 下载全部
+                    <Download size={12} /> 下载全部
                   </button>
                 </div>
                 <div className="flex-1 overflow-y-auto p-4 min-w-0">
@@ -926,10 +926,10 @@ export default function WorldDesignPage() {
         </div>
       )}
 
-      {/* 下载类型弹窗（md / docx；未装 pandoc 时只 md，管理员看安装提示） */}
+      {/* 下载类型弹窗（md / docx）——手机底部抽屉，桌面居中 */}
       {downloadTarget && (
-        <div className="fixed inset-0 z-[70] bg-black/60 flex items-center justify-center p-4" onClick={() => setDownloadTarget(null)}>
-          <div className="w-full max-w-xs bg-surface border border-border rounded-2xl p-5 shadow-xl" onClick={(e) => e.stopPropagation()}>
+        <div className="fixed inset-0 z-[70] bg-black/60 flex items-end md:items-center justify-center" onClick={() => setDownloadTarget(null)}>
+          <div className="w-full md:max-w-xs bg-surface border-t md:border border-border md:rounded-2xl rounded-none p-5 shadow-xl pb-[max(1.25rem,env(safe-area-inset-bottom))]" onClick={(e) => e.stopPropagation()}>
             <div className="text-sm font-semibold text-textPrimary mb-1">{downloadTarget.title}</div>
             <div className="text-[10px] text-textMuted mb-3">
               {downloadTarget.scope === 'section' ? `当前分区：${docsSections.find((s) => s.id === docsActive)?.title || docsActive || '文档'}` : '全部分区合并'}
@@ -937,14 +937,14 @@ export default function WorldDesignPage() {
             <div className="space-y-2">
               <button
                 onClick={() => doDownload('md')}
-                className="w-full inline-flex items-center justify-center gap-1.5 py-2.5 text-sm bg-elevated hover:bg-border text-textPrimary rounded-xl transition-colors"
+                className="btn btn-md btn-secondary w-full"
               >
                 <FileText size={13} /> 下载 .md
               </button>
               {docxAvailable && (
                 <button
                   onClick={() => doDownload('docx')}
-                  className="w-full inline-flex items-center justify-center gap-1.5 py-2.5 text-sm bg-primary-500 hover:bg-primary-400 text-white rounded-xl transition-colors"
+                  className="btn btn-md btn-primary w-full"
                 >
                   <FileText size={13} /> 下载 .docx（Word）
                 </button>
@@ -955,7 +955,7 @@ export default function WorldDesignPage() {
                 如需下载为 docx（Word），请前往管理页安装 pandoc 插件后重启后端。
               </div>
             )}
-            <button onClick={() => setDownloadTarget(null)} className="w-full mt-3 py-1.5 text-xs text-textMuted hover:text-textPrimary transition-colors">取消</button>
+            <button onClick={() => setDownloadTarget(null)} className="btn btn-md btn-ghost w-full mt-2">取消</button>
           </div>
         </div>
       )}
