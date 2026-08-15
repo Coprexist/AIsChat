@@ -68,7 +68,7 @@ export function ConfirmDialogHost() {
       }
       footer={
         <>
-          <Button variant="outline" onClick={() => resolveAndClose(false)}>
+          <Button variant="secondary" onClick={() => resolveAndClose(false)}>
             {options.cancelText || t('common.cancel') || '取消'}
           </Button>
           <Button variant={options.danger ? 'danger' : 'primary'} onClick={() => resolveAndClose(true)}>

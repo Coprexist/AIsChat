@@ -136,29 +136,29 @@ export default function WorldsPage() {
                     入口: {w.bindings?.length ? w.bindings.map((b) => `${b.entity_type}#${b.entity_id}`).join(', ') : '未绑定'}
                   </div>
                 </div>
-                {/* 操作按钮：固定高度 h-8，任何内容（图标/文字/纯图标）严格等高 */}
+                {/* 操作按钮：统一 .btn .btn-sm 语义类（固定高度严格等高） */}
                 <div className="flex items-center gap-2 shrink-0 flex-wrap">
-                  <button onClick={() => openBindModal(w, 'group')} className="h-8 inline-flex items-center text-xs px-3 bg-elevated hover:bg-border text-textSecondary rounded transition-colors">绑定群</button>
-                  <button onClick={() => openBindModal(w, 'agent')} className="h-8 inline-flex items-center text-xs px-3 bg-elevated hover:bg-border text-textSecondary rounded transition-colors">绑定 AI</button>
-                  <button onClick={() => toggleStatus(w)} className="h-8 inline-flex items-center text-xs px-3 bg-elevated hover:bg-border text-textSecondary rounded transition-colors">
+                  <button onClick={() => openBindModal(w, 'group')} className="btn btn-sm btn-secondary">绑定群</button>
+                  <button onClick={() => openBindModal(w, 'agent')} className="btn btn-sm btn-secondary">绑定 AI</button>
+                  <button onClick={() => toggleStatus(w)} className="btn btn-sm btn-secondary">
                     {w.status === 'active' ? '休眠' : '唤醒'}
                   </button>
                   <button
                     onClick={() => window.open(`/world/${w.id}/preview`, '_blank')}
-                    className="h-8 inline-flex items-center gap-1 text-xs px-3 bg-elevated hover:bg-border text-textSecondary rounded transition-colors"
+                    className="btn btn-sm btn-secondary"
                     title="打开沉浸界面（无需绑定群，只绑定 AI 也能进）"
                   >
                     <Eye size={13} /> 打开
                   </button>
                   <button
                     onClick={() => navigate(`/worlds/${w.id}/design`)}
-                    className="h-8 inline-flex items-center gap-1 text-xs px-3 bg-primary-500 hover:bg-primary-400 text-white rounded transition-colors"
+                    className="btn btn-sm btn-primary"
                   >
                     设计页 <ChevronRight size={13} />
                   </button>
                   <button
                     onClick={() => deleteWorld(w)}
-                    className="h-8 inline-flex items-center justify-center w-8 px-0 bg-elevated border border-red-500/40 text-red-400 rounded hover:bg-red-500/15 transition-colors"
+                    className="btn btn-sm btn-danger !w-8 !px-0"
                     title="删除世界（含文件与数据，不可恢复）"
                   >
                     <Trash2 size={13} />

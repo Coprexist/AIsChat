@@ -201,7 +201,7 @@ export default function ConfigGroupCard({ groupKey }: { groupKey: string }) {
       {/* 操作按钮（统一 Button 组件） */}
       <div className="flex items-center gap-2 pt-1">
         {groupKey === 'embedding' && (
-          <Button variant="outline" onClick={handleTest} disabled={saving} icon={<Plug size={14} />}>
+          <Button variant="secondary" onClick={handleTest} disabled={saving} icon={<Plug size={14} />}>
             {tr('test')}
           </Button>
         )}
@@ -214,7 +214,7 @@ export default function ConfigGroupCard({ groupKey }: { groupKey: string }) {
         >
           {saved ? tr('saved') : tr('save')}
         </Button>
-        <Button variant="outline" onClick={handleReset} disabled={saving} title={tr('reset')}>
+        <Button variant="secondary" onClick={handleReset} disabled={saving} title={tr('reset')}>
           <RotateCcw size={16} />
         </Button>
       </div>
