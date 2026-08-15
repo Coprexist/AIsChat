@@ -3,278 +3,415 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
-<title>AIsChat 主题选色表单</title>
+<title>AIsChat 主题选色</title>
 <style>
+  /* ============ 主站主题变量（与 frontend/src/index.css 同源） ============ */
   :root {
-    --canvas: #f8fafc;
-    --surface: #ffffff;
-    --elevated: #f1f5f9;
-    --border: #cbd5e1;
-    --text: #111827;
-    --text-sec: #4b5563;
-    --text-mut: #6b7280;
-    --primary: #8b5cf6;
-    --primary-deep: #7c3aed;
+    --tw-primary-400: 139 92 246;   /* #8B5CF6 */
+    --tw-primary-500: 139 92 246;   /* #8B5CF6 */
+    --tw-primary-600: 109 40 217;   /* #6D28D9 */
+    --tw-accent-400: 251 191 36;    /* #FBBF24 */
+    --tw-accent-500: 217 119 6;     /* #D97706 */
+    --tw-mint-400: 34 197 94;       /* #22C55E */
+    --tw-mint-500: 5 150 105;       /* #059669 */
+    --tw-rose-400: 232 74 105;      /* #E84A69 */
+    --tw-rose-500: 225 29 72;       /* #E11D48 */
+    /* 结构色（浅色主题） */
+    --tw-canvas: 248 250 252;
+    --tw-surface: 255 255 255;
+    --tw-elevated: 241 245 249;
+    --tw-border: 203 213 225;
+    --tw-text-primary: 17 24 39;
+    --tw-text-secondary: 75 85 99;
+    --tw-text-muted: 107 114 128;
   }
+
   * { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body { height: 100%; }
   body {
     font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC", "Microsoft YaHei", sans-serif;
-    background: var(--canvas);
-    color: var(--text);
-    padding: 20px 16px 60px;
-    line-height: 1.5;
-  }
-  .wrap { max-width: 640px; margin: 0 auto; }
-
-  /* 头部 */
-  .header { margin-bottom: 20px; }
-  .header h1 { font-size: 20px; font-weight: 700; letter-spacing: -0.02em; }
-  .header p { font-size: 13px; color: var(--text-sec); margin-top: 6px; }
-  .header .tip {
-    margin-top: 10px; padding: 10px 12px; border-radius: 10px;
-    background: #f5f3ff; border: 1px solid #ddd6fe; color: #6d28d9; font-size: 12.5px;
+    background: rgb(var(--tw-canvas));
+    color: rgb(var(--tw-text-primary));
+    overflow: hidden;
   }
 
-  /* 预览卡 */
-  .preview {
-    background: var(--surface); border: 1px solid var(--border);
-    border-radius: 14px; padding: 16px; margin-bottom: 18px;
+  .layout { display: flex; height: 100vh; }
+
+  /* ============ 左侧：主站界面预览（固定） ============ */
+  .stage-wrap {
+    flex: 0 0 430px;
+    width: 430px;
+    padding: 18px 16px 18px 20px;
+    display: flex; flex-direction: column;
+    background: rgb(var(--tw-canvas));
+    border-right: 1px solid rgb(var(--tw-border));
+    min-height: 0;
   }
-  .preview-title { font-size: 12px; color: var(--text-mut); font-weight: 600; margin-bottom: 10px; letter-spacing: 0.04em; }
-  .preview-row { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; }
-  .pv-btn {
+  .stage-head { display: flex; align-items: center; gap: 8px; margin-bottom: 12px; }
+  .stage-head .dot { width: 10px; height: 10px; border-radius: 50%; background: rgb(var(--tw-elevated)); border: 1px solid rgb(var(--tw-border)); }
+  .stage-head .title { font-size: 13px; font-weight: 600; color: rgb(var(--tw-text-secondary)); }
+
+  /* 主站界面模拟（手机壳） */
+  .phone {
+    flex: 1; min-height: 0;
+    background: rgb(var(--tw-surface));
+    border: 1px solid rgb(var(--tw-border));
+    border-radius: 18px;
+    box-shadow: 0 8px 30px rgba(0,0,0,0.08);
+    display: flex; flex-direction: column;
+    overflow: hidden;
+  }
+  .bar {
+    display: flex; align-items: center; gap: 8px;
+    padding: 10px 12px;
+    border-bottom: 1px solid rgb(var(--tw-border));
+    background: rgb(var(--tw-surface));
+  }
+  .bar .avatar {
+    width: 28px; height: 28px; border-radius: 50%;
+    background: rgb(var(--tw-primary-500)); color: #fff;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 12px; font-weight: 700;
+  }
+  .bar .name { font-size: 13px; font-weight: 600; }
+  .bar .status { font-size: 10px; color: rgb(var(--tw-mint-400)); display: flex; align-items: center; gap: 3px; }
+  .bar .status::before { content: ""; width: 6px; height: 6px; border-radius: 50%; background: rgb(var(--tw-mint-400)); }
+  .bar .icons { margin-left: auto; display: flex; gap: 6px; }
+  .bar .icon-btn {
+    width: 26px; height: 26px; border-radius: 8px;
+    display: flex; align-items: center; justify-content: center;
+    background: rgb(var(--tw-elevated)); color: rgb(var(--tw-text-secondary));
+    font-size: 12px;
+  }
+  .bar .icon-btn.primary { background: rgb(var(--tw-primary-500)); color: #fff; }
+
+  .msgs { flex: 1; min-height: 0; padding: 12px 10px; overflow: hidden; display: flex; flex-direction: column; gap: 10px; }
+  .msg { max-width: 78%; padding: 7px 11px; border-radius: 12px; font-size: 12px; line-height: 1.45; }
+  .msg.mine { align-self: flex-end; background: rgb(var(--tw-primary-500)); color: #fff; border-bottom-right-radius: 4px; }
+  .msg.other { align-self: flex-start; background: rgb(var(--tw-surface)); color: rgb(var(--tw-text-primary)); border: 1px solid rgb(var(--tw-border)); border-bottom-left-radius: 4px; }
+  .msg.mine .link { color: rgba(255,255,255,0.85); text-decoration: underline; }
+  .msg .inline-code { background: rgba(0,0,0,0.06); border-radius: 4px; padding: 0 4px; font-family: ui-monospace, monospace; font-size: 11px; }
+  .msg.mine .inline-code { background: rgba(255,255,255,0.18); }
+
+  .nav { display: flex; flex-direction: column; gap: 2px; padding: 4px; }
+  .nav-item {
+    display: flex; align-items: center; gap: 8px;
+    padding: 7px 10px; border-radius: 8px;
+    font-size: 12px; color: rgb(var(--tw-text-secondary));
+  }
+  .nav-item .ico {
+    width: 18px; height: 18px; border-radius: 5px;
+    background: rgb(var(--tw-elevated));
+    display: flex; align-items: center; justify-content: center;
+    font-size: 9px;
+  }
+  .nav-item.active { background: rgb(var(--tw-primary-500) / 0.12); color: rgb(var(--tw-primary-500)); font-weight: 600; }
+  .nav-item.active .ico { background: rgb(var(--tw-primary-500)); color: #fff; }
+
+  .btns { display: flex; gap: 6px; padding: 10px 12px; border-top: 1px solid rgb(var(--tw-border)); flex-wrap: wrap; }
+  .b {
     display: inline-flex; align-items: center; justify-content: center;
-    height: 40px; padding: 0 18px; border-radius: 10px; border: none;
-    font-size: 14px; font-weight: 500; color: #fff; cursor: pointer;
+    height: 28px; padding: 0 12px; border-radius: 8px;
+    font-size: 11px; font-weight: 500; cursor: pointer; border: none;
+    transition: background .15s;
   }
-  .pv-btn.secondary {
-    background: var(--elevated); color: var(--text-sec);
-    border: 1px solid var(--border);
-  }
-  .pv-badge {
-    display: inline-flex; align-items: center; height: 24px; padding: 0 10px;
-    border-radius: 999px; font-size: 11px; font-weight: 500;
-  }
-  .pv-text { font-size: 13px; }
-  .pv-text b { color: var(--pv-primary-400); font-weight: 600; }
+  .b.primary { background: rgb(var(--tw-primary-500)); color: #fff; }
+  .b.primary:hover { background: rgb(var(--tw-primary-600)); }
+  .b.accent { background: rgb(var(--tw-accent-400)); color: rgb(var(--tw-text-primary)); }
+  .b.mint { background: rgb(var(--tw-mint-500)); color: #fff; }
+  .b.danger { background: rgb(var(--tw-rose-500)); color: #fff; }
+  .b.secondary { background: rgb(var(--tw-elevated)); color: rgb(var(--tw-text-secondary)); border: 1px solid rgb(var(--tw-border)); }
 
-  /* 分组 */
+  .badges { display: flex; gap: 6px; padding: 2px 12px 0; flex-wrap: wrap; }
+  .badge {
+    display: inline-flex; align-items: center; gap: 4px;
+    height: 20px; padding: 0 8px; border-radius: 999px;
+    font-size: 10px; font-weight: 500;
+  }
+  .badge.p { background: rgb(var(--tw-primary-500) / 0.12); color: rgb(var(--tw-primary-500)); }
+  .badge.a { background: rgb(var(--tw-accent-400) / 0.15); color: rgb(var(--tw-accent-500)); }
+  .badge.m { background: rgb(var(--tw-mint-400) / 0.15); color: rgb(var(--tw-mint-500)); }
+  .badge.r { background: rgb(var(--tw-rose-400) / 0.12); color: rgb(var(--tw-rose-500)); }
+  .badge.solid { color: #fff; }
+  .badge.solid.p { background: rgb(var(--tw-primary-500)); }
+  .badge.solid.a { background: rgb(var(--tw-accent-400)); color: rgb(var(--tw-text-primary)); }
+  .badge.solid.m { background: rgb(var(--tw-mint-500)); }
+  .badge.solid.r { background: rgb(var(--tw-rose-500)); }
+
+  .status-row { display: flex; align-items: center; gap: 12px; padding: 4px 12px; font-size: 11px; color: rgb(var(--tw-text-secondary)); }
+  .status-row .live { color: rgb(var(--tw-mint-400)); display: flex; align-items: center; gap: 4px; }
+  .status-row .live::before { content: ""; width: 7px; height: 7px; border-radius: 50%; background: rgb(var(--tw-mint-400)); }
+  .status-row .dnd { color: rgb(var(--tw-rose-400)); display: flex; align-items: center; gap: 4px; }
+  .status-row .dnd::before { content: ""; width: 7px; height: 7px; border-radius: 50%; background: rgb(var(--tw-rose-400)); }
+
+  .input-row { display: flex; gap: 6px; padding: 8px 12px 10px; border-top: 1px solid rgb(var(--tw-border)); }
+  .input {
+    flex: 1; height: 30px; border-radius: 9px;
+    border: 1px solid rgb(var(--tw-border));
+    background: rgb(var(--tw-canvas));
+    padding: 0 10px; font-size: 11px;
+    color: rgb(var(--tw-text-primary));
+    outline: none;
+  }
+  .input:focus { border-color: rgb(var(--tw-primary-500)); box-shadow: 0 0 0 2px rgb(var(--tw-primary-500) / 0.15); }
+  .send {
+    width: 30px; height: 30px; border-radius: 9px; border: none;
+    background: rgb(var(--tw-primary-500)); color: #fff;
+    display: flex; align-items: center; justify-content: center;
+    cursor: pointer; font-size: 13px;
+  }
+  .send:hover { background: rgb(var(--tw-primary-600)); }
+
+  .meter { padding: 4px 12px 2px; }
+  .meter .track { height: 6px; border-radius: 3px; background: rgb(var(--tw-elevated)); overflow: hidden; }
+  .meter .fill { height: 100%; width: 62%; border-radius: 3px; background: rgb(var(--tw-primary-500)); }
+  .meter .lbl { font-size: 10px; color: rgb(var(--tw-text-muted)); margin-bottom: 3px; }
+
+  .toggles { display: flex; gap: 16px; padding: 6px 12px; align-items: center; font-size: 11px; color: rgb(var(--tw-text-secondary)); }
+  .sw { width: 30px; height: 17px; border-radius: 999px; position: relative; background: rgb(var(--tw-mint-400)); cursor: pointer; }
+  .sw::after { content: ""; position: absolute; top: 2px; right: 2px; width: 13px; height: 13px; border-radius: 50%; background: #fff; }
+  .sw.off { background: rgb(var(--tw-border)); }
+  .sw.off::after { right: auto; left: 2px; }
+
+  /* ============ 右侧：选色面板（滚动） ============ */
+  .panel { flex: 1; min-width: 0; overflow-y: auto; padding: 24px 28px 60px; }
+  .panel-head h1 { font-size: 19px; font-weight: 700; letter-spacing: -0.02em; }
+  .panel-head p { font-size: 13px; color: rgb(var(--tw-text-secondary)); margin-top: 5px; }
+  .panel-head .hint {
+    margin-top: 10px; padding: 9px 12px; border-radius: 10px;
+    background: rgb(var(--tw-primary-500) / 0.07);
+    border: 1px solid rgb(var(--tw-primary-500) / 0.2);
+    color: rgb(var(--tw-primary-600));
+    font-size: 12px; line-height: 1.6;
+  }
+
   .group {
-    background: var(--surface); border: 1px solid var(--border);
-    border-radius: 14px; padding: 16px; margin-bottom: 14px;
+    margin-top: 20px;
+    background: rgb(var(--tw-surface));
+    border: 1px solid rgb(var(--tw-border));
+    border-radius: 14px; padding: 16px;
   }
-  .group-head { display: flex; align-items: baseline; justify-content: space-between; margin-bottom: 4px; }
-  .group-name { font-size: 15px; font-weight: 700; }
-  .group-desc { font-size: 12px; color: var(--text-mut); }
-  .group .current-note { font-size: 11.5px; color: var(--text-mut); margin-top: 2px; margin-bottom: 10px; }
+  .group-name { font-size: 14px; font-weight: 700; display: flex; align-items: center; gap: 8px; }
+  .group-name .swatch-sample { width: 16px; height: 16px; border-radius: 5px; border: 1px solid rgba(0,0,0,0.12); }
+  .group-desc { font-size: 11.5px; color: rgb(var(--tw-text-muted)); margin-top: 2px; }
 
-  .field { margin-top: 12px; }
+  .field { margin-top: 14px; }
   .field-label {
     display: flex; align-items: center; gap: 8px;
-    font-size: 12.5px; font-weight: 600; color: var(--text-sec); margin-bottom: 7px;
+    font-size: 12px; font-weight: 600; color: rgb(var(--tw-text-secondary));
+    margin-bottom: 7px;
   }
   .field-label .now {
-    font-size: 11px; font-weight: 400; color: var(--text-mut);
+    font-size: 10.5px; font-weight: 400; color: rgb(var(--tw-text-muted));
     display: inline-flex; align-items: center; gap: 5px;
+    margin-left: auto;
   }
-  .field-label .now .chip {
-    width: 14px; height: 14px; border-radius: 4px; border: 1px solid rgba(0,0,0,0.15);
-    display: inline-block;
-  }
-  .swatches { display: flex; flex-wrap: wrap; gap: 8px; }
+  .field-label .now .chip { width: 13px; height: 13px; border-radius: 4px; border: 1px solid rgba(0,0,0,0.15); display: inline-block; }
+  .swatches { display: flex; flex-wrap: wrap; gap: 7px; }
   .swatch {
-    width: 46px; height: 46px; border-radius: 10px; cursor: pointer;
+    width: 40px; height: 40px; border-radius: 10px; cursor: pointer;
     border: 2px solid transparent; position: relative;
     transition: transform .12s ease, border-color .12s ease;
     box-shadow: 0 1px 2px rgba(0,0,0,0.08);
   }
-  .swatch:hover { transform: scale(1.08); }
-  .swatch.sel { border-color: #111827; box-shadow: 0 0 0 3px rgba(17,24,39,0.12); }
-  .swatch .hex {
-    position: absolute; bottom: -18px; left: 0; right: 0;
-    text-align: center; font-size: 9.5px; color: var(--text-mut);
+  .swatch:hover { transform: scale(1.1); }
+  .swatch.sel { border-color: rgb(var(--tw-text-primary)); box-shadow: 0 0 0 3px rgb(var(--tw-primary-500) / 0.15); }
+  .swatch .tag {
+    position: absolute; bottom: -15px; left: 0; right: 0;
+    text-align: center; font-size: 8.5px; color: rgb(var(--tw-text-muted));
     font-family: ui-monospace, monospace;
   }
-  .swatch-row { margin-bottom: 26px; }
 
-  /* 深色主题提示 */
-  .dark-note {
-    background: #fefce8; border: 1px solid #fde68a; color: #854d0e;
-    border-radius: 10px; padding: 10px 12px; font-size: 12.5px; margin-bottom: 14px;
-  }
-
-  /* 结果 */
   .result {
-    background: var(--surface); border: 1px solid var(--border);
+    margin-top: 20px;
+    background: rgb(var(--tw-surface));
+    border: 1px solid rgb(var(--tw-border));
     border-radius: 14px; padding: 16px;
   }
   .result textarea {
-    width: 100%; min-height: 160px; border: 1px solid var(--border); border-radius: 10px;
-    padding: 10px; font-family: ui-monospace, monospace; font-size: 12px;
-    resize: vertical; background: var(--canvas); color: var(--text);
+    width: 100%; min-height: 140px; border: 1px solid rgb(var(--tw-border));
+    border-radius: 10px; padding: 10px;
+    font-family: ui-monospace, monospace; font-size: 11.5px;
+    resize: vertical; background: rgb(var(--tw-canvas)); color: rgb(var(--tw-text-primary));
   }
   .result-actions { display: flex; gap: 10px; margin-top: 10px; }
-  .gen-btn {
-    flex: 1; height: 44px; border-radius: 10px; border: none;
-    background: var(--primary); color: #fff; font-size: 14px; font-weight: 600; cursor: pointer;
+  .gen-btn { flex: 1; height: 42px; border-radius: 10px; border: none; background: rgb(var(--tw-primary-500)); color: #fff; font-size: 13px; font-weight: 600; cursor: pointer; }
+  .gen-btn:hover { background: rgb(var(--tw-primary-600)); }
+  .copy-btn { flex: 1; height: 42px; border-radius: 10px; background: rgb(var(--tw-surface)); color: rgb(var(--tw-text-secondary)); border: 1px solid rgb(var(--tw-border)); font-size: 13px; font-weight: 600; cursor: pointer; }
+
+  .copied {
+    position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%);
+    background: rgb(var(--tw-text-primary)); color: rgb(var(--tw-surface));
+    padding: 8px 16px; border-radius: 999px; font-size: 13px;
+    opacity: 0; transition: opacity .25s; pointer-events: none; z-index: 99;
   }
-  .gen-btn:active { transform: scale(0.98); }
-  .copy-btn {
-    flex: 1; height: 44px; border-radius: 10px;
-    background: var(--surface); color: var(--text-sec);
-    border: 1px solid var(--border); font-size: 14px; font-weight: 600; cursor: pointer;
-  }
-  .copy-btn:active { transform: scale(0.98); }
-  .copied { position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%);
-    background: #111827; color: #fff; padding: 8px 16px; border-radius: 999px;
-    font-size: 13px; opacity: 0; transition: opacity .25s; pointer-events: none; z-index: 99; }
   .copied.show { opacity: 1; }
+
+  /* 移动端：预览在上、选色在下 */
+  @media (max-width: 860px) {
+    body { overflow: auto; }
+    .layout { flex-direction: column; height: auto; }
+    .stage-wrap { width: 100%; flex: none; padding: 14px; border-right: none; border-bottom: 1px solid rgb(var(--tw-border)); }
+    .phone { height: 480px; flex: none; }
+    .panel { padding: 18px 14px 60px; }
+  }
 </style>
 </head>
 <body>
-<div class="wrap">
+<div class="layout">
 
-  <div class="header">
-    <h1>AIsChat 主题选色表单</h1>
-    <p>点选每个类型色的色块（有实时预览），选完点「生成结果」，把 JSON 发给我即可。</p>
-    <div class="tip">当前问题：浅色主题按钮紫 #8B5CF6 偏深发闷。下表每个类型色给几个候选，选一个你看着舒服的。同类型内 400（文字/图标）和 500（按钮）建议选同色系相邻深浅，保持协调。</div>
-  </div>
+  <!-- ══════ 左侧：主站界面预览（固定） ══════ -->
+  <div class="stage-wrap">
+    <div class="stage-head">
+      <span class="dot"></span><span class="dot"></span><span class="dot"></span>
+      <span class="title">主站界面预览 · 实时</span>
+    </div>
 
-  <!-- 实时预览 -->
-  <div class="preview">
-    <div class="preview-title">实时预览（跟随下方选择变化）</div>
-    <div class="preview-row">
-      <button class="pv-btn" id="pv-primary" style="background:#8b5cf6">主按钮</button>
-      <button class="pv-btn secondary" id="pv-secondary">次级按钮</button>
-      <span class="pv-badge" id="pv-badge" style="background:#8b5cf6;color:#fff">徽章</span>
-    </div>
-    <div class="preview-row" style="margin-top:12px">
-      <span class="pv-text">强调文字 <b id="pv-text">这是主色文字</b> · 普通文字</span>
-    </div>
-    <div class="preview-row" style="margin-top:12px">
-      <span class="pv-badge" id="pv-accent" style="background:#f59e0b;color:#111827">琥珀状态</span>
-      <span class="pv-badge" id="pv-mint" style="background:#10b981;color:#fff">在线</span>
-      <span class="pv-badge" id="pv-rose" style="background:#c9364f;color:#fff">危险</span>
-    </div>
-  </div>
-
-  <!-- 组1：primary 紫 -->
-  <div class="group">
-    <div class="group-head">
-      <span class="group-name">主色 primary（紫）</span>
-      <span class="group-desc">品牌色 · 按钮/强调/链接</span>
-    </div>
-    <div class="current-note">当前：400=#8B5CF6（文字）· 500=#8B5CF6（按钮）· 600=#7C3AED（hover）</div>
-
-    <div class="field">
-      <div class="field-label">
-        primary-400 <span style="font-weight:400;color:var(--text-mut)">强调文字 / 图标 / 链接</span>
-        <span class="now"><span class="chip" style="background:#8b5cf6"></span><span id="cur-p400">#8B5CF6</span></span>
+    <div class="phone">
+      <div class="bar">
+        <div class="avatar">AI</div>
+        <div>
+          <div class="name">群视界 · 星陨大陆</div>
+          <div class="status">在线 · 实时同步</div>
+        </div>
+        <div class="icons">
+          <span class="icon-btn">⌕</span>
+          <span class="icon-btn primary">+</span>
+        </div>
       </div>
-      <div class="swatches" data-var="p400"></div>
-    </div>
 
-    <div class="field">
-      <div class="field-label">
-        primary-500 <span style="font-weight:400;color:var(--text-mut)">主按钮背景（白字）</span>
-        <span class="now"><span class="chip" style="background:#8b5cf6"></span><span id="cur-p500">#8B5CF6</span></span>
+      <div class="nav">
+        <div class="nav-item active"><span class="ico">◆</span> 探索区域</div>
+        <div class="nav-item"><span class="ico">⚔</span> 战斗</div>
+        <div class="nav-item"><span class="ico">▣</span> 商店</div>
+        <div class="nav-item"><span class="ico">☰</span> 任务</div>
       </div>
-      <div class="swatches" data-var="p500"></div>
-    </div>
 
-    <div class="field">
-      <div class="field-label">
-        primary-600 <span style="font-weight:400;color:var(--text-mut)">按钮 hover 加深</span>
-        <span class="now"><span class="chip" style="background:#7c3aed"></span><span id="cur-p600">#6D28D9</span></span>
+      <div class="msgs">
+        <div class="msg other">欢迎来到星陨大陆，<span class="link">点这里</span> 查看规则</div>
+        <div class="msg mine">探索 幽暗森林 <span class="inline-code">/探索</span></div>
+        <div class="msg other">你发现了一只<span class="inline-code">野狼</span>！</div>
+        <div class="msg mine">战斗！</div>
       </div>
-      <div class="swatches" data-var="p600"></div>
-    </div>
-  </div>
 
-  <!-- 组2：accent 金 -->
-  <div class="group">
-    <div class="group-head">
-      <span class="group-name">琥珀金 accent</span>
-      <span class="group-desc">状态变更 / 通知 / 高亮</span>
-    </div>
-    <div class="current-note">当前：400=#F59E0B · 500=#D97706</div>
-
-    <div class="field">
-      <div class="field-label">
-        accent-400 <span style="font-weight:400;color:var(--text-mut)">状态文字 / 图标 / 徽章</span>
-        <span class="now"><span class="chip" style="background:#f59e0b"></span><span id="cur-a400">#FBBF24</span></span>
+      <div class="status-row">
+        <span class="live">在线</span>
+        <span class="dnd">勿扰</span>
+        <span>普通文字</span>
       </div>
-      <div class="swatches" data-var="a400"></div>
-    </div>
 
-    <div class="field">
-      <div class="field-label">
-        accent-500 <span style="font-weight:400;color:var(--text-mut)">实底按钮 / hover</span>
-        <span class="now"><span class="chip" style="background:#d97706"></span><span id="cur-a500">#D97706</span></span>
+      <div class="badges">
+        <span class="badge p">主色标签</span>
+        <span class="badge a">琥珀状态</span>
+        <span class="badge m">在线徽章</span>
+        <span class="badge r">危险标记</span>
+        <span class="badge solid p">实心主色</span>
+        <span class="badge solid a">实心金</span>
+        <span class="badge solid m">实心绿</span>
+        <span class="badge solid r">实心红</span>
       </div>
-      <div class="swatches" data-var="a500"></div>
+
+      <div class="meter">
+        <div class="lbl">存储用量 62%</div>
+        <div class="track"><div class="fill"></div></div>
+      </div>
+
+      <div class="toggles">
+        <span>自动同步 <span class="sw"></span></span>
+        <span>免打扰 <span class="sw off"></span></span>
+      </div>
+
+      <div class="btns">
+        <button class="b primary">主按钮</button>
+        <button class="b secondary">次级</button>
+        <button class="b accent">琥珀</button>
+        <button class="b mint">成功</button>
+        <button class="b danger">删除</button>
+      </div>
+
+      <div class="input-row">
+        <input class="input" placeholder="输入指令…" value="探索 幽暗森林">
+        <button class="send">➤</button>
+      </div>
     </div>
   </div>
 
-  <!-- 组3：mint 绿 -->
-  <div class="group">
-    <div class="group-head">
-      <span class="group-name">活跃绿 mint</span>
-      <span class="group-desc">在线 / 成功 / 已保存</span>
+  <!-- ══════ 右侧：选色面板 ══════ -->
+  <div class="panel">
+    <div class="panel-head">
+      <h1>AIsChat 主题选色</h1>
+      <p>左侧是主站界面实时预览 —— 点选色块立即生效。</p>
+      <div class="hint">每个类型色给 8~10 个候选，点选即可（含当前默认）。同类型 400（文字）与 500（按钮）建议选同色系相邻深浅。选完点「生成结果」复制发我。</div>
     </div>
-    <div class="current-note">当前：400=#10B981 · 500=#059669</div>
 
-    <div class="field">
-      <div class="field-label">
-        mint-400 <span style="font-weight:400;color:var(--text-mut)">在线状态 / 成功文字</span>
-        <span class="now"><span class="chip" style="background:#10b981"></span><span id="cur-m400">#22C55E</span></span>
+    <!-- 组：主色 -->
+    <div class="group">
+      <div class="group-name"><span class="swatch-sample" id="sample-p" style="background:#8B5CF6"></span> 主色 primary（紫）</div>
+      <div class="group-desc">品牌色 · 按钮 / 我的气泡 / 强调 / 链接 / 选中态 / 进度条</div>
+      <div class="field" data-key="primary_400">
+        <div class="field-label">primary-400 强调文字 / 图标 / 链接 <span class="now"><span class="chip"></span><span class="now-hex"></span></span></div>
+        <div class="swatches"></div>
       </div>
-      <div class="swatches" data-var="m400"></div>
-    </div>
-
-    <div class="field">
-      <div class="field-label">
-        mint-500 <span style="font-weight:400;color:var(--text-mut)">实底按钮 / hover</span>
-        <span class="now"><span class="chip" style="background:#059669"></span><span id="cur-m500">#059669</span></span>
+      <div class="field" data-key="primary_500">
+        <div class="field-label">primary-500 主按钮 / 我的气泡 / 发送 <span class="now"><span class="chip"></span><span class="now-hex"></span></span></div>
+        <div class="swatches"></div>
       </div>
-      <div class="swatches" data-var="m500"></div>
-    </div>
-  </div>
-
-  <!-- 组4：rose 玫红 -->
-  <div class="group">
-    <div class="group-head">
-      <span class="group-name">危险玫红 rose</span>
-      <span class="group-desc">删除 / 错误 / 勿扰</span>
-    </div>
-    <div class="current-note">当前：400=#C9364F · 500=#A8283F</div>
-
-    <div class="field">
-      <div class="field-label">
-        rose-400 <span style="font-weight:400;color:var(--text-mut)">危险文字 / 删除链接</span>
-        <span class="now"><span class="chip" style="background:#c9364f"></span><span id="cur-r400">#E84A69</span></span>
+      <div class="field" data-key="primary_600">
+        <div class="field-label">primary-600 按钮 hover <span class="now"><span class="chip"></span><span class="now-hex"></span></span></div>
+        <div class="swatches"></div>
       </div>
-      <div class="swatches" data-var="r400"></div>
     </div>
 
-    <div class="field">
-      <div class="field-label">
-        rose-500 <span style="font-weight:400;color:var(--text-mut)">危险按钮（白字）</span>
-        <span class="now"><span class="chip" style="background:#a8283f"></span><span id="cur-r500">#E11D48</span></span>
+    <!-- 组：琥珀金 -->
+    <div class="group">
+      <div class="group-name"><span class="swatch-sample" id="sample-a" style="background:#FBBF24"></span> 琥珀金 accent</div>
+      <div class="group-desc">状态变更 / 通知 / 高亮 / 星级</div>
+      <div class="field" data-key="accent_400">
+        <div class="field-label">accent-400 状态文字 / 徽章 <span class="now"><span class="chip"></span><span class="now-hex"></span></span></div>
+        <div class="swatches"></div>
       </div>
-      <div class="swatches" data-var="r500"></div>
+      <div class="field" data-key="accent_500">
+        <div class="field-label">accent-500 实底按钮 / hover <span class="now"><span class="chip"></span><span class="now-hex"></span></span></div>
+        <div class="swatches"></div>
+      </div>
     </div>
-  </div>
 
-  <div class="dark-note">说明：以上为浅色主题选色。深色主题保持现有亮紫/亮玫红系（深底发光），如也想调深色主题的某个颜色，在结果 JSON 里告诉我（比如「深色 primary-400 换 #B8A5FB」）。</div>
+    <!-- 组：活跃绿 -->
+    <div class="group">
+      <div class="group-name"><span class="swatch-sample" id="sample-m" style="background:#22C55E"></span> 活跃绿 mint</div>
+      <div class="group-desc">在线 / 成功 / 已保存 / 开关开启</div>
+      <div class="field" data-key="mint_400">
+        <div class="field-label">mint-400 在线状态 / 成功文字 <span class="now"><span class="chip"></span><span class="now-hex"></span></span></div>
+        <div class="swatches"></div>
+      </div>
+      <div class="field" data-key="mint_500">
+        <div class="field-label">mint-500 实底按钮 / hover <span class="now"><span class="chip"></span><span class="now-hex"></span></span></div>
+        <div class="swatches"></div>
+      </div>
+    </div>
 
-  <!-- 结果 -->
-  <div class="result">
-    <div class="preview-title">生成结果</div>
-    <textarea id="out" readonly placeholder="点「生成结果」后这里会出现 JSON…"></textarea>
-    <div class="result-actions">
-      <button class="gen-btn" id="gen">生成结果</button>
-      <button class="copy-btn" id="copy">复制</button>
+    <!-- 组：危险玫红 -->
+    <div class="group">
+      <div class="group-name"><span class="swatch-sample" id="sample-r" style="background:#E84A69"></span> 危险玫红 rose</div>
+      <div class="group-desc">删除 / 错误 / 勿扰</div>
+      <div class="field" data-key="rose_400">
+        <div class="field-label">rose-400 危险文字 / 删除链接 <span class="now"><span class="chip"></span><span class="now-hex"></span></span></div>
+        <div class="swatches"></div>
+      </div>
+      <div class="field" data-key="rose_500">
+        <div class="field-label">rose-500 危险按钮 <span class="now"><span class="chip"></span><span class="now-hex"></span></span></div>
+        <div class="swatches"></div>
+      </div>
+    </div>
+
+    <!-- 结果 -->
+    <div class="result">
+      <div class="field-label">生成结果</div>
+      <textarea id="out" readonly placeholder="点「生成结果」后这里会出现 CSS 变量…"></textarea>
+      <div class="result-actions">
+        <button class="gen-btn" id="gen">生成结果</button>
+        <button class="copy-btn" id="copy">复制</button>
+      </div>
     </div>
   </div>
 
@@ -285,164 +422,114 @@
 (function () {
   'use strict';
 
-  // 每个类型色变量的候选色板
+  // ── 候选色板（每 key 8~10 个，第一个 = 当前默认）──
+  var VIOLETS = ['#8B5CF6','#7C3AED','#A78BFA','#C4B5FD','#6D28D9','#5B21B6','#7E69EA','#9B7BFA','#6366F1','#818CF8'];
+  var GOLDS  = ['#FBBF24','#F59E0B','#F0A020','#E8972C','#D97706','#B45309','#FACC15','#FDE68A','#FCD34D','#EAB308'];
+  var GREENS = ['#22C55E','#10B981','#34D399','#14B8A6','#059669','#047857','#2DD4BF','#4ADE80','#16A34A','#84CC16'];
+  var REDS   = ['#E84A69','#E11D48','#BE123C','#C9364F','#DC2626','#F26D8D','#F43F5E','#FB7185','#9F1239','#F87171'];
+
   var CANDIDATES = {
-    p400: [
-      { hex: '#8B5CF6', note: 'violet-500 当前' },
-      { hex: '#7C3AED', note: 'violet-600' },
-      { hex: '#A78BFA', note: 'violet-400 亮' },
-      { hex: '#9B7BFA', note: '偏亮紫' },
-      { hex: '#7E69EA', note: '柔和紫' },
-      { hex: '#6D28D9', note: 'violet-700' },
-    ],
-    p500: [
-      { hex: '#8B5CF6', note: '当前' },
-      { hex: '#7C3AED', note: 'violet-600' },
-      { hex: '#A78BFA', note: '更亮' },
-      { hex: '#9B7BFA', note: '明亮紫' },
-      { hex: '#7E69EA', note: '柔和' },
-      { hex: '#6D28D9', note: '深紫' },
-    ],
-    p600: [
-      { hex: '#7C3AED', note: '当前' },
-      { hex: '#6D28D9', note: 'violet-700' },
-      { hex: '#8B5CF6', note: '浅一档' },
-      { hex: '#5B21B6', note: 'violet-800' },
-    ],
-    a400: [
-      { hex: '#F59E0B', note: 'amber-500 当前' },
-      { hex: '#FBBF24', note: 'amber-400 亮' },
-      { hex: '#F0A020', note: '暖金' },
-      { hex: '#E8972C', note: '柔和金' },
-      { hex: '#D97706', note: 'amber-600' },
-      { hex: '#FACC15', note: '鲜黄' },
-    ],
-    a500: [
-      { hex: '#D97706', note: '当前' },
-      { hex: '#F59E0B', note: 'amber-500' },
-      { hex: '#E8972C', note: '柔和' },
-      { hex: '#B45309', note: 'amber-700' },
-      { hex: '#C2710A', note: '深金' },
-    ],
-    m400: [
-      { hex: '#10B981', note: 'emerald-500 当前' },
-      { hex: '#34D399', note: 'emerald-400 亮' },
-      { hex: '#14B8A6', note: 'teal-500' },
-      { hex: '#22C55E', note: 'green-500' },
-      { hex: '#059669', note: 'emerald-600' },
-      { hex: '#2DD4BF', note: 'teal-400' },
-    ],
-    m500: [
-      { hex: '#059669', note: '当前' },
-      { hex: '#10B981', note: 'emerald-500' },
-      { hex: '#047857', note: 'emerald-700' },
-      { hex: '#0D9488', note: 'teal-600' },
-    ],
-    r400: [
-      { hex: '#C9364F', note: '当前玫红' },
-      { hex: '#E84A69', note: '亮玫红' },
-      { hex: '#DC2626', note: 'red-600 正红' },
-      { hex: '#E11D48', note: 'rose-600' },
-      { hex: '#F26D8D', note: '亮粉' },
-      { hex: '#A8283F', note: '深玫红' },
-    ],
-    r500: [
-      { hex: '#A8283F', note: '当前' },
-      { hex: '#E11D48', note: 'rose-600' },
-      { hex: '#BE123C', note: 'rose-700' },
-      { hex: '#DC2626', note: 'red-600' },
-      { hex: '#C9364F', note: '玫红' },
-    ],
+    primary_400: VIOLETS,
+    primary_500: VIOLETS,
+    primary_600: ['#6D28D9','#7C3AED','#5B21B6','#8B5CF6','#4C1D95'],
+    accent_400: GOLDS,
+    accent_500: GOLDS,
+    mint_400: GREENS,
+    mint_500: GREENS,
+    rose_400: REDS,
+    rose_500: REDS,
   };
 
-  // 当前选中值（默认 = 现有主题）
+  // 当前选中（默认 = 现有主题）
   var sel = {
-    p400: '#8B5CF6', p500: '#8B5CF6', p600: '#6D28D9',
-    a400: '#FBBF24', a500: '#D97706',
-    m400: '#22C55E', m500: '#059669',
-    r400: '#E84A69', r500: '#E11D48',
+    primary_400: '#8B5CF6', primary_500: '#8B5CF6', primary_600: '#6D28D9',
+    accent_400: '#FBBF24', accent_500: '#D97706',
+    mint_400: '#22C55E', mint_500: '#059669',
+    rose_400: '#E84A69', rose_500: '#E11D48',
   };
 
-  var curLabel = {
-    p400: 'cur-p400', p500: 'cur-p500', p600: 'cur-p600',
-    a400: 'cur-a400', a500: 'cur-a500',
-    m400: 'cur-m400', m500: 'cur-m500',
-    r400: 'cur-r400', r500: 'cur-r500',
-  };
+  function hexToTriplet(hex) {
+    var h = hex.replace('#', '');
+    return parseInt(h.slice(0,2),16) + ' ' + parseInt(h.slice(2,4),16) + ' ' + parseInt(h.slice(4,6),16);
+  }
 
-  function render() {
-    // 预览
-    var p500 = sel.p500, p400 = sel.p400, p600 = sel.p600;
-    document.getElementById('pv-primary').style.background = p500;
-    document.getElementById('pv-primary').onmouseenter = function () { this.style.background = p600; };
-    document.getElementById('pv-primary').onmouseleave = function () { this.style.background = p500; };
-    document.getElementById('pv-badge').style.background = p500;
-    document.getElementById('pv-text').style.color = p400;
-    document.getElementById('pv-accent').style.background = sel.a400;
-    document.getElementById('pv-mint').style.background = sel.m400;
-    document.getElementById('pv-rose').style.background = sel.r400;
-    document.getElementById('pv-rose').style.color = '#fff';
+  // 应用：覆盖 CSS 变量（与主站 applyUserTheme 同机制）→ 左侧预览实时变
+  function apply() {
+    var root = document.documentElement.style;
+    root.setProperty('--tw-primary-400', hexToTriplet(sel.primary_400));
+    root.setProperty('--tw-primary-500', hexToTriplet(sel.primary_500));
+    root.setProperty('--tw-primary-600', hexToTriplet(sel.primary_600));
+    root.setProperty('--tw-accent-400', hexToTriplet(sel.accent_400));
+    root.setProperty('--tw-accent-500', hexToTriplet(sel.accent_500));
+    root.setProperty('--tw-mint-400', hexToTriplet(sel.mint_400));
+    root.setProperty('--tw-mint-500', hexToTriplet(sel.mint_500));
+    root.setProperty('--tw-rose-400', hexToTriplet(sel.rose_400));
+    root.setProperty('--tw-rose-500', hexToTriplet(sel.rose_500));
+    document.getElementById('sample-p').style.background = sel.primary_500;
+    document.getElementById('sample-a').style.background = sel.accent_400;
+    document.getElementById('sample-m').style.background = sel.mint_400;
+    document.getElementById('sample-r').style.background = sel.rose_400;
   }
 
   // 渲染所有色板
   Object.keys(CANDIDATES).forEach(function (key) {
-    var box = document.querySelector('[data-var="' + key + '"]');
-    if (!box) return;
-    CANDIDATES[key].forEach(function (c) {
+    var field = document.querySelector('[data-key="' + key + '"]');
+    if (!field) return;
+    var box = field.querySelector('.swatches');
+    var nowChip = field.querySelector('.chip');
+    var nowHex = field.querySelector('.now-hex');
+    nowHex.textContent = sel[key].toUpperCase();
+    nowChip.style.background = sel[key];
+
+    var seen = {};
+    CANDIDATES[key].forEach(function (hex) {
+      var up = hex.toUpperCase();
+      if (seen[up]) return;   // 去重
+      seen[up] = true;
       var el = document.createElement('div');
-      el.className = 'swatch' + (sel[key].toUpperCase() === c.hex.toUpperCase() ? ' sel' : '');
-      el.style.background = c.hex;
-      el.title = c.hex + ' ' + (c.note || '');
-      el.innerHTML = '<span class="hex">' + c.hex.replace('#', '') + '</span>';
+      el.className = 'swatch' + (sel[key].toUpperCase() === up ? ' sel' : '');
+      el.style.background = hex;
+      el.title = hex;
       el.addEventListener('click', function () {
-        sel[key] = c.hex;
+        sel[key] = hex;
         box.querySelectorAll('.swatch').forEach(function (s) { s.classList.remove('sel'); });
         el.classList.add('sel');
-        document.getElementById(curLabel[key]).textContent = c.hex.toUpperCase();
-        document.getElementById(curLabel[key]).previousElementSibling.style.background = c.hex;
-        render();
+        nowHex.textContent = hex.toUpperCase();
+        nowChip.style.background = hex;
+        apply();
       });
       box.appendChild(el);
     });
   });
 
-  render();
+  apply();
 
   // 生成结果
-  function hexToRgb(hex) {
-    var h = hex.replace('#', '');
-    return parseInt(h.slice(0,2),16) + ' ' + parseInt(h.slice(2,4),16) + ' ' + parseInt(h.slice(4,6),16);
-  }
-
   document.getElementById('gen').addEventListener('click', function () {
     var lines = [];
     lines.push('/* 浅色主题（:root）——按你的选择替换 */');
-    lines.push('--tw-primary-400: ' + hexToRgb(sel.p400) + ';  /* ' + sel.p400 + ' */');
-    lines.push('--tw-primary-500: ' + hexToRgb(sel.p500) + ';  /* ' + sel.p500 + ' */');
-    lines.push('--tw-primary-600: ' + hexToRgb(sel.p600) + ';  /* ' + sel.p600 + ' */');
-    lines.push('--tw-accent-400: ' + hexToRgb(sel.a400) + ';   /* ' + sel.a400 + ' */');
-    lines.push('--tw-accent-500: ' + hexToRgb(sel.a500) + ';   /* ' + sel.a500 + ' */');
-    lines.push('--tw-mint-400: ' + hexToRgb(sel.m400) + ';     /* ' + sel.m400 + ' */');
-    lines.push('--tw-mint-500: ' + hexToRgb(sel.m500) + ';     /* ' + sel.m500 + ' */');
-    lines.push('--tw-rose-400: ' + hexToRgb(sel.r400) + ';     /* ' + sel.r400 + ' */');
-    lines.push('--tw-rose-500: ' + hexToRgb(sel.r500) + ';     /* ' + sel.r500 + ' */');
+    lines.push('--tw-primary-400: ' + hexToTriplet(sel.primary_400) + ';  /* ' + sel.primary_400 + ' */');
+    lines.push('--tw-primary-500: ' + hexToTriplet(sel.primary_500) + ';  /* ' + sel.primary_500 + ' */');
+    lines.push('--tw-primary-600: ' + hexToTriplet(sel.primary_600) + ';  /* ' + sel.primary_600 + ' */');
+    lines.push('--tw-accent-400: ' + hexToTriplet(sel.accent_400) + ';   /* ' + sel.accent_400 + ' */');
+    lines.push('--tw-accent-500: ' + hexToTriplet(sel.accent_500) + ';   /* ' + sel.accent_500 + ' */');
+    lines.push('--tw-mint-400: ' + hexToTriplet(sel.mint_400) + ';     /* ' + sel.mint_400 + ' */');
+    lines.push('--tw-mint-500: ' + hexToTriplet(sel.mint_500) + ';     /* ' + sel.mint_500 + ' */');
+    lines.push('--tw-rose-400: ' + hexToTriplet(sel.rose_400) + ';     /* ' + sel.rose_400 + ' */');
+    lines.push('--tw-rose-500: ' + hexToTriplet(sel.rose_500) + ';     /* ' + sel.rose_500 + ' */');
     document.getElementById('out').value = lines.join('\n');
   });
 
-  // 复制
   document.getElementById('copy').addEventListener('click', function () {
     var ta = document.getElementById('out');
-    if (!ta.value) { document.getElementById('gen').click(); }
+    if (!ta.value) document.getElementById('gen').click();
     ta.select();
     try { document.execCommand('copy'); } catch (e) {}
-    if (navigator.clipboard) {
-      navigator.clipboard.writeText(ta.value).catch(function () {});
-    }
+    if (navigator.clipboard) navigator.clipboard.writeText(ta.value).catch(function () {});
     var tip = document.getElementById('copied');
     tip.classList.add('show');
     setTimeout(function () { tip.classList.remove('show'); }, 1500);
   });
-
 })();
 </script>
 </body>
