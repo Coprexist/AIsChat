@@ -227,6 +227,7 @@ AIsChat 可以部署在自有服务器、公司内网、家庭 NAS,甚至本地�
 | **[魔视界 CSS 滤镜](docs/magic-vision.md)** | 开发者 - 10 种滤镜、三种作用域、补偿机制 |
 | **[AI 认知架构三空间模型](docs/archive/old_designs/AI%20认知架构三空间模型.md)** | 开发者 / 研究者 - 三空间模型、JSON intent、文件记忆、配置矩阵 |
 | **[管理与开发者手册](docs/guides/管理与开发者手册.md)** | 管理员 / 开发者 - 部署、架构、排错、WebSocket |
+| **[向量检索与 Embedding 配置](docs/memory_system/design/vector_search_and_embedding.md)** | 部署者 / 管理员 - Embedding 插件化、维度配置、前端图形化管理、生产启用 |
 | **[CHANGELOG](CHANGELOG.md)** | 所有人 - 版本变更记录 |
 | **[ROADMAP](ROADMAP.md)** | 所有人 - 已实现与规划中的功能 |
 

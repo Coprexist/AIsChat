@@ -3,7 +3,53 @@
 本 CHANGELOG 遵循 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.0.0/) 规范，
 版本号遵守 [语义化版本](https://semver.org/lang/zh-CN/)。
 
-> **当前阶段**：v0.3.5 正式版 — 补丁版本号（第三位）递增。
+> **当前阶段**：v0.3.6 正式版 — 补丁版本号（第三位）递增。
+
+---
+
+## [v0.3.6] - 2026-08-15
+
+### Added — 🧠 Embedding 提供方插件化（向量记忆解耦 DeepSeek）
+
+- **背景**：DeepSeek 官方无 embedding API（调用 404），向量记忆此前依赖 DeepSeek base_url 导致全库 0 向量、向量检索形同虚设
+- **`embedding_providers` 包**（对齐 db_providers 模式）：`disabled`（默认降级）/ `ollama`（复用本地实例）/ `api`（OpenAI 兼容端点）/ `local`（fastembed 离线）四后端可切换，`get_embedding_provider()` 按 `EMBEDDING_BACKEND` 注册表选择
+- **向量哲学**（对齐 dsh-mneme）：向量是可选增强——embed 失败返回 None 自动降级文本检索，永不打断主流程；配置与 chat 完全解耦（`EMBEDDING_BACKEND/BASE_URL/API_KEY/MODEL`）；接口语义对齐 OpenAI 兼容 `/embeddings`，未来转 JS 契约不变
+- `get_embedding()` 签名不变，27 处调用点零改动；显式自定义端点走直连，其余走插件
+
+### Added — 📐 向量维度可配置化（速度 vs 质量自选）
+
+- `EMBEDDING_DIMENSION` 环境变量（默认 1536 兼容现状），模型列定义改读配置（不再写死）
+- **prestart 启动自动对齐**列维度：无向量数据 → 直接 ALTER（毫秒级）；已有向量数据 → 明确告警不静默失败；维度优先级 DB 覆盖 > 环境变量
+- **有数据安全迁移脚本** `scripts/migrate_embedding_dimension.py`（对齐 pg-raggraph expand/contract）：`prepare`（加临时列）→ `backfill`（并发重生成向量，幂等可重入）→ `cutover`（守卫检查后删旧列+改名+重建 HNSW）→ `cleanup`；另有 `fill` 子命令日常回填 NULL 记忆
+- 共享模块 `scripts/_shared.py`（表清单/维度查询/URL 解析/并发回填集中一处，prestart 与迁移脚本共用）
+
+### Added — 🖥️ Embedding 配置前端图形化（部署后零门槛管理）
+
+- **DBConfigSource**（pydantic-settings `customise_sources` 官方机制）：settings 读取自动「DB 覆盖 > env > 默认」三层分层，所有字段零侵入生效
+- 持久化：`system_settings.embedding_config` JSONB + api_key Fernet 加密；读路径走内存缓存（快），保存热更新（无需重启）
+- 管理 API：`GET/PUT/DELETE /admin/embedding-config` + `POST test`（实际调 embed 验维度）
+- 前端：系统设置页新增 **Embedding 向量配置卡片**（后端类型/端点/模型/维度表单 + 测试连接 + 保存生效 + 恢复默认）
+
+### Changed — 🔍 记忆检索对齐 dsh-mneme（关键词优先 + 向量补位）
+
+- `merge_keyword_and_vector()`：关键词命中总是排最前（字面词精确性最高）+ 向量结果去重补位；重叠条目回填真实向量分（O(n) dict）；`mode` 元信息（keyword/vector）
+- `extract_keywords()`：中文友好分词——标点拆分 + 2-gram 滑窗（修复长中文查询整段 LIKE 失效），纯英文不 ngram 防碎片噪音，去 3-gram 精简
+- `_text_search_memories`：title 命中优先排序（对齐 mneme `CASE WHEN`）
+- `recall_memory` 工具去掉 O(n²) 嵌套循环补丁
+
+### Added — ⚡ 向量检索过滤先行（数据量增长时性能保障）
+
+- Alembic `d5e6f7a8b9c1`：过滤列 btree 索引（rough `(owner_id, scope)` / detail `(rough_id)` / 消息表 `(group_id)`）——先按结构化字段缩小候选集（O(log N)），再对"自己的"少量记忆精确向量排序（O(M log M)），与全站总量解耦
+- 对齐 pgvector 官方过滤策略（HNSW 过滤在低比例条件下召回崩，btree 过滤列才是低比例场景正解）
+- 5 万行实测：有索引 2.4ms vs 无索引 4.0ms，行数越大差距越显著
+
+### Changed — 🗄️ 迁移体系统一（Alembic）
+
+- `embedding_config` 加列从自研 migration.py 统一迁入 Alembic（`c3d4e5f6a7b8`，IF NOT EXISTS 幂等），避免双轨混乱
+
+### 📚 文档
+
+- 新增 `docs/memory_system/design/vector_search_and_embedding.md`：架构总览 / 插件化 / 维度配置 / 前端图形化 / 检索策略 / 索引性能 / 生产启用清单 / FAQ
 
 ---
 
