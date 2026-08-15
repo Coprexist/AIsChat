@@ -123,7 +123,24 @@ async def _align_embedding_dimension(conn) -> None:
       （有向量数据需用 scripts/migrate_embedding_dimension.py 安全迁移）
     - SQLite 后端（URL 非 postgresql）→ 跳过（JsonVectorType 维度无关）
     """
-    target = os.getenv("EMBEDDING_DIMENSION", "1536")
+    # 目标维度：DB 覆盖（前端图形化改的）优先，其次环境变量（默认 1536）
+    target = None
+    try:
+        db_cfg = await conn.fetchval(
+            "SELECT embedding_config FROM system_settings WHERE id = 1"
+        )
+        if db_cfg:
+            import json as _json
+            try:
+                db_cfg_obj = _json.loads(db_cfg) if isinstance(db_cfg, str) else db_cfg
+                if db_cfg_obj.get("embedding_dimension"):
+                    target = db_cfg_obj["embedding_dimension"]
+            except Exception:
+                pass
+    except Exception:
+        pass
+    if target is None:
+        target = os.getenv("EMBEDDING_DIMENSION", "1536")
     try:
         dim = int(target)
     except ValueError:
