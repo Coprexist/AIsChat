@@ -61,6 +61,19 @@
 
 - `embedding_config` 加列从自研 migration.py 统一迁入 Alembic（`c3d4e5f6a7b8`，IF NOT EXISTS 幂等），避免双轨混乱
 
+### Added — 🎨 统一 UI 组件库 + 按钮规范（前端焕新）
+
+- **UI 组件库** `components/ui/`：Button / Input / Modal / Select / Card / ConfirmDialog（confirmAsync 替换原生 confirm）
+- **统一按钮规范**（`.btn-*` CSS 语义类，单一规范源）：3 尺寸（32/40/48px 固定高度，图标/无图标严格等高）+ 6 变体（primary/accent/secondary/ghost/danger）；圆角统一 rounded-lg（对齐群视界顶部按钮）
+- **浅色主题对比度修复**：elevated/border 加深 + 全局 `.bg-elevated` inset 描边——修复 321 处旧按钮"与背景分不开"
+
+### Changed — 📱 移动端全面适配（手机/桌面双端友好）
+
+- **世界商城移出主导航**（侧边栏 + 手机底部），入口保留在世界列表页内
+- **世界列表**：卡片手机竖排 + 操作按钮自动换行
+- **设计页接口文档弹窗**：手机全屏（h-full + 横向分区栏）+ 桌面居中双栏；修复 flexbox 滚动陷阱（min-h-0）；下载弹窗改底部抽屉
+- 商城搜索行手机换行（标签输入框响应式）
+
 ### 📚 文档
 
 - 新增 `docs/memory_system/design/vector_search_and_embedding.md`：架构总览 / 插件化 / 维度配置 / 前端图形化 / 检索策略 / 索引性能 / 生产启用清单 / FAQ

@@ -220,6 +220,7 @@ AIsChat 可以部署在自有服务器、公司内网、家庭 NAS,甚至本地�
 | **[文档目录](docs/SUMMARY.md)** | 所有人 - 完整文档索引与阅读路线 |
 | **[用户手册](docs/guides/用户手册.md)** | 终端用户 - 从零开始使用 |
 | **[产品介绍](docs/ABOUT.md)** | 所有人 - 了解项目理念 |
+| **[v0.3.6 前端焕新展示](docs/promo/v0.3.6_frontend_showcase.md)** | 给朋友介绍 - 三大亮点 + 演示要点 |
 | **[项目全景报告](docs/reference/项目全景报告.md)** | AI / 个人用户 / 企业筛查员 - 技术架构、核心亮点、成熟度评估 |
 | **[群视界实现文档](docs/group_world/implementation.md)** | 开发者 - 群视界架构、决策与踩坑(ADR 风格) |
 | **[群视界 API 文档](docs/group_world/api/world_api_docs.md)** | 开发者 / 世界 AI - 9 大分区接口手册 |
