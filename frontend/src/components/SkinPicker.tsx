@@ -18,9 +18,9 @@ const PREVIEW_KEYS = ['primary_500', 'accent_500', 'mint_500', 'rose_500', 'bubb
 // 「默认」卡片的色板（平台默认主题，与 index.css :root 一致）
 const DEFAULT_SWATCHES: Record<string, string> = {
   primary_500: '#8B5CF6',
-  accent_500: '#D97706',
-  mint_500: '#059669',
-  rose_500: '#E11D48',
+  accent_500: '#B45309',
+  mint_500: '#34D399',
+  rose_500: '#E84A69',
   bubble: '#8B5CF6',
 }
 

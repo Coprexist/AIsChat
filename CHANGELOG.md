@@ -3,7 +3,18 @@
 本 CHANGELOG 遵循 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.0.0/) 规范，
 版本号遵守 [语义化版本](https://semver.org/lang/zh-CN/)。
 
-> **当前阶段**：v0.3.12 正式版 — 补丁版本号（第三位）递增。
+> **当前阶段**：v0.3.13 正式版 — 补丁版本号（第三位）递增。
+
+---
+
+## [v0.3.13] - 2026-08-17
+
+### Added — 🎨 主题选色定稿：应用第一轮投票 + 第二轮 A/B 快投
+
+- **应用 ShuAICFR 第一轮方案为平台默认主题**（`index.css` 浅色 `:root`）：主色强调加深 `#6D28D9`，琥珀实底 `#B45309`，活跃绿 `#10B981/#34D399`，危险玫红 `#C9364F/#E84A69`
+- **同步自选色候选板**（ThemeCustomizer「当前」标注指向新默认色，补齐缺失色）与 **皮肤「默认」卡片色板**（SkinPicker）
+- **新增第二轮快投页面** `frontend/public/color-picker-r2.html`：每类型只剩 A（当前应用版）/ B（第一轮代表）两个候选，点选实时预览，提交即投票
+- **新增第二轮投票接口** `/theme-vote-r2`（GET stats / POST 提交），数据存 `data/theme_votes_r2.json`，与第一轮隔离互不影响（自动发现注册，重启生效）
 
 ---
 
