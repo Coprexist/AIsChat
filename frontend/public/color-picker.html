@@ -445,17 +445,17 @@
       <div class="field" data-key="primary_400" data-demo="p400">
         <div class="field-label">primary-400 强调文字 / 图标 / 链接 <span class="now"><span class="chip"></span><span class="now-hex"></span></span></div>
         <div class="swatches"></div>
-        <div class="demo-bar" data-demo-bar="primary_400"></div>
+        <div class="demo-bar" data-demo-bar="p400"></div>
       </div>
       <div class="field" data-key="primary_500" data-demo="p500">
         <div class="field-label">primary-500 主按钮 / 我的气泡 / 发送 <span class="now"><span class="chip"></span><span class="now-hex"></span></span></div>
         <div class="swatches"></div>
-        <div class="demo-bar" data-demo-bar="primary_500"></div>
+        <div class="demo-bar" data-demo-bar="p500"></div>
       </div>
       <div class="field" data-key="primary_600" data-demo="p600">
         <div class="field-label">primary-600 按钮 hover <span class="now"><span class="chip"></span><span class="now-hex"></span></span></div>
         <div class="swatches"></div>
-        <div class="demo-bar" data-demo-bar="primary_600"></div>
+        <div class="demo-bar" data-demo-bar="p600"></div>
       </div>
     </div>
 
@@ -466,12 +466,12 @@
       <div class="field" data-key="accent_400" data-demo="a400">
         <div class="field-label">accent-400 状态文字 / 徽章 <span class="now"><span class="chip"></span><span class="now-hex"></span></span></div>
         <div class="swatches"></div>
-        <div class="demo-bar" data-demo-bar="accent_400"></div>
+        <div class="demo-bar" data-demo-bar="a400"></div>
       </div>
       <div class="field" data-key="accent_500" data-demo="a500">
         <div class="field-label">accent-500 实底按钮 / hover <span class="now"><span class="chip"></span><span class="now-hex"></span></span></div>
         <div class="swatches"></div>
-        <div class="demo-bar" data-demo-bar="accent_500"></div>
+        <div class="demo-bar" data-demo-bar="a500"></div>
       </div>
     </div>
 
@@ -482,12 +482,12 @@
       <div class="field" data-key="mint_400" data-demo="m400">
         <div class="field-label">mint-400 在线状态 / 成功文字 <span class="now"><span class="chip"></span><span class="now-hex"></span></span></div>
         <div class="swatches"></div>
-        <div class="demo-bar" data-demo-bar="mint_400"></div>
+        <div class="demo-bar" data-demo-bar="m400"></div>
       </div>
       <div class="field" data-key="mint_500" data-demo="m500">
         <div class="field-label">mint-500 实底按钮 / hover <span class="now"><span class="chip"></span><span class="now-hex"></span></span></div>
         <div class="swatches"></div>
-        <div class="demo-bar" data-demo-bar="mint_500"></div>
+        <div class="demo-bar" data-demo-bar="m500"></div>
       </div>
     </div>
 
@@ -498,12 +498,12 @@
       <div class="field" data-key="rose_400" data-demo="r400">
         <div class="field-label">rose-400 危险文字 / 删除链接 <span class="now"><span class="chip"></span><span class="now-hex"></span></span></div>
         <div class="swatches"></div>
-        <div class="demo-bar" data-demo-bar="rose_400"></div>
+        <div class="demo-bar" data-demo-bar="r400"></div>
       </div>
       <div class="field" data-key="rose_500" data-demo="r500">
         <div class="field-label">rose-500 危险按钮 <span class="now"><span class="chip"></span><span class="now-hex"></span></span></div>
         <div class="swatches"></div>
-        <div class="demo-bar" data-demo-bar="rose_500"></div>
+        <div class="demo-bar" data-demo-bar="r500"></div>
       </div>
     </div>
 
@@ -598,10 +598,12 @@
   }
 
   // ═══ 每选项旁的元素预览：用当前选中色渲染对应 UI 元素 ═══
+  // 短名 → sel 全名
+  var SHORT_TO_SEL = { p400:'primary_400', p500:'primary_500', p600:'primary_600', a400:'accent_400', a500:'accent_500', m400:'mint_400', m500:'mint_500', r400:'rose_400', r500:'rose_500' };
   function renderDemos() {
     document.querySelectorAll('[data-demo-bar]').forEach(function (bar) {
       var key = bar.getAttribute('data-demo-bar');
-      var color = sel[key] || '#8B5CF6';
+      var color = sel[SHORT_TO_SEL[key]] || '#8B5CF6';
       var html = '';
       switch (key) {
         case 'p400':
