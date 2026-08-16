@@ -695,6 +695,8 @@ class ConnectionManager:
 | `federation_ws.py` | 联邦 WebSocket |
 | `conversation_log.py` | 对话日志 |
 | `system.py` | 系统设置 |
+| `plugins.py` | `/plugins` | 统一插件（列表 / 管理员全局开关 / 用户偏好 / 重扫目录） |
+| `theme_vote.py` | 主题选色投票 |
 
 ### 5.7 服务层 (app/services/)
 
@@ -765,6 +767,18 @@ async def _handle_delay_reply(...): ...
 @register_action_handler("typing_indicator")
 async def _handle_typing_indicator(...): ...
 ```
+
+#### 5.7.5 统一插件系统 (services/plugin/)
+
+> 目录即插件：`plugins/<id>/plugin.json` 自动发现，装好即可用。完整设计见 [plugin_system_design.md](plugin_system/design/plugin_system_design.md)。
+
+| 文件 | 说明 |
+|------|------|
+| `catalog.py` | 双目录扫描（`backend/plugins/` 内置 + `$DATA_DIR/plugins/` 用户）、manifest 解析、skin/skill 载荷读取、DB 同步（目录消失即卸载） |
+| `skill_bridge.py` | 技能插件桥接：全局启用的插件声明注册进 SkillRegistry，关闭/卸载注销（`_from_plugins` 记录，绝不误删内置类型） |
+
+**数据模型**：`plugins`（manifest 快照 + `enabled` 管理员全局开关）+ `user_plugin_prefs`（`user_id`+`plugin_id` 唯一，`enabled` 用户个人开关）。
+生效规则：`effective = plugins.enabled AND user_plugin_prefs.enabled`（无记录默认 true）；皮肤互斥（启用 A 显式停用其余皮肤）。
 
 #### 5.7.4 群视界服务 (services/world/)
 
@@ -898,6 +912,7 @@ class ToolRegistry:
 | `vector_request.py` | `VectorRequest` | 向量化请求 |
 | `market_item.py` | `MarketItem` | 商城商品 |
 | `world_config.py` | `WorldConfig` | 世界配置 |
+| `plugin.py` | `Plugin`, `UserPluginPref` | 统一插件（manifest 快照 + 管理员全局开关 / 用户个人开关） |
 
 ### 5.10 工具注册中心 (app/services/tool_registry.py)
 

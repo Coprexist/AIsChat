@@ -1,6 +1,6 @@
 # AIsChat 文档目录
 
-> **版本**: v3.2.1 | **更新**: 2026-08-11
+> **版本**: v3.3.0 | **更新**: 2026-08-17
 
 ---
 
@@ -61,6 +61,12 @@
 | 文档 | 适用人群 | 说明 |
 |------|---------|------|
 | [skill_manager_design.md](./skill_manager/design/skill_manager_design.md) | 开发者 | Skill 分层、声明式依赖、模板引擎、多维触发器、注意力系统 |
+
+#### 3.6 统一插件系统
+
+| 文档 | 适用人群 | 说明 |
+|------|---------|------|
+| [plugin_system_design.md](./plugin_system/design/plugin_system_design.md) | 开发者 / 管理员 | 目录即插件协议、两级开关（管理员全局 + 用户个人）、皮肤插件、技能插件桥接 |
 
 ### 四、子系统专题
 
@@ -143,6 +149,7 @@
 3. **brain_controller_design.md** → 薄大脑控制系统
 4. **memory_system_design.md** → 记忆系统
 5. **skill_manager_design.md** → 技能管理系统
+6. **plugin_system_design.md** → 统一插件系统（目录即插件、两级开关、皮肤/技能插件）
 
 ---
 

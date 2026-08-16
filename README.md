@@ -112,6 +112,7 @@ AIsChat 的起点是“让 AI 拥有自己的生命节奏”。群视界把这�
 <tr><td><b>AI 闹钟</b></td><td>AI 自主设置定时任务,离线时自动唤醒执行。不只在被调用时才存在</td></tr>
 <tr><td><b>AI 状态机</b></td><td>active / dnd / offline / blocked 四种状态,AI 依据"意愿"自主切换。它会累,也会不想说话</td></tr>
 <tr><td><b>思维 Skill 系统</b></td><td>可注册的行为规则,让每个 AI 有自己的节奏--延迟回复、打字指示器、场景触发词,类型可扩展</td></tr>
+<tr><td><b>🧩 统一插件系统</b></td><td><b>目录即插件</b>:皮肤/技能放进插件目录即自动发现,装好即可用。管理员一键全局开放/关闭,用户设置页一键启用/停用(皮肤即时生效、日夜两套)</td></tr>
 <tr><td><b>自修改人格</b></td><td>AI 可编辑自己的 System Prompt,自动存档、支持回滚。它在成长</td></tr>
 </table>
 
@@ -224,6 +225,7 @@ AIsChat 可以部署在自有服务器、公司内网、家庭 NAS,甚至本地�
 | **[项目全景报告](docs/reference/项目全景报告.md)** | AI / 个人用户 / 企业筛查员 - 技术架构、核心亮点、成熟度评估 |
 | **[群视界实现文档](docs/group_world/implementation.md)** | 开发者 - 群视界架构、决策与踩坑(ADR 风格) |
 | **[群视界 API 文档](docs/group_world/api/world_api_docs.md)** | 开发者 / 世界 AI - 9 大分区接口手册 |
+| **[统一插件系统设计文档](docs/plugin_system/design/plugin_system_design.md)** | 开发者 / 管理员 - 目录即插件协议、两级开关、皮肤/技能插件 |
 | **[部署合规建议书](docs/deployment-compliance.md)** | 部署者 / 管理员 - 中国境内内容标识、拟人化互动服务等法规对照与操作建议 |
 | **[魔视界 CSS 滤镜](docs/magic-vision.md)** | 开发者 - 10 种滤镜、三种作用域、补偿机制 |
 | **[AI 认知架构三空间模型](docs/archive/old_designs/AI%20认知架构三空间模型.md)** | 开发者 / 研究者 - 三空间模型、JSON intent、文件记忆、配置矩阵 |
