@@ -103,7 +103,7 @@ def load_entry_payload(manifest: dict[str, Any]) -> dict[str, Any]:
 
 
 def get_skin_vars(manifest: dict[str, Any]) -> dict[str, Any]:
-    """skin 插件 → {light:{key:hex}, dark:{key:hex}, bubble:{light, dark}}（只保留合法 key）"""
+    """skin 插件 → {light:{key:hex}, dark:{key:hex}}（只保留合法 key）"""
     if manifest.get("category") != "skin":
         return {}
     payload = load_entry_payload(manifest)
@@ -113,7 +113,6 @@ def get_skin_vars(manifest: dict[str, Any]) -> dict[str, Any]:
         for key, hex_val in src.items():
             if key in SKIN_KEYS and isinstance(hex_val, str) and hex_val.startswith("#"):
                 result[mode][key] = hex_val
-    # 兼容旧格式：直接顶层 bubble（或 light/dark 内的 bubble key 已并入上面）
     return result
 
 

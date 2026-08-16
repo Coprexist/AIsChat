@@ -58,29 +58,31 @@ async def list_plugins(
 ):
     """插件列表（登录即可；管理员看到全局开关，普通用户看到自己的开关）"""
     from app.models.plugin import Plugin, UserPluginPref
+    from app.models.user import User as UserModel
 
     await catalog.sync_plugins_to_db(db)  # 懒同步：目录变化即时可见（装好即可用）
     await apply_skill_plugins(db)
 
     user_id = current_user["user_id"]
-    is_admin = current_user.get("role") == "admin"
+    # 角色从 DB 重读（JWT role 可能是提权前的旧值），与 require_admin 同源
+    urow = await db.get(UserModel, user_id)
+    is_admin = bool(urow and urow.role == "admin")
 
     result = await db.execute(select(Plugin))
     rows = {p.id: p for p in result.scalars().all()}
 
-    prefs: dict[str, bool] = {}
-    if not is_admin:
-        pref_result = await db.execute(
-            select(UserPluginPref).where(UserPluginPref.user_id == user_id)
-        )
-        prefs = {p.plugin_id: p.enabled for p in pref_result.scalars().all()}
+    # 所有用户（含 admin）都查个人偏好：admin 也是普通用户，皮肤开关同样走 pref
+    pref_result = await db.execute(
+        select(UserPluginPref).where(UserPluginPref.user_id == user_id)
+    )
+    prefs = {p.plugin_id: p.enabled for p in pref_result.scalars().all()}
 
     disk = catalog.scan_disk()
     plugins = []
     for pid in sorted(rows.keys()):
         row = rows[pid]
         manifest = disk.get(pid, {})
-        user_pref = prefs.get(pid, True) if not is_admin else True
+        user_pref = prefs.get(pid, True)
         plugins.append(_to_view(row, manifest, user_pref, is_admin))
     return {"plugins": plugins}
 
