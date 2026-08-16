@@ -128,15 +128,24 @@ plugins/
 
 ### 5.2 应用链路（前端）
 
+**统一应用链（AuthContext `applyThemeChain`）**——自选色与皮肤共用同一组 CSS 变量，
+必须由一处按固定顺序重算，任何变更点都触发它，否则会互相清掉对方设置的变量
+（曾出 bug：打开设置页时 `applyUserTheme` 清空了已应用的皮肤变量）：
+
 ```
-登录/刷新 → GET /plugins → 找 category=skin 且 effective 的插件
-  → applySkin(id, skin_vars, isDark)     # 按当前主题模式应用对应套变量
-主题切换 → AuthContext 依赖 theme 重新应用（inline style 只能存一份值）
-停用皮肤 → clearSkin() → 用户自选主色（theme_colors）自然恢复
+applyThemeChain():
+  applyUserTheme(ui_prefs.theme_colors)   # ① 自选色（清空主题变量后设置）
+  GET /plugins → 找 category=skin 且 effective 的插件
+  applySkin(id, skin_vars, isDark)        # ② 皮肤最后覆盖（win）
+
+触发点：登录/刷新/主题切换/自选色保存或恢复（依赖变化）、
+       皮肤切换（window 'plugins-changed' 事件）、WS 广播、60s 轮询、页面切回
+停用皮肤 → applySkin(null) → clearSkin() → 自选色/默认自然恢复
 ```
 
-- 皮肤最后应用，**覆盖**用户自选主色之上；停用后自选色恢复
 - `utils/skin.ts`：`applySkin` / `clearSkin` / `skinVarName`（key → `--tw-*` CSS 变量）
+- ThemeCustomizer / SkinPicker 都不再直接调用 `applyUserTheme`/`applySkin` 做全局生效，
+  只负责保存偏好与发事件，最终状态由 AuthContext 统一收敛
 
 ### 5.3 关闭后的回退保障
 

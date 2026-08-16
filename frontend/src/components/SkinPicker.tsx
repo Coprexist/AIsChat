@@ -1,8 +1,7 @@
 import { useState, useEffect, useCallback } from 'react'
 import { api } from '../api/client'
 import { useT } from '../i18n/I18nContext'
-import { useTheme } from '../context/ThemeContext'
-import { applySkin, clearSkin, type PluginView } from '../utils/skin'
+import { type PluginView } from '../utils/skin'
 import { Palette, Check } from 'lucide-react'
 
 /**
@@ -17,13 +16,10 @@ const PREVIEW_KEYS = ['primary_500', 'accent_500', 'mint_500', 'rose_500', 'bubb
 
 export default function SkinPicker() {
   const t = useT()
-  const { theme } = useTheme()
   const [skins, setSkins] = useState<PluginView[]>([])
   const [loading, setLoading] = useState(true)
   const [toggling, setToggling] = useState<string | null>(null)
   const [error, setError] = useState('')
-
-  const isDark = theme === 'dark'
 
   const load = useCallback(async () => {
     try {
@@ -48,12 +44,8 @@ export default function SkinPicker() {
     try {
       await api.post(`/plugins/${skin.id}/pref`, { enabled: !skin.user_enabled })
       await load()
-      // 重新计算生效皮肤并应用（列表已刷新）
-      const res = await api.safe.get<{ plugins: PluginView[] }>('/plugins')
-      if (res.ok) {
-        const active = (res.value?.plugins || []).find((p) => p.category === 'skin' && p.effective)
-        applySkin(active?.id || null, active?.skin_vars, isDark)
-      }
+      // 通知 AuthContext 统一应用链重算（启用即时应用；停用回退自选色/默认）
+      window.dispatchEvent(new CustomEvent('plugins-changed'))
     } catch (e: any) {
       setError(e?.message || '操作失败')
     } finally {

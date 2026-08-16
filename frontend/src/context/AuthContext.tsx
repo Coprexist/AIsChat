@@ -102,22 +102,20 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     } catch { /* 存储不可用时忽略 */ }
   }, [user])
 
-  // 用户主题色应用：登录/刷新/登出时把 ui_prefs.theme_colors 覆盖到 CSS 变量
-  useEffect(() => {
-    applyUserTheme(user?.ui_prefs?.[THEME_COLORS_PREF_KEY])
-  }, [user])
-
-  // 皮肤插件应用：拉插件列表，应用「生效」的皮肤（管理员开放 + 用户启用），无则清除
-  // 回退保障：管理员全局关闭/插件卸载后，皮肤需能自动回退——
-  //   1) 立即：登录/刷新/主题切换（本 effect 触发）
+  // 主题与皮肤统一应用链：先自选色（ui_prefs.theme_colors），后皮肤插件覆盖（win）
+  // 所有触发点都收敛到这里重算，避免 applyUserTheme / applySkin 互相清掉对方设置的变量
+  // 回退保障：管理员全局关闭/插件卸载后皮肤自动回退——
+  //   1) 立即：登录/刷新/主题切换/自选色保存（依赖变化触发）
   //   2) 轮询：每 60s 静默刷新（管理员关闭后 ≤60s 回退）
   //   3) 焦点恢复：页面从后台切回时立即刷新
-  //   4) 事件：收到 WS 广播的 plugins_changed（管理面板操作）立即刷新
-  const applyPlugins = useCallback(() => {
+  //   4) 事件：WS 广播 plugins_changed / 本地切换皮肤或保存自选色 → 立即重算
+  const applyThemeChain = useCallback(() => {
     if (!user) {
+      applyUserTheme(null)
       clearSkin()
       return
     }
+    applyUserTheme(user.ui_prefs?.[THEME_COLORS_PREF_KEY])
     api.safe.get<{ plugins: PluginView[] }>('/plugins')
       .then((res) => {
         if (!res.ok) { clearSkin(); return }
@@ -126,13 +124,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         applySkin(active?.id || null, active?.skin_vars, theme === 'dark')
       })
       .catch(() => clearSkin())
-  }, [user?.id, theme])
+  }, [user?.id, user?.ui_prefs?.[THEME_COLORS_PREF_KEY], theme])
 
   useEffect(() => {
-    applyPlugins()
-    const iv = setInterval(applyPlugins, 60_000)
-    const onVisible = () => { if (document.visibilityState === 'visible') applyPlugins() }
-    const onPluginsChanged = () => applyPlugins()
+    applyThemeChain()
+    const iv = setInterval(applyThemeChain, 60_000)
+    const onVisible = () => { if (document.visibilityState === 'visible') applyThemeChain() }
+    const onPluginsChanged = () => applyThemeChain()
     document.addEventListener('visibilitychange', onVisible)
     window.addEventListener('plugins-changed', onPluginsChanged)
     return () => {
@@ -140,7 +138,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       document.removeEventListener('visibilitychange', onVisible)
       window.removeEventListener('plugins-changed', onPluginsChanged)
     }
-  }, [applyPlugins])
+  }, [applyThemeChain])
 
   const refreshUser = useCallback(async () => {
     try {

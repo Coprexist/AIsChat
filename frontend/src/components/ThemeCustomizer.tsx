@@ -110,6 +110,8 @@ export default function ThemeCustomizer() {
   const [dirty, setDirty] = useState(false)
 
   // 加载：默认 = 当前生效值；用户已存 = 覆盖
+  // 注意：不再在这里调 applyUserTheme —— 主题/皮肤由 AuthContext 统一应用链管理
+  // （applyUserTheme 会清空全部主题变量，在这里调用会把已应用的皮肤变量清掉）
   useEffect(() => {
     const eff = getEffectiveThemeColors()
     const savedColors = (user?.ui_prefs?.[THEME_COLORS_PREF_KEY] as Record<string, string> | undefined) || {}
@@ -119,8 +121,6 @@ export default function ThemeCustomizer() {
     }
     setColors(merged)
     setDirty(false)
-    // 应用已存主题（确保进入页面即生效）
-    applyUserTheme(savedColors)
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [user?.id])
 
@@ -151,8 +151,7 @@ export default function ThemeCustomizer() {
       }
       const ui_prefs = { ...(user?.ui_prefs || {}), [THEME_COLORS_PREF_KEY]: themeColors }
       await api.put('/user/settings', { ui_prefs })
-      await refreshUser()
-      applyUserTheme(themeColors)
+      await refreshUser()  // user 更新 → AuthContext 统一应用链重算（自选色 + 皮肤覆盖）
       setSaved(true)
       setDirty(false)
       setTimeout(() => setSaved(false), 2000)
@@ -166,12 +165,11 @@ export default function ThemeCustomizer() {
   const reset = async () => {
     setSaving(true)
     try {
-      // 清空已存主题 → 恢复默认
+      // 清空已存主题 → 恢复默认（AuthContext 统一应用链重算，含皮肤回退）
       const ui_prefs = { ...(user?.ui_prefs || {}) }
       delete ui_prefs[THEME_COLORS_PREF_KEY]
       await api.put('/user/settings', { ui_prefs })
       await refreshUser()
-      applyUserTheme(null)
       const eff = getEffectiveThemeColors()
       setColors(eff as Partial<Record<ThemeColorKey, string>>)
       setDirty(false)
