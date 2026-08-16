@@ -607,7 +607,7 @@
       var html = '';
       switch (key) {
         case 'p400':
-          html = '<span class="d-text">强调文字</span><span class="d-link">链接</span>'
+          html = '<span class="d-text" style="color:' + color + '">强调文字</span><span class="d-link" style="color:' + color + '">链接</span>'
                + '<span class="d" style="color:' + color + '">◉ 图标</span>'
                + '<span class="d" style="font-size:10px;color:rgb(var(--tw-text-muted))">用于正文强调/链接/图标，需白底可读</span>';
           break;
@@ -621,7 +621,7 @@
                + '<span class="d-hover-note">按钮悬停时用的加深色</span>';
           break;
         case 'a400':
-          html = '<span class="d-badge tint" style="--d-color:' + color + '">琥珀状态</span>'
+          html = '<span class="d-badge tint" style="color:' + color + ';background:' + color + '26">琥珀状态</span>'
                + '<span class="d" style="color:' + color + '">★ 星级</span>'
                + '<span class="d" style="font-size:10px;color:rgb(var(--tw-text-muted))">通知/状态/高亮</span>';
           break;
@@ -630,7 +630,7 @@
                + '<span class="d-hover-note">深琥珀 hover 或实底金按钮</span>';
           break;
         case 'm400':
-          html = '<span class="d-live" style="--d-color:' + color + '">在线</span>'
+          html = '<span class="d-live" style="color:' + color + '">在线</span>'
                + '<span class="d" style="color:' + color + '">✓ 成功</span>'
                + '<span class="d" style="font-size:10px;color:rgb(var(--tw-text-muted))">在线状态/成功提示</span>';
           break;
