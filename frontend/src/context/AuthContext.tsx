@@ -3,6 +3,8 @@ import { api } from '../api/client'
 import { cacheLangForUnauth } from '../i18n/I18nContext'
 import { type Lang, isValidLang, DEFAULT_LANG } from '../i18n/languages'
 import { applyUserTheme, THEME_COLORS_PREF_KEY } from '../utils/userTheme'
+import { applySkin, clearSkin, type PluginView } from '../utils/skin'
+import { useTheme } from './ThemeContext'
 
 interface User {
   id: number
@@ -87,6 +89,7 @@ function buildUserFromData(data: any): User {
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<User | null>(null)
   const [loading, setLoading] = useState(true)
+  const { theme } = useTheme()
 
   // 同步一份到 localStorage（user_info）：世界块/沉浸界面等非 React 环境读取当前用户
   useEffect(() => {
@@ -103,6 +106,27 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     applyUserTheme(user?.ui_prefs?.[THEME_COLORS_PREF_KEY])
   }, [user])
+
+  // 皮肤插件应用：登录/刷新后拉插件列表，应用「生效」的皮肤（管理员开放 + 用户启用）
+  // 主题切换（theme 变化）时按新模式重新应用；登出清除
+  useEffect(() => {
+    if (!user) {
+      clearSkin()
+      return
+    }
+    let cancelled = false
+    api.safe.get<{ plugins: PluginView[] }>('/plugins')
+      .then((res) => {
+        if (cancelled) return
+        if (!res.ok) { clearSkin(); return }
+        const skins = (res.value.plugins || []).filter((p) => p.category === 'skin' && p.effective)
+        const active = skins[0] || null
+        applySkin(active?.id || null, active?.skin_vars, theme === 'dark')
+      })
+      .catch(() => { if (!cancelled) clearSkin() })
+    return () => { cancelled = true }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [user?.id, theme])
 
   const refreshUser = useCallback(async () => {
     try {

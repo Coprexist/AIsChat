@@ -1,0 +1,10 @@
+{
+  "id": "skin-sakura",
+  "name": "樱粉物语",
+  "description": "樱粉色系皮肤，温柔浪漫，适合春天。",
+  "category": "skin",
+  "version": "1.0.0",
+  "author": "AIsChat",
+  "icon": "Flower2",
+  "default_enabled": true
+}

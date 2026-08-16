@@ -6,6 +6,7 @@ import { useT } from '../i18n/I18nContext'
 import Toggle from '../components/Toggle'
 import MagicVisionFilter from '../components/MagicVisionFilter.tsx'
 import ThemeCustomizer from '../components/ThemeCustomizer'
+import SkinPicker from '../components/SkinPicker'
 import { normalizePrefs, defaultPrefs, loadFromStorage, saveToStorage, apply } from '../utils/cssFilters'
 import type { MagicVisionPrefs } from '../utils/cssFilters'
 import { useResizableSidebar } from '../hooks/useResizableSidebar'
@@ -964,6 +965,9 @@ export default function SettingsPage() {
 
         {/* 主题定制 - 个性化主色 */}
         <ThemeCustomizer />
+
+        {/* 皮肤插件 - 一键启用/停用 */}
+        <SkinPicker />
 
         {/* 魔视界 - CSS 滤镜 */}
         <MagicVisionFilter

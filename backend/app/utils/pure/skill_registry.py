@@ -87,6 +87,13 @@ class SkillRegistry:
     def is_valid_type(cls, type_name: str) -> bool:
         return type_name in cls._types
 
+    @classmethod
+    def unregister(cls, type_name: str) -> None:
+        """注销一个技能类型（插件停用/卸载时调用；内置类型不受影响）"""
+        if type_name in cls._types:
+            del cls._types[type_name]
+            logger.info(f"技能类型已注销: {type_name}")
+
 
 # ── 注册内置技能类型 ──
 

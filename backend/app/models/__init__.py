@@ -34,6 +34,7 @@ from app.models.agent_trigger import AgentTrigger
 from app.models.agent_attention import AgentAttention
 from app.models.agent_state_stack import AgentStateStack
 from app.models.user_preferences import UserGroupPreference, UserDMPreference
+from app.models.plugin import Plugin, UserPluginPref
 from app.models.agent_skill_relation import AgentSkillRelation
 from app.models.alarm import AgentAlarm
 from app.models.structured_record import StructuredRecord
@@ -101,6 +102,8 @@ __all__ = [
     "GroupAssistant",
     "UserGroupPreference",
     "UserDMPreference",
+    "Plugin",
+    "UserPluginPref",
 ]
 
 from app.models.api_doc_section import ApiDocSection

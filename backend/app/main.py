@@ -108,6 +108,18 @@ async def lifespan(app: FastAPI):
     except Exception as e:
         logger.warning(f"⚠️ 加载 DB 配置覆盖失败（使用 env 配置）: {e}")
 
+    # 统一插件：磁盘扫描同步 + 技能插件注册（目录即插件，装好即可用）
+    try:
+        from app.database import async_session
+        from app.services.plugin.catalog import sync_plugins_to_db
+        from app.services.plugin.skill_bridge import apply_skill_plugins
+        async with async_session() as plugin_db:
+            changed = await sync_plugins_to_db(plugin_db)
+            await apply_skill_plugins(plugin_db)
+        logger.info(f"🧩 插件目录同步完成（{changed} 项变更）")
+    except Exception as e:
+        logger.warning(f"⚠️ 插件目录同步失败（不影响启动）: {e}", exc_info=True)
+
     # 平台能力版本化（skills/tools 懒加载）：启动时对比内置工具定义，变更则写新版本
     try:
         from app.database import async_session

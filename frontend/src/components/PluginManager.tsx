@@ -1,9 +1,10 @@
 import { useState, useEffect } from 'react'
 import { api } from '../api/client'
-import { Play, Square, CheckCircle, RefreshCw, Plug, Circle } from 'lucide-react'
+import { Play, Square, CheckCircle, RefreshCw, Plug, Circle, Palette, Wand2, Globe, Box, RefreshCcw } from 'lucide-react'
 import { useT } from '../i18n/I18nContext'
 import DocExportTab from './DocExportTab'
 import ApiDocSectionsTab from './ApiDocSectionsTab'
+import type { PluginView } from '../utils/skin'
 
 interface Plugin {
   id: string
@@ -15,12 +16,74 @@ interface Plugin {
   port: number | null
 }
 
+const CATEGORY_ICON: Record<string, any> = {
+  skin: Palette,
+  skill: Wand2,
+  world: Globe,
+  other: Box,
+}
+
+const CATEGORY_LABEL: Record<string, string> = {
+  skin: '皮肤',
+  skill: '技能',
+  world: '世界',
+  other: '其他',
+}
+
 export default function PluginManager() {
   const t = useT()
   const [plugins, setPlugins] = useState<Plugin[]>([])
   const [loading, setLoading] = useState(true)
   const [toggling, setToggling] = useState<string | null>(null)
   const [message, setMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null)
+
+  // ── 统一插件（内容插件：皮肤/技能/世界）管理员视图 ──
+  const [contentPlugins, setContentPlugins] = useState<PluginView[]>([])
+  const [contentLoading, setContentLoading] = useState(false)
+  const [contentToggling, setContentToggling] = useState<string | null>(null)
+
+  const fetchContentPlugins = async () => {
+    setContentLoading(true)
+    try {
+      const data = await api.get<{ plugins: PluginView[] }>('/plugins')
+      setContentPlugins(data.plugins || [])
+    } catch (e: any) {
+      setMessage({ type: 'error', text: `内容插件加载失败: ${e?.message || e}` })
+    } finally {
+      setContentLoading(false)
+    }
+  }
+
+  useEffect(() => {
+    fetchContentPlugins()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
+
+  const handleContentToggle = async (plugin: PluginView) => {
+    setContentToggling(plugin.id)
+    try {
+      const res: any = await api.post(`/plugins/${plugin.id}/toggle`)
+      setMessage({ type: 'success', text: res.message || '已切换' })
+      await fetchContentPlugins()
+    } catch (e: any) {
+      setMessage({ type: 'error', text: e?.message || '操作失败' })
+    } finally {
+      setContentToggling(null)
+    }
+  }
+
+  const handleRescan = async () => {
+    setContentLoading(true)
+    try {
+      const res: any = await api.post('/plugins/rescan')
+      setMessage({ type: 'success', text: res.message || '重扫完成' })
+      await fetchContentPlugins()
+    } catch (e: any) {
+      setMessage({ type: 'error', text: e?.message || '重扫失败' })
+    } finally {
+      setContentLoading(false)
+    }
+  }
 
   const fetchPlugins = async () => {
     try {
@@ -69,6 +132,74 @@ export default function PluginManager() {
     <div className="flex-1 overflow-y-auto p-6 space-y-6">
       <div>
         <h2 className="text-base font-semibold text-textPrimary mb-1">插件管理</h2>
+
+        {/* ═══ 统一插件（内容插件：皮肤 / 技能 / 世界）═══ */}
+        <div className="rounded-xl border border-border bg-elevated/30 p-4 mb-4">
+          <div className="flex items-center justify-between mb-1">
+            <h3 className="text-sm font-medium text-textPrimary flex items-center gap-1.5">
+              <Plug size={15} className="text-primary-400" /> 统一插件（目录即插件）
+            </h3>
+            <button
+              onClick={handleRescan}
+              disabled={contentLoading}
+              className="flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-medium bg-primary-500/10 text-primary-400 hover:bg-primary-500/20 border border-primary-400/20 transition-colors disabled:opacity-50"
+            >
+              <RefreshCcw size={12} className={contentLoading ? 'animate-spin' : ''} /> 重扫目录
+            </button>
+          </div>
+          <p className="text-xs text-textMuted mb-3">
+            插件放在 backend/plugins/ 或 data/plugins/ 目录（含 plugin.json）即自动发现，装好即可用。
+            这里控制全局开放/关闭；用户可在自己的设置页一键启用/停用。
+          </p>
+          {contentLoading && contentPlugins.length === 0 ? (
+            <p className="text-xs text-textMuted py-3">加载中…</p>
+          ) : contentPlugins.length === 0 ? (
+            <p className="text-xs text-textMuted py-3">暂无内容插件</p>
+          ) : (
+            <div className="space-y-2">
+              {contentPlugins.map((plugin) => {
+                const Icon = CATEGORY_ICON[plugin.category] || Box
+                const on = plugin.global_enabled
+                return (
+                  <div key={plugin.id} className="flex items-start justify-between gap-3 p-3 rounded-lg border border-border bg-surface">
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <Icon size={14} className="text-textMuted shrink-0" />
+                        <span className="font-medium text-sm text-textPrimary">{plugin.name}</span>
+                        <span className="px-1.5 py-0.5 rounded text-[10px] font-medium bg-primary-400/10 text-primary-400 border border-primary-400/20">
+                          {CATEGORY_LABEL[plugin.category] || plugin.category}
+                        </span>
+                        <span className="text-[10px] font-mono text-textMuted">v{plugin.version}</span>
+                        {plugin.builtin && (
+                          <span className="px-1.5 py-0.5 rounded text-[10px] bg-gray-100 dark:bg-gray-800 text-gray-500 dark:text-gray-400">内置</span>
+                        )}
+                      </div>
+                      <p className="text-xs text-textSecondary mt-0.5 line-clamp-2">{plugin.description}</p>
+                    </div>
+                    <button
+                      onClick={() => handleContentToggle(plugin)}
+                      disabled={contentToggling === plugin.id}
+                      className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium transition-colors shrink-0 disabled:opacity-50 ${
+                        on
+                          ? 'bg-mint-500 text-white hover:bg-mint-600'
+                          : 'bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-400 hover:bg-gray-200 dark:hover:bg-gray-700'
+                      }`}
+                    >
+                      {contentToggling === plugin.id ? (
+                        <RefreshCw size={14} className="animate-spin" />
+                      ) : on ? (
+                        <CheckCircle size={14} />
+                      ) : (
+                        <Circle size={14} />
+                      )}
+                      {contentToggling === plugin.id ? '处理中…' : on ? '已开放' : '已关闭'}
+                    </button>
+                  </div>
+                )
+              })}
+            </div>
+          )}
+        </div>
 
         {/* 可选能力：文档导出（pandoc）——并入插件管理 */}
         <div className="rounded-xl border border-border bg-elevated/30 p-4 mb-4">
