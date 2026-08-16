@@ -15,6 +15,7 @@
 - **双目录扫描**：内置 `backend/plugins/`（随代码 git 跟踪）+ 用户 `$DATA_DIR/plugins/`（持久化，覆盖内置同名）；启动同步 + API 懒同步 + 管理面板手动重扫
 - **两级开关**：`plugins.enabled`（管理员管理面板一键开放/关闭）+ `user_plugin_prefs.enabled`（用户设置页一键启用/停用）；生效 = 两者都开，默认即用
 - **皮肤插件**：`skin.json` 声明 light/dark 两套 CSS 变量（含气泡 `--tw-bubble`），设置页一键启停 + 即时应用 + 登录/主题切换自动应用 + 皮肤互斥（启用 A 自动停其余）；停用后用户自选主色自然恢复
+- **关闭回退保障**：管理员全局关闭/卸载后在线用户自动回退——WS 广播 `plugins_changed`（秒级）+ 页面切回立即刷新 + 60s 轮询兜底；技能类型随开关注销/恢复（SkillRegistry unregister）
 - **技能插件**：`skill.json` 声明技能类型 → 注册进 SkillRegistry（`unregister` 支持注销），管理员关闭/卸载即回收，绝不误删内置类型
 - **API**：`GET /plugins`、`POST /plugins/{id}/toggle`（管理员）、`POST /plugins/{id}/pref`（用户）、`POST /plugins/rescan`（管理员）
 - **数据库**：`plugins` + `user_plugin_prefs` 表（Alembic `a9b8c7d6e5f4`）

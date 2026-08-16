@@ -107,26 +107,40 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     applyUserTheme(user?.ui_prefs?.[THEME_COLORS_PREF_KEY])
   }, [user])
 
-  // 皮肤插件应用：登录/刷新后拉插件列表，应用「生效」的皮肤（管理员开放 + 用户启用）
-  // 主题切换（theme 变化）时按新模式重新应用；登出清除
-  useEffect(() => {
+  // 皮肤插件应用：拉插件列表，应用「生效」的皮肤（管理员开放 + 用户启用），无则清除
+  // 回退保障：管理员全局关闭/插件卸载后，皮肤需能自动回退——
+  //   1) 立即：登录/刷新/主题切换（本 effect 触发）
+  //   2) 轮询：每 60s 静默刷新（管理员关闭后 ≤60s 回退）
+  //   3) 焦点恢复：页面从后台切回时立即刷新
+  //   4) 事件：收到 WS 广播的 plugins_changed（管理面板操作）立即刷新
+  const applyPlugins = useCallback(() => {
     if (!user) {
       clearSkin()
       return
     }
-    let cancelled = false
     api.safe.get<{ plugins: PluginView[] }>('/plugins')
       .then((res) => {
-        if (cancelled) return
         if (!res.ok) { clearSkin(); return }
         const skins = (res.value.plugins || []).filter((p) => p.category === 'skin' && p.effective)
         const active = skins[0] || null
         applySkin(active?.id || null, active?.skin_vars, theme === 'dark')
       })
-      .catch(() => { if (!cancelled) clearSkin() })
-    return () => { cancelled = true }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+      .catch(() => clearSkin())
   }, [user?.id, theme])
+
+  useEffect(() => {
+    applyPlugins()
+    const iv = setInterval(applyPlugins, 60_000)
+    const onVisible = () => { if (document.visibilityState === 'visible') applyPlugins() }
+    const onPluginsChanged = () => applyPlugins()
+    document.addEventListener('visibilitychange', onVisible)
+    window.addEventListener('plugins-changed', onPluginsChanged)
+    return () => {
+      clearInterval(iv)
+      document.removeEventListener('visibilitychange', onVisible)
+      window.removeEventListener('plugins-changed', onPluginsChanged)
+    }
+  }, [applyPlugins])
 
   const refreshUser = useCallback(async () => {
     try {

@@ -138,6 +138,17 @@ plugins/
 - 皮肤最后应用，**覆盖**用户自选主色之上；停用后自选色恢复
 - `utils/skin.ts`：`applySkin` / `clearSkin` / `skinVarName`（key → `--tw-*` CSS 变量）
 
+### 5.3 关闭后的回退保障
+
+管理员全局关闭 / 插件卸载后，已应用皮肤的在线用户界面要能自动回退，四层保障：
+
+| 层 | 机制 | 延迟 |
+|----|------|------|
+| ① 用户自己停用 | SkinPicker 切换后前端立即 `clearSkin()` | 即时 |
+| ② WS 广播 | 管理员 toggle/rescan 时 `broadcast_to_all({type:"plugins_changed"})`，前端 useWebSocket 收到后转 `window` 事件 → AuthContext 重新拉取应用 | 秒级（需在线且在对话 WS 连接中） |
+| ③ 焦点恢复 | `visibilitychange` 页面从后台切回时立即刷新 | 切回瞬间 |
+| ④ 轮询 | AuthContext 每 60s 静默拉一次 `/plugins` 重新应用（兜底） | ≤60s |
+
 ---
 
 ## 六、技能插件桥接

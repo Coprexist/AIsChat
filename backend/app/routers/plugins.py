@@ -27,6 +27,15 @@ logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/plugins", tags=["统一插件"])
 
 
+async def _broadcast_plugins_changed() -> None:
+    """广播插件变更 → 在线用户前端即时刷新皮肤/插件状态（回退保障）"""
+    try:
+        from app.routers.ws import manager as ws_manager
+        await ws_manager.broadcast_to_all({"type": "plugins_changed"})
+    except Exception as e:
+        logger.warning(f"广播 plugins_changed 失败（不影响主流程）: {e}")
+
+
 class PrefRequest(BaseModel):
     enabled: bool = True
 
@@ -95,6 +104,7 @@ async def rescan_plugins(
     """管理员手动重扫磁盘插件目录（新增/卸载立即生效）"""
     changed = await catalog.sync_plugins_to_db(db)
     await apply_skill_plugins(db)
+    await _broadcast_plugins_changed()
     return {"message": f"重扫完成，{changed} 项变更"}
 
 
@@ -115,6 +125,7 @@ async def toggle_plugin(
     await apply_skill_plugins(db)
     state = "开放" if row.enabled else "关闭"
     logger.info(f"管理员{state}插件 {plugin_id}")
+    await _broadcast_plugins_changed()
     return {"message": f"「{row.name}」已{state}", "global_enabled": row.enabled}
 
 

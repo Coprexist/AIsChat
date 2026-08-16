@@ -146,6 +146,11 @@ export function useWebSocket(
           window.dispatchEvent(new CustomEvent('balance-prompt', { detail: msg.data }))
         }
 
+        // 插件变更广播（管理员开关/重扫）→ 全局事件（AuthContext 监听，皮肤即时回退）
+        if (msg.type === 'plugins_changed') {
+          window.dispatchEvent(new CustomEvent('plugins-changed'))
+        }
+
         // 心跳 ping → 立即回复 pong
         if (msg.type === 'ping') {
           ws.send(JSON.stringify({ type: 'pong' }))
