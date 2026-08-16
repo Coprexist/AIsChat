@@ -1,6 +1,6 @@
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect, useRef, useCallback } from 'react'
 import { api, getApiBaseUrl } from '../api/client'
-import { Plus, Save, Upload, Pencil, Check, Trash2, X, Image as ImageIcon, AlertTriangle } from 'lucide-react'
+import { Save, Upload, Pencil, Check, Trash2, X, Image as ImageIcon, AlertTriangle, Lock, Megaphone, Info } from 'lucide-react'
 import { useT } from '../i18n/I18nContext'
 
 interface MsgData {
@@ -53,16 +53,18 @@ export default function MaintenanceMsgEditor() {
   const [images, setImages] = useState<string[]>([])
   const [loaded, setLoaded] = useState(false)
   const [loadError, setLoadError] = useState('')
-  const [saved, setSaved] = useState(false)
+  const [saveState, setSaveState] = useState<'idle' | 'dirty' | 'saving' | 'saved' | 'error'>('idle')
   const [saveError, setSaveError] = useState('')
-  const [saving, setSaving] = useState(false)
   const [uploading, setUploading] = useState(false)
   const [selPreset, setSelPreset] = useState('')
   const [presetInput, setPresetInput] = useState('')   // 保存预设名称输入
   const [renaming, setRenaming] = useState<string | null>(null)
   const [renameValue, setRenameValue] = useState('')
   const [presetError, setPresetError] = useState('')
+  const [mtState, setMtState] = useState<{ hard: boolean; soft: boolean; auto: boolean } | null>(null)
   const fileRef = useRef<HTMLInputElement>(null)
+  const saveTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const dirtyRef = useRef(false)
 
   const load = async () => {
     try {
@@ -79,27 +81,49 @@ export default function MaintenanceMsgEditor() {
     }
   }
 
-  useEffect(() => { load() }, [])
+  useEffect(() => {
+    load()
+    api.get('/admin/maintenance').then((d: any) => setMtState({ hard: !!d.hard, soft: !!d.soft, auto: !!d.auto })).catch(() => {})
+  }, [])
 
-  const save = async () => {
-    if (saving) return
-    setSaving(true); setSaveError('')
+  /** 保存当前文案到后端（广播给在线用户） */
+  const save = useCallback(async () => {
+    if (saveTimer.current) { clearTimeout(saveTimer.current); saveTimer.current = null }
+    dirtyRef.current = false
+    setSaveState('saving'); setSaveError('')
     try {
       await api.put('/admin/maintenance/msg', msg)
-      setSaved(true); setTimeout(() => setSaved(false), 2000)
+      setSaveState('saved')
+      setTimeout(() => setSaveState(s => (s === 'saved' ? 'idle' : s)), 2500)
     } catch (e: any) {
+      dirtyRef.current = true
+      setSaveState('error')
       setSaveError(e?.detail || e?.message || '保存失败，请重试')
     }
-    setSaving(false)
+  }, [msg])
+
+  /** 字段变更：标记未保存并自动保存（防抖 1.5s） */
+  const updateMsg = (patch: Partial<MsgData>) => {
+    setMsg(prev => ({ ...prev, ...patch }))
+    dirtyRef.current = true
+    setSaveState('dirty')
+    if (saveTimer.current) clearTimeout(saveTimer.current)
+    saveTimer.current = setTimeout(() => save(), 1500)
   }
+
+  // 卸载时若还有未保存修改则立即保存
+  useEffect(() => () => {
+    if (saveTimer.current) clearTimeout(saveTimer.current)
+  }, [])
 
   const applyPreset = async (name: string) => {
     setPresetError('')
     try {
       // 后端 apply 会合并全字段并写入 msg 文件 + 广播；前端同步本地状态
       const r: any = await api.post(`/admin/maintenance/presets/apply?name=${encodeURIComponent(name)}`)
+      if (saveTimer.current) clearTimeout(saveTimer.current)
       setMsg(toMsgData(r.msg))
-      setSelPreset(name)
+      setSaveState('idle')
       setSaveError('')
     } catch (e: any) {
       setPresetError(e?.detail || e?.message || '应用预设失败')
@@ -154,7 +178,7 @@ export default function MaintenanceMsgEditor() {
     try {
       const r: any = await api.upload('/fs/upload-attachment', file)
       const url = publicFileUrl(r.file_id)
-      setMsg(prev => ({ ...prev, hard_image: url }))
+      updateMsg({ hard_image: url })
       try { await api.post(`/admin/maintenance/images?url=${encodeURIComponent(url)}`); setImages(prev => [url, ...prev.filter(x => x !== url)]) } catch {}
     } catch (e: any) {
       setSaveError(e?.detail || e?.message || '上传失败')
@@ -165,14 +189,14 @@ export default function MaintenanceMsgEditor() {
   const addImageUrl = async () => {
     const url = prompt('输入外网图片URL：')
     if (!url) return
-    try { await api.post(`/admin/maintenance/images?url=${encodeURIComponent(url)}`); setImages(prev => [url, ...prev.filter(x => x !== url)]); setMsg(prev => ({ ...prev, hard_image: url })) } catch (e: any) { setSaveError(e?.detail || '添加图片失败') }
+    try { await api.post(`/admin/maintenance/images?url=${encodeURIComponent(url)}`); setImages(prev => [url, ...prev.filter(x => x !== url)]); updateMsg({ hard_image: url }) } catch (e: any) { setSaveError(e?.detail || '添加图片失败') }
   }
 
   const removeImage = async (url: string) => {
     try {
       await api.delete(`/admin/maintenance/images?url=${encodeURIComponent(url)}`)
       setImages(prev => prev.filter(x => x !== url))
-      if (msg.hard_image === url) setMsg(prev => ({ ...prev, hard_image: '' }))
+      if (msg.hard_image === url) updateMsg({ hard_image: '' })
     } catch (e: any) { setSaveError(e?.detail || '删除图片失败') }
   }
 
@@ -193,6 +217,34 @@ export default function MaintenanceMsgEditor() {
 
   return (
     <div className="space-y-3">
+
+      {/* ── 顶部保存栏：保存状态 + 当前维护开关状态 ── */}
+      <div className="bg-surface rounded-xl border border-border px-4 py-3 flex flex-wrap items-center gap-2">
+        <div className="flex items-center gap-2 flex-1 min-w-[200px]">
+          <span className="text-xs font-medium text-textPrimary">维护文案</span>
+          {saveState === 'dirty' && <span className="text-[11px] px-2 py-0.5 rounded-full bg-accent-500/15 text-accent-400">未保存</span>}
+          {saveState === 'saving' && <span className="text-[11px] px-2 py-0.5 rounded-full bg-accent-500/15 text-accent-400">保存中…</span>}
+          {saveState === 'saved' && <span className="text-[11px] px-2 py-0.5 rounded-full bg-mint-500/15 text-mint-400"><Check size={11} className="inline mr-0.5" />已保存，在线用户已同步</span>}
+          {saveState === 'error' && <span className="text-[11px] px-2 py-0.5 rounded-full bg-rose-500/15 text-rose-400 flex items-center gap-1"><AlertTriangle size={11} />保存失败</span>}
+        </div>
+        {mtState && (
+          <span className={`text-[11px] px-2 py-0.5 rounded-full ${
+            mtState.hard ? 'bg-rose-500/15 text-rose-400' : mtState.soft ? 'bg-accent-500/15 text-accent-400' : 'bg-mint-500/15 text-mint-400'
+          }`}>
+            {mtState.auto ? '启动中' : mtState.hard ? '暂停服务中' : mtState.soft ? '温馨提示中' : '未开启'}
+          </span>
+        )}
+        <button onClick={save} disabled={saveState === 'saving'}
+          className="flex items-center gap-1.5 px-4 py-1.5 rounded-lg bg-primary-500 text-white text-xs font-medium hover:bg-primary-600 disabled:opacity-50 transition-colors">
+          <Save size={14} />{saveState === 'saving' ? '保存中…' : '立即保存'}
+        </button>
+      </div>
+      {saveError && <p className="text-[11px] text-rose-400 -mt-1">{saveError}</p>}
+      {mtState && !mtState.hard && !mtState.soft && (
+        <p className="flex items-center gap-1.5 text-[11px] text-textMuted -mt-1">
+          <Info size={12} /> 维护未开启——保存的文案将在开启「暂停服务」或「温馨提示」后展示给用户
+        </p>
+      )}
 
       {/* ── 预设栏 ── */}
       <div className="bg-surface rounded-xl border border-border p-3.5 space-y-2">
@@ -245,20 +297,20 @@ export default function MaintenanceMsgEditor() {
         <div className="bg-surface rounded-xl border border-border p-4 space-y-3">
           <div className="flex items-center gap-1.5 text-xs font-semibold text-textPrimary">
             <span className="w-2 h-2 rounded-full bg-rose-400 animate-pulse" />
-            🔒 暂停服务
+            <Lock size={13} className="text-rose-400" /> 暂停服务
             <span className="text-textMuted font-normal text-[10px] ml-1">——用户看到弹窗/顶栏，API 全部返回 503</span>
           </div>
           <div className="space-y-2.5">
             <div className="flex gap-2 items-start">
               <div className="relative shrink-0">
-                <input type="color" value={msg.hard_color} onChange={e => setMsg({...msg, hard_color: e.target.value})}
+                <input type="color" value={msg.hard_color} onChange={e => updateMsg({ hard_color: e.target.value })}
                   onMouseDown={e => e.stopPropagation()} className="absolute inset-0 opacity-0 w-8 h-8 cursor-pointer" />
                 <div className="w-8 h-8 rounded-lg border border-border/50" style={{ backgroundColor: msg.hard_color }} />
               </div>
               <div className="flex-1 space-y-2">
-                <input value={msg.hard_title} onChange={e => setMsg({...msg, hard_title: e.target.value})} placeholder="标题"
+                <input value={msg.hard_title} onChange={e => updateMsg({ hard_title: e.target.value })} placeholder="标题"
                   className="w-full px-3 py-1.5 rounded-lg border border-border bg-canvas text-xs text-textPrimary focus:outline-none focus:border-primary-500/40" />
-                <input value={msg.hard_body} onChange={e => setMsg({...msg, hard_body: e.target.value})} placeholder="正文"
+                <input value={msg.hard_body} onChange={e => updateMsg({ hard_body: e.target.value })} placeholder="正文"
                   className="w-full px-3 py-1.5 rounded-lg border border-border bg-canvas text-xs text-textPrimary focus:outline-none focus:border-primary-500/40" />
               </div>
             </div>
@@ -266,12 +318,12 @@ export default function MaintenanceMsgEditor() {
               <div className="flex items-center gap-1.5">
                 <span className="text-[10px] text-textMuted">文字色</span>
                 <div className="relative">
-                  <input type="color" value={msg.hard_text_color} onChange={e => setMsg({...msg, hard_text_color: e.target.value})}
+                  <input type="color" value={msg.hard_text_color} onChange={e => updateMsg({ hard_text_color: e.target.value })}
                     onMouseDown={e => e.stopPropagation()} className="absolute inset-0 opacity-0 w-6 h-6 cursor-pointer" />
                   <div className="w-6 h-6 rounded border border-border/50" style={{ backgroundColor: msg.hard_text_color }} />
                 </div>
               </div>
-              <select value={msg.hard_style} onChange={e => setMsg({...msg, hard_style: e.target.value})}
+              <select value={msg.hard_style} onChange={e => updateMsg({ hard_style: e.target.value })}
                 className="px-2.5 py-1.5 rounded-lg border border-border bg-canvas text-[11px] text-textPrimary focus:outline-none">
                 <option value="popup">弹窗</option>
                 <option value="banner">顶栏</option>
@@ -279,7 +331,7 @@ export default function MaintenanceMsgEditor() {
             </div>
             <div>
               <div className="flex gap-1.5">
-                <input value={msg.hard_image} onChange={e => setMsg({...msg, hard_image: e.target.value})} placeholder="图片 URL"
+                <input value={msg.hard_image} onChange={e => updateMsg({ hard_image: e.target.value })} placeholder="图片 URL"
                   className="flex-1 px-3 py-1.5 rounded-lg border border-border bg-canvas text-xs text-textPrimary focus:outline-none focus:border-primary-500/40" />
                 <button onClick={addImageUrl} className="shrink-0 px-2.5 py-1.5 rounded-lg border border-border bg-canvas text-[11px] text-textSecondary hover:text-primary-400 transition-colors" title="添加外链"><ImageIcon size={13} /></button>
                 <label className={`shrink-0 px-2.5 py-1.5 rounded-lg border border-border bg-canvas text-[11px] text-textSecondary hover:text-primary-400 cursor-pointer transition-colors ${uploading ? 'opacity-40 pointer-events-none' : ''}`}>
@@ -292,7 +344,7 @@ export default function MaintenanceMsgEditor() {
                 <div className="flex flex-wrap gap-1.5 mt-2">
                   {images.map((url, i) => (
                     <div key={i} className={`group relative rounded-lg overflow-hidden border transition-colors ${msg.hard_image === url ? 'border-primary-500 ring-1 ring-primary-500/40' : 'border-border/50 hover:border-primary-500/40'}`}>
-                      <button onClick={() => setMsg({...msg, hard_image: url})} className="block w-12 h-12" title={urlLabel(url)}>
+                      <button onClick={() => updateMsg({ hard_image: url })} className="block w-12 h-12" title={urlLabel(url)}>
                         <img src={url} alt="" className="w-12 h-12 object-cover bg-black/20" />
                       </button>
                       <button onClick={() => removeImage(url)}
@@ -328,35 +380,35 @@ export default function MaintenanceMsgEditor() {
         <div className="bg-surface rounded-xl border border-border p-4 space-y-3">
           <div className="flex items-center gap-1.5 text-xs font-semibold text-textPrimary">
             <span className="w-2 h-2 rounded-full bg-accent-400" />
-            📢 温馨提示
+            <Megaphone size={13} className="text-accent-400" /> 温馨提示
             <span className="text-textMuted font-normal text-[10px] ml-1">——用户看到顶栏/弹窗提示，API 正常运行</span>
           </div>
           <div className="space-y-2.5">
             <div className="flex gap-2 items-start">
               <div className="relative shrink-0">
-                <input type="color" value={msg.soft_color} onChange={e => setMsg({...msg, soft_color: e.target.value})}
+                <input type="color" value={msg.soft_color} onChange={e => updateMsg({ soft_color: e.target.value })}
                   onMouseDown={e => e.stopPropagation()} className="absolute inset-0 opacity-0 w-8 h-8 cursor-pointer" />
                 <div className="w-8 h-8 rounded-lg border border-border/50" style={{ backgroundColor: msg.soft_color }} />
               </div>
-              <input value={msg.soft_text} onChange={e => setMsg({...msg, soft_text: e.target.value})} placeholder="播报文字"
+              <input value={msg.soft_text} onChange={e => updateMsg({ soft_text: e.target.value })} placeholder="播报文字"
                 className="flex-1 px-3 py-1.5 rounded-lg border border-border bg-canvas text-xs text-textPrimary focus:outline-none focus:border-primary-500/40" />
             </div>
             <div className="flex items-center gap-3">
               <div className="flex items-center gap-1.5">
                 <span className="text-[10px] text-textMuted">文字色</span>
                 <div className="relative">
-                  <input type="color" value={msg.soft_text_color} onChange={e => setMsg({...msg, soft_text_color: e.target.value})}
+                  <input type="color" value={msg.soft_text_color} onChange={e => updateMsg({ soft_text_color: e.target.value })}
                     onMouseDown={e => e.stopPropagation()} className="absolute inset-0 opacity-0 w-6 h-6 cursor-pointer" />
                   <div className="w-6 h-6 rounded border border-border/50" style={{ backgroundColor: msg.soft_text_color }} />
                 </div>
               </div>
-              <select value={msg.soft_style} onChange={e => setMsg({...msg, soft_style: e.target.value})}
+              <select value={msg.soft_style} onChange={e => updateMsg({ soft_style: e.target.value })}
                 className="px-2.5 py-1.5 rounded-lg border border-border bg-canvas text-[11px] text-textPrimary focus:outline-none">
                 <option value="banner">顶栏</option>
                 <option value="popup">弹窗</option>
               </select>
               <label className="flex items-center gap-1.5 text-[11px] text-textSecondary cursor-pointer select-none ml-auto">
-                <input type="checkbox" checked={msg.soft_once} onChange={e => setMsg({...msg, soft_once: e.target.checked})} className="rounded" />
+                <input type="checkbox" checked={msg.soft_once} onChange={e => updateMsg({ soft_once: e.target.checked })} className="rounded" />
                 仅首次
               </label>
             </div>
@@ -379,16 +431,6 @@ export default function MaintenanceMsgEditor() {
             )}
           </div>
         </div>
-      </div>
-
-      {/* ── 保存 ── */}
-      <div className="flex items-center gap-3 bg-surface rounded-xl border border-border px-4 py-3">
-        <button onClick={save} disabled={saving}
-          className="flex items-center gap-1.5 px-5 py-2 rounded-lg bg-primary-500 text-white text-xs font-medium hover:bg-primary-600 disabled:opacity-50 transition-colors">
-          <Save size={14} />{saving ? '保存中···' : '保存'}
-        </button>
-        {saved && <span className="text-xs text-mint-400"><Check size={12} className="inline text-mint-400" /> 已保存，在线用户已同步</span>}
-        {saveError && <span className="text-xs text-rose-400 flex items-center gap-1"><AlertTriangle size={12} />{saveError}</span>}
       </div>
     </div>
   )

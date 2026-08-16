@@ -1114,7 +1114,7 @@ const zh: TranslationDict = {
 
   // ======================== 管理员 - 维护模式 / 概览 ========================
   'admin.maintenanceMode': '维护模式',
-  'admin.maintenanceStatusPaused': '🔒 暂停服务',
+  'admin.maintenanceStatusPaused': '暂停服务',
   'admin.maintenanceStatusTip': '维护提示',
   'admin.maintenanceStatusNormal': '正常',
   'admin.maintenanceResumeService': '恢复服务',
@@ -1126,10 +1126,10 @@ const zh: TranslationDict = {
   'admin.maintenanceRunning': '· 运行中 ·',
   'admin.maintenanceStopped': '暂停服务',
   'admin.maintenanceTipLabel': '· 维护提示 ·',
-  'admin.maintenanceDescAuto': '⚡ 后端启动/关闭中——自动暂停服务',
-  'admin.maintenanceDescHard': '🔴 管理员暂停了服务',
-  'admin.maintenanceDescSoft': '🟡 管理员开启了维护提示',
-  'admin.maintenanceDescNormal': '🟢 服务完全正常',
+  'admin.maintenanceDescAuto': '后端启动/关闭中——自动暂停服务',
+  'admin.maintenanceDescHard': '管理员暂停了服务',
+  'admin.maintenanceDescSoft': '管理员开启了维护提示',
+  'admin.maintenanceDescNormal': '服务完全正常',
   'admin.broadcast': '全平台播报',
 
   // ======================== 管理员 - API Key 池 / ApiKeyPoolTab ========================
@@ -2727,7 +2727,7 @@ const en: TranslationDict = {
 
   // ======================== Admin - Maintenance / Overview ========================
   'admin.maintenanceMode': 'Maintenance Mode',
-  'admin.maintenanceStatusPaused': '🔒 Service Paused',
+  'admin.maintenanceStatusPaused': 'Service Paused',
   'admin.maintenanceStatusTip': 'Maintenance Notice',
   'admin.maintenanceStatusNormal': 'Normal',
   'admin.maintenanceResumeService': 'Resume Service',
@@ -2739,10 +2739,10 @@ const en: TranslationDict = {
   'admin.maintenanceRunning': '· Running ·',
   'admin.maintenanceStopped': 'Service Paused',
   'admin.maintenanceTipLabel': '· Notice ·',
-  'admin.maintenanceDescAuto': '⚡ Backend starting/stopping — auto paused',
-  'admin.maintenanceDescHard': '🔴 Admin paused the service',
-  'admin.maintenanceDescSoft': '🟡 Admin enabled maintenance notice',
-  'admin.maintenanceDescNormal': '🟢 Service running normally',
+  'admin.maintenanceDescAuto': 'Backend starting/stopping — auto paused',
+  'admin.maintenanceDescHard': 'Admin paused the service',
+  'admin.maintenanceDescSoft': 'Admin enabled maintenance notice',
+  'admin.maintenanceDescNormal': 'Service running normally',
   'admin.broadcast': 'Broadcast',
 
   'admin.overview': 'Overview',
@@ -4504,7 +4504,7 @@ const ja: TranslationDict = {
 
   // ======================== 管理者 - メンテナンス / 概要 ========================
   'admin.maintenanceMode': 'メンテナンスモード',
-  'admin.maintenanceStatusPaused': '🔒 サービス停止中',
+  'admin.maintenanceStatusPaused': 'サービス停止中',
   'admin.maintenanceStatusTip': 'メンテナンス通知',
   'admin.maintenanceStatusNormal': '正常',
   'admin.maintenanceResumeService': 'サービス再開',
@@ -4516,10 +4516,10 @@ const ja: TranslationDict = {
   'admin.maintenanceRunning': '· 稼働中 ·',
   'admin.maintenanceStopped': 'サービス停止中',
   'admin.maintenanceTipLabel': '· 通知中 ·',
-  'admin.maintenanceDescAuto': '⚡ バックエンド起動/停止中 — 自動一時停止',
-  'admin.maintenanceDescHard': '🔴 管理者がサービスを停止しました',
-  'admin.maintenanceDescSoft': '🟡 管理者がメンテナンス通知を有効にしました',
-  'admin.maintenanceDescNormal': '🟢 サービスは正常に稼働中',
+  'admin.maintenanceDescAuto': 'バックエンド起動/停止中 — 自動一時停止',
+  'admin.maintenanceDescHard': '管理者がサービスを停止しました',
+  'admin.maintenanceDescSoft': '管理者がメンテナンス通知を有効にしました',
+  'admin.maintenanceDescNormal': 'サービスは正常に稼働中',
   'admin.broadcast': '全プラットフォーム通知',
 
   'admin.overview': '概要',
