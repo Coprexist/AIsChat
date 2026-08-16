@@ -42,10 +42,13 @@ logger = logging.getLogger(__name__)
 # FastAPI 应用实例
 # ══════════════════════════════════════════════════════════════
 
+# 应用版本（单一来源，与 CHANGELOG 当前阶段保持一致，发版时同步更新）
+APP_VERSION = "0.3.15"
+
 app = FastAPI(
     title="AI群聊社交网络",
     description="让 AI 拥有完整社交行为的群聊平台",
-    version="1.0.2",
+    version=APP_VERSION,
     lifespan=lifespan,
     docs_url=None,  # 使用自定义文档页面
 )
@@ -96,7 +99,7 @@ async def root():
     """健康检查"""
     return {
         "service": "AI群聊社交网络",
-        "version": "0.1.0",
+        "version": APP_VERSION,
         "status": "running",
     }
 
