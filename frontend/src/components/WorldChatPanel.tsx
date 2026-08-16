@@ -1,7 +1,8 @@
 import { memo, useState, useRef, useCallback, useMemo, forwardRef, useImperativeHandle, useEffect } from 'react'
-import { Send, Plus, X, ChevronRight, Brain, ArrowDown, FileText, Search, Globe, Terminal, Package, Clock, Wrench, Eraser, Pin, ChevronDown } from 'lucide-react'
+import { Send, Plus, X, ChevronRight, Brain, ArrowDown, FileText, Search, Globe, Terminal, Package, Clock, Wrench, Eraser, Pin, ChevronDown, Copy, RefreshCw } from 'lucide-react'
 import MarkdownContent from './shared/MarkdownContent'
-import { useWorldChat, WORLD_COMMANDS } from '../hooks/useWorldChat'
+import { useWorldChat, WORLD_COMMANDS, type ChatMsg } from '../hooks/useWorldChat'
+import { api } from '../api/client'
 import { useT } from '../i18n/I18nContext'
 
 // 工具气泡图标：按摘要内容关键词映射（后端文本不带 emoji，图标由前端渲染）
@@ -18,87 +19,100 @@ function toolIcon(content: string) {
   return <Wrench size={12} />
 }
 
-/** 工具气泡（2026-08-13）：running/update 单行状态；done 的 summary 过长时默认 2 行 + 展开/收起 */
-function ToolBubble({ label, error, icon }: { label: string; error?: boolean; icon: React.ReactNode }) {
+/** 工具状态行（DSH 式 GenericCommandCard，2026-08-16 借鉴）：
+ * 单行折叠条：图标 + 工具名 + 状态点(running/ok/error) + 摘要；可展开看详情
+ */
+function ToolBubble({ label, error, icon, running }: { label: string; error?: boolean; icon: React.ReactNode; running?: boolean }) {
   const [expanded, setExpanded] = useState(false)
-  // 长判定：字符多或有换行（多行摘要）才折叠
-  const long = label.length > 90 || label.includes('\n')
-  const collapsible = long && !expanded
+  const state = error ? 'error' : running ? 'running' : 'ok'
+  // 运行中显示 "进行中…" 摘要；完成显示结果摘要（截断）
+  const summary = label.length > 60 ? label.slice(0, 60) + '…' : label
+  const multiline = label.includes('\n')
   return (
-    <div className={`world-msg max-w-[90%] mx-auto text-[11px] rounded-lg overflow-hidden ${error ? 'text-rose-400 bg-rose-500/10 border border-rose-500/20' : 'text-mint-400 bg-mint-400/10 border border-mint-400/20'}`}>
+    <div
+      className={`world-msg max-w-[90%] mx-auto text-[11px] rounded-lg overflow-hidden border ${
+        state === 'error' ? 'bg-rose-500/10 border-rose-500/25' :
+        state === 'running' ? 'bg-mint-400/5 border-mint-400/20' :
+        'bg-mint-400/10 border-mint-400/20'
+      }`}
+    >
       <div
-        className={`px-2 py-1 text-center ${collapsible ? 'cursor-pointer select-none' : ''}`}
-        onClick={() => collapsible && setExpanded(true)}
+        className={`flex items-center gap-1.5 px-2 py-1 ${(multiline || expanded) ? 'cursor-pointer' : ''}`}
+        onClick={() => (multiline || expanded) && setExpanded((v) => !v)}
       >
-        {collapsible ? (
-          <div>
-            {/* 折叠：2 行 + 渐变淡化，与思考气泡一致 */}
-            <div className="relative">
-              <div className="flex items-start justify-center gap-1.5">
-                <span className="shrink-0 mt-0.5">{icon}</span>
-                <span className="min-w-0 line-clamp-2 text-left whitespace-pre-wrap">{label}</span>
-              </div>
-              <div className="absolute inset-x-0 bottom-0 h-5 bg-gradient-to-t from-mint-400/10 to-transparent pointer-events-none" />
-            </div>
-            <span className="inline-flex items-center gap-0.5 text-[10px] opacity-70">
-              <ChevronDown size={10} /> 展开
-            </span>
-          </div>
-        ) : (
-          <div className="flex items-start justify-center gap-1.5">
-            <span className="shrink-0 mt-0.5">{icon}</span>
-            <span className="min-w-0 whitespace-pre-wrap text-left">{label}</span>
-            {long && (
-              <button
-                className="shrink-0 text-[10px] opacity-70 hover:opacity-100 flex items-center gap-0.5"
-                onClick={(e) => { e.stopPropagation(); setExpanded(false) }}
-              >
-                <ChevronDown size={10} className="rotate-180" /> 收起
-              </button>
-            )}
-          </div>
+        <span className="shrink-0 flex items-center justify-center w-3.5 h-3.5 rounded-full border border-current/20" style={{ color: state === 'error' ? 'rgb(var(--tw-rose-400))' : 'rgb(var(--tw-mint-400))' }}>
+          {running ? <span className="w-1.5 h-1.5 rounded-full bg-current animate-pulse" /> :
+           error ? <span className="text-[9px] leading-none font-bold">!</span> :
+           <span className="text-[8px] leading-none">✓</span>}
+        </span>
+        <span className="shrink-0 flex items-center gap-1 text-current" style={{ color: state === 'error' ? 'rgb(var(--tw-rose-400))' : 'rgb(var(--tw-mint-400))' }}>
+          {icon}
+          <span className="font-medium">{running ? '执行中' : error ? '执行失败' : '已完成'}</span>
+        </span>
+        <span className="shrink-0 w-px h-2.5 bg-current/20 mx-0.5" aria-hidden />
+        <span className="flex-1 min-w-0 truncate" style={{ color: state === 'error' ? 'rgb(var(--tw-rose-400))' : 'rgb(var(--tw-mint-400))' }}>
+          {summary}
+        </span>
+        {multiline && (
+          <ChevronDown size={11} className={`shrink-0 text-current/60 transition-transform ${expanded ? 'rotate-180' : ''}`} />
         )}
       </div>
+      {expanded && (
+        <div className="px-2 pb-1.5 whitespace-pre-wrap text-current max-h-48 overflow-y-auto border-t border-current/10 pt-1.5" style={{ color: state === 'error' ? 'rgb(var(--tw-rose-400))' : 'rgb(var(--tw-mint-400))' }}>
+          {label}
+        </div>
+      )}
     </div>
   )
 }
 
-/** 思考气泡（2026-08-13）：独立展示，默认 2 行 + 底部渐变淡化，点击展开看全部 */
-function ReasoningBubble({ text }: { text: string }) {
+/** 思考气泡（DSH 式单行 Think 条，2026-08-16 借鉴 deepseek-harness ReasoningRow）：
+ *  - 单行折叠条：图标 + "思考" + 摘要
+ *  - 运行中：显示最新一行，自动跟随末尾（横向滚动），底部扫光动画
+ *  - 完成：显示第一行作为摘要
+ *  - 点击展开看全部
+ */
+function ReasoningBubble({ text, running }: { text: string; running?: boolean }) {
   const [expanded, setExpanded] = useState(false)
   const t = useT()
-  const bodyRef = useRef<HTMLDivElement>(null)
-  // 折叠：JS 截断只渲染前两行（超出的不渲染，省性能）——流式时没到两行正常增长，
-  // 一旦超过两行就固定显示前两行（新内容在第 3 行起不渲染，自然静止）
-  const lines = text.split('\n')
-  const collapsedText = lines.length > 2 ? lines.slice(0, 2).join('\n') : text
-  // 展开时滚动到气泡顶部（内容开头）
-  const handleToggle = () => {
-    setExpanded((v) => {
-      if (!v) {
-        requestAnimationFrame(() => bodyRef.current?.scrollTo({ top: 0 }))
-      }
-      return !v
-    })
-  }
+  const summaryRef = useRef<HTMLSpanElement>(null)
+
+  // 运行中 = 最新一行；完成 = 第一行（与 DSH firstLine/latestLine 同语义）
+  const summary = running
+    ? (() => { const v = text.trimEnd(); const i = v.lastIndexOf('\n'); return i === -1 ? v : v.slice(i + 1) })()
+    : (() => { const i = text.indexOf('\n'); return i === -1 ? text : text.slice(0, i) })()
+
+  // 运行中自动滚动到末尾（跟随最新输出）
+  useEffect(() => {
+    if (running && summaryRef.current) {
+      summaryRef.current.scrollLeft = summaryRef.current.scrollWidth - summaryRef.current.clientWidth
+    }
+  }, [running, summary])
+
   return (
     <div
-      className="world-msg max-w-[90%] mx-auto cursor-pointer select-none text-[11px] text-textMuted bg-elevated/40 border border-border/50 rounded-lg overflow-hidden"
-      onClick={handleToggle}
+      className={`world-msg max-w-[90%] mx-auto select-none text-[11px] rounded-lg overflow-hidden border ${
+        expanded
+          ? 'bg-elevated/60 border-border/60'
+          : 'bg-elevated/40 border-border/40 cursor-pointer hover:bg-elevated/70 transition-colors'
+      }`}
+      onClick={() => !running && setExpanded((v) => !v)}
     >
-      <div className="flex items-center gap-1 px-2 py-1 border-b border-border/30">
-        <Brain size={11} className="shrink-0 text-textMuted" />
-        <span className="shrink-0 text-[10px] text-textMuted">{t('world.reasoning') || '思考'}</span>
-        <ChevronDown size={11} className={`ml-auto shrink-0 transition-transform ${expanded ? 'rotate-180' : ''}`} />
+      <div className="flex items-center gap-1.5 px-2 py-1">
+        <Brain size={12} className="shrink-0 text-textMuted" />
+        <span className="shrink-0 text-[10px] text-textMuted font-medium">{t('world.reasoning') || '思考'}</span>
+        <span className="shrink-0 w-px h-2.5 bg-border/60 mx-0.5" aria-hidden />
+        <span
+          ref={summaryRef}
+          className={`flex-1 min-w-0 truncate text-textMuted ${running ? 'whitespace-nowrap overflow-hidden' : ''}`}
+        >
+          {summary || (running ? '…' : '')}
+        </span>
+        <ChevronDown size={11} className={`shrink-0 text-textMuted transition-transform ${expanded ? 'rotate-180' : ''}`} />
       </div>
-      {expanded ? (
-        <div ref={bodyRef} className="px-2 py-1.5 whitespace-pre-wrap max-h-72 overflow-y-auto">{text}</div>
-      ) : (
-        <div className="relative">
-          <div className="px-2 py-1.5 whitespace-pre-wrap">{collapsedText}</div>
-          {lines.length > 2 && (
-            <div className="absolute inset-x-0 bottom-0 h-6 bg-gradient-to-t from-elevated/90 to-transparent pointer-events-none" />
-          )}
+      {expanded && (
+        <div className="px-2 pb-1.5 whitespace-pre-wrap text-textMuted max-h-72 overflow-y-auto border-t border-border/30 pt-1.5">
+          {text}
         </div>
       )}
     </div>
@@ -198,6 +212,28 @@ const WorldChatPanel = memo(forwardRef<WorldChatHandle, WorldChatPanelProps>(({ 
     clearLocalInput()
   }, [chat, clearLocalInput])
 
+  // 重新生成（DSH 式 branch 语义）：截断该 AI 回复及其后的历史，重发最后一条用户消息
+  const handleRegenerate = useCallback(async (aiMsgId: number) => {
+    if (chat.chatSending || chat.chatProcessing) return
+    // 找该 AI 回复之前的最后一条用户消息（作为重发对象）
+    const idx = chat.chatMsgs.findIndex((m) => m.id === aiMsgId)
+    const before = idx >= 0 ? chat.chatMsgs.slice(0, idx) : chat.chatMsgs
+    const lastUser = [...before].reverse().find((m) => m.role === 'user' && !m.pending)
+    if (!lastUser || !lastUser.content) return
+    try {
+      // 1) 后端截断：删除该消息及其之后的所有消息
+      const r = await api.post<{ messages: ChatMsg[] }>(`/worlds/${chat.wid}/chat/regenerate`, { session_id: String(aiMsgId) })
+      if (Array.isArray(r.messages)) {
+        chat.setChatMsgs(r.messages)
+        chat.forceScrollToBottom?.()
+      }
+      // 2) 重发最后一条用户消息 → 生成新回复（取代旧回复）
+      chat.submitText(lastUser.content)
+    } catch (err: any) {
+      if (onMsg) onMsg(`重新生成失败：${err?.message || '未知错误'}`)
+    }
+  }, [chat, onMsg])
+
   const handleInsertSuggestion = useCallback((q: string) => {
     const next = localInputRef.current ? localInputRef.current + ' ' + q : q
     localInputRef.current = next
@@ -242,15 +278,17 @@ const WorldChatPanel = memo(forwardRef<WorldChatHandle, WorldChatPanelProps>(({ 
           key={m.id}
           label={label}
           error={m.error ?? m.is_error}
+          running={m.tool_status === 'running' || m.tool_status === 'update'}
           icon={toolIcon(m.content)}
         />
       )
     }
 
-    // 思考独立气泡（2026-08-13）：只有思考没正文（note 且 content 空）——
-    // 默认显示 2 行 + 底部渐变淡化，点击展开看全部
+    // 思考单行条（DSH 式，2026-08-16）：只有思考没正文（note 且 content 空）——
+    // 运行中显示最新一行+扫光，完成显示首行摘要，点击展开
     if (m.role === 'note' && !m.content && m.reasoning) {
-      return <ReasoningBubble key={m.id} text={m.reasoning} />
+      const reasoningRunning = (chat.chatSending || chat.chatProcessing) && m.id === lastAiMsgId
+      return <ReasoningBubble key={m.id} text={m.reasoning} running={reasoningRunning} />
     }
 
     return (
@@ -281,6 +319,24 @@ const WorldChatPanel = memo(forwardRef<WorldChatHandle, WorldChatPanelProps>(({ 
             )
           ) : null}
         </div>
+
+        {/* 消息操作条（DSH 式 MessageIconActions，2026-08-16）：复制 + 重新生成 */}
+        {(m.role === 'ai' || m.role === 'note') && m.content && !m.pending && (
+          <div className="flex items-center gap-0.5 pl-1 opacity-0 group-hover:opacity-100 transition-opacity">
+            <button
+              onClick={() => {
+                try { navigator.clipboard.writeText(m.content || ''); } catch {}
+              }}
+              className="p-1 rounded text-textMuted hover:text-textSecondary hover:bg-elevated transition-colors"
+              title="复制回复"
+            ><Copy size={12} /></button>
+            <button
+              onClick={() => handleRegenerate(m.id)}
+              className="p-1 rounded text-textMuted hover:text-textSecondary hover:bg-elevated transition-colors"
+              title="重新生成（截断此回复并重发，旧回复被取代）"
+            ><RefreshCw size={12} /></button>
+          </div>
+        )}
 
         {/* 中断 → "你可以：继续" */}
         {isLastAi && isInterrupted && !chat.chatSending && !chat.chatProcessing && (

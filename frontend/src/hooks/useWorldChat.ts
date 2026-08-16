@@ -639,7 +639,8 @@ export function useWorldChat({ wid, onRefresh, onMsg }: UseWorldChatOptions) {
   }, [chatSending, chatProcessing, pendingItems])
 
   return {
-    chatMsgs, chatInput, setChatInput,
+    wid,
+    chatMsgs, chatInput, setChatInput, setChatMsgs,
     chatSending, chatProcessing, chatHasMore, chatLoadingOlder,
     chatListRef, chatInputRef, pendingItems, setPendingItems, suggestions,
     cmdActive, setCmdActive, cmdQuery, setCmdQuery, cmdIdx, setCmdIdx, cmdFiltered,

@@ -729,6 +729,52 @@ async def post_chat(
     }
 
 
+@router.post("/{world_id}/chat/regenerate")
+async def regenerate_chat(
+    world_id: int,
+    req: ChatSessionRequest,
+    current_user: dict = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """重新生成：删除指定消息及其之后的所有消息（截断对话历史），返回剩余消息。
+
+    前端拿到剩余消息后，重发最后一条用户消息触发新一轮生成（旧回复被取代，不追加）。
+    """
+    await _require_owner(db, world_id, current_user["user_id"])
+    from sqlalchemy import delete as _delete
+    from app.models.world import World, WorldChatMessage
+    from app.services.world.world_chat_service import get_chat_history, session_id_for_db
+
+    world = await db.get(World, world_id)
+    if world is None:
+        raise HTTPException(status_code=404, detail="世界不存在")
+    sid = session_id_for_db(world)
+
+    # 校验目标消息存在且属于本世界/会话
+    target = (await db.execute(
+        select(WorldChatMessage).where(
+            WorldChatMessage.id == req.session_id,  # 复用 session_id 字段传 message_id（避免新模型）
+            WorldChatMessage.world_id == world_id,
+        )
+    )).scalar_one_or_none()
+    if target is None:
+        raise HTTPException(status_code=404, detail="消息不存在")
+
+    # 删除该消息及其之后的所有消息（含该条 AI 回复）
+    q = _delete(WorldChatMessage).where(
+        WorldChatMessage.world_id == world_id,
+        WorldChatMessage.id >= target.id,
+    )
+    if sid is None:
+        q = q.where(WorldChatMessage.session_id.is_(None))
+    else:
+        q = q.where(WorldChatMessage.session_id == sid)
+    await db.execute(q)
+    await db.commit()
+
+    return {"messages": await get_chat_history(db, world_id, limit=100, session_id=sid)}
+
+
 @router.post("/{world_id}/chat/session")
 async def switch_chat_session(
     world_id: int,
