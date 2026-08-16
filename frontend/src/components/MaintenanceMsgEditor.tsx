@@ -99,6 +99,10 @@ export default function MaintenanceMsgEditor() {
     api.get('/admin/maintenance').then((d: any) => setMtState({ hard: !!d.hard, soft: !!d.soft, auto: !!d.auto })).catch(() => {})
   }, [])
 
+  // 始终持有最新 msg，避免定时器/闭包读到旧值
+  const msgRef = useRef(msg)
+  msgRef.current = msg
+
   /** 保存文案到后端（全量提交，广播给在线用户）；section 决定哪个栏显示状态 */
   const save = useCallback(async (section: 'hard' | 'soft' | 'both') => {
     if (saveTimer.current) { clearTimeout(saveTimer.current); saveTimer.current = null }
@@ -108,7 +112,7 @@ export default function MaintenanceMsgEditor() {
     }
     setState('saving'); setSaveError('')
     try {
-      await api.put('/admin/maintenance/msg', msg)
+      await api.put('/admin/maintenance/msg', msgRef.current)
       setState('saved')
       setTimeout(() => {
         if (section === 'both' || section === 'hard') setHardState(s => (s === 'saved' ? 'idle' : s))
@@ -118,7 +122,7 @@ export default function MaintenanceMsgEditor() {
       setState('error')
       setSaveError(e?.detail || e?.message || '保存失败，请重试')
     }
-  }, [msg])
+  }, [])
 
   /** 字段变更：标记对应栏未保存并自动保存（防抖 1.5s，全量提交） */
   const updateMsg = (patch: Partial<MsgData>) => {

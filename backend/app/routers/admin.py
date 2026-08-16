@@ -3022,7 +3022,8 @@ async def get_maintenance(admin: dict = Depends(require_admin)):
 
 
 def _maintenance_msg_file() -> str:
-    return os.path.join(os.environ.get("MAINTENANCE_DIR", "/tmp"), "maintenance_msg.json")
+    """维护文案 JSON：持久化到数据目录（docker 挂载，重启不丢）；旧数据在 MAINTENANCE_DIR 则迁移"""
+    return os.path.join(settings.data_dir, "maintenance_msg.json")
 
 
 def _load_maintenance_msg() -> dict:
@@ -3104,8 +3105,12 @@ async def get_maintenance_msg(admin: dict = Depends(require_admin)):
 
 @router.put("/maintenance/msg")
 async def save_maintenance_msg(body: MaintenanceMsgBody, admin: dict = Depends(require_admin)):
-    with open(_maintenance_msg_file(), "w") as f:
-        f.write(json.dumps(body.model_dump(), ensure_ascii=False))
+    try:
+        os.makedirs(os.path.dirname(_maintenance_msg_file()), exist_ok=True)
+        with open(_maintenance_msg_file(), "w") as f:
+            f.write(json.dumps(body.model_dump(), ensure_ascii=False))
+    except Exception:
+        raise HTTPException(500, "维护文案保存失败：数据目录不可写")
     await _broadcast_maintenance_update()
     return {"ok": True, "message": "维护文本已保存"}
 
@@ -3158,8 +3163,12 @@ async def apply_preset(admin: dict = Depends(require_admin), name: str = ""):
         "soft_style": p.get("soft_style", "banner"),
         "soft_once": p.get("soft_once", False),
     }
-    with open(_maintenance_msg_file(), "w") as f:
-        f.write(json.dumps(merged, ensure_ascii=False))
+    try:
+        os.makedirs(os.path.dirname(_maintenance_msg_file()), exist_ok=True)
+        with open(_maintenance_msg_file(), "w") as f:
+            f.write(json.dumps(merged, ensure_ascii=False))
+    except Exception:
+        raise HTTPException(500, "应用预设失败：数据目录不可写")
     await _broadcast_maintenance_update()
     return {"ok": True, "message": f"已应用预设「{name}」", "msg": merged}
 

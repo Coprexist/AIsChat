@@ -355,7 +355,18 @@ _MAINTENANCE_DIR = os.environ.get("MAINTENANCE_DIR", "/tmp")
 _MAINTENANCE_AUTO = os.path.join(_MAINTENANCE_DIR, "maintenance_startup")
 _MAINTENANCE_SOFT = os.path.join(_MAINTENANCE_DIR, "maintenance_soft")
 _MAINTENANCE_ADMIN_HARD = os.path.join(_MAINTENANCE_DIR, "maintenance_admin_hard")
-_MAINTENANCE_MSG_FILE = os.path.join(_MAINTENANCE_DIR, "maintenance_msg.json")
+# 维护文案 JSON：持久化到数据目录（docker 挂载 /app/data，重启不丢）
+from app.config import settings as _maint_settings
+_MAINTENANCE_MSG_FILE = os.path.join(_maint_settings.data_dir, "maintenance_msg.json")
+# 旧版本写在 MAINTENANCE_DIR（容器 /tmp）→ 迁移到持久化路径
+_MAINTENANCE_MSG_LEGACY = os.path.join(_MAINTENANCE_DIR, "maintenance_msg.json")
+if not os.path.exists(_MAINTENANCE_MSG_FILE) and os.path.exists(_MAINTENANCE_MSG_LEGACY):
+    try:
+        os.makedirs(_maint_settings.data_dir, exist_ok=True)
+        with open(_MAINTENANCE_MSG_LEGACY) as _src, open(_MAINTENANCE_MSG_FILE, "w") as _dst:
+            _dst.write(_src.read())
+    except Exception:
+        pass
 
 def _get_maintenance_msg() -> dict:
     """读取自定义维护文本，不存在则返回默认"""
