@@ -640,21 +640,51 @@ async def _inject_pending_user_messages(
 ):
     """把插入中的普通消息拼进工具轮上下文（每轮 LLM 调用前调用）。
 
-    2026-08-13 产品定（改）：用户发消息的瞬间已由 world_turn._publish_insert
-    **立即落库 + 广播** [INSERTED]/[INSERT]（气泡马上画入，不等下一轮）；
-    这里只负责把消息拼进 AI 上下文（drain 后追加 user 消息）。
+    2026-08-16 产品定（改）：插入消息**不再立即绘制**——用户发送后先进排队队列，
+    等 AI 真正收到（此处注入上下文）时，才逐条**落库 + 广播** [INSERTED]/[INSERT]
+    （前端清排队弹窗 + 画真实气泡）——用户看到"已发送" = AI 已看到。
     无排队消息时直接返回（零开销）。
     """
     from app.services.world.world_turn import get_world_worker
     insert_items = await get_world_worker(world_id).drain_inserts()
     if not insert_items:
         return
+    # 落库 + 广播（先 [INSERTED] 清前端排队弹窗，再逐条落库 + [INSERT] 画气泡）
+    from app.models.world import World, WorldChatMessage
     for _it in insert_items:
-        for _m in _it["messages"]:
+        tb = _it.get("tb")
+        user_id = _it.get("user_id")
+        msgs = _it.get("messages") or []
+        if tb:
+            try:
+                await tb.broadcast(f"data: [INSERTED]{json.dumps({'count': len(msgs)}, ensure_ascii=False)}\n\n")
+            except Exception:
+                pass
+        ids: list[int] = []
+        for _m in msgs:
             _m_text = str(_m).strip()
             if not _m_text:
                 continue
+            # 落库（真实 msg_id → 前端 [INSERT] 画的气泡与历史一致，刷新不重复）
+            if sid_db is None:
+                _w = await db.get(World, world_id)
+                sid_db = session_id_for_db(_w) if _w else None
+            wm = WorldChatMessage(
+                world_id=world_id, user_id=user_id, role="user",
+                content=_m_text, session_id=sid_db,
+            )
+            db.add(wm)
+            await db.flush()
+            ids.append(wm.id)
+            if tb:
+                try:
+                    await tb.broadcast(f"data: [INSERT]{json.dumps({'msg_id': wm.id, 'content': _m_text}, ensure_ascii=False)}\n\n")
+                except Exception:
+                    pass
+            # 注入 AI 上下文（真正"发送"给 AI）
             messages.append({"role": "user", "content": _m_text})
+        _it["msg_ids"] = ids
+    await db.commit()
 
 
 async def _execute_tool_round(

@@ -205,8 +205,10 @@ class WorldTurnWorker:
     def enqueue(self, user_id: int, message: str | list[str]) -> str:
         """消息入队（支持批量：排队消息一起发给 AI），返回 turn_id（订阅直播用）。
 
-        产品定（2026-08-13）：非命令消息在 AI 工具轮进行中时**直接插入下一轮**（
-        不排队等待）；只有命令（/ 开头，如 /compact /clear）需要当前轮次结束后再发送。
+        产品定（2026-08-16 改）：非命令消息在 AI 工具轮进行中时**进插入队列**（
+        不立即绘制气泡）；等 AI 真正收到（_inject_pending_user_messages 注入上下文）时
+        才落库 + 广播 [INSERTED]/[INSERT] 绘制气泡——用户看到"已发送" = AI 已看到。
+        只有命令（/ 开头，如 /compact /clear）需要当前轮次结束后再发送。
         """
         messages = message if isinstance(message, list) else [message]
         turn_id = uuid.uuid4().hex[:12]
@@ -220,13 +222,9 @@ class WorldTurnWorker:
             tb = TurnBroadcast(turn_id)
             tb.proxy = active_tb
             self.turns[turn_id] = tb
-            self._inserts.append({"user_id": user_id, "messages": messages, "msg_ids": []})
-            # 2026-08-13 产品定（改）：用户发消息**立即**落库 + 广播 [INSERTED]/[INSERT]
-            # （气泡马上画入，不等下一轮 LLM 调用）；_inserts 仅作上下文注入用。
-            try:
-                asyncio.create_task(self._publish_insert(world_id, tb, user_id, messages))
-            except Exception:
-                pass
+            # 2026-08-16 产品定（改）：不再立即落库+广播——消息先进插入队列，
+            # 等 _inject_pending_user_messages 真正注入 AI 上下文时再落库 + 广播绘制气泡。
+            self._inserts.append({"user_id": user_id, "messages": messages, "msg_ids": [], "tb": tb})
             return turn_id
         self.turns[turn_id] = TurnBroadcast(turn_id)
         self.msg_queue.put_nowait({
