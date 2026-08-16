@@ -11,6 +11,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, func, update, delete
 from pydantic import BaseModel, Field
 from app.config import settings
+from app.services.infrastructure.maintenance import maintenance
 from app.database import get_db
 from app.utils.pure.formatting import mask_api_key
 from app.utils.config_resolver import find_old_config
@@ -3013,75 +3014,41 @@ async def get_browser_status(admin: dict = Depends(require_admin)):
 
 @router.get("/maintenance")
 async def get_maintenance(admin: dict = Depends(require_admin)):
-    d = os.environ.get("MAINTENANCE_DIR", "/tmp")
-    return {
-        "auto": os.path.exists(os.path.join(d, "maintenance_startup")),
-        "hard": os.path.exists(os.path.join(d, "maintenance_admin_hard")),
-        "soft": os.path.exists(os.path.join(d, "maintenance_soft")),
-    }
-
-
-def _maintenance_msg_file() -> str:
-    """维护文案 JSON：持久化到数据目录（docker 挂载，重启不丢）；旧数据在 MAINTENANCE_DIR 则迁移"""
-    return os.path.join(settings.data_dir, "maintenance_msg.json")
-
-
-def _load_maintenance_msg() -> dict:
-    try:
-        f = _maintenance_msg_file()
-        if os.path.exists(f):
-            with open(f) as fp:
-                return json.loads(fp.read())
-    except Exception:
-        pass
-    return {"hard_title":"正在更新","hard_body":"服务器正在更新，稍等一下就好~","hard_color":"#f59e0b","hard_text_color":"#ffffff","hard_image":"","hard_style":"popup","soft_text":"服务器正在调整，功能可能偶尔不稳定","soft_color":"#f59e0b","soft_text_color":"#ffffff","soft_style":"banner","soft_once":False}
+    return maintenance.state()
 
 
 def _current_maintenance_mode() -> str | None:
     """返回当前维护模式: hard / soft / None（auto 归入 hard 处理）"""
-    d = os.environ.get("MAINTENANCE_DIR", "/tmp")
-    if os.path.exists(os.path.join(d, "maintenance_startup")) or os.path.exists(os.path.join(d, "maintenance_admin_hard")):
-        return "hard"
-    if os.path.exists(os.path.join(d, "maintenance_soft")):
-        return "soft"
-    return None
+    return maintenance.mode()
 
 
 async def _broadcast_maintenance_update():
     """按当前实际模式广播维护状态（保存文案/应用预设后同步在线用户）"""
     mode = _current_maintenance_mode()
     if mode:
-        await ws_manager.broadcast_to_all({"type": "maintenance_update", "mode": mode, "msg": _load_maintenance_msg()})
+        await ws_manager.broadcast_to_all({"type": "maintenance_update", "mode": mode, "msg": maintenance.get_msg()})
     else:
         await ws_manager.broadcast_to_all({"type": "maintenance_update", "mode": "none"})
 
 
 @router.post("/maintenance/hard")
 async def toggle_hard(admin: dict = Depends(require_admin)):
-    d = os.environ.get("MAINTENANCE_DIR", "/tmp")
-    hard_file = os.path.join(d, "maintenance_admin_hard")
-    if os.path.exists(hard_file):
-        os.remove(hard_file)
+    on = maintenance.toggle_hard()
+    if on:
+        await ws_manager.broadcast_to_all({"type": "maintenance_update", "mode": "hard", "msg": maintenance.get_msg()})
+    else:
         await _broadcast_maintenance_update()
-        return {"hard": False, "message": "硬维护已关闭"}
-    open(hard_file, "w").close()
-    msg = _load_maintenance_msg()
-    await ws_manager.broadcast_to_all({"type": "maintenance_update", "mode": "hard", "msg": msg})
-    return {"hard": True, "message": "硬维护已开启——API 返回 503"}
+    return {"hard": on, "message": "硬维护已开启——API 返回 503" if on else "硬维护已关闭"}
 
 
 @router.post("/maintenance/soft")
 async def toggle_soft(admin: dict = Depends(require_admin)):
-    d = os.environ.get("MAINTENANCE_DIR", "/tmp")
-    soft_file = os.path.join(d, "maintenance_soft")
-    if os.path.exists(soft_file):
-        os.remove(soft_file)
+    on = maintenance.toggle_soft()
+    if on:
+        await ws_manager.broadcast_to_all({"type": "maintenance_update", "mode": "soft", "msg": maintenance.get_msg()})
+    else:
         await _broadcast_maintenance_update()
-        return {"soft": False, "message": "软维护已关闭"}
-    open(soft_file, "w").close()
-    msg = _load_maintenance_msg()
-    await ws_manager.broadcast_to_all({"type": "maintenance_update", "mode": "soft", "msg": msg})
-    return {"soft": True, "message": "软维护已开启——API 正常，前端展示提示"}
+    return {"soft": on, "message": "软维护已开启——API 正常，前端展示提示" if on else "软维护已关闭"}
 
 
 class MaintenanceMsgBody(BaseModel):
@@ -3100,15 +3067,13 @@ class MaintenanceMsgBody(BaseModel):
 
 @router.get("/maintenance/msg")
 async def get_maintenance_msg(admin: dict = Depends(require_admin)):
-    return _load_maintenance_msg()
+    return maintenance.get_msg()
 
 
 @router.put("/maintenance/msg")
 async def save_maintenance_msg(body: MaintenanceMsgBody, admin: dict = Depends(require_admin)):
     try:
-        os.makedirs(os.path.dirname(_maintenance_msg_file()), exist_ok=True)
-        with open(_maintenance_msg_file(), "w") as f:
-            f.write(json.dumps(body.model_dump(), ensure_ascii=False))
+        maintenance.save_msg(body.model_dump())
     except Exception:
         raise HTTPException(500, "维护文案保存失败：数据目录不可写")
     await _broadcast_maintenance_update()
@@ -3164,9 +3129,7 @@ async def apply_preset(admin: dict = Depends(require_admin), name: str = ""):
         "soft_once": p.get("soft_once", False),
     }
     try:
-        os.makedirs(os.path.dirname(_maintenance_msg_file()), exist_ok=True)
-        with open(_maintenance_msg_file(), "w") as f:
-            f.write(json.dumps(merged, ensure_ascii=False))
+        maintenance.save_msg(merged)
     except Exception:
         raise HTTPException(500, "应用预设失败：数据目录不可写")
     await _broadcast_maintenance_update()

@@ -1,17 +1,16 @@
 """
-维护模式管理器 — 集中封装维护状态的读写与文案管理。
+维护模式管理器 — 维护状态的唯一读写入口。
 
-部署形态：单容器单进程，用文件系统标记即可满足需求：
-- maintenance_startup     自动维护（启动/关闭期间），由进程自己创建和删除
-- maintenance_soft        软维护（管理员手动）：API 正常但前端显示提示
-- maintenance_admin_hard  硬维护（管理员手动）：503 拦截
+- 状态：文件标记（单容器单进程部署，标记目录见 settings.maintenance_dir）
+- 读：TTL 缓存（3s）避免每请求 stat；写：立即失效缓存，保证本进程内即时生效
+- 所有读写（lifespan / 中间件 / admin 路由）必须经过本类；
+  外部直接 touch 文件时最长 TTL 内生效
 - 文案 JSON 持久化在数据目录（docker 挂载卷，重启不丢）
-
-历史遗留：旧版本文案写在 MAINTENANCE_DIR（容器 /tmp），首次启动自动迁移到数据目录。
 """
 import json
 import logging
 import os
+import time
 from pathlib import Path
 
 from app.config import settings
@@ -32,42 +31,87 @@ _DEFAULT_MSG = {
 class MaintenanceManager:
     """维护模式状态与文案的统一入口（单例使用：maintenance）"""
 
+    # 文件标记读取的 TTL 缓存（秒）：stat 开销可忽略，缓存主要避免高频路径重复系统调用
+    _STAT_TTL = 3.0
+
     def __init__(self, maint_dir: str | None = None, data_dir: str | None = None):
-        self._dir = maint_dir or os.environ.get("MAINTENANCE_DIR", "/tmp")
+        self._dir = maint_dir or settings.maintenance_dir
         self._auto = os.path.join(self._dir, "maintenance_startup")
         self._soft = os.path.join(self._dir, "maintenance_soft")
         self._hard = os.path.join(self._dir, "maintenance_admin_hard")
         self._msg_file = os.path.join(data_dir or settings.data_dir, "maintenance_msg.json")
         self._legacy_msg = os.path.join(self._dir, "maintenance_msg.json")
+        self._cache: dict[str, tuple[float, bool]] = {}
         self._migrate_legacy_msg()
 
-    # ── 标记读写 ──
+    # ── 状态查询（TTL 缓存） ──
 
-    def set_auto(self) -> None:
-        """进入自动维护（启动/关闭期间）"""
-        with open(self._auto, "w"):
-            pass
-
-    def clear_auto(self) -> bool:
-        """退出自动维护；返回是否确实清掉了（仅清理本次进程创建的标记）"""
-        if os.path.exists(self._auto):
-            os.remove(self._auto)
-            return True
-        return False
+    def _stat(self, key: str, path: str) -> bool:
+        now = time.monotonic()
+        hit = self._cache.get(key)
+        if hit is not None and now - hit[0] < self._STAT_TTL:
+            return hit[1]
+        value = os.path.exists(path)
+        self._cache[key] = (now, value)
+        return value
 
     def is_auto(self) -> bool:
-        return os.path.exists(self._auto)
+        """自动维护（启动/关闭期间）"""
+        return self._stat("auto", self._auto)
 
     def is_soft(self) -> bool:
-        return os.path.exists(self._soft)
+        """软维护（管理员手动）：API 正常但前端显示提示"""
+        return self._stat("soft", self._soft)
 
     def is_hard(self) -> bool:
         """管理员手动硬维护"""
-        return os.path.exists(self._hard)
+        return self._stat("hard", self._hard)
 
     def hard_active(self) -> bool:
         """当前是否处于任何硬维护（自动或管理员手动）"""
         return self.is_auto() or self.is_hard()
+
+    def state(self) -> dict:
+        """三态快照（admin 状态接口用）"""
+        return {"auto": self.is_auto(), "hard": self.is_hard(), "soft": self.is_soft()}
+
+    def mode(self) -> str | None:
+        """当前维护模式: hard / soft / None（auto 归入 hard）"""
+        if self.hard_active():
+            return "hard"
+        if self.is_soft():
+            return "soft"
+        return None
+
+    # ── 状态写入（写后立即失效缓存） ──
+
+    def _set_marker(self, path: str, active: bool) -> bool:
+        """设置/清除标记；返回操作后的状态"""
+        if active:
+            with open(path, "w"):
+                pass
+        elif os.path.exists(path):
+            os.remove(path)
+        self._cache.clear()
+        return os.path.exists(path)
+
+    def set_auto(self) -> None:
+        """进入自动维护（启动/关闭期间）"""
+        self._set_marker(self._auto, True)
+
+    def clear_auto(self) -> bool:
+        """退出自动维护；返回是否确实处于自动维护（供调用方决定提示文案）"""
+        existed = self.is_auto()
+        self._set_marker(self._auto, False)
+        return existed
+
+    def toggle_hard(self) -> bool:
+        """切换管理员硬维护；返回操作后是否开启"""
+        return self._set_marker(self._hard, not os.path.exists(self._hard))
+
+    def toggle_soft(self) -> bool:
+        """切换软维护；返回操作后是否开启"""
+        return self._set_marker(self._soft, not os.path.exists(self._soft))
 
     # ── 文案 ──
 
@@ -80,6 +124,12 @@ class MaintenanceManager:
         except Exception:
             logger.warning("⚠️ 维护文案读取失败，使用默认文案", exc_info=True)
         return dict(_DEFAULT_MSG)
+
+    def save_msg(self, msg: dict) -> None:
+        """持久化维护文案（数据目录，重启不丢）"""
+        Path(settings.data_dir).mkdir(parents=True, exist_ok=True)
+        with open(self._msg_file, "w", encoding="utf-8") as f:
+            f.write(json.dumps(msg, ensure_ascii=False))
 
     def _migrate_legacy_msg(self) -> None:
         """旧版本文案在 MAINTENANCE_DIR（/tmp）→ 迁移到持久化数据目录"""
@@ -95,5 +145,5 @@ class MaintenanceManager:
             logger.warning("⚠️ 维护文案迁移失败（忽略，使用默认文案）", exc_info=True)
 
 
-# 全局单例：中间件 / lifespan / 维护路由共用
+# 全局单例：中间件 / lifespan / admin 路由共用
 maintenance = MaintenanceManager()

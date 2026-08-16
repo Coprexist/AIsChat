@@ -43,6 +43,9 @@ services:
       timeout: 5s
       retries: 5
       start_period: 6s
+    # uvicorn 保持安全默认（--forwarded-allow-ips=127.0.0.1，不信任 X-Forwarded-For）：
+    # docker 端口映射下 vite 看到的客户端源是网关 IP，无法还原真实 IP；
+    # 若未来在宿主层加反向代理还原真实客户端 IP，再配 --forwarded-allow-ips 指向代理地址
     command: sh -c "python prestart.py && uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload-exclude 'data/*' --timeout-graceful-shutdown 5"
 
   frontend:

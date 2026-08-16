@@ -8,6 +8,7 @@ Alembic 迁移环境配置 — 自动检测模型变更，生成迁移脚本
 import logging as _logging
 import os
 import sys
+from logging.handlers import RotatingFileHandler
 from pathlib import Path
 
 # 将项目根目录加入 sys.path，使得 from app import ... 可工作
@@ -38,7 +39,10 @@ def _restore_app_logging() -> None:
         str(Path(__file__).resolve().parent.parent / "app.log"),
     )
     fmt = _logging.Formatter("%(asctime)s [%(levelname)s] %(name)s: %(message)s")
-    for h in (_logging.StreamHandler(), _logging.FileHandler(log_file, encoding="utf-8")):
+    for h in (
+        _logging.StreamHandler(),
+        RotatingFileHandler(log_file, maxBytes=10 * 1024 * 1024, backupCount=5, encoding="utf-8"),
+    ):
         h.setFormatter(fmt)
         root.addHandler(h)
 

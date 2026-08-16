@@ -12,22 +12,25 @@
 ### Changed — 🔧 后端 main.py 质量重构（对照代码审查十项逐条处理）
 
 - **启动流程拆分**：`main.py` 470 行 → 约 150 行；lifespan 拆到新模块 `app/bootstrap.py`，按职责分组 `_startup_db / _startup_plugins / _startup_workers / _startup_world / _startup_federation / _startup_brain_and_skills`
-- **维护模式封装**：文件标记与文案迁移逻辑集中到 `app/services/infrastructure/maintenance.py` 的 `MaintenanceManager`，中间件/lifespan/路由统一调用
+- **维护模式统一入口**：文件标记与文案逻辑集中到 `app/services/infrastructure/maintenance.py` 的 `MaintenanceManager`，中间件/lifespan/admin 路由全部走该入口（admin 原裸写文件与重复的文案读写已删除）；状态读取带 3s TTL 缓存，写入即时失效，开关切换零延迟
 - **日志配置上移**：`basicConfig` 移到所有项目 import 之前，去掉重复的 `getLogger` 定义
 - **import 整理**：无循环依赖风险的模块级 import 全部上移（已验证无模块反向 import main）
-- **CORS 配置化**：新增 `ALLOWED_ORIGINS` env（逗号分隔），默认 `*` 保持内网既有行为
+- **CORS 显式配置**：默认**不启用**（同源代理部署不需要跨域）；`ALLOWED_ORIGINS`（逗号分隔）配置后启用，含 `*` 时不携带凭据（浏览器规范禁止 `*` 与凭据组合），显式域名列表才允许带凭据
+- **中间件独立模块**：IP 追踪 + 维护拦截迁到 `app/middleware.py`，`main.py` 只负责注册
 
 ### Added — ⚙️ 运行健壮性
 
 - **后台任务自动重启**：`spawn_task` 支持异常退出按指数退避自动拉起（1,2,4...封顶 60s，超 10 次放弃记 CRITICAL），循环型 worker 全部启用
 - **数据库就绪等待**：启动时 0.5s 轮询、30s 超时**快速失败**（替代原先 warning 后带病运行）；浏览器启动同样改为等待 DB 就绪而非 `sleep(3)`
 - **定时任务对齐固定时刻**：审计清理/每日备份改为 `sleep_until(3,0)` 计算到下一次凌晨 3 点的延迟（原 24h sleep 会漂移且首次执行晚一天）
+- **日志滚动**：`app.log` 改用 `RotatingFileHandler`（单文件 10MB，保留 5 份），避免无限增长占满磁盘
 
 ### Fixed — 🐛 修复
 
 - **Alembic 静默吞日志**（隐藏已久）：`alembic/env.py` 的 `fileConfig` 会重置根 logger 配置并禁用已存在 logger，导致每次重启后"后台 worker 已全部启动 / Application startup complete"等日志全部消失——`disable_existing_loggers=False` + 迁移后恢复应用日志双通道
 - **`_spawn` 异常日志失效**：`exc_info=exc`（异常实例被当 truthy，记录的是当前上下文而非捕获的异常）→ 改为 `exc_info=(type(exc), exc, exc.__traceback__)`
 - **关闭流程重复日志**：删除重复的"系统关闭"日志行
+- **X-Forwarded-For 伪造漏洞**：中间件手写解析 XFF 绕过了 uvicorn 的可信检查（`forwarded_allow_ips`），任何客户端可伪造审计 IP——改为只取 uvicorn 解析后的 `request.client`，安全默认不信任代理头（已验证伪造 XFF 被忽略）
 
 ---
 

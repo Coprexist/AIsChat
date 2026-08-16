@@ -148,6 +148,16 @@ class Settings(BaseSettings):
     registry_repo: str = os.getenv("REGISTRY_REPO", "Coprexist/AIsChat")
     registry_file: str = os.getenv("REGISTRY_FILE", "federation-registry.json")
 
+    # ── CORS 跨域（默认不启用；同源代理部署不需要 CORS）──
+    # 逗号分隔的允许来源；含 "*" 时允许所有来源，且不携带凭据
+    # （浏览器规范禁止 "*" 与凭据组合，带凭据跨域须显式列出具体域名）。
+    allowed_origins: list[str] = [
+        s.strip() for s in os.getenv("ALLOWED_ORIGINS", "").split(",") if s.strip()
+    ]
+
+    # ── 维护模式标记目录（文件标记，Linux 容器部署，默认 /tmp）──
+    maintenance_dir: str = os.getenv("MAINTENANCE_DIR", "/tmp")
+
     class Config:
         env_file = ".env"
         extra = "allow"

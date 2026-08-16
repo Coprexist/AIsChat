@@ -45,6 +45,7 @@ Desktop.ini
 
 # ── 日志 ──
 *.log
+*.log.*
 
 # ── 其他 ──
 *.tmp
