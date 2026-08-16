@@ -114,6 +114,8 @@ export default function MaintenanceMsgEditor() {
     try {
       await api.put('/admin/maintenance/msg', msgRef.current)
       setState('saved')
+      // 通知全局 Layout 立即刷新维护提示（改完马上看到，不等 30s 轮询）
+      window.dispatchEvent(new CustomEvent('maintenance-saved'))
       setTimeout(() => {
         if (section === 'both' || section === 'hard') setHardState(s => (s === 'saved' ? 'idle' : s))
         if (section === 'both' || section === 'soft') setSoftState(s => (s === 'saved' ? 'idle' : s))
@@ -170,6 +172,7 @@ export default function MaintenanceMsgEditor() {
       setMsg(toMsgData(r.msg))
       setHardState('idle'); setSoftState('idle')
       setSaveError('')
+      window.dispatchEvent(new CustomEvent('maintenance-saved'))
     } catch (e: any) {
       setPresetError(e?.detail || e?.message || '应用预设失败')
     }

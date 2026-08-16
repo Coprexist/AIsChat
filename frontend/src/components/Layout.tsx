@@ -106,10 +106,15 @@ export default function Layout() {
       }
       else if (mode === 'none') hClear()
     }
+    const hSaved = () => {
+      // 管理员保存维护文案后：立即刷新权威状态，改完马上能看到（不等 30s 轮询）
+      fetchMsg()
+    }
     window.addEventListener('maintenance-mode' as any, h1 as any)
     window.addEventListener('maintenance-soft' as any, h2 as any)
     window.addEventListener('maintenance-cleared', hClear)
     window.addEventListener('ws-maintenance-update' as any, hWs as any)
+    window.addEventListener('maintenance-saved', hSaved)
     // 权威状态轮询：修复刷新不恢复 / 非聊天页收不到 WS 广播的问题
     fetchMsg()
     const poll = setInterval(fetchMsg, 30_000)
@@ -119,6 +124,7 @@ export default function Layout() {
       window.removeEventListener('maintenance-soft' as any, h2 as any)
       window.removeEventListener('maintenance-cleared', hClear)
       window.removeEventListener('ws-maintenance-update' as any, hWs as any)
+      window.removeEventListener('maintenance-saved', hSaved)
     }
   }, [])
 
