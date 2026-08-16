@@ -247,13 +247,101 @@
   }
   .copied.show { opacity: 1; }
 
+  /* ════════ 投票 ════════ */
+  .primary-demo { display: flex; align-items: center; gap: 8px; padding: 4px 12px 0; font-size: 11px; color: rgb(var(--tw-text-secondary)); flex-wrap: wrap; }
+  .primary-demo .acc { color: rgb(var(--tw-primary-400)); font-weight: 600; }
+  .primary-demo .link2 { color: rgb(var(--tw-primary-400)); text-decoration: underline; cursor: pointer; }
+  .primary-demo .icon2 { width: 16px; height: 16px; border-radius: 4px; background: rgb(var(--tw-primary-400) / 0.15); color: rgb(var(--tw-primary-400)); display: inline-flex; align-items: center; justify-content: center; font-size: 9px; font-weight: 700; }
+
+  .vote-box { margin-top: 20px; background: rgb(var(--tw-surface)); border: 1px solid rgb(var(--tw-border)); border-radius: 14px; padding: 16px; }
+  .vote-box h3 { font-size: 14px; font-weight: 700; display: flex; align-items: center; gap: 8px; }
+  .vote-box .sub { font-size: 11.5px; color: rgb(var(--tw-text-muted)); margin-top: 3px; }
+  .ident { display: flex; gap: 8px; margin-top: 12px; align-items: center; }
+  .ident .me-avatar { width: 30px; height: 30px; border-radius: 50%; background: rgb(var(--tw-primary-500)); color: #fff; display: flex; align-items: center; justify-content: center; font-size: 12px; font-weight: 700; overflow: hidden; flex: none; }
+  .ident .me-avatar img { width: 100%; height: 100%; object-fit: cover; }
+  .ident input {
+    flex: 1; height: 34px; border-radius: 9px; border: 1px solid rgb(var(--tw-border));
+    background: rgb(var(--tw-canvas)); padding: 0 10px; font-size: 12px; color: rgb(var(--tw-text-primary)); outline: none;
+  }
+  .ident input:focus { border-color: rgb(var(--tw-primary-500)); }
+  .vote-actions { display: flex; gap: 10px; margin-top: 10px; }
+  .vote-btn {
+    flex: 1; height: 42px; border-radius: 10px; border: none;
+    background: rgb(var(--tw-primary-500)); color: #fff; font-size: 13px; font-weight: 600; cursor: pointer;
+  }
+  .vote-btn:hover { background: rgb(var(--tw-primary-600)); }
+  .vote-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+  .vote-status { font-size: 12px; margin-top: 8px; }
+  .vote-status.ok { color: rgb(var(--tw-mint-500)); }
+  .vote-status.err { color: rgb(var(--tw-rose-500)); }
+
+  /* 投票统计：色块下方头像堆 */
+  .vote-stats { margin-top: 16px; }
+  .vote-stats .vs-title { font-size: 12px; font-weight: 600; color: rgb(var(--tw-text-secondary)); margin-bottom: 8px; }
+  .vote-grid { display: flex; flex-wrap: wrap; gap: 14px; }
+  .vote-col { width: 44px; text-align: center; }
+  .vote-col .vswatch { width: 40px; height: 40px; border-radius: 10px; margin: 0 auto; box-shadow: 0 1px 2px rgba(0,0,0,0.1); }
+  .vote-col .vswatch-label { font-size: 9px; color: rgb(var(--tw-text-muted)); margin-top: 2px; font-family: ui-monospace, monospace; }
+  .vote-avatars { display: flex; flex-wrap: wrap; gap: 3px; justify-content: center; margin-top: 6px; min-height: 20px; }
+  .vote-avatar {
+    width: 20px; height: 20px; border-radius: 50%; overflow: hidden;
+    border: 1.5px solid rgb(var(--tw-surface));
+    background: rgb(var(--tw-elevated));
+    display: flex; align-items: center; justify-content: center;
+    font-size: 9px; font-weight: 700; color: rgb(var(--tw-text-secondary));
+  }
+  .vote-avatar img { width: 100%; height: 100%; object-fit: cover; }
+  .vote-avatar.me { border-color: rgb(var(--tw-primary-500)); }
+  .vote-count { font-size: 10px; color: rgb(var(--tw-text-muted)); margin-top: 2px; }
+  .vs-empty { font-size: 11.5px; color: rgb(var(--tw-text-muted)); padding: 10px 0; }
+
+  /* ════════ 每选项旁的元素预览 ════════ */
+  .demo-bar {
+    margin-top: 9px;
+    display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
+    padding: 8px 10px;
+    background: rgb(var(--tw-canvas));
+    border: 1px dashed rgb(var(--tw-border));
+    border-radius: 10px;
+    min-height: 44px;
+  }
+  .demo-bar .demo-label { font-size: 10px; color: rgb(var(--tw-text-muted)); flex: 0 0 auto; }
+  .demo-bar .d { display: inline-flex; align-items: center; gap: 5px; font-size: 11px; }
+  .d-btn {
+    display: inline-flex; align-items: center; justify-content: center;
+    height: 26px; padding: 0 11px; border-radius: 8px;
+    font-size: 11px; font-weight: 500; color: #fff; border: none;
+  }
+  .d-btn.outline {
+    background: transparent; border: 1px solid var(--d-color, #8B5CF6);
+    color: var(--d-color, #8B5CF6);
+  }
+  .d-text { font-weight: 600; color: var(--d-color, #8B5CF6); }
+  .d-link { color: var(--d-color, #8B5CF6); text-decoration: underline; }
+  .d-badge {
+    display: inline-flex; align-items: center; gap: 3px;
+    height: 19px; padding: 0 8px; border-radius: 999px;
+    font-size: 10px; font-weight: 500;
+  }
+  .d-badge.solid { color: #fff; }
+  .d-badge.tint { background: var(--d-color, #8B5CF6) / 0.15; color: var(--d-color, #8B5CF6); }
+  .d-live { display: inline-flex; align-items: center; gap: 4px; color: var(--d-color, #22C55E); font-weight: 500; }
+  .d-live::before { content: ""; width: 7px; height: 7px; border-radius: 50%; background: var(--d-color, #22C55E); }
+  .d-meter { width: 90px; height: 5px; border-radius: 3px; background: rgb(var(--tw-elevated)); overflow: hidden; }
+  .d-meter i { display: block; height: 100%; width: 62%; border-radius: 3px; background: var(--d-color, #8B5CF6); }
+  .d-hover-note { font-size: 10px; color: rgb(var(--tw-text-muted)); }
+
   /* 移动端：预览在上、选色在下 */
   @media (max-width: 860px) {
     body { overflow: auto; }
     .layout { flex-direction: column; height: auto; }
-    .stage-wrap { width: 100%; flex: none; padding: 14px; border-right: none; border-bottom: 1px solid rgb(var(--tw-border)); }
-    .phone { height: 480px; flex: none; }
-    .panel { padding: 18px 14px 60px; }
+    .stage-wrap { width: 100%; flex: none; padding: 12px; border-right: none; border-bottom: 1px solid rgb(var(--tw-border)); }
+    .phone { height: 440px; flex: none; }
+    .panel { padding: 16px 12px 60px; }
+    .stage-head { display: none; }        /* 手机上隐藏「预览」标题，省空间 */
+    .swatch { width: 36px; height: 36px; }
+    .demo-bar { padding: 7px 9px; gap: 8px; }
+    .group { padding: 13px; }
   }
 </style>
 </head>
@@ -298,6 +386,12 @@
         <span class="live">在线</span>
         <span class="dnd">勿扰</span>
         <span>普通文字</span>
+      </div>
+
+      <!-- primary-400 强调文字 / 链接 / 图标 -->
+      <div class="primary-demo">
+        <span class="icon2">i</span>
+        <span>强调文字 <span class="acc">这里是主色强调</span> · <span class="link2">链接文字</span></span>
       </div>
 
       <div class="badges">
@@ -348,17 +442,20 @@
     <div class="group">
       <div class="group-name"><span class="swatch-sample" id="sample-p" style="background:#8B5CF6"></span> 主色 primary（紫）</div>
       <div class="group-desc">品牌色 · 按钮 / 我的气泡 / 强调 / 链接 / 选中态 / 进度条</div>
-      <div class="field" data-key="primary_400">
+      <div class="field" data-key="primary_400" data-demo="p400">
         <div class="field-label">primary-400 强调文字 / 图标 / 链接 <span class="now"><span class="chip"></span><span class="now-hex"></span></span></div>
         <div class="swatches"></div>
+        <div class="demo-bar" data-demo-bar="primary_400"></div>
       </div>
-      <div class="field" data-key="primary_500">
+      <div class="field" data-key="primary_500" data-demo="p500">
         <div class="field-label">primary-500 主按钮 / 我的气泡 / 发送 <span class="now"><span class="chip"></span><span class="now-hex"></span></span></div>
         <div class="swatches"></div>
+        <div class="demo-bar" data-demo-bar="primary_500"></div>
       </div>
-      <div class="field" data-key="primary_600">
+      <div class="field" data-key="primary_600" data-demo="p600">
         <div class="field-label">primary-600 按钮 hover <span class="now"><span class="chip"></span><span class="now-hex"></span></span></div>
         <div class="swatches"></div>
+        <div class="demo-bar" data-demo-bar="primary_600"></div>
       </div>
     </div>
 
@@ -366,13 +463,15 @@
     <div class="group">
       <div class="group-name"><span class="swatch-sample" id="sample-a" style="background:#FBBF24"></span> 琥珀金 accent</div>
       <div class="group-desc">状态变更 / 通知 / 高亮 / 星级</div>
-      <div class="field" data-key="accent_400">
+      <div class="field" data-key="accent_400" data-demo="a400">
         <div class="field-label">accent-400 状态文字 / 徽章 <span class="now"><span class="chip"></span><span class="now-hex"></span></span></div>
         <div class="swatches"></div>
+        <div class="demo-bar" data-demo-bar="accent_400"></div>
       </div>
-      <div class="field" data-key="accent_500">
+      <div class="field" data-key="accent_500" data-demo="a500">
         <div class="field-label">accent-500 实底按钮 / hover <span class="now"><span class="chip"></span><span class="now-hex"></span></span></div>
         <div class="swatches"></div>
+        <div class="demo-bar" data-demo-bar="accent_500"></div>
       </div>
     </div>
 
@@ -380,13 +479,15 @@
     <div class="group">
       <div class="group-name"><span class="swatch-sample" id="sample-m" style="background:#22C55E"></span> 活跃绿 mint</div>
       <div class="group-desc">在线 / 成功 / 已保存 / 开关开启</div>
-      <div class="field" data-key="mint_400">
+      <div class="field" data-key="mint_400" data-demo="m400">
         <div class="field-label">mint-400 在线状态 / 成功文字 <span class="now"><span class="chip"></span><span class="now-hex"></span></span></div>
         <div class="swatches"></div>
+        <div class="demo-bar" data-demo-bar="mint_400"></div>
       </div>
-      <div class="field" data-key="mint_500">
+      <div class="field" data-key="mint_500" data-demo="m500">
         <div class="field-label">mint-500 实底按钮 / hover <span class="now"><span class="chip"></span><span class="now-hex"></span></span></div>
         <div class="swatches"></div>
+        <div class="demo-bar" data-demo-bar="mint_500"></div>
       </div>
     </div>
 
@@ -394,14 +495,38 @@
     <div class="group">
       <div class="group-name"><span class="swatch-sample" id="sample-r" style="background:#E84A69"></span> 危险玫红 rose</div>
       <div class="group-desc">删除 / 错误 / 勿扰</div>
-      <div class="field" data-key="rose_400">
+      <div class="field" data-key="rose_400" data-demo="r400">
         <div class="field-label">rose-400 危险文字 / 删除链接 <span class="now"><span class="chip"></span><span class="now-hex"></span></span></div>
         <div class="swatches"></div>
+        <div class="demo-bar" data-demo-bar="rose_400"></div>
       </div>
-      <div class="field" data-key="rose_500">
+      <div class="field" data-key="rose_500" data-demo="r500">
         <div class="field-label">rose-500 危险按钮 <span class="now"><span class="chip"></span><span class="now-hex"></span></span></div>
         <div class="swatches"></div>
+        <div class="demo-bar" data-demo-bar="rose_500"></div>
       </div>
+    </div>
+
+    <!-- 投票 -->
+    <div class="vote-box">
+      <h3>提交你的选择</h3>
+      <p class="sub">选完后提交，其他人也能看到每个颜色被谁选了（会按昵称/头像显示）。</p>
+      <div class="ident">
+        <div class="me-avatar" id="me-avatar">?</div>
+        <input id="ident-name" placeholder="输入你的昵称（未登录）" maxlength="30">
+      </div>
+      <div class="vote-actions">
+        <button class="vote-btn" id="vote-submit">提交投票</button>
+        <button class="vote-btn" id="vote-refresh" style="flex:0 0 auto;background:rgb(var(--tw-elevated));color:rgb(var(--tw-text-secondary));border:1px solid rgb(var(--tw-border))">刷新</button>
+      </div>
+      <div class="vote-status" id="vote-status"></div>
+    </div>
+
+    <!-- 投票统计 -->
+    <div class="vote-stats">
+      <div class="vs-title">每个颜色的选择情况（头像 = 选了该色的人）</div>
+      <div id="vote-grid" class="vote-grid"></div>
+      <div class="vs-empty" id="vote-empty">还没有人提交，点上面的「提交投票」成为第一个。</div>
     </div>
 
     <!-- 结果 -->
@@ -469,6 +594,60 @@
     document.getElementById('sample-a').style.background = sel.accent_400;
     document.getElementById('sample-m').style.background = sel.mint_400;
     document.getElementById('sample-r').style.background = sel.rose_400;
+    renderDemos();
+  }
+
+  // ═══ 每选项旁的元素预览：用当前选中色渲染对应 UI 元素 ═══
+  function renderDemos() {
+    document.querySelectorAll('[data-demo-bar]').forEach(function (bar) {
+      var key = bar.getAttribute('data-demo-bar');
+      var color = sel[key] || '#8B5CF6';
+      var html = '';
+      switch (key) {
+        case 'p400':
+          html = '<span class="d-text">强调文字</span><span class="d-link">链接</span>'
+               + '<span class="d" style="color:' + color + '">◉ 图标</span>'
+               + '<span class="d" style="font-size:10px;color:rgb(var(--tw-text-muted))">用于正文强调/链接/图标，需白底可读</span>';
+          break;
+        case 'p500':
+          html = '<span class="d-btn" style="background:' + color + '">主按钮</span>'
+               + '<span class="d-badge solid" style="background:' + color + '">我的气泡</span>'
+               + '<span class="d" style="font-size:10px;color:rgb(var(--tw-text-muted))">主按钮/我的消息气泡/发送键</span>';
+          break;
+        case 'p600':
+          html = '<span class="d-btn" style="background:' + color + '">hover 态</span>'
+               + '<span class="d-hover-note">按钮悬停时用的加深色</span>';
+          break;
+        case 'a400':
+          html = '<span class="d-badge tint" style="--d-color:' + color + '">琥珀状态</span>'
+               + '<span class="d" style="color:' + color + '">★ 星级</span>'
+               + '<span class="d" style="font-size:10px;color:rgb(var(--tw-text-muted))">通知/状态/高亮</span>';
+          break;
+        case 'a500':
+          html = '<span class="d-btn" style="background:' + color + ';color:rgb(var(--tw-text-primary))">实底按钮</span>'
+               + '<span class="d-hover-note">深琥珀 hover 或实底金按钮</span>';
+          break;
+        case 'm400':
+          html = '<span class="d-live" style="--d-color:' + color + '">在线</span>'
+               + '<span class="d" style="color:' + color + '">✓ 成功</span>'
+               + '<span class="d" style="font-size:10px;color:rgb(var(--tw-text-muted))">在线状态/成功提示</span>';
+          break;
+        case 'm500':
+          html = '<span class="d-btn" style="background:' + color + '">保存</span>'
+               + '<span class="d" style="font-size:10px;color:rgb(var(--tw-text-muted))">实底绿按钮（配白字需够深）</span>';
+          break;
+        case 'r400':
+          html = '<span class="d" style="color:' + color + '">✕ 删除链接</span>'
+               + '<span class="d" style="color:' + color + '">⚠ 错误</span>'
+               + '<span class="d" style="font-size:10px;color:rgb(var(--tw-text-muted))">危险文字/删除</span>';
+          break;
+        case 'r500':
+          html = '<span class="d-btn" style="background:' + color + '">删除</span>'
+               + '<span class="d-hover-note">危险按钮（白字需够深）</span>';
+          break;
+      }
+      bar.innerHTML = '<span class="demo-label">预览</span>' + html;
+    });
   }
 
   // 渲染所有色板
@@ -530,6 +709,133 @@
     tip.classList.add('show');
     setTimeout(function () { tip.classList.remove('show'); }, 1500);
   });
+
+  /* ════════ 投票：身份识别 + 提交 + 统计 ════════ */
+  var me = { name: '', avatar: null };
+  var voteStatus = document.getElementById('vote-status');
+  var nameInput = document.getElementById('ident-name');
+  var meAvatar = document.getElementById('me-avatar');
+
+  function setStatus(text, ok) {
+    voteStatus.textContent = text || '';
+    voteStatus.className = 'vote-status ' + (ok ? 'ok' : 'err');
+  }
+
+  // 尝试识别登录用户（拿头像）
+  (function initIdentity() {
+    var token = null;
+    try { token = localStorage.getItem('access_token'); } catch (e) {}
+    if (!token) return;
+    fetch('/api/auth/me', { headers: { 'Authorization': 'Bearer ' + token } })
+      .then(function (r) { return r.json(); })
+      .then(function (u) {
+        if (!u || !u.username) return;
+        me.name = u.username;
+        me.avatar = u.avatar_url || null;
+        nameInput.value = u.username;
+        if (me.avatar) {
+          meAvatar.innerHTML = '<img src="' + me.avatar + '" alt="">';
+        } else {
+          meAvatar.textContent = (u.username || '?').charAt(0).toUpperCase();
+        }
+      })
+      .catch(function () {});
+  })();
+
+  // 提交
+  document.getElementById('vote-submit').addEventListener('click', function () {
+    var name = (nameInput.value || '').trim();
+    if (!name) { setStatus('请先输入昵称', false); return; }
+    if (name !== me.name) { me.name = name; me.avatar = null; }
+    meAvatar.textContent = name.charAt(0).toUpperCase();
+    var body = { colors: sel, user_name: name, avatar_url: me.avatar };
+    setStatus('提交中…', true);
+    fetch('/api/theme-vote', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body),
+    })
+      .then(function (r) { return r.json(); })
+      .then(function (d) {
+        if (d.ok) { setStatus('已提交（当前 ' + d.count + ' 人参与）', true); loadStats(); }
+        else setStatus(d.reason || '提交失败', false);
+      })
+      .catch(function () { setStatus('提交失败：请确认后端已重启（新接口需重启容器生效）', false); });
+  });
+
+  document.getElementById('vote-refresh').addEventListener('click', loadStats);
+
+  // 统计：按「字段 + 颜色」聚合头像
+  function loadStats() {
+    fetch('/api/theme-vote/stats')
+      .then(function (r) { return r.json(); })
+      .then(function (d) {
+        var items = d.items || [];
+        var grid = document.getElementById('vote-grid');
+        var empty = document.getElementById('vote-empty');
+        grid.innerHTML = '';
+        if (!items.length) { empty.style.display = ''; return; }
+        empty.style.display = 'none';
+
+        // 聚合：{fieldKey: {hex: [{name, avatar, me}]}}
+        var agg = {};
+        items.forEach(function (v) {
+          var colors = v.colors || {};
+          Object.keys(colors).forEach(function (k) {
+            var hex = String(colors[k] || '').toUpperCase();
+            if (!hex) return;
+            if (!agg[k]) agg[k] = {};
+            if (!agg[k][hex]) agg[k][hex] = [];
+            agg[k][hex].push({ name: v.user_name || '匿名', avatar: v.avatar_url || null, me: v.user_name === me.name });
+          });
+        });
+
+        // 只展示有投票的字段（按面板顺序）
+        var order = ['primary_400','primary_500','primary_600','accent_400','accent_500','mint_400','mint_500','rose_400','rose_500'];
+        order.forEach(function (k) {
+          if (!agg[k]) return;
+          var group = document.createElement('div');
+          group.style.cssText = 'margin-top:14px';
+          var label = document.createElement('div');
+          label.style.cssText = 'font-size:11px;font-weight:600;color:rgb(var(--tw-text-muted));margin-bottom:6px';
+          label.textContent = k;
+          group.appendChild(label);
+          var row = document.createElement('div');
+          row.className = 'vote-grid';
+          Object.keys(agg[k]).forEach(function (hex) {
+            var voters = agg[k][hex];
+            var col = document.createElement('div');
+            col.className = 'vote-col';
+            var sw = document.createElement('div');
+            sw.className = 'vswatch';
+            sw.style.background = '#' + hex.replace('#','');
+            var vl = document.createElement('div');
+            vl.className = 'vswatch-label';
+            vl.textContent = hex;
+            var av = document.createElement('div');
+            av.className = 'vote-avatars';
+            voters.forEach(function (v) {
+              var a = document.createElement('div');
+              a.className = 'vote-avatar' + (v.me ? ' me' : '');
+              a.title = v.name;
+              if (v.avatar) a.innerHTML = '<img src="' + v.avatar + '" alt="">';
+              else a.textContent = v.name.charAt(0).toUpperCase();
+              av.appendChild(a);
+            });
+            var cnt = document.createElement('div');
+            cnt.className = 'vote-count';
+            cnt.textContent = voters.length + ' 人';
+            col.appendChild(sw); col.appendChild(vl); col.appendChild(av); col.appendChild(cnt);
+            row.appendChild(col);
+          });
+          group.appendChild(row);
+          grid.appendChild(group);
+        });
+      })
+      .catch(function () {});
+  }
+
+  loadStats();
 })();
 </script>
 </body>
