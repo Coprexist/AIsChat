@@ -232,7 +232,7 @@ applyThemeChain():
 | 文件 | 说明 |
 |------|------|
 | `src/utils/skin.ts` | 皮肤应用/清除/变量名映射（模块级状态） |
-| `src/components/SkinPicker.tsx` | 设置页「外观 → 皮肤」区块：卡片 + 一键启停 + 即时应用 |
+| `src/components/SkinPicker.tsx` | 设置页「外观 → 皮肤」区块：**卡片式选择**（点卡片即应用，「默认」也是卡片）、即时生效、互斥 |
 | `src/context/AuthContext.tsx` | 登录/刷新/主题切换时自动应用生效皮肤；登出清除 |
 | `src/components/PluginManager.tsx` | 管理面板「插件管理 → 统一插件」区：全局开关 + 重扫目录 |
 
