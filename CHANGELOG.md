@@ -19,7 +19,7 @@
 - **技能插件**：`skill.json` 声明技能类型 → 注册进 SkillRegistry（`unregister` 支持注销），管理员关闭/卸载即回收，绝不误删内置类型
 - **API**：`GET /plugins`、`POST /plugins/{id}/toggle`（管理员）、`POST /plugins/{id}/pref`（用户）、`POST /plugins/rescan`（管理员）
 - **数据库**：`plugins` + `user_plugin_prefs` 表（Alembic `a9b8c7d6e5f4`）
-- **内置示例**：极光青碧（skin）、樱粉物语（skin）、写作工坊（skill：`writing_studio` 技能类型）
+- **内置示例**：极光青碧（skin）、写作工坊（skill：`writing_studio` 技能类型）
 - **前端**：设置页外观新增「皮肤」区块（`SkinPicker`）；管理面板插件管理新增「统一插件」区（`PluginManager` 升级）
 
 ---

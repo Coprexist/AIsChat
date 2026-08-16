@@ -256,7 +256,6 @@ applyThemeChain():
 | id | 类别 | 说明 |
 |----|------|------|
 | `skin-aurora` | skin | 极光青碧（青碧色系，日夜两套） |
-| `skin-sakura` | skin | 樱粉物语（樱粉色系，日夜两套） |
 | `skill-writing-studio` | skill | 写作工坊（技能类型 `writing_studio`） |
 
 复制示例目录改名改字段，即是新插件。
