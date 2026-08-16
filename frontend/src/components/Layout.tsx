@@ -31,38 +31,35 @@ export default function Layout() {
       try {
         const res = await fetch('/api/maintenance-msg')
         const d = await res.json()
-        const txt = { title: d.hard_title||'正在更新', body: d.hard_body||'服务器正在更新', color: d.hard_color||'#f59e0b', textColor: d.hard_text_color||'#ffffff', image: d.hard_image||'', style: d.hard_style||'popup' }
-        localStorage.setItem('maintenance_msg', JSON.stringify(txt))
-        setHardText(txt)
-        if (d.soft_text) { setSoftText(d.soft_text); localStorage.setItem('maintenance_soft', d.soft_text) }
-        if (d.soft_color) { setSoftColor(d.soft_color); localStorage.setItem('maintenance_soft_color', d.soft_color) }
-        if (d.soft_text_color) { setSoftTextColor(d.soft_text_color); localStorage.setItem('maintenance_soft_text_color', d.soft_text_color) }
-        if (d.soft_style) { setSoftStyle(d.soft_style) }
-        setSoftOnce(!!d.soft_once)
+        // 权威维护状态：hard/soft 布尔由后端中间件/接口返回
+        if (d.hard) {
+          localStorage.setItem('_maint_detected', '1')
+          localStorage.setItem('_maint_hard_visible', '1')
+          applyHardData(d)
+          // 用户本会话已手动关闭过硬维护弹窗 → 不再自动弹出（轮询不再强制显示）
+          if (!sessionStorage.getItem('maint_hard_dismissed')) setMaintenance(true)
+          setImgError(false)
+        } else if (d.soft) {
+          setSoftMaintenance(true)
+          localStorage.setItem('_maint_detected', '1')
+          applySoftData(d)
+        } else {
+          // 维护已结束
+          localStorage.removeItem('_maint_hard_visible')
+          localStorage.removeItem('_maint_detected')
+          setMaintenance(false); setSoftMaintenance(false)
+        }
       } catch {}
     }
-    const h1 = async (e?: CustomEvent) => {
-      setMaintenance(true); setImgError(false)
-      // 优先用事件带的数据（含全量 msg），其次读 API
-      const m = e?.detail?.msg
-      if (m?.hard_title) {
-        setHardText({ title: m.hard_title, body: m.hard_body||'', color: m.hard_color||'#f59e0b', textColor: m.hard_text_color||'#ffffff', image: m.hard_image||'', style: m.hard_style||'popup' })
-        localStorage.setItem('maintenance_msg', JSON.stringify({title: m.hard_title, body: m.hard_body, color: m.hard_color, textColor: m.hard_text_color, image: m.hard_image, style: m.hard_style}))
-        if (m.soft_text) { setSoftText(m.soft_text); setSoftColor(m.soft_color||'#f59e0b'); setSoftTextColor(m.soft_text_color||'#ffffff'); setSoftStyle(m.soft_style||'banner'); setSoftOnce(!!m.soft_once) }
-      } else if (e?.detail?.detail) {
-        setHardText({ title: '服务器维护中', body: e.detail.detail, color: '#f59e0b', textColor: '#ffffff', image: '', style: 'popup' })
-      } else await fetchMsg()
-    }
-    const h2 = async () => {
-      setSoftMaintenance(true)
-      await fetchMsg()
-    }
-    const hClear = () => { setMaintenance(false); setSoftMaintenance(false) }
-    const hWs = (e: CustomEvent) => {
-      const { mode, msg } = e.detail
-      if (mode === 'hard') h1({ detail: { msg } } as any)
-      else if (mode === 'soft') { if (msg) applySoftData(msg); setSoftMaintenance(true) }
-      else if (mode === 'none') hClear()
+    const applyHardData = (m: any) => {
+      const txt = { title: m.hard_title||'正在更新', body: m.hard_body||'服务器正在更新', color: m.hard_color||'#f59e0b', textColor: m.hard_text_color||'#ffffff', image: m.hard_image||'', style: m.hard_style||'popup' }
+      setHardText(txt)
+      localStorage.setItem('maintenance_msg', JSON.stringify(txt))
+      if (m.soft_text) { setSoftText(m.soft_text); localStorage.setItem('maintenance_soft', m.soft_text) }
+      if (m.soft_color) { setSoftColor(m.soft_color); localStorage.setItem('maintenance_soft_color', m.soft_color) }
+      if (m.soft_text_color) { setSoftTextColor(m.soft_text_color); localStorage.setItem('maintenance_soft_text_color', m.soft_text_color) }
+      if (m.soft_style) { setSoftStyle(m.soft_style) }
+      setSoftOnce(!!m.soft_once)
     }
     const applySoftData = (d: any) => {
       if (d.soft_text) { setSoftText(d.soft_text); localStorage.setItem('maintenance_soft', d.soft_text) }
@@ -70,12 +67,54 @@ export default function Layout() {
       if (d.soft_text_color) { setSoftTextColor(d.soft_text_color); localStorage.setItem('maintenance_soft_text_color', d.soft_text_color) }
       if (d.soft_style) { setSoftStyle(d.soft_style) }
       setSoftOnce(!!d.soft_once)
+      if (d.hard_title) setHardText({ title: d.hard_title, body: d.hard_body||'', color: d.hard_color||'#f59e0b', textColor: d.hard_text_color||'#ffffff', image: d.hard_image||'', style: d.hard_style||'popup' })
+    }
+    const h1 = async (e?: CustomEvent) => {
+      localStorage.setItem('_maint_hard_visible', '1')
+      setImgError(false)
+      // 优先用事件带的数据（含全量 msg），其次读 API
+      const m = e?.detail?.msg
+      if (m?.hard_title) {
+        applyHardData(m)
+      } else if (e?.detail?.detail) {
+        setHardText({ title: '服务器维护中', body: e.detail.detail, color: '#f59e0b', textColor: '#ffffff', image: '', style: 'popup' })
+      } else await fetchMsg()
+      // 用户本会话已手动关闭 → 不强制弹出（503 持续触发时不再打扰）
+      if (!sessionStorage.getItem('maint_hard_dismissed')) setMaintenance(true)
+    }
+    const h2 = async () => {
+      // 软维护头出现 → 显示提示（文案由挂载 fetch / 30s 轮询 / WS 广播更新）
+      setSoftMaintenance(true)
+    }
+    const hClear = () => {
+      localStorage.removeItem('_maint_hard_visible')
+      localStorage.removeItem('_maint_detected')
+      setMaintenance(false); setSoftMaintenance(false)
+    }
+    const hWs = (e: CustomEvent) => {
+      const { mode, msg } = e.detail
+      if (mode === 'hard') {
+        // 管理员重新开启硬维护 → 强制重新显示（即使本会话曾手动关闭）
+        sessionStorage.removeItem('maint_hard_dismissed')
+        h1({ detail: { msg } } as any)
+      }
+      else if (mode === 'soft') {
+        // 管理员重新开启软维护 → 清除"本会话已忽略"标记，让提示重新出现
+        sessionStorage.removeItem('maint_soft_dismissed')
+        if (msg) applySoftData(msg)
+        setSoftMaintenance(true)
+      }
+      else if (mode === 'none') hClear()
     }
     window.addEventListener('maintenance-mode' as any, h1 as any)
     window.addEventListener('maintenance-soft' as any, h2 as any)
     window.addEventListener('maintenance-cleared', hClear)
     window.addEventListener('ws-maintenance-update' as any, hWs as any)
+    // 权威状态轮询：修复刷新不恢复 / 非聊天页收不到 WS 广播的问题
+    fetchMsg()
+    const poll = setInterval(fetchMsg, 30_000)
     return () => {
+      clearInterval(poll)
       window.removeEventListener('maintenance-mode' as any, h1 as any)
       window.removeEventListener('maintenance-soft' as any, h2 as any)
       window.removeEventListener('maintenance-cleared', hClear)
@@ -200,12 +239,12 @@ export default function Layout() {
             className="shrink-0 px-2 py-0.5 rounded text-[10px] opacity-80 hover:opacity-100 transition-opacity" style={{ backgroundColor: 'rgba(0,0,0,0.15)' }}><X size={12} /></button>
         </div>
       )}
-      {/* 软维护——弹窗 */}
-      {softMaintenance && !(softOnce && sessionStorage.getItem('maint_soft_done')) && softStyle === 'popup' && (
-        <div className="fixed inset-0 z-[65] flex items-center justify-center bg-black/50 p-4" onClick={() => { setSoftMaintenance(false); if (softOnce) sessionStorage.setItem('maint_soft_done', '1') }}>
+      {/* 软维护——弹窗（关闭后本会话不再弹，除非管理员重新开启） */}
+      {softMaintenance && !(softOnce && sessionStorage.getItem('maint_soft_done')) && !sessionStorage.getItem('maint_soft_dismissed') && softStyle === 'popup' && (
+        <div className="fixed inset-0 z-[65] flex items-center justify-center bg-black/50 p-4" onClick={() => { setSoftMaintenance(false); sessionStorage.setItem('maint_soft_dismissed', '1') }}>
           <div className="bg-surface rounded-xl p-5 max-w-xs w-full text-center shadow-xl border border-border/50" onClick={e => e.stopPropagation()}>
             <div className="text-sm mb-3">{softText}</div>
-            <button onClick={() => { setSoftMaintenance(false); if (softOnce) sessionStorage.setItem('maint_soft_done', '1') }}
+            <button onClick={() => { setSoftMaintenance(false); sessionStorage.setItem('maint_soft_dismissed', '1') }}
               className="px-4 py-1.5 rounded-lg text-xs font-medium transition-opacity hover:opacity-90" style={{ backgroundColor: softColor, color: softTextColor }}>知道了</button>
           </div>
         </div>
@@ -215,7 +254,7 @@ export default function Layout() {
       {maintenance && hardText.style === 'banner' && (
         <div className="fixed top-0 left-0 right-0 z-[70] text-xs text-center py-2 px-4 font-medium flex items-center justify-center gap-2" style={{ backgroundColor: hardText.color, color: hardText.textColor }}>
           <span>{hardText.title} · {hardText.body}</span>
-          <button onClick={() => setMaintenance(false)}
+          <button onClick={() => { setMaintenance(false); sessionStorage.setItem('maint_hard_dismissed', '1') }}
             className="shrink-0 px-2 py-0.5 rounded text-[10px] opacity-80 hover:opacity-100 transition-opacity" style={{ backgroundColor: 'rgba(0,0,0,0.15)' }}><X size={12} /></button>
         </div>
       )}
@@ -229,7 +268,7 @@ export default function Layout() {
             {hardText.image && !imgError && (
               <img src={hardText.image} alt="" className="w-24 h-24 object-contain mx-auto mb-4 rounded-lg" onError={() => setImgError(true)} />
             )}
-            <button onClick={() => setMaintenance(false)}
+            <button onClick={() => { setMaintenance(false); sessionStorage.setItem('maint_hard_dismissed', '1') }}
               className="px-5 py-2 text-sm rounded-lg font-medium transition-opacity hover:opacity-90" style={{ backgroundColor: hardText.color, color: hardText.textColor }}>知道了</button>
           </div>
         </div>

@@ -15,6 +15,8 @@ function getApiBaseUrl(): string {
   return '/api'
 }
 
+export { getApiBaseUrl }
+
 class ApiError extends Error {
   status: number
   detail: string
@@ -72,9 +74,10 @@ async function request<T = any>(
     } } catch {}
   }
 
-  // 检测维护已关闭（之前显示维护但这次请求正常）
-  if (res.status !== 503 && res.headers.get('X-Maintenance') !== 'true') {
-    if (localStorage.getItem('_maint_detected')) {
+  // 维护关闭检测：只有明确拿到"非维护"响应才清除（软维护开启时所有响应带头，
+  // 硬维护期间 bypass 路径无头——不能据此判定维护已结束，清除统一由 Layout 轮询 /maintenance-msg 驱动）
+  if (res.status !== 503 && res.headers.get('X-Maintenance') !== 'true' && !res.headers.get('X-Maintenance-Hard')) {
+    if (localStorage.getItem('_maint_detected') && !localStorage.getItem('_maint_hard_visible')) {
       localStorage.removeItem('_maint_detected')
       window.dispatchEvent(new CustomEvent('maintenance-cleared'))
     }

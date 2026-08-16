@@ -393,7 +393,14 @@ async def client_ip_middleware(request, call_next):
 @app.middleware("http")
 async def maintenance_middleware(request, call_next):
     path = request.url.path
-    bypass = path in ("/health", "/", "/docs", "/openapi.json") or path.startswith("/admin") or path.startswith("/auth") or path.startswith("/maintenance-msg")
+    # bypass：健康检查/文档/管理/认证/维护消息本身/维护弹窗公开图片
+    bypass = (
+        path in ("/health", "/", "/docs", "/openapi.json")
+        or path.startswith("/admin")
+        or path.startswith("/auth")
+        or path.startswith("/maintenance-msg")
+        or path.startswith("/fs/public")
+    )
 
     # 硬维护（自动启动/关闭 或 管理员手动）：503 拦截
     if (os.path.exists(_MAINTENANCE_AUTO) or os.path.exists(_MAINTENANCE_ADMIN_HARD)) and not bypass:
@@ -406,8 +413,13 @@ async def maintenance_middleware(request, call_next):
 
     # 软维护（手动）：API 正常但前端显示提示
     response = await call_next(request)
-    if os.path.exists(_MAINTENANCE_SOFT) and not bypass:
+    if os.path.exists(_MAINTENANCE_SOFT):
+        # 所有响应（含 bypass）都带维护头，前端据此显隐提示且不会误判"已关闭"
         response.headers["X-Maintenance"] = "true"
+        if not path.startswith("/maintenance-msg"):
+            response.headers["X-Maintenance-Hard"] = str(
+                os.path.exists(_MAINTENANCE_AUTO) or os.path.exists(_MAINTENANCE_ADMIN_HARD)
+            )
     return response
 
 
@@ -429,7 +441,12 @@ async def root():
 
 @app.get("/maintenance-msg")
 async def public_maintenance_msg():
-    return _get_maintenance_msg()
+    msg = _get_maintenance_msg()
+    return {
+        **msg,
+        "hard": os.path.exists(_MAINTENANCE_AUTO) or os.path.exists(_MAINTENANCE_ADMIN_HARD),
+        "soft": os.path.exists(_MAINTENANCE_SOFT),
+    }
 
 
 @app.get("/health")

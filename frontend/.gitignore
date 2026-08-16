@@ -22,3 +22,6 @@ build/
 *.swp
 *.swo
 *~
+
+# TypeScript incremental build info
+*.tsbuildinfo

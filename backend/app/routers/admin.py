@@ -3013,29 +3013,57 @@ async def get_browser_status(admin: dict = Depends(require_admin)):
 
 @router.get("/maintenance")
 async def get_maintenance(admin: dict = Depends(require_admin)):
+    d = os.environ.get("MAINTENANCE_DIR", "/tmp")
     return {
-        "auto": os.path.exists("/tmp/maintenance_startup"),
-        "hard": os.path.exists("/tmp/maintenance_admin_hard"),
-        "soft": os.path.exists("/tmp/maintenance_soft"),
+        "auto": os.path.exists(os.path.join(d, "maintenance_startup")),
+        "hard": os.path.exists(os.path.join(d, "maintenance_admin_hard")),
+        "soft": os.path.exists(os.path.join(d, "maintenance_soft")),
     }
+
+
+def _maintenance_msg_file() -> str:
+    return os.path.join(os.environ.get("MAINTENANCE_DIR", "/tmp"), "maintenance_msg.json")
 
 
 def _load_maintenance_msg() -> dict:
     try:
-        if os.path.exists("/tmp/maintenance_msg.json"):
-            with open("/tmp/maintenance_msg.json") as f:
-                return json.loads(f.read())
-    except: pass
+        f = _maintenance_msg_file()
+        if os.path.exists(f):
+            with open(f) as fp:
+                return json.loads(fp.read())
+    except Exception:
+        pass
     return {"hard_title":"正在更新","hard_body":"服务器正在更新，稍等一下就好~","hard_color":"#f59e0b","hard_text_color":"#ffffff","hard_image":"","hard_style":"popup","soft_text":"服务器正在调整，功能可能偶尔不稳定","soft_color":"#f59e0b","soft_text_color":"#ffffff","soft_style":"banner","soft_once":False}
+
+
+def _current_maintenance_mode() -> str | None:
+    """返回当前维护模式: hard / soft / None（auto 归入 hard 处理）"""
+    d = os.environ.get("MAINTENANCE_DIR", "/tmp")
+    if os.path.exists(os.path.join(d, "maintenance_startup")) or os.path.exists(os.path.join(d, "maintenance_admin_hard")):
+        return "hard"
+    if os.path.exists(os.path.join(d, "maintenance_soft")):
+        return "soft"
+    return None
+
+
+async def _broadcast_maintenance_update():
+    """按当前实际模式广播维护状态（保存文案/应用预设后同步在线用户）"""
+    mode = _current_maintenance_mode()
+    if mode:
+        await ws_manager.broadcast_to_all({"type": "maintenance_update", "mode": mode, "msg": _load_maintenance_msg()})
+    else:
+        await ws_manager.broadcast_to_all({"type": "maintenance_update", "mode": "none"})
 
 
 @router.post("/maintenance/hard")
 async def toggle_hard(admin: dict = Depends(require_admin)):
-    if os.path.exists("/tmp/maintenance_admin_hard"):
-        os.remove("/tmp/maintenance_admin_hard")
-        await ws_manager.broadcast_to_all({"type": "maintenance_update", "mode": "none"})
+    d = os.environ.get("MAINTENANCE_DIR", "/tmp")
+    hard_file = os.path.join(d, "maintenance_admin_hard")
+    if os.path.exists(hard_file):
+        os.remove(hard_file)
+        await _broadcast_maintenance_update()
         return {"hard": False, "message": "硬维护已关闭"}
-    open("/tmp/maintenance_admin_hard", "w").close()
+    open(hard_file, "w").close()
     msg = _load_maintenance_msg()
     await ws_manager.broadcast_to_all({"type": "maintenance_update", "mode": "hard", "msg": msg})
     return {"hard": True, "message": "硬维护已开启——API 返回 503"}
@@ -3043,11 +3071,13 @@ async def toggle_hard(admin: dict = Depends(require_admin)):
 
 @router.post("/maintenance/soft")
 async def toggle_soft(admin: dict = Depends(require_admin)):
-    if os.path.exists("/tmp/maintenance_soft"):
-        os.remove("/tmp/maintenance_soft")
-        await ws_manager.broadcast_to_all({"type": "maintenance_update", "mode": "none"})
+    d = os.environ.get("MAINTENANCE_DIR", "/tmp")
+    soft_file = os.path.join(d, "maintenance_soft")
+    if os.path.exists(soft_file):
+        os.remove(soft_file)
+        await _broadcast_maintenance_update()
         return {"soft": False, "message": "软维护已关闭"}
-    open("/tmp/maintenance_soft", "w").close()
+    open(soft_file, "w").close()
     msg = _load_maintenance_msg()
     await ws_manager.broadcast_to_all({"type": "maintenance_update", "mode": "soft", "msg": msg})
     return {"soft": True, "message": "软维护已开启——API 正常，前端展示提示"}
@@ -3069,31 +3099,25 @@ class MaintenanceMsgBody(BaseModel):
 
 @router.get("/maintenance/msg")
 async def get_maintenance_msg(admin: dict = Depends(require_admin)):
-    try:
-        if os.path.exists("/tmp/maintenance_msg.json"):
-            with open("/tmp/maintenance_msg.json") as f:
-                return json.loads(f.read())
-    except: pass
-    return {"hard_title":"正在更新","hard_body":"服务器正在更新，稍等一下就好~","hard_color":"#f59e0b","hard_text_color":"#ffffff","hard_image":"","hard_style":"popup","soft_text":"服务器正在调整，功能可能偶尔不稳定","soft_color":"#f59e0b","soft_text_color":"#ffffff","soft_style":"banner","soft_once":False}
+    return _load_maintenance_msg()
 
 
 @router.put("/maintenance/msg")
 async def save_maintenance_msg(body: MaintenanceMsgBody, admin: dict = Depends(require_admin)):
-    with open("/tmp/maintenance_msg.json", "w") as f:
+    with open(_maintenance_msg_file(), "w") as f:
         f.write(json.dumps(body.model_dump(), ensure_ascii=False))
+    await _broadcast_maintenance_update()
     return {"ok": True, "message": "维护文本已保存"}
 
 
-_PRESETS_FILE = "/app/data/maintenance_presets.json"
+_PRESETS_FILE = os.path.join(settings.data_dir, "maintenance_presets.json")
 _DEFAULT_PRESETS = [
-    {"name": "服务器更新", "hard_title": "正在更新", "hard_body": "服务器正在更新，稍等一下就好~", "hard_color": "#f59e0b", "soft_text": "服务器正在更新，功能可能偶尔不稳定", "soft_color": "#f59e0b", "soft_text_color": "#ffffff", "soft_once": False},
-    {"name": "紧急维护", "hard_title": "紧急维护", "hard_body": "服务器突发故障，正在紧急抢修中，请稍后再来", "hard_color": "#ef4444", "soft_text": "服务器正在紧急维护，可能会出现短暂不可用", "soft_color": "#ef4444", "soft_text_color": "#ffffff", "soft_once": False},
-    {"name": "功能升级", "hard_title": "功能升级中", "hard_body": "正在升级新功能，马上就好~", "hard_color": "#8b5cf6", "soft_text": "新功能部署中，部分功能可能暂时不可用", "soft_color": "#8b5cf6", "soft_text_color": "#ffffff", "soft_once": False},
-    {"name": "网络波动", "hard_title": "网络波动", "hard_body": "网络不稳定，正在排查中", "hard_color": "#f59e0b", "soft_text": "网络有些不稳定，正在处理", "soft_color": "#f59e0b", "soft_text_color": "#ffffff", "soft_once": False},
-    {"name": "数据库维护", "hard_title": "数据库维护", "hard_body": "数据库正在优化，稍等片刻", "hard_color": "#3b82f6", "soft_text": "数据库正在维护，涉及存储的功能可能受影响", "soft_color": "#3b82f6", "soft_text_color": "#ffffff", "soft_once": False},
-    {"name": "性能优化", "hard_title": "性能优化中", "hard_body": "正在优化服务器性能，请稍等", "hard_color": "#10b981", "soft_text": "服务器性能调优中，体验可能略有影响", "soft_color": "#10b981", "soft_text_color": "#ffffff", "soft_once": False},
-    {"name": "新春快乐", "hard_title": "新春快乐 🧧", "hard_body": "服务器回家过年啦~稍等片刻，马上回来！", "hard_color": "#dc2626", "soft_text": "春节期间可能会有短暂离线，祝大家新年快乐！", "soft_color": "#dc2626", "soft_text_color": "#ffffff", "soft_once": False},
-    {"name": "假日休息", "hard_title": "假期中 🌴", "hard_body": "服务器也需要放假~休息一下马上回来", "hard_color": "#06b6d4", "soft_text": "假期期间响应可能稍慢，祝假期愉快！", "soft_color": "#06b6d4", "soft_text_color": "#ffffff", "soft_once": False},
+    {"name": "服务器更新", "hard_title": "正在更新", "hard_body": "服务器正在更新，稍等一下就好~", "hard_color": "#f59e0b", "hard_text_color": "#ffffff", "hard_image": "", "hard_style": "popup", "soft_text": "服务器正在更新，功能可能偶尔不稳定", "soft_color": "#f59e0b", "soft_text_color": "#ffffff", "soft_style": "banner", "soft_once": False},
+    {"name": "紧急维护", "hard_title": "紧急维护", "hard_body": "服务器突发故障，正在紧急抢修中，请稍后再来", "hard_color": "#ef4444", "hard_text_color": "#ffffff", "hard_image": "", "hard_style": "popup", "soft_text": "服务器正在紧急维护，可能会出现短暂不可用", "soft_color": "#ef4444", "soft_text_color": "#ffffff", "soft_style": "banner", "soft_once": False},
+    {"name": "功能升级", "hard_title": "功能升级中", "hard_body": "正在升级新功能，马上就好~", "hard_color": "#8b5cf6", "hard_text_color": "#ffffff", "hard_image": "", "hard_style": "popup", "soft_text": "新功能部署中，部分功能可能暂时不可用", "soft_color": "#8b5cf6", "soft_text_color": "#ffffff", "soft_style": "banner", "soft_once": False},
+    {"name": "网络波动", "hard_title": "网络波动", "hard_body": "网络不稳定，正在排查中", "hard_color": "#f59e0b", "hard_text_color": "#ffffff", "hard_image": "", "hard_style": "popup", "soft_text": "网络有些不稳定，正在处理", "soft_color": "#f59e0b", "soft_text_color": "#ffffff", "soft_style": "banner", "soft_once": False},
+    {"name": "数据库维护", "hard_title": "数据库维护", "hard_body": "数据库正在优化，稍等片刻", "hard_color": "#3b82f6", "hard_text_color": "#ffffff", "hard_image": "", "hard_style": "popup", "soft_text": "数据库正在维护，涉及存储的功能可能受影响", "soft_color": "#3b82f6", "soft_text_color": "#ffffff", "soft_style": "banner", "soft_once": False},
+    {"name": "性能优化", "hard_title": "性能优化中", "hard_body": "正在优化服务器性能，请稍等", "hard_color": "#10b981", "hard_text_color": "#ffffff", "hard_image": "", "hard_style": "popup", "soft_text": "服务器性能调优中，体验可能略有影响", "soft_color": "#10b981", "soft_text_color": "#ffffff", "soft_style": "banner", "soft_once": False},
 ]
 
 def _load_presets():
@@ -3101,9 +3125,14 @@ def _load_presets():
         if os.path.exists(_PRESETS_FILE):
             with open(_PRESETS_FILE) as f:
                 return json.loads(f.read())
-    except: pass
-    with open(_PRESETS_FILE, "w") as f:
-        f.write(json.dumps(_DEFAULT_PRESETS, ensure_ascii=False))
+    except Exception:
+        pass
+    try:
+        os.makedirs(os.path.dirname(_PRESETS_FILE), exist_ok=True)
+        with open(_PRESETS_FILE, "w") as f:
+            f.write(json.dumps(_DEFAULT_PRESETS, ensure_ascii=False))
+    except Exception:
+        pass
     return list(_DEFAULT_PRESETS)
 
 
@@ -3116,9 +3145,23 @@ async def list_presets(admin: dict = Depends(require_admin)):
 async def apply_preset(admin: dict = Depends(require_admin), name: str = ""):
     p = next((p for p in _load_presets() if p["name"] == name), None)
     if not p: raise HTTPException(404, f"预设 {name} 不存在")
-    with open("/tmp/maintenance_msg.json", "w") as f:
-        f.write(json.dumps({"hard_title":p["hard_title"],"hard_body":p["hard_body"],"hard_color":p.get("hard_color","#f59e0b"),"hard_text_color":p.get("hard_text_color","#ffffff"),"hard_image":p.get("hard_image",""),"hard_style":p.get("hard_style","popup"),"soft_text":p["soft_text"],"soft_color":p.get("soft_color","#f59e0b"),"soft_text_color":p.get("soft_text_color","#ffffff"),"soft_style":p.get("soft_style","banner"),"soft_once":p.get("soft_once",False)}, ensure_ascii=False))
-    return {"ok": True, "message": f"已应用预设「{name}」", "msg": p}
+    merged = {
+        "hard_title": p.get("hard_title", "正在更新"),
+        "hard_body": p.get("hard_body", "服务器正在更新，稍等一下就好~"),
+        "hard_color": p.get("hard_color", "#f59e0b"),
+        "hard_text_color": p.get("hard_text_color", "#ffffff"),
+        "hard_image": p.get("hard_image", ""),
+        "hard_style": p.get("hard_style", "popup"),
+        "soft_text": p.get("soft_text", "服务器正在调整，功能可能偶尔不稳定"),
+        "soft_color": p.get("soft_color", "#f59e0b"),
+        "soft_text_color": p.get("soft_text_color", "#ffffff"),
+        "soft_style": p.get("soft_style", "banner"),
+        "soft_once": p.get("soft_once", False),
+    }
+    with open(_maintenance_msg_file(), "w") as f:
+        f.write(json.dumps(merged, ensure_ascii=False))
+    await _broadcast_maintenance_update()
+    return {"ok": True, "message": f"已应用预设「{name}」", "msg": merged}
 
 
 @router.delete("/maintenance/presets/{name}")
@@ -3135,23 +3178,39 @@ class MaintenancePresetBody(BaseModel):
     hard_title: str = "正在更新"
     hard_body: str = "服务器正在更新，稍等一下就好~"
     hard_color: str = "#f59e0b"
+    hard_text_color: str = "#ffffff"
+    hard_image: str = ""
+    hard_style: str = "popup"
     soft_text: str = "服务器正在调整，功能可能偶尔不稳定"
     soft_color: str = "#f59e0b"
     soft_text_color: str = "#ffffff"
+    soft_style: str = "banner"
     soft_once: bool = False
 
 
 @router.post("/maintenance/presets")
 async def add_preset(body: MaintenancePresetBody, admin: dict = Depends(require_admin)):
+    """保存预设（同名覆盖，避免先删后建的数据丢失）"""
     presets = _load_presets()
-    if any(p["name"] == body.name for p in presets): raise HTTPException(400, f"预设 {body.name} 已存在")
-    presets.append(body.model_dump())
-    with open(_PRESETS_FILE, "w") as f: f.write(json.dumps(presets, ensure_ascii=False))
-    return {"ok": True, "message": f"已添加预设「{body.name}」"}
+    data = body.model_dump()
+    replaced = False
+    for i, p in enumerate(presets):
+        if p["name"] == body.name:
+            presets[i] = data
+            replaced = True
+            break
+    if not replaced:
+        presets.append(data)
+    try:
+        os.makedirs(os.path.dirname(_PRESETS_FILE), exist_ok=True)
+        with open(_PRESETS_FILE, "w") as f: f.write(json.dumps(presets, ensure_ascii=False))
+    except Exception:
+        raise HTTPException(500, f"预设保存失败：{_PRESETS_FILE} 不可写")
+    return {"ok": True, "message": f"已{'覆盖' if replaced else '添加'}预设「{body.name}」"}
 
 
 # 维护图片库（独立于预设）
-_IMG_FILE = "/app/data/maintenance_images.json"
+_IMG_FILE = os.path.join(settings.data_dir, "maintenance_images.json")
 
 def _load_images() -> list[str]:
     try:
@@ -3178,6 +3237,7 @@ async def add_image(admin: dict = Depends(require_admin), url: str = ""):
 
 @router.delete("/maintenance/images")
 async def del_image(admin: dict = Depends(require_admin), url: str = ""):
+    if not url: raise HTTPException(400, "缺少 url")
     imgs = _load_images()
     new_list = [i for i in imgs if i != url]
     with open(_IMG_FILE, "w") as f: f.write(json.dumps(new_list, ensure_ascii=False))

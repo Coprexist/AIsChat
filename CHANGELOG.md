@@ -3,7 +3,30 @@
 本 CHANGELOG 遵循 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.0.0/) 规范，
 版本号遵守 [语义化版本](https://semver.org/lang/zh-CN/)。
 
-> **当前阶段**：v0.3.7 正式版 — 补丁版本号（第三位）递增。
+> **当前阶段**：v0.3.8 正式版 — 补丁版本号（第三位）递增。
+
+---
+
+## [v0.3.8] - 2026-08-17
+
+### Fixed — 🔧 维护通知系统全面修复（概览页"通知"区块）
+
+- **维护路径统一**：`admin.py` 不再硬编码 `/tmp`，全部跟随 `MAINTENANCE_DIR` env（与中间件一致）；预设/图片库文件移入 `settings.data_dir`（容器 `/app/data`，随数据目录持久化）
+- **`X-Maintenance` 头不再漏发**：软维护开启时所有响应（含 `/auth`、`/admin`、`/maintenance-msg` 等 bypass 路径）都带头 → 修复"用户访问认证/管理接口后维护提示被误判已关闭而消失"的闪烁 BUG
+- **维护弹窗图片可加载**：`/fs/public` 加入维护中间件 bypass → 硬维护期间维护弹窗配图不再 503
+- **保存即同步**：保存文案 / 应用预设后广播 `maintenance_update`，在线用户实时看到新文案（此前需等开关或刷新）
+- **`/maintenance-msg` 返回 hard/soft 状态**：前端刷新页面后能立即恢复维护提示（此前刷新后提示丢失，且非聊天页收不到 WS 广播）→ Layout 增加 30s 权威状态轮询兜底
+- **软维护弹窗不再反复弹出**：关闭后本会话不再弹，管理员重新开启（WS 广播）后恢复
+- **硬维护弹窗可关闭**：用户点"知道了"后本会话不再被轮询强制弹出
+- **预设字段补全**：`_DEFAULT_PRESETS` 补齐 `hard_text_color/hard_image/hard_style/soft_style/soft_text_color`，应用预设不再丢字段（此前 `hard_style` 变 undefined → 弹窗样式错乱）
+- **保存预设不再先删后建**：后端同名覆盖（upsert），避免网络失败时原预设丢失；预设保存/重命名/删除全部改为内联 UI（移除 `prompt/alert/confirm` 原生弹窗）
+- **错误可见**：加载失败、保存失败、上传失败均有明确提示（此前静默失败，编辑器直接消失）
+- **桌面端图片 URL 修复**：上传后的维护图片按实例地址拼 URL（此前硬编码 `/api` 前缀，桌面端加载失败）
+
+### Changed — 🎨 维护通知 UI 重构（概览页）
+
+- **OverviewTab 状态条**：改用 i18n key（zh/en/ja）+ 状态图标底色 + 操作中禁用/加载态 + 错误提示
+- **MaintenanceMsgEditor**：硬维护/软维护均增加实时预览（弹窗/顶栏两种样式）；图片库改为缩略图网格（点选应用、悬停删除、选中高亮）；布局与全站卡片风格统一
 
 ---
 
