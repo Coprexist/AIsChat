@@ -5,6 +5,8 @@ Alembic 迁移环境配置 — 自动检测模型变更，生成迁移脚本
   alembic revision --autogenerate -m "描述变更"
   alembic upgrade head
 """
+import logging as _logging
+import os
 import sys
 from pathlib import Path
 
@@ -19,9 +21,32 @@ from alembic import context
 # Alembic 配置对象
 config = context.config
 
-# 日志配置
+
+def _restore_app_logging() -> None:
+    """恢复应用日志配置。
+
+    fileConfig 会把根 logger 的 handler 换成 alembic.ini 的 console，
+    并默认禁用已存在的 logger，导致迁移完成后应用日志全部静默
+    （worker 启动、就绪提示、uvicorn 收尾日志都消失）。这里重建应用
+    StreamHandler + FileHandler，保持迁移后日志不中断。
+    """
+    root = _logging.getLogger()
+    root.handlers = []
+    root.setLevel(_logging.INFO)
+    log_file = os.environ.get(
+        "LOG_FILE",
+        str(Path(__file__).resolve().parent.parent / "app.log"),
+    )
+    fmt = _logging.Formatter("%(asctime)s [%(levelname)s] %(name)s: %(message)s")
+    for h in (_logging.StreamHandler(), _logging.FileHandler(log_file, encoding="utf-8")):
+        h.setFormatter(fmt)
+        root.addHandler(h)
+
+
+# 日志配置（disable_existing_loggers=False：不禁用已存在的 app.* logger）
 if config.config_file_name is not None:
-    fileConfig(config.config_file_name)
+    fileConfig(config.config_file_name, disable_existing_loggers=False)
+    _restore_app_logging()
 
 # ── 从应用导入 Base 和所有模型（使 autogenerate 可检测） ──
 from app.database import Base

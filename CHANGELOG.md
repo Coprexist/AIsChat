@@ -3,7 +3,31 @@
 本 CHANGELOG 遵循 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.0.0/) 规范，
 版本号遵守 [语义化版本](https://semver.org/lang/zh-CN/)。
 
-> **当前阶段**：v0.3.14 正式版 — 补丁版本号（第三位）递增。
+> **当前阶段**：v0.3.15 正式版 — 补丁版本号（第三位）递增。
+
+---
+
+## [v0.3.15] - 2026-08-17
+
+### Changed — 🔧 后端 main.py 质量重构（对照代码审查十项逐条处理）
+
+- **启动流程拆分**：`main.py` 470 行 → 约 150 行；lifespan 拆到新模块 `app/bootstrap.py`，按职责分组 `_startup_db / _startup_plugins / _startup_workers / _startup_world / _startup_federation / _startup_brain_and_skills`
+- **维护模式封装**：文件标记与文案迁移逻辑集中到 `app/services/infrastructure/maintenance.py` 的 `MaintenanceManager`，中间件/lifespan/路由统一调用
+- **日志配置上移**：`basicConfig` 移到所有项目 import 之前，去掉重复的 `getLogger` 定义
+- **import 整理**：无循环依赖风险的模块级 import 全部上移（已验证无模块反向 import main）
+- **CORS 配置化**：新增 `ALLOWED_ORIGINS` env（逗号分隔），默认 `*` 保持内网既有行为
+
+### Added — ⚙️ 运行健壮性
+
+- **后台任务自动重启**：`spawn_task` 支持异常退出按指数退避自动拉起（1,2,4...封顶 60s，超 10 次放弃记 CRITICAL），循环型 worker 全部启用
+- **数据库就绪等待**：启动时 0.5s 轮询、30s 超时**快速失败**（替代原先 warning 后带病运行）；浏览器启动同样改为等待 DB 就绪而非 `sleep(3)`
+- **定时任务对齐固定时刻**：审计清理/每日备份改为 `sleep_until(3,0)` 计算到下一次凌晨 3 点的延迟（原 24h sleep 会漂移且首次执行晚一天）
+
+### Fixed — 🐛 修复
+
+- **Alembic 静默吞日志**（隐藏已久）：`alembic/env.py` 的 `fileConfig` 会重置根 logger 配置并禁用已存在 logger，导致每次重启后"后台 worker 已全部启动 / Application startup complete"等日志全部消失——`disable_existing_loggers=False` + 迁移后恢复应用日志双通道
+- **`_spawn` 异常日志失效**：`exc_info=exc`（异常实例被当 truthy，记录的是当前上下文而非捕获的异常）→ 改为 `exc_info=(type(exc), exc, exc.__traceback__)`
+- **关闭流程重复日志**：删除重复的"系统关闭"日志行
 
 ---
 
