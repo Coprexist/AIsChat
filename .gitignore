@@ -55,6 +55,9 @@ Desktop.ini
 CLAUDE.md
 .claude/
 
+# ── dsh 本地技能（仅本地会话使用，绝不公开） ──
+.dsh/
+
 # ── 冻结本文件（后续本地修改不提交） ──
 .gitignore
 .agent-memory.md
