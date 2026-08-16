@@ -1037,6 +1037,13 @@ async def stream_world_chat(
             return
         # note 为 None = 非注册命令：继续走 LLM（未知斜杠当普通消息处理）
 
+    # ── 第一轮前注入插入消息（2026-08-16 修复：原来只在工具轮循环内注入——
+    # 若 AI 第一轮不调工具直接收尾，插入消息永远进不了上下文，用户要等下一轮才被 AI 看到）──
+    try:
+        await _inject_pending_user_messages(db, world_id, messages, sid_db)
+    except Exception as e:
+        logger.warning(f"🌐 世界 #{world_id} 首轮插入消息注入失败（非致命）: {e}")
+
     # ── 请求 DeepSeek（stream=true，透传 SSE）──
     payload: dict = {
         "model": model,
