@@ -68,7 +68,8 @@ export default function SkinPicker() {
           </span>
         )}
       </div>
-      <p className="text-xs text-textMuted mb-3">{t('settings.skinDesc')}</p>
+      <p className="text-xs text-textMuted mb-1">{t('settings.skinDesc')}</p>
+      <p className="text-[11px] text-accent-500 mb-3">{t('settings.skinMutualExclusive')}</p>
 
       {loading ? (
         <p className="text-xs text-textMuted">{t('settings.loadingPlugins')}</p>
@@ -86,9 +87,16 @@ export default function SkinPicker() {
               <div
                 key={skin.id}
                 className={`relative rounded-xl border p-3 transition-colors ${
-                  on ? 'border-primary-400/50 bg-primary-400/5' : 'border-border bg-surface'
+                  on
+                    ? 'border-mint-400/60 bg-mint-400/5 ring-1 ring-mint-400/30'
+                    : 'border-border bg-surface'
                 }`}
               >
+                {on && (
+                  <span className="absolute -top-2 left-3 px-2 py-0.5 rounded-full bg-mint-500 text-white text-[10px] font-medium flex items-center gap-0.5 shadow">
+                    <Check size={10} /> {t('settings.skinInUse')}
+                  </span>
+                )}
                 {/* 色板预览（light 主色） */}
                 <div className="flex items-center gap-1.5 mb-2">
                   {PREVIEW_KEYS.map((k) => (
@@ -108,7 +116,7 @@ export default function SkinPicker() {
                     onClick={() => toggle(skin)}
                     disabled={toggling === skin.id || adminOff}
                     className={`relative w-9 h-5 rounded-full transition-colors disabled:opacity-40 ${
-                      on ? 'bg-primary-500' : 'bg-border'
+                      on ? 'bg-mint-500' : 'bg-border'
                     }`}
                     title={adminOff ? t('settings.skinAdminOff') : (on ? t('settings.skinOff') : t('settings.skinOn'))}
                   >

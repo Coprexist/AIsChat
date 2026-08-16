@@ -40,7 +40,7 @@ class PrefRequest(BaseModel):
     enabled: bool = True
 
 
-def _to_view(row, manifest: dict, user_pref: bool, is_admin: bool) -> dict:
+def _to_view(row, manifest: dict, user_pref: bool, is_admin: bool, users_count: int | None = None) -> dict:
     """DB 行 + 磁盘 manifest → API 视图"""
     skin_vars = catalog.get_skin_vars(manifest) if manifest.get("category") == "skin" else {}
     return {
@@ -56,6 +56,7 @@ def _to_view(row, manifest: dict, user_pref: bool, is_admin: bool) -> dict:
         "user_enabled": user_pref,
         "effective": bool(row.enabled and user_pref),
         "is_admin": is_admin,
+        "users_count": users_count,  # 管理员视角：显式启用了该插件的用户数（皮肤 = 正在用这套的人数）
         "skin_vars": skin_vars,
     }
 
@@ -86,13 +87,24 @@ async def list_plugins(
     )
     prefs = {p.plugin_id: p.enabled for p in pref_result.scalars().all()}
 
+    # 管理员视角：统计每个插件被多少用户显式启用（皮肤 = 正在用这套皮肤的人数）
+    users_count: dict[str, int] = {}
+    if is_admin:
+        from sqlalchemy import func
+        count_result = await db.execute(
+            select(UserPluginPref.plugin_id, func.count(UserPluginPref.id))
+            .where(UserPluginPref.enabled.is_(True))
+            .group_by(UserPluginPref.plugin_id)
+        )
+        users_count = {pid: int(c) for pid, c in count_result.all()}
+
     disk = catalog.scan_disk()
     plugins = []
     for pid in sorted(rows.keys()):
         row = rows[pid]
         manifest = disk.get(pid, {})
         user_pref = prefs.get(pid, True)
-        plugins.append(_to_view(row, manifest, user_pref, is_admin))
+        plugins.append(_to_view(row, manifest, user_pref, is_admin, users_count.get(pid)))
     return {"plugins": plugins}
 
 

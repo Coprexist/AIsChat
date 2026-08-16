@@ -28,6 +28,7 @@ export interface PluginView {
   user_enabled: boolean
   effective: boolean
   is_admin: boolean
+  users_count: number | null
   skin_vars: SkinVars
 }
 

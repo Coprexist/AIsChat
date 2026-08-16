@@ -173,6 +173,11 @@ export default function PluginManager() {
                         {plugin.builtin && (
                           <span className="px-1.5 py-0.5 rounded text-[10px] bg-gray-100 dark:bg-gray-800 text-gray-500 dark:text-gray-400">内置</span>
                         )}
+                        {plugin.users_count != null && plugin.users_count > 0 && (
+                          <span className="px-1.5 py-0.5 rounded text-[10px] bg-mint-400/10 text-mint-400 border border-mint-400/20">
+                            {plugin.users_count} 人{plugin.category === 'skin' ? '在用' : '启用'}
+                          </span>
+                        )}
                       </div>
                       <p className="text-xs text-textSecondary mt-0.5 line-clamp-2">{plugin.description}</p>
                     </div>
