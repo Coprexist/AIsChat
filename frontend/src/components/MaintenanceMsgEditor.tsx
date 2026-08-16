@@ -46,6 +46,19 @@ function urlLabel(url: string): string {
   try { return decodeURIComponent(url.split('/').pop() || url).slice(0, 24) } catch { return url }
 }
 
+type SaveState = 'idle' | 'dirty' | 'saving' | 'saved' | 'error'
+
+/** 判断补丁属于硬维护还是软维护字段 */
+function patchSection(patch: Partial<MsgData>): 'hard' | 'soft' | 'both' {
+  const keys = Object.keys(patch) as (keyof MsgData)[]
+  const hasHard = keys.some(k => k.startsWith('hard'))
+  const hasSoft = keys.some(k => k.startsWith('soft'))
+  if (hasHard && hasSoft) return 'both'
+  if (hasHard) return 'hard'
+  if (hasSoft) return 'soft'
+  return 'both'
+}
+
 export default function MaintenanceMsgEditor() {
   const t = useT()
   const [msg, setMsg] = useState<MsgData>(DEFAULT_MSG)
@@ -53,7 +66,8 @@ export default function MaintenanceMsgEditor() {
   const [images, setImages] = useState<string[]>([])
   const [loaded, setLoaded] = useState(false)
   const [loadError, setLoadError] = useState('')
-  const [saveState, setSaveState] = useState<'idle' | 'dirty' | 'saving' | 'saved' | 'error'>('idle')
+  const [hardState, setHardState] = useState<SaveState>('idle')
+  const [softState, setSoftState] = useState<SaveState>('idle')
   const [saveError, setSaveError] = useState('')
   const [uploading, setUploading] = useState(false)
   const [selPreset, setSelPreset] = useState('')
@@ -64,7 +78,6 @@ export default function MaintenanceMsgEditor() {
   const [mtState, setMtState] = useState<{ hard: boolean; soft: boolean; auto: boolean } | null>(null)
   const fileRef = useRef<HTMLInputElement>(null)
   const saveTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
-  const dirtyRef = useRef(false)
 
   const load = async () => {
     try {
@@ -86,35 +99,63 @@ export default function MaintenanceMsgEditor() {
     api.get('/admin/maintenance').then((d: any) => setMtState({ hard: !!d.hard, soft: !!d.soft, auto: !!d.auto })).catch(() => {})
   }, [])
 
-  /** 保存当前文案到后端（广播给在线用户） */
-  const save = useCallback(async () => {
+  /** 保存文案到后端（全量提交，广播给在线用户）；section 决定哪个栏显示状态 */
+  const save = useCallback(async (section: 'hard' | 'soft' | 'both') => {
     if (saveTimer.current) { clearTimeout(saveTimer.current); saveTimer.current = null }
-    dirtyRef.current = false
-    setSaveState('saving'); setSaveError('')
+    const setState = (s: SaveState) => {
+      if (section === 'both' || section === 'hard') setHardState(s)
+      if (section === 'both' || section === 'soft') setSoftState(s)
+    }
+    setState('saving'); setSaveError('')
     try {
       await api.put('/admin/maintenance/msg', msg)
-      setSaveState('saved')
-      setTimeout(() => setSaveState(s => (s === 'saved' ? 'idle' : s)), 2500)
+      setState('saved')
+      setTimeout(() => {
+        if (section === 'both' || section === 'hard') setHardState(s => (s === 'saved' ? 'idle' : s))
+        if (section === 'both' || section === 'soft') setSoftState(s => (s === 'saved' ? 'idle' : s))
+      }, 2500)
     } catch (e: any) {
-      dirtyRef.current = true
-      setSaveState('error')
+      setState('error')
       setSaveError(e?.detail || e?.message || '保存失败，请重试')
     }
   }, [msg])
 
-  /** 字段变更：标记未保存并自动保存（防抖 1.5s） */
+  /** 字段变更：标记对应栏未保存并自动保存（防抖 1.5s，全量提交） */
   const updateMsg = (patch: Partial<MsgData>) => {
     setMsg(prev => ({ ...prev, ...patch }))
-    dirtyRef.current = true
-    setSaveState('dirty')
+    const sec = patchSection(patch)
+    if (sec === 'hard' || sec === 'both') setHardState('dirty')
+    if (sec === 'soft' || sec === 'both') setSoftState('dirty')
     if (saveTimer.current) clearTimeout(saveTimer.current)
-    saveTimer.current = setTimeout(() => save(), 1500)
+    saveTimer.current = setTimeout(() => save(sec), 1500)
   }
 
   // 卸载时若还有未保存修改则立即保存
   useEffect(() => () => {
     if (saveTimer.current) clearTimeout(saveTimer.current)
   }, [])
+
+  /** 每栏标题行右侧的保存按钮 */
+  const SaveButton = ({ section, state, onSave }: { section: 'hard' | 'soft'; state: SaveState; onSave: () => void }) => {
+    const label = state === 'dirty' ? '保存更改' : state === 'saving' ? '保存中…' : state === 'saved' ? '已保存' : '保存并更新'
+    return (
+      <button
+        onClick={onSave}
+        disabled={state === 'saving' || state === 'saved'}
+        className={`flex items-center gap-1 px-2.5 py-1 rounded-lg text-[11px] font-medium transition-colors ${
+          state === 'dirty'
+            ? 'bg-primary-500 text-white hover:bg-primary-600'
+            : state === 'saved'
+              ? 'bg-mint-500/15 text-mint-400'
+              : state === 'error'
+                ? 'bg-rose-500/15 text-rose-400'
+                : 'bg-canvas border border-border text-textSecondary hover:text-primary-400 hover:border-primary-500/40'
+        }`}
+      >
+        {state === 'saved' ? <Check size={12} /> : <Save size={12} />}{label}
+      </button>
+    )
+  }
 
   const applyPreset = async (name: string) => {
     setPresetError('')
@@ -123,7 +164,7 @@ export default function MaintenanceMsgEditor() {
       const r: any = await api.post(`/admin/maintenance/presets/apply?name=${encodeURIComponent(name)}`)
       if (saveTimer.current) clearTimeout(saveTimer.current)
       setMsg(toMsgData(r.msg))
-      setSaveState('idle')
+      setHardState('idle'); setSoftState('idle')
       setSaveError('')
     } catch (e: any) {
       setPresetError(e?.detail || e?.message || '应用预设失败')
@@ -218,15 +259,8 @@ export default function MaintenanceMsgEditor() {
   return (
     <div className="space-y-3">
 
-      {/* ── 顶部保存栏：保存状态 + 当前维护开关状态 ── */}
-      <div className="bg-surface rounded-xl border border-border px-4 py-3 flex flex-wrap items-center gap-2">
-        <div className="flex items-center gap-2 flex-1 min-w-[200px]">
-          <span className="text-xs font-medium text-textPrimary">维护文案</span>
-          {saveState === 'dirty' && <span className="text-[11px] px-2 py-0.5 rounded-full bg-accent-500/15 text-accent-400">未保存</span>}
-          {saveState === 'saving' && <span className="text-[11px] px-2 py-0.5 rounded-full bg-accent-500/15 text-accent-400">保存中…</span>}
-          {saveState === 'saved' && <span className="text-[11px] px-2 py-0.5 rounded-full bg-mint-500/15 text-mint-400"><Check size={11} className="inline mr-0.5" />已保存，在线用户已同步</span>}
-          {saveState === 'error' && <span className="text-[11px] px-2 py-0.5 rounded-full bg-rose-500/15 text-rose-400 flex items-center gap-1"><AlertTriangle size={11} />保存失败</span>}
-        </div>
+      {/* ── 维护状态提示行（保存按钮在各栏内） ── */}
+      <div className="flex flex-wrap items-center gap-2">
         {mtState && (
           <span className={`text-[11px] px-2 py-0.5 rounded-full ${
             mtState.hard ? 'bg-rose-500/15 text-rose-400' : mtState.soft ? 'bg-accent-500/15 text-accent-400' : 'bg-mint-500/15 text-mint-400'
@@ -234,17 +268,13 @@ export default function MaintenanceMsgEditor() {
             {mtState.auto ? '启动中' : mtState.hard ? '暂停服务中' : mtState.soft ? '温馨提示中' : '未开启'}
           </span>
         )}
-        <button onClick={save} disabled={saveState === 'saving'}
-          className="flex items-center gap-1.5 px-4 py-1.5 rounded-lg bg-primary-500 text-white text-xs font-medium hover:bg-primary-600 disabled:opacity-50 transition-colors">
-          <Save size={14} />{saveState === 'saving' ? '保存中…' : '立即保存'}
-        </button>
+        {mtState && !mtState.hard && !mtState.soft && (
+          <span className="flex items-center gap-1.5 text-[11px] text-textMuted">
+            <Info size={12} /> 保存的文案将在开启「暂停服务」或「温馨提示」后展示给用户
+          </span>
+        )}
+        {saveError && <span className="text-[11px] text-rose-400 flex items-center gap-1"><AlertTriangle size={12} />{saveError}</span>}
       </div>
-      {saveError && <p className="text-[11px] text-rose-400 -mt-1">{saveError}</p>}
-      {mtState && !mtState.hard && !mtState.soft && (
-        <p className="flex items-center gap-1.5 text-[11px] text-textMuted -mt-1">
-          <Info size={12} /> 维护未开启——保存的文案将在开启「暂停服务」或「温馨提示」后展示给用户
-        </p>
-      )}
 
       {/* ── 预设栏 ── */}
       <div className="bg-surface rounded-xl border border-border p-3.5 space-y-2">
@@ -298,7 +328,10 @@ export default function MaintenanceMsgEditor() {
           <div className="flex items-center gap-1.5 text-xs font-semibold text-textPrimary">
             <span className="w-2 h-2 rounded-full bg-rose-400 animate-pulse" />
             <Lock size={13} className="text-rose-400" /> 暂停服务
-            <span className="text-textMuted font-normal text-[10px] ml-1">——用户看到弹窗/顶栏，API 全部返回 503</span>
+            <span className="text-textMuted font-normal text-[10px] ml-1 hidden sm:inline">——用户看到弹窗/顶栏，API 全部返回 503</span>
+            <span className="ml-auto shrink-0">
+              <SaveButton section="hard" state={hardState} onSave={() => save('hard')} />
+            </span>
           </div>
           <div className="space-y-2.5">
             <div className="flex gap-2 items-start">
@@ -381,7 +414,10 @@ export default function MaintenanceMsgEditor() {
           <div className="flex items-center gap-1.5 text-xs font-semibold text-textPrimary">
             <span className="w-2 h-2 rounded-full bg-accent-400" />
             <Megaphone size={13} className="text-accent-400" /> 温馨提示
-            <span className="text-textMuted font-normal text-[10px] ml-1">——用户看到顶栏/弹窗提示，API 正常运行</span>
+            <span className="text-textMuted font-normal text-[10px] ml-1 hidden sm:inline">——用户看到顶栏/弹窗提示，API 正常运行</span>
+            <span className="ml-auto shrink-0">
+              <SaveButton section="soft" state={softState} onSave={() => save('soft')} />
+            </span>
           </div>
           <div className="space-y-2.5">
             <div className="flex gap-2 items-start">
