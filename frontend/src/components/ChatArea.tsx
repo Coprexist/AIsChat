@@ -11,6 +11,10 @@ import SearchOverlay from './SearchOverlay'
 import { Bell, BellOff, UserPlus, Settings, ArrowLeft, Bot, User, Globe, X, Check, Users, AlertTriangle } from 'lucide-react'
 import { useT } from '../i18n/I18nContext'
 import { useResizableSidebar } from '../hooks/useResizableSidebar'
+import { isEmbedded } from '../embed/bridge'
+
+/** 嵌入模式（?embed=1）：隐藏聊天列表侧边栏，只渲染对话区，导航由宿主提供 */
+const EMBED = isEmbedded()
 
 interface Group {
   id: number
@@ -113,7 +117,8 @@ export default function ChatArea({ groupId, dmSessionId }: ChatAreaProps) {
 
   return (
     <div className="flex h-full relative">
-      {/* 统一侧边栏：群聊 + 私信列表（桌面端可拖拽调整宽度） */}
+      {/* 统一侧边栏：群聊 + 私信列表（桌面端可拖拽调整宽度；嵌入模式隐藏，由宿主导航） */}
+      {!EMBED && (
       <div
         ref={sidebarRef}
         className={`shrink-0 ${mobileSidebarOpen ? 'absolute inset-0 z-30' : 'hidden md:block'} md:relative md:z-auto`}
@@ -135,6 +140,7 @@ export default function ChatArea({ groupId, dmSessionId }: ChatAreaProps) {
           onMouseDown={handleResizeStart}
         />
       </div>
+      )}
 
       {/* ── 右侧主区域 ── */}
       {!hasActiveConversation ? (

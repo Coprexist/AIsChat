@@ -3,6 +3,7 @@ import { lazy } from 'react'
 import { useAuth } from './context/AuthContext'
 import Layout from './components/Layout'
 import { getPublicRoutes, getProtectedRoutes } from './utils/pageRegistry'
+import { initEmbedBridge, setEmbedNavigator, isEmbedded } from './embed/bridge'
 
 const NotFoundPage = lazy(() => import('./pages/NotFoundPage'))
 
@@ -55,6 +56,12 @@ const _routes = [
 
 export const routes = _routes
 export const router = createBrowserRouter(_routes)
+
+// 嵌入模式：注册导航器并初始化嵌入桥（接收宿主导航指令、上报联系人列表）
+if (isEmbedded()) {
+  setEmbedNavigator((path) => router.navigate(path))
+  initEmbedBridge()
+}
 
 /** 给 demo 模式用：创建带 basename 的 BrowserRouter */
 export function createDemoRouter(basename: string) {

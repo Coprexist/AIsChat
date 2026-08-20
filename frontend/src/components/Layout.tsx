@@ -6,6 +6,10 @@ import BalancePromptModal from './BalancePromptModal'
 import { useDesktopNotification } from '../hooks/useDesktopNotification'
 import { Wrench, X } from 'lucide-react'
 import { loadFromStorage, apply } from '../utils/cssFilters'
+import { isEmbedded } from '../embed/bridge'
+
+/** 嵌入模式（?embed=1）：隐藏本应用侧边栏/移动导航，只渲染对话内容，由宿主提供导航与外壳 */
+const EMBED = isEmbedded()
 
 export default function Layout() {
   const [drawerOpen, setDrawerOpen] = useState(false)
@@ -163,15 +167,15 @@ export default function Layout() {
 
   return (
     <div className="flex h-dvh overflow-hidden bg-canvas">
-      {/* ── 桌面端侧栏（沉浸界面默认收起） ── */}
-      {!hideSidebar && (
+      {/* ── 桌面端侧栏（沉浸界面默认收起；嵌入模式不渲染） ── */}
+      {!EMBED && !hideSidebar && (
         <div className="hidden md:block shrink-0">
           <Sidebar />
         </div>
       )}
 
-      {/* ── 沉浸界面：侧边栏悬浮开关（世界代码可经 WorldUI 隐藏） ── */}
-      {hideSidebar && !floatingIconHidden && (
+      {/* ── 沉浸界面：侧边栏悬浮开关（世界代码可经 WorldUI 隐藏；嵌入模式不渲染） ── */}
+      {!EMBED && hideSidebar && !floatingIconHidden && (
         sidebarOverlay ? (
           <>
             {/* 点击外部关闭 */}
@@ -201,15 +205,16 @@ export default function Layout() {
         )
       )}
 
-      {/* ── 移动端抽屉遮罩 ── */}
-      {drawerOpen && (
+      {/* ── 移动端抽屉遮罩（嵌入模式不渲染） ── */}
+      {!EMBED && drawerOpen && (
         <div
           className="md:hidden fixed inset-0 z-40 bg-black/60 transition-opacity"
           onClick={() => setDrawerOpen(false)}
         />
       )}
 
-      {/* ── 移动端抽屉 ── */}
+      {/* ── 移动端抽屉（嵌入模式不渲染） ── */}
+      {!EMBED && (
       <div
         className={`md:hidden fixed inset-y-0 left-0 z-50 w-72 transform transition-transform duration-250 ${
           drawerOpen ? 'translate-x-0' : '-translate-x-full'
@@ -217,6 +222,7 @@ export default function Layout() {
       >
         <Sidebar mobile onClose={() => setDrawerOpen(false)} />
       </div>
+      )}
 
       {/* ── 主内容区 ── */}
       {/* 聊天详情页（hideNav）内部自己管理滚动（消息列表 flex-1 overflow-y-auto），main 不滚动，
@@ -231,8 +237,8 @@ export default function Layout() {
         </Suspense>
       </main>
 
-      {/* ── 移动端底部导航（聊天详情页隐藏） ── */}
-      {!hideNav && <MobileNav closeDrawer={() => setDrawerOpen(false)} />}
+      {/* ── 移动端底部导航（聊天详情页隐藏；嵌入模式不渲染） ── */}
+      {!EMBED && !hideNav && <MobileNav closeDrawer={() => setDrawerOpen(false)} />}
 
       {/* ── 全局弹窗 ── */}
       <BalancePromptModal />

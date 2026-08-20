@@ -1,0 +1,7 @@
+# dsh-aischat bundle patch: mounts the dual-face AIsChat integration plugin.
+# The host half proxies the local AIsChat backend (default 127.0.0.1:5228)
+# through /aischat-api (HTTP) and /aischat-ws (WebSocket upgrade); the client
+# half renders the native sidebar entry, chat view, and settings page.
+- insert:
+    - id: dsh-aischat
+      name: dsh-aischat
