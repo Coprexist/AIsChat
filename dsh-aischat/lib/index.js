@@ -1,7 +1,7 @@
 // src/index.ts
 import http from "node:http";
 import z from "@deepseek-ai/schemastery";
-import { createReadStream, existsSync, statSync, mkdirSync, readFileSync, writeFileSync, realpathSync } from "node:fs";
+import { createReadStream, existsSync, statSync, mkdirSync, readFileSync, writeFileSync, realpathSync, readdirSync } from "node:fs";
 import { join, normalize, extname, sep } from "node:path";
 import { fileURLToPath } from "node:url";
 import os from "node:os";
@@ -274,6 +274,27 @@ function textOutput(value) {
   const text = typeof value === "string" ? value : JSON.stringify(value, null, 2);
   return [{ type: "text", text }];
 }
+function listWorldDirs() {
+  const out = [];
+  try {
+    if (!existsSync(WORLD_DIR_BASE)) return out;
+    for (const entry of readdirSync(WORLD_DIR_BASE, { withFileTypes: true })) {
+      if (!entry.isDirectory()) continue;
+      const metaPath = join(WORLD_DIR_BASE, entry.name, ".aischat-world.json");
+      let worldId = null;
+      let name2 = "";
+      try {
+        const meta = JSON.parse(readFileSync(metaPath, "utf8"));
+        worldId = Number(meta.worldId) || null;
+        name2 = String(meta.name ?? "");
+      } catch {
+      }
+      out.push({ dir: entry.name, worldId, name: name2 });
+    }
+  } catch {
+  }
+  return out;
+}
 function apply(ctx, config) {
   const backendUrl = config.backendUrl.replace(/\/+$/, "");
   ctx.webServer.register({
@@ -342,8 +363,16 @@ function apply(ctx, config) {
             return;
           }
           sessionTokenMap.set(sessionId, token);
+          ctx.logger?.info?.(`dsh-aischat: token registered for session ${sessionId}`);
           send(200, { ok: true });
         }).catch(() => send(400, { error: "bad request" }));
+        return;
+      }
+      if (req.method === "GET" && route === `${WORLDS_PREFIX}/status`) {
+        send(200, {
+          tokenSessions: [...sessionTokenMap.keys()],
+          worldDirs: listWorldDirs()
+        });
         return;
       }
       send(404, { error: "not found" });
