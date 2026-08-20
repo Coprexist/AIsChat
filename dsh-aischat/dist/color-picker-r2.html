@@ -1,0 +1,546 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
+<title>AIsChat 主题选色 · 第二轮快投</title>
+<style>
+  :root {
+    /* 当前应用版（第一轮 ShuAICFR 方案，2026-08-16 已应用为默认主题） */
+    --tw-primary-400: 109 40 217;   /* #6D28D9 */
+    --tw-primary-500: 139 92 246;   /* #8B5CF6 */
+    --tw-primary-600: 109 40 217;   /* #6D28D9 */
+    --tw-accent-400: 251 191 36;    /* #FBBF24 */
+    --tw-accent-500: 180 83 9;      /* #B45309 */
+    --tw-mint-400: 16 185 129;      /* #10B981 */
+    --tw-mint-500: 52 211 153;      /* #34D399 */
+    --tw-rose-400: 201 54 79;       /* #C9364F */
+    --tw-rose-500: 232 74 105;      /* #E84A69 */
+    /* 结构色（浅色主题） */
+    --tw-canvas: 248 250 252;
+    --tw-surface: 255 255 255;
+    --tw-elevated: 241 245 249;
+    --tw-border: 203 213 225;
+    --tw-text-primary: 17 24 39;
+    --tw-text-secondary: 75 85 99;
+    --tw-text-muted: 107 114 128;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body { height: 100%; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC", "Microsoft YaHei", sans-serif;
+    background: rgb(var(--tw-canvas));
+    color: rgb(var(--tw-text-primary));
+    overflow: hidden;
+  }
+  .layout { display: flex; height: 100vh; }
+
+  /* ============ 左侧：主站界面预览（固定） ============ */
+  .stage-wrap {
+    flex: 0 0 430px; width: 430px;
+    padding: 18px 16px 18px 20px;
+    display: flex; flex-direction: column;
+    background: rgb(var(--tw-canvas));
+    border-right: 1px solid rgb(var(--tw-border));
+    min-height: 0;
+  }
+  .stage-head { display: flex; align-items: center; gap: 8px; margin-bottom: 12px; }
+  .stage-head .dot { width: 10px; height: 10px; border-radius: 50%; background: rgb(var(--tw-elevated)); border: 1px solid rgb(var(--tw-border)); }
+  .stage-head .title { font-size: 13px; font-weight: 600; color: rgb(var(--tw-text-secondary)); }
+
+  .phone {
+    flex: 1; min-height: 0;
+    background: rgb(var(--tw-surface));
+    border: 1px solid rgb(var(--tw-border));
+    border-radius: 18px;
+    box-shadow: 0 8px 30px rgba(0,0,0,0.08);
+    display: flex; flex-direction: column;
+    overflow: hidden;
+  }
+  .bar { display: flex; align-items: center; gap: 8px; padding: 10px 12px; border-bottom: 1px solid rgb(var(--tw-border)); background: rgb(var(--tw-surface)); }
+  .bar .avatar { width: 28px; height: 28px; border-radius: 50%; background: rgb(var(--tw-primary-500)); color: #fff; display: flex; align-items: center; justify-content: center; font-size: 12px; font-weight: 700; }
+  .bar .name { font-size: 13px; font-weight: 600; }
+  .bar .status { font-size: 10px; color: rgb(var(--tw-mint-400)); display: flex; align-items: center; gap: 3px; }
+  .bar .status::before { content: ""; width: 6px; height: 6px; border-radius: 50%; background: rgb(var(--tw-mint-400)); }
+  .bar .icons { margin-left: auto; display: flex; gap: 6px; }
+  .bar .icon-btn { width: 26px; height: 26px; border-radius: 8px; display: flex; align-items: center; justify-content: center; background: rgb(var(--tw-elevated)); color: rgb(var(--tw-text-secondary)); font-size: 12px; }
+  .bar .icon-btn.primary { background: rgb(var(--tw-primary-500)); color: #fff; }
+
+  .msgs { flex: 1; min-height: 0; padding: 12px 10px; overflow: hidden; display: flex; flex-direction: column; gap: 10px; }
+  .msg { max-width: 78%; padding: 7px 11px; border-radius: 12px; font-size: 12px; line-height: 1.45; }
+  .msg.mine { align-self: flex-end; background: rgb(var(--tw-primary-500)); color: #fff; border-bottom-right-radius: 4px; }
+  .msg.other { align-self: flex-start; background: rgb(var(--tw-surface)); color: rgb(var(--tw-text-primary)); border: 1px solid rgb(var(--tw-border)); border-bottom-left-radius: 4px; }
+  .msg.mine .link { color: rgba(255,255,255,0.85); text-decoration: underline; }
+  .msg .inline-code { background: rgba(0,0,0,0.06); border-radius: 4px; padding: 0 4px; font-family: ui-monospace, monospace; font-size: 11px; }
+  .msg.mine .inline-code { background: rgba(255,255,255,0.18); }
+
+  .nav { display: flex; flex-direction: column; gap: 2px; padding: 4px; }
+  .nav-item { display: flex; align-items: center; gap: 8px; padding: 7px 10px; border-radius: 8px; font-size: 12px; color: rgb(var(--tw-text-secondary)); }
+  .nav-item .ico { width: 18px; height: 18px; border-radius: 5px; background: rgb(var(--tw-elevated)); display: flex; align-items: center; justify-content: center; font-size: 9px; }
+  .nav-item.active { background: rgb(var(--tw-primary-500) / 0.12); color: rgb(var(--tw-primary-500)); font-weight: 600; }
+  .nav-item.active .ico { background: rgb(var(--tw-primary-500)); color: #fff; }
+
+  .btns { display: flex; gap: 6px; padding: 10px 12px; border-top: 1px solid rgb(var(--tw-border)); flex-wrap: wrap; }
+  .b { display: inline-flex; align-items: center; justify-content: center; height: 28px; padding: 0 12px; border-radius: 8px; font-size: 11px; font-weight: 500; cursor: pointer; border: none; transition: background .15s; }
+  .b.primary { background: rgb(var(--tw-primary-500)); color: #fff; }
+  .b.primary:hover { background: rgb(var(--tw-primary-600)); }
+  .b.secondary { background: rgb(var(--tw-elevated)); color: rgb(var(--tw-text-secondary)); border: 1px solid rgb(var(--tw-border)); }
+
+  .badges { display: flex; gap: 6px; padding: 2px 12px 0; flex-wrap: wrap; }
+  .badge { display: inline-flex; align-items: center; gap: 4px; height: 20px; padding: 0 8px; border-radius: 999px; font-size: 10px; font-weight: 500; }
+  .badge.p { background: rgb(var(--tw-primary-500) / 0.12); color: rgb(var(--tw-primary-500)); }
+  .badge.a { background: rgb(var(--tw-accent-400) / 0.15); color: rgb(var(--tw-accent-500)); }
+  .badge.m { background: rgb(var(--tw-mint-400) / 0.15); color: rgb(var(--tw-mint-500)); }
+  .badge.r { background: rgb(var(--tw-rose-400) / 0.12); color: rgb(var(--tw-rose-500)); }
+  .badge.solid { color: #fff; }
+  .badge.solid.p { background: rgb(var(--tw-primary-500)); }
+  .badge.solid.a { background: rgb(var(--tw-accent-400)); color: rgb(var(--tw-text-primary)); }
+  .badge.solid.m { background: rgb(var(--tw-mint-500)); }
+  .badge.solid.r { background: rgb(var(--tw-rose-500)); }
+
+  .status-row { display: flex; align-items: center; gap: 12px; padding: 4px 12px; font-size: 11px; color: rgb(var(--tw-text-secondary)); }
+  .status-row .live { color: rgb(var(--tw-mint-400)); display: flex; align-items: center; gap: 4px; }
+  .status-row .live::before { content: ""; width: 7px; height: 7px; border-radius: 50%; background: rgb(var(--tw-mint-400)); }
+
+  .input-row { display: flex; gap: 6px; padding: 8px 12px 10px; border-top: 1px solid rgb(var(--tw-border)); }
+  .input { flex: 1; height: 30px; border-radius: 9px; border: 1px solid rgb(var(--tw-border)); background: rgb(var(--tw-canvas)); padding: 0 10px; font-size: 11px; color: rgb(var(--tw-text-primary)); outline: none; }
+  .input:focus { border-color: rgb(var(--tw-primary-500)); box-shadow: 0 0 0 2px rgb(var(--tw-primary-500) / 0.15); }
+  .send { width: 30px; height: 30px; border-radius: 9px; border: none; background: rgb(var(--tw-primary-500)); color: #fff; display: flex; align-items: center; justify-content: center; cursor: pointer; font-size: 13px; }
+  .send:hover { background: rgb(var(--tw-primary-600)); }
+
+  .primary-demo { display: flex; align-items: center; gap: 8px; padding: 4px 12px 0; font-size: 11px; color: rgb(var(--tw-text-secondary)); flex-wrap: wrap; }
+  .primary-demo .acc { color: rgb(var(--tw-primary-400)); font-weight: 600; }
+  .primary-demo .link2 { color: rgb(var(--tw-primary-400)); text-decoration: underline; cursor: pointer; }
+
+  /* ============ 右侧：二轮 A/B 快选面板 ============ */
+  .panel { flex: 1; min-width: 0; overflow-y: auto; padding: 24px 28px 60px; }
+  .panel-head h1 { font-size: 19px; font-weight: 700; letter-spacing: -0.02em; }
+  .panel-head p { font-size: 13px; color: rgb(var(--tw-text-secondary)); margin-top: 5px; }
+  .panel-head .hint {
+    margin-top: 10px; padding: 9px 12px; border-radius: 10px;
+    background: rgb(var(--tw-primary-500) / 0.07);
+    border: 1px solid rgb(var(--tw-primary-500) / 0.2);
+    color: rgb(var(--tw-primary-600));
+    font-size: 12px; line-height: 1.6;
+  }
+  .panel-head .hint b { font-weight: 700; }
+
+  .group { margin-top: 20px; background: rgb(var(--tw-surface)); border: 1px solid rgb(var(--tw-border)); border-radius: 14px; padding: 16px; }
+  .group-name { font-size: 14px; font-weight: 700; display: flex; align-items: center; gap: 8px; }
+  .group-name .swatch-sample { width: 16px; height: 16px; border-radius: 5px; border: 1px solid rgba(0,0,0,0.12); }
+  .group-desc { font-size: 11.5px; color: rgb(var(--tw-text-muted)); margin-top: 2px; }
+
+  .field { margin-top: 16px; }
+  .field-label { display: flex; align-items: center; gap: 8px; font-size: 12px; font-weight: 600; color: rgb(var(--tw-text-secondary)); margin-bottom: 8px; }
+
+  .opts { display: flex; gap: 10px; flex-wrap: wrap; }
+  .opt {
+    flex: 1 1 200px; min-width: 200px;
+    display: flex; align-items: center; gap: 10px;
+    padding: 10px 12px;
+    border: 2px solid rgb(var(--tw-border));
+    border-radius: 12px;
+    cursor: pointer;
+    transition: border-color .12s, background .12s, transform .12s;
+    background: rgb(var(--tw-canvas));
+  }
+  .opt:hover { transform: translateY(-1px); }
+  .opt.sel { border-color: rgb(var(--tw-primary-500)); background: rgb(var(--tw-primary-500) / 0.06); }
+  .opt .o-swatch { width: 40px; height: 40px; border-radius: 10px; flex: none; box-shadow: 0 1px 2px rgba(0,0,0,0.1); }
+  .opt .o-info { flex: 1; min-width: 0; }
+  .opt .o-tag { font-size: 10px; font-weight: 700; color: rgb(var(--tw-text-muted)); letter-spacing: 0.02em; }
+  .opt.sel .o-tag { color: rgb(var(--tw-primary-500)); }
+  .opt .o-hex { font-size: 12px; font-weight: 700; font-family: ui-monospace, monospace; margin-top: 1px; }
+  .opt .o-count { font-size: 10.5px; color: rgb(var(--tw-text-muted)); margin-top: 2px; display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+  .opt .o-avatars { display: flex; gap: 2px; flex-wrap: wrap; }
+  .opt .o-avatar { width: 18px; height: 18px; border-radius: 50%; overflow: hidden; border: 1px solid rgb(var(--tw-surface)); background: rgb(var(--tw-elevated)); display: flex; align-items: center; justify-content: center; font-size: 8.5px; font-weight: 700; color: rgb(var(--tw-text-secondary)); }
+  .opt .o-avatar img { width: 100%; height: 100%; object-fit: cover; }
+  .opt .o-avatar.me { border-color: rgb(var(--tw-primary-500)); }
+
+  .vote-box { margin-top: 20px; background: rgb(var(--tw-surface)); border: 1px solid rgb(var(--tw-border)); border-radius: 14px; padding: 16px; }
+  .vote-box h3 { font-size: 14px; font-weight: 700; }
+  .vote-box .sub { font-size: 11.5px; color: rgb(var(--tw-text-muted)); margin-top: 3px; }
+  .ident { display: flex; gap: 8px; margin-top: 12px; align-items: center; }
+  .ident .me-avatar { width: 30px; height: 30px; border-radius: 50%; background: rgb(var(--tw-primary-500)); color: #fff; display: flex; align-items: center; justify-content: center; font-size: 12px; font-weight: 700; overflow: hidden; flex: none; }
+  .ident .me-avatar img { width: 100%; height: 100%; object-fit: cover; }
+  .ident input { flex: 1; height: 34px; border-radius: 9px; border: 1px solid rgb(var(--tw-border)); background: rgb(var(--tw-canvas)); padding: 0 10px; font-size: 12px; color: rgb(var(--tw-text-primary)); outline: none; }
+  .ident input:focus { border-color: rgb(var(--tw-primary-500)); }
+  .vote-actions { display: flex; gap: 10px; margin-top: 10px; }
+  .vote-btn { flex: 1; height: 42px; border-radius: 10px; border: none; background: rgb(var(--tw-primary-500)); color: #fff; font-size: 13px; font-weight: 600; cursor: pointer; }
+  .vote-btn:hover { background: rgb(var(--tw-primary-600)); }
+  .vote-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+  .vote-btn.ghost { flex: 0 0 auto; background: rgb(var(--tw-elevated)); color: rgb(var(--tw-text-secondary)); border: 1px solid rgb(var(--tw-border)); }
+  .vote-status { font-size: 12px; margin-top: 8px; }
+  .vote-status.ok { color: rgb(var(--tw-mint-500)); }
+  .vote-status.err { color: rgb(var(--tw-rose-500)); }
+
+  .result { margin-top: 20px; background: rgb(var(--tw-surface)); border: 1px solid rgb(var(--tw-border)); border-radius: 14px; padding: 16px; }
+  .result textarea { width: 100%; min-height: 130px; border: 1px solid rgb(var(--tw-border)); border-radius: 10px; padding: 10px; font-family: ui-monospace, monospace; font-size: 11.5px; resize: vertical; background: rgb(var(--tw-canvas)); color: rgb(var(--tw-text-primary)); }
+  .result-actions { display: flex; gap: 10px; margin-top: 10px; }
+  .gen-btn { flex: 1; height: 42px; border-radius: 10px; border: none; background: rgb(var(--tw-primary-500)); color: #fff; font-size: 13px; font-weight: 600; cursor: pointer; }
+  .gen-btn:hover { background: rgb(var(--tw-primary-600)); }
+  .copy-btn { flex: 1; height: 42px; border-radius: 10px; background: rgb(var(--tw-surface)); color: rgb(var(--tw-text-secondary)); border: 1px solid rgb(var(--tw-border)); font-size: 13px; font-weight: 600; cursor: pointer; }
+
+  .copied { position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%); background: rgb(var(--tw-text-primary)); color: rgb(var(--tw-surface)); padding: 8px 16px; border-radius: 999px; font-size: 13px; opacity: 0; transition: opacity .25s; pointer-events: none; z-index: 99; }
+  .copied.show { opacity: 1; }
+
+  @media (max-width: 860px) {
+    body { overflow: auto; }
+    .layout { flex-direction: column; height: auto; }
+    .stage-wrap { width: 100%; flex: none; padding: 12px; border-right: none; border-bottom: 1px solid rgb(var(--tw-border)); }
+    .phone { height: 440px; flex: none; }
+    .panel { padding: 16px 12px 60px; }
+    .stage-head { display: none; }
+    .opt { flex: 1 1 100%; min-width: 0; }
+  }
+</style>
+</head>
+<body>
+<div class="layout">
+
+  <!-- ══════ 左侧：主站界面预览（实时） ══════ -->
+  <div class="stage-wrap">
+    <div class="stage-head">
+      <span class="dot"></span><span class="dot"></span><span class="dot"></span>
+      <span class="title">主站界面预览 · 实时</span>
+    </div>
+    <div class="phone">
+      <div class="bar">
+        <div class="avatar">AI</div>
+        <div>
+          <div class="name">群视界 · 星陨大陆</div>
+          <div class="status">在线 · 实时同步</div>
+        </div>
+        <div class="icons">
+          <span class="icon-btn">⌕</span>
+          <span class="icon-btn primary">+</span>
+        </div>
+      </div>
+      <div class="nav">
+        <div class="nav-item active"><span class="ico">◆</span> 探索区域</div>
+        <div class="nav-item"><span class="ico">⚔</span> 战斗</div>
+        <div class="nav-item"><span class="ico">▣</span> 商店</div>
+        <div class="nav-item"><span class="ico">☰</span> 任务</div>
+      </div>
+      <div class="msgs">
+        <div class="msg other">欢迎来到星陨大陆，<span class="link">点这里</span> 查看规则</div>
+        <div class="msg mine">探索 幽暗森林 <span class="inline-code">/探索</span></div>
+        <div class="msg other">你发现了一只<span class="inline-code">野狼</span>！</div>
+        <div class="msg mine">战斗！</div>
+      </div>
+      <div class="status-row">
+        <span class="live">在线</span>
+        <span>普通文字</span>
+      </div>
+      <div class="primary-demo">
+        <span class="acc">强调文字</span> · <span class="link2">链接文字</span>
+      </div>
+      <div class="badges">
+        <span class="badge p">主色标签</span>
+        <span class="badge a">琥珀状态</span>
+        <span class="badge m">在线徽章</span>
+        <span class="badge r">危险标记</span>
+        <span class="badge solid p">实心主色</span>
+        <span class="badge solid m">实心绿</span>
+        <span class="badge solid r">实心红</span>
+      </div>
+      <div class="btns">
+        <button class="b primary">主按钮</button>
+        <button class="b secondary">次级</button>
+      </div>
+      <div class="input-row">
+        <input class="input" placeholder="输入指令…" value="探索 幽暗森林">
+        <button class="send">➤</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ══════ 右侧：A/B 快选 ══════ -->
+  <div class="panel">
+    <div class="panel-head">
+      <h1>AIsChat 主题选色 · 第二轮快投</h1>
+      <p>第一轮 ShuAICFR 方案已应用为当前主题（左侧预览即应用版）。</p>
+      <div class="hint">
+        <b>本轮规则</b>：每个类型只剩 <b>A（当前应用版）</b> 和 <b>B（第一轮另一代表）</b> 两个候选。
+        点选即实时预览，选完点「提交投票」。B 源：第一轮该字段得票最高 / 最有代表性的另一个选项。
+      </div>
+    </div>
+
+    <!-- 组：主色 -->
+    <div class="group">
+      <div class="group-name"><span class="swatch-sample" id="sample-p" style="background:#6D28D9"></span> 主色 primary</div>
+      <div class="group-desc">品牌色 · 按钮 / 我的气泡 / 强调 / 链接 / 选中态 / 进度条</div>
+      <div class="field" data-key="primary_400">
+        <div class="field-label">primary-400 强调文字 / 图标 / 链接</div>
+        <div class="opts"></div>
+      </div>
+      <div class="field" data-key="primary_500">
+        <div class="field-label">primary-500 主按钮 / 我的气泡 / 发送</div>
+        <div class="opts"></div>
+      </div>
+      <div class="field" data-key="primary_600">
+        <div class="field-label">primary-600 按钮 hover</div>
+        <div class="opts"></div>
+      </div>
+    </div>
+
+    <!-- 组：琥珀金 -->
+    <div class="group">
+      <div class="group-name"><span class="swatch-sample" id="sample-a" style="background:#FBBF24"></span> 琥珀金 accent</div>
+      <div class="group-desc">状态变更 / 通知 / 高亮 / 星级</div>
+      <div class="field" data-key="accent_400">
+        <div class="field-label">accent-400 状态文字 / 徽章</div>
+        <div class="opts"></div>
+      </div>
+      <div class="field" data-key="accent_500">
+        <div class="field-label">accent-500 实底按钮 / hover</div>
+        <div class="opts"></div>
+      </div>
+    </div>
+
+    <!-- 组：活跃绿 -->
+    <div class="group">
+      <div class="group-name"><span class="swatch-sample" id="sample-m" style="background:#10B981"></span> 活跃绿 mint</div>
+      <div class="group-desc">在线 / 成功 / 已保存 / 开关开启</div>
+      <div class="field" data-key="mint_400">
+        <div class="field-label">mint-400 在线状态 / 成功文字</div>
+        <div class="opts"></div>
+      </div>
+      <div class="field" data-key="mint_500">
+        <div class="field-label">mint-500 实底按钮 / hover</div>
+        <div class="opts"></div>
+      </div>
+    </div>
+
+    <!-- 组：危险玫红 -->
+    <div class="group">
+      <div class="group-name"><span class="swatch-sample" id="sample-r" style="background:#C9364F"></span> 危险玫红 rose</div>
+      <div class="group-desc">删除 / 错误 / 勿扰</div>
+      <div class="field" data-key="rose_400">
+        <div class="field-label">rose-400 危险文字 / 删除链接</div>
+        <div class="opts"></div>
+      </div>
+      <div class="field" data-key="rose_500">
+        <div class="field-label">rose-500 危险按钮</div>
+        <div class="opts"></div>
+      </div>
+    </div>
+
+    <!-- 投票 -->
+    <div class="vote-box">
+      <h3>提交你的选择</h3>
+      <p class="sub">每类型 A/B 二选一；改过的字段提交的是你最终的选择。</p>
+      <div class="ident">
+        <div class="me-avatar" id="me-avatar">?</div>
+        <input id="ident-name" placeholder="输入你的昵称（未登录）" maxlength="30">
+      </div>
+      <div class="vote-actions">
+        <button class="vote-btn" id="vote-submit">提交投票</button>
+        <button class="vote-btn ghost" id="vote-refresh">刷新</button>
+      </div>
+      <div class="vote-status" id="vote-status"></div>
+    </div>
+
+    <!-- 结果 -->
+    <div class="result">
+      <div class="field-label">生成结果（当前所选完整方案）</div>
+      <textarea id="out" readonly placeholder="点「生成结果」后这里会出现 CSS 变量…"></textarea>
+      <div class="result-actions">
+        <button class="gen-btn" id="gen">生成结果</button>
+        <button class="copy-btn" id="copy">复制</button>
+      </div>
+    </div>
+  </div>
+
+</div>
+<div class="copied" id="copied">已复制</div>
+
+<script>
+(function () {
+  'use strict';
+
+  // 每字段 A/B：A = 当前应用版（ShuAICFR 第一轮方案），B = 一轮代表
+  var PAIRS = {
+    primary_400: ['#6D28D9', '#7C3AED'],
+    primary_500: ['#8B5CF6', '#A78BFA'],
+    primary_600: ['#6D28D9', '#8B5CF6'],
+    accent_400:  ['#FBBF24', '#F0A020'],
+    accent_500:  ['#B45309', '#FCD34D'],
+    mint_400:    ['#10B981', '#16A34A'],
+    mint_500:    ['#34D399', '#16A34A'],
+    rose_400:    ['#C9364F', '#E11D48'],
+    rose_500:    ['#E84A69', '#DC2626'],
+  };
+  // B 的来源（第一轮谁的代表）
+  var B_SRC = {
+    primary_400: 'oxo·zhouc_yu', primary_500: 'oxo', primary_600: 'oxo·zhouc_yu',
+    accent_400: '+', accent_500: 'oxo',
+    mint_400: 'zhouc_yu', mint_500: 'oxo',
+    rose_400: '+·oxo', rose_500: 'oxo·zhouc_yu',
+  };
+  var ORDER = ['primary_400','primary_500','primary_600','accent_400','accent_500','mint_400','mint_500','rose_400','rose_500'];
+
+  // 当前选中（默认 = A = 应用版）
+  var sel = {};
+  ORDER.forEach(function (k) { sel[k] = PAIRS[k][0]; });
+
+  function hexToTriplet(hex) {
+    var h = hex.replace('#', '');
+    return parseInt(h.slice(0,2),16) + ' ' + parseInt(h.slice(2,4),16) + ' ' + parseInt(h.slice(4,6),16);
+  }
+
+  function apply() {
+    var root = document.documentElement.style;
+    root.setProperty('--tw-primary-400', hexToTriplet(sel.primary_400));
+    root.setProperty('--tw-primary-500', hexToTriplet(sel.primary_500));
+    root.setProperty('--tw-primary-600', hexToTriplet(sel.primary_600));
+    root.setProperty('--tw-accent-400', hexToTriplet(sel.accent_400));
+    root.setProperty('--tw-accent-500', hexToTriplet(sel.accent_500));
+    root.setProperty('--tw-mint-400', hexToTriplet(sel.mint_400));
+    root.setProperty('--tw-mint-500', hexToTriplet(sel.mint_500));
+    root.setProperty('--tw-rose-400', hexToTriplet(sel.rose_400));
+    root.setProperty('--tw-rose-500', hexToTriplet(sel.rose_500));
+    document.getElementById('sample-p').style.background = sel.primary_500;
+    document.getElementById('sample-a').style.background = sel.accent_400;
+    document.getElementById('sample-m').style.background = sel.mint_400;
+    document.getElementById('sample-r').style.background = sel.rose_400;
+  }
+
+  // 渲染 A/B 选项（含投票统计头像）
+  function renderOpts(stats) {
+    // stats: { key: { hex: [{name, avatar, me}] } }
+    ORDER.forEach(function (k) {
+      var box = document.querySelector('.field[data-key="' + k + '"] .opts');
+      box.innerHTML = '';
+      PAIRS[k].forEach(function (hex, idx) {
+        var isA = idx === 0;
+        var opt = document.createElement('div');
+        opt.className = 'opt' + (sel[k] === hex ? ' sel' : '');
+        var voters = (stats && stats[k] && stats[k][hex]) || [];
+        var avHtml = voters.map(function (v) {
+          if (v.avatar) return '<span class="o-avatar' + (v.me ? ' me' : '') + '" title="' + v.name + '"><img src="' + v.avatar + '" alt=""></span>';
+          return '<span class="o-avatar' + (v.me ? ' me' : '') + '" title="' + v.name + '">' + v.name.charAt(0).toUpperCase() + '</span>';
+        }).join('');
+        opt.innerHTML =
+          '<span class="o-swatch" style="background:' + hex + '"></span>' +
+          '<span class="o-info">' +
+            '<span class="o-tag">' + (isA ? 'A · 当前应用' : 'B · 一轮备选（' + (B_SRC[k] || '') + '）') + '</span>' +
+            '<span class="o-hex">' + hex.toUpperCase() + '</span>' +
+            '<span class="o-count">' +
+              '<span>' + voters.length + ' 人</span>' +
+              (voters.length ? '<span class="o-avatars">' + avHtml + '</span>' : '') +
+            '</span>' +
+          '</span>';
+        opt.addEventListener('click', function () {
+          sel[k] = hex;
+          box.querySelectorAll('.opt').forEach(function (o) { o.classList.remove('sel'); });
+          opt.classList.add('sel');
+          apply();
+        });
+        box.appendChild(opt);
+      });
+    });
+  }
+
+  apply();
+  renderOpts(null);
+
+  // ── 生成结果 ──
+  document.getElementById('gen').addEventListener('click', function () {
+    var lines = [];
+    lines.push('/* 浅色主题（:root）—— 二轮定稿 */');
+    ORDER.forEach(function (k) {
+      var pad = '  ';
+      lines.push('--tw-' + k.replace(/_/g, '-') + ':' + pad + hexToTriplet(sel[k]) + ';  /* ' + sel[k].toUpperCase() + ' */');
+    });
+    document.getElementById('out').value = lines.join('\n');
+  });
+
+  document.getElementById('copy').addEventListener('click', function () {
+    var ta = document.getElementById('out');
+    if (!ta.value) document.getElementById('gen').click();
+    ta.select();
+    try { document.execCommand('copy'); } catch (e) {}
+    if (navigator.clipboard) navigator.clipboard.writeText(ta.value).catch(function () {});
+    var tip = document.getElementById('copied');
+    tip.classList.add('show');
+    setTimeout(function () { tip.classList.remove('show'); }, 1500);
+  });
+
+  // ── 投票：身份 + 提交 + 统计 ──
+  var me = { name: '', avatar: null };
+  var voteStatus = document.getElementById('vote-status');
+  var nameInput = document.getElementById('ident-name');
+  var meAvatar = document.getElementById('me-avatar');
+
+  function setStatus(text, ok) {
+    voteStatus.textContent = text || '';
+    voteStatus.className = 'vote-status ' + (ok ? 'ok' : 'err');
+  }
+
+  (function initIdentity() {
+    var token = null;
+    try { token = localStorage.getItem('access_token'); } catch (e) {}
+    if (!token) return;
+    fetch('/api/auth/me', { headers: { 'Authorization': 'Bearer ' + token } })
+      .then(function (r) { return r.json(); })
+      .then(function (u) {
+        if (!u || !u.username) return;
+        me.name = u.username;
+        me.avatar = u.avatar_url || null;
+        nameInput.value = u.username;
+        if (me.avatar) meAvatar.innerHTML = '<img src="' + me.avatar + '" alt="">';
+        else meAvatar.textContent = (u.username || '?').charAt(0).toUpperCase();
+      })
+      .catch(function () {});
+  })();
+
+  document.getElementById('vote-submit').addEventListener('click', function () {
+    var name = (nameInput.value || '').trim();
+    if (!name) { setStatus('请先输入昵称', false); return; }
+    if (name !== me.name) { me.name = name; me.avatar = null; }
+    meAvatar.textContent = name.charAt(0).toUpperCase();
+    var body = { colors: sel, user_name: name, avatar_url: me.avatar };
+    setStatus('提交中…', true);
+    fetch('/api/theme-vote-r2', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body),
+    })
+      .then(function (r) { return r.json(); })
+      .then(function (d) {
+        if (d.ok) { setStatus('已提交（当前 ' + d.count + ' 人参与）', true); loadStats(); }
+        else setStatus(d.reason || '提交失败', false);
+      })
+      .catch(function () { setStatus('提交失败：请确认后端已重启（新接口需重启容器生效）', false); });
+  });
+
+  document.getElementById('vote-refresh').addEventListener('click', loadStats);
+
+  function loadStats() {
+    fetch('/api/theme-vote-r2/stats')
+      .then(function (r) { return r.json(); })
+      .then(function (d) {
+        var items = d.items || [];
+        var agg = {};
+        items.forEach(function (v) {
+          var colors = v.colors || {};
+          Object.keys(colors).forEach(function (k) {
+            var hex = String(colors[k] || '').toUpperCase();
+            if (!hex) return;
+            if (!agg[k]) agg[k] = {};
+            if (!agg[k][hex]) agg[k][hex] = [];
+            agg[k][hex].push({ name: v.user_name || '匿名', avatar: v.avatar_url || null, me: v.user_name === me.name });
+          });
+        });
+        renderOpts(agg);
+      })
+      .catch(function () {});
+  }
+
+  loadStats();
+})();
+</script>
+</body>
+</html>

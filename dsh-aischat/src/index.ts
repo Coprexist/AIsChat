@@ -25,6 +25,9 @@ import type { IncomingMessage, ServerResponse } from 'node:http'
 import http from 'node:http'
 import type { Duplex } from 'node:stream'
 import z from '@deepseek-ai/schemastery'
+import { createReadStream, existsSync, statSync } from 'node:fs'
+import { join, normalize, extname } from 'node:path'
+import { fileURLToPath } from 'node:url'
 
 /** Stable Cordis plugin name. */
 export const name = 'dsh-aischat'
@@ -45,6 +48,65 @@ export const Config: z<Config> = z.object({
 /** Routes owned by this plugin. */
 const HTTP_PREFIX = '/aischat-api'
 const WS_PATH = '/aischat-ws'
+/** 前端静态资源挂载前缀（iframe 嵌入沉浸式界面等页面）。 */
+const UI_PREFIX = '/aischat-ui'
+
+/** 静态资源根目录：插件包内 dist/（前端 BASE_URL=/aischat-ui/ 构建产物）。 */
+const UI_ROOT = join(fileURLToPath(new URL('.', import.meta.url)), '..', 'dist')
+
+/** 静态文件 content-type 表（前端产物常用子集；缺省 application/octet-stream）。 */
+const MIME: Record<string, string> = {
+  '.html': 'text/html; charset=utf-8',
+  '.js': 'text/javascript; charset=utf-8',
+  '.mjs': 'text/javascript; charset=utf-8',
+  '.css': 'text/css; charset=utf-8',
+  '.json': 'application/json; charset=utf-8',
+  '.png': 'image/png',
+  '.jpg': 'image/jpeg',
+  '.jpeg': 'image/jpeg',
+  '.gif': 'image/gif',
+  '.svg': 'image/svg+xml',
+  '.webp': 'image/webp',
+  '.ico': 'image/x-icon',
+  '.woff': 'font/woff',
+  '.woff2': 'font/woff2',
+  '.ttf': 'font/ttf',
+  '.map': 'application/json',
+  '.txt': 'text/plain; charset=utf-8',
+  '.md': 'text/markdown; charset=utf-8',
+}
+
+/**
+ * 服务前端静态产物（`/aischat-ui/*`）。路径解析锚定在 dist 根内，杜绝
+ * `..` 穿越；SPA 路由（无扩展名的路径）回退到 index.html。
+ */
+function serveStatic(req: IncomingMessage, res: ServerResponse): void {
+  const raw = (req.url ?? '/').split('?')[0]
+  const rel = raw === UI_PREFIX || raw === `${UI_PREFIX}/` ? '/index.html' : raw.slice(UI_PREFIX.length)
+  const candidate = normalize(join(UI_ROOT, rel))
+  if (!candidate.startsWith(UI_ROOT)) {
+    res.writeHead(403)
+    res.end('forbidden')
+    return
+  }
+
+  let file = candidate
+  if (!existsSync(file) || statSync(file).isDirectory()) {
+    // SPA 回退：未知路径一律给 index.html（前端路由接管）
+    file = join(UI_ROOT, 'index.html')
+  }
+  if (!existsSync(file)) {
+    res.writeHead(404)
+    res.end('not found')
+    return
+  }
+
+  res.writeHead(200, {
+    'content-type': MIME[extname(file).toLowerCase()] ?? 'application/octet-stream',
+    'cache-control': extname(file) === '.html' ? 'no-cache' : 'public, max-age=31536000, immutable',
+  })
+  createReadStream(file).pipe(res)
+}
 
 /** Headers that must not be forwarded (RFC 7230 hop-by-hop). */
 const HOP_BY_HOP = new Set([
@@ -210,6 +272,12 @@ export function apply(ctx: Context, config: Config): void {
     },
   })
 
+  ctx.webServer.register({
+    kind: 'prefix',
+    path: UI_PREFIX,
+    handler: serveStatic,
+  })
+
   ctx.webServer.registerUpgrade({
     path: WS_PATH,
     handler: (req, socket, head) => {
@@ -217,5 +285,5 @@ export function apply(ctx: Context, config: Config): void {
     },
   })
 
-  ctx.logger?.info?.(`dsh-aischat: proxying /aischat-api and /aischat-ws -> ${backendUrl}`)
+  ctx.logger?.info?.(`dsh-aischat: proxying /aischat-api and /aischat-ws -> ${backendUrl}; serving /aischat-ui`)
 }

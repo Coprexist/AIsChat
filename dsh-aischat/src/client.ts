@@ -134,6 +134,14 @@ async function loadMessages(active) {
   if (active.kind === 'group') {
     const data = await api(`/chat/messages?group_id=${encodeURIComponent(active.id)}&limit=50&offset=0`)
     list = (data && data.messages) || []
+    // 群聊成员名字：成员接口返回 {type: 'ai'|'human', id, name}——AI 发送者
+    // 在 /chat/user/{id} 查不到，必须用成员表（按 "type:id" 缓存）。
+    const members = await api(`/groups/${encodeURIComponent(active.id)}/members`).catch(() => [])
+    if (Array.isArray(members)) {
+      for (const mb of members) {
+        if (mb && mb.id != null && mb.name) store.nameCache[`${mb.type}:${mb.id}`] = mb.name
+      }
+    }
   } else {
     // DM 专用接口：带认证的游标分页（/chat/messages 的 dm 分支会把
     // user_id 硬编码为 0，永远无权访问，不能用于私信）
@@ -172,6 +180,11 @@ function senderName(m, user) {
   if (m == null) return ''
   if (m.sender_id != null && String(m.sender_type) !== 'ai' && String(m.sender_id) === String(user ? user.id : '')) return '我'
   if (m.sender_name) return m.sender_name
+  // 优先按 "type:id" 查（群聊成员表缓存，含 AI 名字），再查无前缀（DM 用户缓存）
+  if (m.sender_id != null && m.sender_type) {
+    const keyed = store.nameCache[`${m.sender_type}:${m.sender_id}`]
+    if (keyed) return keyed
+  }
   if (m.sender_id != null && store.nameCache[m.sender_id]) return store.nameCache[m.sender_id]
   if (String(m.sender_type) === 'ai') return 'AI'
   return '用户' + (m.sender_id != null ? m.sender_id : '')
@@ -447,6 +460,21 @@ const style = {
   inviteAccept: { background: 'var(--dsw-alias-state-business-primary)', color: '#fff' },
   inviteReject: { background: 'var(--dsw-alias-interactive-bg-hover)', color: 'var(--dsw-alias-label-primary)' },
   inviteStatus: { fontSize: 12, color: 'var(--dsw-alias-label-tertiary)', paddingTop: 2 },
+  headBtn: { flex: 'none', padding: '4px 10px', borderRadius: 8, border: 'none', background: 'transparent', color: 'var(--dsw-alias-label-secondary)', cursor: 'pointer', fontSize: 14, lineHeight: 1 },
+  headBtnActive: { background: 'var(--dsw-alias-interactive-bg-hover)', color: 'var(--dsw-alias-label-primary)' },
+  settingsPanel: { flex: 'none', maxHeight: '40%', overflowY: 'auto', borderBottom: '1px solid var(--dsw-alias-border-l2)', background: 'var(--dsw-alias-bg-layer-2)', padding: '12px 16px', fontSize: 13, color: 'var(--dsw-alias-label-primary)', display: 'flex', flexDirection: 'column', gap: 10 },
+  settingsRow: { display: 'flex', alignItems: 'center', gap: 8 },
+  settingsLabel: { flex: 1, minWidth: 0, color: 'var(--dsw-alias-label-secondary)' },
+  settingsTitle: { fontSize: 13, fontWeight: 600, color: 'var(--dsw-alias-label-primary)' },
+  settingsHint: { fontSize: 12, color: 'var(--dsw-alias-label-tertiary)', lineHeight: 1.5 },
+  memberRow: { display: 'flex', alignItems: 'center', gap: 8, padding: '4px 0' },
+  memberName: { flex: 1, minWidth: 0, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', fontSize: 13 },
+  memberRole: { flex: 'none', fontSize: 11, color: 'var(--dsw-alias-label-tertiary)' },
+  smallBtn: { flex: 'none', padding: '4px 12px', borderRadius: 8, border: '1px solid var(--dsw-alias-border-l2)', background: 'transparent', color: 'var(--dsw-alias-label-primary)', cursor: 'pointer', fontSize: 12, fontWeight: 500 },
+  smallBtnOn: { background: 'var(--dsw-alias-interactive-bg-hover)', borderColor: 'transparent' },
+  immersive: { position: 'absolute', inset: 0, zIndex: 5, display: 'flex', flexDirection: 'column', background: 'var(--dsw-alias-bg-base)' },
+  immersiveBar: { flex: 'none', display: 'flex', alignItems: 'center', gap: 10, padding: '8px 14px', borderBottom: '1px solid var(--dsw-alias-border-l2)', fontSize: 13, fontWeight: 600, color: 'var(--dsw-alias-label-primary)' },
+  immersiveFrame: { flex: 1, minHeight: 0, border: 'none', width: '100%', background: 'var(--dsw-alias-bg-base)' },
   composer: { flex: 'none', display: 'flex', gap: 8, padding: '12px 20px', borderTop: '1px solid var(--dsw-alias-border-l2)', background: 'var(--dsw-alias-bg-base)' },
   input: { flex: 1, minHeight: 38, borderRadius: 12, border: '1px solid var(--dsw-alias-border-l2)', background: 'var(--dsw-specific-input-major, var(--dsw-alias-bg-base))', color: 'var(--dsw-alias-label-primary)', padding: '8px 14px', fontSize: 13, outline: 'none', fontFamily: 'inherit' },
   send: { flex: 'none', padding: '0 18px', height: 38, borderRadius: 12, border: 'none', background: 'var(--dsw-alias-state-business-primary)', color: '#fff', fontSize: 13, fontWeight: 600, cursor: 'pointer' },
@@ -592,11 +620,126 @@ function InviteCard({ inv }) {
   )
 }
 
+/** 群聊设置面板：成员列表、置顶、免打扰。 */
+function GroupSettings({ active }) {
+  const [members, setMembers] = useState(null)
+  const [info, setInfo] = useState(null)
+  const [, force] = useState(0)
+  const refresh = () => force((n) => n + 1)
+
+  useEffect(() => {
+    let alive = true
+    setMembers(null)
+    api(`/groups/${encodeURIComponent(active.id)}`).then((g) => { if (alive) setInfo(g) }).catch(() => {})
+    api(`/groups/${encodeURIComponent(active.id)}/members`).then((m) => { if (alive) setMembers(m) }).catch(() => {})
+    return () => { alive = false }
+  }, [active.id])
+
+  const togglePin = async () => {
+    try {
+      await api(`/groups/${encodeURIComponent(active.id)}/pin`, { method: 'POST' })
+      store.contacts = null
+      loadContacts(true).catch(() => {})
+      const g = await api(`/groups/${encodeURIComponent(active.id)}`)
+      setInfo(g)
+    } catch (e) { window.dispatchEvent(new CustomEvent('aischat:error:' + (e.message || '操作失败'))) }
+  }
+  const toggleDnd = async () => {
+    try {
+      if (info && info.dnd_until) {
+        await api(`/groups/${encodeURIComponent(active.id)}/dnd/cancel`, { method: 'POST' })
+      } else {
+        await api(`/groups/${encodeURIComponent(active.id)}/dnd`, { method: 'POST', json: { duration_minutes: null } })
+      }
+      const g = await api(`/groups/${encodeURIComponent(active.id)}`)
+      setInfo(g)
+    } catch (e) { window.dispatchEvent(new CustomEvent('aischat:error:' + (e.message || '操作失败'))) }
+  }
+
+  const pinned = !!(info && info.is_pinned)
+  const inDnd = !!(info && info.dnd_until)
+  const roleLabel = (r) => (r === 'owner' ? '群主' : r === 'admin' ? '管理员' : '成员')
+
+  return h('div', { style: style.settingsPanel },
+    h('div', { style: style.settingsTitle }, '群聊设置'),
+    info ? h('div', { style: style.settingsRow },
+      h('span', { style: style.settingsLabel }, '置顶群聊'),
+      h('button', { style: { ...style.smallBtn, ...(pinned ? style.smallBtnOn : {}) }, onClick: togglePin }, pinned ? '已置顶' : '置顶'),
+    ) : null,
+    info ? h('div', { style: style.settingsRow },
+      h('span', { style: style.settingsLabel }, '免打扰'),
+      h('button', { style: { ...style.smallBtn, ...(inDnd ? style.smallBtnOn : {}) }, onClick: toggleDnd }, inDnd ? '已开启' : '开启'),
+    ) : null,
+    info && info.announcement ? h('div', { style: { ...style.settingsHint, background: 'var(--dsw-alias-bg-base)', borderRadius: 8, padding: '8px 10px' } }, '公告：' + info.announcement) : null,
+    h('div', { style: { ...style.settingsTitle, marginTop: 4 } }, '成员（' + (members ? members.length : '…') + '）'),
+    members
+      ? h('div', { style: { display: 'flex', flexDirection: 'column', gap: 2 } },
+          members.map((m) => h('div', { key: String(m.type) + ':' + String(m.id), style: style.memberRow },
+            h('span', { style: style.memberName }, m.name),
+            h('span', { style: style.memberRole }, roleLabel(m.role)),
+          )))
+      : h('div', { style: style.settingsHint }, '加载中…'),
+  )
+}
+
+/** 私信设置面板：置顶、免打扰。 */
+function DmSettings({ active }) {
+  const [, force] = useState(0)
+  const refresh = () => force((n) => n + 1)
+  const [info, setInfo] = useState(null)
+
+  useEffect(() => {
+    let alive = true
+    setInfo(null)
+    api(`/dm/${encodeURIComponent(active.id)}?summary=true`).then((d) => { if (alive) setInfo(d) }).catch(() => {})
+    return () => { alive = false }
+  }, [active.id])
+
+  const togglePin = async () => {
+    try {
+      await api(`/dm/${encodeURIComponent(active.id)}/pin`, { method: 'POST' })
+      store.contacts = null
+      loadContacts(true).catch(() => {})
+      const d = await api(`/dm/${encodeURIComponent(active.id)}?summary=true`)
+      setInfo(d)
+    } catch (e) { window.dispatchEvent(new CustomEvent('aischat:error:' + (e.message || '操作失败'))) }
+  }
+  const toggleDnd = async () => {
+    try {
+      const inDnd = !!(info && info.my_dnd_until)
+      await api(`/dm/${encodeURIComponent(active.id)}/dnd`, { method: 'POST', json: { duration_minutes: inDnd ? 0 : null } })
+      const d = await api(`/dm/${encodeURIComponent(active.id)}?summary=true`)
+      setInfo(d)
+    } catch (e) { window.dispatchEvent(new CustomEvent('aischat:error:' + (e.message || '操作失败'))) }
+  }
+
+  const pinned = !!(info && info.is_pinned)
+  const inDnd = !!(info && info.my_dnd_until)
+
+  return h('div', { style: style.settingsPanel },
+    h('div', { style: style.settingsTitle }, '私信设置'),
+    h('div', { style: style.settingsRow },
+      h('span', { style: style.settingsLabel }, '置顶对话'),
+      h('button', { style: { ...style.smallBtn, ...(pinned ? style.smallBtnOn : {}) }, onClick: togglePin }, pinned ? '已置顶' : '置顶'),
+    ),
+    h('div', { style: style.settingsRow },
+      h('span', { style: style.settingsLabel }, '免打扰'),
+      h('button', { style: { ...style.smallBtn, ...(inDnd ? style.smallBtnOn : {}) }, onClick: toggleDnd }, inDnd ? '已开启' : '开启'),
+    ),
+  )
+}
+
 function MsgList({ messages, user }) {
+  const listRef = useRef(null)
+  // 对话默认到底：消息列表变化（切换对话/新消息/加载历史）时滚到底部
+  useEffect(() => {
+    const el = listRef.current
+    if (el) el.scrollTop = el.scrollHeight
+  }, [messages])
   if (!messages || messages.length === 0) {
     return h('div', { style: style.empty }, '暂无消息，发送第一条吧')
   }
-  return h('div', { style: style.msgs },
+  return h('div', { ref: listRef, style: style.msgs },
     messages.map((m) => {
       const mine = String(m.sender_type) === 'user' || String(m.sender_type) === 'human'
         ? String(m.sender_id) === String(user ? user.id : '')
@@ -646,12 +789,26 @@ function MsgList({ messages, user }) {
 }
 
 /** The conversation column: message list + composer (sends to AIsChat). */
-function ConversationColumn({ refresh }) {
+function ConversationColumn({ refresh, onImmersive }) {
   const [draft, setDraft] = useState('')
   const [sending, setSending] = useState(false)
+  const [showSettings, setShowSettings] = useState(false)
+  const [worldId, setWorldId] = useState(null)
   const active = store.active
   const user = store.user
   const messages = store.messages
+
+  // 群聊：查询是否绑定群视界（有绑定才显示"沉浸式界面"入口）
+  useEffect(() => {
+    let alive = true
+    setWorldId(null)
+    if (active && active.kind === 'group') {
+      api(`/worlds/by-entity?entity_type=group&entity_id=${encodeURIComponent(active.id)}`)
+        .then((d) => { if (alive && d && d.world_id != null) setWorldId(d.world_id) })
+        .catch(() => {})
+    }
+    return () => { alive = false }
+  }, [active])
 
   const send = async () => {
     const text = draft.trim()
@@ -682,7 +839,24 @@ function ConversationColumn({ refresh }) {
     h('div', { style: style.mainHead },
       h('span', { style: { fontWeight: 600 } }, active.title),
       h('span', { style: { fontSize: 12, color: 'var(--dsw-alias-label-tertiary)' } }, active.kind === 'group' ? '群聊' : '私信'),
+      worldId != null
+        ? h('button', {
+            style: { ...style.headBtn, color: 'var(--dsw-alias-state-business-primary)', marginLeft: 'auto' },
+            onClick: () => onImmersive && onImmersive(worldId),
+            title: '在沉浸式界面打开',
+          }, '沉浸式')
+        : null,
+      h('button', {
+        style: { ...style.headBtn, ...(showSettings ? style.headBtnActive : {}), ...(worldId != null ? {} : { marginLeft: 'auto' }) },
+        onClick: () => setShowSettings((v) => !v),
+        title: active.kind === 'group' ? '群聊设置' : '私信设置',
+      }, '⚙'),
     ),
+    showSettings
+      ? (active.kind === 'group'
+          ? h(GroupSettings, { active })
+          : h(DmSettings, { active }))
+      : null,
     h(MsgList, { messages, user }),
     h('div', { style: style.composer },
       h('input', {
@@ -696,6 +870,58 @@ function ConversationColumn({ refresh }) {
     ),
   )
 }
+
+/**
+ * 沉浸式界面：iframe 内嵌前端页面（同源托管 /aischat-ui/...）。
+ * path 为完整 iframe src（含 ?embed=1）；设置页功能导航与群聊沉浸式共用。
+ */
+function ImmersivePanel({ path, title, onClose }) {
+  return h('div', { style: style.immersive },
+    h('div', { style: style.immersiveBar },
+      h('span', { style: { flex: 1 } }, title || '沉浸式界面'),
+      h('button', { style: style.closeBtn, onClick: onClose }, '返回'),
+    ),
+    h('iframe', { src: path, style: style.immersiveFrame, title: title || '沉浸式界面', sandbox: 'allow-scripts allow-same-origin allow-forms allow-popups' }),
+  )
+}
+
+/** 模块级沉浸式状态：board 与设置页都能打开/关闭同一个覆盖层。 */
+const immersiveState = { path: null, title: '' }
+
+/** 打开沉浸式 iframe：附加当前 token（前端 embed 桥注入复用登录态）。 */
+function openImmersive(path, title) {
+  const sep = path.includes('?') ? '&' : '?'
+  immersiveState.path = path + sep + 'token=' + encodeURIComponent(store.token || '')
+  immersiveState.title = title || ''
+  window.dispatchEvent(new CustomEvent('aischat:immersive'))
+}
+
+function closeImmersive() {
+  immersiveState.path = null
+  immersiveState.title = ''
+  window.dispatchEvent(new CustomEvent('aischat:immersive'))
+}
+
+/** 全局沉浸式覆盖层入口：监听 immersive 广播，有路径时渲染面板。 */
+function ImmersiveOverlay() {
+  const [, force] = useState(0)
+  useEffect(() => {
+    const on = () => force((n) => n + 1)
+    window.addEventListener('aischat:immersive', on)
+    return () => window.removeEventListener('aischat:immersive', on)
+  }, [])
+  if (!immersiveState.path) return null
+  return h(ImmersivePanel, { path: immersiveState.path, title: immersiveState.title, onClose: closeImmersive })
+}
+
+/** AIC 功能导航：点击在沉浸式覆盖层打开前端对应页面（同源 iframe）。 */
+const FEATURES = [
+  { id: 'worlds', label: '群视界', path: '/worlds' },
+  { id: 'friends', label: '好友', path: '/friends' },
+  { id: 'agents', label: '我的 AI', path: '/agents' },
+  { id: 'admin', label: '管理', path: '/admin' },
+  { id: 'settings', label: '设置', path: '/settings' },
+]
 
 /** The AIsChat board: covers the whole frame like the Workspace board. */
 function AisChatBoard({ onClose }) {
@@ -777,9 +1003,20 @@ function AisChatBoard({ onClose }) {
         (!pinnedDms.length && !pinnedGroups.length && !restDms.length && !restGroups.length)
           ? h('div', { style: { ...style.empty, padding: 24 } }, '暂无联系人')
           : null,
+        h('div', { style: { ...style.group, marginTop: 10, borderTop: '1px solid var(--dsw-alias-border-l2)', paddingTop: 8 } },
+          h('div', { style: style.groupLabel }, '功能'),
+          FEATURES.map((f) => h('button', {
+            key: f.id,
+            style: { ...style.row, fontSize: 13 },
+            onClick: () => openImmersive(`/aischat-ui${f.path}?embed=1`, f.label),
+          }, f.label)),
+        ),
       ),
     ),
-    h(ConversationColumn, { refresh }),
+    h(ConversationColumn, {
+      refresh,
+      onImmersive: (wid) => openImmersive(`/aischat-ui/world-view/${encodeURIComponent(wid)}?embed=1`, '沉浸式界面'),
+    }),
   )
 }
 
@@ -801,7 +1038,7 @@ function SettingsPage() {
     )
   }
 
-  return h('div', { style: { padding: 20, maxWidth: 420 } },
+  return h('div', { style: { padding: 20, maxWidth: 480 } },
     h('div', { style: { fontSize: 16, fontWeight: 600, marginBottom: 16, color: 'var(--dsw-alias-label-primary)' } }, 'AIsChat'),
     h('div', { style: { ...style.row, padding: '8px 0' } },
       h('span', { style: style.avatar }, initials(user.name)),
@@ -810,7 +1047,15 @@ function SettingsPage() {
         h('div', { style: style.rowSub }, '已登录'),
       ),
     ),
-    h('button', { style: { ...style.btn, background: 'var(--dsw-alias-state-danger-primary, #e5484d)', marginTop: 16 }, onClick: doLogout }, '退出登录'),
+    h('div', { style: { fontSize: 13, fontWeight: 600, margin: '18px 0 8px', color: 'var(--dsw-alias-label-primary)' } }, '功能'),
+    h('div', { style: { display: 'flex', flexDirection: 'column', gap: 2 } },
+      FEATURES.map((f) => h('button', {
+        key: f.id,
+        style: { ...style.footBtn, padding: '9px 10px', fontSize: 14 },
+        onClick: () => openImmersive(`/aischat-ui${f.path}?embed=1`, f.label),
+      }, f.label)),
+    ),
+    h('button', { style: { ...style.btn, background: 'var(--dsw-alias-state-danger-primary, #e5484d)', marginTop: 20 }, onClick: doLogout }, '退出登录'),
     h('div', { style: style.hint }, '服务通过本机同源代理访问，无公网地址参与。'),
   )
 }
@@ -892,6 +1137,12 @@ module.exports = {
       BoardEntry,
     )))
 
+    // 全局沉浸式覆盖层：群聊"沉浸式"按钮与设置页功能导航共用（iframe 打开后盖住整个 frame）。
+    disposers.push(ctx.slots.inject('shell.overlay', () => ctx.slots.register(
+      { name: 'shell.overlay', id: 'aischat-immersive', order: 40 },
+      ImmersiveOverlay,
+    )))
+
     disposers.push(ctx.slots.inject('settings.section', () => ctx.slots.register(
       { name: 'settings.section', id: 'aischat', order: 40, label: 'AIsChat' },
       SettingsPage,
@@ -900,6 +1151,19 @@ module.exports = {
     // Reconnect on window focus if the WS dropped while hidden.
     window.addEventListener('focus', () => {
       if (store.token && !store.ws) connectWs()
+    })
+
+    // 前端 iframe（嵌入模式）登录态失效时通知宿主：打开 AIsChat board 让用户登录。
+    // 监听 aischat-embed 消息（source 校验 + 只响应 iframe 子窗口）。
+    window.addEventListener('message', (event) => {
+      const data = event.data
+      if (!data || typeof data !== 'object' || data.source !== 'aischat-embed') return
+      if (data.type === 'request-login' || data.type === 'unauthorized') {
+        if (!boardOpen) {
+          boardOpen = true
+          bump()
+        }
+      }
     })
 
     return () => {

@@ -87,6 +87,12 @@ async function loadMessages(active) {
   if (active.kind === "group") {
     const data = await api(`/chat/messages?group_id=${encodeURIComponent(active.id)}&limit=50&offset=0`);
     list = data && data.messages || [];
+    const members = await api(`/groups/${encodeURIComponent(active.id)}/members`).catch(() => []);
+    if (Array.isArray(members)) {
+      for (const mb of members) {
+        if (mb && mb.id != null && mb.name) store.nameCache[`${mb.type}:${mb.id}`] = mb.name;
+      }
+    }
   } else {
     list = await api(`/dm/${encodeURIComponent(active.id)}/messages?limit=50`);
   }
@@ -114,6 +120,10 @@ function senderName(m, user) {
   if (m == null) return "";
   if (m.sender_id != null && String(m.sender_type) !== "ai" && String(m.sender_id) === String(user ? user.id : "")) return "\u6211";
   if (m.sender_name) return m.sender_name;
+  if (m.sender_id != null && m.sender_type) {
+    const keyed = store.nameCache[`${m.sender_type}:${m.sender_id}`];
+    if (keyed) return keyed;
+  }
   if (m.sender_id != null && store.nameCache[m.sender_id]) return store.nameCache[m.sender_id];
   if (String(m.sender_type) === "ai") return "AI";
   return "\u7528\u6237" + (m.sender_id != null ? m.sender_id : "");
@@ -347,6 +357,21 @@ var style = {
   inviteAccept: { background: "var(--dsw-alias-state-business-primary)", color: "#fff" },
   inviteReject: { background: "var(--dsw-alias-interactive-bg-hover)", color: "var(--dsw-alias-label-primary)" },
   inviteStatus: { fontSize: 12, color: "var(--dsw-alias-label-tertiary)", paddingTop: 2 },
+  headBtn: { flex: "none", padding: "4px 10px", borderRadius: 8, border: "none", background: "transparent", color: "var(--dsw-alias-label-secondary)", cursor: "pointer", fontSize: 14, lineHeight: 1 },
+  headBtnActive: { background: "var(--dsw-alias-interactive-bg-hover)", color: "var(--dsw-alias-label-primary)" },
+  settingsPanel: { flex: "none", maxHeight: "40%", overflowY: "auto", borderBottom: "1px solid var(--dsw-alias-border-l2)", background: "var(--dsw-alias-bg-layer-2)", padding: "12px 16px", fontSize: 13, color: "var(--dsw-alias-label-primary)", display: "flex", flexDirection: "column", gap: 10 },
+  settingsRow: { display: "flex", alignItems: "center", gap: 8 },
+  settingsLabel: { flex: 1, minWidth: 0, color: "var(--dsw-alias-label-secondary)" },
+  settingsTitle: { fontSize: 13, fontWeight: 600, color: "var(--dsw-alias-label-primary)" },
+  settingsHint: { fontSize: 12, color: "var(--dsw-alias-label-tertiary)", lineHeight: 1.5 },
+  memberRow: { display: "flex", alignItems: "center", gap: 8, padding: "4px 0" },
+  memberName: { flex: 1, minWidth: 0, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", fontSize: 13 },
+  memberRole: { flex: "none", fontSize: 11, color: "var(--dsw-alias-label-tertiary)" },
+  smallBtn: { flex: "none", padding: "4px 12px", borderRadius: 8, border: "1px solid var(--dsw-alias-border-l2)", background: "transparent", color: "var(--dsw-alias-label-primary)", cursor: "pointer", fontSize: 12, fontWeight: 500 },
+  smallBtnOn: { background: "var(--dsw-alias-interactive-bg-hover)", borderColor: "transparent" },
+  immersive: { position: "absolute", inset: 0, zIndex: 5, display: "flex", flexDirection: "column", background: "var(--dsw-alias-bg-base)" },
+  immersiveBar: { flex: "none", display: "flex", alignItems: "center", gap: 10, padding: "8px 14px", borderBottom: "1px solid var(--dsw-alias-border-l2)", fontSize: 13, fontWeight: 600, color: "var(--dsw-alias-label-primary)" },
+  immersiveFrame: { flex: 1, minHeight: 0, border: "none", width: "100%", background: "var(--dsw-alias-bg-base)" },
   composer: { flex: "none", display: "flex", gap: 8, padding: "12px 20px", borderTop: "1px solid var(--dsw-alias-border-l2)", background: "var(--dsw-alias-bg-base)" },
   input: { flex: 1, minHeight: 38, borderRadius: 12, border: "1px solid var(--dsw-alias-border-l2)", background: "var(--dsw-specific-input-major, var(--dsw-alias-bg-base))", color: "var(--dsw-alias-label-primary)", padding: "8px 14px", fontSize: 13, outline: "none", fontFamily: "inherit" },
   send: { flex: "none", padding: "0 18px", height: 38, borderRadius: 12, border: "none", background: "var(--dsw-alias-state-business-primary)", color: "#fff", fontSize: 13, fontWeight: 600, cursor: "pointer" },
@@ -488,13 +513,153 @@ function InviteCard({ inv }) {
     ) : h("div", { style: style.inviteStatus }, label)
   );
 }
+function GroupSettings({ active }) {
+  const [members, setMembers] = useState(null);
+  const [info, setInfo] = useState(null);
+  const [, force] = useState(0);
+  const refresh = () => force((n) => n + 1);
+  useEffect(() => {
+    let alive = true;
+    setMembers(null);
+    api(`/groups/${encodeURIComponent(active.id)}`).then((g) => {
+      if (alive) setInfo(g);
+    }).catch(() => {
+    });
+    api(`/groups/${encodeURIComponent(active.id)}/members`).then((m) => {
+      if (alive) setMembers(m);
+    }).catch(() => {
+    });
+    return () => {
+      alive = false;
+    };
+  }, [active.id]);
+  const togglePin = async () => {
+    try {
+      await api(`/groups/${encodeURIComponent(active.id)}/pin`, { method: "POST" });
+      store.contacts = null;
+      loadContacts(true).catch(() => {
+      });
+      const g = await api(`/groups/${encodeURIComponent(active.id)}`);
+      setInfo(g);
+    } catch (e) {
+      window.dispatchEvent(new CustomEvent("aischat:error:" + (e.message || "\u64CD\u4F5C\u5931\u8D25")));
+    }
+  };
+  const toggleDnd = async () => {
+    try {
+      if (info && info.dnd_until) {
+        await api(`/groups/${encodeURIComponent(active.id)}/dnd/cancel`, { method: "POST" });
+      } else {
+        await api(`/groups/${encodeURIComponent(active.id)}/dnd`, { method: "POST", json: { duration_minutes: null } });
+      }
+      const g = await api(`/groups/${encodeURIComponent(active.id)}`);
+      setInfo(g);
+    } catch (e) {
+      window.dispatchEvent(new CustomEvent("aischat:error:" + (e.message || "\u64CD\u4F5C\u5931\u8D25")));
+    }
+  };
+  const pinned = !!(info && info.is_pinned);
+  const inDnd = !!(info && info.dnd_until);
+  const roleLabel = (r) => r === "owner" ? "\u7FA4\u4E3B" : r === "admin" ? "\u7BA1\u7406\u5458" : "\u6210\u5458";
+  return h(
+    "div",
+    { style: style.settingsPanel },
+    h("div", { style: style.settingsTitle }, "\u7FA4\u804A\u8BBE\u7F6E"),
+    info ? h(
+      "div",
+      { style: style.settingsRow },
+      h("span", { style: style.settingsLabel }, "\u7F6E\u9876\u7FA4\u804A"),
+      h("button", { style: { ...style.smallBtn, ...pinned ? style.smallBtnOn : {} }, onClick: togglePin }, pinned ? "\u5DF2\u7F6E\u9876" : "\u7F6E\u9876")
+    ) : null,
+    info ? h(
+      "div",
+      { style: style.settingsRow },
+      h("span", { style: style.settingsLabel }, "\u514D\u6253\u6270"),
+      h("button", { style: { ...style.smallBtn, ...inDnd ? style.smallBtnOn : {} }, onClick: toggleDnd }, inDnd ? "\u5DF2\u5F00\u542F" : "\u5F00\u542F")
+    ) : null,
+    info && info.announcement ? h("div", { style: { ...style.settingsHint, background: "var(--dsw-alias-bg-base)", borderRadius: 8, padding: "8px 10px" } }, "\u516C\u544A\uFF1A" + info.announcement) : null,
+    h("div", { style: { ...style.settingsTitle, marginTop: 4 } }, "\u6210\u5458\uFF08" + (members ? members.length : "\u2026") + "\uFF09"),
+    members ? h(
+      "div",
+      { style: { display: "flex", flexDirection: "column", gap: 2 } },
+      members.map((m) => h(
+        "div",
+        { key: String(m.type) + ":" + String(m.id), style: style.memberRow },
+        h("span", { style: style.memberName }, m.name),
+        h("span", { style: style.memberRole }, roleLabel(m.role))
+      ))
+    ) : h("div", { style: style.settingsHint }, "\u52A0\u8F7D\u4E2D\u2026")
+  );
+}
+function DmSettings({ active }) {
+  const [, force] = useState(0);
+  const refresh = () => force((n) => n + 1);
+  const [info, setInfo] = useState(null);
+  useEffect(() => {
+    let alive = true;
+    setInfo(null);
+    api(`/dm/${encodeURIComponent(active.id)}?summary=true`).then((d) => {
+      if (alive) setInfo(d);
+    }).catch(() => {
+    });
+    return () => {
+      alive = false;
+    };
+  }, [active.id]);
+  const togglePin = async () => {
+    try {
+      await api(`/dm/${encodeURIComponent(active.id)}/pin`, { method: "POST" });
+      store.contacts = null;
+      loadContacts(true).catch(() => {
+      });
+      const d = await api(`/dm/${encodeURIComponent(active.id)}?summary=true`);
+      setInfo(d);
+    } catch (e) {
+      window.dispatchEvent(new CustomEvent("aischat:error:" + (e.message || "\u64CD\u4F5C\u5931\u8D25")));
+    }
+  };
+  const toggleDnd = async () => {
+    try {
+      const inDnd2 = !!(info && info.my_dnd_until);
+      await api(`/dm/${encodeURIComponent(active.id)}/dnd`, { method: "POST", json: { duration_minutes: inDnd2 ? 0 : null } });
+      const d = await api(`/dm/${encodeURIComponent(active.id)}?summary=true`);
+      setInfo(d);
+    } catch (e) {
+      window.dispatchEvent(new CustomEvent("aischat:error:" + (e.message || "\u64CD\u4F5C\u5931\u8D25")));
+    }
+  };
+  const pinned = !!(info && info.is_pinned);
+  const inDnd = !!(info && info.my_dnd_until);
+  return h(
+    "div",
+    { style: style.settingsPanel },
+    h("div", { style: style.settingsTitle }, "\u79C1\u4FE1\u8BBE\u7F6E"),
+    h(
+      "div",
+      { style: style.settingsRow },
+      h("span", { style: style.settingsLabel }, "\u7F6E\u9876\u5BF9\u8BDD"),
+      h("button", { style: { ...style.smallBtn, ...pinned ? style.smallBtnOn : {} }, onClick: togglePin }, pinned ? "\u5DF2\u7F6E\u9876" : "\u7F6E\u9876")
+    ),
+    h(
+      "div",
+      { style: style.settingsRow },
+      h("span", { style: style.settingsLabel }, "\u514D\u6253\u6270"),
+      h("button", { style: { ...style.smallBtn, ...inDnd ? style.smallBtnOn : {} }, onClick: toggleDnd }, inDnd ? "\u5DF2\u5F00\u542F" : "\u5F00\u542F")
+    )
+  );
+}
 function MsgList({ messages, user }) {
+  const listRef = useRef(null);
+  useEffect(() => {
+    const el = listRef.current;
+    if (el) el.scrollTop = el.scrollHeight;
+  }, [messages]);
   if (!messages || messages.length === 0) {
     return h("div", { style: style.empty }, "\u6682\u65E0\u6D88\u606F\uFF0C\u53D1\u9001\u7B2C\u4E00\u6761\u5427");
   }
   return h(
     "div",
-    { style: style.msgs },
+    { ref: listRef, style: style.msgs },
     messages.map((m) => {
       const mine = String(m.sender_type) === "user" || String(m.sender_type) === "human" ? String(m.sender_id) === String(user ? user.id : "") : false;
       const name = senderName(m, user);
@@ -542,12 +707,27 @@ function MsgList({ messages, user }) {
     })
   );
 }
-function ConversationColumn({ refresh }) {
+function ConversationColumn({ refresh, onImmersive }) {
   const [draft, setDraft] = useState("");
   const [sending, setSending] = useState(false);
+  const [showSettings, setShowSettings] = useState(false);
+  const [worldId, setWorldId] = useState(null);
   const active = store.active;
   const user = store.user;
   const messages = store.messages;
+  useEffect(() => {
+    let alive = true;
+    setWorldId(null);
+    if (active && active.kind === "group") {
+      api(`/worlds/by-entity?entity_type=group&entity_id=${encodeURIComponent(active.id)}`).then((d) => {
+        if (alive && d && d.world_id != null) setWorldId(d.world_id);
+      }).catch(() => {
+      });
+    }
+    return () => {
+      alive = false;
+    };
+  }, [active]);
   const send = async () => {
     const text = draft.trim();
     if (!text || sending) return;
@@ -581,8 +761,19 @@ function ConversationColumn({ refresh }) {
       "div",
       { style: style.mainHead },
       h("span", { style: { fontWeight: 600 } }, active.title),
-      h("span", { style: { fontSize: 12, color: "var(--dsw-alias-label-tertiary)" } }, active.kind === "group" ? "\u7FA4\u804A" : "\u79C1\u4FE1")
+      h("span", { style: { fontSize: 12, color: "var(--dsw-alias-label-tertiary)" } }, active.kind === "group" ? "\u7FA4\u804A" : "\u79C1\u4FE1"),
+      worldId != null ? h("button", {
+        style: { ...style.headBtn, color: "var(--dsw-alias-state-business-primary)", marginLeft: "auto" },
+        onClick: () => onImmersive && onImmersive(worldId),
+        title: "\u5728\u6C89\u6D78\u5F0F\u754C\u9762\u6253\u5F00"
+      }, "\u6C89\u6D78\u5F0F") : null,
+      h("button", {
+        style: { ...style.headBtn, ...showSettings ? style.headBtnActive : {}, ...worldId != null ? {} : { marginLeft: "auto" } },
+        onClick: () => setShowSettings((v) => !v),
+        title: active.kind === "group" ? "\u7FA4\u804A\u8BBE\u7F6E" : "\u79C1\u4FE1\u8BBE\u7F6E"
+      }, "\u2699")
     ),
+    showSettings ? active.kind === "group" ? h(GroupSettings, { active }) : h(DmSettings, { active }) : null,
     h(MsgList, { messages, user }),
     h(
       "div",
@@ -600,6 +791,48 @@ function ConversationColumn({ refresh }) {
     )
   );
 }
+function ImmersivePanel({ path, title, onClose }) {
+  return h(
+    "div",
+    { style: style.immersive },
+    h(
+      "div",
+      { style: style.immersiveBar },
+      h("span", { style: { flex: 1 } }, title || "\u6C89\u6D78\u5F0F\u754C\u9762"),
+      h("button", { style: style.closeBtn, onClick: onClose }, "\u8FD4\u56DE")
+    ),
+    h("iframe", { src: path, style: style.immersiveFrame, title: title || "\u6C89\u6D78\u5F0F\u754C\u9762", sandbox: "allow-scripts allow-same-origin allow-forms allow-popups" })
+  );
+}
+var immersiveState = { path: null, title: "" };
+function openImmersive(path, title) {
+  const sep = path.includes("?") ? "&" : "?";
+  immersiveState.path = path + sep + "token=" + encodeURIComponent(store.token || "");
+  immersiveState.title = title || "";
+  window.dispatchEvent(new CustomEvent("aischat:immersive"));
+}
+function closeImmersive() {
+  immersiveState.path = null;
+  immersiveState.title = "";
+  window.dispatchEvent(new CustomEvent("aischat:immersive"));
+}
+function ImmersiveOverlay() {
+  const [, force] = useState(0);
+  useEffect(() => {
+    const on = () => force((n) => n + 1);
+    window.addEventListener("aischat:immersive", on);
+    return () => window.removeEventListener("aischat:immersive", on);
+  }, []);
+  if (!immersiveState.path) return null;
+  return h(ImmersivePanel, { path: immersiveState.path, title: immersiveState.title, onClose: closeImmersive });
+}
+var FEATURES = [
+  { id: "worlds", label: "\u7FA4\u89C6\u754C", path: "/worlds" },
+  { id: "friends", label: "\u597D\u53CB", path: "/friends" },
+  { id: "agents", label: "\u6211\u7684 AI", path: "/agents" },
+  { id: "admin", label: "\u7BA1\u7406", path: "/admin" },
+  { id: "settings", label: "\u8BBE\u7F6E", path: "/settings" }
+];
 function AisChatBoard({ onClose }) {
   const [, force] = useState(0);
   const refresh = useCallback(() => force((n) => n + 1), []);
@@ -691,10 +924,23 @@ function AisChatBoard({ onClose }) {
         section("\u7F6E\u9876\u7FA4\u804A", pinnedGroups, "group"),
         section("\u79C1\u4FE1", restDms, "dm"),
         section("\u7FA4\u804A", restGroups, "group"),
-        !pinnedDms.length && !pinnedGroups.length && !restDms.length && !restGroups.length ? h("div", { style: { ...style.empty, padding: 24 } }, "\u6682\u65E0\u8054\u7CFB\u4EBA") : null
+        !pinnedDms.length && !pinnedGroups.length && !restDms.length && !restGroups.length ? h("div", { style: { ...style.empty, padding: 24 } }, "\u6682\u65E0\u8054\u7CFB\u4EBA") : null,
+        h(
+          "div",
+          { style: { ...style.group, marginTop: 10, borderTop: "1px solid var(--dsw-alias-border-l2)", paddingTop: 8 } },
+          h("div", { style: style.groupLabel }, "\u529F\u80FD"),
+          FEATURES.map((f) => h("button", {
+            key: f.id,
+            style: { ...style.row, fontSize: 13 },
+            onClick: () => openImmersive(`/aischat-ui${f.path}?embed=1`, f.label)
+          }, f.label))
+        )
       )
     ),
-    h(ConversationColumn, { refresh })
+    h(ConversationColumn, {
+      refresh,
+      onImmersive: (wid) => openImmersive(`/aischat-ui/world-view/${encodeURIComponent(wid)}?embed=1`, "\u6C89\u6D78\u5F0F\u754C\u9762")
+    })
   );
 }
 function SettingsPage() {
@@ -716,7 +962,7 @@ function SettingsPage() {
   }
   return h(
     "div",
-    { style: { padding: 20, maxWidth: 420 } },
+    { style: { padding: 20, maxWidth: 480 } },
     h("div", { style: { fontSize: 16, fontWeight: 600, marginBottom: 16, color: "var(--dsw-alias-label-primary)" } }, "AIsChat"),
     h(
       "div",
@@ -729,7 +975,17 @@ function SettingsPage() {
         h("div", { style: style.rowSub }, "\u5DF2\u767B\u5F55")
       )
     ),
-    h("button", { style: { ...style.btn, background: "var(--dsw-alias-state-danger-primary, #e5484d)", marginTop: 16 }, onClick: doLogout }, "\u9000\u51FA\u767B\u5F55"),
+    h("div", { style: { fontSize: 13, fontWeight: 600, margin: "18px 0 8px", color: "var(--dsw-alias-label-primary)" } }, "\u529F\u80FD"),
+    h(
+      "div",
+      { style: { display: "flex", flexDirection: "column", gap: 2 } },
+      FEATURES.map((f) => h("button", {
+        key: f.id,
+        style: { ...style.footBtn, padding: "9px 10px", fontSize: 14 },
+        onClick: () => openImmersive(`/aischat-ui${f.path}?embed=1`, f.label)
+      }, f.label))
+    ),
+    h("button", { style: { ...style.btn, background: "var(--dsw-alias-state-danger-primary, #e5484d)", marginTop: 20 }, onClick: doLogout }, "\u9000\u51FA\u767B\u5F55"),
     h("div", { style: style.hint }, "\u670D\u52A1\u901A\u8FC7\u672C\u673A\u540C\u6E90\u4EE3\u7406\u8BBF\u95EE\uFF0C\u65E0\u516C\u7F51\u5730\u5740\u53C2\u4E0E\u3002")
   );
 }
@@ -797,12 +1053,26 @@ module.exports = {
       { name: "shell.overlay", id: "aischat-board", order: 30 },
       BoardEntry
     )));
+    disposers.push(ctx.slots.inject("shell.overlay", () => ctx.slots.register(
+      { name: "shell.overlay", id: "aischat-immersive", order: 40 },
+      ImmersiveOverlay
+    )));
     disposers.push(ctx.slots.inject("settings.section", () => ctx.slots.register(
       { name: "settings.section", id: "aischat", order: 40, label: "AIsChat" },
       SettingsPage
     )));
     window.addEventListener("focus", () => {
       if (store.token && !store.ws) connectWs();
+    });
+    window.addEventListener("message", (event) => {
+      const data = event.data;
+      if (!data || typeof data !== "object" || data.source !== "aischat-embed") return;
+      if (data.type === "request-login" || data.type === "unauthorized") {
+        if (!boardOpen) {
+          boardOpen = true;
+          bump();
+        }
+      }
     });
     return () => {
       for (const dispose of disposers.splice(0)) dispose();

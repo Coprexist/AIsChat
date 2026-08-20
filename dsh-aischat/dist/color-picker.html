@@ -1,0 +1,844 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
+<title>AIsChat 主题选色</title>
+<style>
+  /* ============ 主站主题变量（与 frontend/src/index.css 同源） ============ */
+  :root {
+    --tw-primary-400: 139 92 246;   /* #8B5CF6 */
+    --tw-primary-500: 139 92 246;   /* #8B5CF6 */
+    --tw-primary-600: 109 40 217;   /* #6D28D9 */
+    --tw-accent-400: 251 191 36;    /* #FBBF24 */
+    --tw-accent-500: 217 119 6;     /* #D97706 */
+    --tw-mint-400: 34 197 94;       /* #22C55E */
+    --tw-mint-500: 5 150 105;       /* #059669 */
+    --tw-rose-400: 232 74 105;      /* #E84A69 */
+    --tw-rose-500: 225 29 72;       /* #E11D48 */
+    /* 结构色（浅色主题） */
+    --tw-canvas: 248 250 252;
+    --tw-surface: 255 255 255;
+    --tw-elevated: 241 245 249;
+    --tw-border: 203 213 225;
+    --tw-text-primary: 17 24 39;
+    --tw-text-secondary: 75 85 99;
+    --tw-text-muted: 107 114 128;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body { height: 100%; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC", "Microsoft YaHei", sans-serif;
+    background: rgb(var(--tw-canvas));
+    color: rgb(var(--tw-text-primary));
+    overflow: hidden;
+  }
+
+  .layout { display: flex; height: 100vh; }
+
+  /* ============ 左侧：主站界面预览（固定） ============ */
+  .stage-wrap {
+    flex: 0 0 430px;
+    width: 430px;
+    padding: 18px 16px 18px 20px;
+    display: flex; flex-direction: column;
+    background: rgb(var(--tw-canvas));
+    border-right: 1px solid rgb(var(--tw-border));
+    min-height: 0;
+  }
+  .stage-head { display: flex; align-items: center; gap: 8px; margin-bottom: 12px; }
+  .stage-head .dot { width: 10px; height: 10px; border-radius: 50%; background: rgb(var(--tw-elevated)); border: 1px solid rgb(var(--tw-border)); }
+  .stage-head .title { font-size: 13px; font-weight: 600; color: rgb(var(--tw-text-secondary)); }
+
+  /* 主站界面模拟（手机壳） */
+  .phone {
+    flex: 1; min-height: 0;
+    background: rgb(var(--tw-surface));
+    border: 1px solid rgb(var(--tw-border));
+    border-radius: 18px;
+    box-shadow: 0 8px 30px rgba(0,0,0,0.08);
+    display: flex; flex-direction: column;
+    overflow: hidden;
+  }
+  .bar {
+    display: flex; align-items: center; gap: 8px;
+    padding: 10px 12px;
+    border-bottom: 1px solid rgb(var(--tw-border));
+    background: rgb(var(--tw-surface));
+  }
+  .bar .avatar {
+    width: 28px; height: 28px; border-radius: 50%;
+    background: rgb(var(--tw-primary-500)); color: #fff;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 12px; font-weight: 700;
+  }
+  .bar .name { font-size: 13px; font-weight: 600; }
+  .bar .status { font-size: 10px; color: rgb(var(--tw-mint-400)); display: flex; align-items: center; gap: 3px; }
+  .bar .status::before { content: ""; width: 6px; height: 6px; border-radius: 50%; background: rgb(var(--tw-mint-400)); }
+  .bar .icons { margin-left: auto; display: flex; gap: 6px; }
+  .bar .icon-btn {
+    width: 26px; height: 26px; border-radius: 8px;
+    display: flex; align-items: center; justify-content: center;
+    background: rgb(var(--tw-elevated)); color: rgb(var(--tw-text-secondary));
+    font-size: 12px;
+  }
+  .bar .icon-btn.primary { background: rgb(var(--tw-primary-500)); color: #fff; }
+
+  .msgs { flex: 1; min-height: 0; padding: 12px 10px; overflow: hidden; display: flex; flex-direction: column; gap: 10px; }
+  .msg { max-width: 78%; padding: 7px 11px; border-radius: 12px; font-size: 12px; line-height: 1.45; }
+  .msg.mine { align-self: flex-end; background: rgb(var(--tw-primary-500)); color: #fff; border-bottom-right-radius: 4px; }
+  .msg.other { align-self: flex-start; background: rgb(var(--tw-surface)); color: rgb(var(--tw-text-primary)); border: 1px solid rgb(var(--tw-border)); border-bottom-left-radius: 4px; }
+  .msg.mine .link { color: rgba(255,255,255,0.85); text-decoration: underline; }
+  .msg .inline-code { background: rgba(0,0,0,0.06); border-radius: 4px; padding: 0 4px; font-family: ui-monospace, monospace; font-size: 11px; }
+  .msg.mine .inline-code { background: rgba(255,255,255,0.18); }
+
+  .nav { display: flex; flex-direction: column; gap: 2px; padding: 4px; }
+  .nav-item {
+    display: flex; align-items: center; gap: 8px;
+    padding: 7px 10px; border-radius: 8px;
+    font-size: 12px; color: rgb(var(--tw-text-secondary));
+  }
+  .nav-item .ico {
+    width: 18px; height: 18px; border-radius: 5px;
+    background: rgb(var(--tw-elevated));
+    display: flex; align-items: center; justify-content: center;
+    font-size: 9px;
+  }
+  .nav-item.active { background: rgb(var(--tw-primary-500) / 0.12); color: rgb(var(--tw-primary-500)); font-weight: 600; }
+  .nav-item.active .ico { background: rgb(var(--tw-primary-500)); color: #fff; }
+
+  .btns { display: flex; gap: 6px; padding: 10px 12px; border-top: 1px solid rgb(var(--tw-border)); flex-wrap: wrap; }
+  .b {
+    display: inline-flex; align-items: center; justify-content: center;
+    height: 28px; padding: 0 12px; border-radius: 8px;
+    font-size: 11px; font-weight: 500; cursor: pointer; border: none;
+    transition: background .15s;
+  }
+  .b.primary { background: rgb(var(--tw-primary-500)); color: #fff; }
+  .b.primary:hover { background: rgb(var(--tw-primary-600)); }
+  .b.accent { background: rgb(var(--tw-accent-400)); color: rgb(var(--tw-text-primary)); }
+  .b.mint { background: rgb(var(--tw-mint-500)); color: #fff; }
+  .b.danger { background: rgb(var(--tw-rose-500)); color: #fff; }
+  .b.secondary { background: rgb(var(--tw-elevated)); color: rgb(var(--tw-text-secondary)); border: 1px solid rgb(var(--tw-border)); }
+
+  .badges { display: flex; gap: 6px; padding: 2px 12px 0; flex-wrap: wrap; }
+  .badge {
+    display: inline-flex; align-items: center; gap: 4px;
+    height: 20px; padding: 0 8px; border-radius: 999px;
+    font-size: 10px; font-weight: 500;
+  }
+  .badge.p { background: rgb(var(--tw-primary-500) / 0.12); color: rgb(var(--tw-primary-500)); }
+  .badge.a { background: rgb(var(--tw-accent-400) / 0.15); color: rgb(var(--tw-accent-500)); }
+  .badge.m { background: rgb(var(--tw-mint-400) / 0.15); color: rgb(var(--tw-mint-500)); }
+  .badge.r { background: rgb(var(--tw-rose-400) / 0.12); color: rgb(var(--tw-rose-500)); }
+  .badge.solid { color: #fff; }
+  .badge.solid.p { background: rgb(var(--tw-primary-500)); }
+  .badge.solid.a { background: rgb(var(--tw-accent-400)); color: rgb(var(--tw-text-primary)); }
+  .badge.solid.m { background: rgb(var(--tw-mint-500)); }
+  .badge.solid.r { background: rgb(var(--tw-rose-500)); }
+
+  .status-row { display: flex; align-items: center; gap: 12px; padding: 4px 12px; font-size: 11px; color: rgb(var(--tw-text-secondary)); }
+  .status-row .live { color: rgb(var(--tw-mint-400)); display: flex; align-items: center; gap: 4px; }
+  .status-row .live::before { content: ""; width: 7px; height: 7px; border-radius: 50%; background: rgb(var(--tw-mint-400)); }
+  .status-row .dnd { color: rgb(var(--tw-rose-400)); display: flex; align-items: center; gap: 4px; }
+  .status-row .dnd::before { content: ""; width: 7px; height: 7px; border-radius: 50%; background: rgb(var(--tw-rose-400)); }
+
+  .input-row { display: flex; gap: 6px; padding: 8px 12px 10px; border-top: 1px solid rgb(var(--tw-border)); }
+  .input {
+    flex: 1; height: 30px; border-radius: 9px;
+    border: 1px solid rgb(var(--tw-border));
+    background: rgb(var(--tw-canvas));
+    padding: 0 10px; font-size: 11px;
+    color: rgb(var(--tw-text-primary));
+    outline: none;
+  }
+  .input:focus { border-color: rgb(var(--tw-primary-500)); box-shadow: 0 0 0 2px rgb(var(--tw-primary-500) / 0.15); }
+  .send {
+    width: 30px; height: 30px; border-radius: 9px; border: none;
+    background: rgb(var(--tw-primary-500)); color: #fff;
+    display: flex; align-items: center; justify-content: center;
+    cursor: pointer; font-size: 13px;
+  }
+  .send:hover { background: rgb(var(--tw-primary-600)); }
+
+  .meter { padding: 4px 12px 2px; }
+  .meter .track { height: 6px; border-radius: 3px; background: rgb(var(--tw-elevated)); overflow: hidden; }
+  .meter .fill { height: 100%; width: 62%; border-radius: 3px; background: rgb(var(--tw-primary-500)); }
+  .meter .lbl { font-size: 10px; color: rgb(var(--tw-text-muted)); margin-bottom: 3px; }
+
+  .toggles { display: flex; gap: 16px; padding: 6px 12px; align-items: center; font-size: 11px; color: rgb(var(--tw-text-secondary)); }
+  .sw { width: 30px; height: 17px; border-radius: 999px; position: relative; background: rgb(var(--tw-mint-400)); cursor: pointer; }
+  .sw::after { content: ""; position: absolute; top: 2px; right: 2px; width: 13px; height: 13px; border-radius: 50%; background: #fff; }
+  .sw.off { background: rgb(var(--tw-border)); }
+  .sw.off::after { right: auto; left: 2px; }
+
+  /* ============ 右侧：选色面板（滚动） ============ */
+  .panel { flex: 1; min-width: 0; overflow-y: auto; padding: 24px 28px 60px; }
+  .panel-head h1 { font-size: 19px; font-weight: 700; letter-spacing: -0.02em; }
+  .panel-head p { font-size: 13px; color: rgb(var(--tw-text-secondary)); margin-top: 5px; }
+  .panel-head .hint {
+    margin-top: 10px; padding: 9px 12px; border-radius: 10px;
+    background: rgb(var(--tw-primary-500) / 0.07);
+    border: 1px solid rgb(var(--tw-primary-500) / 0.2);
+    color: rgb(var(--tw-primary-600));
+    font-size: 12px; line-height: 1.6;
+  }
+
+  .group {
+    margin-top: 20px;
+    background: rgb(var(--tw-surface));
+    border: 1px solid rgb(var(--tw-border));
+    border-radius: 14px; padding: 16px;
+  }
+  .group-name { font-size: 14px; font-weight: 700; display: flex; align-items: center; gap: 8px; }
+  .group-name .swatch-sample { width: 16px; height: 16px; border-radius: 5px; border: 1px solid rgba(0,0,0,0.12); }
+  .group-desc { font-size: 11.5px; color: rgb(var(--tw-text-muted)); margin-top: 2px; }
+
+  .field { margin-top: 14px; }
+  .field-label {
+    display: flex; align-items: center; gap: 8px;
+    font-size: 12px; font-weight: 600; color: rgb(var(--tw-text-secondary));
+    margin-bottom: 7px;
+  }
+  .field-label .now {
+    font-size: 10.5px; font-weight: 400; color: rgb(var(--tw-text-muted));
+    display: inline-flex; align-items: center; gap: 5px;
+    margin-left: auto;
+  }
+  .field-label .now .chip { width: 13px; height: 13px; border-radius: 4px; border: 1px solid rgba(0,0,0,0.15); display: inline-block; }
+  .swatches { display: flex; flex-wrap: wrap; gap: 7px; }
+  .swatch {
+    width: 40px; height: 40px; border-radius: 10px; cursor: pointer;
+    border: 2px solid transparent; position: relative;
+    transition: transform .12s ease, border-color .12s ease;
+    box-shadow: 0 1px 2px rgba(0,0,0,0.08);
+  }
+  .swatch:hover { transform: scale(1.1); }
+  .swatch.sel { border-color: rgb(var(--tw-text-primary)); box-shadow: 0 0 0 3px rgb(var(--tw-primary-500) / 0.15); }
+  .swatch .tag {
+    position: absolute; bottom: -15px; left: 0; right: 0;
+    text-align: center; font-size: 8.5px; color: rgb(var(--tw-text-muted));
+    font-family: ui-monospace, monospace;
+  }
+
+  .result {
+    margin-top: 20px;
+    background: rgb(var(--tw-surface));
+    border: 1px solid rgb(var(--tw-border));
+    border-radius: 14px; padding: 16px;
+  }
+  .result textarea {
+    width: 100%; min-height: 140px; border: 1px solid rgb(var(--tw-border));
+    border-radius: 10px; padding: 10px;
+    font-family: ui-monospace, monospace; font-size: 11.5px;
+    resize: vertical; background: rgb(var(--tw-canvas)); color: rgb(var(--tw-text-primary));
+  }
+  .result-actions { display: flex; gap: 10px; margin-top: 10px; }
+  .gen-btn { flex: 1; height: 42px; border-radius: 10px; border: none; background: rgb(var(--tw-primary-500)); color: #fff; font-size: 13px; font-weight: 600; cursor: pointer; }
+  .gen-btn:hover { background: rgb(var(--tw-primary-600)); }
+  .copy-btn { flex: 1; height: 42px; border-radius: 10px; background: rgb(var(--tw-surface)); color: rgb(var(--tw-text-secondary)); border: 1px solid rgb(var(--tw-border)); font-size: 13px; font-weight: 600; cursor: pointer; }
+
+  .copied {
+    position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%);
+    background: rgb(var(--tw-text-primary)); color: rgb(var(--tw-surface));
+    padding: 8px 16px; border-radius: 999px; font-size: 13px;
+    opacity: 0; transition: opacity .25s; pointer-events: none; z-index: 99;
+  }
+  .copied.show { opacity: 1; }
+
+  /* ════════ 投票 ════════ */
+  .primary-demo { display: flex; align-items: center; gap: 8px; padding: 4px 12px 0; font-size: 11px; color: rgb(var(--tw-text-secondary)); flex-wrap: wrap; }
+  .primary-demo .acc { color: rgb(var(--tw-primary-400)); font-weight: 600; }
+  .primary-demo .link2 { color: rgb(var(--tw-primary-400)); text-decoration: underline; cursor: pointer; }
+  .primary-demo .icon2 { width: 16px; height: 16px; border-radius: 4px; background: rgb(var(--tw-primary-400) / 0.15); color: rgb(var(--tw-primary-400)); display: inline-flex; align-items: center; justify-content: center; font-size: 9px; font-weight: 700; }
+
+  .vote-box { margin-top: 20px; background: rgb(var(--tw-surface)); border: 1px solid rgb(var(--tw-border)); border-radius: 14px; padding: 16px; }
+  .vote-box h3 { font-size: 14px; font-weight: 700; display: flex; align-items: center; gap: 8px; }
+  .vote-box .sub { font-size: 11.5px; color: rgb(var(--tw-text-muted)); margin-top: 3px; }
+  .ident { display: flex; gap: 8px; margin-top: 12px; align-items: center; }
+  .ident .me-avatar { width: 30px; height: 30px; border-radius: 50%; background: rgb(var(--tw-primary-500)); color: #fff; display: flex; align-items: center; justify-content: center; font-size: 12px; font-weight: 700; overflow: hidden; flex: none; }
+  .ident .me-avatar img { width: 100%; height: 100%; object-fit: cover; }
+  .ident input {
+    flex: 1; height: 34px; border-radius: 9px; border: 1px solid rgb(var(--tw-border));
+    background: rgb(var(--tw-canvas)); padding: 0 10px; font-size: 12px; color: rgb(var(--tw-text-primary)); outline: none;
+  }
+  .ident input:focus { border-color: rgb(var(--tw-primary-500)); }
+  .vote-actions { display: flex; gap: 10px; margin-top: 10px; }
+  .vote-btn {
+    flex: 1; height: 42px; border-radius: 10px; border: none;
+    background: rgb(var(--tw-primary-500)); color: #fff; font-size: 13px; font-weight: 600; cursor: pointer;
+  }
+  .vote-btn:hover { background: rgb(var(--tw-primary-600)); }
+  .vote-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+  .vote-status { font-size: 12px; margin-top: 8px; }
+  .vote-status.ok { color: rgb(var(--tw-mint-500)); }
+  .vote-status.err { color: rgb(var(--tw-rose-500)); }
+
+  /* 投票统计：色块下方头像堆 */
+  .vote-stats { margin-top: 16px; }
+  .vote-stats .vs-title { font-size: 12px; font-weight: 600; color: rgb(var(--tw-text-secondary)); margin-bottom: 8px; }
+  .vote-grid { display: flex; flex-wrap: wrap; gap: 14px; }
+  .vote-col { width: 44px; text-align: center; }
+  .vote-col .vswatch { width: 40px; height: 40px; border-radius: 10px; margin: 0 auto; box-shadow: 0 1px 2px rgba(0,0,0,0.1); }
+  .vote-col .vswatch-label { font-size: 9px; color: rgb(var(--tw-text-muted)); margin-top: 2px; font-family: ui-monospace, monospace; }
+  .vote-avatars { display: flex; flex-wrap: wrap; gap: 3px; justify-content: center; margin-top: 6px; min-height: 20px; }
+  .vote-avatar {
+    width: 20px; height: 20px; border-radius: 50%; overflow: hidden;
+    border: 1.5px solid rgb(var(--tw-surface));
+    background: rgb(var(--tw-elevated));
+    display: flex; align-items: center; justify-content: center;
+    font-size: 9px; font-weight: 700; color: rgb(var(--tw-text-secondary));
+  }
+  .vote-avatar img { width: 100%; height: 100%; object-fit: cover; }
+  .vote-avatar.me { border-color: rgb(var(--tw-primary-500)); }
+  .vote-count { font-size: 10px; color: rgb(var(--tw-text-muted)); margin-top: 2px; }
+  .vs-empty { font-size: 11.5px; color: rgb(var(--tw-text-muted)); padding: 10px 0; }
+
+  /* ════════ 每选项旁的元素预览 ════════ */
+  .demo-bar {
+    margin-top: 9px;
+    display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
+    padding: 8px 10px;
+    background: rgb(var(--tw-canvas));
+    border: 1px dashed rgb(var(--tw-border));
+    border-radius: 10px;
+    min-height: 44px;
+  }
+  .demo-bar .demo-label { font-size: 10px; color: rgb(var(--tw-text-muted)); flex: 0 0 auto; }
+  .demo-bar .d { display: inline-flex; align-items: center; gap: 5px; font-size: 11px; }
+  .d-btn {
+    display: inline-flex; align-items: center; justify-content: center;
+    height: 26px; padding: 0 11px; border-radius: 8px;
+    font-size: 11px; font-weight: 500; color: #fff; border: none;
+  }
+  .d-btn.outline {
+    background: transparent; border: 1px solid var(--d-color, #8B5CF6);
+    color: var(--d-color, #8B5CF6);
+  }
+  .d-text { font-weight: 600; color: var(--d-color, #8B5CF6); }
+  .d-link { color: var(--d-color, #8B5CF6); text-decoration: underline; }
+  .d-badge {
+    display: inline-flex; align-items: center; gap: 3px;
+    height: 19px; padding: 0 8px; border-radius: 999px;
+    font-size: 10px; font-weight: 500;
+  }
+  .d-badge.solid { color: #fff; }
+  .d-badge.tint { background: var(--d-color, #8B5CF6) / 0.15; color: var(--d-color, #8B5CF6); }
+  .d-live { display: inline-flex; align-items: center; gap: 4px; color: var(--d-color, #22C55E); font-weight: 500; }
+  .d-live::before { content: ""; width: 7px; height: 7px; border-radius: 50%; background: var(--d-color, #22C55E); }
+  .d-meter { width: 90px; height: 5px; border-radius: 3px; background: rgb(var(--tw-elevated)); overflow: hidden; }
+  .d-meter i { display: block; height: 100%; width: 62%; border-radius: 3px; background: var(--d-color, #8B5CF6); }
+  .d-hover-note { font-size: 10px; color: rgb(var(--tw-text-muted)); }
+
+  /* 移动端：预览在上、选色在下 */
+  @media (max-width: 860px) {
+    body { overflow: auto; }
+    .layout { flex-direction: column; height: auto; }
+    .stage-wrap { width: 100%; flex: none; padding: 12px; border-right: none; border-bottom: 1px solid rgb(var(--tw-border)); }
+    .phone { height: 440px; flex: none; }
+    .panel { padding: 16px 12px 60px; }
+    .stage-head { display: none; }        /* 手机上隐藏「预览」标题，省空间 */
+    .swatch { width: 36px; height: 36px; }
+    .demo-bar { padding: 7px 9px; gap: 8px; }
+    .group { padding: 13px; }
+  }
+</style>
+</head>
+<body>
+<div class="layout">
+
+  <!-- ══════ 左侧：主站界面预览（固定） ══════ -->
+  <div class="stage-wrap">
+    <div class="stage-head">
+      <span class="dot"></span><span class="dot"></span><span class="dot"></span>
+      <span class="title">主站界面预览 · 实时</span>
+    </div>
+
+    <div class="phone">
+      <div class="bar">
+        <div class="avatar">AI</div>
+        <div>
+          <div class="name">群视界 · 星陨大陆</div>
+          <div class="status">在线 · 实时同步</div>
+        </div>
+        <div class="icons">
+          <span class="icon-btn">⌕</span>
+          <span class="icon-btn primary">+</span>
+        </div>
+      </div>
+
+      <div class="nav">
+        <div class="nav-item active"><span class="ico">◆</span> 探索区域</div>
+        <div class="nav-item"><span class="ico">⚔</span> 战斗</div>
+        <div class="nav-item"><span class="ico">▣</span> 商店</div>
+        <div class="nav-item"><span class="ico">☰</span> 任务</div>
+      </div>
+
+      <div class="msgs">
+        <div class="msg other">欢迎来到星陨大陆，<span class="link">点这里</span> 查看规则</div>
+        <div class="msg mine">探索 幽暗森林 <span class="inline-code">/探索</span></div>
+        <div class="msg other">你发现了一只<span class="inline-code">野狼</span>！</div>
+        <div class="msg mine">战斗！</div>
+      </div>
+
+      <div class="status-row">
+        <span class="live">在线</span>
+        <span class="dnd">勿扰</span>
+        <span>普通文字</span>
+      </div>
+
+      <!-- primary-400 强调文字 / 链接 / 图标 -->
+      <div class="primary-demo">
+        <span class="icon2">i</span>
+        <span>强调文字 <span class="acc">这里是主色强调</span> · <span class="link2">链接文字</span></span>
+      </div>
+
+      <div class="badges">
+        <span class="badge p">主色标签</span>
+        <span class="badge a">琥珀状态</span>
+        <span class="badge m">在线徽章</span>
+        <span class="badge r">危险标记</span>
+        <span class="badge solid p">实心主色</span>
+        <span class="badge solid a">实心金</span>
+        <span class="badge solid m">实心绿</span>
+        <span class="badge solid r">实心红</span>
+      </div>
+
+      <div class="meter">
+        <div class="lbl">存储用量 62%</div>
+        <div class="track"><div class="fill"></div></div>
+      </div>
+
+      <div class="toggles">
+        <span>自动同步 <span class="sw"></span></span>
+        <span>免打扰 <span class="sw off"></span></span>
+      </div>
+
+      <div class="btns">
+        <button class="b primary">主按钮</button>
+        <button class="b secondary">次级</button>
+        <button class="b accent">琥珀</button>
+        <button class="b mint">成功</button>
+        <button class="b danger">删除</button>
+      </div>
+
+      <div class="input-row">
+        <input class="input" placeholder="输入指令…" value="探索 幽暗森林">
+        <button class="send">➤</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ══════ 右侧：选色面板 ══════ -->
+  <div class="panel">
+    <div class="panel-head">
+      <h1>AIsChat 主题选色</h1>
+      <p>左侧是主站界面实时预览 —— 点选色块立即生效。</p>
+      <div class="hint">每个类型色给 8~10 个候选，点选即可（含当前默认）。同类型 400（文字）与 500（按钮）建议选同色系相邻深浅。选完点「生成结果」复制发我。</div>
+    </div>
+
+    <!-- 组：主色 -->
+    <div class="group">
+      <div class="group-name"><span class="swatch-sample" id="sample-p" style="background:#8B5CF6"></span> 主色 primary（紫）</div>
+      <div class="group-desc">品牌色 · 按钮 / 我的气泡 / 强调 / 链接 / 选中态 / 进度条</div>
+      <div class="field" data-key="primary_400" data-demo="p400">
+        <div class="field-label">primary-400 强调文字 / 图标 / 链接 <span class="now"><span class="chip"></span><span class="now-hex"></span></span></div>
+        <div class="swatches"></div>
+        <div class="demo-bar" data-demo-bar="p400"></div>
+      </div>
+      <div class="field" data-key="primary_500" data-demo="p500">
+        <div class="field-label">primary-500 主按钮 / 我的气泡 / 发送 <span class="now"><span class="chip"></span><span class="now-hex"></span></span></div>
+        <div class="swatches"></div>
+        <div class="demo-bar" data-demo-bar="p500"></div>
+      </div>
+      <div class="field" data-key="primary_600" data-demo="p600">
+        <div class="field-label">primary-600 按钮 hover <span class="now"><span class="chip"></span><span class="now-hex"></span></span></div>
+        <div class="swatches"></div>
+        <div class="demo-bar" data-demo-bar="p600"></div>
+      </div>
+    </div>
+
+    <!-- 组：琥珀金 -->
+    <div class="group">
+      <div class="group-name"><span class="swatch-sample" id="sample-a" style="background:#FBBF24"></span> 琥珀金 accent</div>
+      <div class="group-desc">状态变更 / 通知 / 高亮 / 星级</div>
+      <div class="field" data-key="accent_400" data-demo="a400">
+        <div class="field-label">accent-400 状态文字 / 徽章 <span class="now"><span class="chip"></span><span class="now-hex"></span></span></div>
+        <div class="swatches"></div>
+        <div class="demo-bar" data-demo-bar="a400"></div>
+      </div>
+      <div class="field" data-key="accent_500" data-demo="a500">
+        <div class="field-label">accent-500 实底按钮 / hover <span class="now"><span class="chip"></span><span class="now-hex"></span></span></div>
+        <div class="swatches"></div>
+        <div class="demo-bar" data-demo-bar="a500"></div>
+      </div>
+    </div>
+
+    <!-- 组：活跃绿 -->
+    <div class="group">
+      <div class="group-name"><span class="swatch-sample" id="sample-m" style="background:#22C55E"></span> 活跃绿 mint</div>
+      <div class="group-desc">在线 / 成功 / 已保存 / 开关开启</div>
+      <div class="field" data-key="mint_400" data-demo="m400">
+        <div class="field-label">mint-400 在线状态 / 成功文字 <span class="now"><span class="chip"></span><span class="now-hex"></span></span></div>
+        <div class="swatches"></div>
+        <div class="demo-bar" data-demo-bar="m400"></div>
+      </div>
+      <div class="field" data-key="mint_500" data-demo="m500">
+        <div class="field-label">mint-500 实底按钮 / hover <span class="now"><span class="chip"></span><span class="now-hex"></span></span></div>
+        <div class="swatches"></div>
+        <div class="demo-bar" data-demo-bar="m500"></div>
+      </div>
+    </div>
+
+    <!-- 组：危险玫红 -->
+    <div class="group">
+      <div class="group-name"><span class="swatch-sample" id="sample-r" style="background:#E84A69"></span> 危险玫红 rose</div>
+      <div class="group-desc">删除 / 错误 / 勿扰</div>
+      <div class="field" data-key="rose_400" data-demo="r400">
+        <div class="field-label">rose-400 危险文字 / 删除链接 <span class="now"><span class="chip"></span><span class="now-hex"></span></span></div>
+        <div class="swatches"></div>
+        <div class="demo-bar" data-demo-bar="r400"></div>
+      </div>
+      <div class="field" data-key="rose_500" data-demo="r500">
+        <div class="field-label">rose-500 危险按钮 <span class="now"><span class="chip"></span><span class="now-hex"></span></span></div>
+        <div class="swatches"></div>
+        <div class="demo-bar" data-demo-bar="r500"></div>
+      </div>
+    </div>
+
+    <!-- 投票 -->
+    <div class="vote-box">
+      <h3>提交你的选择</h3>
+      <p class="sub">选完后提交，其他人也能看到每个颜色被谁选了（会按昵称/头像显示）。</p>
+      <div class="ident">
+        <div class="me-avatar" id="me-avatar">?</div>
+        <input id="ident-name" placeholder="输入你的昵称（未登录）" maxlength="30">
+      </div>
+      <div class="vote-actions">
+        <button class="vote-btn" id="vote-submit">提交投票</button>
+        <button class="vote-btn" id="vote-refresh" style="flex:0 0 auto;background:rgb(var(--tw-elevated));color:rgb(var(--tw-text-secondary));border:1px solid rgb(var(--tw-border))">刷新</button>
+      </div>
+      <div class="vote-status" id="vote-status"></div>
+    </div>
+
+    <!-- 投票统计 -->
+    <div class="vote-stats">
+      <div class="vs-title">每个颜色的选择情况（头像 = 选了该色的人）</div>
+      <div id="vote-grid" class="vote-grid"></div>
+      <div class="vs-empty" id="vote-empty">还没有人提交，点上面的「提交投票」成为第一个。</div>
+    </div>
+
+    <!-- 结果 -->
+    <div class="result">
+      <div class="field-label">生成结果</div>
+      <textarea id="out" readonly placeholder="点「生成结果」后这里会出现 CSS 变量…"></textarea>
+      <div class="result-actions">
+        <button class="gen-btn" id="gen">生成结果</button>
+        <button class="copy-btn" id="copy">复制</button>
+      </div>
+    </div>
+  </div>
+
+</div>
+<div class="copied" id="copied">已复制</div>
+
+<script>
+(function () {
+  'use strict';
+
+  // ── 候选色板（每 key 8~10 个，第一个 = 当前默认）──
+  var VIOLETS = ['#8B5CF6','#7C3AED','#A78BFA','#C4B5FD','#6D28D9','#5B21B6','#7E69EA','#9B7BFA','#6366F1','#818CF8'];
+  var GOLDS  = ['#FBBF24','#F59E0B','#F0A020','#E8972C','#D97706','#B45309','#FACC15','#FDE68A','#FCD34D','#EAB308'];
+  var GREENS = ['#22C55E','#10B981','#34D399','#14B8A6','#059669','#047857','#2DD4BF','#4ADE80','#16A34A','#84CC16'];
+  var REDS   = ['#E84A69','#E11D48','#BE123C','#C9364F','#DC2626','#F26D8D','#F43F5E','#FB7185','#9F1239','#F87171'];
+
+  var CANDIDATES = {
+    primary_400: VIOLETS,
+    primary_500: VIOLETS,
+    primary_600: ['#6D28D9','#7C3AED','#5B21B6','#8B5CF6','#4C1D95'],
+    accent_400: GOLDS,
+    accent_500: GOLDS,
+    mint_400: GREENS,
+    mint_500: GREENS,
+    rose_400: REDS,
+    rose_500: REDS,
+  };
+
+  // 当前选中（默认 = 现有主题）
+  var sel = {
+    primary_400: '#8B5CF6', primary_500: '#8B5CF6', primary_600: '#6D28D9',
+    accent_400: '#FBBF24', accent_500: '#D97706',
+    mint_400: '#22C55E', mint_500: '#059669',
+    rose_400: '#E84A69', rose_500: '#E11D48',
+  };
+
+  function hexToTriplet(hex) {
+    var h = hex.replace('#', '');
+    return parseInt(h.slice(0,2),16) + ' ' + parseInt(h.slice(2,4),16) + ' ' + parseInt(h.slice(4,6),16);
+  }
+
+  // 应用：覆盖 CSS 变量（与主站 applyUserTheme 同机制）→ 左侧预览实时变
+  function apply() {
+    var root = document.documentElement.style;
+    root.setProperty('--tw-primary-400', hexToTriplet(sel.primary_400));
+    root.setProperty('--tw-primary-500', hexToTriplet(sel.primary_500));
+    root.setProperty('--tw-primary-600', hexToTriplet(sel.primary_600));
+    root.setProperty('--tw-accent-400', hexToTriplet(sel.accent_400));
+    root.setProperty('--tw-accent-500', hexToTriplet(sel.accent_500));
+    root.setProperty('--tw-mint-400', hexToTriplet(sel.mint_400));
+    root.setProperty('--tw-mint-500', hexToTriplet(sel.mint_500));
+    root.setProperty('--tw-rose-400', hexToTriplet(sel.rose_400));
+    root.setProperty('--tw-rose-500', hexToTriplet(sel.rose_500));
+    document.getElementById('sample-p').style.background = sel.primary_500;
+    document.getElementById('sample-a').style.background = sel.accent_400;
+    document.getElementById('sample-m').style.background = sel.mint_400;
+    document.getElementById('sample-r').style.background = sel.rose_400;
+    renderDemos();
+  }
+
+  // ═══ 每选项旁的元素预览：用当前选中色渲染对应 UI 元素 ═══
+  // 短名 → sel 全名
+  var SHORT_TO_SEL = { p400:'primary_400', p500:'primary_500', p600:'primary_600', a400:'accent_400', a500:'accent_500', m400:'mint_400', m500:'mint_500', r400:'rose_400', r500:'rose_500' };
+  function renderDemos() {
+    document.querySelectorAll('[data-demo-bar]').forEach(function (bar) {
+      var key = bar.getAttribute('data-demo-bar');
+      var color = sel[SHORT_TO_SEL[key]] || '#8B5CF6';
+      var html = '';
+      switch (key) {
+        case 'p400':
+          html = '<span class="d-text" style="color:' + color + '">强调文字</span><span class="d-link" style="color:' + color + '">链接</span>'
+               + '<span class="d" style="color:' + color + '">◉ 图标</span>'
+               + '<span class="d" style="font-size:10px;color:rgb(var(--tw-text-muted))">用于正文强调/链接/图标，需白底可读</span>';
+          break;
+        case 'p500':
+          html = '<span class="d-btn" style="background:' + color + '">主按钮</span>'
+               + '<span class="d-badge solid" style="background:' + color + '">我的气泡</span>'
+               + '<span class="d" style="font-size:10px;color:rgb(var(--tw-text-muted))">主按钮/我的消息气泡/发送键</span>';
+          break;
+        case 'p600':
+          html = '<span class="d-btn" style="background:' + color + '">hover 态</span>'
+               + '<span class="d-hover-note">按钮悬停时用的加深色</span>';
+          break;
+        case 'a400':
+          html = '<span class="d-badge tint" style="color:' + color + ';background:' + color + '26">琥珀状态</span>'
+               + '<span class="d" style="color:' + color + '">★ 星级</span>'
+               + '<span class="d" style="font-size:10px;color:rgb(var(--tw-text-muted))">通知/状态/高亮</span>';
+          break;
+        case 'a500':
+          html = '<span class="d-btn" style="background:' + color + ';color:rgb(var(--tw-text-primary))">实底按钮</span>'
+               + '<span class="d-hover-note">深琥珀 hover 或实底金按钮</span>';
+          break;
+        case 'm400':
+          html = '<span class="d-live" style="color:' + color + '">在线</span>'
+               + '<span class="d" style="color:' + color + '">✓ 成功</span>'
+               + '<span class="d" style="font-size:10px;color:rgb(var(--tw-text-muted))">在线状态/成功提示</span>';
+          break;
+        case 'm500':
+          html = '<span class="d-btn" style="background:' + color + '">保存</span>'
+               + '<span class="d" style="font-size:10px;color:rgb(var(--tw-text-muted))">实底绿按钮（配白字需够深）</span>';
+          break;
+        case 'r400':
+          html = '<span class="d" style="color:' + color + '">✕ 删除链接</span>'
+               + '<span class="d" style="color:' + color + '">⚠ 错误</span>'
+               + '<span class="d" style="font-size:10px;color:rgb(var(--tw-text-muted))">危险文字/删除</span>';
+          break;
+        case 'r500':
+          html = '<span class="d-btn" style="background:' + color + '">删除</span>'
+               + '<span class="d-hover-note">危险按钮（白字需够深）</span>';
+          break;
+      }
+      bar.innerHTML = '<span class="demo-label">预览</span>' + html;
+    });
+  }
+
+  // 渲染所有色板
+  Object.keys(CANDIDATES).forEach(function (key) {
+    var field = document.querySelector('[data-key="' + key + '"]');
+    if (!field) return;
+    var box = field.querySelector('.swatches');
+    var nowChip = field.querySelector('.chip');
+    var nowHex = field.querySelector('.now-hex');
+    nowHex.textContent = sel[key].toUpperCase();
+    nowChip.style.background = sel[key];
+
+    var seen = {};
+    CANDIDATES[key].forEach(function (hex) {
+      var up = hex.toUpperCase();
+      if (seen[up]) return;   // 去重
+      seen[up] = true;
+      var el = document.createElement('div');
+      el.className = 'swatch' + (sel[key].toUpperCase() === up ? ' sel' : '');
+      el.style.background = hex;
+      el.title = hex;
+      el.addEventListener('click', function () {
+        sel[key] = hex;
+        box.querySelectorAll('.swatch').forEach(function (s) { s.classList.remove('sel'); });
+        el.classList.add('sel');
+        nowHex.textContent = hex.toUpperCase();
+        nowChip.style.background = hex;
+        apply();
+      });
+      box.appendChild(el);
+    });
+  });
+
+  apply();
+
+  // 生成结果
+  document.getElementById('gen').addEventListener('click', function () {
+    var lines = [];
+    lines.push('/* 浅色主题（:root）——按你的选择替换 */');
+    lines.push('--tw-primary-400: ' + hexToTriplet(sel.primary_400) + ';  /* ' + sel.primary_400 + ' */');
+    lines.push('--tw-primary-500: ' + hexToTriplet(sel.primary_500) + ';  /* ' + sel.primary_500 + ' */');
+    lines.push('--tw-primary-600: ' + hexToTriplet(sel.primary_600) + ';  /* ' + sel.primary_600 + ' */');
+    lines.push('--tw-accent-400: ' + hexToTriplet(sel.accent_400) + ';   /* ' + sel.accent_400 + ' */');
+    lines.push('--tw-accent-500: ' + hexToTriplet(sel.accent_500) + ';   /* ' + sel.accent_500 + ' */');
+    lines.push('--tw-mint-400: ' + hexToTriplet(sel.mint_400) + ';     /* ' + sel.mint_400 + ' */');
+    lines.push('--tw-mint-500: ' + hexToTriplet(sel.mint_500) + ';     /* ' + sel.mint_500 + ' */');
+    lines.push('--tw-rose-400: ' + hexToTriplet(sel.rose_400) + ';     /* ' + sel.rose_400 + ' */');
+    lines.push('--tw-rose-500: ' + hexToTriplet(sel.rose_500) + ';     /* ' + sel.rose_500 + ' */');
+    document.getElementById('out').value = lines.join('\n');
+  });
+
+  document.getElementById('copy').addEventListener('click', function () {
+    var ta = document.getElementById('out');
+    if (!ta.value) document.getElementById('gen').click();
+    ta.select();
+    try { document.execCommand('copy'); } catch (e) {}
+    if (navigator.clipboard) navigator.clipboard.writeText(ta.value).catch(function () {});
+    var tip = document.getElementById('copied');
+    tip.classList.add('show');
+    setTimeout(function () { tip.classList.remove('show'); }, 1500);
+  });
+
+  /* ════════ 投票：身份识别 + 提交 + 统计 ════════ */
+  var me = { name: '', avatar: null };
+  var voteStatus = document.getElementById('vote-status');
+  var nameInput = document.getElementById('ident-name');
+  var meAvatar = document.getElementById('me-avatar');
+
+  function setStatus(text, ok) {
+    voteStatus.textContent = text || '';
+    voteStatus.className = 'vote-status ' + (ok ? 'ok' : 'err');
+  }
+
+  // 尝试识别登录用户（拿头像）
+  (function initIdentity() {
+    var token = null;
+    try { token = localStorage.getItem('access_token'); } catch (e) {}
+    if (!token) return;
+    fetch('/api/auth/me', { headers: { 'Authorization': 'Bearer ' + token } })
+      .then(function (r) { return r.json(); })
+      .then(function (u) {
+        if (!u || !u.username) return;
+        me.name = u.username;
+        me.avatar = u.avatar_url || null;
+        nameInput.value = u.username;
+        if (me.avatar) {
+          meAvatar.innerHTML = '<img src="' + me.avatar + '" alt="">';
+        } else {
+          meAvatar.textContent = (u.username || '?').charAt(0).toUpperCase();
+        }
+      })
+      .catch(function () {});
+  })();
+
+  // 提交
+  document.getElementById('vote-submit').addEventListener('click', function () {
+    var name = (nameInput.value || '').trim();
+    if (!name) { setStatus('请先输入昵称', false); return; }
+    if (name !== me.name) { me.name = name; me.avatar = null; }
+    meAvatar.textContent = name.charAt(0).toUpperCase();
+    var body = { colors: sel, user_name: name, avatar_url: me.avatar };
+    setStatus('提交中…', true);
+    fetch('/api/theme-vote', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body),
+    })
+      .then(function (r) { return r.json(); })
+      .then(function (d) {
+        if (d.ok) { setStatus('已提交（当前 ' + d.count + ' 人参与）', true); loadStats(); }
+        else setStatus(d.reason || '提交失败', false);
+      })
+      .catch(function () { setStatus('提交失败：请确认后端已重启（新接口需重启容器生效）', false); });
+  });
+
+  document.getElementById('vote-refresh').addEventListener('click', loadStats);
+
+  // 统计：按「字段 + 颜色」聚合头像
+  function loadStats() {
+    fetch('/api/theme-vote/stats')
+      .then(function (r) { return r.json(); })
+      .then(function (d) {
+        var items = d.items || [];
+        var grid = document.getElementById('vote-grid');
+        var empty = document.getElementById('vote-empty');
+        grid.innerHTML = '';
+        if (!items.length) { empty.style.display = ''; return; }
+        empty.style.display = 'none';
+
+        // 聚合：{fieldKey: {hex: [{name, avatar, me}]}}
+        var agg = {};
+        items.forEach(function (v) {
+          var colors = v.colors || {};
+          Object.keys(colors).forEach(function (k) {
+            var hex = String(colors[k] || '').toUpperCase();
+            if (!hex) return;
+            if (!agg[k]) agg[k] = {};
+            if (!agg[k][hex]) agg[k][hex] = [];
+            agg[k][hex].push({ name: v.user_name || '匿名', avatar: v.avatar_url || null, me: v.user_name === me.name });
+          });
+        });
+
+        // 只展示有投票的字段（按面板顺序）
+        var order = ['primary_400','primary_500','primary_600','accent_400','accent_500','mint_400','mint_500','rose_400','rose_500'];
+        order.forEach(function (k) {
+          if (!agg[k]) return;
+          var group = document.createElement('div');
+          group.style.cssText = 'margin-top:14px';
+          var label = document.createElement('div');
+          label.style.cssText = 'font-size:11px;font-weight:600;color:rgb(var(--tw-text-muted));margin-bottom:6px';
+          label.textContent = k;
+          group.appendChild(label);
+          var row = document.createElement('div');
+          row.className = 'vote-grid';
+          Object.keys(agg[k]).forEach(function (hex) {
+            var voters = agg[k][hex];
+            var col = document.createElement('div');
+            col.className = 'vote-col';
+            var sw = document.createElement('div');
+            sw.className = 'vswatch';
+            sw.style.background = '#' + hex.replace('#','');
+            var vl = document.createElement('div');
+            vl.className = 'vswatch-label';
+            vl.textContent = hex;
+            var av = document.createElement('div');
+            av.className = 'vote-avatars';
+            voters.forEach(function (v) {
+              var a = document.createElement('div');
+              a.className = 'vote-avatar' + (v.me ? ' me' : '');
+              a.title = v.name;
+              if (v.avatar) a.innerHTML = '<img src="' + v.avatar + '" alt="">';
+              else a.textContent = v.name.charAt(0).toUpperCase();
+              av.appendChild(a);
+            });
+            var cnt = document.createElement('div');
+            cnt.className = 'vote-count';
+            cnt.textContent = voters.length + ' 人';
+            col.appendChild(sw); col.appendChild(vl); col.appendChild(av); col.appendChild(cnt);
+            row.appendChild(col);
+          });
+          group.appendChild(row);
+          grid.appendChild(group);
+        });
+      })
+      .catch(function () {});
+  }
+
+  loadStats();
+})();
+</script>
+</body>
+</html>
