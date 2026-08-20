@@ -29,14 +29,20 @@ class SkillEvaluationResult:
 
 # ── 注册式分发：action 类（影响回复行为） ──
 
-_ACTION_HANDLERS: dict[str, Callable] = {}
+# 条目 = (owner, handler)；owner 为来源插件 id，内置 handler 为 None（永不回收）。
+# owner 并入条目而非独立表 → 单一来源，停用/卸载时精确回收，同名类型谁注册删谁。
+_ACTION_HANDLERS: dict[str, tuple[str | None, Callable]] = {}
 
 
-def register_action_handler(skill_type: str):
-    """装饰器：注册 action 类技能处理器"""
+def register_action_handler(skill_type: str, owner: str | None = None):
+    """装饰器：注册 action 类技能处理器。
+
+    :param skill_type: 技能类型标识
+    :param owner: 来源插件 id（内置注册留 None；插件由 skill_bridge 加载时传入）
+    """
     def wrapper(func: Callable):
-        _ACTION_HANDLERS[skill_type] = func
-        logger.debug(f"Action 技能处理器已注册: {skill_type} -> {func.__name__}")
+        _ACTION_HANDLERS[skill_type] = (owner, func)
+        logger.debug(f"Action 技能处理器已注册: {skill_type} -> {func.__name__} (owner={owner})")
         return func
     return wrapper
 
@@ -79,14 +85,18 @@ async def _handle_typing_indicator(
 
 # ── 注册式分发：inject 类（注入提示词） ──
 
-_INJECT_HANDLERS: dict[str, Callable] = {}
+_INJECT_HANDLERS: dict[str, tuple[str | None, Callable]] = {}
 
 
-def register_inject_handler(skill_type: str):
-    """装饰器：注册 inject 类技能处理器"""
+def register_inject_handler(skill_type: str, owner: str | None = None):
+    """装饰器：注册 inject 类技能处理器。
+
+    :param skill_type: 技能类型标识
+    :param owner: 来源插件 id（内置注册留 None；插件由 skill_bridge 加载时传入）
+    """
     def wrapper(func: Callable):
-        _INJECT_HANDLERS[skill_type] = func
-        logger.debug(f"Inject 技能处理器已注册: {skill_type} -> {func.__name__}")
+        _INJECT_HANDLERS[skill_type] = (owner, func)
+        logger.debug(f"Inject 技能处理器已注册: {skill_type} -> {func.__name__} (owner={owner})")
         return func
     return wrapper
 
@@ -240,7 +250,8 @@ async def evaluate_action_skills(
             continue
 
         # 注册式分发：从 _ACTION_HANDLERS 查找处理器
-        handler = _ACTION_HANDLERS.get(skill.skill_type)
+        entry = _ACTION_HANDLERS.get(skill.skill_type)
+        handler = entry[1] if entry else None
         if handler and skill.is_enabled:
             await handler(db, agent, skill, config, result, context, delay_allowed)
 
@@ -287,7 +298,8 @@ async def evaluate_inject_skills(
             continue
 
         # 注册式分发：从 _INJECT_HANDLERS 查找处理器
-        handler = _INJECT_HANDLERS.get(skill.skill_type)
+        entry = _INJECT_HANDLERS.get(skill.skill_type)
+        handler = entry[1] if entry else None
         if handler and skill.is_enabled:
             await handler(db, agent, skill, config, prompts, now)
 

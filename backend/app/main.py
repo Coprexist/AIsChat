@@ -43,7 +43,7 @@ logger = logging.getLogger(__name__)
 # ══════════════════════════════════════════════════════════════
 
 # 应用版本（单一来源，与 CHANGELOG 当前阶段保持一致，发版时同步更新）
-APP_VERSION = "0.3.15"
+APP_VERSION = "0.3.10"
 
 app = FastAPI(
     title="AI群聊社交网络",
