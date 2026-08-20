@@ -5,7 +5,21 @@
  */
 import { type Result, success, failure } from '../utils/result'
 
+/** 嵌入模式检测（与 embed/bridge 的 isEmbedded 同规则；此处独立实现避免循环依赖） */
+function isEmbeddedMode(): boolean {
+  try {
+    return typeof window !== 'undefined' && new URLSearchParams(window.location.search).has('embed')
+  } catch {
+    return false
+  }
+}
+
+/** 嵌入模式下的 API 前缀（宿主 DSH 通过同源代理提供） */
+const EMBED_API_PREFIX = '/aischat-api'
+
 function getApiBaseUrl(): string {
+  // 嵌入模式（DSH iframe）：走宿主同源代理前缀
+  if (isEmbeddedMode()) return EMBED_API_PREFIX
   // 桌面端：从 localStorage 读取实例地址
   const stored = localStorage.getItem('instance_url')
   if (stored) {
@@ -16,6 +30,21 @@ function getApiBaseUrl(): string {
 }
 
 export { getApiBaseUrl }
+
+/** 401 统一处理：嵌入模式通知宿主（不整页跳转，避免 iframe 跳出宿主）；独立模式清 token 跳登录页 */
+function handleUnauthorized(path: string) {
+  if (path.endsWith('/auth/login') || path.endsWith('/auth/register')) return
+  localStorage.removeItem('access_token')
+  if (isEmbeddedMode()) {
+    try {
+      window.parent?.postMessage({ source: 'aischat-embed', type: 'unauthorized' }, '*')
+    } catch {
+      /* 宿主不可达时静默 */
+    }
+    return
+  }
+  window.location.href = '/login'
+}
 
 class ApiError extends Error {
   status: number
@@ -53,10 +82,9 @@ async function request<T = any>(
     headers,
   })
 
-  // 401 且不是登录请求 → token 过期/无效，跳转登录页
+  // 401 且不是登录请求 → token 过期/无效（嵌入模式通知宿主，独立模式跳登录页）
   if (res.status === 401 && !path.endsWith('/auth/login') && !path.endsWith('/auth/register')) {
-    localStorage.removeItem('access_token')
-    window.location.href = '/login'
+    handleUnauthorized(path)
     throw new ApiError('Unauthorized', 401)
   }
 
@@ -119,10 +147,9 @@ async function uploadFile(path: string, file: File): Promise<any> {
     body: formData,
   })
 
-  // 401 且不是登录请求 → token 过期/无效，跳转登录页
+  // 401 且不是登录请求 → token 过期/无效（嵌入模式通知宿主，独立模式跳登录页）
   if (res.status === 401 && !path.endsWith('/auth/login') && !path.endsWith('/auth/register')) {
-    localStorage.removeItem('access_token')
-    window.location.href = '/login'
+    handleUnauthorized(path)
     throw new ApiError('Unauthorized', 401)
   }
 

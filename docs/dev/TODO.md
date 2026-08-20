@@ -5,9 +5,26 @@
 
 ---
 
-## 🔲 侧边栏双板块重构（dsh-aischat 客户端架构改造）
+## ✅ 已完成（2026-08-20）
 
-### 需求（用户 2026-08 凌晨确认）
+- [x] **DSH 插件 v1**（`dsh-aischat`）：同源网关（`/aischat-api` HTTP + `/aischat-ws` WS 代理）+ 侧边栏 board + 设置页；已 commit `1f81c12`
+- [x] **消息渲染照搬 DSH 风格**：官方 `MarkdownText`（GFM+KaTeX）、我方气泡 `--dsw-specific-bubble` 右对齐 + 名称靠右、图片附件 blob→objectURL、群聊邀请卡片
+- [x] **401 自动登出**（不再静默"暂无联系人"）
+- [x] **私信读取/发送修复**：改用带认证的 `/dm/{id}/messages`（后端 `/chat/messages` dm 分支硬编码 user_id=0、`/chat/message` 签名缺 dm_session_id——两个后端 bug，前端已绕开）
+- [x] **需求1：对话默认到底**（消息变化自动滚底）
+- [x] **需求2：群视界沉浸式界面**——长线优雅方案：`/aischat-ui` 静态托管（`BASE_URL=/aischat-ui/` 构建 + SPA 回退 + 防穿越）+ iframe 沉浸式覆盖层；群聊头部自动查 `/worlds/by-entity` 显示"沉浸式"按钮；嵌入模式增强（API 基址走 `/aischat-api`、401 通知宿主、`?token=` 注入、router basename 修复 404）
+- [x] **需求3：私信/群聊设置页**（⚙：置顶/免打扰/公告/成员列表）
+- [x] **需求4：AIC 功能导航**——AIC 侧边栏"功能"分组（群视界/好友/我的AI/管理/设置）+ DSH 设置页同款入口，点击在沉浸式覆盖层打开对应前端页面
+- [x] **群聊名字解析修复**：成员表（含 AI）按 `type:id` 缓存名字
+- [x] **iframe 登录引导**：token 失效时显示"请先在宿主应用中登录"引导页 → 通知宿主打开 AIsChat board 登录（不显示 AIsChat 自带登录表单）
+
+---
+
+## 🔲 侧边栏双板块重构（dsh-aischat 客户端架构改造——未实施）
+
+> 用户 2026-08 凌晨提出，因当晚会话转向"消息渲染/设置页/沉浸式"需求而未实施，方案调研已完整存档。
+
+### 需求（用户确认）
 
 侧边栏两大板块**平级**：
 
@@ -63,3 +80,9 @@
 - [ ] world 分类落地（协议里已留占位，本阶段不实现 —— YAGNI）
 - [ ] 前端插件 UI（皮肤/技能插件的用户配置界面）
 - [ ] Git 提交本轮变更（提交前检查 .gitignore 排除敏感文件：.env、token.txt 等）
+
+---
+
+## 📌 备注
+
+- 后端遗留 bug（前端已绕开，供后端修复）：`/chat/messages` 的 dm 分支 `get_dm_messages(db, dm_session_id, 0, ...)` 硬编码 user_id=0 永远无权访问；`/chat/message` 的 ChatApi.create_message 签名缺 `dm_session_id` 参数会 500。

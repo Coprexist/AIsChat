@@ -4,6 +4,7 @@ import { useAuth } from '../context/AuthContext'
 import { useT } from '../i18n/I18nContext'
 import { cacheLangForUnauth } from '../i18n/I18nContext'
 import { api } from '../api/client'
+import { isEmbedded } from '../embed/bridge'
 import { MessageCircle, Mail } from 'lucide-react'
 import VerificationCodeInput from '../components/VerificationCodeInput'
 
@@ -40,6 +41,29 @@ function clearSessionState() {
 }
 
 export default function LoginPage() {
+  // 嵌入模式（DSH iframe）且未登录：不展示自带登录表单（避免双重登录体验），
+  // 引导用户回宿主登录；宿主登录后 token 经 ?token= 注入复用。
+  if (isEmbedded()) {
+    return (
+      <div className="flex items-center justify-center h-full min-h-screen bg-canvas px-6">
+        <div className="text-center max-w-sm">
+          <div className="text-lg font-semibold text-textPrimary mb-2">AIsChat</div>
+          <div className="text-sm text-textSecondary mb-6">请先在宿主应用中登录 AIsChat，再打开此功能。</div>
+          <button
+            onClick={() => {
+              try {
+                window.parent?.postMessage({ source: 'aischat-embed', type: 'request-login' }, '*')
+              } catch { /* 静默 */ }
+            }}
+            className="px-5 py-2 rounded-lg bg-primary-600 text-white text-sm font-medium hover:bg-primary-500"
+          >
+            去登录
+          </button>
+        </div>
+      </div>
+    )
+  }
+
   const saved = loadSessionState()
   const [mode, setMode] = useState<'login' | 'register'>(saved.mode || 'login')
   const [username, setUsername] = useState('')

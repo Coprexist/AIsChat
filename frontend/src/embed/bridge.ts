@@ -115,10 +115,25 @@ export async function reportContacts(): Promise<void> {
 
 /**
  * 初始化嵌入桥：监听宿主消息并上报初始状态。
+ * 若宿主在 URL 注入 ?token=...，则写入 access_token 复用登录态
+ * （DSH 插件与前端各自维护登录态，宿主打开 iframe 时附带自身 token）。
  * 返回清理函数；非嵌入模式直接返回 noop。
  */
 export function initEmbedBridge(): () => void {
   if (!isEmbedded()) return () => {}
+
+  // 宿主注入 token：只接受 URL 参数（宿主可读可控），写入后从地址栏清除避免残留
+  try {
+    const url = new URL(window.location.href)
+    const injected = url.searchParams.get('token')
+    if (injected) {
+      localStorage.setItem('access_token', injected)
+      url.searchParams.delete('token')
+      window.history.replaceState(null, '', url.toString())
+    }
+  } catch {
+    /* 静默 */
+  }
 
   const onMessage = (event: MessageEvent) => {
     const data = event.data

@@ -120,6 +120,25 @@
 - **语言中立契约**：处理器上下文为普通对象/字典，不绑定 Python 特定机制，未来后端换语言时插件契约可平移
 - **四层验证闭环**：加载层、分发层、开关层、集成层全部通过
 
+### Added — 🔌 DSH 插件 `dsh-aischat`（AIsChat 以一等公民嵌入 DeepSeek Harness）
+
+- **同源网关（Host 半边 `dsh-aischat/src/index.ts`）**：`/aischat-api` HTTP 代理（剥离 hop-by-hop、转发 Authorization、502 兜底）+ `/aischat-ws` WebSocket 升级代理（重放 `/ws?token=`、双向透传）——浏览器永不接触后端地址，**全程 loopback、零公网地址**
+- **侧边栏 board（Client 半边）**：`shell.overlay` 全帧面板，左侧 rail（置顶私信/置顶群聊/私信/群聊 + 用户行 + 退出），右侧对话列（消息 + 专属 composer，发送到选中的 AIsChat 对话，不碰 DSH 会话语义）
+- **登录统一**：`aisc.token` 存浏览器 localStorage；401 自动登出回登录页（不再静默显示"暂无联系人"假空态）
+- **消息渲染完全照搬 DSH 风格**：复用官方 `MarkdownText`（GFM + KaTeX 公式 + 安全过滤）——我方消息 DSH 用户气泡样式（`--dsw-specific-bubble` + label-primary + 22px 圆角 + 名称靠右），对方消息原生排版；**任何针对 DSH 对话风格的主题/插件改动自动作用到 AIsChat**
+- **图片附件**：`attachments` 里 `image/*` 提取，带 token fetch blob → objectURL（官方 resolveImage 同款机制，按 file_id 缓存）
+- **群聊邀请卡片**：`message_type=group_invitation` 专用卡片（📨 + 邀请人/群名 + 接受/拒绝按钮 + 状态）
+- **对话默认到底**：消息列表变化自动滚动到底部
+- **私信/群聊设置页**：对话头部 ⚙——群聊（置顶/免打扰/公告/成员列表）、私信（置顶/免打扰）
+- **群聊名字解析修复**：成员表（含 AI）按 `type:id` 缓存名字，不再显示"用户11"/裸"AI"
+
+### Added — 🖼️ 沉浸式界面与功能导航（长线优雅：前端静态托管 + 同源 iframe）
+
+- **前端静态托管（Host）**：`/aischat-ui` 前缀服务 `BASE_URL=/aischat-ui/` 构建产物（SPA 回退、路径穿越防护、immutable 缓存）
+- **嵌入模式增强（前端）**：`api/client.ts` 嵌入时 API 基址走 `/aischat-api` 代理；401 不跳出 iframe 改为通知宿主；`?token=` URL 注入复用登录态（写入后从地址栏清除）；router basename `/aischat-ui`（修复嵌入路由 404）
+- **沉浸式覆盖层（Client）**：`shell.overlay` 全局 iframe 面板——群聊头部"沉浸式"按钮（自动查 `/worlds/by-entity` 绑定世界 → `/aischat-ui/world-view/{id}?embed=1`）+ AIC 侧边栏"功能"分组（群视界/好友/我的AI/管理/设置）+ DSH 设置页同款导航
+- **登录引导**：iframe 内 token 失效时不再显示 AIsChat 自带登录表单，改为"请先在宿主应用中登录"引导页 → 通知宿主打开 AIsChat board 登录（登录态统一由 DSH 插件管理）
+
 ---
 
 ## [v0.3.7] - 2026-08-17

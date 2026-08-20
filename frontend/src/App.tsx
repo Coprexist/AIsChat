@@ -55,7 +55,11 @@ const _routes = [
 ]
 
 export const routes = _routes
-export const router = createBrowserRouter(_routes)
+
+// 嵌入模式：以宿主挂载前缀为 basename（DSH 托管于 /aischat-ui），否则路由
+// 期望 /worlds 而实际 URL 是 /aischat-ui/worlds → 全部 404
+const ROUTER_BASENAME = isEmbedded() ? '/aischat-ui' : undefined
+export const router = createBrowserRouter(_routes, ROUTER_BASENAME !== undefined ? { basename: ROUTER_BASENAME } : undefined)
 
 // 嵌入模式：注册导航器并初始化嵌入桥（接收宿主导航指令、上报联系人列表）
 if (isEmbedded()) {
