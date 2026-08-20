@@ -25,7 +25,7 @@ import type { IncomingMessage, ServerResponse } from 'node:http'
 import http from 'node:http'
 import type { Duplex } from 'node:stream'
 import z from '@deepseek-ai/schemastery'
-import { createReadStream, existsSync, statSync, mkdirSync, readFileSync, writeFileSync, realpathSync } from 'node:fs'
+import { createReadStream, existsSync, statSync, mkdirSync, readFileSync, writeFileSync, realpathSync, readdirSync } from 'node:fs'
 import { join, normalize, extname, sep } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import os from 'node:os'
@@ -394,6 +394,27 @@ function textOutput(value: unknown): Array<{ type: 'text'; text: string }> {
   return [{ type: 'text', text }]
 }
 
+/** 列出 WORLD_DIR_BASE 下的世界目录（含 worldId，诊断用）。 */
+function listWorldDirs(): Array<{ dir: string; worldId: number | null; name: string }> {
+  const out: Array<{ dir: string; worldId: number | null; name: string }> = []
+  try {
+    if (!existsSync(WORLD_DIR_BASE)) return out
+    for (const entry of readdirSync(WORLD_DIR_BASE, { withFileTypes: true })) {
+      if (!entry.isDirectory()) continue
+      const metaPath = join(WORLD_DIR_BASE, entry.name, '.aischat-world.json')
+      let worldId: number | null = null
+      let name = ''
+      try {
+        const meta = JSON.parse(readFileSync(metaPath, 'utf8')) as { worldId?: unknown; name?: unknown }
+        worldId = Number(meta.worldId) || null
+        name = String(meta.name ?? '')
+      } catch { /* no meta */ }
+      out.push({ dir: entry.name, worldId, name })
+    }
+  } catch { /* ignore */ }
+  return out
+}
+
 /** @param ctx - harness context exposing the webServer carrier. */
 export function apply(ctx: Context, config: Config): void {
   const backendUrl = config.backendUrl.replace(/\/+$/, '')
@@ -459,8 +480,17 @@ export function apply(ctx: Context, config: Config): void {
           const token = String(body.token ?? '')
           if (!sessionId) { send(400, { error: 'missing sessionId' }); return }
           sessionTokenMap.set(sessionId, token)
+          ctx.logger?.info?.(`dsh-aischat: token registered for session ${sessionId}`)
           send(200, { ok: true })
         }).catch(() => send(400, { error: 'bad request' }))
+        return
+      }
+      // 诊断：当前 host 内存里的世界会话/token 状态（仅调试用，不含 token 明文）。
+      if (req.method === 'GET' && route === `${WORLDS_PREFIX}/status`) {
+        send(200, {
+          tokenSessions: [...sessionTokenMap.keys()],
+          worldDirs: listWorldDirs(),
+        })
         return
       }
       send(404, { error: 'not found' })

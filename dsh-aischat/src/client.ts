@@ -1141,8 +1141,11 @@ module.exports = {
           const dir = await dirRes.json().catch(() => null)
           if (!dir || !dir.path) continue
           const ws = await ctx.workspaces.create({ path: dir.path }).catch(() => null)
-          if (!ws || !ws.id) continue
-          const sessionId = await ctx.workspaces.connectWorkspace(ws.id).catch(() => null)
+          // 官方 WorkspaceView 的主键是 workspaceId（不是 id）。
+          if (!ws) continue
+          const workspaceId = ws.workspaceId || ws.id
+          if (!workspaceId) continue
+          const sessionId = await ctx.workspaces.connectWorkspace(workspaceId).catch(() => null)
           if (sessionId) {
             await fetch('/aischat-worlds/token', {
               method: 'POST',
