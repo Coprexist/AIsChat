@@ -149,6 +149,8 @@
   - `world_lifecycle`：唤醒/休眠世界
 - **按会话路由**：工具从会话 cwd 解析 `.aischat-world.json` 定位世界——`AIC群视界-*` 会话里直接可用，普通会话自动拒绝并提示
 - **token 仅内存**：client 同步时上报 `{sessionId, token}`，host 存内存供 owner 鉴权写操作（不落盘、不打日志）
+- **同步 bug 修复**：`workspaces.create` 返回值主键是 `workspaceId`（非 `id`）——误用 `ws.id` 会跳过会话创建与 token 上报（浏览器实测暴露），已改 `workspaceId || id`
+- **诊断端点**：`GET /aischat-worlds/status` → `{tokenSessions, worldDirs}`（不含 token 明文），排障用
 - **提示词注入**：systemPrompt 注册泛化世界操作引导段（目录名以 `AIC群视界-` 开头时 agent 知道可用 `world_*` 工具）
 - **世界页内嵌群聊修复**：`chat-panel.js` / `sidebar.js` / `adventure.js` / `identity.js` 读取注入的 `window.WORLD_API` / `WORLD_UI`（DSH 嵌入 = `/aischat-api` / `/aischat-ui`，独立部署保持 `/api` / 空）——世界页内群聊、平台菜单、SSE 不再落到宿主 SPA fallback
 - **代理 Location 重写**：Host 代理对后端 3xx 重定向补 `/aischat-api` 前缀（`/world/{id}/preview` → `/aischat-api/world/{id}/files/...`），沉浸式 iframe 内世界页可完整加载

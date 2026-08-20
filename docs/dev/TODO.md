@@ -20,7 +20,11 @@
 - [x] **沉浸式内容修复**：WorldViewPage iframe 路径嵌入时走 `/aischat-api`（否则被宿主 SPA fallback 接住显示 DSH 界面）；Host 代理重写 3xx Location 补前缀
 - [x] **世界页内嵌群聊/平台菜单前缀**：后端注入 `window.WORLD_API` / `WORLD_UI`（经代理头），`chat-panel.js` / `sidebar.js` / `adventure.js` / `identity.js` 读取——独立部署默认值不受影响
 - [x] **需求5：群视界世界嵌入 DSH 工作区**——每个自己创建的世界自动同步为工作区文件夹 `AIC群视界-世界名` + DSH 会话（官方 `workspaces.create` / `connectWorkspace`，幂等）；Host 注册 `world_*` 工具集（文件读写/世界 API/群聊/生命周期，按会话 cwd 路由）；token 仅内存；systemPrompt 泛化引导段
-- [ ] **client 同步待浏览器实测**：headless 验证受限，等用户在页面打开 AIsChat 后确认 `AIC群视界-*` 文件夹/会话出现、`world_*` 工具在会话内可调
+- [x] **需求5 浏览器实测（文件夹 ✓ / 工具 ✗）**：用户确认 `AIC群视界-*` 文件夹出现在 DSH 工作区、会话 cwd 正确指向世界目录、`.aischat-world.json` 可读（worldId 39 识别成功）；但 `world_list_files` 报"未连接登录态"
+- [x] **token 上报 bug 修复**：client 同步里 `workspaces.create` 返回值主键是 **`workspaceId`**（不是 `id`），`ws.id` 恒 undefined → 跳过了 `connectWorkspace` + token 上报 → host 内存 `sessionTokenMap` 空（诊断端点 `/aischat-worlds/status` 确认 tokenSessions=[]）。已改为 `ws.workspaceId || ws.id`
+- [x] **诊断端点**：`GET /aischat-worlds/status` → `{tokenSessions, worldDirs}`（token 明文不返回）；token 上报打 `ctx.logger` 日志
+- [ ] **需求5 token 链路待复测**：用户刷新 + 打开 AIsChat 后查 `/aischat-worlds/status` 应见 `tokenSessions` 非空 → 再测 `world_list_files` / `world_write_file` / `world_chat`
+- [ ] **内存 token 局限**：dsh-web 重启会清空内存 token，需重新打开 AIsChat 触发同步；后续可选持久化方案（如 host 侧加密落盘）
 
 ---
 
