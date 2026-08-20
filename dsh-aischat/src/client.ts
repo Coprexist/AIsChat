@@ -26,7 +26,7 @@ const { useEffect, useState, useRef, useCallback, useMemo } = React
 // 我方与对方消息都用 MarkdownText（完整 GFM/LaTeX，我方保留 DSH 用户
 // 气泡样式）——任何针对 DSH 对话渲染风格的主题/插件改动都会自动作用到
 // AIsChat。
-const { MarkdownText } = require('@deepseek-ai/dsh-client-ui-primitives')
+const { MarkdownText, IconNewChatOutline16 } = require('@deepseek-ai/dsh-client-ui-primitives')
 
 /** Plugin identity. */
 const PLUGIN_ID = 'dsh-aischat'
@@ -423,12 +423,16 @@ function h(type, props, ...children) {
 
 const style = {
   board: { position: 'fixed', inset: 0, zIndex: 30, display: 'flex', background: 'var(--dsw-alias-bg-base)', fontFamily: 'var(--ds-font-family, system-ui, sans-serif)', color: 'var(--dsw-alias-label-primary)' },
-  rail: { width: 264, flex: 'none', borderRight: '1px solid var(--dsw-alias-border-l2)', display: 'flex', flexDirection: 'column', minHeight: 0, background: 'var(--dsw-specific-sidebar-fill)', padding: '8px 0' },
-  railHead: { padding: '10px 14px 8px', fontSize: 15, fontWeight: 600, color: 'var(--dsw-alias-label-primary)', display: 'flex', alignItems: 'center', justifyContent: 'space-between' },
-  railUser: { display: 'flex', alignItems: 'center', gap: 8, padding: '8px 14px', borderTop: '1px solid var(--dsw-alias-border-l2)' },
+  // 侧边栏 rail：照搬官方 SidebarRoot 容器（--dsh-sidebar-inline-padding:12px、6px 12px 内边距、sidebar-fill 背景、14px 字号）。
+  rail: { width: 264, flex: 'none', borderRight: '1px solid var(--dsw-alias-border-l2)', display: 'flex', flexDirection: 'column', minHeight: 0, background: 'var(--dsw-specific-sidebar-fill)', padding: '6px 12px', boxSizing: 'border-box', fontSize: 14, color: 'var(--dsw-alias-label-primary)' },
+  // 板块头：照搬官方 WorkspaceBrowser sectionHeader（36px 高、tertiary 色、12px 圆角、左内边距 4px）。
+  railHead: { boxSizing: 'border-box', height: 36, color: 'var(--dsw-alias-label-tertiary)', borderRadius: 12, flex: 'none', alignItems: 'center', gap: 4, marginBottom: 4, paddingLeft: 4, display: 'flex', overflow: 'hidden' },
+  // 板块头标题：照搬官方 sectionLabel（nowrap、max-width 45%、20px 行高）。
+  railLabel: { whiteSpace: 'nowrap', minWidth: 0, maxWidth: '45%', flex: 'none', lineHeight: '20px', overflow: 'hidden' },
+  railUser: { display: 'flex', alignItems: 'center', gap: 8, padding: '8px 4px', borderTop: '1px solid var(--dsw-alias-border-l2)' },
   group: { padding: '2px 0' },
-  groupLabel: { padding: '6px 14px 4px', fontSize: 12, color: 'var(--dsw-alias-label-secondary)', fontWeight: 600, letterSpacing: '.02em' },
-  row: { display: 'flex', alignItems: 'center', gap: 8, padding: '7px 14px', cursor: 'pointer', fontSize: 13, color: 'var(--dsw-alias-label-primary)', border: 'none', background: 'transparent', width: '100%', textAlign: 'left', boxSizing: 'border-box' },
+  groupLabel: { padding: '8px 12px 4px', fontSize: 12, color: 'var(--dsw-alias-label-tertiary)', fontWeight: 600, letterSpacing: '.02em' },
+  row: { display: 'flex', alignItems: 'center', gap: 8, padding: '7px 4px', cursor: 'pointer', fontSize: 13, color: 'var(--dsw-alias-label-primary)', border: 'none', background: 'transparent', width: '100%', textAlign: 'left', boxSizing: 'border-box' },
   rowHover: { background: 'var(--dsw-alias-interactive-bg-hover)' },
   rowActive: { background: 'var(--dsw-alias-interactive-bg-hover-solid, var(--dsw-alias-interactive-bg-hover))' },
   avatar: { width: 28, height: 28, borderRadius: '50%', flex: 'none', background: 'var(--dsw-alias-state-business-tertiary)', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', fontSize: 12, fontWeight: 600, color: 'var(--dsw-alias-label-primary)', overflow: 'hidden' },
@@ -472,7 +476,9 @@ const style = {
   memberRole: { flex: 'none', fontSize: 11, color: 'var(--dsw-alias-label-tertiary)' },
   smallBtn: { flex: 'none', padding: '4px 12px', borderRadius: 8, border: '1px solid var(--dsw-alias-border-l2)', background: 'transparent', color: 'var(--dsw-alias-label-primary)', cursor: 'pointer', fontSize: 12, fontWeight: 500 },
   smallBtnOn: { background: 'var(--dsw-alias-interactive-bg-hover)', borderColor: 'transparent' },
-  immersive: { position: 'absolute', inset: 0, zIndex: 5, display: 'flex', flexDirection: 'column', background: 'var(--dsw-alias-bg-base)' },
+  // 沉浸式覆盖层：zIndex 必须高于 board（30），否则在 AIsChat board 打开时
+  // 会被 board 盖住（两者同在 shell.overlay 槽内，board fixed z30 > 本层 z5）。
+  immersive: { position: 'fixed', inset: 0, zIndex: 40, display: 'flex', flexDirection: 'column', background: 'var(--dsw-alias-bg-base)' },
   immersiveBar: { flex: 'none', display: 'flex', alignItems: 'center', gap: 10, padding: '8px 14px', borderBottom: '1px solid var(--dsw-alias-border-l2)', fontSize: 13, fontWeight: 600, color: 'var(--dsw-alias-label-primary)' },
   immersiveFrame: { flex: 1, minHeight: 0, border: 'none', width: '100%', background: 'var(--dsw-alias-bg-base)' },
   composer: { flex: 'none', display: 'flex', gap: 8, padding: '12px 20px', borderTop: '1px solid var(--dsw-alias-border-l2)', background: 'var(--dsw-alias-bg-base)' },
@@ -487,7 +493,13 @@ const style = {
   err: { color: 'var(--dsw-alias-state-error-primary)', fontSize: 12, margin: '6px 0 0' },
   hint: { color: 'var(--dsw-alias-label-tertiary)', fontSize: 12, marginTop: 10, lineHeight: 1.5 },
   footBtn: { display: 'flex', alignItems: 'center', gap: 6, padding: '6px 10px', borderRadius: 8, border: 'none', background: 'transparent', color: 'var(--dsw-alias-label-primary)', cursor: 'pointer', fontSize: 13, width: '100%' },
-  closeBtn: { flex: 'none', padding: '4px 10px', borderRadius: 8, border: '1px solid var(--dsw-alias-border-l2)', background: 'transparent', color: 'var(--dsw-alias-label-secondary)', cursor: 'pointer', fontSize: 12 },
+  // 侧边栏底部动作按钮：照搬官方设置 trigger（VOzbGW_trigger）——宽 calc(100%+8px)、
+  // margin 4px -4px、高 34、圆角 12、14px/22px 排版，保证与下方"设置"按钮完全对齐。
+  footTrigger: { boxSizing: 'border-box', cursor: 'pointer', width: 'calc(100% + 8px)', height: 34, color: 'var(--dsw-alias-label-primary)', background: 'transparent', border: 'none', borderRadius: 12, flex: 'none', display: 'flex', alignItems: 'center', gap: 8, margin: '4px -4px', padding: '6px 2px 6px 10px', fontFamily: 'inherit', fontSize: 14, lineHeight: '22px', overflow: 'hidden' },
+  // rail（侧边栏收起）变体：官方 trigger rail——36px 圆形、仅图标。
+  footTriggerRail: { borderRadius: '50%', justifyContent: 'center', gap: 0, width: 36, height: 36, margin: '8px 0 10px', padding: 0 },
+  // 板块头/面板小按钮：官方 iconButton 观感——无边框、hover 圆角背景。
+  closeBtn: { flex: 'none', height: 28, padding: '0 10px', borderRadius: 14, border: 'none', background: 'transparent', color: 'var(--dsw-alias-label-secondary)', cursor: 'pointer', fontSize: 12, lineHeight: 1, display: 'inline-flex', alignItems: 'center' },
   scroll: { flex: 1, minHeight: 0, overflowY: 'auto' },
 }
 
@@ -987,8 +999,8 @@ function AisChatBoard({ onClose }) {
   return h('div', { style: style.board },
     h('div', { style: style.rail },
       h('div', { style: style.railHead },
-        h('span', {}, 'AIsChat'),
-        h('button', { style: style.closeBtn, onClick: onClose }, '返回工作区'),
+        h('span', { style: style.railLabel }, 'AIsChat'),
+        h('button', { style: { ...style.closeBtn, marginLeft: 'auto', fontSize: 12 }, onClick: onClose }, '返回工作区'),
       ),
       h('div', { style: style.railUser },
         h('span', { style: style.avatar }, initials(user.name)),
@@ -1060,7 +1072,7 @@ function SettingsPage() {
   )
 }
 
-function FooterButton() {
+function FooterButton({ wide }) {
   const [open, setOpen] = useState(false)
   useEffect(() => {
     const onRefresh = () => setOpen(boardOpenRef.current)
@@ -1072,9 +1084,16 @@ function FooterButton() {
     setOpen(next)
     window.dispatchEvent(new CustomEvent('aischat:board-toggle', { detail: next }))
   }
-  return h('button', { style: { ...style.footBtn, ...(open ? { background: 'var(--dsw-alias-interactive-bg-hover-solid, var(--dsw-alias-interactive-bg-hover))' } : {}) }, onClick: toggle, title: 'AIsChat 聊天' },
-    h('span', { style: { fontSize: 14 } }, '💬'),
-    h('span', { style: { fontWeight: 500 } }, 'AIsChat'),
+  const rail = wide === false
+  // 官方 trigger 风格：wide 全宽行（图标+文字），rail 时 36px 圆形仅图标。
+  return h('button', {
+    style: { ...style.footTrigger, ...(rail ? style.footTriggerRail : {}), ...(open ? { background: 'var(--dsw-alias-interactive-bg-hover-solid, var(--dsw-alias-interactive-bg-hover))' } : {}) },
+    onClick: toggle,
+    title: 'AIsChat 聊天',
+    'aria-label': rail ? 'AIsChat' : undefined,
+  },
+    h(IconNewChatOutline16, { size: rail ? 18 : 16 }),
+    rail ? null : h('span', { style: { fontWeight: 500 } }, 'AIsChat'),
   )
 }
 
@@ -1085,7 +1104,7 @@ const boardOpenRef = { current: false }
 
 module.exports = {
   name: 'dsh-aischat',
-  inject: ['slots'],
+  inject: ['slots', 'workspaces'],
   apply(ctx) {
     let boardOpen = false
 
@@ -1094,12 +1113,59 @@ module.exports = {
       window.dispatchEvent(new CustomEvent('aischat:board-refresh'))
     }
 
+    /**
+     * 把 AIsChat 世界同步为 DSH 工作区文件夹 + 会话：
+     *   世界 → 目录（AIC群视界-世界名 + .aischat-world.json）→
+     *   ctx.workspaces.create({path}) → connectWorkspace() 得会话 →
+     *   上报 {sessionId, token}（host 仅内存保存，供 owner 鉴权写操作）。
+     * 全部走官方 API，幂等（重复同步复用同一 workspace/空白会话）。
+     * 只同步当前用户自己创建（可编辑）的世界——/worlds 本就只返回 owner。
+     */
+    let lastWorldsSync = 0
+    const syncWorlds = async (force = false) => {
+      if (!store.token || !store.user || !ctx.workspaces) return
+      const now = Date.now()
+      if (!force && now - lastWorldsSync < 30_000) return
+      lastWorldsSync = now
+      try {
+        const worlds = await api('/worlds').catch(() => null)
+        if (!Array.isArray(worlds)) return
+        for (const w of worlds) {
+          if (!w || !w.id) continue
+          const dirRes = await fetch('/aischat-worlds/dir', {
+            method: 'POST',
+            headers: { 'content-type': 'application/json' },
+            body: JSON.stringify({ worldId: w.id, name: w.name || `世界${w.id}` }),
+          }).catch(() => null)
+          if (!dirRes || !dirRes.ok) continue
+          const dir = await dirRes.json().catch(() => null)
+          if (!dir || !dir.path) continue
+          const ws = await ctx.workspaces.create({ path: dir.path }).catch(() => null)
+          if (!ws || !ws.id) continue
+          const sessionId = await ctx.workspaces.connectWorkspace(ws.id).catch(() => null)
+          if (sessionId) {
+            await fetch('/aischat-worlds/token', {
+              method: 'POST',
+              headers: { 'content-type': 'application/json' },
+              body: JSON.stringify({ sessionId, token: store.token }),
+            }).catch(() => {})
+          }
+        }
+      } catch { /* 同步失败静默：不影响 AIsChat 主功能 */ }
+    }
+
+    // 登录态变化时自动同步世界到工作区（节流 30s）。
+    window.addEventListener('aischat:auth', () => {
+      if (store.token) syncWorlds()
+    })
+
+    // 打开 AIsChat board 时也补一次同步（force 跳过节流，幂等安全）。
     window.addEventListener('aischat:board-toggle', (e) => {
       boardOpen = !!e.detail
+      if (boardOpen && store.token) syncWorlds(true)
       bump()
     })
 
-    // Surface transient errors as console warnings (no intrusive toasts).
     window.addEventListener('aischat:error', (e) => {
       console.warn('[aischat]', e.detail)
     })

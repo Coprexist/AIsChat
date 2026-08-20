@@ -668,7 +668,7 @@ async def _get_creator_name(db: AsyncSession, world_id: int) -> str:
 
 def _inject_world_vars(
     html: str, world_id: int, creator_name: str, group_id: int | None, world_name: str = "",
-    entry: dict | None = None,
+    entry: dict | None = None, api_prefix: str = "/api", ui_prefix: str = "",
 ) -> str:
     """向世界 HTML 注入环境变量（世界代码零硬编码，打包/换实例即插即用）。
 
@@ -681,6 +681,8 @@ def _inject_world_vars(
       USER_ID      当前用户编号（无登录态 = null，客户端可补）
       WORLD_ENTRY  入口分流：{kind: 'group'|'dm'|'main', group_id, group_type_slug}
                    世界代码据此渲染不同界面（群类型→对应场景、私聊→对话地点、直进→主页）
+      WORLD_API    API 前缀（独立部署 /api；宿主嵌入时由宿主代理注入 /aischat-api）
+      WORLD_UI     主应用前端前缀（独立部署空串；宿主嵌入时 /aischat-ui）
     """
     script = (
         "<script>\n"
@@ -690,6 +692,8 @@ def _inject_world_vars(
         f"window.WORLD_AI_NAME = {json.dumps(creator_name, ensure_ascii=False)};\n"
         f"window.GROUP_ID = {group_id if group_id is not None else 'null'};\n"
         f"window.WORLD_ENTRY = {json.dumps(entry or {'kind': 'main', 'group_id': None, 'group_type_slug': None}, ensure_ascii=False)};\n"
+        f"window.WORLD_API = {json.dumps(api_prefix, ensure_ascii=False)};\n"
+        f"window.WORLD_UI = {json.dumps(ui_prefix, ensure_ascii=False)};\n"
         "window.USER_ID = null; // 由宿主环境注入\n"
         "</script>\n"
         "<script>\n"
@@ -765,7 +769,11 @@ async def serve_world_file(
         elif entry_from in ("dm", "main"):
             entry["kind"] = entry_from
         html = target.read_text(encoding="utf-8", errors="replace")
-        return HTMLResponse(_inject_world_vars(html, world_id, creator_name, group_id, world_name, entry=entry))
+        # 宿主嵌入（DSH）时由宿主代理注入 x-aischat-api-prefix / x-aischat-ui-prefix，
+        # 世界代码据此拼 API/前端地址；独立部署无这些头，用默认值。
+        api_prefix = request.headers.get("x-aischat-api-prefix", "/api")
+        ui_prefix = request.headers.get("x-aischat-ui-prefix", "")
+        return HTMLResponse(_inject_world_vars(html, world_id, creator_name, group_id, world_name, entry=entry, api_prefix=api_prefix, ui_prefix=ui_prefix))
     # 世界代码频繁变化：ETag 条件缓存——更新后自动拿新版（免强刷），
     # 未更新时浏览器 304 走缓存（不重复下载）（2026-08-05 产品）
     etag = f'"{target.stat().st_mtime_ns:x}-{target.stat().st_size:x}"'

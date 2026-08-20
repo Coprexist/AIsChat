@@ -4,7 +4,7 @@ var module = { exports: {} }; var exports = module.exports;
 // src/client.ts
 var React = require("react");
 var { useEffect, useState, useRef, useCallback, useMemo } = React;
-var { MarkdownText } = require("@deepseek-ai/dsh-client-ui-primitives");
+var { MarkdownText, IconNewChatOutline16 } = require("@deepseek-ai/dsh-client-ui-primitives");
 var API = "/aischat-api";
 var WS_BASE = "/aischat-ws";
 var K_TOKEN = "aisc.token";
@@ -320,12 +320,16 @@ function h(type, props, ...children) {
 }
 var style = {
   board: { position: "fixed", inset: 0, zIndex: 30, display: "flex", background: "var(--dsw-alias-bg-base)", fontFamily: "var(--ds-font-family, system-ui, sans-serif)", color: "var(--dsw-alias-label-primary)" },
-  rail: { width: 264, flex: "none", borderRight: "1px solid var(--dsw-alias-border-l2)", display: "flex", flexDirection: "column", minHeight: 0, background: "var(--dsw-specific-sidebar-fill)", padding: "8px 0" },
-  railHead: { padding: "10px 14px 8px", fontSize: 15, fontWeight: 600, color: "var(--dsw-alias-label-primary)", display: "flex", alignItems: "center", justifyContent: "space-between" },
-  railUser: { display: "flex", alignItems: "center", gap: 8, padding: "8px 14px", borderTop: "1px solid var(--dsw-alias-border-l2)" },
+  // 侧边栏 rail：照搬官方 SidebarRoot 容器（--dsh-sidebar-inline-padding:12px、6px 12px 内边距、sidebar-fill 背景、14px 字号）。
+  rail: { width: 264, flex: "none", borderRight: "1px solid var(--dsw-alias-border-l2)", display: "flex", flexDirection: "column", minHeight: 0, background: "var(--dsw-specific-sidebar-fill)", padding: "6px 12px", boxSizing: "border-box", fontSize: 14, color: "var(--dsw-alias-label-primary)" },
+  // 板块头：照搬官方 WorkspaceBrowser sectionHeader（36px 高、tertiary 色、12px 圆角、左内边距 4px）。
+  railHead: { boxSizing: "border-box", height: 36, color: "var(--dsw-alias-label-tertiary)", borderRadius: 12, flex: "none", alignItems: "center", gap: 4, marginBottom: 4, paddingLeft: 4, display: "flex", overflow: "hidden" },
+  // 板块头标题：照搬官方 sectionLabel（nowrap、max-width 45%、20px 行高）。
+  railLabel: { whiteSpace: "nowrap", minWidth: 0, maxWidth: "45%", flex: "none", lineHeight: "20px", overflow: "hidden" },
+  railUser: { display: "flex", alignItems: "center", gap: 8, padding: "8px 4px", borderTop: "1px solid var(--dsw-alias-border-l2)" },
   group: { padding: "2px 0" },
-  groupLabel: { padding: "6px 14px 4px", fontSize: 12, color: "var(--dsw-alias-label-secondary)", fontWeight: 600, letterSpacing: ".02em" },
-  row: { display: "flex", alignItems: "center", gap: 8, padding: "7px 14px", cursor: "pointer", fontSize: 13, color: "var(--dsw-alias-label-primary)", border: "none", background: "transparent", width: "100%", textAlign: "left", boxSizing: "border-box" },
+  groupLabel: { padding: "8px 12px 4px", fontSize: 12, color: "var(--dsw-alias-label-tertiary)", fontWeight: 600, letterSpacing: ".02em" },
+  row: { display: "flex", alignItems: "center", gap: 8, padding: "7px 4px", cursor: "pointer", fontSize: 13, color: "var(--dsw-alias-label-primary)", border: "none", background: "transparent", width: "100%", textAlign: "left", boxSizing: "border-box" },
   rowHover: { background: "var(--dsw-alias-interactive-bg-hover)" },
   rowActive: { background: "var(--dsw-alias-interactive-bg-hover-solid, var(--dsw-alias-interactive-bg-hover))" },
   avatar: { width: 28, height: 28, borderRadius: "50%", flex: "none", background: "var(--dsw-alias-state-business-tertiary)", display: "inline-flex", alignItems: "center", justifyContent: "center", fontSize: 12, fontWeight: 600, color: "var(--dsw-alias-label-primary)", overflow: "hidden" },
@@ -369,7 +373,9 @@ var style = {
   memberRole: { flex: "none", fontSize: 11, color: "var(--dsw-alias-label-tertiary)" },
   smallBtn: { flex: "none", padding: "4px 12px", borderRadius: 8, border: "1px solid var(--dsw-alias-border-l2)", background: "transparent", color: "var(--dsw-alias-label-primary)", cursor: "pointer", fontSize: 12, fontWeight: 500 },
   smallBtnOn: { background: "var(--dsw-alias-interactive-bg-hover)", borderColor: "transparent" },
-  immersive: { position: "absolute", inset: 0, zIndex: 5, display: "flex", flexDirection: "column", background: "var(--dsw-alias-bg-base)" },
+  // 沉浸式覆盖层：zIndex 必须高于 board（30），否则在 AIsChat board 打开时
+  // 会被 board 盖住（两者同在 shell.overlay 槽内，board fixed z30 > 本层 z5）。
+  immersive: { position: "fixed", inset: 0, zIndex: 40, display: "flex", flexDirection: "column", background: "var(--dsw-alias-bg-base)" },
   immersiveBar: { flex: "none", display: "flex", alignItems: "center", gap: 10, padding: "8px 14px", borderBottom: "1px solid var(--dsw-alias-border-l2)", fontSize: 13, fontWeight: 600, color: "var(--dsw-alias-label-primary)" },
   immersiveFrame: { flex: 1, minHeight: 0, border: "none", width: "100%", background: "var(--dsw-alias-bg-base)" },
   composer: { flex: "none", display: "flex", gap: 8, padding: "12px 20px", borderTop: "1px solid var(--dsw-alias-border-l2)", background: "var(--dsw-alias-bg-base)" },
@@ -384,7 +390,13 @@ var style = {
   err: { color: "var(--dsw-alias-state-error-primary)", fontSize: 12, margin: "6px 0 0" },
   hint: { color: "var(--dsw-alias-label-tertiary)", fontSize: 12, marginTop: 10, lineHeight: 1.5 },
   footBtn: { display: "flex", alignItems: "center", gap: 6, padding: "6px 10px", borderRadius: 8, border: "none", background: "transparent", color: "var(--dsw-alias-label-primary)", cursor: "pointer", fontSize: 13, width: "100%" },
-  closeBtn: { flex: "none", padding: "4px 10px", borderRadius: 8, border: "1px solid var(--dsw-alias-border-l2)", background: "transparent", color: "var(--dsw-alias-label-secondary)", cursor: "pointer", fontSize: 12 },
+  // 侧边栏底部动作按钮：照搬官方设置 trigger（VOzbGW_trigger）——宽 calc(100%+8px)、
+  // margin 4px -4px、高 34、圆角 12、14px/22px 排版，保证与下方"设置"按钮完全对齐。
+  footTrigger: { boxSizing: "border-box", cursor: "pointer", width: "calc(100% + 8px)", height: 34, color: "var(--dsw-alias-label-primary)", background: "transparent", border: "none", borderRadius: 12, flex: "none", display: "flex", alignItems: "center", gap: 8, margin: "4px -4px", padding: "6px 2px 6px 10px", fontFamily: "inherit", fontSize: 14, lineHeight: "22px", overflow: "hidden" },
+  // rail（侧边栏收起）变体：官方 trigger rail——36px 圆形、仅图标。
+  footTriggerRail: { borderRadius: "50%", justifyContent: "center", gap: 0, width: 36, height: 36, margin: "8px 0 10px", padding: 0 },
+  // 板块头/面板小按钮：官方 iconButton 观感——无边框、hover 圆角背景。
+  closeBtn: { flex: "none", height: 28, padding: "0 10px", borderRadius: 14, border: "none", background: "transparent", color: "var(--dsw-alias-label-secondary)", cursor: "pointer", fontSize: 12, lineHeight: 1, display: "inline-flex", alignItems: "center" },
   scroll: { flex: 1, minHeight: 0, overflowY: "auto" }
 };
 function initials(name) {
@@ -907,8 +919,8 @@ function AisChatBoard({ onClose }) {
       h(
         "div",
         { style: style.railHead },
-        h("span", {}, "AIsChat"),
-        h("button", { style: style.closeBtn, onClick: onClose }, "\u8FD4\u56DE\u5DE5\u4F5C\u533A")
+        h("span", { style: style.railLabel }, "AIsChat"),
+        h("button", { style: { ...style.closeBtn, marginLeft: "auto", fontSize: 12 }, onClick: onClose }, "\u8FD4\u56DE\u5DE5\u4F5C\u533A")
       ),
       h(
         "div",
@@ -989,7 +1001,7 @@ function SettingsPage() {
     h("div", { style: style.hint }, "\u670D\u52A1\u901A\u8FC7\u672C\u673A\u540C\u6E90\u4EE3\u7406\u8BBF\u95EE\uFF0C\u65E0\u516C\u7F51\u5730\u5740\u53C2\u4E0E\u3002")
   );
 }
-function FooterButton() {
+function FooterButton({ wide }) {
   const [open, setOpen] = useState(false);
   useEffect(() => {
     const onRefresh = () => setOpen(boardOpenRef.current);
@@ -1001,25 +1013,69 @@ function FooterButton() {
     setOpen(next);
     window.dispatchEvent(new CustomEvent("aischat:board-toggle", { detail: next }));
   };
+  const rail = wide === false;
   return h(
     "button",
-    { style: { ...style.footBtn, ...open ? { background: "var(--dsw-alias-interactive-bg-hover-solid, var(--dsw-alias-interactive-bg-hover))" } : {} }, onClick: toggle, title: "AIsChat \u804A\u5929" },
-    h("span", { style: { fontSize: 14 } }, "\u{1F4AC}"),
-    h("span", { style: { fontWeight: 500 } }, "AIsChat")
+    {
+      style: { ...style.footTrigger, ...rail ? style.footTriggerRail : {}, ...open ? { background: "var(--dsw-alias-interactive-bg-hover-solid, var(--dsw-alias-interactive-bg-hover))" } : {} },
+      onClick: toggle,
+      title: "AIsChat \u804A\u5929",
+      "aria-label": rail ? "AIsChat" : void 0
+    },
+    h(IconNewChatOutline16, { size: rail ? 18 : 16 }),
+    rail ? null : h("span", { style: { fontWeight: 500 } }, "AIsChat")
   );
 }
 var boardOpenRef = { current: false };
 module.exports = {
   name: "dsh-aischat",
-  inject: ["slots"],
+  inject: ["slots", "workspaces"],
   apply(ctx) {
     let boardOpen = false;
     const bump = () => {
       boardOpenRef.current = boardOpen;
       window.dispatchEvent(new CustomEvent("aischat:board-refresh"));
     };
+    let lastWorldsSync = 0;
+    const syncWorlds = async (force = false) => {
+      if (!store.token || !store.user || !ctx.workspaces) return;
+      const now = Date.now();
+      if (!force && now - lastWorldsSync < 3e4) return;
+      lastWorldsSync = now;
+      try {
+        const worlds = await api("/worlds").catch(() => null);
+        if (!Array.isArray(worlds)) return;
+        for (const w of worlds) {
+          if (!w || !w.id) continue;
+          const dirRes = await fetch("/aischat-worlds/dir", {
+            method: "POST",
+            headers: { "content-type": "application/json" },
+            body: JSON.stringify({ worldId: w.id, name: w.name || `\u4E16\u754C${w.id}` })
+          }).catch(() => null);
+          if (!dirRes || !dirRes.ok) continue;
+          const dir = await dirRes.json().catch(() => null);
+          if (!dir || !dir.path) continue;
+          const ws = await ctx.workspaces.create({ path: dir.path }).catch(() => null);
+          if (!ws || !ws.id) continue;
+          const sessionId = await ctx.workspaces.connectWorkspace(ws.id).catch(() => null);
+          if (sessionId) {
+            await fetch("/aischat-worlds/token", {
+              method: "POST",
+              headers: { "content-type": "application/json" },
+              body: JSON.stringify({ sessionId, token: store.token })
+            }).catch(() => {
+            });
+          }
+        }
+      } catch {
+      }
+    };
+    window.addEventListener("aischat:auth", () => {
+      if (store.token) syncWorlds();
+    });
     window.addEventListener("aischat:board-toggle", (e) => {
       boardOpen = !!e.detail;
+      if (boardOpen && store.token) syncWorlds(true);
       bump();
     });
     window.addEventListener("aischat:error", (e) => {

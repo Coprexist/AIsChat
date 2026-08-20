@@ -22,7 +22,9 @@
   var GROUP_ID = CONFIG.groupId != null ? CONFIG.groupId : (window.GROUP_ID != null ? window.GROUP_ID : null);
   var HEIGHT = CONFIG.height || '420px';
   var TITLE = CONFIG.title || '群聊';
-  var API_BASE = CONFIG.apiBase || '/api';
+  // API 前缀：优先宿主注入的 WORLD_API（DSH 嵌入 = /aischat-api），其次显式
+  // 配置，最后独立部署默认 /api。
+  var API_BASE = window.WORLD_API || CONFIG.apiBase || '/api';
   var POLL_MS = CONFIG.pollMs != null ? CONFIG.pollMs : 5000;
   var INITIAL_LIMIT = 50;
 

@@ -33,7 +33,9 @@
     if (!token) { flash('未登录：请从主界面进入世界'); return; }
     var headers = { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + token };
     var body = JSON.stringify({ content: text });
-    fetch('/api/groups/' + groupId + '/messages', { method: 'POST', headers: headers, body: body })
+    // API 前缀：宿主嵌入时用注入的 WORLD_API（/aischat-api）；独立部署用 /api（vite 代理）。
+    var apiBase = window.WORLD_API || '/api';
+    fetch(apiBase + '/groups/' + groupId + '/messages', { method: 'POST', headers: headers, body: body })
       .then(function (r) { if (!r.ok) throw new Error('HTTP ' + r.status); return r; })
       .catch(function () {
         return fetch('/groups/' + groupId + '/messages', { method: 'POST', headers: headers, body: body });
@@ -54,7 +56,9 @@
   /* ── SSE：世界程序发布的 identity_state（谁在场/角色） ── */
   function bindWorldEvents() {
     if (!worldId) return;
-    var es = new EventSource('/world/' + worldId + '/events');
+    // 前缀跟随宿主注入的 WORLD_API（DSH 嵌入 = /aischat-api）；独立部署保持直连。
+    var evtBase = window.WORLD_API ? window.WORLD_API + '/world/' : '/world/';
+    var es = new EventSource(evtBase + worldId + '/events');
     es.onmessage = function (e) {
       var state;
       try { state = JSON.parse(e.data); } catch (err) { return; }

@@ -5,6 +5,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { useParams, useNavigate, useSearchParams } from 'react-router-dom'
 import { ChevronLeft, ChevronRight } from 'lucide-react'
+import { isEmbedded } from '../embed/bridge'
 
 export default function WorldViewPage() {
   const { worldId } = useParams()
@@ -17,6 +18,10 @@ export default function WorldViewPage() {
   const [notFound, setNotFound] = useState(false)
 
   const wid = Number(worldId)
+
+  // 嵌入模式（DSH iframe）：世界文件走宿主同源代理前缀 /aischat-api，
+  // 否则 /world/... 会被宿主 SPA fallback 接住（显示宿主界面而非群视界）。
+  const worldBase = isEmbedded() ? '/aischat-api' : ''
 
   // 返回：Tauri 关窗口；其他一律切回「标准界面」（群聊优先，其次世界列表），不依赖关窗
   const handleBack = () => {
@@ -90,7 +95,7 @@ export default function WorldViewPage() {
         ) : (
           <iframe
             ref={iframeRef}
-            src={`/world/${wid}/preview${groupId ? `?group_id=${groupId}` : entryFrom ? `?from=${entryFrom}` : ''}`}
+            src={`${worldBase}/world/${wid}/preview${groupId ? `?group_id=${groupId}` : entryFrom ? `?from=${entryFrom}` : ''}`}
             className="w-full h-full bg-white"
             title="世界"
             onLoad={(e) => {

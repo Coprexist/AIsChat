@@ -17,6 +17,10 @@
 - [x] **需求4：AIC 功能导航**——AIC 侧边栏"功能"分组（群视界/好友/我的AI/管理/设置）+ DSH 设置页同款入口，点击在沉浸式覆盖层打开对应前端页面
 - [x] **群聊名字解析修复**：成员表（含 AI）按 `type:id` 缓存名字
 - [x] **iframe 登录引导**：token 失效时显示"请先在宿主应用中登录"引导页 → 通知宿主打开 AIsChat board 登录（不显示 AIsChat 自带登录表单）
+- [x] **沉浸式内容修复**：WorldViewPage iframe 路径嵌入时走 `/aischat-api`（否则被宿主 SPA fallback 接住显示 DSH 界面）；Host 代理重写 3xx Location 补前缀
+- [x] **世界页内嵌群聊/平台菜单前缀**：后端注入 `window.WORLD_API` / `WORLD_UI`（经代理头），`chat-panel.js` / `sidebar.js` / `adventure.js` / `identity.js` 读取——独立部署默认值不受影响
+- [x] **需求5：群视界世界嵌入 DSH 工作区**——每个自己创建的世界自动同步为工作区文件夹 `AIC群视界-世界名` + DSH 会话（官方 `workspaces.create` / `connectWorkspace`，幂等）；Host 注册 `world_*` 工具集（文件读写/世界 API/群聊/生命周期，按会话 cwd 路由）；token 仅内存；systemPrompt 泛化引导段
+- [ ] **client 同步待浏览器实测**：headless 验证受限，等用户在页面打开 AIsChat 后确认 `AIC群视界-*` 文件夹/会话出现、`world_*` 工具在会话内可调
 
 ---
 

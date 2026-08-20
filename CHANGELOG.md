@@ -139,6 +139,20 @@
 - **沉浸式覆盖层（Client）**：`shell.overlay` 全局 iframe 面板——群聊头部"沉浸式"按钮（自动查 `/worlds/by-entity` 绑定世界 → `/aischat-ui/world-view/{id}?embed=1`）+ AIC 侧边栏"功能"分组（群视界/好友/我的AI/管理/设置）+ DSH 设置页同款导航
 - **登录引导**：iframe 内 token 失效时不再显示 AIsChat 自带登录表单，改为"请先在宿主应用中登录"引导页 → 通知宿主打开 AIsChat board 登录（登录态统一由 DSH 插件管理）
 
+### Added — 🗂️ 群视界世界嵌入 DSH 工作区（对话用 DSH 的 agent，操作对象是 AIsChat 世界）
+
+- **世界 → 工作区文件夹自动同步**：登录 AIsChat 或打开面板时，每个**自己创建的世界**自动同步为 DSH 工作区文件夹 `AIC群视界-世界名`（`$DSH_HOME/aischat-worlds/` 真实目录 + `.aischat-world.json` 世界身份）+ 一个 DSH 会话——全走官方 `workspaces.create` / `connectWorkspace` API，官方工作区自动显示、官方更新零影响，重复同步幂等
+- **世界操作工具集（Host `world_*`，按会话所属世界自动路由）**：
+  - `world_list_files` / `world_read_file` / `world_write_file` / `world_delete_file`：世界页面代码的文件树/读写（owner 鉴权写，`/worlds/{id}/files`）
+  - `world_api`：世界受控 API（world/chat/memories/usage/groups/group-messages/state/data，经沙箱 `api_token` 鉴权）
+  - `world_chat`：读写世界绑定群聊消息（以世界身份发送）
+  - `world_lifecycle`：唤醒/休眠世界
+- **按会话路由**：工具从会话 cwd 解析 `.aischat-world.json` 定位世界——`AIC群视界-*` 会话里直接可用，普通会话自动拒绝并提示
+- **token 仅内存**：client 同步时上报 `{sessionId, token}`，host 存内存供 owner 鉴权写操作（不落盘、不打日志）
+- **提示词注入**：systemPrompt 注册泛化世界操作引导段（目录名以 `AIC群视界-` 开头时 agent 知道可用 `world_*` 工具）
+- **世界页内嵌群聊修复**：`chat-panel.js` / `sidebar.js` / `adventure.js` / `identity.js` 读取注入的 `window.WORLD_API` / `WORLD_UI`（DSH 嵌入 = `/aischat-api` / `/aischat-ui`，独立部署保持 `/api` / 空）——世界页内群聊、平台菜单、SSE 不再落到宿主 SPA fallback
+- **代理 Location 重写**：Host 代理对后端 3xx 重定向补 `/aischat-api` 前缀（`/world/{id}/preview` → `/aischat-api/world/{id}/files/...`），沉浸式 iframe 内世界页可完整加载
+
 ---
 
 ## [v0.3.7] - 2026-08-17

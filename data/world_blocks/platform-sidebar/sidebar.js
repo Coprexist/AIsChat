@@ -10,13 +10,16 @@
 */
 (function () {
   // 平台基础菜单：四个目的地必保留，但组名/项名可自定义（样式可直接改 sidebar.css）
+  // 跳转目标拼 WORLD_UI 前缀：独立部署为空串（/worlds），宿主嵌入时
+  // （DSH）为 /aischat-ui（/aischat-ui/worlds），否则会落到宿主的 SPA fallback。
+  var UI_BASE = window.WORLD_UI || "";
   var PLATFORM_TITLE = window.SIDEBAR_PLATFORM_TITLE || "平台";
   var PLATFORM_LABELS = window.SIDEBAR_PLATFORM_LABELS || {};
   var PLATFORM_ITEMS = [
-    { label: PLATFORM_LABELS.home || "首页", href: "/" },
-    { label: PLATFORM_LABELS.chat || "聊天", href: "/chat" },
-    { label: PLATFORM_LABELS.worlds || "世界列表", href: "/worlds" },
-    { label: PLATFORM_LABELS.settings || "设置", href: "/settings" }
+    { label: PLATFORM_LABELS.home || "首页", href: UI_BASE + "/" },
+    { label: PLATFORM_LABELS.chat || "聊天", href: UI_BASE + "/chat" },
+    { label: PLATFORM_LABELS.worlds || "世界列表", href: UI_BASE + "/worlds" },
+    { label: PLATFORM_LABELS.settings || "设置", href: UI_BASE + "/settings" }
   ];
   var CUSTOM_ITEMS = window.SIDEBAR_ITEMS || [];
   var BRAND = window.SIDEBAR_BRAND || (window.WORLD_AI_NAME || "世界");
