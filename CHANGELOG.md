@@ -70,6 +70,13 @@
 - **世界页内嵌群聊修复**：`chat-panel.js` / `sidebar.js` / `adventure.js` / `identity.js` 读取注入的 `window.WORLD_API` / `WORLD_UI`（DSH 嵌入 = `/aischat-api` / `/aischat-ui`，独立部署保持 `/api` / 空）——世界页内群聊、平台菜单、SSE 不再落到宿主 SPA fallback
 - **代理 Location 重写**：Host 代理对后端 3xx 重定向补 `/aischat-api` 前缀（`/world/{id}/preview` → `/aischat-api/world/{id}/files/...`），沉浸式 iframe 内世界页可完整加载
 
+### Fixed — 🔧 同步正确性三连修（GitHub 式同步实测暴露）
+
+- **快照文件自身误判**：`.aischat-sync.json` 未被 `isMirrorExcluded` 排除，被 `walkDir` 计为本地文件且快照无其记录 → 永远判为「本地新增」→ 温和自动拉取**永远拒绝**（浏览器实测：token 正常上报、目录已建、文件却拉不下来）。已把快照文件加入排除列表
+- **force 覆盖不全**：`world_pull force:true` 之前只放行检查，`pullTargets` 不含冲突文件与本地修改文件 → 返回 `ok:true` 却 `pulled:0`，**冲突/本地修改实际未被覆盖**。已补齐：force 拉取时 `conflict + changedLocal` 一并入队，以远端为准覆盖
+- **快照无条件「洗白」（最严重）**：pull/push 成功后用**全量本地文件**重建快照并写入当前 mtime——未同步的本地修改、被跳过的冲突、远端新改动全部被标成「已同步」，**温和自动拉取从此检测不到世界新版本**（实测：制造真实冲突后 force 拉取返回「无变化」）。已改为：**只更新实际成功同步的文件**，其余保留旧记录；push 后用重新拉取的远端树写 rm（PUT 会更新远端 mtime）
+- **验证**：温和拒绝（本地脏/冲突不覆盖）✓、force 覆盖冲突与本地修改 ✓、脏快照重建（force 全量以远端为准）✓、远端改动自动拉取 ✓、无变化识别 ✓
+
 ---
 ## [v0.3.9] - 2026-08-17
 

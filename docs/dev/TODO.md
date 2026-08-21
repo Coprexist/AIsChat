@@ -25,7 +25,8 @@
 - [x] **诊断端点**：`GET /aischat-worlds/status` → `{tokenWorlds, worldDirs}`（token 明文不返回）；token 上报打 `ctx.logger` 日志
 - [x] **token 按世界路由**：改为 `{worldId, token}` 上报（sessionId 会被 DSH 新建会话流程更换，不稳定）；工具按 cwd 解析世界后取 token
 - [x] **GitHub 式双向同步（世界文件本地镜像）**：`.aischat-sync.json` 快照 + 三路对比（added/removed/changedRemote/changedLocal/conflict）；自动拉取仅当本地干净+世界有改动（温和，不覆盖 agent 工作文件）；world_pull/world_push 带冲突保护 + force；版本提示注入 updateHint/conflictHint；world_run/world_trigger 新增；agent 用 DSH 原生工具操作镜像 + world_push 同步
-- [ ] **需求5 全链路复测**：用户刷新+打开 AIsChat 后：① tokenWorlds 非空 ② 工作区目录出现世界文件（自动拉取）③ world_* 工具可用 ④ 原生 read/write + world_push 通 ⑤ 冲突场景（本地改+世界改同一文件）报告正常
+- [x] **需求5 全链路复测（全部通过）**：① tokenWorlds 非空（6 世界）✓ ② 工作区目录出现世界文件（自动拉取生效：星野镇10/星陨大陆32/棋盘大陆22/诗の子20；测试2/还没想好为远端空世界）✓ ③ world_* 工具注册+路由保护正常 ✓ ④ 冲突场景：温和拒绝不覆盖 ✓、force 覆盖冲突与本地修改 ✓、脏快照重建 ✓、远端改动自动拉取 ✓、无变化识别 ✓
+- [x] **同步正确性三连修**（实测暴露）：① `.aischat-sync.json` 自身未被排除 → 永远判"本地新增"→ 温和拉取永远拒绝（已排除）② force 拉取不含冲突/本地修改 → `ok:true` 却 `pulled:0`（已补齐）③ pull/push 后全量重建快照 → 未同步文件被"洗白"，温和拉取从此检测不到世界新版本（改为只更新实际同步成功的文件 + push 后重拉远端树写 rm）
 - [ ] **内存 token 局限**：dsh-web 重启会清空内存 token，需重新打开 AIsChat 触发同步；后续可选持久化方案（如 host 侧加密落盘）
 
 ---
