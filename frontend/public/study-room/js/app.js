@@ -34,6 +34,7 @@ const setShort = $('set-short');
 const setLong = $('set-long');
 const setIntervalInput = $('set-interval');
 const setAutoStart = $('set-auto-start');
+const setStereo = $('set-stereo');
 const modalCancel = $('modal-cancel');
 const modalSave = $('modal-save');
 
@@ -307,6 +308,7 @@ function openSettings() {
     setLong.value = state.settings.long;
     setIntervalInput.value = state.settings.interval;
     setAutoStart.classList.toggle('on', state.settings.autoStart);
+    setStereo.classList.toggle('on', state.settings.stereo !== false);
     settingsModal.classList.add('show');
 }
 function closeSettings() {
@@ -318,8 +320,15 @@ function saveSettingsFromModal() {
     state.settings.long = Math.max(1, Math.min(60, parseInt(setLong.value) || 15));
     state.settings.interval = Math.max(2, Math.min(8, parseInt(setIntervalInput.value) || 4));
     state.settings.autoStart = setAutoStart.classList.contains('on');
+    state.settings.stereo = setStereo.classList.contains('on');
     saveSettings();
     updateNoiseVolume();
+    // 声道模式变化：正在播放时重新生成噪声 buffer（立即生效）
+    if (state.soundType !== 'off') {
+        const t = state.soundType;
+        stopNoise();
+        startNoise(t);
+    }
     if (!state.isRunning && !state.isPaused) {
         state.remainingSeconds = getModeSeconds(state.mode);
         state.totalSeconds = state.remainingSeconds;
@@ -353,6 +362,7 @@ function bindEvents() {
     modalSave.addEventListener('click', saveSettingsFromModal);
     settingsModal.addEventListener('click', e => { if (e.target === settingsModal) closeSettings(); });
     setAutoStart.addEventListener('click', () => setAutoStart.classList.toggle('on'));
+    setStereo.addEventListener('click', () => setStereo.classList.toggle('on'));
 
     todoAddBtn.addEventListener('click', () => {
         addTodo(todoInput.value);

@@ -33,48 +33,48 @@ async function initAudio() {
 // 合成手法（业界共识，参考 Audiokinetic 雨声合成 / procedural audio 滤波塑形）：
 // 白噪/棕噪为源 → 二阶 IIR 滤波塑形（带通雨幕、低通风声、低通涌动）→
 // 慢速 LFO 幅度起伏（风/涌动）→ Kellet 粉噪作森林中频层。
-//   rain  雨幕 = 白噪二阶带通(400~3000Hz) + 白噪二阶带通(1k~4k)水滴短脉冲 + 棕噪湿润
+// 两遍合成：
+//   第一遍 底噪层（立体声 = 左右独立随机 / 单声道 = 复制居中）
+//   第二遍 瞬态层（雨滴 / 浪花簇）等功率声像（pan）：
+//     雨滴固定散布左右、浪花簇整簇左→右 / 右→左扫过（"浪花从左边过来在右边消失"）
+//   rain  雨幕 = 白噪二阶带通(400~3000Hz) + 水滴 pan 散布 + 棕噪湿润
 //   forest 风声 = 棕噪二阶低通(800Hz) + Kellet 粉噪中频 + 白噪二阶低通(1500Hz)叶沙 + 0.11Hz LFO
-//   deep   涌动 = 棕噪二阶低通(450Hz) + 白噪二阶带通(1.5k~2.5k)水泡 + 0.07Hz LFO
+//   deep   涌动 = 棕噪二阶低通(450Hz) + 浪花簇 pan 扫动 + 0.07Hz LFO
 function makeNoiseBuffer(ctx, type) {
     const seconds = BUFFER_SECONDS;
     const rate = ctx.sampleRate;
     const len = Math.floor(rate * seconds);
     const buf = ctx.createBuffer(2, len, rate);
+    const stereo = state.settings.stereo !== false;
 
     // 二阶低通系数（级联两个一阶，-24dB/oct 才够塑形）：a = 1 - exp(-2π·fc/fs)
     const lp = (fc) => 1 - Math.exp(-2 * Math.PI * fc / rate);
+    // 二阶低通状态机（级联两个一阶）
+    const S = (a) => ({ a, s1: 0, s2: 0, lp: function (x) {
+        const t = this.s1 + this.a * (x - this.s1);
+        this.s2 = this.s2 + this.a * (t - this.s2);
+        this.s1 = t;
+        return this.s2;
+    }});
 
-    for (let ch = 0; ch < 2; ch++) {
+    // ── 第一遍：底噪层（不含瞬态）──
+    const chans = stereo ? [0, 1] : [0];   // 单声道只生成左声道，之后复制
+    for (const ch of chans) {
         const data = buf.getChannelData(ch);
-        // 各二阶低通状态（每声道独立 → 立体声宽度）；状态按 [s1, s2] 级联
-        const S = (a) => ({ a, s1: 0, s2: 0, lp: function (x) {
-            const t = this.s1 + this.a * (x - this.s1);
-            this.s2 = this.s2 + this.a * (t - this.s2);
-            this.s1 = t;
-            return this.s2;
-        }});
         const rainBedHi = S(lp(3000)), rainBedLo = S(lp(400));   // 雨幕带通上下界
-        const dropHi = S(lp(4000)), dropLo = S(lp(1000));        // 水滴带通（更像水珠，不刺耳）
         const windLo = S(lp(800));                                // 森林风声
         const leafLo = S(lp(1500));                               // 森林叶沙
         const deepLo = S(lp(450));                                // 深海涌动
-        const bubbleHi = S(lp(2500)), bubbleLo = S(lp(1500));     // 深海气泡带通
-        let brown = 0;   // 棕噪积分器
+        let brown = 0;
         // 经典 Paul Kellet 粉噪状态（森林中频层）
         let k0 = 0, k1 = 0, k2 = 0, k3 = 0, k4 = 0, k5 = 0, k6 = 0;
-        // 雨滴状态：高通白噪短脉冲（2~8ms），间隔 30~120ms
-        let dropNext = 0, dropPhase = 0, dropDur = 0, dropEnv = 0;
-        // 深海浪花簇状态：水泡成簇出现（1~3s 一簇，簇间隔 3~10s），配合播放层高潮包络
-        let clusterNext = 0, clusterPhase = 0, clusterDur = 0;
-        // LFO 起伏（风声/涌动）：每声道相位错开
+        // LFO 起伏（风声/涌动）：每声道相位错开（立体声更宽）
         const lfoFreq = type === 'deep' ? 0.07 : 0.11;
-        const lfoPhase = ch * Math.PI; // 左右错相，立体声更宽
+        const lfoPhase = ch * Math.PI;
 
         for (let i = 0; i < len; i++) {
-            const w = Math.random() * 2 - 1;  // 白噪源
+            const w = Math.random() * 2 - 1;
             brown = brown * 0.995 + w * 0.005;
-            // 经典 Paul Kellet 粉噪（森林中频层更自然）
             k0 = 0.99886 * k0 + w * 0.0555179;
             k1 = 0.99332 * k1 + w * 0.0750759;
             k2 = 0.96900 * k2 + w * 0.1538520;
@@ -87,50 +87,83 @@ function makeNoiseBuffer(ctx, type) {
             let s = 0;
             if (type === 'rain') {
                 // 雨幕：白噪 → 二阶带通 400~3000Hz（雨落的"嘶"，主体）
-                const bed = rainBedHi.lp(w) - rainBedLo.lp(w);
-                // 水滴：白噪 → 二阶带通 1000~4000Hz 的短脉冲（点缀，幅度小）
-                const dropNoise = dropHi.lp(w) - dropLo.lp(w);
-                dropNext -= 1 / rate;
-                if (dropNext <= 0) {
-                    dropDur = 0.002 + Math.random() * 0.006;
-                    dropPhase = dropDur;
-                    dropEnv = 0.06 + Math.random() * 0.1;
-                    dropNext = 0.03 + Math.random() * 0.09;
-                }
-                let drop = 0;
-                if (dropPhase > 0) {
-                    const tt = dropDur - dropPhase;
-                    drop = dropNoise * (Math.exp(-tt * 400) * dropEnv);
-                    dropPhase -= 1 / rate;
-                }
-                s = bed * 1.4 + drop + brown * 0.06;
+                s = (rainBedHi.lp(w) - rainBedLo.lp(w)) * 1.4 + brown * 0.06;
             } else if (type === 'forest') {
-                // 风声：棕噪 → 二阶低通800；叶沙：白噪 → 二阶低通1500；中频：Kellet 粉噪
                 const wind = windLo.lp(brown);
                 const leaf = leafLo.lp(w);
-                // 0.11Hz LFO 风起伏（±40%）
                 const lfo = 0.6 + 0.4 * Math.sin(2 * Math.PI * lfoFreq * i / rate + lfoPhase);
                 s = (wind * 0.42 + pink * 0.3 + leaf * 0.14) * lfo;
             } else if (type === 'deep') {
-                // 涌动：棕噪 → 二阶低通450；浪花：白噪 → 二阶带通(1.5k~2.5k)，成簇出现
-                const swell = deepLo.lp(brown);
-                const bubbles = bubbleHi.lp(w) - bubbleLo.lp(w);
-                clusterNext -= 1 / rate;
-                if (clusterNext <= 0) {
-                    clusterDur = 1 + Math.random() * 2;   // 浪花簇持续 1~3s
-                    clusterPhase = clusterDur;
-                    clusterNext = 3 + Math.random() * 7;  // 簇间隔 3~10s
-                }
-                let bubble = 0;
-                if (clusterPhase > 0) {
-                    bubble = bubbles * (0.5 + Math.random() * 0.7); // 簇内气泡随机强度
-                    clusterPhase -= 1 / rate;
-                }
-                // 0.07Hz LFO 涌动（±35%）
+                // 涌动：棕噪 → 二阶低通450
                 const lfo = 0.65 + 0.35 * Math.sin(2 * Math.PI * lfoFreq * i / rate + lfoPhase);
-                s = (swell * 3.0 + bubble * 1.2) * lfo;
+                s = deepLo.lp(brown) * 3.0 * lfo;
             }
             data[i] = s;
+        }
+    }
+    if (!stereo) buf.getChannelData(1).set(buf.getChannelData(0));
+
+    // ── 第二遍：瞬态层 + 等功率声像（pan）──
+    // 单声道模式下跳过（信号已在中央）；forest 无瞬态。
+    if (stereo && (type === 'rain' || type === 'deep')) {
+        const L = buf.getChannelData(0), R = buf.getChannelData(1);
+        const dropHi = S(lp(4000)), dropLo = S(lp(1000));   // 水滴带通（更像水珠）
+        const bubHi = S(lp(2500)), bubLo = S(lp(1500));     // 浪花带通
+        // 瞬态触发状态（单流，密度×2 保持左右各一半时相当的总量）
+        let th0 = 0, th1 = 0;   // pan 起止角（等功率：0=全左，π/2=全右）
+        let dropNext2 = 0, dropPhase2 = 0, dropDur2 = 0, dropEnv2 = 0; // 水滴（rain）
+        let clNext = 0, clPhase = 0, clDur = 0;                        // 浪花簇（deep）
+
+        // 拾取 pan 轨迹：雨滴固定随机位置散布；浪花簇 1/3 左→右、1/3 右→左、1/3 固定
+        const pickDropPan = () => {
+            const th = Math.random() * Math.PI / 2;
+            th0 = th1 = th;
+        };
+        const pickClusterPan = () => {
+            const r = Math.random();
+            if (r < 1 / 3) { th0 = 0; th1 = Math.PI / 2; }            // 左 → 右
+            else if (r < 2 / 3) { th0 = Math.PI / 2; th1 = 0; }       // 右 → 左
+            else { const th = Math.random() * Math.PI / 2; th0 = th1 = th; }
+        };
+
+        for (let i = 0; i < len; i++) {
+            const w = Math.random() * 2 - 1;
+            let mono = 0, prog = 0;
+            if (type === 'rain') {
+                dropNext2 -= 1 / rate;
+                if (dropNext2 <= 0) {
+                    dropDur2 = 0.002 + Math.random() * 0.006;
+                    dropPhase2 = dropDur2;
+                    dropEnv2 = 0.06 + Math.random() * 0.1;
+                    dropNext2 = 0.015 + Math.random() * 0.045;  // 密度×2（原本左右各一半）
+                    pickDropPan();
+                }
+                if (dropPhase2 > 0) {
+                    const dn = dropHi.lp(w) - dropLo.lp(w);
+                    mono = dn * Math.exp(-(dropDur2 - dropPhase2) * 400) * dropEnv2;
+                    prog = 1 - dropPhase2 / dropDur2;
+                    dropPhase2 -= 1 / rate;
+                }
+            } else { // deep
+                clNext -= 1 / rate;
+                if (clNext <= 0) {
+                    clDur = 1 + Math.random() * 2;
+                    clPhase = clDur;
+                    clNext = 1.5 + Math.random() * 3.5;   // 簇频率×2
+                    pickClusterPan();
+                }
+                if (clPhase > 0) {
+                    mono = (bubHi.lp(w) - bubLo.lp(w)) * (0.5 + Math.random() * 0.7);
+                    prog = 1 - clPhase / clDur;
+                    clPhase -= 1 / rate;
+                }
+            }
+            if (mono !== 0) {
+                // 等功率平移：L = m·cosθ，R = m·sinθ（θ 随簇进度扫过 → 空间移动）
+                const th = th0 + (th1 - th0) * prog;
+                L[i] += mono * Math.cos(th);
+                R[i] += mono * Math.sin(th);
+            }
         }
     }
     return buf;

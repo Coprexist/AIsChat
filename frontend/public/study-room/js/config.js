@@ -18,7 +18,8 @@ const DEFAULT_SETTINGS = {
     long: 15,
     interval: 4,
     volume: 30,
-    autoStart: false
+    autoStart: false,
+    stereo: true
 };
 
 const MODES = {
