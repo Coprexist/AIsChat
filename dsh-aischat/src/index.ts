@@ -423,6 +423,7 @@ function listWorldDirs(): Array<{ dir: string; worldId: number | null; name: str
 function isMirrorExcluded(relPath: string): boolean {
   const base = relPath.split('/').pop() ?? relPath
   if (relPath === '.aischat-world.json') return true
+  if (relPath === SNAPSHOT_FILE) return true // 快照文件自身不计入对比（否则永远被当本地新增）
   if (base === '__pycache__' || relPath.includes('/__pycache__/')) return true
   if (base.endsWith('.pyc')) return true
   if (base === '.DS_Store') return true
@@ -544,8 +545,10 @@ async function pullWithSnapshot(
   }
 
   const pullTargets = [...cmp.added, ...cmp.changedRemote]
+  if (force) pullTargets.push(...cmp.conflict, ...cmp.changedLocal) // force：冲突与本地修改都以远端为准覆盖
   let pulled = 0
   let skipped = 0
+  const pulledOk: string[] = []
   for (const rel of pullTargets) {
     try {
       const res = await backendRequest(backendUrl, 'GET', `/world/${worldId}/files/${encodeURIComponent(rel)}`)
@@ -554,27 +557,25 @@ async function pullWithSnapshot(
       mkdirSync(join(target, '..'), { recursive: true })
       writeFileSync(target, res.text, 'utf8')
       pulled++
+      pulledOk.push(rel)
     } catch { skipped++ }
   }
   // 远端删除：本地没改过（或 force）→ 删本地。
+  const removedOk: string[] = []
   for (const rel of cmp.removed) {
     if (force || !cmp.changedLocal.includes(rel)) {
-      try { unlinkSync(join(dir, rel)); pulled++ } catch { skipped++ }
+      try { unlinkSync(join(dir, rel)); pulled++; removedOk.push(rel) } catch { skipped++ }
     }
   }
 
-  // 更新快照。
-  const nextSnap: SyncSnapshot = { v: 1, files: {} }
-  const localFiles = walkDir(dir)
-  for (const p of localFiles) {
-    if (isMirrorExcluded(p)) continue
-    const rm = tree.find((t) => t.path === p)?.mtime ?? snap.files[p]?.rm ?? 0
-    nextSnap.files[p] = { lm: statMtime(join(dir, p)), rm }
+  // 更新快照：只更新「实际成功同步」的文件，其余保留旧记录——
+  // 否则未同步的本地修改/冲突会被洗白成「已同步」，下次对比就检测不到了。
+  const nextSnap: SyncSnapshot = { v: 1, files: { ...snap.files } }
+  for (const rel of pulledOk) {
+    const rm = tree.find((t) => t.path === rel)?.mtime ?? snap.files[rel]?.rm ?? 0
+    nextSnap.files[rel] = { lm: statMtime(join(dir, rel)), rm }
   }
-  for (const t of tree) {
-    if (isMirrorExcluded(t.path) || nextSnap.files[t.path]) continue
-    nextSnap.files[t.path] = { lm: 0, rm: t.mtime }
-  }
+  for (const rel of removedOk) delete nextSnap.files[rel]
   writeSnapshot(dir, nextSnap)
 
   const parts: string[] = []
@@ -601,9 +602,11 @@ async function pushWithSnapshot(
   const cmp = compareMirror(tree, dir, snap)
 
   const pushTargets = new Set([...cmp.changedLocal, ...cmp.added])
+  if (force) for (const c of cmp.conflict) pushTargets.add(c) // force：冲突文件也以本地为准覆盖远端
   let pushed = 0
   let skipped = 0
   const errors: string[] = []
+  const pushedOk: string[] = []
   const localFiles = walkDir(dir)
   for (const rel of localFiles) {
     if (!pushTargets.has(rel) || isMirrorExcluded(rel)) continue
@@ -611,24 +614,30 @@ async function pushWithSnapshot(
     try {
       const content = readFileSync(join(dir, rel), 'utf8')
       const res = await backendRequest(backendUrl, 'PUT', `/worlds/${worldId}/files`, { token, json: { path: rel, content } })
-      if (res.status === 200) pushed++
+      if (res.status === 200) { pushed++; pushedOk.push(rel) }
       else errors.push(`${rel} (${res.status})`)
     } catch { errors.push(`${rel}（读写失败）`) }
   }
   // 本地删除（远端有、本地没有且快照有记录）：推删除。
+  const removedOk: string[] = []
   for (const p of cmp.removed) {
     if (!force && cmp.conflict.includes(p)) continue
     const res = await backendRequest(backendUrl, 'DELETE', `/worlds/${worldId}/files?path=${encodeURIComponent(p)}`, { token })
-    if (res.status === 200) pushed++
+    if (res.status === 200) { pushed++; removedOk.push(p) }
     else errors.push(`${p} (删除 ${res.status})`)
   }
 
-  const nextSnap: SyncSnapshot = { v: 1, files: {} }
-  for (const p of localFiles) {
-    if (isMirrorExcluded(p)) continue
-    const rm = tree.find((t) => t.path === p)?.mtime ?? 0
-    nextSnap.files[p] = { lm: statMtime(join(dir, p)), rm }
+  // 更新快照：只更新「实际推送成功」的文件，其余保留旧记录——
+  // 否则未推送的远端改动会被洗白，温和自动拉取就检测不到世界新版本了。
+  // 远端 mtime 用推送后重新拉取的树（PUT 会更新远端 mtime）。
+  let freshTree = tree
+  if (pushed > 0) freshTree = (await fetchRemoteTree(backendUrl, worldId, token)) ?? tree
+  const nextSnap: SyncSnapshot = { v: 1, files: { ...snap.files } }
+  for (const rel of pushedOk) {
+    const rm = freshTree.find((t) => t.path === rel)?.mtime ?? snap.files[rel]?.rm ?? 0
+    nextSnap.files[rel] = { lm: statMtime(join(dir, rel)), rm }
   }
+  for (const rel of removedOk) delete nextSnap.files[rel]
   writeSnapshot(dir, nextSnap)
 
   return {
@@ -748,7 +757,7 @@ export function apply(ctx: Context, config: Config): void {
           if (!Number.isInteger(worldId) || worldId <= 0) { send(400, { error: 'invalid worldId' }); return }
           const dir = worldDirFor(worldId)
           if (!dir) { send(404, { error: `工作区没有世界 ${worldId} 的目录（请先同步）` }); return }
-          const result = await pullWithSnapshot(backendUrl, worldId, dir, worldTokenMap.get(worldId))
+          const result = await pullWithSnapshot(backendUrl, worldId, dir, worldTokenMap.get(worldId), body.force === true)
           send(result.ok ? 200 : 409, result)
         }).catch(() => send(400, { error: 'bad request' }))
         return

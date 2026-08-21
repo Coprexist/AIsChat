@@ -299,6 +299,7 @@ function listWorldDirs() {
 function isMirrorExcluded(relPath) {
   const base = relPath.split("/").pop() ?? relPath;
   if (relPath === ".aischat-world.json") return true;
+  if (relPath === SNAPSHOT_FILE) return true;
   if (base === "__pycache__" || relPath.includes("/__pycache__/")) return true;
   if (base.endsWith(".pyc")) return true;
   if (base === ".DS_Store") return true;
@@ -396,8 +397,10 @@ async function pullWithSnapshot(backendUrl, worldId, dir, token, force = false) 
     };
   }
   const pullTargets = [...cmp.added, ...cmp.changedRemote];
+  if (force) pullTargets.push(...cmp.conflict, ...cmp.changedLocal);
   let pulled = 0;
   let skipped = 0;
+  const pulledOk = [];
   for (const rel of pullTargets) {
     try {
       const res = await backendRequest(backendUrl, "GET", `/world/${worldId}/files/${encodeURIComponent(rel)}`);
@@ -409,31 +412,29 @@ async function pullWithSnapshot(backendUrl, worldId, dir, token, force = false) 
       mkdirSync(join(target, ".."), { recursive: true });
       writeFileSync(target, res.text, "utf8");
       pulled++;
+      pulledOk.push(rel);
     } catch {
       skipped++;
     }
   }
+  const removedOk = [];
   for (const rel of cmp.removed) {
     if (force || !cmp.changedLocal.includes(rel)) {
       try {
         unlinkSync(join(dir, rel));
         pulled++;
+        removedOk.push(rel);
       } catch {
         skipped++;
       }
     }
   }
-  const nextSnap = { v: 1, files: {} };
-  const localFiles = walkDir(dir);
-  for (const p of localFiles) {
-    if (isMirrorExcluded(p)) continue;
-    const rm = tree.find((t) => t.path === p)?.mtime ?? snap.files[p]?.rm ?? 0;
-    nextSnap.files[p] = { lm: statMtime(join(dir, p)), rm };
+  const nextSnap = { v: 1, files: { ...snap.files } };
+  for (const rel of pulledOk) {
+    const rm = tree.find((t) => t.path === rel)?.mtime ?? snap.files[rel]?.rm ?? 0;
+    nextSnap.files[rel] = { lm: statMtime(join(dir, rel)), rm };
   }
-  for (const t of tree) {
-    if (isMirrorExcluded(t.path) || nextSnap.files[t.path]) continue;
-    nextSnap.files[t.path] = { lm: 0, rm: t.mtime };
-  }
+  for (const rel of removedOk) delete nextSnap.files[rel];
   writeSnapshot(dir, nextSnap);
   const parts = [];
   if (cmp.added.length) parts.push(`+${cmp.added.length} \u65B0\u589E`);
@@ -454,9 +455,11 @@ async function pushWithSnapshot(backendUrl, worldId, dir, token, force = false) 
   if (!tree) return { ok: false, message: "\u65E0\u6CD5\u83B7\u53D6\u4E16\u754C\u6587\u4EF6\u6811\uFF08\u9700\u767B\u5F55\u6001\uFF09" };
   const cmp = compareMirror(tree, dir, snap);
   const pushTargets = /* @__PURE__ */ new Set([...cmp.changedLocal, ...cmp.added]);
+  if (force) for (const c of cmp.conflict) pushTargets.add(c);
   let pushed = 0;
   let skipped = 0;
   const errors = [];
+  const pushedOk = [];
   const localFiles = walkDir(dir);
   for (const rel of localFiles) {
     if (!pushTargets.has(rel) || isMirrorExcluded(rel)) continue;
@@ -467,24 +470,31 @@ async function pushWithSnapshot(backendUrl, worldId, dir, token, force = false) 
     try {
       const content = readFileSync(join(dir, rel), "utf8");
       const res = await backendRequest(backendUrl, "PUT", `/worlds/${worldId}/files`, { token, json: { path: rel, content } });
-      if (res.status === 200) pushed++;
-      else errors.push(`${rel} (${res.status})`);
+      if (res.status === 200) {
+        pushed++;
+        pushedOk.push(rel);
+      } else errors.push(`${rel} (${res.status})`);
     } catch {
       errors.push(`${rel}\uFF08\u8BFB\u5199\u5931\u8D25\uFF09`);
     }
   }
+  const removedOk = [];
   for (const p of cmp.removed) {
     if (!force && cmp.conflict.includes(p)) continue;
     const res = await backendRequest(backendUrl, "DELETE", `/worlds/${worldId}/files?path=${encodeURIComponent(p)}`, { token });
-    if (res.status === 200) pushed++;
-    else errors.push(`${p} (\u5220\u9664 ${res.status})`);
+    if (res.status === 200) {
+      pushed++;
+      removedOk.push(p);
+    } else errors.push(`${p} (\u5220\u9664 ${res.status})`);
   }
-  const nextSnap = { v: 1, files: {} };
-  for (const p of localFiles) {
-    if (isMirrorExcluded(p)) continue;
-    const rm = tree.find((t) => t.path === p)?.mtime ?? 0;
-    nextSnap.files[p] = { lm: statMtime(join(dir, p)), rm };
+  let freshTree = tree;
+  if (pushed > 0) freshTree = await fetchRemoteTree(backendUrl, worldId, token) ?? tree;
+  const nextSnap = { v: 1, files: { ...snap.files } };
+  for (const rel of pushedOk) {
+    const rm = freshTree.find((t) => t.path === rel)?.mtime ?? snap.files[rel]?.rm ?? 0;
+    nextSnap.files[rel] = { lm: statMtime(join(dir, rel)), rm };
   }
+  for (const rel of removedOk) delete nextSnap.files[rel];
   writeSnapshot(dir, nextSnap);
   return {
     ok: true,
@@ -613,7 +623,7 @@ function apply(ctx, config) {
             send(404, { error: `\u5DE5\u4F5C\u533A\u6CA1\u6709\u4E16\u754C ${worldId} \u7684\u76EE\u5F55\uFF08\u8BF7\u5148\u540C\u6B65\uFF09` });
             return;
           }
-          const result = await pullWithSnapshot(backendUrl, worldId, dir, worldTokenMap.get(worldId));
+          const result = await pullWithSnapshot(backendUrl, worldId, dir, worldTokenMap.get(worldId), body.force === true);
           send(result.ok ? 200 : 409, result);
         }).catch(() => send(400, { error: "bad request" }));
         return;
