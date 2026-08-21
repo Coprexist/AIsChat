@@ -346,9 +346,10 @@ function backendRequest(
         ...(data ? { 'content-length': String(Buffer.byteLength(data)) } : {}),
       },
     }, (res) => {
-      let text = ''
-      res.on('data', (c) => { text += c })
-      res.on('end', () => resolve({ status: res.statusCode ?? 502, text }))
+      // 用 Buffer 数组收集，最后统一 utf8 解码——避免跨 TCP chunk 截断多字节字符（U+FFFD 乱码）
+      const chunks: Buffer[] = []
+      res.on('data', (c: Buffer) => { chunks.push(Buffer.isBuffer(c) ? c : Buffer.from(c)) })
+      res.on('end', () => resolve({ status: res.statusCode ?? 502, text: Buffer.concat(chunks).toString('utf8') }))
     })
     req.on('error', reject)
     if (data) req.write(data)
@@ -551,11 +552,26 @@ async function pullWithSnapshot(
   const pulledOk: string[] = []
   for (const rel of pullTargets) {
     try {
-      const res = await backendRequest(backendUrl, 'GET', `/world/${worldId}/files/${encodeURIComponent(rel)}`)
-      if (res.status !== 200) { skipped++; continue }
+      let content: string | null = null
+      // HTML 走带 token 的原始读取（静态路由会注入世界变量，拉下来的是注入版）
+      if (/\.html?$/i.test(rel)) {
+        if (!token) { skipped++; continue }
+        const res = await backendRequest(backendUrl, 'GET', `/worlds/${worldId}/files/content?path=${encodeURIComponent(rel)}`, { token })
+        if (res.status !== 200) { skipped++; continue }
+        try {
+          const data = JSON.parse(res.text) as { content?: unknown; binary?: boolean }
+          if (data.binary) { skipped++; continue }
+          content = typeof data.content === 'string' ? data.content : null
+        } catch { skipped++; continue }
+      } else {
+        const res = await backendRequest(backendUrl, 'GET', `/world/${worldId}/files/${encodeURIComponent(rel)}`)
+        if (res.status !== 200) { skipped++; continue }
+        content = res.text
+      }
+      if (content === null) { skipped++; continue }
       const target = join(dir, rel)
       mkdirSync(join(target, '..'), { recursive: true })
-      writeFileSync(target, res.text, 'utf8')
+      writeFileSync(target, content, 'utf8')
       pulled++
       pulledOk.push(rel)
     } catch { skipped++ }

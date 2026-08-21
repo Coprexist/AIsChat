@@ -232,11 +232,11 @@ function backendRequest(backendUrl, method, path, opts = {}) {
         ...data ? { "content-length": String(Buffer.byteLength(data)) } : {}
       }
     }, (res) => {
-      let text = "";
+      const chunks = [];
       res.on("data", (c) => {
-        text += c;
+        chunks.push(Buffer.isBuffer(c) ? c : Buffer.from(c));
       });
-      res.on("end", () => resolve({ status: res.statusCode ?? 502, text }));
+      res.on("end", () => resolve({ status: res.statusCode ?? 502, text: Buffer.concat(chunks).toString("utf8") }));
     });
     req.on("error", reject);
     if (data) req.write(data);
@@ -403,14 +403,43 @@ async function pullWithSnapshot(backendUrl, worldId, dir, token, force = false) 
   const pulledOk = [];
   for (const rel of pullTargets) {
     try {
-      const res = await backendRequest(backendUrl, "GET", `/world/${worldId}/files/${encodeURIComponent(rel)}`);
-      if (res.status !== 200) {
+      let content = null;
+      if (/\.html?$/i.test(rel)) {
+        if (!token) {
+          skipped++;
+          continue;
+        }
+        const res = await backendRequest(backendUrl, "GET", `/worlds/${worldId}/files/content?path=${encodeURIComponent(rel)}`, { token });
+        if (res.status !== 200) {
+          skipped++;
+          continue;
+        }
+        try {
+          const data = JSON.parse(res.text);
+          if (data.binary) {
+            skipped++;
+            continue;
+          }
+          content = typeof data.content === "string" ? data.content : null;
+        } catch {
+          skipped++;
+          continue;
+        }
+      } else {
+        const res = await backendRequest(backendUrl, "GET", `/world/${worldId}/files/${encodeURIComponent(rel)}`);
+        if (res.status !== 200) {
+          skipped++;
+          continue;
+        }
+        content = res.text;
+      }
+      if (content === null) {
         skipped++;
         continue;
       }
       const target = join(dir, rel);
       mkdirSync(join(target, ".."), { recursive: true });
-      writeFileSync(target, res.text, "utf8");
+      writeFileSync(target, content, "utf8");
       pulled++;
       pulledOk.push(rel);
     } catch {
