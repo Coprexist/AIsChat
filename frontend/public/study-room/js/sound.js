@@ -1,13 +1,25 @@
-// ==================== 音频引擎（预生成噪声 buffer 循环播放） ====================
+// ==================== 音频引擎（双 buffer 交叉淡化无缝播放） ====================
 //
-// 不用 AudioWorklet：模块加载在 file:// / http / 受限 iframe 下会失败导致无声。
-// 改为在 main thread 用经典算法（Paul Kellet 粉噪 + 布朗积分）预生成噪声
-// buffer，AudioBufferSourceNode.loop 循环播放——任何环境都能响。
+// 不用 AudioWorklet（模块加载在 file:// / http / 受限 iframe 下会失败导致无声），
+// 也不用单 buffer loop（噪声首尾不连续，每循环一次接缝处有可闻的"断一下"）。
+//
+// 方案：预生成两个不同内容的噪声 buffer（10s），交替播放，切换时 300ms
+// 交叉淡化（一个淡出的同时另一个从开头淡入）——任意环境都能响，且听感无缝。
 'use strict';
 
 let audioCtx = null;
-let sourceNode = null;
 let masterGain = null;
+let swapTimer = null;
+
+// 双 buffer 播放状态：active 是当前出声的 buffer 下标，另一个待切换。
+let bufs = [null, null];
+let srcs = [null, null];
+let gains = [null, null];
+let active = 0;
+
+const BUFFER_SECONDS = 10;   // 每个 buffer 时长
+const FADE = 0.3;            // 交叉淡化时长（秒）
+const SWAP_INTERVAL = BUFFER_SECONDS - FADE; // 每 9.7s 切换一次
 
 // 初始化音频上下文
 async function initAudio() {
@@ -17,9 +29,9 @@ async function initAudio() {
     return audioCtx;
 }
 
-// 预生成指定类型的噪声 buffer（10 秒，端点交叉淡化避免循环咔哒）
-function makeNoiseBuffer(ctx, type, seconds) {
-    seconds = seconds || 10;
+// 预生成指定类型的噪声 buffer（纯 main thread 算法，任何环境可用）
+function makeNoiseBuffer(ctx, type) {
+    const seconds = BUFFER_SECONDS;
     const rate = ctx.sampleRate;
     const len = Math.floor(rate * seconds);
     const buf = ctx.createBuffer(2, len, rate);
@@ -29,7 +41,7 @@ function makeNoiseBuffer(ctx, type, seconds) {
         // 粉噪声状态（Paul Kellet 滤波器）
         let b0 = 0, b1 = 0, b2 = 0, b3 = 0, b4 = 0, b5 = 0, b6 = 0;
         let brown = 0;
-        // 雨滴状态（与旧 AudioWorklet 一致的随机脉冲逻辑）
+        // 雨滴状态：间隔更稀疏、幅度更柔和、衰减更圆润（避免"放鞭炮"感）
         let dropNext = 0, dropPhase = 0, dropDur = 0, dropEnv = 0;
 
         for (let i = 0; i < len; i++) {
@@ -46,19 +58,21 @@ function makeNoiseBuffer(ctx, type, seconds) {
 
             let s = 0;
             if (type === 'rain') {
-                s = pink * 0.3 + brown * 0.04;
+                // 绵密雨幕打底 + 稀疏柔和的滴答点缀
+                s = pink * 0.35 + brown * 0.05;
                 dropNext -= 1 / rate;
                 if (dropNext <= 0) {
-                    dropDur = 0.005 + Math.random() * 0.02;
+                    dropDur = 0.006 + Math.random() * 0.02;
                     dropPhase = dropDur;
-                    dropEnv = 0.08 + Math.random() * 0.15;
-                    dropNext = Math.random() < 0.5
-                        ? 0.008 + Math.random() * 0.012
-                        : 0.02 + Math.random() * 0.06;
+                    dropEnv = 0.04 + Math.random() * 0.08; // 0.04~0.12，原来 0.08~0.23
+                    // 间隔：60% 密集 20~50ms，40% 稀疏 60~210ms（平均≈65ms，密度约为原来一半）
+                    dropNext = Math.random() < 0.6
+                        ? 0.02 + Math.random() * 0.03
+                        : 0.06 + Math.random() * 0.15;
                 }
                 if (dropPhase > 0) {
                     const tt = dropDur - dropPhase;
-                    s += pink * (Math.exp(-tt * 120) * dropEnv);
+                    s += pink * (Math.exp(-tt * 60) * dropEnv); // 衰减系数 120→60，更圆润
                     dropPhase -= 1 / rate;
                 }
             } else if (type === 'forest') {
@@ -69,18 +83,38 @@ function makeNoiseBuffer(ctx, type, seconds) {
             data[i] = s;
         }
     }
-
-    // 端点交叉淡化（首尾各 20ms 淡入/淡出），消除 loop 接缝处的咔哒声
-    const fade = Math.floor(rate * 0.02);
-    for (let ch = 0; ch < 2; ch++) {
-        const data = buf.getChannelData(ch);
-        for (let i = 0; i < fade; i++) {
-            const g = i / fade;
-            data[i] *= g;
-            data[len - 1 - i] *= g;
-        }
-    }
     return buf;
+}
+
+// 创建连接到指定 gain 的 source（从 0 开始播放）
+function makeSource(buffer, gain) {
+    const s = audioCtx.createBufferSource();
+    s.buffer = buffer;
+    s.connect(gain);
+    s.start();
+    return s;
+}
+
+// 交叉淡化切换：淡出当前、淡入另一个（新 source 从开头播，旧的有 FADE 余量自然结束）
+function swapBuffers() {
+    if (!audioCtx || !srcs[0] || !srcs[1]) return;
+    const t = audioCtx.currentTime + 0.02;
+    const next = 1 - active;
+
+    // 淡出当前
+    gains[active].gain.cancelScheduledValues(t);
+    gains[active].gain.setValueAtTime(Math.max(gains[active].gain.value, 0.0001), t);
+    gains[active].gain.linearRampToValueAtTime(0, t + FADE);
+
+    // 旧 source 播完剩余自然结束；新 source 重新从开头播并淡入
+    try { srcs[next].stop(); } catch (e) {}
+    try { srcs[next].disconnect(); } catch (e) {}
+    srcs[next] = makeSource(bufs[next], gains[next]);
+    gains[next].gain.cancelScheduledValues(t);
+    gains[next].gain.setValueAtTime(0, t);
+    gains[next].gain.linearRampToValueAtTime(1, t + FADE);
+
+    active = next;
 }
 
 // 开始播放指定类型的噪声
@@ -107,12 +141,19 @@ async function startNoise(type) {
     masterGain.gain.value = state.settings.volume / 100;
     masterGain.connect(audioCtx.destination);
 
-    // 预生成噪声 buffer 循环播放
-    sourceNode = audioCtx.createBufferSource();
-    sourceNode.buffer = makeNoiseBuffer(audioCtx, type);
-    sourceNode.loop = true;
-    sourceNode.connect(masterGain);
-    sourceNode.start();
+    // 两个不同内容的噪声 buffer + 各自的 gain/source
+    for (let i = 0; i < 2; i++) {
+        bufs[i] = makeNoiseBuffer(audioCtx, type);
+        gains[i] = audioCtx.createGain();
+        gains[i].gain.value = i === 0 ? 1 : 0;
+        gains[i].connect(masterGain);
+    }
+    srcs[0] = makeSource(bufs[0], gains[0]); // 先出声
+    srcs[1] = makeSource(bufs[1], gains[1]); // 静音待命
+    active = 0;
+
+    // 每 SWAP_INTERVAL 秒交叉淡化切换一次（无缝衔接）
+    swapTimer = setInterval(swapBuffers, SWAP_INTERVAL * 1000);
 
     state.soundType = type;
     updateSoundButtons();
@@ -120,10 +161,11 @@ async function startNoise(type) {
 
 // 停止噪声
 function stopNoise() {
-    if (sourceNode) {
-        try { sourceNode.stop(); } catch (e) {}
-        try { sourceNode.disconnect(); } catch (e) {}
-        sourceNode = null;
+    if (swapTimer) { clearInterval(swapTimer); swapTimer = null; }
+    for (let i = 0; i < 2; i++) {
+        if (srcs[i]) { try { srcs[i].stop(); } catch (e) {} try { srcs[i].disconnect(); } catch (e) {} srcs[i] = null; }
+        if (gains[i]) { try { gains[i].disconnect(); } catch (e) {} gains[i] = null; }
+        bufs[i] = null;
     }
     if (masterGain) {
         try { masterGain.disconnect(); } catch (e) {}
