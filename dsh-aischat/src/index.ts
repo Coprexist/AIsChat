@@ -993,7 +993,9 @@ export function apply(ctx: Context, config: Config): void {
     'world_pull',
     '把 AIsChat 世界的最新文件拉取到当前工作区目录（本地世界镜像）。' +
     '带冲突保护：本地有未推送的修改或冲突文件时会拒绝并报告，绝不覆盖你的改动；' +
-    'force=true 时强制以世界为准覆盖。拉取后返回变化清单（新增/修改/删除）。',
+    'force=true 时强制以世界为准覆盖。拉取后返回变化清单（新增/修改/删除）。' +
+    '注意：返回里的 pulled N 是实际下载写盘的文件数（force 覆盖本地改动也计入）；' +
+    'message 报「无变化」只表示远端无新增/修改/删除，不代表没拉东西。',
     { type: 'object', properties: { force: { type: 'boolean', description: 'true 时强制以世界为准覆盖本地（含冲突）' } }, additionalProperties: false },
     async (args, world) => {
       const dir = worldDirFor(world.worldId)
@@ -1010,7 +1012,8 @@ export function apply(ctx: Context, config: Config): void {
     '把当前工作区目录（本地世界镜像）的全部改动同步回 AIsChat 世界。' +
     '只推送本地修改过的文件（带快照对比）；冲突文件（远端也改过）默认跳过并报告，' +
     'force=true 时以本地为准覆盖。排除本地元数据 .aischat-world.json 与 __pycache__。' +
-    '你（agent）用 DSH 原生 read/write/edit/bash 修改工作区文件后调用本工具让改动在 AIsChat 中生效。',
+    '你（agent）用 DSH 原生 read/write/edit/bash 修改工作区文件后调用本工具让改动在 AIsChat 中生效。' +
+    '注意：返回「已同步（无变化）」= 快照认为本地与远端已一致（改动很可能已在远端），用 world_read_file 复核内容，别当没生效。',
     { type: 'object', properties: { force: { type: 'boolean', description: 'true 时以本地为准强制覆盖冲突文件' } }, additionalProperties: false },
     async (args, world) => {
       const dir = worldDirFor(world.worldId)
@@ -1062,6 +1065,7 @@ export function apply(ctx: Context, config: Config): void {
       '工具读写它们（bash 可直接运行世界 Python 代码测试）。修改完成后调用 world_push 把改动同步回 AIsChat 世界；' +
       '若世界在别处被改过、需要最新文件时用 world_pull 主动拉取。' +
       '精确操作（世界 API、绑定群聊消息、唤醒/休眠、沙箱运行）用 world_* 系列工具。' +
+      '同步/限流机制（push「无变化」含义、429 处理、pulled 语义）用 world_view_doc 打开 10 分区查看。' +
       '世界是用户嵌入 DSH 的「可操作对象」——你的推理与工具仍走 DSH 体系，只是操作目标属于 AIsChat。',
   })
 

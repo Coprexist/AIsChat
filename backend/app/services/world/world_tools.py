@@ -16,7 +16,7 @@ from pathlib import Path
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.services.world.world_api_docs import section_intro_text
+from app.services.world.world_api_docs import section_intro_text, _discover_sections
 
 logger = logging.getLogger(__name__)
 
@@ -247,7 +247,7 @@ WORLD_TOOLS = [
             "description": "查看「群视界 API 文档」指定分区的详细接口内容（文档按区分区，此处只列区名与区介绍，需要细节时按需打开对应分区）：\n" + section_intro_text(),
             "parameters": {
                 "type": "object",
-                "properties": {"section": {"type": "string", "description": "分区号（01~08）"}},
+                "properties": {"section": {"type": "string", "description": "分区号（01~" + str(len(_discover_sections())).zfill(2) + "，见上方区列表）"}},
                 "required": ["section"],
             },
         },
