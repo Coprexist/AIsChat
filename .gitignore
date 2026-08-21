@@ -65,3 +65,6 @@ core.*
 backend/core.*
 frontend/public/docs/
 AIsChat-Client
+
+# dsh-aischat 构建符号链接
+/dsh-aischat/node_modules
