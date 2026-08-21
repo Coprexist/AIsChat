@@ -598,6 +598,7 @@ async function pullWithSnapshot(
   if (cmp.added.length) parts.push(`+${cmp.added.length} 新增`)
   if (cmp.changedRemote.length) parts.push(`~${cmp.changedRemote.length} 修改`)
   if (cmp.removed.length) parts.push(`-${cmp.removed.length} 删除`)
+  if (pulled > 0 && !parts.length) parts.push(`↓${pulled} 覆盖`) // force 拉取本地改动/冲突时也如实上报
   return {
     ok: true,
     pulled,

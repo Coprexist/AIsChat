@@ -469,6 +469,7 @@ async function pullWithSnapshot(backendUrl, worldId, dir, token, force = false) 
   if (cmp.added.length) parts.push(`+${cmp.added.length} \u65B0\u589E`);
   if (cmp.changedRemote.length) parts.push(`~${cmp.changedRemote.length} \u4FEE\u6539`);
   if (cmp.removed.length) parts.push(`-${cmp.removed.length} \u5220\u9664`);
+  if (pulled > 0 && !parts.length) parts.push(`\u2193${pulled} \u8986\u76D6`);
   return {
     ok: true,
     pulled,
