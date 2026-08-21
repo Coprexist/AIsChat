@@ -29,56 +29,93 @@ async function initAudio() {
     return audioCtx;
 }
 
-// 预生成指定类型的噪声 buffer（纯 main thread 算法，任何环境可用）
+// 预生成指定类型的噪声 buffer
+// 合成手法（业界共识，参考 Audiokinetic 雨声合成 / procedural audio 滤波塑形）：
+// 白噪/棕噪为源 → 二阶 IIR 滤波塑形（带通雨幕、低通风声、低通涌动）→
+// 慢速 LFO 幅度起伏（风/涌动）→ Kellet 粉噪作森林中频层。
+//   rain  雨幕 = 白噪二阶带通(400~3000Hz) + 白噪二阶带通(1k~4k)水滴短脉冲 + 棕噪湿润
+//   forest 风声 = 棕噪二阶低通(800Hz) + Kellet 粉噪中频 + 白噪二阶低通(1500Hz)叶沙 + 0.11Hz LFO
+//   deep   涌动 = 棕噪二阶低通(450Hz) + 白噪二阶带通(1.5k~2.5k)水泡 + 0.07Hz LFO
 function makeNoiseBuffer(ctx, type) {
     const seconds = BUFFER_SECONDS;
     const rate = ctx.sampleRate;
     const len = Math.floor(rate * seconds);
     const buf = ctx.createBuffer(2, len, rate);
 
+    // 二阶低通系数（级联两个一阶，-24dB/oct 才够塑形）：a = 1 - exp(-2π·fc/fs)
+    const lp = (fc) => 1 - Math.exp(-2 * Math.PI * fc / rate);
+
     for (let ch = 0; ch < 2; ch++) {
         const data = buf.getChannelData(ch);
-        // 粉噪声状态（Paul Kellet 滤波器）
-        let b0 = 0, b1 = 0, b2 = 0, b3 = 0, b4 = 0, b5 = 0, b6 = 0;
-        let brown = 0;
-        // 雨滴状态：间隔更稀疏、幅度更柔和、衰减更圆润（避免"放鞭炮"感）
+        // 各二阶低通状态（每声道独立 → 立体声宽度）；状态按 [s1, s2] 级联
+        const S = (a) => ({ a, s1: 0, s2: 0, lp: function (x) {
+            const t = this.s1 + this.a * (x - this.s1);
+            this.s2 = this.s2 + this.a * (t - this.s2);
+            this.s1 = t;
+            return this.s2;
+        }});
+        const rainBedHi = S(lp(3000)), rainBedLo = S(lp(400));   // 雨幕带通上下界
+        const dropHi = S(lp(4000)), dropLo = S(lp(1000));        // 水滴带通（更像水珠，不刺耳）
+        const windLo = S(lp(800));                                // 森林风声
+        const leafLo = S(lp(1500));                               // 森林叶沙
+        const deepLo = S(lp(450));                                // 深海涌动
+        const bubbleHi = S(lp(2500)), bubbleLo = S(lp(1500));     // 深海气泡带通
+        let brown = 0;   // 棕噪积分器
+        // 经典 Paul Kellet 粉噪状态（森林中频层）
+        let k0 = 0, k1 = 0, k2 = 0, k3 = 0, k4 = 0, k5 = 0, k6 = 0;
+        // 雨滴状态：高通白噪短脉冲（2~8ms），间隔 30~120ms
         let dropNext = 0, dropPhase = 0, dropDur = 0, dropEnv = 0;
+        // LFO 起伏（风声/涌动）：每声道相位错开
+        const lfoFreq = type === 'deep' ? 0.07 : 0.11;
+        const lfoPhase = ch * Math.PI; // 左右错相，立体声更宽
 
         for (let i = 0; i < len; i++) {
-            const w = Math.random() * 2 - 1;
-            b0 = 0.99886 * b0 + w * 0.0555179;
-            b1 = 0.99332 * b1 + w * 0.0750759;
-            b2 = 0.96900 * b2 + w * 0.1538520;
-            b3 = 0.86650 * b3 + w * 0.3104856;
-            b4 = 0.55000 * b4 + w * 0.5329522;
-            b5 = -0.7616 * b5 - w * 0.0168980;
-            const pink = (b0 + b1 + b2 + b3 + b4 + b5 + b6 + w * 0.5362) * 0.11 * 2;
-            b6 = w * 0.115926;
+            const w = Math.random() * 2 - 1;  // 白噪源
             brown = brown * 0.995 + w * 0.005;
+            // 经典 Paul Kellet 粉噪（森林中频层更自然）
+            k0 = 0.99886 * k0 + w * 0.0555179;
+            k1 = 0.99332 * k1 + w * 0.0750759;
+            k2 = 0.96900 * k2 + w * 0.1538520;
+            k3 = 0.86650 * k3 + w * 0.3104856;
+            k4 = 0.55000 * k4 + w * 0.5329522;
+            k5 = -0.7616 * k5 - w * 0.0168980;
+            const pink = (k0 + k1 + k2 + k3 + k4 + k5 + k6 + w * 0.5362) * 0.11 * 2;
+            k6 = w * 0.115926;
 
             let s = 0;
             if (type === 'rain') {
-                // 绵密雨幕打底 + 稀疏柔和的滴答点缀
-                s = pink * 0.35 + brown * 0.05;
+                // 雨幕：白噪 → 二阶带通 400~3000Hz（雨落的"嘶"，主体）
+                const bed = rainBedHi.lp(w) - rainBedLo.lp(w);
+                // 水滴：白噪 → 二阶带通 1000~4000Hz 的短脉冲（点缀，幅度小）
+                const dropNoise = dropHi.lp(w) - dropLo.lp(w);
                 dropNext -= 1 / rate;
                 if (dropNext <= 0) {
-                    dropDur = 0.006 + Math.random() * 0.02;
+                    dropDur = 0.002 + Math.random() * 0.006;
                     dropPhase = dropDur;
-                    dropEnv = 0.04 + Math.random() * 0.08; // 0.04~0.12，原来 0.08~0.23
-                    // 间隔：60% 密集 20~50ms，40% 稀疏 60~210ms（平均≈65ms，密度约为原来一半）
-                    dropNext = Math.random() < 0.6
-                        ? 0.02 + Math.random() * 0.03
-                        : 0.06 + Math.random() * 0.15;
+                    dropEnv = 0.06 + Math.random() * 0.1;
+                    dropNext = 0.03 + Math.random() * 0.09;
                 }
+                let drop = 0;
                 if (dropPhase > 0) {
                     const tt = dropDur - dropPhase;
-                    s += pink * (Math.exp(-tt * 60) * dropEnv); // 衰减系数 120→60，更圆润
+                    drop = dropNoise * (Math.exp(-tt * 400) * dropEnv);
                     dropPhase -= 1 / rate;
                 }
+                s = bed * 1.4 + drop + brown * 0.06;
             } else if (type === 'forest') {
-                s = brown * 0.45 + pink * 0.25;
+                // 风声：棕噪 → 二阶低通800；叶沙：白噪 → 二阶低通1500；中频：Kellet 粉噪
+                const wind = windLo.lp(brown);
+                const leaf = leafLo.lp(w);
+                // 0.11Hz LFO 风起伏（±40%）
+                const lfo = 0.6 + 0.4 * Math.sin(2 * Math.PI * lfoFreq * i / rate + lfoPhase);
+                s = (wind * 0.42 + pink * 0.3 + leaf * 0.14) * lfo;
             } else if (type === 'deep') {
-                s = brown * 0.6 + pink * 0.15;
+                // 涌动：棕噪 → 二阶低通450；水泡：白噪 → 二阶带通(1500~2500)
+                const swell = deepLo.lp(brown);
+                const bubbles = bubbleHi.lp(w) - bubbleLo.lp(w);
+                // 0.07Hz LFO 涌动（±35%）
+                const lfo = 0.65 + 0.35 * Math.sin(2 * Math.PI * lfoFreq * i / rate + lfoPhase);
+                s = (swell * 2.2 + bubbles * 0.15) * lfo;
             }
             data[i] = s;
         }
