@@ -25,7 +25,7 @@ import type { IncomingMessage, ServerResponse } from 'node:http'
 import http from 'node:http'
 import type { Duplex } from 'node:stream'
 import z from '@deepseek-ai/schemastery'
-import { createReadStream, existsSync, statSync, mkdirSync, readFileSync, writeFileSync, realpathSync, readdirSync } from 'node:fs'
+import { createReadStream, existsSync, statSync, mkdirSync, readFileSync, writeFileSync, realpathSync, readdirSync, unlinkSync } from 'node:fs'
 import { join, normalize, extname, sep } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import os from 'node:os'
@@ -289,9 +289,13 @@ function proxyWs(
 const WORLD_DIR_BASE = join(process.env.DSH_HOME ?? join(os.homedir(), '.dsh'), 'aischat-worlds')
 const WORLDS_PREFIX = '/aischat-worlds'
 
-/** sessionId -> { worldId, name }（client 同步时上报）。 */
-const sessionWorldMap = new Map<string, { worldId: number; name: string }>()
-/** sessionId -> AIsChat token（仅内存，供 owner 鉴权写操作；不落盘）。 */
+/**
+ * worldId -> AIsChat token（仅内存，供 owner 鉴权写操作；不落盘）。
+ * 按世界而非会话路由：用户在工作区新建/切换会话不影响 token 归属
+ * （会话可能由 DSH 新建流程创建，sessionId 不稳定；世界目录是稳定标识）。
+ */
+const worldTokenMap = new Map<number, string>()
+/** 兼容旧上报：sessionId -> token（已弃用，保留以兼容旧 client）。 */
 const sessionTokenMap = new Map<string, string>()
 
 /** 目录名清理：去掉文件系统非法字符，保留中文。 */
@@ -415,6 +419,248 @@ function listWorldDirs(): Array<{ dir: string; worldId: number | null; name: str
   return out
 }
 
+/** 世界镜像中应排除的文件（本地元数据 + 运行时产物）。 */
+function isMirrorExcluded(relPath: string): boolean {
+  const base = relPath.split('/').pop() ?? relPath
+  if (relPath === '.aischat-world.json') return true
+  if (base === '__pycache__' || relPath.includes('/__pycache__/')) return true
+  if (base.endsWith('.pyc')) return true
+  if (base === '.DS_Store') return true
+  return false
+}
+
+/** 按 worldId 找工作区世界目录（在 WORLD_DIR_BASE 下匹配 .aischat-world.json）。 */
+function worldDirFor(worldId: number): string | null {
+  try {
+    if (!existsSync(WORLD_DIR_BASE)) return null
+    for (const entry of readdirSync(WORLD_DIR_BASE, { withFileTypes: true })) {
+      if (!entry.isDirectory()) continue
+      const metaPath = join(WORLD_DIR_BASE, entry.name, '.aischat-world.json')
+      try {
+        const meta = JSON.parse(readFileSync(metaPath, 'utf8')) as { worldId?: unknown }
+        if (Number(meta.worldId) === worldId) return join(WORLD_DIR_BASE, entry.name)
+      } catch { /* skip */ }
+    }
+  } catch { /* ignore */ }
+  return null
+}
+
+// ════════════════════════════════════════════════════════════════════
+// GitHub 式双向同步（.aischat-sync.json 快照 + 三路对比）
+//
+// 快照记录每个文件「上次同步时的本地 mtime / 远端 mtime」：
+//   本地 mtime 变了  = 本地有未推送修改（changedLocal）
+//   远端 mtime 变了  = 世界上有改动（changedRemote）
+//   两边都变          = 冲突（conflict，不自动覆盖，交 AI/用户裁决）
+// ════════════════════════════════════════════════════════════════════
+
+interface SyncSnapshot { v: 1; files: Record<string, { lm: number; rm: number }> }
+interface SyncCompare {
+  added: string[]          // 远端有、本地无（可安全拉取）
+  removed: string[]        // 远端无、本地有且本地未改（可安全删除）
+  changedRemote: string[]  // 世界改了、本地未改（可安全拉取）
+  changedLocal: string[]   // 本地改了、世界未改（可安全推送）
+  conflict: string[]       // 两边都改（需裁决）
+}
+
+const SNAPSHOT_FILE = '.aischat-sync.json'
+
+function readSnapshot(dir: string): SyncSnapshot {
+  try {
+    const parsed = JSON.parse(readFileSync(join(dir, SNAPSHOT_FILE), 'utf8')) as SyncSnapshot
+    if (parsed && parsed.v === 1 && parsed.files && typeof parsed.files === 'object') return parsed
+  } catch { /* 无快照或损坏 */ }
+  return { v: 1, files: {} }
+}
+
+function writeSnapshot(dir: string, snap: SyncSnapshot): void {
+  try { writeFileSync(join(dir, SNAPSHOT_FILE), JSON.stringify(snap, null, 2), 'utf8') } catch { /* ignore */ }
+}
+
+function statMtime(p: string): number {
+  try { return statSync(p).mtimeMs } catch { return 0 }
+}
+
+/** 三路对比：世界文件树（path→mtime）vs 本地文件 vs 快照。 */
+function compareMirror(remoteTree: Array<{ path: string; mtime: number }>, dir: string, snap: SyncSnapshot): SyncCompare {
+  const remote = new Map<string, number>()
+  for (const f of remoteTree) if (f.path && !isMirrorExcluded(f.path)) remote.set(f.path, f.mtime)
+  const localFiles = walkDir(dir).filter((p) => !isMirrorExcluded(p))
+  const local = new Map<string, number>()
+  for (const p of localFiles) local.set(p, statMtime(join(dir, p)))
+
+  const out: SyncCompare = { added: [], removed: [], changedRemote: [], changedLocal: [], conflict: [] }
+  const seen = new Set<string>()
+
+  for (const [p, rm] of remote) {
+    seen.add(p)
+    const rec = snap.files[p]
+    const localMtime = local.get(p) ?? 0
+    if (rec === undefined) {
+      if (localMtime === 0) out.added.push(p)
+      else out.changedLocal.push(p) // 本地也有但无快照：视为本地新增，保留本地
+      continue
+    }
+    const remoteChanged = rm !== rec.rm
+    const localChanged = localMtime !== rec.lm
+    if (remoteChanged && localChanged) out.conflict.push(p)
+    else if (remoteChanged) out.changedRemote.push(p)
+    else if (localChanged) out.changedLocal.push(p)
+  }
+  for (const p of local.keys()) {
+    if (seen.has(p)) continue
+    if (snap.files[p] === undefined) out.changedLocal.push(p) // 本地新增
+    else out.removed.push(p) // 之前同步过、现在远端没了
+  }
+  return out
+}
+
+/** 远端文件树（path→mtime；无 token 返回 null）。 */
+async function fetchRemoteTree(backendUrl: string, worldId: number, token?: string): Promise<Array<{ path: string; mtime: number }> | null> {
+  if (!token) return null
+  const tree = await backendRequest(backendUrl, 'GET', `/worlds/${worldId}/files?prefix=`, { token })
+  if (tree.status !== 200) return null
+  try {
+    const files = (JSON.parse(tree.text || '{}') as { files?: Array<{ path: string; mtime?: number }> }).files ?? []
+    return files.map((f) => ({ path: String(f.path ?? ''), mtime: Number(f.mtime) || 0 }))
+  } catch { return null }
+}
+
+/** 拉取（带快照/冲突保护）：本地有未推送修改或冲突时拒绝（force 除外）。 */
+async function pullWithSnapshot(
+  backendUrl: string, worldId: number, dir: string, token: string | undefined, force = false,
+): Promise<{ ok: boolean; message?: string; pulled?: number; skipped?: number; conflict?: string[] }> {
+  const snap = readSnapshot(dir)
+  const tree = await fetchRemoteTree(backendUrl, worldId, token)
+  if (!tree) return { ok: false, message: '无法获取世界文件树（需登录态）' }
+  const cmp = compareMirror(tree, dir, snap)
+
+  if (!force && (cmp.changedLocal.length > 0 || cmp.conflict.length > 0)) {
+    return {
+      ok: false,
+      message: '本地有未推送的修改或冲突，已取消拉取（不会覆盖你的改动）',
+      conflict: cmp.conflict,
+    }
+  }
+
+  const pullTargets = [...cmp.added, ...cmp.changedRemote]
+  let pulled = 0
+  let skipped = 0
+  for (const rel of pullTargets) {
+    try {
+      const res = await backendRequest(backendUrl, 'GET', `/world/${worldId}/files/${encodeURIComponent(rel)}`)
+      if (res.status !== 200) { skipped++; continue }
+      const target = join(dir, rel)
+      mkdirSync(join(target, '..'), { recursive: true })
+      writeFileSync(target, res.text, 'utf8')
+      pulled++
+    } catch { skipped++ }
+  }
+  // 远端删除：本地没改过（或 force）→ 删本地。
+  for (const rel of cmp.removed) {
+    if (force || !cmp.changedLocal.includes(rel)) {
+      try { unlinkSync(join(dir, rel)); pulled++ } catch { skipped++ }
+    }
+  }
+
+  // 更新快照。
+  const nextSnap: SyncSnapshot = { v: 1, files: {} }
+  const localFiles = walkDir(dir)
+  for (const p of localFiles) {
+    if (isMirrorExcluded(p)) continue
+    const rm = tree.find((t) => t.path === p)?.mtime ?? snap.files[p]?.rm ?? 0
+    nextSnap.files[p] = { lm: statMtime(join(dir, p)), rm }
+  }
+  for (const t of tree) {
+    if (isMirrorExcluded(t.path) || nextSnap.files[t.path]) continue
+    nextSnap.files[t.path] = { lm: 0, rm: t.mtime }
+  }
+  writeSnapshot(dir, nextSnap)
+
+  const parts: string[] = []
+  if (cmp.added.length) parts.push(`+${cmp.added.length} 新增`)
+  if (cmp.changedRemote.length) parts.push(`~${cmp.changedRemote.length} 修改`)
+  if (cmp.removed.length) parts.push(`-${cmp.removed.length} 删除`)
+  return {
+    ok: true,
+    pulled,
+    skipped,
+    conflict: cmp.conflict,
+    message: `已拉取世界最新文件${parts.length ? `：${parts.join(' ')}` : '（无变化）'}`,
+  }
+}
+
+/** 推送（带快照/冲突保护）：推本地修改；冲突文件跳过（除非 force）。 */
+async function pushWithSnapshot(
+  backendUrl: string, worldId: number, dir: string, token: string | undefined, force = false,
+): Promise<{ ok: boolean; message?: string; pushed?: number; skipped?: number; conflict?: string[] }> {
+  if (!token) return { ok: false, message: '该世界会话未连接登录态，无法推送（需 owner 权限）' }
+  const snap = readSnapshot(dir)
+  const tree = await fetchRemoteTree(backendUrl, worldId, token)
+  if (!tree) return { ok: false, message: '无法获取世界文件树（需登录态）' }
+  const cmp = compareMirror(tree, dir, snap)
+
+  const pushTargets = new Set([...cmp.changedLocal, ...cmp.added])
+  let pushed = 0
+  let skipped = 0
+  const errors: string[] = []
+  const localFiles = walkDir(dir)
+  for (const rel of localFiles) {
+    if (!pushTargets.has(rel) || isMirrorExcluded(rel)) continue
+    if (cmp.conflict.includes(rel) && !force) { errors.push(`${rel}（冲突，远端也改过——请先裁决或用 force 覆盖）`); continue }
+    try {
+      const content = readFileSync(join(dir, rel), 'utf8')
+      const res = await backendRequest(backendUrl, 'PUT', `/worlds/${worldId}/files`, { token, json: { path: rel, content } })
+      if (res.status === 200) pushed++
+      else errors.push(`${rel} (${res.status})`)
+    } catch { errors.push(`${rel}（读写失败）`) }
+  }
+  // 本地删除（远端有、本地没有且快照有记录）：推删除。
+  for (const p of cmp.removed) {
+    if (!force && cmp.conflict.includes(p)) continue
+    const res = await backendRequest(backendUrl, 'DELETE', `/worlds/${worldId}/files?path=${encodeURIComponent(p)}`, { token })
+    if (res.status === 200) pushed++
+    else errors.push(`${p} (删除 ${res.status})`)
+  }
+
+  const nextSnap: SyncSnapshot = { v: 1, files: {} }
+  for (const p of localFiles) {
+    if (isMirrorExcluded(p)) continue
+    const rm = tree.find((t) => t.path === p)?.mtime ?? 0
+    nextSnap.files[p] = { lm: statMtime(join(dir, p)), rm }
+  }
+  writeSnapshot(dir, nextSnap)
+
+  return {
+    ok: true,
+    pushed,
+    skipped,
+    conflict: cmp.conflict,
+    message: `已同步到世界${pushed ? `（${pushed} 个文件）` : '（无变化）'}`,
+  }
+}
+
+/** 递归列出一个目录下的全部文件（相对路径，跳过 __pycache__）。 */
+function walkDir(root: string): string[] {
+  const out: string[] = []
+  const visit = (dir: string): void => {
+    let entries: Array<{ name: string; isDirectory: () => boolean; isFile: () => boolean; isSymbolicLink: () => boolean }>
+    try { entries = readdirSync(dir, { withFileTypes: true }) } catch { return }
+    for (const e of entries) {
+      const full = join(dir, e.name)
+      const rel = full.slice(root.length).replace(/^[/\\]/, '')
+      if (e.isDirectory()) {
+        if (e.name === '__pycache__') continue
+        visit(full)
+      } else if (e.isFile() || e.isSymbolicLink()) {
+        out.push(rel)
+      }
+    }
+  }
+  visit(root)
+  return out
+}
+
 /** @param ctx - harness context exposing the webServer carrier. */
 export function apply(ctx: Context, config: Config): void {
   const backendUrl = config.backendUrl.replace(/\/+$/, '')
@@ -476,21 +722,35 @@ export function apply(ctx: Context, config: Config): void {
       }
       if (req.method === 'POST' && route === `${WORLDS_PREFIX}/token`) {
         readJsonBody(req).then((body) => {
-          const sessionId = String(body.sessionId ?? '')
+          const worldId = Number(body.worldId)
           const token = String(body.token ?? '')
-          if (!sessionId) { send(400, { error: 'missing sessionId' }); return }
-          sessionTokenMap.set(sessionId, token)
-          ctx.logger?.info?.(`dsh-aischat: token registered for session ${sessionId}`)
+          // 兼容旧上报（sessionId 形式）：忽略 sessionId，仅按 worldId 记。
+          if (!Number.isInteger(worldId) || worldId <= 0) { send(400, { error: 'missing worldId' }); return }
+          if (!token) { send(400, { error: 'missing token' }); return }
+          worldTokenMap.set(worldId, token)
+          ctx.logger?.info?.(`dsh-aischat: token registered for world ${worldId}`)
           send(200, { ok: true })
         }).catch(() => send(400, { error: 'bad request' }))
         return
       }
-      // 诊断：当前 host 内存里的世界会话/token 状态（仅调试用，不含 token 明文）。
+      // 诊断：当前 host 内存里的世界 token 状态（仅调试用，不含 token 明文）。
       if (req.method === 'GET' && route === `${WORLDS_PREFIX}/status`) {
         send(200, {
-          tokenSessions: [...sessionTokenMap.keys()],
+          tokenWorlds: [...worldTokenMap.keys()],
           worldDirs: listWorldDirs(),
         })
+        return
+      }
+      // 拉取世界文件到工作区镜像目录（列文件树需 owner token；读单个文件免鉴权）。
+      if (req.method === 'POST' && route === `${WORLDS_PREFIX}/pull`) {
+        readJsonBody(req).then(async (body) => {
+          const worldId = Number(body.worldId)
+          if (!Number.isInteger(worldId) || worldId <= 0) { send(400, { error: 'invalid worldId' }); return }
+          const dir = worldDirFor(worldId)
+          if (!dir) { send(404, { error: `工作区没有世界 ${worldId} 的目录（请先同步）` }); return }
+          const result = await pullWithSnapshot(backendUrl, worldId, dir, worldTokenMap.get(worldId))
+          send(result.ok ? 200 : 409, result)
+        }).catch(() => send(400, { error: 'bad request' }))
         return
       }
       send(404, { error: 'not found' })
@@ -502,7 +762,9 @@ export function apply(ctx: Context, config: Config): void {
     const session = exec.agent?.session
     const world = resolveWorldFromCwd(session?.header?.cwd)
     if (!world) return null
-    const token = session?.id ? sessionTokenMap.get(String(session.id)) : undefined
+    // 优先按世界取 token（稳定标识）；兼容旧 sessionId 上报。
+    const token = worldTokenMap.get(world.worldId)
+      ?? (session?.id ? sessionTokenMap.get(String(session.id)) : undefined)
     return { ...world, token }
   }
 
@@ -523,7 +785,29 @@ export function apply(ctx: Context, config: Config): void {
           return { error: '当前会话不属于任何 AIsChat 世界：请先在工作区打开一个「AIC群视界-世界名」会话（该会话目录需含 .aischat-world.json）。' }
         }
         try {
-          return await execute((rawArgs ?? {}) as Record<string, unknown>, world)
+          const result = await execute((rawArgs ?? {}) as Record<string, unknown>, world)
+          // 版本提示注入：非同步类工具执行后，若世界有更新未拉取 / 存在冲突，
+          // 在结果上附加提示，让 agent 知道可 world_pull / 需处理冲突（GitHub 式）。
+          if (result && typeof result === 'object' && !toolName.startsWith('world_pull') && !toolName.startsWith('world_push')) {
+            const dir = worldDirFor(world.worldId)
+            if (dir) {
+              try {
+                const snap = readSnapshot(dir)
+                const tree = await fetchRemoteTree(backendUrl, world.worldId, world.token)
+                if (tree) {
+                  const cmp = compareMirror(tree, dir, snap)
+                  const updateCount = cmp.added.length + cmp.changedRemote.length
+                  if (updateCount > 0) {
+                    (result as Record<string, unknown>).updateHint = `世界有 ${updateCount} 个文件更新未拉取（用 world_pull 获取最新；若你刚改过文件，先 world_push）`
+                  }
+                  if (cmp.conflict.length > 0) {
+                    (result as Record<string, unknown>).conflictHint = `以下文件存在同步冲突：${cmp.conflict.slice(0, 5).join(', ')}（用 world_pull / world_push 的 force 裁决）`
+                  }
+                }
+              } catch { /* 提示失败不影响主结果 */ }
+            }
+          }
+          return result
         } catch (e) {
           return { error: String((e as Error).message ?? e) }
         }
@@ -664,12 +948,79 @@ export function apply(ctx: Context, config: Config): void {
     },
   )
 
+  registerWorldTool(
+    'world_pull',
+    '把 AIsChat 世界的最新文件拉取到当前工作区目录（本地世界镜像）。' +
+    '带冲突保护：本地有未推送的修改或冲突文件时会拒绝并报告，绝不覆盖你的改动；' +
+    'force=true 时强制以世界为准覆盖。拉取后返回变化清单（新增/修改/删除）。',
+    { type: 'object', properties: { force: { type: 'boolean', description: 'true 时强制以世界为准覆盖本地（含冲突）' } }, additionalProperties: false },
+    async (args, world) => {
+      const dir = worldDirFor(world.worldId)
+      if (!dir) return { error: '找不到该世界的工作区目录。' }
+      const result = await pullWithSnapshot(backendUrl, world.worldId, dir, world.token, args.force === true)
+      return result.ok
+        ? { ok: true, message: result.message, pulled: result.pulled, skipped: result.skipped, conflict: result.conflict }
+        : { error: result.message, conflict: result.conflict }
+    },
+  )
+
+  registerWorldTool(
+    'world_push',
+    '把当前工作区目录（本地世界镜像）的全部改动同步回 AIsChat 世界。' +
+    '只推送本地修改过的文件（带快照对比）；冲突文件（远端也改过）默认跳过并报告，' +
+    'force=true 时以本地为准覆盖。排除本地元数据 .aischat-world.json 与 __pycache__。' +
+    '你（agent）用 DSH 原生 read/write/edit/bash 修改工作区文件后调用本工具让改动在 AIsChat 中生效。',
+    { type: 'object', properties: { force: { type: 'boolean', description: 'true 时以本地为准强制覆盖冲突文件' } }, additionalProperties: false },
+    async (args, world) => {
+      const dir = worldDirFor(world.worldId)
+      if (!dir) return { error: '找不到该世界的工作区目录。' }
+      const result = await pushWithSnapshot(backendUrl, world.worldId, dir, world.token, args.force === true)
+      return result.ok
+        ? { ok: true, message: result.message, pushed: result.pushed, skipped: result.skipped, conflict: result.conflict }
+        : { error: result.message, conflict: result.conflict }
+    },
+  )
+
+  registerWorldTool(
+    'world_run',
+    '在 AIsChat 后端沙箱中运行一段 Python 代码（世界上下文：注入 WORLD_ID/WORLD_API_TOKEN 等环境；配额默认 24MB/10s）。' +
+    '适合测试世界逻辑；完整的页面/逻辑改动请用 DSH 原生工具改工作区文件 + world_push。',
+    { type: 'object', properties: { code: { type: 'string', description: '要运行的 Python 代码' }, entry: { type: 'string', description: '可选入口，如 main.py' } }, required: ['code'], additionalProperties: false },
+    async (args, world) => {
+      if (!world.token) return { error: '该世界会话未连接登录态，无法运行世界代码（需 owner 权限）。' }
+      const res = await backendRequest(backendUrl, 'POST', `/worlds/${world.worldId}/run`, {
+        token: world.token,
+        json: { code: String(args.code ?? ''), entry: args.entry ? String(args.entry) : undefined },
+      })
+      if (res.status >= 400) return { error: `运行失败 (${res.status})`, detail: res.text.slice(0, 400) }
+      try { return JSON.parse(res.text) as unknown } catch { return { ok: true, content: res.text.slice(0, 60000) } }
+    },
+  )
+
+  registerWorldTool(
+    'world_trigger',
+    '触发当前 AIsChat 世界入口的 handle(event)（世界沙箱），用于测试世界对事件的响应。',
+    { type: 'object', properties: { event: { type: 'object', description: '事件载荷，如 {type: "message", ...}' }, entry: { type: 'string', description: '可选入口，如 main.py' } }, required: ['event'], additionalProperties: false },
+    async (args, world) => {
+      if (!world.token) return { error: '该世界会话未连接登录态，无法触发世界（需 owner 权限）。' }
+      const res = await backendRequest(backendUrl, 'POST', `/worlds/${world.worldId}/trigger`, {
+        token: world.token,
+        json: { event: args.event ?? {}, entry: args.entry ? String(args.entry) : undefined },
+      })
+      if (res.status >= 400) return { error: `触发失败 (${res.status})`, detail: res.text.slice(0, 400) }
+      try { return JSON.parse(res.text) as unknown } catch { return { ok: true, content: res.text.slice(0, 60000) } }
+    },
+  )
+
   // ── 世界会话提示词（泛化引导，不依赖具体会话） ─────────────────────
   ctx.systemPrompt.section({
     name: 'aischat-world-context',
     order: 150,
     text: '如果你的会话工作目录位于 aischat-worlds 目录下（目录名以「AIC群视界-」开头），你正在操作一个 AIsChat 群视界世界：' +
-      '该世界的页面代码、数据与群聊都属于它。可用 world_* 系列工具读写世界文件、调用世界 API、收发绑定群聊消息、唤醒/休眠世界。' +
+      '该工作目录是世界的「本地镜像」——世界页面代码、数据文件都在里面，你可以直接用 DSH 原生的 read/write/edit/glob/grep/bash ' +
+      '工具读写它们（bash 可直接运行世界 Python 代码测试）。修改完成后调用 world_push 把改动同步回 AIsChat 世界；' +
+      '若世界在别处被改过、需要最新文件时用 world_pull 主动拉取。' +
+      '精确操作（世界 API、绑定群聊消息、唤醒/休眠、沙箱运行）用 world_* 系列工具。' +
       '世界是用户嵌入 DSH 的「可操作对象」——你的推理与工具仍走 DSH 体系，只是操作目标属于 AIsChat。',
   })
 

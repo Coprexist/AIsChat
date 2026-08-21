@@ -1059,15 +1059,19 @@ module.exports = {
           if (!ws) continue;
           const workspaceId = ws.workspaceId || ws.id;
           if (!workspaceId) continue;
-          const sessionId = await ctx.workspaces.connectWorkspace(workspaceId).catch(() => null);
-          if (sessionId) {
-            await fetch("/aischat-worlds/token", {
-              method: "POST",
-              headers: { "content-type": "application/json" },
-              body: JSON.stringify({ sessionId, token: store.token })
-            }).catch(() => {
-            });
-          }
+          await ctx.workspaces.connectWorkspace(workspaceId).catch(() => null);
+          await fetch("/aischat-worlds/token", {
+            method: "POST",
+            headers: { "content-type": "application/json" },
+            body: JSON.stringify({ worldId: w.id, token: store.token })
+          }).catch(() => {
+          });
+          await fetch("/aischat-worlds/pull", {
+            method: "POST",
+            headers: { "content-type": "application/json" },
+            body: JSON.stringify({ worldId: w.id })
+          }).catch(() => {
+          });
         }
       } catch {
       }

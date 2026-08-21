@@ -1,7 +1,7 @@
 // src/index.ts
 import http from "node:http";
 import z from "@deepseek-ai/schemastery";
-import { createReadStream, existsSync, statSync, mkdirSync, readFileSync, writeFileSync, realpathSync, readdirSync } from "node:fs";
+import { createReadStream, existsSync, statSync, mkdirSync, readFileSync, writeFileSync, realpathSync, readdirSync, unlinkSync } from "node:fs";
 import { join, normalize, extname, sep } from "node:path";
 import { fileURLToPath } from "node:url";
 import os from "node:os";
@@ -181,6 +181,7 @@ function proxyWs(backendUrl, req, socket, head) {
 }
 var WORLD_DIR_BASE = join(process.env.DSH_HOME ?? join(os.homedir(), ".dsh"), "aischat-worlds");
 var WORLDS_PREFIX = "/aischat-worlds";
+var worldTokenMap = /* @__PURE__ */ new Map();
 var sessionTokenMap = /* @__PURE__ */ new Map();
 function sanitizeDirName(name2) {
   return String(name2 || "").replace(/[\\/:*?"<>|\u0000-\u001f]/g, "_").trim() || "\u672A\u547D\u540D\u4E16\u754C";
@@ -295,6 +296,227 @@ function listWorldDirs() {
   }
   return out;
 }
+function isMirrorExcluded(relPath) {
+  const base = relPath.split("/").pop() ?? relPath;
+  if (relPath === ".aischat-world.json") return true;
+  if (base === "__pycache__" || relPath.includes("/__pycache__/")) return true;
+  if (base.endsWith(".pyc")) return true;
+  if (base === ".DS_Store") return true;
+  return false;
+}
+function worldDirFor(worldId) {
+  try {
+    if (!existsSync(WORLD_DIR_BASE)) return null;
+    for (const entry of readdirSync(WORLD_DIR_BASE, { withFileTypes: true })) {
+      if (!entry.isDirectory()) continue;
+      const metaPath = join(WORLD_DIR_BASE, entry.name, ".aischat-world.json");
+      try {
+        const meta = JSON.parse(readFileSync(metaPath, "utf8"));
+        if (Number(meta.worldId) === worldId) return join(WORLD_DIR_BASE, entry.name);
+      } catch {
+      }
+    }
+  } catch {
+  }
+  return null;
+}
+var SNAPSHOT_FILE = ".aischat-sync.json";
+function readSnapshot(dir) {
+  try {
+    const parsed = JSON.parse(readFileSync(join(dir, SNAPSHOT_FILE), "utf8"));
+    if (parsed && parsed.v === 1 && parsed.files && typeof parsed.files === "object") return parsed;
+  } catch {
+  }
+  return { v: 1, files: {} };
+}
+function writeSnapshot(dir, snap) {
+  try {
+    writeFileSync(join(dir, SNAPSHOT_FILE), JSON.stringify(snap, null, 2), "utf8");
+  } catch {
+  }
+}
+function statMtime(p) {
+  try {
+    return statSync(p).mtimeMs;
+  } catch {
+    return 0;
+  }
+}
+function compareMirror(remoteTree, dir, snap) {
+  const remote = /* @__PURE__ */ new Map();
+  for (const f of remoteTree) if (f.path && !isMirrorExcluded(f.path)) remote.set(f.path, f.mtime);
+  const localFiles = walkDir(dir).filter((p) => !isMirrorExcluded(p));
+  const local = /* @__PURE__ */ new Map();
+  for (const p of localFiles) local.set(p, statMtime(join(dir, p)));
+  const out = { added: [], removed: [], changedRemote: [], changedLocal: [], conflict: [] };
+  const seen = /* @__PURE__ */ new Set();
+  for (const [p, rm] of remote) {
+    seen.add(p);
+    const rec = snap.files[p];
+    const localMtime = local.get(p) ?? 0;
+    if (rec === void 0) {
+      if (localMtime === 0) out.added.push(p);
+      else out.changedLocal.push(p);
+      continue;
+    }
+    const remoteChanged = rm !== rec.rm;
+    const localChanged = localMtime !== rec.lm;
+    if (remoteChanged && localChanged) out.conflict.push(p);
+    else if (remoteChanged) out.changedRemote.push(p);
+    else if (localChanged) out.changedLocal.push(p);
+  }
+  for (const p of local.keys()) {
+    if (seen.has(p)) continue;
+    if (snap.files[p] === void 0) out.changedLocal.push(p);
+    else out.removed.push(p);
+  }
+  return out;
+}
+async function fetchRemoteTree(backendUrl, worldId, token) {
+  if (!token) return null;
+  const tree = await backendRequest(backendUrl, "GET", `/worlds/${worldId}/files?prefix=`, { token });
+  if (tree.status !== 200) return null;
+  try {
+    const files = JSON.parse(tree.text || "{}").files ?? [];
+    return files.map((f) => ({ path: String(f.path ?? ""), mtime: Number(f.mtime) || 0 }));
+  } catch {
+    return null;
+  }
+}
+async function pullWithSnapshot(backendUrl, worldId, dir, token, force = false) {
+  const snap = readSnapshot(dir);
+  const tree = await fetchRemoteTree(backendUrl, worldId, token);
+  if (!tree) return { ok: false, message: "\u65E0\u6CD5\u83B7\u53D6\u4E16\u754C\u6587\u4EF6\u6811\uFF08\u9700\u767B\u5F55\u6001\uFF09" };
+  const cmp = compareMirror(tree, dir, snap);
+  if (!force && (cmp.changedLocal.length > 0 || cmp.conflict.length > 0)) {
+    return {
+      ok: false,
+      message: "\u672C\u5730\u6709\u672A\u63A8\u9001\u7684\u4FEE\u6539\u6216\u51B2\u7A81\uFF0C\u5DF2\u53D6\u6D88\u62C9\u53D6\uFF08\u4E0D\u4F1A\u8986\u76D6\u4F60\u7684\u6539\u52A8\uFF09",
+      conflict: cmp.conflict
+    };
+  }
+  const pullTargets = [...cmp.added, ...cmp.changedRemote];
+  let pulled = 0;
+  let skipped = 0;
+  for (const rel of pullTargets) {
+    try {
+      const res = await backendRequest(backendUrl, "GET", `/world/${worldId}/files/${encodeURIComponent(rel)}`);
+      if (res.status !== 200) {
+        skipped++;
+        continue;
+      }
+      const target = join(dir, rel);
+      mkdirSync(join(target, ".."), { recursive: true });
+      writeFileSync(target, res.text, "utf8");
+      pulled++;
+    } catch {
+      skipped++;
+    }
+  }
+  for (const rel of cmp.removed) {
+    if (force || !cmp.changedLocal.includes(rel)) {
+      try {
+        unlinkSync(join(dir, rel));
+        pulled++;
+      } catch {
+        skipped++;
+      }
+    }
+  }
+  const nextSnap = { v: 1, files: {} };
+  const localFiles = walkDir(dir);
+  for (const p of localFiles) {
+    if (isMirrorExcluded(p)) continue;
+    const rm = tree.find((t) => t.path === p)?.mtime ?? snap.files[p]?.rm ?? 0;
+    nextSnap.files[p] = { lm: statMtime(join(dir, p)), rm };
+  }
+  for (const t of tree) {
+    if (isMirrorExcluded(t.path) || nextSnap.files[t.path]) continue;
+    nextSnap.files[t.path] = { lm: 0, rm: t.mtime };
+  }
+  writeSnapshot(dir, nextSnap);
+  const parts = [];
+  if (cmp.added.length) parts.push(`+${cmp.added.length} \u65B0\u589E`);
+  if (cmp.changedRemote.length) parts.push(`~${cmp.changedRemote.length} \u4FEE\u6539`);
+  if (cmp.removed.length) parts.push(`-${cmp.removed.length} \u5220\u9664`);
+  return {
+    ok: true,
+    pulled,
+    skipped,
+    conflict: cmp.conflict,
+    message: `\u5DF2\u62C9\u53D6\u4E16\u754C\u6700\u65B0\u6587\u4EF6${parts.length ? `\uFF1A${parts.join(" ")}` : "\uFF08\u65E0\u53D8\u5316\uFF09"}`
+  };
+}
+async function pushWithSnapshot(backendUrl, worldId, dir, token, force = false) {
+  if (!token) return { ok: false, message: "\u8BE5\u4E16\u754C\u4F1A\u8BDD\u672A\u8FDE\u63A5\u767B\u5F55\u6001\uFF0C\u65E0\u6CD5\u63A8\u9001\uFF08\u9700 owner \u6743\u9650\uFF09" };
+  const snap = readSnapshot(dir);
+  const tree = await fetchRemoteTree(backendUrl, worldId, token);
+  if (!tree) return { ok: false, message: "\u65E0\u6CD5\u83B7\u53D6\u4E16\u754C\u6587\u4EF6\u6811\uFF08\u9700\u767B\u5F55\u6001\uFF09" };
+  const cmp = compareMirror(tree, dir, snap);
+  const pushTargets = /* @__PURE__ */ new Set([...cmp.changedLocal, ...cmp.added]);
+  let pushed = 0;
+  let skipped = 0;
+  const errors = [];
+  const localFiles = walkDir(dir);
+  for (const rel of localFiles) {
+    if (!pushTargets.has(rel) || isMirrorExcluded(rel)) continue;
+    if (cmp.conflict.includes(rel) && !force) {
+      errors.push(`${rel}\uFF08\u51B2\u7A81\uFF0C\u8FDC\u7AEF\u4E5F\u6539\u8FC7\u2014\u2014\u8BF7\u5148\u88C1\u51B3\u6216\u7528 force \u8986\u76D6\uFF09`);
+      continue;
+    }
+    try {
+      const content = readFileSync(join(dir, rel), "utf8");
+      const res = await backendRequest(backendUrl, "PUT", `/worlds/${worldId}/files`, { token, json: { path: rel, content } });
+      if (res.status === 200) pushed++;
+      else errors.push(`${rel} (${res.status})`);
+    } catch {
+      errors.push(`${rel}\uFF08\u8BFB\u5199\u5931\u8D25\uFF09`);
+    }
+  }
+  for (const p of cmp.removed) {
+    if (!force && cmp.conflict.includes(p)) continue;
+    const res = await backendRequest(backendUrl, "DELETE", `/worlds/${worldId}/files?path=${encodeURIComponent(p)}`, { token });
+    if (res.status === 200) pushed++;
+    else errors.push(`${p} (\u5220\u9664 ${res.status})`);
+  }
+  const nextSnap = { v: 1, files: {} };
+  for (const p of localFiles) {
+    if (isMirrorExcluded(p)) continue;
+    const rm = tree.find((t) => t.path === p)?.mtime ?? 0;
+    nextSnap.files[p] = { lm: statMtime(join(dir, p)), rm };
+  }
+  writeSnapshot(dir, nextSnap);
+  return {
+    ok: true,
+    pushed,
+    skipped,
+    conflict: cmp.conflict,
+    message: `\u5DF2\u540C\u6B65\u5230\u4E16\u754C${pushed ? `\uFF08${pushed} \u4E2A\u6587\u4EF6\uFF09` : "\uFF08\u65E0\u53D8\u5316\uFF09"}`
+  };
+}
+function walkDir(root) {
+  const out = [];
+  const visit = (dir) => {
+    let entries;
+    try {
+      entries = readdirSync(dir, { withFileTypes: true });
+    } catch {
+      return;
+    }
+    for (const e of entries) {
+      const full = join(dir, e.name);
+      const rel = full.slice(root.length).replace(/^[/\\]/, "");
+      if (e.isDirectory()) {
+        if (e.name === "__pycache__") continue;
+        visit(full);
+      } else if (e.isFile() || e.isSymbolicLink()) {
+        out.push(rel);
+      }
+    }
+  };
+  visit(root);
+  return out;
+}
 function apply(ctx, config) {
   const backendUrl = config.backendUrl.replace(/\/+$/, "");
   ctx.webServer.register({
@@ -356,23 +578,44 @@ function apply(ctx, config) {
       }
       if (req.method === "POST" && route === `${WORLDS_PREFIX}/token`) {
         readJsonBody(req).then((body) => {
-          const sessionId = String(body.sessionId ?? "");
+          const worldId = Number(body.worldId);
           const token = String(body.token ?? "");
-          if (!sessionId) {
-            send(400, { error: "missing sessionId" });
+          if (!Number.isInteger(worldId) || worldId <= 0) {
+            send(400, { error: "missing worldId" });
             return;
           }
-          sessionTokenMap.set(sessionId, token);
-          ctx.logger?.info?.(`dsh-aischat: token registered for session ${sessionId}`);
+          if (!token) {
+            send(400, { error: "missing token" });
+            return;
+          }
+          worldTokenMap.set(worldId, token);
+          ctx.logger?.info?.(`dsh-aischat: token registered for world ${worldId}`);
           send(200, { ok: true });
         }).catch(() => send(400, { error: "bad request" }));
         return;
       }
       if (req.method === "GET" && route === `${WORLDS_PREFIX}/status`) {
         send(200, {
-          tokenSessions: [...sessionTokenMap.keys()],
+          tokenWorlds: [...worldTokenMap.keys()],
           worldDirs: listWorldDirs()
         });
+        return;
+      }
+      if (req.method === "POST" && route === `${WORLDS_PREFIX}/pull`) {
+        readJsonBody(req).then(async (body) => {
+          const worldId = Number(body.worldId);
+          if (!Number.isInteger(worldId) || worldId <= 0) {
+            send(400, { error: "invalid worldId" });
+            return;
+          }
+          const dir = worldDirFor(worldId);
+          if (!dir) {
+            send(404, { error: `\u5DE5\u4F5C\u533A\u6CA1\u6709\u4E16\u754C ${worldId} \u7684\u76EE\u5F55\uFF08\u8BF7\u5148\u540C\u6B65\uFF09` });
+            return;
+          }
+          const result = await pullWithSnapshot(backendUrl, worldId, dir, worldTokenMap.get(worldId));
+          send(result.ok ? 200 : 409, result);
+        }).catch(() => send(400, { error: "bad request" }));
         return;
       }
       send(404, { error: "not found" });
@@ -382,7 +625,7 @@ function apply(ctx, config) {
     const session = exec.agent?.session;
     const world = resolveWorldFromCwd(session?.header?.cwd);
     if (!world) return null;
-    const token = session?.id ? sessionTokenMap.get(String(session.id)) : void 0;
+    const token = worldTokenMap.get(world.worldId) ?? (session?.id ? sessionTokenMap.get(String(session.id)) : void 0);
     return { ...world, token };
   };
   const registerWorldTool = (toolName, description, parameters, execute) => {
@@ -397,7 +640,28 @@ function apply(ctx, config) {
           return { error: "\u5F53\u524D\u4F1A\u8BDD\u4E0D\u5C5E\u4E8E\u4EFB\u4F55 AIsChat \u4E16\u754C\uFF1A\u8BF7\u5148\u5728\u5DE5\u4F5C\u533A\u6253\u5F00\u4E00\u4E2A\u300CAIC\u7FA4\u89C6\u754C-\u4E16\u754C\u540D\u300D\u4F1A\u8BDD\uFF08\u8BE5\u4F1A\u8BDD\u76EE\u5F55\u9700\u542B .aischat-world.json\uFF09\u3002" };
         }
         try {
-          return await execute(rawArgs ?? {}, world);
+          const result = await execute(rawArgs ?? {}, world);
+          if (result && typeof result === "object" && !toolName.startsWith("world_pull") && !toolName.startsWith("world_push")) {
+            const dir = worldDirFor(world.worldId);
+            if (dir) {
+              try {
+                const snap = readSnapshot(dir);
+                const tree = await fetchRemoteTree(backendUrl, world.worldId, world.token);
+                if (tree) {
+                  const cmp = compareMirror(tree, dir, snap);
+                  const updateCount = cmp.added.length + cmp.changedRemote.length;
+                  if (updateCount > 0) {
+                    result.updateHint = `\u4E16\u754C\u6709 ${updateCount} \u4E2A\u6587\u4EF6\u66F4\u65B0\u672A\u62C9\u53D6\uFF08\u7528 world_pull \u83B7\u53D6\u6700\u65B0\uFF1B\u82E5\u4F60\u521A\u6539\u8FC7\u6587\u4EF6\uFF0C\u5148 world_push\uFF09`;
+                  }
+                  if (cmp.conflict.length > 0) {
+                    result.conflictHint = `\u4EE5\u4E0B\u6587\u4EF6\u5B58\u5728\u540C\u6B65\u51B2\u7A81\uFF1A${cmp.conflict.slice(0, 5).join(", ")}\uFF08\u7528 world_pull / world_push \u7684 force \u88C1\u51B3\uFF09`;
+                  }
+                }
+              } catch {
+              }
+            }
+          }
+          return result;
         } catch (e) {
           return { error: String(e.message ?? e) };
         }
@@ -550,10 +814,68 @@ function apply(ctx, config) {
       }
     }
   );
+  registerWorldTool(
+    "world_pull",
+    "\u628A AIsChat \u4E16\u754C\u7684\u6700\u65B0\u6587\u4EF6\u62C9\u53D6\u5230\u5F53\u524D\u5DE5\u4F5C\u533A\u76EE\u5F55\uFF08\u672C\u5730\u4E16\u754C\u955C\u50CF\uFF09\u3002\u5E26\u51B2\u7A81\u4FDD\u62A4\uFF1A\u672C\u5730\u6709\u672A\u63A8\u9001\u7684\u4FEE\u6539\u6216\u51B2\u7A81\u6587\u4EF6\u65F6\u4F1A\u62D2\u7EDD\u5E76\u62A5\u544A\uFF0C\u7EDD\u4E0D\u8986\u76D6\u4F60\u7684\u6539\u52A8\uFF1Bforce=true \u65F6\u5F3A\u5236\u4EE5\u4E16\u754C\u4E3A\u51C6\u8986\u76D6\u3002\u62C9\u53D6\u540E\u8FD4\u56DE\u53D8\u5316\u6E05\u5355\uFF08\u65B0\u589E/\u4FEE\u6539/\u5220\u9664\uFF09\u3002",
+    { type: "object", properties: { force: { type: "boolean", description: "true \u65F6\u5F3A\u5236\u4EE5\u4E16\u754C\u4E3A\u51C6\u8986\u76D6\u672C\u5730\uFF08\u542B\u51B2\u7A81\uFF09" } }, additionalProperties: false },
+    async (args, world) => {
+      const dir = worldDirFor(world.worldId);
+      if (!dir) return { error: "\u627E\u4E0D\u5230\u8BE5\u4E16\u754C\u7684\u5DE5\u4F5C\u533A\u76EE\u5F55\u3002" };
+      const result = await pullWithSnapshot(backendUrl, world.worldId, dir, world.token, args.force === true);
+      return result.ok ? { ok: true, message: result.message, pulled: result.pulled, skipped: result.skipped, conflict: result.conflict } : { error: result.message, conflict: result.conflict };
+    }
+  );
+  registerWorldTool(
+    "world_push",
+    "\u628A\u5F53\u524D\u5DE5\u4F5C\u533A\u76EE\u5F55\uFF08\u672C\u5730\u4E16\u754C\u955C\u50CF\uFF09\u7684\u5168\u90E8\u6539\u52A8\u540C\u6B65\u56DE AIsChat \u4E16\u754C\u3002\u53EA\u63A8\u9001\u672C\u5730\u4FEE\u6539\u8FC7\u7684\u6587\u4EF6\uFF08\u5E26\u5FEB\u7167\u5BF9\u6BD4\uFF09\uFF1B\u51B2\u7A81\u6587\u4EF6\uFF08\u8FDC\u7AEF\u4E5F\u6539\u8FC7\uFF09\u9ED8\u8BA4\u8DF3\u8FC7\u5E76\u62A5\u544A\uFF0Cforce=true \u65F6\u4EE5\u672C\u5730\u4E3A\u51C6\u8986\u76D6\u3002\u6392\u9664\u672C\u5730\u5143\u6570\u636E .aischat-world.json \u4E0E __pycache__\u3002\u4F60\uFF08agent\uFF09\u7528 DSH \u539F\u751F read/write/edit/bash \u4FEE\u6539\u5DE5\u4F5C\u533A\u6587\u4EF6\u540E\u8C03\u7528\u672C\u5DE5\u5177\u8BA9\u6539\u52A8\u5728 AIsChat \u4E2D\u751F\u6548\u3002",
+    { type: "object", properties: { force: { type: "boolean", description: "true \u65F6\u4EE5\u672C\u5730\u4E3A\u51C6\u5F3A\u5236\u8986\u76D6\u51B2\u7A81\u6587\u4EF6" } }, additionalProperties: false },
+    async (args, world) => {
+      const dir = worldDirFor(world.worldId);
+      if (!dir) return { error: "\u627E\u4E0D\u5230\u8BE5\u4E16\u754C\u7684\u5DE5\u4F5C\u533A\u76EE\u5F55\u3002" };
+      const result = await pushWithSnapshot(backendUrl, world.worldId, dir, world.token, args.force === true);
+      return result.ok ? { ok: true, message: result.message, pushed: result.pushed, skipped: result.skipped, conflict: result.conflict } : { error: result.message, conflict: result.conflict };
+    }
+  );
+  registerWorldTool(
+    "world_run",
+    "\u5728 AIsChat \u540E\u7AEF\u6C99\u7BB1\u4E2D\u8FD0\u884C\u4E00\u6BB5 Python \u4EE3\u7801\uFF08\u4E16\u754C\u4E0A\u4E0B\u6587\uFF1A\u6CE8\u5165 WORLD_ID/WORLD_API_TOKEN \u7B49\u73AF\u5883\uFF1B\u914D\u989D\u9ED8\u8BA4 24MB/10s\uFF09\u3002\u9002\u5408\u6D4B\u8BD5\u4E16\u754C\u903B\u8F91\uFF1B\u5B8C\u6574\u7684\u9875\u9762/\u903B\u8F91\u6539\u52A8\u8BF7\u7528 DSH \u539F\u751F\u5DE5\u5177\u6539\u5DE5\u4F5C\u533A\u6587\u4EF6 + world_push\u3002",
+    { type: "object", properties: { code: { type: "string", description: "\u8981\u8FD0\u884C\u7684 Python \u4EE3\u7801" }, entry: { type: "string", description: "\u53EF\u9009\u5165\u53E3\uFF0C\u5982 main.py" } }, required: ["code"], additionalProperties: false },
+    async (args, world) => {
+      if (!world.token) return { error: "\u8BE5\u4E16\u754C\u4F1A\u8BDD\u672A\u8FDE\u63A5\u767B\u5F55\u6001\uFF0C\u65E0\u6CD5\u8FD0\u884C\u4E16\u754C\u4EE3\u7801\uFF08\u9700 owner \u6743\u9650\uFF09\u3002" };
+      const res = await backendRequest(backendUrl, "POST", `/worlds/${world.worldId}/run`, {
+        token: world.token,
+        json: { code: String(args.code ?? ""), entry: args.entry ? String(args.entry) : void 0 }
+      });
+      if (res.status >= 400) return { error: `\u8FD0\u884C\u5931\u8D25 (${res.status})`, detail: res.text.slice(0, 400) };
+      try {
+        return JSON.parse(res.text);
+      } catch {
+        return { ok: true, content: res.text.slice(0, 6e4) };
+      }
+    }
+  );
+  registerWorldTool(
+    "world_trigger",
+    "\u89E6\u53D1\u5F53\u524D AIsChat \u4E16\u754C\u5165\u53E3\u7684 handle(event)\uFF08\u4E16\u754C\u6C99\u7BB1\uFF09\uFF0C\u7528\u4E8E\u6D4B\u8BD5\u4E16\u754C\u5BF9\u4E8B\u4EF6\u7684\u54CD\u5E94\u3002",
+    { type: "object", properties: { event: { type: "object", description: '\u4E8B\u4EF6\u8F7D\u8377\uFF0C\u5982 {type: "message", ...}' }, entry: { type: "string", description: "\u53EF\u9009\u5165\u53E3\uFF0C\u5982 main.py" } }, required: ["event"], additionalProperties: false },
+    async (args, world) => {
+      if (!world.token) return { error: "\u8BE5\u4E16\u754C\u4F1A\u8BDD\u672A\u8FDE\u63A5\u767B\u5F55\u6001\uFF0C\u65E0\u6CD5\u89E6\u53D1\u4E16\u754C\uFF08\u9700 owner \u6743\u9650\uFF09\u3002" };
+      const res = await backendRequest(backendUrl, "POST", `/worlds/${world.worldId}/trigger`, {
+        token: world.token,
+        json: { event: args.event ?? {}, entry: args.entry ? String(args.entry) : void 0 }
+      });
+      if (res.status >= 400) return { error: `\u89E6\u53D1\u5931\u8D25 (${res.status})`, detail: res.text.slice(0, 400) };
+      try {
+        return JSON.parse(res.text);
+      } catch {
+        return { ok: true, content: res.text.slice(0, 6e4) };
+      }
+    }
+  );
   ctx.systemPrompt.section({
     name: "aischat-world-context",
     order: 150,
-    text: "\u5982\u679C\u4F60\u7684\u4F1A\u8BDD\u5DE5\u4F5C\u76EE\u5F55\u4F4D\u4E8E aischat-worlds \u76EE\u5F55\u4E0B\uFF08\u76EE\u5F55\u540D\u4EE5\u300CAIC\u7FA4\u89C6\u754C-\u300D\u5F00\u5934\uFF09\uFF0C\u4F60\u6B63\u5728\u64CD\u4F5C\u4E00\u4E2A AIsChat \u7FA4\u89C6\u754C\u4E16\u754C\uFF1A\u8BE5\u4E16\u754C\u7684\u9875\u9762\u4EE3\u7801\u3001\u6570\u636E\u4E0E\u7FA4\u804A\u90FD\u5C5E\u4E8E\u5B83\u3002\u53EF\u7528 world_* \u7CFB\u5217\u5DE5\u5177\u8BFB\u5199\u4E16\u754C\u6587\u4EF6\u3001\u8C03\u7528\u4E16\u754C API\u3001\u6536\u53D1\u7ED1\u5B9A\u7FA4\u804A\u6D88\u606F\u3001\u5524\u9192/\u4F11\u7720\u4E16\u754C\u3002\u4E16\u754C\u662F\u7528\u6237\u5D4C\u5165 DSH \u7684\u300C\u53EF\u64CD\u4F5C\u5BF9\u8C61\u300D\u2014\u2014\u4F60\u7684\u63A8\u7406\u4E0E\u5DE5\u5177\u4ECD\u8D70 DSH \u4F53\u7CFB\uFF0C\u53EA\u662F\u64CD\u4F5C\u76EE\u6807\u5C5E\u4E8E AIsChat\u3002"
+    text: "\u5982\u679C\u4F60\u7684\u4F1A\u8BDD\u5DE5\u4F5C\u76EE\u5F55\u4F4D\u4E8E aischat-worlds \u76EE\u5F55\u4E0B\uFF08\u76EE\u5F55\u540D\u4EE5\u300CAIC\u7FA4\u89C6\u754C-\u300D\u5F00\u5934\uFF09\uFF0C\u4F60\u6B63\u5728\u64CD\u4F5C\u4E00\u4E2A AIsChat \u7FA4\u89C6\u754C\u4E16\u754C\uFF1A\u8BE5\u5DE5\u4F5C\u76EE\u5F55\u662F\u4E16\u754C\u7684\u300C\u672C\u5730\u955C\u50CF\u300D\u2014\u2014\u4E16\u754C\u9875\u9762\u4EE3\u7801\u3001\u6570\u636E\u6587\u4EF6\u90FD\u5728\u91CC\u9762\uFF0C\u4F60\u53EF\u4EE5\u76F4\u63A5\u7528 DSH \u539F\u751F\u7684 read/write/edit/glob/grep/bash \u5DE5\u5177\u8BFB\u5199\u5B83\u4EEC\uFF08bash \u53EF\u76F4\u63A5\u8FD0\u884C\u4E16\u754C Python \u4EE3\u7801\u6D4B\u8BD5\uFF09\u3002\u4FEE\u6539\u5B8C\u6210\u540E\u8C03\u7528 world_push \u628A\u6539\u52A8\u540C\u6B65\u56DE AIsChat \u4E16\u754C\uFF1B\u82E5\u4E16\u754C\u5728\u522B\u5904\u88AB\u6539\u8FC7\u3001\u9700\u8981\u6700\u65B0\u6587\u4EF6\u65F6\u7528 world_pull \u4E3B\u52A8\u62C9\u53D6\u3002\u7CBE\u786E\u64CD\u4F5C\uFF08\u4E16\u754C API\u3001\u7ED1\u5B9A\u7FA4\u804A\u6D88\u606F\u3001\u5524\u9192/\u4F11\u7720\u3001\u6C99\u7BB1\u8FD0\u884C\uFF09\u7528 world_* \u7CFB\u5217\u5DE5\u5177\u3002\u4E16\u754C\u662F\u7528\u6237\u5D4C\u5165 DSH \u7684\u300C\u53EF\u64CD\u4F5C\u5BF9\u8C61\u300D\u2014\u2014\u4F60\u7684\u63A8\u7406\u4E0E\u5DE5\u5177\u4ECD\u8D70 DSH \u4F53\u7CFB\uFF0C\u53EA\u662F\u64CD\u4F5C\u76EE\u6807\u5C5E\u4E8E AIsChat\u3002"
   });
   ctx.logger?.info?.(`dsh-aischat: proxying /aischat-api and /aischat-ws -> ${backendUrl}; serving /aischat-ui; world sync at ${WORLDS_PREFIX}`);
 }

@@ -6,6 +6,98 @@
 > **当前阶段**：v0.3.10 正式版 — 补丁版本号（第三位）递增。
 ---
 
+## [v0.3.10] - 2026-08-19
+
+### Added — 🧩 嵌入兼容层（DSH 插件化第一步：AIsChat 可作为插件嵌入宿主）
+
+- **`?embed=1` 嵌入模式**：URL 带 `embed` 参数时，`Layout` 隐藏全局侧边栏/移动导航、`ChatArea` 隐藏聊天列表侧边栏，只渲染对话区——宿主（如 DSH）提供导航与外壳，界面即"融合"
+- **嵌入桥 `frontend/src/embed/bridge.ts`**（新模块，纯增量、不改既有流程）：
+  - 嵌入模式下向宿主 `postMessage` 上报：`ready`（加载完成+登录态）、`contacts`（群聊/私信列表，复用现有 `/groups`、`/dm/sessions` API）
+  - 接收宿主指令：`navigate`（站内导航，走现有 router）、`refresh`（重新上报）
+  - **安全边界**：`access_token` 绝不跨窗口传输，只交换联系人元数据与导航路径；宿主侧校验 `event.origin`
+- **接入点**：`App.tsx` 创建 router 后注册导航器并初始化桥；未嵌入时零开销（`isEmbedded()` 惰性求值）
+
+### Added — 🧩 行为插件协议（阶段二：AIsChat 自身全面插件化）
+
+- **行为插件入口 `backend/app/services/plugin/api.py`**（新模块）：`@skill(type, category, name, description, config_schema)` 装饰器——**声明与行为合一**，一个装饰器同时完成 SkillRegistry 元数据注册 + skill_engine 行为处理器注册，消灭"skill.json 声明 + handlers 注册"的双写
+- **插件目录契约扩展**：插件目录内可选 `plugin.py`（行为入口），与现有 `plugin.json` + `skill.json` 共存；无 `plugin.py` 的旧声明插件完全兼容
+- **owner 来源追踪**：skill_engine 注册表条目从 `type → handler` 改为 `type → (owner, handler)`（单一来源，无并行表）；内置 handler owner=None 永不回收，插件 handler 停用/卸载时按 owner 精确回收，同名类型谁注册删谁
+- **skill_bridge 统一加载/卸载**：`_load_behavior_plugin`（importlib 加载 plugin.py，owner 经 `set_current_plugin` 注入）+ `_unload_plugin`（行为 + 元数据一起回收）；生命周期与声明插件一致（启动 + 开关切换 + rescan）
+- **示例行为插件 `backend/plugins/keyword-autoreply/`**：关键词自动回复（inject 类），展示完整契约
+- **语言中立契约**：处理器上下文为普通对象/字典，不绑定 Python 特定机制，未来后端换语言时插件契约可平移
+- **四层验证闭环**：加载层、分发层、开关层、集成层全部通过
+
+### Added — 🔌 DSH 插件 `dsh-aischat`（AIsChat 以一等公民嵌入 DeepSeek Harness）
+
+- **同源网关（Host 半边 `dsh-aischat/src/index.ts`）**：`/aischat-api` HTTP 代理（剥离 hop-by-hop、转发 Authorization、502 兜底）+ `/aischat-ws` WebSocket 升级代理（重放 `/ws?token=`、双向透传）——浏览器永不接触后端地址，**全程 loopback、零公网地址**
+- **侧边栏 board（Client 半边）**：`shell.overlay` 全帧面板，左侧 rail（置顶私信/置顶群聊/私信/群聊 + 用户行 + 退出），右侧对话列（消息 + 专属 composer，发送到选中的 AIsChat 对话，不碰 DSH 会话语义）
+- **登录统一**：`aisc.token` 存浏览器 localStorage；401 自动登出回登录页（不再静默显示"暂无联系人"假空态）
+- **消息渲染完全照搬 DSH 风格**：复用官方 `MarkdownText`（GFM + KaTeX 公式 + 安全过滤）——我方消息 DSH 用户气泡样式（`--dsw-specific-bubble` + label-primary + 22px 圆角 + 名称靠右），对方消息原生排版；**任何针对 DSH 对话风格的主题/插件改动自动作用到 AIsChat**
+- **图片附件**：`attachments` 里 `image/*` 提取，带 token fetch blob → objectURL（官方 resolveImage 同款机制，按 file_id 缓存）
+- **群聊邀请卡片**：`message_type=group_invitation` 专用卡片（📨 + 邀请人/群名 + 接受/拒绝按钮 + 状态）
+- **对话默认到底**：消息列表变化自动滚动到底部
+- **私信/群聊设置页**：对话头部 ⚙——群聊（置顶/免打扰/公告/成员列表）、私信（置顶/免打扰）
+- **群聊名字解析修复**：成员表（含 AI）按 `type:id` 缓存名字，不再显示"用户11"/裸"AI"
+
+### Added — 🖼️ 沉浸式界面与功能导航（长线优雅：前端静态托管 + 同源 iframe）
+
+- **前端静态托管（Host）**：`/aischat-ui` 前缀服务 `BASE_URL=/aischat-ui/` 构建产物（SPA 回退、路径穿越防护、immutable 缓存）
+- **嵌入模式增强（前端）**：`api/client.ts` 嵌入时 API 基址走 `/aischat-api` 代理；401 不跳出 iframe 改为通知宿主；`?token=` URL 注入复用登录态（写入后从地址栏清除）；router basename `/aischat-ui`（修复嵌入路由 404）
+- **沉浸式覆盖层（Client）**：`shell.overlay` 全局 iframe 面板——群聊头部"沉浸式"按钮（自动查 `/worlds/by-entity` 绑定世界 → `/aischat-ui/world-view/{id}?embed=1`）+ AIC 侧边栏"功能"分组（群视界/好友/我的AI/管理/设置）+ DSH 设置页同款导航
+- **登录引导**：iframe 内 token 失效时不再显示 AIsChat 自带登录表单，改为"请先在宿主应用中登录"引导页 → 通知宿主打开 AIsChat board 登录（登录态统一由 DSH 插件管理）
+
+### Added — 🗂️ 群视界世界嵌入 DSH 工作区（对话用 DSH 的 agent，操作对象是 AIsChat 世界）
+
+- **世界 → 工作区文件夹自动同步**：登录 AIsChat 或打开面板时，每个**自己创建的世界**自动同步为 DSH 工作区文件夹 `AIC群视界-世界名`（`$DSH_HOME/aischat-worlds/` 真实目录 + `.aischat-world.json` 世界身份）+ 一个 DSH 会话——全走官方 `workspaces.create` / `connectWorkspace` API，官方工作区自动显示、官方更新零影响，重复同步幂等
+- **世界操作工具集（Host `world_*`，按会话所属世界自动路由）**：
+  - `world_list_files` / `world_read_file` / `world_write_file` / `world_delete_file`：世界页面代码的文件树/读写（owner 鉴权写，`/worlds/{id}/files`）
+  - `world_api`：世界受控 API（world/chat/memories/usage/groups/group-messages/state/data，经沙箱 `api_token` 鉴权）
+  - `world_chat`：读写世界绑定群聊消息（以世界身份发送）
+  - `world_lifecycle`：唤醒/休眠世界
+- **按会话路由**：工具从会话 cwd 解析 `.aischat-world.json` 定位世界——`AIC群视界-*` 会话里直接可用，普通会话自动拒绝并提示
+- **token 仅内存**：client 同步时上报 `{sessionId, token}`，host 存内存供 owner 鉴权写操作（不落盘、不打日志）
+- **同步 bug 修复**：`workspaces.create` 返回值主键是 `workspaceId`（非 `id`）——误用 `ws.id` 会跳过会话创建与 token 上报（浏览器实测暴露），已改 `workspaceId || id`
+- **token 按世界路由**：改为 `{worldId, token}` 上报（DSH 新建会话流程会换 sessionId，按会话路由不稳）——工具按 cwd 解析世界后取 token，会话新建/切换不影响
+- **诊断端点**：`GET /aischat-worlds/status` → `{tokenWorlds, worldDirs}`（不含 token 明文），排障用
+- **GitHub 式双向同步（世界文件本地镜像）**：
+  - **工作区目录 = 世界文件镜像**：`world_pull` 把世界文件拉到工作区目录，agent 用 **DSH 原生 read/write/edit/glob/grep/bash** 直接操作（bash 可跑世界代码测试），`world_push` 同步回世界——不再依赖专用文件工具
+  - **`.aischat-sync.json` 快照 + 三路对比**：记录每文件「上次同步时本地/远端 mtime」→ 分类 added / removed / changedRemote / changedLocal / conflict（两边都改）
+  - **自动拉取（温和）**：打开 AIsChat 时自动执行，仅当「本地无未推送修改且世界有改动」才拉取，返回 `+新增 ~修改 -删除` 报告；本地脏/冲突一律拒绝，绝不覆盖 agent 正在工作的文件（对话中文件不被自动改动）
+  - **冲突裁决**：冲突文件不盲目覆盖——world_pull / world_push 默认跳过并报告，`force:true` 才强制；AI 读两边内容决定（保留本地 / 采用世界 / 手动合并）
+  - **版本提示注入**：任何 world_* 工具执行后，若世界有更新未拉取 → 结果附 `updateHint`；有冲突 → 附 `conflictHint`（GitHub 式"有可用更新"提示）
+- **新增工具**：`world_push` / `world_pull`（快照对比 + force）、`world_run`（后端沙箱跑 Python，24MB/10s）、`world_trigger`（触发 handle(event)）；原有 world_read_file / write_file / list / delete / api / chat / lifecycle 全保留
+- **提示词注入**：systemPrompt 注册泛化世界操作引导段（工作区目录 = 世界镜像，用 DSH 原生工具 + world_push 同步；world_pull 拉最新）
+- **世界页内嵌群聊修复**：`chat-panel.js` / `sidebar.js` / `adventure.js` / `identity.js` 读取注入的 `window.WORLD_API` / `WORLD_UI`（DSH 嵌入 = `/aischat-api` / `/aischat-ui`，独立部署保持 `/api` / 空）——世界页内群聊、平台菜单、SSE 不再落到宿主 SPA fallback
+- **代理 Location 重写**：Host 代理对后端 3xx 重定向补 `/aischat-api` 前缀（`/world/{id}/preview` → `/aischat-api/world/{id}/files/...`），沉浸式 iframe 内世界页可完整加载
+
+---
+## [v0.3.9] - 2026-08-17
+
+### Changed — 🔧 后端 main.py 质量重构（对照代码审查十项逐条处理）
+
+- **启动流程拆分**：`main.py` 470 行 → 约 150 行；lifespan 拆到新模块 `app/bootstrap.py`，按职责分组 `_startup_db / _startup_plugins / _startup_workers / _startup_world / _startup_federation / _startup_brain_and_skills`
+- **维护模式统一入口**：文件标记与文案逻辑集中到 `app/services/infrastructure/maintenance.py` 的 `MaintenanceManager`，中间件/lifespan/admin 路由全部走该入口（admin 原裸写文件与重复的文案读写已删除）；状态读取带 3s TTL 缓存，写入即时失效，开关切换零延迟
+- **日志配置上移**：`basicConfig` 移到所有项目 import 之前，去掉重复的 `getLogger` 定义
+- **import 整理**：无循环依赖风险的模块级 import 全部上移（已验证无模块反向 import main）
+- **CORS 显式配置**：默认**不启用**（同源代理部署不需要跨域）；`ALLOWED_ORIGINS`（逗号分隔）配置后启用，含 `*` 时不携带凭据（浏览器规范禁止 `*` 与凭据组合），显式域名列表才允许带凭据
+- **中间件独立模块**：IP 追踪 + 维护拦截迁到 `app/middleware.py`，`main.py` 只负责注册
+
+### Added — ⚙️ 运行健壮性
+
+- **后台任务自动重启**：`spawn_task` 支持异常退出按指数退避自动拉起（1,2,4...封顶 60s，超 10 次放弃记 CRITICAL），循环型 worker 全部启用
+- **数据库就绪等待**：启动时 0.5s 轮询、30s 超时**快速失败**（替代原先 warning 后带病运行）；浏览器启动同样改为等待 DB 就绪而非 `sleep(3)`
+- **定时任务对齐固定时刻**：审计清理/每日备份改为 `sleep_until(3,0)` 计算到下一次凌晨 3 点的延迟（原 24h sleep 会漂移且首次执行晚一天）
+- **日志滚动**：`app.log` 改用 `RotatingFileHandler`（单文件 10MB，保留 5 份），避免无限增长占满磁盘
+
+### Fixed — 🐛 修复
+
+- **Alembic 静默吞日志**（隐藏已久）：`alembic/env.py` 的 `fileConfig` 会重置根 logger 配置并禁用已存在 logger，导致每次重启后"后台 worker 已全部启动 / Application startup complete"等日志全部消失——`disable_existing_loggers=False` + 迁移后恢复应用日志双通道
+- **`_spawn` 异常日志失效**：`exc_info=exc`（异常实例被当 truthy，记录的是当前上下文而非捕获的异常）→ 改为 `exc_info=(type(exc), exc, exc.__traceback__)`
+- **关闭流程重复日志**：删除重复的"系统关闭"日志行
+- **X-Forwarded-For 伪造漏洞**：中间件手写解析 XFF 绕过了 uvicorn 的可信检查（`forwarded_allow_ips`），任何客户端可伪造审计 IP——改为只取 uvicorn 解析后的 `request.client`，安全默认不信任代理头（已验证伪造 XFF 被忽略）
+
+---
+
 ## [v0.3.8] - 2026-08-17
 
 ### Fixed — 🔧 维护通知系统全面修复（概览页"通知"区块）
@@ -72,90 +164,6 @@
 
 ---
 
-## [v0.3.9] - 2026-08-17
-
-### Changed — 🔧 后端 main.py 质量重构（对照代码审查十项逐条处理）
-
-- **启动流程拆分**：`main.py` 470 行 → 约 150 行；lifespan 拆到新模块 `app/bootstrap.py`，按职责分组 `_startup_db / _startup_plugins / _startup_workers / _startup_world / _startup_federation / _startup_brain_and_skills`
-- **维护模式统一入口**：文件标记与文案逻辑集中到 `app/services/infrastructure/maintenance.py` 的 `MaintenanceManager`，中间件/lifespan/admin 路由全部走该入口（admin 原裸写文件与重复的文案读写已删除）；状态读取带 3s TTL 缓存，写入即时失效，开关切换零延迟
-- **日志配置上移**：`basicConfig` 移到所有项目 import 之前，去掉重复的 `getLogger` 定义
-- **import 整理**：无循环依赖风险的模块级 import 全部上移（已验证无模块反向 import main）
-- **CORS 显式配置**：默认**不启用**（同源代理部署不需要跨域）；`ALLOWED_ORIGINS`（逗号分隔）配置后启用，含 `*` 时不携带凭据（浏览器规范禁止 `*` 与凭据组合），显式域名列表才允许带凭据
-- **中间件独立模块**：IP 追踪 + 维护拦截迁到 `app/middleware.py`，`main.py` 只负责注册
-
-### Added — ⚙️ 运行健壮性
-
-- **后台任务自动重启**：`spawn_task` 支持异常退出按指数退避自动拉起（1,2,4...封顶 60s，超 10 次放弃记 CRITICAL），循环型 worker 全部启用
-- **数据库就绪等待**：启动时 0.5s 轮询、30s 超时**快速失败**（替代原先 warning 后带病运行）；浏览器启动同样改为等待 DB 就绪而非 `sleep(3)`
-- **定时任务对齐固定时刻**：审计清理/每日备份改为 `sleep_until(3,0)` 计算到下一次凌晨 3 点的延迟（原 24h sleep 会漂移且首次执行晚一天）
-- **日志滚动**：`app.log` 改用 `RotatingFileHandler`（单文件 10MB，保留 5 份），避免无限增长占满磁盘
-
-### Fixed — 🐛 修复
-
-- **Alembic 静默吞日志**（隐藏已久）：`alembic/env.py` 的 `fileConfig` 会重置根 logger 配置并禁用已存在 logger，导致每次重启后"后台 worker 已全部启动 / Application startup complete"等日志全部消失——`disable_existing_loggers=False` + 迁移后恢复应用日志双通道
-- **`_spawn` 异常日志失效**：`exc_info=exc`（异常实例被当 truthy，记录的是当前上下文而非捕获的异常）→ 改为 `exc_info=(type(exc), exc, exc.__traceback__)`
-- **关闭流程重复日志**：删除重复的"系统关闭"日志行
-- **X-Forwarded-For 伪造漏洞**：中间件手写解析 XFF 绕过了 uvicorn 的可信检查（`forwarded_allow_ips`），任何客户端可伪造审计 IP——改为只取 uvicorn 解析后的 `request.client`，安全默认不信任代理头（已验证伪造 XFF 被忽略）
-
----
-
-## [v0.3.10] - 2026-08-19
-
-### Added — 🧩 嵌入兼容层（DSH 插件化第一步：AIsChat 可作为插件嵌入宿主）
-
-- **`?embed=1` 嵌入模式**：URL 带 `embed` 参数时，`Layout` 隐藏全局侧边栏/移动导航、`ChatArea` 隐藏聊天列表侧边栏，只渲染对话区——宿主（如 DSH）提供导航与外壳，界面即"融合"
-- **嵌入桥 `frontend/src/embed/bridge.ts`**（新模块，纯增量、不改既有流程）：
-  - 嵌入模式下向宿主 `postMessage` 上报：`ready`（加载完成+登录态）、`contacts`（群聊/私信列表，复用现有 `/groups`、`/dm/sessions` API）
-  - 接收宿主指令：`navigate`（站内导航，走现有 router）、`refresh`（重新上报）
-  - **安全边界**：`access_token` 绝不跨窗口传输，只交换联系人元数据与导航路径；宿主侧校验 `event.origin`
-- **接入点**：`App.tsx` 创建 router 后注册导航器并初始化桥；未嵌入时零开销（`isEmbedded()` 惰性求值）
-
-### Added — 🧩 行为插件协议（阶段二：AIsChat 自身全面插件化）
-
-- **行为插件入口 `backend/app/services/plugin/api.py`**（新模块）：`@skill(type, category, name, description, config_schema)` 装饰器——**声明与行为合一**，一个装饰器同时完成 SkillRegistry 元数据注册 + skill_engine 行为处理器注册，消灭"skill.json 声明 + handlers 注册"的双写
-- **插件目录契约扩展**：插件目录内可选 `plugin.py`（行为入口），与现有 `plugin.json` + `skill.json` 共存；无 `plugin.py` 的旧声明插件完全兼容
-- **owner 来源追踪**：skill_engine 注册表条目从 `type → handler` 改为 `type → (owner, handler)`（单一来源，无并行表）；内置 handler owner=None 永不回收，插件 handler 停用/卸载时按 owner 精确回收，同名类型谁注册删谁
-- **skill_bridge 统一加载/卸载**：`_load_behavior_plugin`（importlib 加载 plugin.py，owner 经 `set_current_plugin` 注入）+ `_unload_plugin`（行为 + 元数据一起回收）；生命周期与声明插件一致（启动 + 开关切换 + rescan）
-- **示例行为插件 `backend/plugins/keyword-autoreply/`**：关键词自动回复（inject 类），展示完整契约
-- **语言中立契约**：处理器上下文为普通对象/字典，不绑定 Python 特定机制，未来后端换语言时插件契约可平移
-- **四层验证闭环**：加载层、分发层、开关层、集成层全部通过
-
-### Added — 🔌 DSH 插件 `dsh-aischat`（AIsChat 以一等公民嵌入 DeepSeek Harness）
-
-- **同源网关（Host 半边 `dsh-aischat/src/index.ts`）**：`/aischat-api` HTTP 代理（剥离 hop-by-hop、转发 Authorization、502 兜底）+ `/aischat-ws` WebSocket 升级代理（重放 `/ws?token=`、双向透传）——浏览器永不接触后端地址，**全程 loopback、零公网地址**
-- **侧边栏 board（Client 半边）**：`shell.overlay` 全帧面板，左侧 rail（置顶私信/置顶群聊/私信/群聊 + 用户行 + 退出），右侧对话列（消息 + 专属 composer，发送到选中的 AIsChat 对话，不碰 DSH 会话语义）
-- **登录统一**：`aisc.token` 存浏览器 localStorage；401 自动登出回登录页（不再静默显示"暂无联系人"假空态）
-- **消息渲染完全照搬 DSH 风格**：复用官方 `MarkdownText`（GFM + KaTeX 公式 + 安全过滤）——我方消息 DSH 用户气泡样式（`--dsw-specific-bubble` + label-primary + 22px 圆角 + 名称靠右），对方消息原生排版；**任何针对 DSH 对话风格的主题/插件改动自动作用到 AIsChat**
-- **图片附件**：`attachments` 里 `image/*` 提取，带 token fetch blob → objectURL（官方 resolveImage 同款机制，按 file_id 缓存）
-- **群聊邀请卡片**：`message_type=group_invitation` 专用卡片（📨 + 邀请人/群名 + 接受/拒绝按钮 + 状态）
-- **对话默认到底**：消息列表变化自动滚动到底部
-- **私信/群聊设置页**：对话头部 ⚙——群聊（置顶/免打扰/公告/成员列表）、私信（置顶/免打扰）
-- **群聊名字解析修复**：成员表（含 AI）按 `type:id` 缓存名字，不再显示"用户11"/裸"AI"
-
-### Added — 🖼️ 沉浸式界面与功能导航（长线优雅：前端静态托管 + 同源 iframe）
-
-- **前端静态托管（Host）**：`/aischat-ui` 前缀服务 `BASE_URL=/aischat-ui/` 构建产物（SPA 回退、路径穿越防护、immutable 缓存）
-- **嵌入模式增强（前端）**：`api/client.ts` 嵌入时 API 基址走 `/aischat-api` 代理；401 不跳出 iframe 改为通知宿主；`?token=` URL 注入复用登录态（写入后从地址栏清除）；router basename `/aischat-ui`（修复嵌入路由 404）
-- **沉浸式覆盖层（Client）**：`shell.overlay` 全局 iframe 面板——群聊头部"沉浸式"按钮（自动查 `/worlds/by-entity` 绑定世界 → `/aischat-ui/world-view/{id}?embed=1`）+ AIC 侧边栏"功能"分组（群视界/好友/我的AI/管理/设置）+ DSH 设置页同款导航
-- **登录引导**：iframe 内 token 失效时不再显示 AIsChat 自带登录表单，改为"请先在宿主应用中登录"引导页 → 通知宿主打开 AIsChat board 登录（登录态统一由 DSH 插件管理）
-
-### Added — 🗂️ 群视界世界嵌入 DSH 工作区（对话用 DSH 的 agent，操作对象是 AIsChat 世界）
-
-- **世界 → 工作区文件夹自动同步**：登录 AIsChat 或打开面板时，每个**自己创建的世界**自动同步为 DSH 工作区文件夹 `AIC群视界-世界名`（`$DSH_HOME/aischat-worlds/` 真实目录 + `.aischat-world.json` 世界身份）+ 一个 DSH 会话——全走官方 `workspaces.create` / `connectWorkspace` API，官方工作区自动显示、官方更新零影响，重复同步幂等
-- **世界操作工具集（Host `world_*`，按会话所属世界自动路由）**：
-  - `world_list_files` / `world_read_file` / `world_write_file` / `world_delete_file`：世界页面代码的文件树/读写（owner 鉴权写，`/worlds/{id}/files`）
-  - `world_api`：世界受控 API（world/chat/memories/usage/groups/group-messages/state/data，经沙箱 `api_token` 鉴权）
-  - `world_chat`：读写世界绑定群聊消息（以世界身份发送）
-  - `world_lifecycle`：唤醒/休眠世界
-- **按会话路由**：工具从会话 cwd 解析 `.aischat-world.json` 定位世界——`AIC群视界-*` 会话里直接可用，普通会话自动拒绝并提示
-- **token 仅内存**：client 同步时上报 `{sessionId, token}`，host 存内存供 owner 鉴权写操作（不落盘、不打日志）
-- **同步 bug 修复**：`workspaces.create` 返回值主键是 `workspaceId`（非 `id`）——误用 `ws.id` 会跳过会话创建与 token 上报（浏览器实测暴露），已改 `workspaceId || id`
-- **诊断端点**：`GET /aischat-worlds/status` → `{tokenSessions, worldDirs}`（不含 token 明文），排障用
-- **提示词注入**：systemPrompt 注册泛化世界操作引导段（目录名以 `AIC群视界-` 开头时 agent 知道可用 `world_*` 工具）
-- **世界页内嵌群聊修复**：`chat-panel.js` / `sidebar.js` / `adventure.js` / `identity.js` 读取注入的 `window.WORLD_API` / `WORLD_UI`（DSH 嵌入 = `/aischat-api` / `/aischat-ui`，独立部署保持 `/api` / 空）——世界页内群聊、平台菜单、SSE 不再落到宿主 SPA fallback
-- **代理 Location 重写**：Host 代理对后端 3xx 重定向补 `/aischat-api` 前缀（`/world/{id}/preview` → `/aischat-api/world/{id}/files/...`），沉浸式 iframe 内世界页可完整加载
-
----
 
 ## [v0.3.7] - 2026-08-17
 

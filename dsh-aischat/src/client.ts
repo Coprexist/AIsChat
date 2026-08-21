@@ -1145,14 +1145,22 @@ module.exports = {
           if (!ws) continue
           const workspaceId = ws.workspaceId || ws.id
           if (!workspaceId) continue
-          const sessionId = await ctx.workspaces.connectWorkspace(workspaceId).catch(() => null)
-          if (sessionId) {
-            await fetch('/aischat-worlds/token', {
-              method: 'POST',
-              headers: { 'content-type': 'application/json' },
-              body: JSON.stringify({ sessionId, token: store.token }),
-            }).catch(() => {})
-          }
+          await ctx.workspaces.connectWorkspace(workspaceId).catch(() => null)
+          // token 按 worldId 上报（稳定标识）：host 按世界路由，不依赖
+          // sessionId（DSH 新建会话流程会创建新会话，sessionId 不稳定）。
+          await fetch('/aischat-worlds/token', {
+            method: 'POST',
+            headers: { 'content-type': 'application/json' },
+            body: JSON.stringify({ worldId: w.id, token: store.token }),
+          }).catch(() => {})
+          // 温和自动拉取：host 端带快照/冲突保护——仅当「本地无未推送修改且
+          // 世界有改动」时才拉取并报告变化；本地有修改或冲突一律拒绝，绝不覆盖
+          // agent 正在工作的文件。对话进行中文件不会被自动改动。
+          await fetch('/aischat-worlds/pull', {
+            method: 'POST',
+            headers: { 'content-type': 'application/json' },
+            body: JSON.stringify({ worldId: w.id }),
+          }).catch(() => {})
         }
       } catch { /* 同步失败静默：不影响 AIsChat 主功能 */ }
     }

@@ -22,8 +22,10 @@
 - [x] **需求5：群视界世界嵌入 DSH 工作区**——每个自己创建的世界自动同步为工作区文件夹 `AIC群视界-世界名` + DSH 会话（官方 `workspaces.create` / `connectWorkspace`，幂等）；Host 注册 `world_*` 工具集（文件读写/世界 API/群聊/生命周期，按会话 cwd 路由）；token 仅内存；systemPrompt 泛化引导段
 - [x] **需求5 浏览器实测（文件夹 ✓ / 工具 ✗）**：用户确认 `AIC群视界-*` 文件夹出现在 DSH 工作区、会话 cwd 正确指向世界目录、`.aischat-world.json` 可读（worldId 39 识别成功）；但 `world_list_files` 报"未连接登录态"
 - [x] **token 上报 bug 修复**：client 同步里 `workspaces.create` 返回值主键是 **`workspaceId`**（不是 `id`），`ws.id` 恒 undefined → 跳过了 `connectWorkspace` + token 上报 → host 内存 `sessionTokenMap` 空（诊断端点 `/aischat-worlds/status` 确认 tokenSessions=[]）。已改为 `ws.workspaceId || ws.id`
-- [x] **诊断端点**：`GET /aischat-worlds/status` → `{tokenSessions, worldDirs}`（token 明文不返回）；token 上报打 `ctx.logger` 日志
-- [ ] **需求5 token 链路待复测**：用户刷新 + 打开 AIsChat 后查 `/aischat-worlds/status` 应见 `tokenSessions` 非空 → 再测 `world_list_files` / `world_write_file` / `world_chat`
+- [x] **诊断端点**：`GET /aischat-worlds/status` → `{tokenWorlds, worldDirs}`（token 明文不返回）；token 上报打 `ctx.logger` 日志
+- [x] **token 按世界路由**：改为 `{worldId, token}` 上报（sessionId 会被 DSH 新建会话流程更换，不稳定）；工具按 cwd 解析世界后取 token
+- [x] **GitHub 式双向同步（世界文件本地镜像）**：`.aischat-sync.json` 快照 + 三路对比（added/removed/changedRemote/changedLocal/conflict）；自动拉取仅当本地干净+世界有改动（温和，不覆盖 agent 工作文件）；world_pull/world_push 带冲突保护 + force；版本提示注入 updateHint/conflictHint；world_run/world_trigger 新增；agent 用 DSH 原生工具操作镜像 + world_push 同步
+- [ ] **需求5 全链路复测**：用户刷新+打开 AIsChat 后：① tokenWorlds 非空 ② 工作区目录出现世界文件（自动拉取）③ world_* 工具可用 ④ 原生 read/write + world_push 通 ⑤ 冲突场景（本地改+世界改同一文件）报告正常
 - [ ] **内存 token 局限**：dsh-web 重启会清空内存 token，需重新打开 AIsChat 触发同步；后续可选持久化方案（如 host 侧加密落盘）
 
 ---
