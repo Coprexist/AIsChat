@@ -17,6 +17,20 @@
   拉回本地的是注入后文件而非原始代码。修复：`.html/.htm` 改走带 token 的 `/worlds/{id}/files/content` 原始读取接口。
 - **同步快照单位**：`.aischat-sync.json` 的 `lm` 必须用毫秒（对齐 DSH `statMtime` 的 mtimeMs）；
   单位不一致会导致全文件误判 changedLocal，force 拉取覆盖本地。
+- **`world_pull` force 模式误报「无变化」**：`pulled: N` 但 message 报「无变化」——force 拉取的
+  conflict/changedLocal 覆盖未计入统计。修复：pulled > 0 时如实上报 `↓N 覆盖`。
+
+### Added — 📖 平台机制文档与 AI 提示词增强（同步/限流）
+
+- **接口文档新增 10 分区「同步与限流机制」**（`api_docs/sections/10-sync-rate-limit.md`）：DSH 世界镜像
+  双向同步（快照三路对比 / `world_pull` pulled 语义 / `world_push`「无变化」含义）、写操作限流（429 =
+  太快不是故障、前端降级规则）、事件通道说明、常见问题速查表——群视界 AI（`view_api_doc`）与
+  DSH 世界会话（`world_view_doc`）共用同一份。
+- **世界 AI 强注入提示词**（`FORCED_PROMPT_SEGMENTS`）：新增【文件同步机制】与【限流机制】两段常驻，
+  防止把 push「无变化」误判成没生效、把 429 误判成通道故障。
+- **`view_api_doc` 分区号动态化**：工具描述不再写死 `01~08`，自动跟随文档分区（现 01~10）。
+- **DSH 世界会话按需指路**：`world_push`/`world_pull` 工具 description 补关键语义提醒（调用瞬间可见，
+  零常驻 token）；世界上下文提示词加「10 分区」指路，细节单一来源在文档。
 
 
 ### Added — 🧩 嵌入兼容层（DSH 插件化第一步：AIsChat 可作为插件嵌入宿主）
