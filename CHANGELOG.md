@@ -77,6 +77,14 @@
 - **快照无条件「洗白」（最严重）**：pull/push 成功后用**全量本地文件**重建快照并写入当前 mtime——未同步的本地修改、被跳过的冲突、远端新改动全部被标成「已同步」，**温和自动拉取从此检测不到世界新版本**（实测：制造真实冲突后 force 拉取返回「无变化」）。已改为：**只更新实际成功同步的文件**，其余保留旧记录；push 后用重新拉取的远端树写 rm（PUT 会更新远端 mtime）
 - **验证**：温和拒绝（本地脏/冲突不覆盖）✓、force 覆盖冲突与本地修改 ✓、脏快照重建（force 全量以远端为准）✓、远端改动自动拉取 ✓、无变化识别 ✓
 
+### Added — 📖 DSH 侧平台文档查看（world_view_doc）
+
+- **受控 API 新增两个端点**（`world_proxy.py`，复用 `_authorize_world_api` api_token 鉴权 + 现有限流）：
+  - `GET /world/{id}/api/docs` → 平台 API 文档分区列表（id/标题/区介绍，DB 权威）
+  - `GET /world/{id}/api/docs/{section}` → 指定分区完整内容（防路径穿越，只允许注册表内 id，未知分区 400 / 缺失 404）
+- **DSH 新工具 `world_view_doc`**（`dsh-aischat/src/index.ts`，参照 `world_api` 同款实现：`registerWorldTool` + `resolveWorldApiToken` + `backendRequest`）：不传 section 列分区、传 section（01~09）读分区内容——DSH 世界会话与 AIsChat 世界 AI 的 `view_api_doc` 同一份文档注册表，写世界代码时接口细节按需可查
+- **验证**：分区列表（9 区）✓、读分区内容 ✓、越界分区 400 ✓、世界会话路由引导 ✓
+
 ---
 ## [v0.3.9] - 2026-08-17
 

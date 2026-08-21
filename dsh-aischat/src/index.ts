@@ -904,6 +904,21 @@ export function apply(ctx: Context, config: Config): void {
   )
 
   registerWorldTool(
+    'world_view_doc',
+    '查看「群视界 API 文档」的接口文档：不传 section 返回分区列表（id/标题/区介绍），传 section（如 03）返回该分区完整内容。文档按区分区：01 世界编号变量（写页面代码前必读）、02 世界UI桥、03 文件操作、04 积木体系、05 群聊 API、06 页面与资源、07 懒通知与世界时间、08 错误与安全、09 世界 API。先看分区列表的区介绍判断要开哪个区，只开需要的，不要一次全读。',
+    { type: 'object', properties: { section: { type: 'string', description: '分区号（01~09），不传则返回分区列表' } }, required: [], additionalProperties: false },
+    async (args, world) => {
+      const apiToken = await resolveWorldApiToken(backendUrl, world.worldId, world.token)
+      if (!apiToken) return { error: '无法取得该世界的 API token（需 owner 登录态且世界已初始化）。' }
+      const section = String(args.section ?? '').trim()
+      const path = section ? `/world/${world.worldId}/api/docs/${encodeURIComponent(section)}` : `/world/${world.worldId}/api/docs`
+      const res = await backendRequest(backendUrl, 'GET', path, { headers: { 'x-world-token': apiToken } })
+      if (res.status >= 400) return { error: `文档读取失败 (${res.status})`, detail: res.text.slice(0, 400) }
+      try { return JSON.parse(res.text) as unknown } catch { return { ok: true, content: res.text.slice(0, 60000) } }
+    },
+  )
+
+  registerWorldTool(
     'world_chat',
     '读写当前 AIsChat 群视界世界绑定群聊的消息。action=read 拉最近消息（groupId 省略时自动取世界绑定的第一个群）；action=send 以世界身份发消息。',
     { type: 'object', properties: { action: { type: 'string', enum: ['read', 'send'] }, groupId: { type: 'number' }, content: { type: 'string', description: 'send 时的消息内容' }, limit: { type: 'number', default: 20 } }, required: ['action'], additionalProperties: false },

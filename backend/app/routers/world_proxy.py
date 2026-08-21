@@ -203,6 +203,36 @@ async def world_api_info(
     }
 
 
+@router.get("/{world_id}/api/docs")
+async def world_api_docs_list(
+    world_id: int,
+    request: Request,
+    db: AsyncSession = Depends(get_db),
+):
+    """受控 API：平台 API 文档分区列表（id/标题/区介绍；与 view_api_doc 同一份注册表）"""
+    await _authorize_world_api(db, world_id, request)
+    from app.services.world.world_api_docs import get_sections
+    return {"sections": await get_sections(db)}
+
+
+@router.get("/{world_id}/api/docs/{section}")
+async def world_api_docs_view(
+    world_id: int,
+    section: str,
+    request: Request,
+    db: AsyncSession = Depends(get_db),
+):
+    """受控 API：查看指定分区完整文档（防路径穿越，只允许注册表内 id）"""
+    await _authorize_world_api(db, world_id, request)
+    from app.services.world.world_api_docs import view_section
+    try:
+        return view_section(section)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    except FileNotFoundError as e:
+        raise HTTPException(status_code=404, detail=str(e))
+
+
 @router.get("/{world_id}/api/chat")
 async def world_api_chat(
     world_id: int,
