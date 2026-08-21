@@ -1170,6 +1170,10 @@ module.exports = {
       if (store.token) syncWorlds()
     })
 
+    // 页面加载后若已恢复登录态（localStorage），立即静默上报一次——用户
+    // 直接点进「AIC群视界」工作区即可使用 world 工具，无需先点开 AIsChat 面板。
+    if (store.token && store.user) syncWorlds()
+
     // 打开 AIsChat board 时也补一次同步（force 跳过节流，幂等安全）。
     window.addEventListener('aischat:board-toggle', (e) => {
       boardOpen = !!e.detail
@@ -1182,6 +1186,17 @@ module.exports = {
     })
 
     const disposers = []
+
+    // host 仅内存保存世界 token，dsh-web 重启即丢：监听连接重建
+    // （connection/reset，host 重启后页面自动重连会触发）自动补上报，
+    // 保证重启后点进世界工作区依然即用。幂等，syncWorlds 自带 30s 节流。
+    const onConnectionReset = () => { if (store.token && store.user) syncWorlds() }
+    if (typeof ctx.on === 'function') disposers.push(ctx.on('connection/reset', onConnectionReset))
+
+    // 定时兜底：事件丢失等漏网上报时机 60s 内自动补齐（幂等；节流下空转成本≈0）。
+    const syncTimer = setInterval(() => { if (store.token && store.user) syncWorlds() }, 60_000)
+    disposers.push(() => clearInterval(syncTimer))
+
     disposers.push(ctx.slots.inject('sidebar.footer.action', () => ctx.slots.register(
       { name: 'sidebar.footer.action', id: 'aischat-entry', order: 10, label: 'AIsChat' },
       FooterButton,

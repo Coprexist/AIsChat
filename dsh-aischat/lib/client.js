@@ -1079,6 +1079,7 @@ module.exports = {
     window.addEventListener("aischat:auth", () => {
       if (store.token) syncWorlds();
     });
+    if (store.token && store.user) syncWorlds();
     window.addEventListener("aischat:board-toggle", (e) => {
       boardOpen = !!e.detail;
       if (boardOpen && store.token) syncWorlds(true);
@@ -1088,6 +1089,14 @@ module.exports = {
       console.warn("[aischat]", e.detail);
     });
     const disposers = [];
+    const onConnectionReset = () => {
+      if (store.token && store.user) syncWorlds();
+    };
+    if (typeof ctx.on === "function") disposers.push(ctx.on("connection/reset", onConnectionReset));
+    const syncTimer = setInterval(() => {
+      if (store.token && store.user) syncWorlds();
+    }, 6e4);
+    disposers.push(() => clearInterval(syncTimer));
     disposers.push(ctx.slots.inject("sidebar.footer.action", () => ctx.slots.register(
       { name: "sidebar.footer.action", id: "aischat-entry", order: 10, label: "AIsChat" },
       FooterButton
