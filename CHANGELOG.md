@@ -8,6 +8,17 @@
 
 ## [v0.3.10] - 2026-08-19
 
+### Fixed — 🔧 DSH 世界同步两个编码/注入 bug（dsh-aischat）
+
+- **`backendRequest` 响应拼接 utf8 截断**：`res.on('data', c => text += c)` 对每个 TCP chunk 单独 utf8 解码，
+  多字节字符（如 `──`）跨 chunk 边界时损坏为 U+FFFD 乱码——`world_pull` 拉取含中文注释的 JS 文件会静默写坏本地。
+  修复：Buffer 数组收集 + 最后统一 `Buffer.concat().toString('utf8')`。
+- **`world_pull` 拉 HTML 拉到注入版**：走 `/world/{id}/files/{path}` 静态路由会对 HTML 注入世界变量（WORLD_ID 等），
+  拉回本地的是注入后文件而非原始代码。修复：`.html/.htm` 改走带 token 的 `/worlds/{id}/files/content` 原始读取接口。
+- **同步快照单位**：`.aischat-sync.json` 的 `lm` 必须用毫秒（对齐 DSH `statMtime` 的 mtimeMs）；
+  单位不一致会导致全文件误判 changedLocal，force 拉取覆盖本地。
+
+
 ### Added — 🧩 嵌入兼容层（DSH 插件化第一步：AIsChat 可作为插件嵌入宿主）
 
 - **`?embed=1` 嵌入模式**：URL 带 `embed` 参数时，`Layout` 隐藏全局侧边栏/移动导航、`ChatArea` 隐藏聊天列表侧边栏，只渲染对话区——宿主（如 DSH）提供导航与外壳，界面即"融合"
