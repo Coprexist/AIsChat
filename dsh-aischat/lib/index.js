@@ -764,6 +764,24 @@ function apply(ctx, config) {
     }
   );
   registerWorldTool(
+    "world_view_doc",
+    "\u67E5\u770B\u300C\u7FA4\u89C6\u754C API \u6587\u6863\u300D\u7684\u63A5\u53E3\u6587\u6863\uFF1A\u4E0D\u4F20 section \u8FD4\u56DE\u5206\u533A\u5217\u8868\uFF08id/\u6807\u9898/\u533A\u4ECB\u7ECD\uFF09\uFF0C\u4F20 section\uFF08\u5982 03\uFF09\u8FD4\u56DE\u8BE5\u5206\u533A\u5B8C\u6574\u5185\u5BB9\u3002\u6587\u6863\u6309\u533A\u5206\u533A\uFF1A01 \u4E16\u754C\u7F16\u53F7\u53D8\u91CF\uFF08\u5199\u9875\u9762\u4EE3\u7801\u524D\u5FC5\u8BFB\uFF09\u300102 \u4E16\u754CUI\u6865\u300103 \u6587\u4EF6\u64CD\u4F5C\u300104 \u79EF\u6728\u4F53\u7CFB\u300105 \u7FA4\u804A API\u300106 \u9875\u9762\u4E0E\u8D44\u6E90\u300107 \u61D2\u901A\u77E5\u4E0E\u4E16\u754C\u65F6\u95F4\u300108 \u9519\u8BEF\u4E0E\u5B89\u5168\u300109 \u4E16\u754C API\u3002\u5148\u770B\u5206\u533A\u5217\u8868\u7684\u533A\u4ECB\u7ECD\u5224\u65AD\u8981\u5F00\u54EA\u4E2A\u533A\uFF0C\u53EA\u5F00\u9700\u8981\u7684\uFF0C\u4E0D\u8981\u4E00\u6B21\u5168\u8BFB\u3002",
+    { type: "object", properties: { section: { type: "string", description: "\u5206\u533A\u53F7\uFF0801~09\uFF09\uFF0C\u4E0D\u4F20\u5219\u8FD4\u56DE\u5206\u533A\u5217\u8868" } }, required: [], additionalProperties: false },
+    async (args, world) => {
+      const apiToken = await resolveWorldApiToken(backendUrl, world.worldId, world.token);
+      if (!apiToken) return { error: "\u65E0\u6CD5\u53D6\u5F97\u8BE5\u4E16\u754C\u7684 API token\uFF08\u9700 owner \u767B\u5F55\u6001\u4E14\u4E16\u754C\u5DF2\u521D\u59CB\u5316\uFF09\u3002" };
+      const section = String(args.section ?? "").trim();
+      const path = section ? `/world/${world.worldId}/api/docs/${encodeURIComponent(section)}` : `/world/${world.worldId}/api/docs`;
+      const res = await backendRequest(backendUrl, "GET", path, { headers: { "x-world-token": apiToken } });
+      if (res.status >= 400) return { error: `\u6587\u6863\u8BFB\u53D6\u5931\u8D25 (${res.status})`, detail: res.text.slice(0, 400) };
+      try {
+        return JSON.parse(res.text);
+      } catch {
+        return { ok: true, content: res.text.slice(0, 6e4) };
+      }
+    }
+  );
+  registerWorldTool(
     "world_chat",
     "\u8BFB\u5199\u5F53\u524D AIsChat \u7FA4\u89C6\u754C\u4E16\u754C\u7ED1\u5B9A\u7FA4\u804A\u7684\u6D88\u606F\u3002action=read \u62C9\u6700\u8FD1\u6D88\u606F\uFF08groupId \u7701\u7565\u65F6\u81EA\u52A8\u53D6\u4E16\u754C\u7ED1\u5B9A\u7684\u7B2C\u4E00\u4E2A\u7FA4\uFF09\uFF1Baction=send \u4EE5\u4E16\u754C\u8EAB\u4EFD\u53D1\u6D88\u606F\u3002",
     { type: "object", properties: { action: { type: "string", enum: ["read", "send"] }, groupId: { type: "number" }, content: { type: "string", description: "send \u65F6\u7684\u6D88\u606F\u5185\u5BB9" }, limit: { type: "number", default: 20 } }, required: ["action"], additionalProperties: false },
