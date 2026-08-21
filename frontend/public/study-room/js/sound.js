@@ -65,6 +65,8 @@ function makeNoiseBuffer(ctx, type) {
         let k0 = 0, k1 = 0, k2 = 0, k3 = 0, k4 = 0, k5 = 0, k6 = 0;
         // 雨滴状态：高通白噪短脉冲（2~8ms），间隔 30~120ms
         let dropNext = 0, dropPhase = 0, dropDur = 0, dropEnv = 0;
+        // 深海浪花簇状态：水泡成簇出现（1~3s 一簇，簇间隔 3~10s），配合播放层高潮包络
+        let clusterNext = 0, clusterPhase = 0, clusterDur = 0;
         // LFO 起伏（风声/涌动）：每声道相位错开
         const lfoFreq = type === 'deep' ? 0.07 : 0.11;
         const lfoPhase = ch * Math.PI; // 左右错相，立体声更宽
@@ -110,12 +112,23 @@ function makeNoiseBuffer(ctx, type) {
                 const lfo = 0.6 + 0.4 * Math.sin(2 * Math.PI * lfoFreq * i / rate + lfoPhase);
                 s = (wind * 0.42 + pink * 0.3 + leaf * 0.14) * lfo;
             } else if (type === 'deep') {
-                // 涌动：棕噪 → 二阶低通450；水泡：白噪 → 二阶带通(1500~2500)
+                // 涌动：棕噪 → 二阶低通450；浪花：白噪 → 二阶带通(1.5k~2.5k)，成簇出现
                 const swell = deepLo.lp(brown);
                 const bubbles = bubbleHi.lp(w) - bubbleLo.lp(w);
+                clusterNext -= 1 / rate;
+                if (clusterNext <= 0) {
+                    clusterDur = 1 + Math.random() * 2;   // 浪花簇持续 1~3s
+                    clusterPhase = clusterDur;
+                    clusterNext = 3 + Math.random() * 7;  // 簇间隔 3~10s
+                }
+                let bubble = 0;
+                if (clusterPhase > 0) {
+                    bubble = bubbles * (0.5 + Math.random() * 0.7); // 簇内气泡随机强度
+                    clusterPhase -= 1 / rate;
+                }
                 // 0.07Hz LFO 涌动（±35%）
                 const lfo = 0.65 + 0.35 * Math.sin(2 * Math.PI * lfoFreq * i / rate + lfoPhase);
-                s = (swell * 2.2 + bubbles * 0.15) * lfo;
+                s = (swell * 3.0 + bubble * 1.2) * lfo;
             }
             data[i] = s;
         }
@@ -154,6 +167,45 @@ function swapBuffers() {
     active = next;
 }
 
+// 三角分布 [min,max]，峰值在 mode（高潮持续时间分布：更多落在 ~40s）
+function triMode(min, max, mode) {
+    const u = Math.random();
+    const p = (mode - min) / (max - min);
+    return u < p
+        ? min + (mode - min) * Math.sqrt(u / p)
+        : mode + (max - mode) * (1 - Math.sqrt((1 - u) / (1 - p)));
+}
+
+// 深海高潮包络：随机"高潮/平静"事件，整体增益 0.55~1.55 起伏（大浪来了又走）
+const swell = { phase: 'calm', remain: 0, target: 1 };
+let swellTimer = null;
+let swellGain = null;
+
+function planSwell() {
+    if (Math.random() < 0.55) {
+        // 高潮：持续 5~60s，三角分布峰值 40s，强度 1.15~1.55
+        swell.phase = 'swell';
+        swell.remain = triMode(5, 60, 40);
+        swell.target = 1.15 + Math.random() * 0.4;
+    } else {
+        // 平静：8~30s，0.55~0.75
+        swell.phase = 'calm';
+        swell.remain = 8 + Math.random() * 22;
+        swell.target = 0.55 + Math.random() * 0.2;
+    }
+}
+
+function startSwellScheduler() {
+    planSwell();
+    swellTimer = setInterval(() => {
+        if (!swellGain) return;
+        // 指数逼近目标（时间常数 ~0.6s → 浪渐强/渐弱，不突兀）
+        swellGain.gain.setTargetAtTime(swell.target, audioCtx.currentTime, 0.6);
+        swell.remain -= 0.1;
+        if (swell.remain <= 0) planSwell();
+    }, 100);
+}
+
 // 开始播放指定类型的噪声
 async function startNoise(type) {
     await initAudio();
@@ -176,7 +228,16 @@ async function startNoise(type) {
     // 总音量节点
     masterGain = audioCtx.createGain();
     masterGain.gain.value = state.settings.volume / 100;
-    masterGain.connect(audioCtx.destination);
+    if (type === 'deep') {
+        // 深海：高潮包络节点（阵阵浪花），放在 masterGain 之后调制整体
+        swellGain = audioCtx.createGain();
+        swellGain.gain.value = 1;
+        masterGain.connect(swellGain);
+        swellGain.connect(audioCtx.destination);
+        startSwellScheduler();
+    } else {
+        masterGain.connect(audioCtx.destination);
+    }
 
     // 两个不同内容的噪声 buffer + 各自的 gain/source
     for (let i = 0; i < 2; i++) {
@@ -199,11 +260,13 @@ async function startNoise(type) {
 // 停止噪声
 function stopNoise() {
     if (swapTimer) { clearInterval(swapTimer); swapTimer = null; }
+    if (swellTimer) { clearInterval(swellTimer); swellTimer = null; }
     for (let i = 0; i < 2; i++) {
         if (srcs[i]) { try { srcs[i].stop(); } catch (e) {} try { srcs[i].disconnect(); } catch (e) {} srcs[i] = null; }
         if (gains[i]) { try { gains[i].disconnect(); } catch (e) {} gains[i] = null; }
         bufs[i] = null;
     }
+    if (swellGain) { try { swellGain.disconnect(); } catch (e) {} swellGain = null; }
     if (masterGain) {
         try { masterGain.disconnect(); } catch (e) {}
         masterGain = null;
