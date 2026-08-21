@@ -36,6 +36,7 @@ const MarketPage = lazy(() => import('../pages/MarketPage'))
 const MarketPublishPage = lazy(() => import('../pages/MarketPublishPage'))
 const WorldDesignPage = lazy(() => import('../pages/WorldDesignPage'))
 const WorldViewPage = lazy(() => import('../pages/WorldViewPage'))
+const StudyRoomPage = lazy(() => import('../pages/StudyRoomPage'))
 const NotFoundPage = lazy(() => import('../pages/NotFoundPage'))
 
 // ── 路由定义类型 ──
@@ -102,6 +103,7 @@ export function getProtectedRoutes(AdminGuardComponent: ComponentType<{ children
     { path: 'market/publish', element: <MarketPublishPage /> },
     { path: 'worlds/:worldId/design', element: <WorldDesignPage /> },
     { path: 'world-view/:worldId', element: <WorldViewPage /> },
+    { path: 'study', element: <StudyRoomPage /> },
     { path: 'manual', element: <ManualPage /> },
     { path: 'manual/admin', element: <ManualPage /> },
     { path: 'admin', element: <A><AdminPage /></A> },

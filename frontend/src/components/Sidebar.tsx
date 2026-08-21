@@ -12,6 +12,7 @@ export default function Sidebar({ mobile, onClose, translucent }: { mobile?: boo
   const { user, logout } = useAuth()
   const navigate = useNavigate()
   const [collapsed, setCollapsed] = useState(false)
+  const [toolsOpen, setToolsOpen] = useState(false)
   const t = useT()
   const pendingRequests = usePendingFriendRequests()
 
@@ -159,6 +160,36 @@ export default function Sidebar({ mobile, onClose, translucent }: { mobile?: boo
           </NavLink>
         </nav>
       )}
+
+      {/* 小工具（三根杠菜单） */}
+      <div className="p-2 border-t border-border shrink-0 relative">
+        <button
+          onClick={() => setToolsOpen(!toolsOpen)}
+          className={`flex items-center rounded-xl text-textSecondary hover:text-textPrimary hover:bg-elevated transition-all duration-200 text-sm ${
+            collapsed ? 'justify-center w-10 h-10' : 'gap-3 w-full px-3 py-2.5'
+          }`}
+          title={t('sidebar.tools')}
+        >
+          <Menu size={18} />
+          {!collapsed && <span>{t('sidebar.tools')}</span>}
+        </button>
+        {toolsOpen && (
+          <>
+            <div className="fixed inset-0 z-40" onClick={() => setToolsOpen(false)} />
+            <div
+              className={`absolute bottom-full mb-2 z-50 w-44 rounded-xl border border-border bg-surface shadow-2xl py-1.5 ${collapsed ? 'left-0' : 'left-2'}`}
+            >
+              <button
+                onClick={() => { setToolsOpen(false); navigate('/study') }}
+                className="w-full flex items-center gap-3 px-3 py-2 text-sm text-textSecondary hover:text-textPrimary hover:bg-elevated transition-colors"
+              >
+                <span className="text-base leading-none">📚</span>
+                <span>{t('sidebar.studyRoom')}</span>
+              </button>
+            </div>
+          </>
+        )}
+      </div>
 
       {/* 退出 */}
       <div className="p-2 border-t border-border shrink-0">
