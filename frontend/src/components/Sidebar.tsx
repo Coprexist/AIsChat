@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { NavLink, useNavigate } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
-import { Shield, LogOut, Menu, X, ChevronLeft, BookOpen, Settings } from 'lucide-react'
+import { Shield, LogOut, Menu, X, ChevronLeft, BookOpen, Settings, Library } from 'lucide-react'
 import { MANUAL_URL } from '../constants'
 import SearchOverlay from './SearchOverlay'
 import { useT } from '../i18n/I18nContext'
@@ -183,7 +183,7 @@ export default function Sidebar({ mobile, onClose, translucent }: { mobile?: boo
                 onClick={() => { setToolsOpen(false); navigate('/study') }}
                 className="w-full flex items-center gap-3 px-3 py-2 text-sm text-textSecondary hover:text-textPrimary hover:bg-elevated transition-colors"
               >
-                <span className="text-base leading-none">📚</span>
+                <Library size={16} strokeWidth={2} />
                 <span>{t('sidebar.studyRoom')}</span>
               </button>
             </div>
