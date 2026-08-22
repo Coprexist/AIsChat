@@ -315,6 +315,33 @@ body {
 .chart-hint { color: var(--text-muted); font-size: 0.75rem; margin: 6px 0 0; text-align: center; }
 .chart-axis { color: var(--text-muted); font-size: 0.6rem; text-align: center; margin-top: 3px; font-family: var(--mono); }
 
+/* 圆形进度环（计时）——标准 SVG 进度条：固定宽高容器 + 绝对定位 SVG + 文字 flex 居中 */
+.time-ring {
+    position: relative;
+    width: min(260px, 52vw);
+    height: min(260px, 52vw);
+    margin: 12px auto;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+.ring-svg { position: absolute; inset: 0; width: 100%; height: 100%; transform: rotate(-90deg); }
+.ring-bg { fill: none; stroke: var(--border); stroke-width: 2.2; }
+.ring-fg {
+    fill: none; stroke: var(--blue); stroke-width: 2.2; stroke-linecap: round;
+    stroke-dasharray: 100, 100; stroke-dashoffset: 100;
+    transition: stroke-dashoffset 0.25s linear;
+}
+.mode-focus .ring-fg { stroke: var(--blue); }
+.mode-short .ring-fg { stroke: var(--green); }
+.mode-long .ring-fg { stroke: var(--purple); }
+.ring-center {
+    display: flex; flex-direction: column;
+    align-items: center; justify-content: center;
+    gap: 8px; text-align: center;
+}
+.ring-center .time-display { font-size: clamp(2.6rem, 7vw, 4.2rem); }
+
 /* 设置弹窗：白噪音按钮组 */
 .sound-row { display: flex; gap: 6px; flex-wrap: wrap; }
 

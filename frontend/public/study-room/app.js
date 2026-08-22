@@ -103,11 +103,11 @@ function formatTime(sec) {
 function updateTimerDisplay() {
     const sec = state.isRunning ? Math.max(0, (state.endTime - Date.now()) / 1000) : state.remainingSeconds;
     timeDisplay.textContent = formatTime(sec);
-    // 圆形进度：已过比例 → 环填充
+    // 圆形进度（标准方案：周长=100，dashoffset = 100 - 已过%）
     if (progressRing) {
         const total = state.totalSeconds || 1;
         const p = Math.min(1, Math.max(0, 1 - sec / total));
-        progressRing.style.strokeDashoffset = String(553 * (1 - p));
+        progressRing.style.strokeDashoffset = String(100 * (1 - p));
     }
     return sec;
 }
