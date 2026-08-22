@@ -110,6 +110,8 @@ body {
     gap: 20px;
     padding: 24px;
     transition: border-color 0.2s;
+    min-width: 0;              /* 允许收缩，不出界 */
+    overflow: hidden;
 }
 .timer-card.mode-focus { border-color: rgba(79, 156, 249, 0.3); }
 .timer-card.mode-short { border-color: rgba(74, 222, 128, 0.3); }
@@ -119,6 +121,10 @@ body {
     display: flex; gap: 4px;
     background: var(--bg-hover);
     border-radius: 30px; padding: 4px;
+    max-width: 100%;           /* 永不超出卡片宽度 */
+    flex-wrap: wrap;           /* 极窄时允许折行，不出界 */
+    justify-content: center;
+    flex-shrink: 0;
 }
 .mode-tab {
     padding: 6px 18px;
@@ -127,6 +133,9 @@ body {
     color: var(--text-secondary);
     font-size: 0.9rem; cursor: pointer;
     transition: var(--transition); font-weight: 500;
+    white-space: nowrap;
+    flex: 0 1 auto;
+    min-width: 0;
 }
 .mode-tab.active {
     background: var(--blue); color: #0b0e14; font-weight: 600;
@@ -503,7 +512,7 @@ body {
     .app { padding: 10px 12px; gap: 8px; }
     .main { flex-direction: column; gap: 8px; overflow-y: auto; }
     .timer-col { gap: 8px; }
-    .timer-card { gap: 12px; padding: 16px 12px; }
+    .timer-card { gap: 12px; padding: 16px 12px; justify-content: flex-start; overflow-y: auto; }
 
     /* 声音条：按钮 3 列均分两行 + 音量独占一行，窄屏整齐不溢出 */
     .sound-bar {
