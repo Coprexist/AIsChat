@@ -84,8 +84,8 @@ function makeLayerBuffer(ctx, key) {
     let k0 = 0, k1 = 0, k2 = 0, k3 = 0, k4 = 0, k5 = 0, k6 = 0;
     // 水滴脉冲状态
     let dropNext = 0, dropPhase = 0, dropDur = 0, dropEnv = 0;
-    // 深海气泡状态：成串出现（一串 1~3 个，串内带随机停顿），单个气泡是低频扫频啁啾
-    let bubNext = 0.8, bubRemain = 0, bubPhase = 0, bubGap = 0, bubF0 = 0, bubF1 = 0, bubAmp = 0, bubT = 0;
+    // 深海气泡状态：成串出现（一串 3~8 个连续上升，串内短停顿），单个气泡是低频扫频啁啾
+    let bubNext = 1.2, bubRemain = 0, bubPhase = 0, bubGap = 0, bubF0 = 0, bubF1 = 0, bubAmp = 0, bubT = 0;
     // 幅度包络状态（森林/浪花：随机游走，无固定周期——自然起伏而非规律涨落）
     let env = 0.6, envTarget = 0.6, envNext = 0;
     // 深海涌动 LFO（唯一保留正弦：慢涌 0.035Hz ≈28s 一周期，潮汐感更缓更隐）
@@ -145,17 +145,19 @@ function makeLayerBuffer(ctx, key) {
             // 深海低频水压底噪：棕色噪声 → 140Hz 极低通，恒定、无起伏（水下压力感）
             s = abyssLo.lp(brown) * 5.0;
         } else if (key === 'bubble') {
-            // 深海气泡（柔和咕噜）：低频、圆润、无节拍——
-            // 单泡 160~320ms，频率 140~300Hz 仅轻微上滑（上限 ~450Hz，无尖锐高频）；
-            // 串内气泡间有随机停顿，串间隔用平方分布（多为短、偶有长），彻底打散规律感
+            // 深海气泡（连续上升的咕噜串）：一串 3~8 个，串内短停顿 0.08~0.25s
+            // （连续的"咕噜咕噜咕噜"，不是零星单泡）；串间隔平方分布（多为短、偶有长）
+            // 打散规律感；单泡低频 140~300Hz 仅轻微上滑（上限 ~450Hz，无尖锐高频）
             bubNext -= 1 / rate;
             if (bubNext <= 0) {
-                bubRemain = 1 + Math.floor(Math.random() * 3);
-                bubNext = 0.8 + Math.pow(Math.random(), 2) * 3.5;   // 平方分布：0.8~4.3s
+                // 串大小 1~8、偏大分布（pow<1 偏向大值）：多数 4~7 个的大串，
+                // 偶尔 1~2 个的短串点缀，变化更自然
+                bubRemain = 1 + Math.floor(Math.pow(Math.random(), 0.7) * 8);
+                bubNext = 1.2 + Math.pow(Math.random(), 2) * 4;      // 串间隔平方分布：1.2~5.2s
             }
             if (bubRemain > 0) {
                 if (bubGap > 0) {
-                    bubGap -= 1 / rate;      // 串内随机停顿，避免背靠背连发
+                    bubGap -= 1 / rate;      // 串内短停顿：连续但不连发
                 } else {
                     bubPhase -= 1 / rate;
                     if (bubPhase <= 0) {
@@ -164,7 +166,7 @@ function makeLayerBuffer(ctx, key) {
                         bubAmp = 0.25 + Math.random() * 0.3;        // 轻幅度
                         bubT = 0;
                         bubPhase = 0.16 + Math.random() * 0.16;     // 单泡 160~320ms
-                        bubGap = 0.15 + Math.random() * 0.4;        // 下一泡前停顿 0.15~0.55s
+                        bubGap = 0.08 + Math.random() * 0.17;       // 下一泡停顿 0.08~0.25s
                         bubRemain--;
                     } else if (bubT < bubPhase) {
                         const p = bubT / bubPhase;
