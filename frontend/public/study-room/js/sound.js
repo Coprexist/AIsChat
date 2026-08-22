@@ -26,12 +26,17 @@ const SWAP_JITTER = 1;    // 每层 ±1s 随机错峰（秒）
 // ── 层配置：每个音色由若干声源层组成，az = 方位角（弧度，0=正前，+右 -左）──
 // drift: 声源方位随机漂移（浪花/气泡在声场中缓缓移动）
 const LAYER_DEFS = {
-    rain: [                      // 雨：雨幕 + 近滴答（石面）+ 远噼啪 + 房檐滴水（多层远近/材质）
+    rain: [                      // 暴雨：雨幕 + 近滴答（石面）+ 远噼啪 + 房檐滴水（多层远近/材质）
         { key: 'rainbed', az: -0.7 },
         { key: 'rainbed', az: 0.7 },
         { key: 'dropsNear', drift: true },   // 近处清晰滴答：短促高频，石面/硬面
         { key: 'dropsFar', drift: true },    // 远处噼啪：密集轻柔，中频（空气衰减高频）
-        { key: 'dripGutter', az: 0.4 },      // 房檐滴水：慢速、低频共鸣"嗒"
+        { key: 'dripGutter', az: 0.4 },      // 房檐滴水：慢速、短促中低频"嗒"
+    ],
+    drizzle: [                   // 细雨：轻雨幕 + 稀疏滴答（无噼啪层/无房檐滴水）
+        { key: 'rainbed', az: -0.7, light: true },
+        { key: 'rainbed', az: 0.7, light: true },
+        { key: 'dropsNear', drift: true, light: true },
     ],
     forest: [                    // 森林：以风声为主（左右两层立体风 + 粉噪 + 叶沙点缀）
         { key: 'wind', az: -0.8 },
@@ -127,16 +132,19 @@ function makeLayerBuffer(ctx, key, def) {
 
         let s = 0;
         if (key === 'rainbed') {
-            s = (bedHi.lp(w) - bedLo.lp(w)) * 0.7 + brown * 0.04;
+            // 雨幕：细雨（light）= 幅度小、更"细"的高频质感；暴雨 = 浑厚雨幕
+            const light = def && def.light;
+            s = (bedHi.lp(w) - bedLo.lp(w)) * (light ? 0.3 : 0.7) + brown * (light ? 0.02 : 0.04);
         } else if (key === 'dropsNear') {
-            // 近处清晰滴答（石面/硬面）：短促清脆高频脉冲，8~25 滴/秒，
-            // 少量但响亮、可辨——"滴答、滴答"
+            // 近处清晰滴答（石面/硬面）：短促清脆高频脉冲；
+            // 暴雨 = 8~25 滴/秒响亮；细雨（light）= 4~12 滴/秒更轻
+            const light = def && def.light;
             dropNext -= 1 / rate;
             if (dropNext <= 0) {
                 dropDur = 0.0015 + Math.random() * 0.004;     // 1.5~5.5ms 极短促
                 dropPhase = dropDur;
-                dropEnv = 0.22 + Math.random() * 0.28;        // 响亮（近）
-                dropNext = 0.04 + Math.random() * 0.085;      // 8~25 滴/秒
+                dropEnv = light ? 0.12 + Math.random() * 0.12 : 0.22 + Math.random() * 0.28;
+                dropNext = light ? 0.08 + Math.random() * 0.17 : 0.04 + Math.random() * 0.085;
             }
             if (dropPhase > 0) {
                 s = (nearHi.lp(w) - nearLo.lp(w)) * Math.exp(-(dropDur - dropPhase) * 600) * dropEnv;
