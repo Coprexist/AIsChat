@@ -92,6 +92,18 @@ MIGRATIONS: list[tuple[str, str]] = [
             updated_at TIMESTAMP DEFAULT NOW()
         )""",
     ),
+    (
+        "study_records 表（自习室学习时长）",
+        """CREATE TABLE IF NOT EXISTS study_records (
+            id SERIAL PRIMARY KEY,
+            user_id INT NOT NULL,
+            date VARCHAR(10) NOT NULL,
+            minutes INT NOT NULL DEFAULT 0,
+            created_at TIMESTAMP DEFAULT NOW(),
+            updated_at TIMESTAMP DEFAULT NOW(),
+            UNIQUE (user_id, date)
+        )""",
+    ),
 ]
 
 
