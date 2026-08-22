@@ -6,8 +6,11 @@ from fastapi import APIRouter, Depends, HTTPException, status, File, UploadFile
 from sqlalchemy.ext.asyncio import AsyncSession
 from pydantic import BaseModel, Field, field_validator
 from app.database import get_db
+from app.repositories.user_repo import UserRepository
+from app.repositories.api_key_pool_repo import ApiKeyPoolRepository
 from app.services.infrastructure.auth_service import update_user_settings
 from app.utils.auth import get_current_user
+from app.routers.deps import get_user_repo, get_api_key_pool_repo
 from app.schemas.auth import UserInfoResponse
 from app.models.user import User
 from app.utils.text import validate_status_text
@@ -48,13 +51,15 @@ class RedeemRequest(BaseModel):
 async def update_settings(
     req: UpdateSettingsRequest,
     current_user: dict = Depends(get_current_user),
-    db: AsyncSession = Depends(get_db),
+    user_repo: UserRepository = Depends(get_user_repo),
+    api_key_pool_repo: ApiKeyPoolRepository = Depends(get_api_key_pool_repo),
 ):
     """更新用户设置（用户名、密码、API Key、策略模式等）"""
     try:
         return await update_user_settings(
-            db,
             user_id=current_user["user_id"],
+            user_repo=user_repo,
+            api_key_pool_repo=api_key_pool_repo,
             username=req.username,
             password=req.password,
             api_base_url=req.api_base_url,

@@ -7,10 +7,11 @@ from fastapi import APIRouter, Depends, HTTPException, status, Request
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, func
 from app.database import get_db
-from app.routers.deps import get_user_repo, get_system_settings_repo, get_verification_repo
+from app.routers.deps import get_user_repo, get_system_settings_repo, get_verification_repo, get_api_key_pool_repo
 from app.repositories.user_repo import UserRepository, SQLAlchemyUserRepository
 from app.repositories.system_settings_repo import SystemSettingsRepository
 from app.repositories.verification_repo import VerificationRepository
+from app.repositories.api_key_pool_repo import ApiKeyPoolRepository
 from app.schemas.auth import (
     RegisterRequest, LoginRequest, TokenResponse, UserInfoResponse,
     EmailVerificationRequest, VerifyEmailRequest, RebindEmailRequest,
@@ -59,21 +60,37 @@ async def register(
         ip = request.client.host if request.client else None
         await log_user_action(db, "register", user.id, "user", details={"username": req.username}, ip=ip)
         # 注册后自动登录（使用用户名+密码方式）
-        return await login_user(db, req.username, req.password, method="direct")
+        return await login_user(
+            login_id=req.username,
+            password=req.password,
+            method="direct",
+            user_repo=user_repo,
+            settings_repo=settings_repo,
+            verification_repo=verification_repo,
+        )
     except ValueError as e:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
 
 
 @router.post("/login", response_model=TokenResponse)
-async def login(req: LoginRequest, request: Request, db: AsyncSession = Depends(get_db)):
+async def login(
+    req: LoginRequest,
+    request: Request,
+    db: AsyncSession = Depends(get_db),
+    user_repo: UserRepository = Depends(get_user_repo),
+    settings_repo: SystemSettingsRepository = Depends(get_system_settings_repo),
+    verification_repo: VerificationRepository = Depends(get_verification_repo),
+):
     """用户登录，返回 JWT 令牌。"""
     try:
         result = await login_user(
-            db,
-            req.login_id,
+            login_id=req.login_id,
             password=req.password,
             method=req.method,
             verification_code=req.verification_code,
+            user_repo=user_repo,
+            settings_repo=settings_repo,
+            verification_repo=verification_repo,
         )
         from app.services.audit_service import log_user_action
         ip = request.client.host if request.client else None
@@ -87,10 +104,16 @@ async def login(req: LoginRequest, request: Request, db: AsyncSession = Depends(
 async def me(
     current_user: dict = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
+    user_repo: UserRepository = Depends(get_user_repo),
+    api_key_pool_repo: ApiKeyPoolRepository = Depends(get_api_key_pool_repo),
 ):
     """获取当前用户信息。"""
     try:
-        return await get_user_info(db, current_user["user_id"])
+        return await get_user_info(
+            user_id=current_user["user_id"],
+            user_repo=user_repo,
+            api_key_pool_repo=api_key_pool_repo,
+        )
     except ValueError as e:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e))
 
@@ -200,11 +223,20 @@ async def verify_email(
 async def rebind_email_endpoint(
     req: RebindEmailRequest,
     current_user: dict = Depends(get_current_user),
-    db: AsyncSession = Depends(get_db),
+    user_repo: UserRepository = Depends(get_user_repo),
+    verification_repo: VerificationRepository = Depends(get_verification_repo),
+    api_key_pool_repo: ApiKeyPoolRepository = Depends(get_api_key_pool_repo),
 ):
     """换绑邮箱（需登录，需新邮箱验证码）"""
     try:
-        return await rebind_email(db, current_user["user_id"], req.email, req.code)
+        return await rebind_email(
+            user_id=current_user["user_id"],
+            email=req.email,
+            code=req.code,
+            user_repo=user_repo,
+            verification_repo=verification_repo,
+            api_key_pool_repo=api_key_pool_repo,
+        )
     except ValueError as e:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
 
@@ -212,10 +244,17 @@ async def rebind_email_endpoint(
 @router.delete("/email", response_model=UserInfoResponse)
 async def remove_email_endpoint(
     current_user: dict = Depends(get_current_user),
-    db: AsyncSession = Depends(get_db),
+    user_repo: UserRepository = Depends(get_user_repo),
+    settings_repo: SystemSettingsRepository = Depends(get_system_settings_repo),
+    api_key_pool_repo: ApiKeyPoolRepository = Depends(get_api_key_pool_repo),
 ):
     """解绑邮箱（需登录，仅在 require_email_verification=OFF 时允许）"""
     try:
-        return await unbind_email(db, current_user["user_id"])
+        return await unbind_email(
+            user_id=current_user["user_id"],
+            user_repo=user_repo,
+            settings_repo=settings_repo,
+            api_key_pool_repo=api_key_pool_repo,
+        )
     except ValueError as e:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))

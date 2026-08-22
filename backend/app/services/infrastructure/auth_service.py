@@ -3,14 +3,13 @@
 处理用户注册、登录、信息获取
 """
 import logging
-from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select, func
 from app.models.user import User
 from app.utils.auth import hash_password, verify_password, create_access_token
 from app.utils.crypto import encrypt_api_key, decrypt_api_key
 from app.repositories.user_repo import UserRepository
 from app.repositories.system_settings_repo import SystemSettingsRepository
 from app.repositories.verification_repo import VerificationRepository
+from app.repositories.api_key_pool_repo import ApiKeyPoolRepository
 
 logger = logging.getLogger(__name__)
 
@@ -129,11 +128,14 @@ async def register_user(
 
 
 async def login_user(
-    db: AsyncSession,
+    *,
     login_id: str,
     password: str | None = None,
     method: str = "direct",
     verification_code: str | None = None,
+    user_repo: UserRepository,
+    settings_repo: SystemSettingsRepository,
+    verification_repo: VerificationRepository,
 ) -> dict:
     """
     用户登录，返回 JWT 令牌信息。
@@ -143,6 +145,7 @@ async def login_user(
     # 检查登录方式是否可用
     try:
         sys = await settings_repo.get_settings()
+        login_providers = sys.get("login_providers", ["direct"])
         if method not in login_providers:
             raise ValueError("该登录方式暂不可用")
     except ValueError as e:
@@ -152,12 +155,9 @@ async def login_user(
         pass
 
     # 查找用户：先按 username，再按 email
-    user = None
-    result = await db.execute(select(User).where(User.username == login_id))
-    user = result.scalar_one_or_none()
+    user = await user_repo.get_by_username(login_id)
     if user is None:
-        result = await db.execute(select(User).where(User.email == login_id))
-        user = result.scalar_one_or_none()
+        user = await user_repo.get_by_email(login_id)
 
     if user is None:
         raise ValueError("用户名或密码错误")
@@ -175,8 +175,7 @@ async def login_user(
         if not verification_code:
             raise ValueError("请输入验证码")
 
-        from app.services.infrastructure.verification_service import verify_code
-        if not await verify_code(db, email_addr, verification_code, "login"):
+        if not await verification_repo.verify_code(email_addr, verification_code, "login"):
             raise ValueError("用户名或密码错误")
 
     elif method == "direct":
@@ -186,8 +185,6 @@ async def login_user(
             raise ValueError("用户名或密码错误")
     else:
         raise ValueError("不支持的登录方式")
-
-
 
     access_token = create_access_token({
         "user_id": user.id,
@@ -209,10 +206,14 @@ async def login_user(
     }
 
 
-async def get_user_info(db: AsyncSession, user_id: int) -> dict:
+async def get_user_info(
+    *,
+    user_id: int,
+    user_repo: UserRepository,
+    api_key_pool_repo: ApiKeyPoolRepository,
+) -> dict:
     """获取用户信息"""
-    result = await db.execute(select(User).where(User.id == user_id))
-    user = result.scalar_one_or_none()
+    user = await user_repo.get_by_id(user_id)
 
     if user is None:
         raise ValueError("用户不存在")
@@ -220,13 +221,7 @@ async def get_user_info(db: AsyncSession, user_id: int) -> dict:
     # v0.1.5: 查询绑定的池 Key 名
     assigned_pool_key_name = None
     try:
-        from app.models.api_key_pool import UserApiAssignment, ApiKeyPool
-        assign_result = await db.execute(
-            select(ApiKeyPool.name).join(
-                UserApiAssignment, UserApiAssignment.pool_key_id == ApiKeyPool.id
-            ).where(UserApiAssignment.user_id == user_id)
-        )
-        assigned_pool_key_name = assign_result.scalar()
+        assigned_pool_key_name = await api_key_pool_repo.get_assigned_pool_key_name(user_id)
     except Exception:
         pass
 
@@ -263,49 +258,51 @@ async def get_user_info(db: AsyncSession, user_id: int) -> dict:
 
 
 async def rebind_email(
-    db: AsyncSession,
+    *,
     user_id: int,
     email: str,
     code: str,
+    user_repo: UserRepository,
+    verification_repo: VerificationRepository,
+    api_key_pool_repo: ApiKeyPoolRepository,
 ) -> dict:
     """换绑邮箱。需验证新邮箱的验证码。"""
-    result = await db.execute(select(User).where(User.id == user_id))
-    user = result.scalar_one_or_none()
+    user = await user_repo.get_by_id(user_id)
     if user is None:
         raise ValueError("用户不存在")
 
-    # 校验验证码
-    from app.services.infrastructure.verification_service import verify_code
-    if not await verify_code(db, email, code, "rebind"):
+    if not await verification_repo.verify_code(email, code, "rebind"):
         raise ValueError("验证码错误或已过期")
 
-    # 检查邮箱唯一性
-    existing = await db.execute(
-        select(User).where(User.email == email, User.id != user_id)
-    )
-    if existing.scalar_one_or_none():
+    existing = await user_repo.get_by_email(email)
+    if existing and existing.id != user_id:
         raise ValueError("该邮箱已被其他账号使用")
 
     user.email = email
     user.email_verified = True
-    await db.flush()
-    await db.refresh(user)
+    await user_repo.flush()
+    await user_repo.refresh(user)
 
     logger.info(f"用户 {user_id} 已换绑邮箱 → {email}")
-    return await get_user_info(db, user_id)
+    return await get_user_info(
+        user_id=user_id,
+        user_repo=user_repo,
+        api_key_pool_repo=api_key_pool_repo,
+    )
 
 
 async def unbind_email(
-    db: AsyncSession,
+    *,
     user_id: int,
+    user_repo: UserRepository,
+    settings_repo: SystemSettingsRepository,
+    api_key_pool_repo: ApiKeyPoolRepository,
 ) -> dict:
     """解绑邮箱（仅在 require_email_verification=OFF 时允许）"""
-    result = await db.execute(select(User).where(User.id == user_id))
-    user = result.scalar_one_or_none()
+    user = await user_repo.get_by_id(user_id)
     if user is None:
         raise ValueError("用户不存在")
 
-    # 检查系统是否关闭了邮箱验证
     try:
         sys = await settings_repo.get_settings()
         if sys.get("require_email_verification", False):
@@ -315,16 +312,22 @@ async def unbind_email(
 
     user.email = None
     user.email_verified = False
-    await db.flush()
-    await db.refresh(user)
+    await user_repo.flush()
+    await user_repo.refresh(user)
 
     logger.info(f"用户 {user_id} 已解绑邮箱")
-    return await get_user_info(db, user_id)
+    return await get_user_info(
+        user_id=user_id,
+        user_repo=user_repo,
+        api_key_pool_repo=api_key_pool_repo,
+    )
 
 
 async def update_user_settings(
-    db: AsyncSession,
+    *,
     user_id: int,
+    user_repo: UserRepository,
+    api_key_pool_repo: ApiKeyPoolRepository,
     username: str | None = None,
     password: str | None = None,
     api_base_url: str | None = None,
@@ -341,15 +344,13 @@ async def update_user_settings(
     prefer_own_key: bool | None = None,
 ) -> dict:
     """更新用户设置（含用户名和密码修改）"""
-    result = await db.execute(select(User).where(User.id == user_id))
-    user = result.scalar_one_or_none()
+    user = await user_repo.get_by_id(user_id)
     if user is None:
         raise ValueError("用户不存在")
 
     if username is not None:
-        # 检查用户名唯一性
-        existing = await db.execute(select(User).where(User.username == username, User.id != user_id))
-        if existing.scalar_one_or_none():
+        existing = await user_repo.get_by_username(username)
+        if existing and existing.id != user_id:
             raise ValueError("用户名已被占用")
         user.username = username
     if password is not None:
@@ -381,6 +382,11 @@ async def update_user_settings(
     if prefer_own_key is not None:
         user.prefer_own_key = prefer_own_key
 
-    await db.flush()
-    await db.refresh(user)
-    return await get_user_info(db, user_id)
+    await user_repo.flush()
+    await user_repo.refresh(user)
+    return await get_user_info(
+        user_id=user_id,
+        user_repo=user_repo,
+        api_key_pool_repo=api_key_pool_repo,
+    )
+
