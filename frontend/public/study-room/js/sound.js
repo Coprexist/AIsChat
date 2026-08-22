@@ -260,13 +260,14 @@ function makeLayerBuffer(ctx, key, def) {
             s = (foamHi.lp(w) - foamLo.lp(w)) * 1.1 * walkEnv(i);
         } else if (key === 'abyss') {
             // 深海低频水压底噪：棕色噪声 → 140Hz 极低通，恒定、无起伏（水下压力感）
-            s = abyssLo.lp(brown) * 8.0;
+            // 用户要求背景音调大 3 倍：增益 ×3（×8→×24），峰值限幅在 1.0 内防削波
+            s = Math.max(-1, Math.min(1, abyssLo.lp(brown) * 24.0));
         } else if (key === 'bubble') {
             // 深海气泡（可重叠的咕噜串）：一串 1~8 个（偏大分布），串内密集触发，
             // 新气泡不等旧气泡播完——多个气泡同时发声叠加，像水下气泡群一起冒；
             // quiet=小音量远层组：音色与主组完全一致（低频咕噜、同样时长），
             // 只是音量更小、串略小略稀——"远处也有一组同样的气泡"
-            const BUBBLE_VOLUME = 0.35;   // 气泡整体音量：在缩减 75% 基础上增大 40%（区间 30~45% 中值）
+            const BUBBLE_VOLUME = 0.9;    // 气泡整体音量：提到能压过背景底噪、清晰可闻（原 0.35）
             const quiet = def && def.quiet;
             const ampScale = (quiet ? 0.12 : 0.3) * BUBBLE_VOLUME;
             const maxConc = quiet ? 3 : 4;
@@ -280,21 +281,21 @@ function makeLayerBuffer(ctx, key, def) {
                 if (bubRemain <= 0) {
                     bubRemain = quiet
                         ? 1 + Math.floor(Math.pow(Math.random(), 0.7) * 5)  // 小声组串略小
-                        : 1 + Math.floor(Math.pow(Math.random(), 0.7) * 8); // 主组串大
+                        : 3 + Math.floor(Math.random() * 8);                // 主组串 3~10 个
                     bubNext = serGap;
                 } else {
                     bubRemain--;
                     bubNext = inSerGap;
                 }
                 if (bubbles.length < maxConc) {
-                    // 低沉圆润的"咕噜"音：100~220Hz 几乎不扫频（1.05~1.3 倍）、
-                    // 时长 180~340ms——频率不猛跳就没有"啵"的清脆感
-                    const f0 = 100 + Math.random() * 120;
+                    // "咕噜"浊音：低频 60~160Hz，正弦 + 少量噪声混合（不是纯正弦电子音），
+                    // 时长 120~260ms——像水泡翻滚的"咕"，不是"呜"长音
+                    const f0 = 60 + Math.random() * 100;
                     bubbles.push({
                         f0,
                         f1: f0 * (1.05 + Math.random() * 0.25),
-                        amp: (0.25 + Math.random() * 0.3) * ampScale,
-                        dur: 0.18 + Math.random() * 0.16,
+                        amp: (0.3 + Math.random() * 0.3) * ampScale,
+                        dur: 0.12 + Math.random() * 0.14,
                         t: 0,
                     });
                 }
@@ -306,7 +307,8 @@ function makeLayerBuffer(ctx, key, def) {
                 const p = b.t / b.dur;
                 const f = b.f0 + (b.f1 - b.f0) * p;
                 const env = Math.sin(Math.PI * Math.min(1, p));
-                s += Math.sin(2 * Math.PI * f * b.t) * env * b.amp;
+                // 正弦 80% + 低频噪声 20% 混合 → 浊音"咕"（纯正弦会像电子音）
+                s += (Math.sin(2 * Math.PI * f * b.t) * 0.8 + w * 0.2) * env * b.amp;
                 b.t += 1 / rate;
             }
         }

@@ -291,6 +291,7 @@ body {
 .sound-bar {
     display: flex;
     align-items: center;
+    justify-content: center;   /* 内容居中：全屏/放大时与计时圆环同一中心线对齐 */
     gap: 14px;
     background: var(--bg-card);
     border: 1px solid var(--border);
@@ -354,15 +355,13 @@ body {
 .chart-hint { color: var(--text-muted); font-size: 0.75rem; margin: 6px 0 0; text-align: center; }
 .chart-axis { color: var(--text-muted); font-size: 0.6rem; text-align: center; margin-top: 3px; font-family: var(--mono); }
 
-/* 圆形进度环（计时）——标准 SVG 进度条：固定宽高容器 + 绝对定位 SVG + 文字 flex 居中 */
+/* 圆形进度环（计时）——标准 SVG 进度条：固定宽高容器 + 绝对定位 SVG + 文字绝对居中 */
 .time-ring {
     position: relative;
     width: min(260px, 52vw);
     height: min(260px, 52vw);
     margin: 12px auto;
-    display: flex;
-    align-items: center;
-    justify-content: center;
+    flex-shrink: 0;
 }
 .ring-svg { position: absolute; inset: 0; width: 100%; height: 100%; }  /* 弧线 d 起点在顶部，无需旋转 */
 .ring-bg { fill: none; stroke: var(--border); stroke-width: 1.8; }
@@ -373,10 +372,17 @@ body {
 .mode-focus .ring-fg { stroke: var(--blue); }
 .mode-short .ring-fg { stroke: var(--green); }
 .mode-long .ring-fg { stroke: var(--purple); }
+/* 文字层：绝对铺满圆环容器并 flex 居中 → 放大/全屏/任何布局下都在环的正中心 */
 .ring-center {
-    display: flex; flex-direction: column;
-    align-items: center; justify-content: center;
-    gap: 12px; text-align: center;
+    position: absolute;
+    inset: 0;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 12px;
+    text-align: center;
+    pointer-events: none;
 }
 .ring-center .time-display { font-size: clamp(2.3rem, 6vw, 3.6rem); }
 
