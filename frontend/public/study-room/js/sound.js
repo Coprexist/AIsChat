@@ -79,7 +79,7 @@ function makeLayerBuffer(ctx, key, def) {
     const bedHi = S(lp(3000)), bedLo = S(lp(400));   // 雨幕带通
     const nearHi = S(lp(5200)), nearLo = S(lp(2400)); // 近滴答（石面/硬面：清脆高频）
     const farHi = S(lp(1800)), farLo = S(lp(700));   // 远噼啪（高频被空气衰减：中频）
-    const gutLo = S(lp(900));                        // 房檐滴水（低频共鸣）
+    const gutLo = S(lp(700));                        // 房檐滴水（中低频闷嗒）
     const windLo = S(lp(800));                        // 风声低通
     const leafLo = S(lp(1500));                       // 叶沙低通
     const swellLo = S(lp(450));                       // 涌动低通
@@ -157,19 +157,17 @@ function makeLayerBuffer(ctx, key, def) {
                 farPhase -= 1 / rate;
             }
         } else if (key === 'dripGutter') {
-            // 房檐滴水：慢速（0.5~1.5s 一滴）、低频共鸣"嗒"——水从檐口落下
-            // 撞击积水，有体腔共鸣感，与石面滴答明显不同
+            // 房檐滴水：慢速（0.5~1.5s 一滴）、短促"嗒"——中低频噪声脉冲，
+            // 无音高不拖尾（不是低频"咚"，避免像鼓点），与石面清脆滴答形成材质差
             gutNext -= 1 / rate;
             if (gutNext <= 0) {
-                gutDur = 0.05 + Math.random() * 0.05;        // 50~100ms 共鸣
+                gutDur = 0.025 + Math.random() * 0.035;      // 25~60ms 短促
                 gutPhase = gutDur;
-                gutEnv = 0.3 + Math.random() * 0.35;         // 中等
+                gutEnv = 0.28 + Math.random() * 0.3;         // 中等
                 gutNext = 0.5 + Math.random() * 1.0;         // 0.5~1.5s 一滴
             }
             if (gutPhase > 0) {
-                const pg = 1 - gutPhase / gutDur;            // 0→1
-                s = (gutLo.lp(w) * Math.exp(-(gutDur - gutPhase) * 28) * gutEnv
-                     + Math.sin(2 * Math.PI * 160 * pg * gutDur) * Math.exp(-(gutDur - gutPhase) * 22) * gutEnv * 0.8) * 0.75;
+                s = gutLo.lp(w) * Math.exp(-(gutDur - gutPhase) * 90) * gutEnv * 0.75;
                 gutPhase -= 1 / rate;
             }
         } else if (key === 'wind') {
