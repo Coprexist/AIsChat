@@ -43,6 +43,7 @@ const LAYER_DEFS = {
     deep: [                      // 深海（水下）：低频水压底噪 + 气泡咕噜噜
         { key: 'abyss', az: 0 },
         { key: 'bubble', drift: true },
+        { key: 'bubble', drift: true, quiet: true },   // 小声的远层气泡群（背景层次）
     ],
 };
 
@@ -56,7 +57,7 @@ async function initAudio() {
 
 // ── 层 buffer 生成（单声道） ──────────────────────────────────────────────
 
-function makeLayerBuffer(ctx, key) {
+function makeLayerBuffer(ctx, key, def) {
     const rate = ctx.sampleRate;
     const len = Math.floor(rate * BUFFER_SECONDS);
     const buf = ctx.createBuffer(1, len, rate);
@@ -149,21 +150,30 @@ function makeLayerBuffer(ctx, key) {
         } else if (key === 'bubble') {
             // 深海气泡（可重叠的咕噜串）：一串 1~8 个（偏大分布），串内密集触发，
             // 新气泡不等旧气泡播完——多个气泡同时发声叠加，像水下气泡群一起冒；
-            // 并发上限 4 防过载；单泡低频 140~300Hz 轻微上滑，无尖锐高频
+            // quiet=小音量远层组：幅度更低、并发更少、串更小更稀，做背景层次
+            const quiet = def && def.quiet;
+            const ampScale = quiet ? 0.12 : 0.3;          // 小声组约为主组的 40%
+            const maxConc = quiet ? 3 : 4;
+            const serGap = quiet ? 2.2 + Math.pow(Math.random(), 2) * 5
+                                 : 1.2 + Math.pow(Math.random(), 2) * 4;   // 串间隔
+            const inSerGap = quiet ? 0.2 + Math.random() * 0.3
+                                   : 0.08 + Math.random() * 0.2;           // 串内触发
             bubNext -= 1 / rate;
             if (bubNext <= 0) {
                 if (bubRemain <= 0) {
-                    bubRemain = 1 + Math.floor(Math.pow(Math.random(), 0.7) * 8); // 1~8 偏大
-                    bubNext = 1.2 + Math.pow(Math.random(), 2) * 4;   // 串间隔：1.2~5.2s
+                    bubRemain = quiet
+                        ? 1 + Math.floor(Math.pow(Math.random(), 0.7) * 4)  // 小声组串小
+                        : 1 + Math.floor(Math.pow(Math.random(), 0.7) * 8); // 主组串大
+                    bubNext = serGap;
                 } else {
                     bubRemain--;
-                    bubNext = 0.08 + Math.random() * 0.2;             // 串内密集触发：0.08~0.28s
+                    bubNext = inSerGap;
                 }
-                if (bubbles.length < 4) {                            // 并发上限 4
+                if (bubbles.length < maxConc) {
                     bubbles.push({
                         f0: 140 + Math.random() * 160,
                         f1: (140 + Math.random() * 160) * (1.2 + Math.random() * 0.4),
-                        amp: 0.25 + Math.random() * 0.3,
+                        amp: (0.25 + Math.random() * 0.3) * ampScale,
                         dur: 0.16 + Math.random() * 0.16,
                         t: 0,
                     });
@@ -176,7 +186,7 @@ function makeLayerBuffer(ctx, key) {
                 const p = b.t / b.dur;
                 const f = b.f0 + (b.f1 - b.f0) * p;
                 const env = Math.sin(Math.PI * Math.min(1, p));
-                s += Math.sin(2 * Math.PI * f * b.t) * env * b.amp * 0.3;
+                s += Math.sin(2 * Math.PI * f * b.t) * env * b.amp;
                 b.t += 1 / rate;
             }
         }
@@ -230,7 +240,7 @@ function createLayer(def) {
     });
     ly.panner.connect(masterGain);
     for (let i = 0; i < 2; i++) {
-        ly.bufs[i] = makeLayerBuffer(audioCtx, def.key);
+        ly.bufs[i] = makeLayerBuffer(audioCtx, def.key, def);
         ly.gains[i] = audioCtx.createGain();
         ly.gains[i].gain.value = i === 0 ? 1 : 0;
     }
