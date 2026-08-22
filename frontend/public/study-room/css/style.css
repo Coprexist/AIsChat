@@ -597,6 +597,8 @@ body {
         padding: 2px 0;
         margin-bottom: 0;
     }
+    /* 侧栏卡标题是 h3（全局 .card h3 带 12px 下边距）——折叠态统一为 0，与计时器标题一致 */
+    .card h3.acc-head { margin-bottom: 0; }
     .acc-head svg { width: 14px; height: 14px; }
     .acc-head::after {
         content: '＋';
@@ -615,7 +617,8 @@ body {
     .acc-inner { display: block; overflow: hidden; min-height: 0; }
     .acc-open > .acc-body { grid-template-rows: 1fr; }
     .acc-open > .acc-head::after { content: '－'; }
-    .acc-open > .acc-head { color: var(--blue); }
+    .acc-open > .acc-head { color: var(--blue); margin-bottom: 12px; }
+    .card.acc-open > h3.acc-head { margin-bottom: 12px; }
     /* 展开时恢复卡片内部纵向排布 */
     .timer-card.acc-open > .acc-body > .acc-inner,
     .sidebar .card.acc-open > .acc-body > .acc-inner { display: flex; flex-direction: column; gap: 12px; }

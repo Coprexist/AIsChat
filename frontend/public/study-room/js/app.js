@@ -477,34 +477,32 @@ function bindEvents() {
     // ── 周期 & 设置：从服务器拉取（跨设备一致）──
     studyLoadRemote();
 
-    // ── 小屏手风琴（≤768px 生效）：4 卡点标题互斥展开，默认计时卡展开其余折叠 ──
-    const accHeads = document.querySelectorAll('.acc-head');
+    // ── 小屏手风琴（≤768px 生效）：点整张卡片互斥展开/收起 ──
+    // 默认展开态由 HTML 上的 acc-open 类决定（计时卡默认展开），不依赖 JS 时序
+    const accHosts = document.querySelectorAll('.timer-card, .sidebar .card');
     const accOpen = () => window.matchMedia('(max-width: 768px)').matches;
-    if (accHeads.length) {
-        // 计时卡默认展开，其余默认折叠
-        if (accOpen()) {
-            const timerCardEl = document.getElementById('timer-card');
-            if (timerCardEl) timerCardEl.classList.add('acc-open');
-        }
-        accHeads.forEach(head => head.addEventListener('click', () => {
+    if (accHosts.length) {
+        accHosts.forEach(host => host.addEventListener('click', (e) => {
             if (!accOpen()) return;   // 桌面不启用折叠
-            const host = head.closest('.timer-card, .card');
-            if (!host) return;
-            // 若已展开 → 收起（再点一下折叠）
+            // 点击卡片内部交互元素（按钮/输入框等）不触发折叠
+            if (e.target.closest('button, input, a, .todo-checkbox, .todo-delete, .todo-item')) return;
+            // 若已展开 → 收起
             if (host.classList.contains('acc-open')) {
                 host.classList.remove('acc-open');
                 return;
             }
             // 互斥：收起所有，再展开当前
-            document.querySelectorAll('.timer-card, .sidebar .card').forEach(c => c.classList.remove('acc-open'));
+            accHosts.forEach(c => c.classList.remove('acc-open'));
             host.classList.add('acc-open');
         }));
         // 跨断点切换：进入小屏时若全部折叠则默认展开计时卡
         window.addEventListener('resize', () => {
             if (accOpen()) {
-                const timerCardEl = document.getElementById('timer-card');
                 const anyOpen = document.querySelector('.timer-card.acc-open, .sidebar .card.acc-open');
-                if (!anyOpen && timerCardEl) timerCardEl.classList.add('acc-open');
+                if (!anyOpen) {
+                    const timerCardEl = document.getElementById('timer-card');
+                    if (timerCardEl) timerCardEl.classList.add('acc-open');
+                }
             }
         });
     }
