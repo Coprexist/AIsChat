@@ -81,17 +81,18 @@ function makeLayerBuffer(ctx, key) {
     let dropNext = 0, dropPhase = 0, dropDur = 0, dropEnv = 0;
     // 幅度包络状态（森林/浪花：随机游走，无固定周期——自然起伏而非规律涨落）
     let env = 0.6, envTarget = 0.6, envNext = 0;
-    // 深海涌动 LFO（唯一保留正弦：慢涌 0.07Hz，深海底噪本来就要"潮汐感"）
-    const lfoFreq = key === 'swell' ? 0.07 : 0;
+    // 深海涌动 LFO（唯一保留正弦：慢涌 0.035Hz ≈28s 一周期，潮汐感更缓更隐）
+    const lfoFreq = key === 'swell' ? 0.035 : 0;
 
-    // 随机游走包络：每 1~4s 随机换目标幅度，慢逼近（τ≈1s）→ 无周期、平滑起伏
+    // 随机游走包络：每 6~14s 才换一次目标幅度（收窄到 0.6~1.0），
+    // 逼近更慢（τ≈4s）→ 音量几乎恒定，只剩极缓的"呼吸感"，不打扰专注
     const walkEnv = (i) => {
         envNext -= 1 / rate;
         if (envNext <= 0) {
-            envTarget = 0.45 + Math.random() * 0.75;
-            envNext = 1 + Math.random() * 3;
+            envTarget = 0.6 + Math.random() * 0.4;
+            envNext = 6 + Math.random() * 8;
         }
-        env += (envTarget - env) * 0.00002;
+        env += (envTarget - env) * 0.000006;
         return env;
     };
 
@@ -129,7 +130,7 @@ function makeLayerBuffer(ctx, key) {
         } else if (key === 'pink') {
             s = pink * 0.3 * walkEnv(i);
         } else if (key === 'swell') {
-            const lfo = 0.65 + 0.35 * Math.sin(2 * Math.PI * lfoFreq * i / rate);
+            const lfo = 0.75 + 0.25 * Math.sin(2 * Math.PI * lfoFreq * i / rate);
             s = swellLo.lp(brown) * 3.6 * lfo;
         } else if (key === 'foam') {
             s = (foamHi.lp(w) - foamLo.lp(w)) * 1.1 * walkEnv(i);
@@ -158,18 +159,18 @@ function makeSource(buffer, gain, panner) {
     return s;
 }
 
-// 漂移层：每 1~2s 微调目标方位（±20°），HRTF 用 τ=2s 连续渐变跟随——
-// 声像永远在平滑渐变（如"左40% 5秒内渐到左48%"），不会跳到端点
+// 漂移层：每 3.5~7s 才微调一次目标方位（±8°），HRTF 用 τ=4s 极缓渐变跟随——
+// 声像几乎静止，只在很长的尺度上缓缓呼吸（如"左40% 20秒内渐到左44%"）
 function scheduleDrift(ly) {
     ly.driftTimer = setTimeout(() => {
-        const az = Math.min(1.0, Math.max(-1.0, ly.az + (Math.random() - 0.5) * 0.7));
+        const az = Math.min(1.0, Math.max(-1.0, ly.az + (Math.random() - 0.5) * 0.28));
         ly.az = az;
         const t = audioCtx.currentTime;
-        ly.panner.positionX.setTargetAtTime(Math.sin(az), t, 2);
-        ly.panner.positionY.setTargetAtTime(0, t, 2);
-        ly.panner.positionZ.setTargetAtTime(-Math.cos(az), t, 2);
+        ly.panner.positionX.setTargetAtTime(Math.sin(az), t, 4);
+        ly.panner.positionY.setTargetAtTime(0, t, 4);
+        ly.panner.positionZ.setTargetAtTime(-Math.cos(az), t, 4);
         scheduleDrift(ly);
-    }, 1000 + Math.random() * 1000);
+    }, 3500 + Math.random() * 3500);
 }
 
 function createLayer(def) {
@@ -234,14 +235,14 @@ let swellTimer = null;
 let swellGain = null;
 
 function planSwell() {
-    if (Math.random() < 0.55) {
+    if (Math.random() < 0.4) {
         swell.phase = 'swell';
-        swell.remain = triMode(5, 60, 40);
-        swell.target = 1.15 + Math.random() * 0.4;
+        swell.remain = triMode(20, 90, 55);
+        swell.target = 1.05 + Math.random() * 0.3;
     } else {
         swell.phase = 'calm';
-        swell.remain = 8 + Math.random() * 22;
-        swell.target = 0.55 + Math.random() * 0.2;
+        swell.remain = 25 + Math.random() * 45;
+        swell.target = 0.7 + Math.random() * 0.15;
     }
 }
 
@@ -249,7 +250,7 @@ function startSwellScheduler() {
     planSwell();
     swellTimer = setInterval(() => {
         if (!swellGain) return;
-        swellGain.gain.setTargetAtTime(swell.target, audioCtx.currentTime, 0.6);
+        swellGain.gain.setTargetAtTime(swell.target, audioCtx.currentTime, 1.5);
         swell.remain -= 0.1;
         if (swell.remain <= 0) planSwell();
     }, 100);
