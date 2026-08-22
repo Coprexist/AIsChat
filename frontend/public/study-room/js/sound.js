@@ -82,7 +82,8 @@ function makeLayerBuffer(ctx, key, def) {
 
     // 各层滤波器
     const bedHi = S(lp(3000)), bedLo = S(lp(400));   // 雨幕带通
-    const nearHi = S(lp(5200)), nearLo = S(lp(2400)); // 近滴答（石面/硬面：清脆高频）
+    const nearHi = S(lp(5200)), nearLo = S(lp(2400)); // 暴雨近滴答（石面/硬面：清脆高频）
+    const nearHiL = S(lp(4000)), nearLoL = S(lp(1100)); // 细雨近滴答（宽频：每颗"滴"有实体感）
     const farHi = S(lp(1800)), farLo = S(lp(700));   // 远噼啪（高频被空气衰减：中频）
     const gutLo = S(lp(700));                        // 房檐滴水（中低频闷嗒）
     const windLo = S(lp(800));                        // 风声低通
@@ -132,22 +133,25 @@ function makeLayerBuffer(ctx, key, def) {
 
         let s = 0;
         if (key === 'rainbed') {
-            // 雨幕：细雨（light）= 幅度小、更"细"的高频质感；暴雨 = 浑厚雨幕
+            // 雨幕：细雨（light）= 幅度很小，让稀疏滴答凸出来（点点滴滴可辨）
             const light = def && def.light;
-            s = (bedHi.lp(w) - bedLo.lp(w)) * (light ? 0.3 : 0.7) + brown * (light ? 0.02 : 0.04);
+            s = (bedHi.lp(w) - bedLo.lp(w)) * (light ? 0.16 : 0.7) + brown * (light ? 0.015 : 0.04);
         } else if (key === 'dropsNear') {
             // 近处清晰滴答（石面/硬面）：短促清脆高频脉冲；
-            // 暴雨 = 8~25 滴/秒响亮；细雨（light）= 4~12 滴/秒更轻
+            // 暴雨 = 8~25 滴/秒响亮短促（2.4~5.2kHz 清脆）；细雨（light）= 4~10 滴/秒
+            // 加宽频段（1.1~4kHz）、加长（3~9ms）、衰减稍慢 → 每颗"滴"有实体感，
+            // 从轻雨幕里凸出来，可辨的"点点滴滴"
             const light = def && def.light;
             dropNext -= 1 / rate;
             if (dropNext <= 0) {
-                dropDur = 0.0015 + Math.random() * 0.004;     // 1.5~5.5ms 极短促
+                dropDur = light ? 0.003 + Math.random() * 0.006 : 0.0015 + Math.random() * 0.004;
                 dropPhase = dropDur;
-                dropEnv = light ? 0.12 + Math.random() * 0.12 : 0.22 + Math.random() * 0.28;
-                dropNext = light ? 0.08 + Math.random() * 0.17 : 0.04 + Math.random() * 0.085;
+                dropEnv = light ? 0.16 + Math.random() * 0.16 : 0.22 + Math.random() * 0.28;
+                dropNext = light ? 0.1 + Math.random() * 0.15 : 0.04 + Math.random() * 0.085;
             }
             if (dropPhase > 0) {
-                s = (nearHi.lp(w) - nearLo.lp(w)) * Math.exp(-(dropDur - dropPhase) * 600) * dropEnv;
+                const hi = light ? nearHiL : nearHi, lo = light ? nearLoL : nearLo;
+                s = (hi.lp(w) - lo.lp(w)) * Math.exp(-(dropDur - dropPhase) * (light ? 260 : 600)) * dropEnv;
                 dropPhase -= 1 / rate;
             }
         } else if (key === 'dropsFar') {
