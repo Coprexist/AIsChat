@@ -80,9 +80,9 @@ def register_middlewares(app: FastAPI) -> None:
     """统一注册所有 HTTP 中间件（CORS + 请求日志 + IP 追踪 + 维护模式拦截）
 
     Starlette 后注册者先执行，执行顺序：
-    1. maintenance_middleware（维护拦截，最先判断）
+    1. request_logging_middleware（请求日志 + Request ID，最外层，保证所有请求都被记录）
     2. client_ip_middleware（IP 追踪）
-    3. request_logging_middleware（请求日志 + Request ID）
+    3. maintenance_middleware（维护拦截，最内层）
     4. CORS（框架内置，最先注册）
     """
     # ── CORS（默认不启用：同源代理部署不需要跨域） ──
@@ -101,6 +101,7 @@ def register_middlewares(app: FastAPI) -> None:
         )
 
     # ── 自定义中间件（后注册者先执行） ──
-    app.middleware("http")(request_logging_middleware)
-    app.middleware("http")(client_ip_middleware)
-    app.middleware("http")(maintenance_middleware)
+    # 顺序：先注册内层，后注册外层
+    app.middleware("http")(maintenance_middleware)   # 内层
+    app.middleware("http")(client_ip_middleware)     # 中层
+    app.middleware("http")(request_logging_middleware) # 外层（最后注册，最先执行）
