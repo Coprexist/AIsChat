@@ -493,14 +493,65 @@ body {
 @keyframes toast-in { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
 @keyframes toast-out { from { opacity: 1; } to { opacity: 0; transform: translateY(-8px); } }
 
-/* 响应式 */
+/* 响应式：小屏（平板/横屏手机）——元素随屏平滑收缩，到边界不溢出 */
+@media (max-width: 900px) {
+    .app { padding: 12px 16px; gap: 10px; }
+}
+
+/* 竖屏手机：单列布局，圆环/字体/按钮/间距全部随视口收缩 */
 @media (max-width: 768px) {
-    .app { padding: 10px; gap: 8px; }
-    .sound-bar { flex-wrap: wrap; gap: 8px; }
+    .app { padding: 10px 12px; gap: 8px; }
+    .main { flex-direction: column; gap: 8px; overflow-y: auto; }
+    .timer-col { gap: 8px; }
+    .timer-card { gap: 12px; padding: 16px 12px; }
+
+    /* 声音条：按钮 3 列均分两行 + 音量独占一行，窄屏整齐不溢出 */
+    .sound-bar {
+        flex-wrap: wrap;
+        gap: 8px;
+        padding: 8px 10px;
+        justify-content: flex-start;
+    }
+    .sound-bar-label { font-size: 0.75rem; }
+    .sound-bar .sound-row {
+        flex: 1 1 100%;
+        display: grid;
+        grid-template-columns: repeat(3, 1fr);
+        gap: 6px;
+    }
+    .sound-bar .sound-btn {
+        padding: 7px 6px;
+        font-size: 0.78rem;
+    }
     .sound-bar .volume-row { width: 100%; }
-    .main { flex-direction: column; gap: 8px; }
+
+    /* 圆环与文字：随屏收缩，环最大 58vw、字随 vw 流式缩放 */
+    .time-ring {
+        width: min(250px, 58vw);
+        height: min(250px, 58vw);
+        margin: 8px auto;
+    }
+    .ring-center .time-display { font-size: clamp(1.7rem, 9vw, 3.2rem); }
+    .ring-center .status-text { font-size: 0.75rem; }
+    .mode-tab { padding: 5px 14px; font-size: 0.85rem; }
+
+    /* 按钮：收窄适配单列 */
+    .controls .btn { min-width: 116px; padding: 9px 18px; }
+
+    /* 侧栏：横向滑动卡片 */
     .sidebar { width: 100%; flex-direction: row; overflow-x: auto; }
     .sidebar .card { min-width: 220px; flex: 1; }
-    .time-display { font-size: 3.5rem; }
-    .controls .btn { padding: 8px 20px; }
+
+    .footer { font-size: 0.78rem; }
+}
+
+/* 超窄屏（小尺寸竖屏手机，≤420px）：进一步收细 */
+@media (max-width: 420px) {
+    .time-ring { width: min(220px, 62vw); height: min(220px, 62vw); }
+    .ring-center .time-display { font-size: clamp(1.5rem, 10vw, 2.6rem); }
+    .controls .btn { min-width: 104px; padding: 8px 14px; font-size: 0.88rem; }
+    .sound-bar .sound-btn { font-size: 0.72rem; padding: 6px 4px; }
+    .brand span { font-size: 1.05rem; }
+    .icon-btn { width: 36px; height: 36px; }
+    .stat-value { font-size: 1.1rem; }
 }
