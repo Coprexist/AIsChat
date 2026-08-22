@@ -485,4 +485,6 @@ body {
     .sidebar .card { min-width: 220px; flex: 1; }
     .time-display { font-size: 3.5rem; }
     .controls .btn { padding: 8px 20px; }
+    /* 触屏无 hover，周期解释问号在手机上无用且挤占空间 → 隐藏 */
+    .cycle-help { display: none; }
 }
