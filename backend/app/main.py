@@ -10,15 +10,12 @@ setup_logging()
 
 import asyncio
 import logging
-import os
-
 from fastapi import FastAPI, Request
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
 
 from app.bootstrap import lifespan
 from app.config import settings
-from app.database import check_db_connection
 from app.middleware import register_middlewares
 from app.routers import get_all_routers
 from app.services.infrastructure.maintenance import maintenance
