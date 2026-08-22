@@ -35,10 +35,11 @@ async def request_logging_middleware(request: Request, call_next):
     response = await call_next(request)
     elapsed_ms = (time.monotonic() - start) * 1000
     response.headers["X-Request-ID"] = request_id
-    logger.info(
-        f"[{request_id}] {request.method} {request.url.path} → "
-        f"{response.status_code} ({elapsed_ms:.0f}ms)"
-    )
+    if request.url.path != "/health":
+        logger.info(
+            f"[{request_id}] {request.method} {request.url.path} → "
+            f"{response.status_code} ({elapsed_ms:.0f}ms)"
+        )
     return response
 
 

@@ -19,6 +19,9 @@ from pathlib import Path
 # 日志级别：支持运行时调整（如 LOG_LEVEL=DEBUG）
 _LOG_LEVEL = os.environ.get("LOG_LEVEL", "INFO").upper()
 
+# uvicorn access 日志级别（默认 WARNING，减少健康检查刷屏）
+_ACCESS_LOG_LEVEL = os.environ.get("UVICORN_ACCESS_LOG_LEVEL", "WARNING").upper()
+
 # 日志文件路径（默认 backend/app.log，可通过 LOG_FILE 覆盖）
 _LOG_FILE = os.environ.get(
     "LOG_FILE",
@@ -82,7 +85,7 @@ def setup_logging() -> None:
             },
             "uvicorn.access": {
                 "handlers": list(handlers.keys()),
-                "level": _LOG_LEVEL,
+                "level": _ACCESS_LOG_LEVEL,
                 "propagate": False,
             },
             # 应用 logger
