@@ -13,6 +13,7 @@ import logging
 import os
 
 from fastapi import FastAPI, HTTPException, Request
+from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
 
 from app.bootstrap import lifespan
@@ -28,7 +29,6 @@ logger = logging.getLogger(__name__)
 # FastAPI 应用实例
 # ══════════════════════════════════════════════════════════════
 
-# 应用版本：优先读环境变量（CI/CD 注入），回退硬编码默认值
 APP_VERSION = os.environ.get("APP_VERSION", "0.3.13")
 
 app = FastAPI(
@@ -36,7 +36,9 @@ app = FastAPI(
     description="让 AI 拥有完整社交行为的群聊平台",
     version=APP_VERSION,
     lifespan=lifespan,
-    docs_url=None,  # 使用自定义文档页面（routers/swagger_docs.py）
+    docs_url=None,       # 使用自定义文档页面（routers/swagger_docs.py）
+    redoc_url=None,      # 关闭 ReDoc，避免重复暴露
+    # openapi_url 保留默认 "/openapi.json"，方便 API 调试/代码生成
 )
 
 
@@ -62,11 +64,23 @@ async def http_exception_handler(request: Request, exc: HTTPException):
     )
 
 
+@app.exception_handler(RequestValidationError)
+async def validation_exception_handler(request: Request, exc: RequestValidationError):
+    """请求参数校验失败，返回统一格式，不暴露请求体内容"""
+    return JSONResponse(
+        status_code=422,
+        content={"detail": exc.errors()},
+    )
+
+
 @app.exception_handler(Exception)
 async def global_exception_handler(request: Request, exc: Exception):
     """未捕获异常统一返回模糊错误，详细堆栈仅记录日志"""
+    # 注意：不能使用 exc_info=True，因为异常处理器中 sys.exc_info() 可能已清空
     logger.error(
-        f"未捕获异常: {request.method} {request.url.path}",
+        "未捕获异常: %s %s",
+        request.method,
+        request.url.path,
         exc_info=(type(exc), exc, exc.__traceback__),
     )
     return JSONResponse(
@@ -109,7 +123,7 @@ async def health():
         logger.warning("[WARN] 健康检查: 数据库查询超时（5s）")
     except Exception as e:
         db_ok = False
-        logger.warning(f"[WARN] 健康检查异常: {e}")
+        logger.warning("[WARN] 健康检查异常", exc_info=True)
 
     status_code = 200 if db_ok else 503
     return JSONResponse(
