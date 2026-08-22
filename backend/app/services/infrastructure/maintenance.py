@@ -125,6 +125,15 @@ class MaintenanceManager:
             logger.warning("⚠️ 维护文案读取失败，使用默认文案", exc_info=True)
         return dict(_DEFAULT_MSG)
 
+
+    def get_public_message(self) -> dict:
+        """供公开路由使用，不暴露内部字段"""
+        msg = self.get_msg() or {}
+        return {
+            "msg": msg.get("hard_body", ""),
+            "hard": self.hard_active(),
+        }
+
     def save_msg(self, msg: dict) -> None:
         """持久化维护文案（数据目录，重启不丢）"""
         Path(settings.data_dir).mkdir(parents=True, exist_ok=True)

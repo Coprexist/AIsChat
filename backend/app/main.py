@@ -55,15 +55,6 @@ for _router in get_all_routers():
 # 全局异常处理器（统一 JSON 错误格式）
 # ══════════════════════════════════════════════════════════════
 
-@app.exception_handler(HTTPException)
-async def http_exception_handler(request: Request, exc: HTTPException):
-    """HTTPException 按原状态码返回 detail（保持 FastAPI 默认行为）"""
-    return JSONResponse(
-        status_code=exc.status_code,
-        content={"detail": exc.detail},
-    )
-
-
 @app.exception_handler(RequestValidationError)
 async def validation_exception_handler(request: Request, exc: RequestValidationError):
     """请求参数校验失败，返回统一格式，过滤 input 字段避免泄露请求体内容"""
@@ -110,11 +101,7 @@ async def root():
 @app.get("/maintenance-msg")
 async def public_maintenance_msg():
     """维护状态（仅返回前端需要的精简信息）"""
-    msg = maintenance.get_msg() or {}
-    return {
-        "msg": msg.get("hard_body", ""),
-        "hard": maintenance.hard_active(),
-    }
+    return maintenance.get_public_message()
 
 
 @app.get("/health")
@@ -125,9 +112,9 @@ async def health():
     except asyncio.TimeoutError:
         db_ok = False
         logger.warning("[WARN] 健康检查: 数据库查询超时（5s）")
-    except Exception:
+    except Exception as e:
         db_ok = False
-        logger.warning("[WARN] 健康检查异常", exc_info=True)
+        logger.warning("[WARN] 健康检查异常: %s", e)
 
     status_code = 200 if db_ok else 503
     return JSONResponse(
