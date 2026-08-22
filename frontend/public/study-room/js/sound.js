@@ -146,7 +146,7 @@ function makeLayerBuffer(ctx, key, def) {
             s = (foamHi.lp(w) - foamLo.lp(w)) * 1.1 * walkEnv(i);
         } else if (key === 'abyss') {
             // 深海低频水压底噪：棕色噪声 → 140Hz 极低通，恒定、无起伏（水下压力感）
-            s = abyssLo.lp(brown) * 5.0;
+            s = abyssLo.lp(brown) * 8.0;
         } else if (key === 'bubble') {
             // 深海气泡（可重叠的咕噜串）：一串 1~8 个（偏大分布），串内密集触发，
             // 新气泡不等旧气泡播完——多个气泡同时发声叠加，像水下气泡群一起冒；
