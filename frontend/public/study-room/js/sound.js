@@ -135,23 +135,32 @@ function makeLayerBuffer(ctx, key, def) {
 
         let s = 0;
         if (key === 'rainbed') {
-            // 雨幕：细雨（light）= 幅度很小，让稀疏滴答凸出来（点点滴滴可辨）
+            // 雨幕：细雨（light）= 幅度极小（真实细雨底噪极轻），让稀疏滴答凸出来
             const light = def && def.light;
-            s = (bedHi.lp(w) - bedLo.lp(w)) * (light ? 0.16 : 0.7) + brown * (light ? 0.015 : 0.04);
+            s = (bedHi.lp(w) - bedLo.lp(w)) * (light ? 0.08 : 0.7) + brown * (light ? 0.008 : 0.04);
         } else if (key === 'dropsNear') {
             const light = def && def.light;
             if (light) {
-                // 细雨滴答（专业参数）：单滴 10~25ms 指数衰减、0.9~2.9kHz 共振正弦+带通噪声、
-                // 活跃池允许偶尔重叠（并发上限 3），间隔 0.09~0.25s → 4~11 滴/秒
+                // 细雨滴答（按真实花园细雨录音分析校准，2026-08）：
+                // 稀疏 2~5 滴/秒、间隔对数正态(中位~180ms, 112~302ms)、
+                // 单滴 12~300ms 指数衰减（中位~70ms，含长尾）、
+                // 强度对数正态（远近层次）、活跃池允许偶尔重叠
                 dropNext -= 1 / rate;
                 if (dropNext <= 0) {
-                    // 平方分布偏短：多数间隔 0.09~0.2s（单颗），偶有 0.02s 内连发 → 偶尔重叠
-                    dropNext = Math.pow(Math.random(), 1.6) * 0.22 + 0.02;
-                    if (lightDrops.length < 3) {
+                    // 对数正态间隔：中位约 0.18s，跨度 0.05~0.8s
+                    dropNext = Math.exp(Math.log(0.18) + (Math.random() * 2 - 1) * 1.1);
+                    dropNext = Math.max(0.05, Math.min(0.8, dropNext));
+                    if (lightDrops.length < 4) {
+                        // 单滴时长：对数正态，中位 71ms，跨度 12~300ms（含长尾共振）
+                        const dur = Math.max(0.012, Math.min(0.3,
+                            Math.exp(Math.log(0.071) + (Math.random() * 2 - 1) * 1.6)));
+                        // 强度：对数正态（远近距离层次）
+                        const amp = Math.max(0.06, Math.min(0.6,
+                            Math.exp(Math.log(0.16) + (Math.random() * 2 - 1) * 0.7)));
                         lightDrops.push({
-                            f: 900 + Math.random() * 2000,       // 0.9~2.9kHz
-                            amp: 0.18 + Math.random() * 0.2,
-                            dur: 0.01 + Math.random() * 0.015,   // 10~25ms
+                            f: 900 + Math.random() * 2000,       // 0.9~2.9kHz（中频 52% 为主）
+                            amp,
+                            dur,
                             ph: Math.random() * Math.PI * 2,
                             t: 0,
                         });
@@ -160,11 +169,10 @@ function makeLayerBuffer(ctx, key, def) {
                 for (let di = lightDrops.length - 1; di >= 0; di--) {
                     const d = lightDrops[di];
                     if (d.t >= d.dur) { lightDrops.splice(di, 1); continue; }
-                    const env = Math.exp(-(d.t / d.dur) * 4);    // 指数衰减（尾部 10~30ms 共振感）
-                    // 共振正弦（音高感）+ 带通噪声（撞击瞬态）
+                    const env = Math.exp(-(d.t / d.dur) * 3.5);    // 指数衰减（长尾共振）
                     const reso = Math.sin(2 * Math.PI * d.f * d.t + d.ph);
                     const burst = nearHiL.lp(w) - nearLoL.lp(w);
-                    s = (reso * 0.7 + burst * 0.3) * env * d.amp;
+                    s = (reso * 0.65 + burst * 0.35) * env * d.amp;
                     d.t += 1 / rate;
                 }
             } else {
