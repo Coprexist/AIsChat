@@ -58,7 +58,9 @@ function makeNoiseBuffer(ctx, type) {
     }});
 
     // ── 第一遍：底噪层（不含瞬态）──
-    const chans = stereo ? [0, 1] : [0];   // 单声道只生成左声道，之后复制
+    // deep 低频涌动用单流复制（两耳相同）：低频本就不定向，保证两耳始终平衡，
+    // 立体声感交给浪花瞬态层；rain/forest 保持左右独立随机（宽声场）。
+    const chans = (!stereo || type === 'deep') ? [0] : [0, 1];
     for (const ch of chans) {
         const data = buf.getChannelData(ch);
         const rainBedHi = S(lp(3000)), rainBedLo = S(lp(400));   // 雨幕带通上下界
@@ -101,7 +103,7 @@ function makeNoiseBuffer(ctx, type) {
             data[i] = s;
         }
     }
-    if (!stereo) buf.getChannelData(1).set(buf.getChannelData(0));
+    if (!stereo || type === 'deep') buf.getChannelData(1).set(buf.getChannelData(0));
 
     // ── 第二遍：瞬态层 + 等功率声像（pan）──
     // 单声道模式下跳过（信号已在中央）；forest 无瞬态。
@@ -109,21 +111,24 @@ function makeNoiseBuffer(ctx, type) {
         const L = buf.getChannelData(0), R = buf.getChannelData(1);
         const dropHi = S(lp(4000)), dropLo = S(lp(1000));   // 水滴带通（更像水珠）
         const bubHi = S(lp(2500)), bubLo = S(lp(1500));     // 浪花带通
-        // 瞬态触发状态（单流，密度×2 保持左右各一半时相当的总量）
-        let th0 = 0, th1 = 0;   // pan 起止角（等功率：0=全左，π/2=全右）
+        // 瞬态触发状态
+        let th0 = 0, th1 = 0;   // pan 起止角（等功率；收窄范围保证两耳始终有声）
         let dropNext2 = 0, dropPhase2 = 0, dropDur2 = 0, dropEnv2 = 0; // 水滴（rain）
-        let clNext = 0, clPhase = 0, clDur = 0;                        // 浪花簇（deep）
+        let bubNext = 0, bubPhase = 0, bubAmp = 0;   // 持续水泡（deep）
+        let panNext = 0, panDur = 1;                 // pan 漂移段（deep：1~3s 缓慢扫动）
 
-        // 拾取 pan 轨迹：雨滴固定随机位置散布；浪花簇 1/3 左→右、1/3 右→左、1/3 固定
+        // pan 范围：收窄到 30°~60°（等功率下每耳电平 ≥ cos60°=0.5，-6dB，不出现"单耳只有一点"）
+        const P_MIN = Math.PI / 6, P_MAX = Math.PI / 3;
+        // 雨滴：收窄散布（每耳 ≥ -8dB）；浪花：1/3 左→右、1/3 右→左、1/3 固定（均在 30°~60° 内）
         const pickDropPan = () => {
-            const th = Math.random() * Math.PI / 2;
+            const th = Math.PI / 8 + Math.random() * (Math.PI * 3 / 8 - Math.PI / 8);
             th0 = th1 = th;
         };
         const pickClusterPan = () => {
             const r = Math.random();
-            if (r < 1 / 3) { th0 = 0; th1 = Math.PI / 2; }            // 左 → 右
-            else if (r < 2 / 3) { th0 = Math.PI / 2; th1 = 0; }       // 右 → 左
-            else { const th = Math.random() * Math.PI / 2; th0 = th1 = th; }
+            if (r < 1 / 3) { th0 = P_MIN; th1 = P_MAX; }              // 左 → 右
+            else if (r < 2 / 3) { th0 = P_MAX; th1 = P_MIN; }         // 右 → 左
+            else { const th = P_MIN + Math.random() * (P_MAX - P_MIN); th0 = th1 = th; }
         };
 
         for (let i = 0; i < len; i++) {
@@ -144,19 +149,22 @@ function makeNoiseBuffer(ctx, type) {
                     prog = 1 - dropPhase2 / dropDur2;
                     dropPhase2 -= 1 / rate;
                 }
-            } else { // deep
-                clNext -= 1 / rate;
-                if (clNext <= 0) {
-                    clDur = 1 + Math.random() * 2;
-                    clPhase = clDur;
-                    clNext = 1.5 + Math.random() * 3.5;   // 簇频率×2
-                    pickClusterPan();
+            } else { // deep：持续浪花（连续水泡，无 on/off 断续）
+                bubNext -= 1 / rate;
+                if (bubNext <= 0) {
+                    bubPhase = 0.01 + Math.random() * 0.03;   // 单泡 10~40ms
+                    // 强度随 0.15Hz LFO 起伏（浪花涌动感，始终存在）
+                    bubAmp = (0.35 + Math.random() * 0.55) * (0.55 + 0.45 * Math.sin(2 * Math.PI * 0.15 * i / rate));
+                    bubNext = 0.015 + Math.random() * 0.045;  // 持续触发（15~60ms 间隔）
                 }
-                if (clPhase > 0) {
-                    mono = (bubHi.lp(w) - bubLo.lp(w)) * (0.5 + Math.random() * 0.7);
-                    prog = 1 - clPhase / clDur;
-                    clPhase -= 1 / rate;
+                if (bubPhase > 0) {
+                    mono = (bubHi.lp(w) - bubLo.lp(w)) * bubAmp * Math.exp(-bubPhase * 60);
+                    bubPhase -= 1 / rate;
                 }
+                // pan 漂移段：每 1~3s 重新拾取起止角（浪花缓慢扫过声场）
+                panNext -= 1 / rate;
+                if (panNext <= 0) { pickClusterPan(); panDur = 1 + Math.random() * 2; panNext = panDur; }
+                prog = 1 - panNext / panDur;
             }
             if (mono !== 0) {
                 // 等功率平移：L = m·cosθ，R = m·sinθ（θ 随簇进度扫过 → 空间移动）
