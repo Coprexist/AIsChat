@@ -8,6 +8,8 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.database import get_db
 from app.repositories.user_repo import UserRepository, SQLAlchemyUserRepository
+from app.repositories.system_settings_repo import SystemSettingsRepository, SQLAlchemySystemSettingsRepository
+from app.repositories.verification_repo import VerificationRepository, SQLAlchemyVerificationRepository
 from app.utils.auth import get_current_user
 from app.services.agent.agent_service import get_agent
 
@@ -30,3 +32,13 @@ async def require_agent_access(
 async def get_user_repo(db: AsyncSession = Depends(get_db)) -> UserRepository:
     """依赖注入：构造用户仓库。"""
     return SQLAlchemyUserRepository(db)
+
+
+async def get_system_settings_repo(db: AsyncSession = Depends(get_db)) -> SystemSettingsRepository:
+    """依赖注入：构造系统设置仓库。"""
+    return SQLAlchemySystemSettingsRepository(db)
+
+
+async def get_verification_repo(db: AsyncSession = Depends(get_db)) -> VerificationRepository:
+    """依赖注入：构造验证码仓库。"""
+    return SQLAlchemyVerificationRepository(db)

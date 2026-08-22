@@ -8,7 +8,9 @@ from sqlalchemy import select, func
 from app.models.user import User
 from app.utils.auth import hash_password, verify_password, create_access_token
 from app.utils.crypto import encrypt_api_key, decrypt_api_key
-from app.repositories.user_repo import UserRepository, SQLAlchemyUserRepository
+from app.repositories.user_repo import UserRepository
+from app.repositories.system_settings_repo import SystemSettingsRepository
+from app.repositories.verification_repo import VerificationRepository
 
 logger = logging.getLogger(__name__)
 
@@ -26,13 +28,14 @@ def _get_api_key_last4(user) -> str:
 
 async def register_user(
     *,
-    db: AsyncSession,
     username: str,
     password: str,
     email: str | None = None,
     verification_code: str | None = None,
     admin_bypass: bool = False,
     user_repo: UserRepository,
+    settings_repo: SystemSettingsRepository,
+    verification_repo: VerificationRepository,
 ) -> User:
     """
     注册新用户。
@@ -52,13 +55,10 @@ async def register_user(
 
     # 读取系统设置
     require_verification = False
-    login_providers = ["direct"]
     registration_enabled = True
     try:
-        from app.services.infrastructure.system_settings_service import get_settings
-        sys = await get_settings(db)
+        sys = await settings_repo.get_settings()
         require_verification = sys.get("require_email_verification", False)
-        login_providers = sys.get("login_providers", ["direct"])
         registration_enabled = sys.get("registration_enabled", True)
     except Exception:
         pass
@@ -85,8 +85,7 @@ async def register_user(
             raise ValueError("该邮箱已被其他账号使用")
 
         # 验证码校验
-        from app.services.infrastructure.verification_service import verify_code
-        if not await verify_code(db, email, verification_code, "register"):
+        if not await verification_repo.verify_code(email, verification_code, "register"):
             raise ValueError("验证码错误或已过期")
 
         email_verified = True
@@ -97,8 +96,7 @@ async def register_user(
             raise ValueError("该邮箱已被其他账号使用")
         # 如果提供了验证码，校验之
         if verification_code:
-            from app.services.infrastructure.verification_service import verify_code
-            if await verify_code(db, email, verification_code, "register"):
+            if await verification_repo.verify_code(email, verification_code, "register"):
                 email_verified = True
 
     user = User(
@@ -112,8 +110,7 @@ async def register_user(
     )
     # 读取全局默认设置（语言 + 平台赠送额度）
     try:
-        from app.services.infrastructure.system_settings_service import get_settings
-        sys = await get_settings(db)
+        sys = await settings_repo.get_settings()
         user.language = sys.get("default_language", "zh")
         user.platform_gifted_credit = sys.get("default_platform_credit", 0)
         user.file_quota_mb = sys.get("default_file_quota_mb", 100)
@@ -145,9 +142,7 @@ async def login_user(
     """
     # 检查登录方式是否可用
     try:
-        from app.services.infrastructure.system_settings_service import get_settings
-        sys = await get_settings(db)
-        login_providers = sys.get("login_providers", ["direct"])
+        sys = await settings_repo.get_settings()
         if method not in login_providers:
             raise ValueError("该登录方式暂不可用")
     except ValueError as e:
@@ -312,8 +307,7 @@ async def unbind_email(
 
     # 检查系统是否关闭了邮箱验证
     try:
-        from app.services.infrastructure.system_settings_service import get_settings
-        sys = await get_settings(db)
+        sys = await settings_repo.get_settings()
         if sys.get("require_email_verification", False):
             raise ValueError("当前要求邮箱验证，无法解绑邮箱")
     except Exception:

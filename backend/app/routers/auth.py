@@ -7,8 +7,10 @@ from fastapi import APIRouter, Depends, HTTPException, status, Request
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, func
 from app.database import get_db
-from app.routers.deps import get_user_repo
+from app.routers.deps import get_user_repo, get_system_settings_repo, get_verification_repo
 from app.repositories.user_repo import UserRepository, SQLAlchemyUserRepository
+from app.repositories.system_settings_repo import SystemSettingsRepository
+from app.repositories.verification_repo import VerificationRepository
 from app.schemas.auth import (
     RegisterRequest, LoginRequest, TokenResponse, UserInfoResponse,
     EmailVerificationRequest, VerifyEmailRequest, RebindEmailRequest,
@@ -34,16 +36,24 @@ async def has_users(db: AsyncSession = Depends(get_db)):
 
 
 @router.post("/register", response_model=TokenResponse)
-async def register(req: RegisterRequest, request: Request, db: AsyncSession = Depends(get_db), user_repo: UserRepository = Depends(get_user_repo)):
+async def register(
+    req: RegisterRequest,
+    request: Request,
+    db: AsyncSession = Depends(get_db),
+    user_repo: UserRepository = Depends(get_user_repo),
+    settings_repo: SystemSettingsRepository = Depends(get_system_settings_repo),
+    verification_repo: VerificationRepository = Depends(get_verification_repo),
+):
     """注册新用户。第一个注册的用户自动成为管理员。"""
     try:
         user = await register_user(
-            db=db,
             username=req.username,
             password=req.password,
             email=req.email,
             verification_code=req.verification_code,
             user_repo=user_repo,
+            settings_repo=settings_repo,
+            verification_repo=verification_repo,
         )
         from app.services.audit_service import log_user_action
         ip = request.client.host if request.client else None

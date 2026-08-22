@@ -13,8 +13,10 @@ from pydantic import BaseModel, Field
 from app.config import settings
 from app.services.infrastructure.maintenance import maintenance
 from app.database import get_db
-from app.routers.deps import get_user_repo
+from app.routers.deps import get_user_repo, get_system_settings_repo, get_verification_repo
 from app.repositories.user_repo import UserRepository, SQLAlchemyUserRepository
+from app.repositories.system_settings_repo import SystemSettingsRepository
+from app.repositories.verification_repo import VerificationRepository
 from app.utils.pure.formatting import mask_api_key
 from app.utils.config_resolver import find_old_config
 from app.models.user import User
@@ -297,16 +299,19 @@ async def admin_create_user(
     admin: dict = Depends(require_admin),
     db: AsyncSession = Depends(get_db),
     user_repo: UserRepository = Depends(get_user_repo),
+    settings_repo: SystemSettingsRepository = Depends(get_system_settings_repo),
+    verification_repo: VerificationRepository = Depends(get_verification_repo),
 ):
     """管理员手动创建用户（绕过注册通道开关和邮箱验证）"""
     try:
         user = await register_user(
-            db=db,
             username=req.username,
             password=req.password,
             email=req.email,
             admin_bypass=True,
             user_repo=user_repo,
+            settings_repo=settings_repo,
+            verification_repo=verification_repo,
         )
         await _log_admin_action(
             db, admin["user_id"], "create_user", "user", user.id,
@@ -326,6 +331,8 @@ async def admin_import_users_csv(
     admin: dict = Depends(require_admin),
     db: AsyncSession = Depends(get_db),
     user_repo: UserRepository = Depends(get_user_repo),
+    settings_repo: SystemSettingsRepository = Depends(get_system_settings_repo),
+    verification_repo: VerificationRepository = Depends(get_verification_repo),
 ):
     """管理员通过 CSV 批量创建用户。CSV 格式：username,password[,email]"""
     if not file.filename or not file.filename.lower().endswith(".csv"):
@@ -357,12 +364,13 @@ async def admin_import_users_csv(
 
         try:
             user = await register_user(
-                db=db,
                 username=username,
                 password=password,
                 email=email,
                 admin_bypass=True,
                 user_repo=user_repo,
+                settings_repo=settings_repo,
+                verification_repo=verification_repo,
             )
             results.append({"row": i, "status": "ok", "user_id": user.id, "username": username})
         except ValueError as e:
