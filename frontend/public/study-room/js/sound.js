@@ -98,7 +98,9 @@ function makeLayerBuffer(ctx, key, def) {
     let dropNext = 0, dropPhase = 0, dropDur = 0, dropEnv = 0;
     let farNext = 0, farPhase = 0, farDur = 0, farEnv = 0;
     let gutNext = 1, gutPhase = 0, gutDur = 0, gutEnv = 0;
-    // 细雨滴答活跃池（专业雨滴声学：单滴 10~25ms、1~3kHz 共振、允许偶尔重叠）
+    // 雨幕独立起伏（真实雨声能量波动）
+    let rainEnv = 0.8, rainTarget = 0.8, rainNext = 0;
+    // 细雨滴答活跃池（专业雨滴声学：短促噪声瞬态、允许偶尔重叠）
     const lightDrops = [];
     // 深海气泡：活跃气泡池（可重叠发声，不用等前一个播完）+ 串触发状态
     // 一串 1~8 个（偏大分布）；串内密集触发（0.08~0.28s）→ 同时 2~4 个气泡叠响
@@ -135,9 +137,22 @@ function makeLayerBuffer(ctx, key, def) {
 
         let s = 0;
         if (key === 'rainbed') {
-            // 雨幕：细雨（light）= 幅度极小（真实细雨底噪极轻），让稀疏滴答凸出来
+            // 雨幕（参考 mynoise Cosy Rain/RAIN4 实测）：
+            // 连续不断的中低频沙沙声（低频为主、高频很少、重心~1.3kHz），
+            // 叠加明显的缓慢起伏（真实雨幕能量变异 0.46~0.5：一阵一阵的波动感）；
+            // 细雨（light）= 更轻更柔；暴雨 = 更厚
             const light = def && def.light;
-            s = (bedHi.lp(w) - bedLo.lp(w)) * (light ? 0.08 : 0.7) + brown * (light ? 0.008 : 0.04);
+            const bw = light ? 0.5 : 1.0;   // 带宽/厚度
+            // 雨幕独立起伏：目标幅度 0.55~1.15、每 5~10s 换一次（比森林呼吸更明显）
+            rainNext -= 1 / rate;
+            if (rainNext <= 0) {
+                rainTarget = 0.55 + Math.random() * 0.6;
+                rainNext = 5 + Math.random() * 5;
+            }
+            rainEnv += (rainTarget - rainEnv) * 0.00001;
+            // 中低频沙沙（雨声主体）：600~2500Hz 带通 + 深低频垫
+            s = ((bedHi.lp(w) - bedLo.lp(w)) * 0.9 * bw
+                + swellLo.lp(brown) * (light ? 0.35 : 0.9)) * rainEnv;
         } else if (key === 'dropsNear') {
             const light = def && def.light;
             if (light) {
@@ -151,14 +166,13 @@ function makeLayerBuffer(ctx, key, def) {
                     dropNext = Math.exp(Math.log(0.18) + (Math.random() * 2 - 1) * 1.1);
                     dropNext = Math.max(0.05, Math.min(0.8, dropNext));
                     if (lightDrops.length < 4) {
-                        // 单滴时长：对数正态，中位 71ms，跨度 12~300ms（含长尾共振）
-                        const dur = Math.max(0.012, Math.min(0.3,
-                            Math.exp(Math.log(0.071) + (Math.random() * 2 - 1) * 1.6)));
+                        // 单滴时长：短促噪声瞬态 15~60ms（无音高、无长尾，像"哒"不是"叮"）
+                        const dur = 0.015 + Math.random() * 0.045;
                         // 强度：对数正态（远近距离层次）
                         const amp = Math.max(0.06, Math.min(0.6,
                             Math.exp(Math.log(0.16) + (Math.random() * 2 - 1) * 0.7)));
                         lightDrops.push({
-                            f: 900 + Math.random() * 2000,       // 0.9~2.9kHz（中频 52% 为主）
+                            f: 900 + Math.random() * 2000,       // 0.9~2.9kHz（中频为主）
                             amp,
                             dur,
                             ph: Math.random() * Math.PI * 2,
@@ -169,10 +183,11 @@ function makeLayerBuffer(ctx, key, def) {
                 for (let di = lightDrops.length - 1; di >= 0; di--) {
                     const d = lightDrops[di];
                     if (d.t >= d.dur) { lightDrops.splice(di, 1); continue; }
-                    const env = Math.exp(-(d.t / d.dur) * 3.5);    // 指数衰减（长尾共振）
-                    const reso = Math.sin(2 * Math.PI * d.f * d.t + d.ph);
+                    const env = Math.exp(-(d.t / d.dur) * 4);    // 指数衰减
+                    // 纯宽带噪声瞬态（无正弦/无音高）——真实雨滴撞击声是噪声，
+                    // 加了正弦共振就会像敲乐器
                     const burst = nearHiL.lp(w) - nearLoL.lp(w);
-                    s = (reso * 0.65 + burst * 0.35) * env * d.amp;
+                    s = burst * env * d.amp;
                     d.t += 1 / rate;
                 }
             } else {
