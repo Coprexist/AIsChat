@@ -254,9 +254,13 @@ body {
 .card h3 svg { width: 14px; height: 14px; }
 
 /* 待办 */
-.todo-input-row { display: flex; gap: 6px; margin-bottom: 10px; }
+.todo-input-row {
+    display: flex; gap: 6px; margin-bottom: 10px;
+    min-width: 0;                    /* 允许收缩，按钮不出界 */
+}
 .todo-input {
-    flex: 1; padding: 8px 12px;
+    flex: 1; min-width: 0;           /* 输入框优先收缩，不挤跑按钮 */
+    padding: 8px 12px;
     border-radius: 8px;
     border: 1px solid var(--border);
     background: var(--bg);
@@ -265,13 +269,18 @@ body {
     outline: none;
     font-family: var(--font);
     user-select: text;
+    height: 38px;                    /* 固定高度，与按钮对齐 */
 }
 .todo-input:focus { border-color: var(--blue); }
 .todo-add-btn {
-    padding: 8px 14px;
+    padding: 0 16px;                 /* 宽度内边距，高度交给 line-height+height 统一 */
+    height: 38px;                    /* 与输入框等高，长宽比协调 */
     border-radius: 8px;
     border: none; background: var(--blue);
     color: #0b0e14; font-weight: 600; cursor: pointer;
+    font-size: 0.9rem;
+    flex-shrink: 0;                  /* 不收缩：按钮永远完整可见 */
+    white-space: nowrap;
 }
 .todo-list { list-style: none; max-height: 180px; overflow-y: auto; }
 .todo-item {
