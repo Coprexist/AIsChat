@@ -1,5 +1,5 @@
 """
-HTTP 中间件 — 请求 IP 追踪与维护模式拦截。
+HTTP 中间件 — CORS + 请求 IP 追踪 + 维护模式拦截。
 
 IP 追踪只取 uvicorn 解析后的 request.client，不自行解析 X-Forwarded-For：
 uvicorn 的 ProxyHeadersMiddleware 仅信任 --forwarded-allow-ips 内的代理
@@ -12,6 +12,7 @@ vite 看到的客户端源是网关 IP，后端审计 IP 为网关地址；要�
 import logging
 
 from fastapi import FastAPI, Request
+from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 
 from app.services.infrastructure.maintenance import maintenance
@@ -59,7 +60,28 @@ async def maintenance_middleware(request: Request, call_next):
 
 
 def register_middlewares(app: FastAPI) -> None:
-    """注册 HTTP 中间件（Starlette 后注册者先执行：maintenance 先于 client_ip，
-    与历史行为一致——被维护拦截的请求不进入 IP 追踪）"""
+    """统一注册所有 HTTP 中间件（CORS + IP 追踪 + 维护模式拦截）
+
+    Starlette 后注册者先执行，执行顺序：
+    1. maintenance_middleware（维护拦截，最先判断）
+    2. client_ip_middleware（IP 追踪）
+    3. CORS（框架内置，最先注册）
+    """
+    # ── CORS（默认不启用：同源代理部署不需要跨域） ──
+    # ALLOWED_ORIGINS（逗号分隔）配置后启用：
+    #   - 含 "*"：允许所有来源，但不携带凭据（浏览器规范禁止 "*" 与凭据组合）
+    #   - 显式域名列表：允许带凭据的精确跨域
+    from app.config import settings
+    _origins = settings.allowed_origins
+    if _origins:
+        app.add_middleware(
+            CORSMiddleware,
+            allow_origins=_origins,
+            allow_credentials="*" not in _origins,
+            allow_methods=["*"],
+            allow_headers=["*"],
+        )
+
+    # ── 自定义中间件（后注册者先执行） ──
     app.middleware("http")(client_ip_middleware)
     app.middleware("http")(maintenance_middleware)

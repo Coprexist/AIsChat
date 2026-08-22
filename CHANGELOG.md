@@ -3,8 +3,25 @@
 本 CHANGELOG 遵循 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.0.0/) 规范，
 版本号遵守 [语义化版本](https://semver.org/lang/zh-CN/)。
 
-> **当前阶段**：v0.3.10 正式版 — 补丁版本号（第三位）递增。
+> **当前阶段**：v0.3.11 正式版 — 补丁版本号（第三位）递增。
 ---
+
+## [v0.3.11] - 2026-08-22
+
+### Changed — 🏗️ main.py 优雅化重构
+
+- **日志配置独立模块**：`logging.basicConfig` → `logging.config.dictConfig`（`app/logging_config.py`），
+  显式覆盖 root logger 配置（不受第三方库 import 时已配置的影响）；支持 `LOG_LEVEL` 环境变量动态调整日志级别。
+- **APP_VERSION 支持环境变量注入**：CI/CD 可通过 `APP_VERSION` 环境变量覆盖版本号，回退硬编码默认值。
+- **CORS 统一收入 middleware.py**：CORS 中间件注册从 main.py 移入 `register_middlewares()`，
+  所有中间件（CORS + IP 追踪 + 维护拦截）单一入口管理。
+- **全局异常处理器**：注册 `exception_handler(Exception)` 统一返回 JSON 格式错误响应 + 完整堆栈日志，
+  替代 FastAPI 默认的 HTML 500 页面。
+- **请求日志 + Request ID**：新增 `request_logging_middleware`，每个请求生成 8 位 Request ID（`X-Request-ID` 头），
+  记录 `METHOD PATH → STATUS (Xms)` 格式的访问日志。
+- **健康检查增强**：`/health` 增加 `asyncio.wait_for` 5s 超时保护，返回标准 HTTP 状态码（200/503），
+  不再暴露数据库连接细节。
+- **维护状态接口精简**：`/maintenance-msg` 仅返回 `msg` + `hard`，不再暴露 `soft` 状态和完整配置。
 
 ## [v0.3.10] - 2026-08-19
 
