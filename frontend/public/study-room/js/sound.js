@@ -1,25 +1,43 @@
-// ==================== 音频引擎（双 buffer 交叉淡化无缝播放） ====================
+// ==================== 音频引擎（多层声源 + HRTF 双耳空间化） ====================
 //
-// 不用 AudioWorklet（模块加载在 file:// / http / 受限 iframe 下会失败导致无声），
-// 也不用单 buffer loop（噪声首尾不连续，每循环一次接缝处有可闻的"断一下"）。
+// 空间化参考专业做法（W3C Web Audio PannerNode / HRTF 双耳渲染）：
+// 每个噪声层是独立的单声道声源，经 PannerNode（panningModel:'HRTF'）摆到
+// 真实方位（±方位角），浏览器用头相关传递函数渲染成双耳输出——比手工
+// 等功率 pan 真实得多；方位可平滑移动（浪花/水滴在声场中漂移）。
 //
-// 方案：预生成两个不同内容的噪声 buffer（10s），交替播放，切换时 300ms
-// 交叉淡化（一个淡出的同时另一个从开头淡入）——任意环境都能响，且听感无缝。
+// 无缝：每层两个不同内容的 10s buffer 交替播放，切换时 300ms 交叉淡化。
+// 兼容性：全部用预生成 buffer + 原生节点（PannerNode 无需 secure context、
+// 无需外部资源），file:// / http / iframe 都能响。
 'use strict';
 
 let audioCtx = null;
 let masterGain = null;
 let swapTimer = null;
+let layers = [];          // 当前音色的所有声源层
+let active = 0;           // 全局交叉淡化：所有层同一时刻切换
 
-// 双 buffer 播放状态：active 是当前出声的 buffer 下标，另一个待切换。
-let bufs = [null, null];
-let srcs = [null, null];
-let gains = [null, null];
-let active = 0;
+const BUFFER_SECONDS = 10;
+const FADE = 0.3;
+const SWAP_INTERVAL = BUFFER_SECONDS - FADE;
 
-const BUFFER_SECONDS = 10;   // 每个 buffer 时长
-const FADE = 0.3;            // 交叉淡化时长（秒）
-const SWAP_INTERVAL = BUFFER_SECONDS - FADE; // 每 9.7s 切换一次
+// ── 层配置：每个音色由若干声源层组成，az = 方位角（弧度，0=正前，+右 -左）──
+// drift: 声源方位随机漂移（浪花/水滴在声场中缓缓移动）
+const LAYER_DEFS = {
+    rain: [
+        { key: 'rainbed', az: -0.7 },
+        { key: 'rainbed', az: 0.7 },
+        { key: 'raindrops', drift: true },
+    ],
+    forest: [
+        { key: 'wind', az: -0.8 },
+        { key: 'pink', az: 0 },
+        { key: 'leaf', az: 0.8 },
+    ],
+    deep: [
+        { key: 'swell', az: 0 },
+        { key: 'foam', drift: true },
+    ],
+};
 
 // 初始化音频上下文
 async function initAudio() {
@@ -29,27 +47,16 @@ async function initAudio() {
     return audioCtx;
 }
 
-// 预生成指定类型的噪声 buffer
-// 合成手法（业界共识，参考 Audiokinetic 雨声合成 / procedural audio 滤波塑形）：
-// 白噪/棕噪为源 → 二阶 IIR 滤波塑形（带通雨幕、低通风声、低通涌动）→
-// 慢速 LFO 幅度起伏（风/涌动）→ Kellet 粉噪作森林中频层。
-// 两遍合成：
-//   第一遍 底噪层（立体声 = 左右独立随机 / 单声道 = 复制居中）
-//   第二遍 瞬态层（雨滴 / 浪花簇）等功率声像（pan）：
-//     雨滴固定散布左右、浪花簇整簇左→右 / 右→左扫过（"浪花从左边过来在右边消失"）
-//   rain  雨幕 = 白噪二阶带通(400~3000Hz) + 水滴 pan 散布 + 棕噪湿润
-//   forest 风声 = 棕噪二阶低通(800Hz) + Kellet 粉噪中频 + 白噪二阶低通(1500Hz)叶沙 + 0.11Hz LFO
-//   deep   涌动 = 棕噪二阶低通(450Hz) + 浪花簇 pan 扫动 + 0.07Hz LFO
-function makeNoiseBuffer(ctx, type) {
-    const seconds = BUFFER_SECONDS;
-    const rate = ctx.sampleRate;
-    const len = Math.floor(rate * seconds);
-    const buf = ctx.createBuffer(2, len, rate);
-    const stereo = state.settings.stereo !== false;
+// ── 层 buffer 生成（单声道） ──────────────────────────────────────────────
 
-    // 二阶低通系数（级联两个一阶，-24dB/oct 才够塑形）：a = 1 - exp(-2π·fc/fs)
+function makeLayerBuffer(ctx, key) {
+    const rate = ctx.sampleRate;
+    const len = Math.floor(rate * BUFFER_SECONDS);
+    const buf = ctx.createBuffer(1, len, rate);
+    const data = buf.getChannelData(0);
+
+    // 二阶低通系数（-24dB/oct 塑形）
     const lp = (fc) => 1 - Math.exp(-2 * Math.PI * fc / rate);
-    // 二阶低通状态机（级联两个一阶）
     const S = (a) => ({ a, s1: 0, s2: 0, lp: function (x) {
         const t = this.s1 + this.a * (x - this.s1);
         this.s2 = this.s2 + this.a * (t - this.s2);
@@ -57,158 +64,144 @@ function makeNoiseBuffer(ctx, type) {
         return this.s2;
     }});
 
-    // ── 第一遍：底噪层（不含瞬态）──
-    // deep 低频涌动用单流复制（两耳相同）：低频本就不定向，保证两耳始终平衡，
-    // 立体声感交给浪花瞬态层；rain/forest 保持左右独立随机（宽声场）。
-    const chans = (!stereo || type === 'deep') ? [0] : [0, 1];
-    for (const ch of chans) {
-        const data = buf.getChannelData(ch);
-        const rainBedHi = S(lp(3000)), rainBedLo = S(lp(400));   // 雨幕带通上下界
-        const windLo = S(lp(800));                                // 森林风声
-        const leafLo = S(lp(1500));                               // 森林叶沙
-        const deepLo = S(lp(450));                                // 深海涌动
-        let brown = 0;
-        // 经典 Paul Kellet 粉噪状态（森林中频层）
-        let k0 = 0, k1 = 0, k2 = 0, k3 = 0, k4 = 0, k5 = 0, k6 = 0;
-        // LFO 起伏（风声/涌动）：每声道相位错开（立体声更宽）
-        const lfoFreq = type === 'deep' ? 0.07 : 0.11;
-        const lfoPhase = ch * Math.PI;
+    // 各层滤波器
+    const bedHi = S(lp(3000)), bedLo = S(lp(400));   // 雨幕带通
+    const dropHi = S(lp(4000)), dropLo = S(lp(1000)); // 水滴带通
+    const windLo = S(lp(800));                        // 风声低通
+    const leafLo = S(lp(1500));                       // 叶沙低通
+    const swellLo = S(lp(450));                       // 涌动低通
+    const foamHi = S(lp(2500)), foamLo = S(lp(1500)); // 浪花带通
 
-        for (let i = 0; i < len; i++) {
-            const w = Math.random() * 2 - 1;
-            brown = brown * 0.995 + w * 0.005;
-            k0 = 0.99886 * k0 + w * 0.0555179;
-            k1 = 0.99332 * k1 + w * 0.0750759;
-            k2 = 0.96900 * k2 + w * 0.1538520;
-            k3 = 0.86650 * k3 + w * 0.3104856;
-            k4 = 0.55000 * k4 + w * 0.5329522;
-            k5 = -0.7616 * k5 - w * 0.0168980;
-            const pink = (k0 + k1 + k2 + k3 + k4 + k5 + k6 + w * 0.5362) * 0.11 * 2;
-            k6 = w * 0.115926;
+    let brown = 0;
+    let k0 = 0, k1 = 0, k2 = 0, k3 = 0, k4 = 0, k5 = 0, k6 = 0;
+    // 水滴脉冲状态
+    let dropNext = 0, dropPhase = 0, dropDur = 0, dropEnv = 0;
+    // 浪花幅度包络（连续随机游走，非脉冲）
+    let env = 0.45, envTarget = 0.45, envNext = 0;
+    // 各层 LFO（风声/涌动）
+    const lfoFreq = key === 'swell' ? 0.07 : key === 'wind' || key === 'leaf' || key === 'pink' ? 0.11 : 0;
 
-            let s = 0;
-            if (type === 'rain') {
-                // 雨幕：白噪 → 二阶带通 400~3000Hz（雨落的"嘶"，主体）
-                s = (rainBedHi.lp(w) - rainBedLo.lp(w)) * 1.2 + brown * 0.06;
-            } else if (type === 'forest') {
-                const wind = windLo.lp(brown);
-                const leaf = leafLo.lp(w);
-                const lfo = 0.6 + 0.4 * Math.sin(2 * Math.PI * lfoFreq * i / rate + lfoPhase);
-                s = (wind * 0.42 + pink * 0.3 + leaf * 0.14) * lfo;
-            } else if (type === 'deep') {
-                // 涌动：棕噪 → 二阶低通450
-                const lfo = 0.65 + 0.35 * Math.sin(2 * Math.PI * lfoFreq * i / rate + lfoPhase);
-                s = deepLo.lp(brown) * 3.0 * lfo;
+    for (let i = 0; i < len; i++) {
+        const w = Math.random() * 2 - 1;
+        brown = brown * 0.995 + w * 0.005;
+        k0 = 0.99886 * k0 + w * 0.0555179;
+        k1 = 0.99332 * k1 + w * 0.0750759;
+        k2 = 0.96900 * k2 + w * 0.1538520;
+        k3 = 0.86650 * k3 + w * 0.3104856;
+        k4 = 0.55000 * k4 + w * 0.5329522;
+        k5 = -0.7616 * k5 - w * 0.0168980;
+        const pink = (k0 + k1 + k2 + k3 + k4 + k5 + k6 + w * 0.5362) * 0.11 * 2;
+        k6 = w * 0.115926;
+
+        let s = 0;
+        if (key === 'rainbed') {
+            s = (bedHi.lp(w) - bedLo.lp(w)) * 0.7 + brown * 0.04;
+        } else if (key === 'raindrops') {
+            dropNext -= 1 / rate;
+            if (dropNext <= 0) {
+                dropDur = 0.002 + Math.random() * 0.006;
+                dropPhase = dropDur;
+                dropEnv = 0.12 + Math.random() * 0.18;
+                dropNext = 0.02 + Math.random() * 0.06;
             }
-            data[i] = s;
+            if (dropPhase > 0) {
+                s = (dropHi.lp(w) - dropLo.lp(w)) * Math.exp(-(dropDur - dropPhase) * 400) * dropEnv;
+                dropPhase -= 1 / rate;
+            }
+        } else if (key === 'wind') {
+            const lfo = 0.6 + 0.4 * Math.sin(2 * Math.PI * lfoFreq * i / rate);
+            s = windLo.lp(brown) * 1.6 * lfo;
+        } else if (key === 'leaf') {
+            const lfo = 0.6 + 0.4 * Math.sin(2 * Math.PI * lfoFreq * i / rate + 1.2);
+            s = leafLo.lp(w) * 0.5 * lfo;
+        } else if (key === 'pink') {
+            const lfo = 0.6 + 0.4 * Math.sin(2 * Math.PI * lfoFreq * i / rate + 2.4);
+            s = pink * 0.3 * lfo;
+        } else if (key === 'swell') {
+            const lfo = 0.65 + 0.35 * Math.sin(2 * Math.PI * lfoFreq * i / rate);
+            s = swellLo.lp(brown) * 3.6 * lfo;
+        } else if (key === 'foam') {
+            envNext -= 1 / rate;
+            if (envNext <= 0) {
+                envTarget = 0.22 + Math.random() * 0.7;
+                envNext = 0.08 + Math.random() * 0.17;
+            }
+            env += (envTarget - env) * 0.00005;
+            s = (foamHi.lp(w) - foamLo.lp(w)) * 1.1 * env;
         }
-    }
-    if (!stereo || type === 'deep') buf.getChannelData(1).set(buf.getChannelData(0));
-
-    // ── 第二遍：瞬态层 + 等功率声像（pan）──
-    // 单声道模式下跳过（信号已在中央）；forest 无瞬态。
-    if (stereo && (type === 'rain' || type === 'deep')) {
-        const L = buf.getChannelData(0), R = buf.getChannelData(1);
-        const dropHi = S(lp(4000)), dropLo = S(lp(1000));   // 水滴带通（更像水珠）
-        const bubHi = S(lp(2500)), bubLo = S(lp(1500));     // 浪花带通
-        // 瞬态触发状态
-        let th0 = 0, th1 = 0;   // pan 起止角（等功率；收窄范围保证两耳始终有声）
-        let dropNext2 = 0, dropPhase2 = 0, dropDur2 = 0, dropEnv2 = 0; // 水滴（rain）
-        let bubNext = 0, bubPhase = 0, bubAmp = 0;   // 持续水泡（deep）
-        let panNext = 0, panDur = 1;                 // pan 漂移段（deep：1~3s 缓慢扫动）
-
-        // pan 范围：收窄到 30°~60°（等功率下每耳电平 ≥ cos60°=0.5，-6dB，不出现"单耳只有一点"）
-        const P_MIN = Math.PI / 6, P_MAX = Math.PI / 3;
-        // 雨滴：收窄散布（每耳 ≥ -8dB）；浪花：1/3 左→右、1/3 右→左、1/3 固定（均在 30°~60° 内）
-        const pickDropPan = () => {
-            const th = Math.PI / 8 + Math.random() * (Math.PI * 3 / 8 - Math.PI / 8);
-            th0 = th1 = th;
-        };
-        const pickClusterPan = () => {
-            const r = Math.random();
-            if (r < 1 / 3) { th0 = P_MIN; th1 = P_MAX; }              // 左 → 右
-            else if (r < 2 / 3) { th0 = P_MAX; th1 = P_MIN; }         // 右 → 左
-            else { const th = P_MIN + Math.random() * (P_MAX - P_MIN); th0 = th1 = th; }
-        };
-
-        for (let i = 0; i < len; i++) {
-            const w = Math.random() * 2 - 1;
-            let mono = 0, prog = 0;
-            if (type === 'rain') {
-                dropNext2 -= 1 / rate;
-                if (dropNext2 <= 0) {
-                    dropDur2 = 0.002 + Math.random() * 0.006;
-                    dropPhase2 = dropDur2;
-                    dropEnv2 = 0.06 + Math.random() * 0.1;
-                    dropNext2 = 0.015 + Math.random() * 0.045;  // 密度×2（原本左右各一半）
-                    pickDropPan();
-                }
-                if (dropPhase2 > 0) {
-                    const dn = dropHi.lp(w) - dropLo.lp(w);
-                    mono = dn * Math.exp(-(dropDur2 - dropPhase2) * 400) * dropEnv2;
-                    prog = 1 - dropPhase2 / dropDur2;
-                    dropPhase2 -= 1 / rate;
-                }
-            } else { // deep：持续浪花（连续水泡，无 on/off 断续）
-                bubNext -= 1 / rate;
-                if (bubNext <= 0) {
-                    bubPhase = 0.01 + Math.random() * 0.03;   // 单泡 10~40ms
-                    // 强度随 0.15Hz LFO 起伏（浪花涌动感，始终存在）
-                    bubAmp = (0.35 + Math.random() * 0.55) * (0.55 + 0.45 * Math.sin(2 * Math.PI * 0.15 * i / rate));
-                    bubNext = 0.015 + Math.random() * 0.045;  // 持续触发（15~60ms 间隔）
-                }
-                if (bubPhase > 0) {
-                    mono = (bubHi.lp(w) - bubLo.lp(w)) * bubAmp * Math.exp(-bubPhase * 60);
-                    bubPhase -= 1 / rate;
-                }
-                // pan 漂移段：每 1~3s 重新拾取起止角（浪花缓慢扫过声场）
-                panNext -= 1 / rate;
-                if (panNext <= 0) { pickClusterPan(); panDur = 1 + Math.random() * 2; panNext = panDur; }
-                prog = 1 - panNext / panDur;
-            }
-            if (mono !== 0) {
-                // 等功率平移：L = m·cosθ，R = m·sinθ（θ 随簇进度扫过 → 空间移动）
-                const th = th0 + (th1 - th0) * prog;
-                L[i] += mono * Math.cos(th);
-                R[i] += mono * Math.sin(th);
-            }
-        }
+        data[i] = s;
     }
     return buf;
 }
 
-// 创建连接到指定 gain 的 source（从 0 开始播放）
-function makeSource(buffer, gain) {
+// ── 空间化与播放 ─────────────────────────────────────────────────────────
+
+// HRTF 摆位：声源放在 X-Z 平面单位圆上（listener 默认在原点朝 -Z）
+function placePanner(panner, az, when) {
+    const t = when !== undefined ? when : audioCtx.currentTime;
+    panner.positionX.setTargetAtTime(Math.sin(az), t, 0.05);
+    panner.positionY.setTargetAtTime(0, t, 0.05);
+    panner.positionZ.setTargetAtTime(-Math.cos(az), t, 0.05);
+}
+
+function makeSource(buffer, gain, panner) {
     const s = audioCtx.createBufferSource();
     s.buffer = buffer;
     s.connect(gain);
+    gain.connect(panner);
     s.start();
     return s;
 }
 
-// 交叉淡化切换：淡出当前、淡入另一个（新 source 从开头播，旧的有 FADE 余量自然结束）
+// 漂移层：每 2~6s 随机换一个方位（HRTF 平滑移动，声源在声场中缓缓游走）
+function scheduleDrift(ly) {
+    ly.driftTimer = setTimeout(() => {
+        const az = (Math.random() * 2 - 1) * 1.0;   // ±57°
+        placePanner(ly.panner, az);
+        scheduleDrift(ly);
+    }, 2000 + Math.random() * 4000);
+}
+
+function createLayer(def) {
+    const ly = { def, panner: null, bufs: [null, null], srcs: [null, null], gains: [null, null], driftTimer: null };
+    ly.panner = new PannerNode(audioCtx, {
+        panningModel: 'HRTF',
+        distanceModel: 'inverse',
+        refDistance: 1,
+        maxDistance: 100,
+        rolloffFactor: 0,   // 无距离衰减：方位只决定方向，音量统一
+    });
+    ly.panner.connect(masterGain);
+    for (let i = 0; i < 2; i++) {
+        ly.bufs[i] = makeLayerBuffer(audioCtx, def.key);
+        ly.gains[i] = audioCtx.createGain();
+        ly.gains[i].gain.value = i === 0 ? 1 : 0;
+    }
+    ly.srcs[0] = makeSource(ly.bufs[0], ly.gains[0], ly.panner);
+    ly.srcs[1] = makeSource(ly.bufs[1], ly.gains[1], ly.panner);
+    return ly;
+}
+
+// 全局交叉淡化：所有层同一时刻切换
 function swapBuffers() {
-    if (!audioCtx || !srcs[0] || !srcs[1]) return;
+    if (!layers.length) return;
     const t = audioCtx.currentTime + 0.02;
     const next = 1 - active;
-
-    // 淡出当前
-    gains[active].gain.cancelScheduledValues(t);
-    gains[active].gain.setValueAtTime(Math.max(gains[active].gain.value, 0.0001), t);
-    gains[active].gain.linearRampToValueAtTime(0, t + FADE);
-
-    // 旧 source 播完剩余自然结束；新 source 重新从开头播并淡入
-    try { srcs[next].stop(); } catch (e) {}
-    try { srcs[next].disconnect(); } catch (e) {}
-    srcs[next] = makeSource(bufs[next], gains[next]);
-    gains[next].gain.cancelScheduledValues(t);
-    gains[next].gain.setValueAtTime(0, t);
-    gains[next].gain.linearRampToValueAtTime(1, t + FADE);
-
+    for (const ly of layers) {
+        ly.gains[active].gain.cancelScheduledValues(t);
+        ly.gains[active].gain.setValueAtTime(Math.max(ly.gains[active].gain.value, 0.0001), t);
+        ly.gains[active].gain.linearRampToValueAtTime(0, t + FADE);
+        try { ly.srcs[next].stop(); } catch (e) {}
+        try { ly.srcs[next].disconnect(); } catch (e) {}
+        ly.srcs[next] = makeSource(ly.bufs[next], ly.gains[next], ly.panner);
+        ly.gains[next].gain.cancelScheduledValues(t);
+        ly.gains[next].gain.setValueAtTime(0, t);
+        ly.gains[next].gain.linearRampToValueAtTime(1, t + FADE);
+    }
     active = next;
 }
 
-// 三角分布 [min,max]，峰值在 mode（高潮持续时间分布：更多落在 ~40s）
+// 三角分布 [min,max]，峰值在 mode（高潮持续时间：更多落在 ~40s）
 function triMode(min, max, mode) {
     const u = Math.random();
     const p = (mode - min) / (max - min);
@@ -217,19 +210,17 @@ function triMode(min, max, mode) {
         : mode + (max - mode) * (1 - Math.sqrt((1 - u) / (1 - p)));
 }
 
-// 深海高潮包络：随机"高潮/平静"事件，整体增益 0.55~1.55 起伏（大浪来了又走）
+// 深海高潮包络：整体增益 0.55~1.55 起伏（大浪来了又走）
 const swell = { phase: 'calm', remain: 0, target: 1 };
 let swellTimer = null;
 let swellGain = null;
 
 function planSwell() {
     if (Math.random() < 0.55) {
-        // 高潮：持续 5~60s，三角分布峰值 40s，强度 1.15~1.55
         swell.phase = 'swell';
         swell.remain = triMode(5, 60, 40);
         swell.target = 1.15 + Math.random() * 0.4;
     } else {
-        // 平静：8~30s，0.55~0.75
         swell.phase = 'calm';
         swell.remain = 8 + Math.random() * 22;
         swell.target = 0.55 + Math.random() * 0.2;
@@ -240,7 +231,6 @@ function startSwellScheduler() {
     planSwell();
     swellTimer = setInterval(() => {
         if (!swellGain) return;
-        // 指数逼近目标（时间常数 ~0.6s → 浪渐强/渐弱，不突兀）
         swellGain.gain.setTargetAtTime(swell.target, audioCtx.currentTime, 0.6);
         swell.remain -= 0.1;
         if (swell.remain <= 0) planSwell();
@@ -251,12 +241,9 @@ function startSwellScheduler() {
 async function startNoise(type) {
     await initAudio();
 
-    // 确保音频上下文处于运行状态（需要用户手势）
     if (audioCtx.state === 'suspended') {
         try { await audioCtx.resume(); } catch (e) { console.error('音频恢复失败:', e); }
     }
-
-    // 停止已有声音
     stopNoise();
 
     if (type === 'off') {
@@ -264,13 +251,14 @@ async function startNoise(type) {
         updateSoundButtons();
         return;
     }
-    if (type !== 'rain' && type !== 'forest' && type !== 'deep') return;
+    if (!LAYER_DEFS[type]) return;
 
-    // 总音量节点
+    const stereo = state.settings.stereo !== false;
+
+    // 总音量节点（deep 后接高潮包络）
     masterGain = audioCtx.createGain();
     masterGain.gain.value = state.settings.volume / 100;
     if (type === 'deep') {
-        // 深海：高潮包络节点（阵阵浪花），放在 masterGain 之后调制整体
         swellGain = audioCtx.createGain();
         swellGain.gain.value = 1;
         masterGain.connect(swellGain);
@@ -280,18 +268,18 @@ async function startNoise(type) {
         masterGain.connect(audioCtx.destination);
     }
 
-    // 两个不同内容的噪声 buffer + 各自的 gain/source
-    for (let i = 0; i < 2; i++) {
-        bufs[i] = makeNoiseBuffer(audioCtx, type);
-        gains[i] = audioCtx.createGain();
-        gains[i].gain.value = i === 0 ? 1 : 0;
-        gains[i].connect(masterGain);
-    }
-    srcs[0] = makeSource(bufs[0], gains[0]); // 先出声
-    srcs[1] = makeSource(bufs[1], gains[1]); // 静音待命
+    // 创建各声源层并摆位
+    layers = LAYER_DEFS[type].map((def) => {
+        const ly = createLayer(def);
+        if (!stereo) {
+            placePanner(ly.panner, 0);   // 单声道：全部居中
+        } else if (def.drift) {
+            scheduleDrift(ly);           // 漂移层：HRTF 方位随机游走
+        }
+        return ly;
+    });
     active = 0;
 
-    // 每 SWAP_INTERVAL 秒交叉淡化切换一次（无缝衔接）
     swapTimer = setInterval(swapBuffers, SWAP_INTERVAL * 1000);
 
     state.soundType = type;
@@ -302,11 +290,16 @@ async function startNoise(type) {
 function stopNoise() {
     if (swapTimer) { clearInterval(swapTimer); swapTimer = null; }
     if (swellTimer) { clearInterval(swellTimer); swellTimer = null; }
-    for (let i = 0; i < 2; i++) {
-        if (srcs[i]) { try { srcs[i].stop(); } catch (e) {} try { srcs[i].disconnect(); } catch (e) {} srcs[i] = null; }
-        if (gains[i]) { try { gains[i].disconnect(); } catch (e) {} gains[i] = null; }
-        bufs[i] = null;
+    for (const ly of layers) {
+        if (ly.driftTimer) clearTimeout(ly.driftTimer);
+        for (let i = 0; i < 2; i++) {
+            if (ly.srcs[i]) { try { ly.srcs[i].stop(); } catch (e) {} try { ly.srcs[i].disconnect(); } catch (e) {} ly.srcs[i] = null; }
+            if (ly.gains[i]) { try { ly.gains[i].disconnect(); } catch (e) {} ly.gains[i] = null; }
+            ly.bufs[i] = null;
+        }
+        if (ly.panner) { try { ly.panner.disconnect(); } catch (e) {} ly.panner = null; }
     }
+    layers = [];
     if (swellGain) { try { swellGain.disconnect(); } catch (e) {} swellGain = null; }
     if (masterGain) {
         try { masterGain.disconnect(); } catch (e) {}
