@@ -415,9 +415,9 @@ body {
     text-align: center;
     pointer-events: none;
 }
-/* 时间文字：cqw 相对圆环宽度等比缩放（23% 圆环宽）——任何断点/尺寸下比例恒定统一 */
+/* 时间文字：cqw 相对圆环宽度等比缩放（19% 环宽，留足边距——字体实际渲染宽于估算也不会碰环边） */
 .ring-center .time-display {
-    font-size: 23cqw;
+    font-size: 19cqw;
     line-height: 1;
 }
 
