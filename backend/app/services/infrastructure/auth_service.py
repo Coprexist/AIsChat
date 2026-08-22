@@ -8,6 +8,7 @@ from sqlalchemy import select, func
 from app.models.user import User
 from app.utils.auth import hash_password, verify_password, create_access_token
 from app.utils.crypto import encrypt_api_key, decrypt_api_key
+from app.repositories.user_repo import UserRepository, SQLAlchemyUserRepository
 
 logger = logging.getLogger(__name__)
 
@@ -31,6 +32,7 @@ async def register_user(
     verification_code: str | None = None,
     *,
     admin_bypass: bool = False,
+    user_repo: UserRepository | None = None,
 ) -> User:
     """
     注册新用户。
@@ -39,14 +41,15 @@ async def register_user(
     如果 require_email_verification=OFF：email 选填。
     admin_bypass=True：管理员后台创建，跳过注册通道开关和邮箱验证。
     """
+    if user_repo is None:
+        user_repo = SQLAlchemyUserRepository(db)
     # 检查用户名是否已存在
-    result = await db.execute(select(User).where(User.username == username))
-    if result.scalar_one_or_none() is not None:
+    existing_user = await user_repo.get_by_username(username)
+    if existing_user is not None:
         raise ValueError("用户名已存在")
 
     # 判断是否为首个用户（排除系统用户 id=0）
-    count_result = await db.execute(select(func.count(User.id)).where(User.type != 'system'))
-    user_count = count_result.scalar()
+    user_count = await user_repo.count_non_system_users()
     is_first = user_count == 0
 
     # 读取系统设置
@@ -79,10 +82,8 @@ async def register_user(
             raise ValueError("请输入邮箱验证码")
 
         # 检查邮箱唯一性
-        existing_email = await db.execute(
-            select(User).where(User.email == email)
-        )
-        if existing_email.scalar_one_or_none():
+        existing_email = await user_repo.get_by_email(email)
+        if existing_email:
             raise ValueError("该邮箱已被其他账号使用")
 
         # 验证码校验
@@ -93,10 +94,8 @@ async def register_user(
         email_verified = True
     elif email:
         # 非强制模式但提供了邮箱：检查唯一性，不强制验证
-        existing_email = await db.execute(
-            select(User).where(User.email == email)
-        )
-        if existing_email.scalar_one_or_none():
+        existing_email = await user_repo.get_by_email(email)
+        if existing_email:
             raise ValueError("该邮箱已被其他账号使用")
         # 如果提供了验证码，校验之
         if verification_code:
@@ -124,9 +123,9 @@ async def register_user(
         user.language = "zh"
         user.platform_gifted_credit = 0
         user.file_quota_mb = 100
-    db.add(user)
-    await db.flush()
-    await db.refresh(user)
+    await user_repo.add(user)
+    await user_repo.flush()
+    await user_repo.refresh(user)
 
     if is_first:
         logger.info(f"🎉 首个用户 '{username}' 自动成为管理员")
