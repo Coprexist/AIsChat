@@ -408,6 +408,12 @@ function bindEvents() {
     fullscreenBtn.addEventListener('click', toggleFullscreen);
     document.addEventListener('fullscreenchange', updateFullscreenBtn);
     settingsBtn.addEventListener('click', openSettings);
+    // 周期解释问号：点击弹 toast（手机触屏也能看；桌面另有悬停提示）
+    const cycleHelp = document.querySelector('.cycle-help');
+    if (cycleHelp) cycleHelp.addEventListener('click', (e) => {
+        e.stopPropagation();
+        showToast(`周期：每完成 ${state.settings.interval} 个专注进一次长休息，然后开始新一轮（间隔可在设置中调整）。`);
+    });
     modalCancel.addEventListener('click', closeSettings);
     modalSave.addEventListener('click', saveSettingsFromModal);
     settingsModal.addEventListener('click', e => { if (e.target === settingsModal) closeSettings(); });
