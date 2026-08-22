@@ -398,7 +398,6 @@ body {
     height: min(260px, 52vw);
     margin: 12px auto;
     flex-shrink: 0;
-    container-type: inline-size;   /* 容器查询：内部 cqw 单位跟随圆环宽度等比缩放 */
 }
 .ring-svg { position: absolute; inset: 0; width: 100%; height: 100%; }  /* 弧线 d 起点在顶部，无需旋转 */
 .ring-bg { fill: none; stroke: var(--border); stroke-width: 1.8; }
@@ -421,9 +420,9 @@ body {
     text-align: center;
     pointer-events: none;
 }
-/* 时间文字：cqw 相对圆环宽度等比缩放（19% 环宽，留足边距——字体实际渲染宽于估算也不会碰环边） */
+/* 时间文字：按断点固定 rem（弃用 cqw 容器查询——部分 webview 不支持会导致字号失效/重叠） */
 .ring-center .time-display {
-    font-size: 19cqw;
+    font-size: clamp(2rem, 5.5vw, 3.4rem);
     line-height: 1;
 }
 
@@ -554,13 +553,14 @@ body {
     .sound-bar .volume-row { width: 100%; }
 
     /* 圆环与文字：小屏圆环可收缩（flex-shrink:1）让位，保证按钮/周期全部可见；
-       字体用 cqw 已自动等比，无需单独设置 */
+       字体按断点固定 rem */
     .time-ring {
         width: min(210px, 48vw);
         height: min(210px, 48vw);
         margin: 8px auto;
         flex-shrink: 1;          /* 空间不足时圆环先收缩，不让内容被挤走 */
     }
+    .ring-center .time-display { font-size: clamp(1.6rem, 6vw, 2.6rem); }
     .ring-center .status-text { font-size: 0.75rem; }
     .mode-tab { padding: 5px 14px; font-size: 0.85rem; }
 
@@ -584,7 +584,7 @@ body {
     .timer-col .sound-bar { flex: 0 0 auto; }
     .timer-col .timer-card { flex: 1 1 0; min-height: 0; }
 
-    /* ── 手风琴：计时卡 + 侧栏 3 卡统一，grid 0fr→1fr 平滑展开 ── */
+    /* ── 手风琴：max-height 动画（兼容性优于 grid 0fr/1fr），点整卡互斥展开/收起 ── */
     .acc-head {
         display: flex;
         align-items: center;
@@ -598,6 +598,7 @@ body {
         user-select: none;
         padding: 2px 0;
         margin-bottom: 0;
+        line-height: 1.4;          /* 与侧栏 h3 默认行高一致，折叠态高度统一 */
     }
     /* 侧栏卡标题是 h3（全局 .card h3 带 12px 下边距）——折叠态统一为 0，与计时器标题一致 */
     .card h3.acc-head { margin-bottom: 0; }
@@ -610,25 +611,23 @@ body {
         color: var(--text-muted);
         transition: transform 0.2s;
     }
-    /* 内容体：grid 行折叠动画（0fr→1fr），display 始终保留（不破坏内部 flex 布局） */
+    /* 内容体：max-height 0→大值 平滑展开，display 保留（不破坏内部 flex） */
     .acc-body {
-        display: grid;
-        grid-template-rows: 0fr;
-        transition: grid-template-rows 0.35s ease;
-        min-height: 0;
+        max-height: 0;
+        overflow: hidden;
+        transition: max-height 0.35s ease;
     }
-    .acc-inner { display: block; overflow: hidden; min-height: 0; }
-    .acc-open > .acc-body { grid-template-rows: 1fr; }
+    .acc-open > .acc-body { max-height: 2000px; }
     .acc-open > .acc-head::after { content: '－'; }
     .acc-open > .acc-head { color: var(--blue); margin-bottom: 12px; }
     .card.acc-open > h3.acc-head { margin-bottom: 12px; }
-    /* 展开后内容超高时卡内滚动（不再硬裁剪按钮） */
-    .acc-open > .acc-body > .acc-inner { overflow-y: auto; }
     /* 展开时恢复卡片内部纵向排布 */
-    .timer-card.acc-open > .acc-body > .acc-inner,
-    .sidebar .card.acc-open > .acc-body > .acc-inner { display: flex; flex-direction: column; gap: 12px; }
-    .timer-card.acc-open > .acc-body > .acc-inner { align-items: center; }
-    .sidebar .card.acc-open > .acc-body > .acc-inner { align-items: stretch; }
+    .timer-card.acc-open > .acc-body,
+    .sidebar .card.acc-open > .acc-body { overflow-y: auto; }
+    .timer-card.acc-open > .acc-body,
+    .sidebar .card.acc-open > .acc-body { display: flex; flex-direction: column; gap: 12px; }
+    .timer-card.acc-open > .acc-body { align-items: center; }
+    .sidebar .card.acc-open > .acc-body { align-items: stretch; }
 
     /* 待办列表限高（展开时内部滚动） */
     .sidebar .todo-list { max-height: 160px; }

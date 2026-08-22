@@ -478,10 +478,17 @@ function bindEvents() {
     studyLoadRemote();
 
     // ── 小屏手风琴（≤768px 生效）：点整张卡片互斥展开/收起 ──
-    // 默认展开态由 HTML 上的 acc-open 类决定（计时卡默认展开），不依赖 JS 时序
     const accHosts = document.querySelectorAll('.timer-card, .sidebar .card');
     const accOpen = () => window.matchMedia('(max-width: 768px)').matches;
     if (accHosts.length) {
+        // 默认展开：小屏时若全部折叠，强制展开计时卡（双保险，不依赖 HTML class）
+        if (accOpen()) {
+            const anyOpen = document.querySelector('.timer-card.acc-open, .sidebar .card.acc-open');
+            if (!anyOpen) {
+                const t = document.getElementById('timer-card');
+                if (t) t.classList.add('acc-open');
+            }
+        }
         accHosts.forEach(host => host.addEventListener('click', (e) => {
             if (!accOpen()) return;   // 桌面不启用折叠
             // 点击卡片内部交互元素（按钮/输入框等）不触发折叠
