@@ -33,25 +33,26 @@
             </div>
         </header>
 
-    <!-- 固定声音条（始终可见：音色切换 + 音量，不藏进设置；全屏/沉浸时也直接可调） -->
-    <div class="sound-bar" id="sound-bar">
-        <span class="sound-bar-label">白噪音</span>
-        <div class="sound-row">
-            <button class="sound-btn" data-sound="rain">暴雨</button>
-            <button class="sound-btn" data-sound="drizzle">细雨</button>
-            <button class="sound-btn" data-sound="forest">森林</button>
-            <button class="sound-btn" data-sound="sea">海面</button>
-            <button class="sound-btn" data-sound="deep">深海</button>
-            <button class="sound-btn active" data-sound="off">静音</button>
-        </div>
-        <div class="volume-row">
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/><path d="M15.54 8.46a5 5 0 0 1 0 7.07"/><path d="M19.07 4.93a10 10 0 0 1 0 14.14"/></svg>
-            <input type="range" class="volume-slider" id="volume-slider" min="0" max="100" value="30">
-        </div>
-    </div>
-
-        <!-- 主内容 -->
+    <!-- 主内容 -->
         <div class="main">
+            <!-- 计时列：声音条 + 计时卡同宽同列，左右边缘永远对齐 -->
+            <div class="timer-col">
+                <!-- 固定声音条（始终可见：音色切换 + 音量，不藏进设置；全屏/沉浸时也直接可调） -->
+                <div class="sound-bar" id="sound-bar">
+                    <span class="sound-bar-label">白噪音</span>
+                    <div class="sound-row">
+                        <button class="sound-btn" data-sound="rain">暴雨</button>
+                        <button class="sound-btn" data-sound="drizzle">细雨</button>
+                        <button class="sound-btn" data-sound="forest">森林</button>
+                        <button class="sound-btn" data-sound="sea">海面</button>
+                        <button class="sound-btn" data-sound="deep">深海</button>
+                        <button class="sound-btn active" data-sound="off">静音</button>
+                    </div>
+                    <div class="volume-row">
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/><path d="M15.54 8.46a5 5 0 0 1 0 7.07"/><path d="M19.07 4.93a10 10 0 0 1 0 14.14"/></svg>
+                        <input type="range" class="volume-slider" id="volume-slider" min="0" max="100" value="30">
+                    </div>
+                </div>
             <!-- 计时器 -->
             <section class="timer-card mode-focus" id="timer-card">
                 <div class="mode-tabs">
@@ -80,6 +81,7 @@
                     <span class="cycle-help" title="每完成 N 个专注（可在设置中调整），进入一次长休息，然后开始新一轮。">?</span>
                 </div>
             </section>
+            </div><!-- /timer-col -->
 
             <!-- 侧栏 -->
             <aside class="sidebar" id="sidebar">

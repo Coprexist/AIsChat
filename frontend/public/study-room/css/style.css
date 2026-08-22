@@ -85,6 +85,18 @@ body {
     overflow: hidden;
 }
 
+/* 计时列：声音条 + 计时卡 同一列，永远同宽、左右边缘对齐 */
+.timer-col {
+    flex: 1;
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    min-height: 0;
+}
+.timer-col .sound-bar { width: 100%; }
+.timer-col .timer-card { flex: 1; min-height: 0; }
+
 /* 计时器卡片 */
 .timer-card {
     flex: 1;
