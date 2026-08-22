@@ -152,7 +152,7 @@ function makeLayerBuffer(ctx, key, def) {
             // 新气泡不等旧气泡播完——多个气泡同时发声叠加，像水下气泡群一起冒；
             // quiet=小音量远层组：音色与主组完全一致（低频咕噜、同样时长），
             // 只是音量更小、串略小略稀——"远处也有一组同样的气泡"
-            const BUBBLE_VOLUME = 0.25;   // 气泡整体音量：缩减 75%（保留 25%）
+            const BUBBLE_VOLUME = 0.35;   // 气泡整体音量：在缩减 75% 基础上增大 40%（区间 30~45% 中值）
             const quiet = def && def.quiet;
             const ampScale = (quiet ? 0.12 : 0.3) * BUBBLE_VOLUME;
             const maxConc = quiet ? 3 : 4;
