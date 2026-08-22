@@ -98,6 +98,8 @@ function makeLayerBuffer(ctx, key, def) {
     let dropNext = 0, dropPhase = 0, dropDur = 0, dropEnv = 0;
     let farNext = 0, farPhase = 0, farDur = 0, farEnv = 0;
     let gutNext = 1, gutPhase = 0, gutDur = 0, gutEnv = 0;
+    // 细雨滴答活跃池（专业雨滴声学：单滴 10~25ms、1~3kHz 共振、允许偶尔重叠）
+    const lightDrops = [];
     // 深海气泡：活跃气泡池（可重叠发声，不用等前一个播完）+ 串触发状态
     // 一串 1~8 个（偏大分布）；串内密集触发（0.08~0.28s）→ 同时 2~4 个气泡叠响
     let bubNext = 1.2, bubRemain = 0;
@@ -137,22 +139,47 @@ function makeLayerBuffer(ctx, key, def) {
             const light = def && def.light;
             s = (bedHi.lp(w) - bedLo.lp(w)) * (light ? 0.16 : 0.7) + brown * (light ? 0.015 : 0.04);
         } else if (key === 'dropsNear') {
-            // 近处清晰滴答（石面/硬面）：短促清脆高频脉冲；
-            // 暴雨 = 8~25 滴/秒响亮短促（2.4~5.2kHz 清脆）；细雨（light）= 4~10 滴/秒
-            // 加宽频段（1.1~4kHz）、加长（3~9ms）、衰减稍慢 → 每颗"滴"有实体感，
-            // 从轻雨幕里凸出来，可辨的"点点滴滴"
             const light = def && def.light;
-            dropNext -= 1 / rate;
-            if (dropNext <= 0) {
-                dropDur = light ? 0.003 + Math.random() * 0.006 : 0.0015 + Math.random() * 0.004;
-                dropPhase = dropDur;
-                dropEnv = light ? 0.16 + Math.random() * 0.16 : 0.22 + Math.random() * 0.28;
-                dropNext = light ? 0.1 + Math.random() * 0.15 : 0.04 + Math.random() * 0.085;
-            }
-            if (dropPhase > 0) {
-                const hi = light ? nearHiL : nearHi, lo = light ? nearLoL : nearLo;
-                s = (hi.lp(w) - lo.lp(w)) * Math.exp(-(dropDur - dropPhase) * (light ? 260 : 600)) * dropEnv;
-                dropPhase -= 1 / rate;
+            if (light) {
+                // 细雨滴答（专业参数）：单滴 10~25ms 指数衰减、0.9~2.9kHz 共振正弦+带通噪声、
+                // 活跃池允许偶尔重叠（并发上限 3），间隔 0.09~0.25s → 4~11 滴/秒
+                dropNext -= 1 / rate;
+                if (dropNext <= 0) {
+                    // 平方分布偏短：多数间隔 0.09~0.2s（单颗），偶有 0.02s 内连发 → 偶尔重叠
+                    dropNext = Math.pow(Math.random(), 1.6) * 0.22 + 0.02;
+                    if (lightDrops.length < 3) {
+                        lightDrops.push({
+                            f: 900 + Math.random() * 2000,       // 0.9~2.9kHz
+                            amp: 0.18 + Math.random() * 0.2,
+                            dur: 0.01 + Math.random() * 0.015,   // 10~25ms
+                            ph: Math.random() * Math.PI * 2,
+                            t: 0,
+                        });
+                    }
+                }
+                for (let di = lightDrops.length - 1; di >= 0; di--) {
+                    const d = lightDrops[di];
+                    if (d.t >= d.dur) { lightDrops.splice(di, 1); continue; }
+                    const env = Math.exp(-(d.t / d.dur) * 4);    // 指数衰减（尾部 10~30ms 共振感）
+                    // 共振正弦（音高感）+ 带通噪声（撞击瞬态）
+                    const reso = Math.sin(2 * Math.PI * d.f * d.t + d.ph);
+                    const burst = nearHiL.lp(w) - nearLoL.lp(w);
+                    s = (reso * 0.7 + burst * 0.3) * env * d.amp;
+                    d.t += 1 / rate;
+                }
+            } else {
+                // 暴雨近滴答（石面/硬面）：短促清脆高频脉冲，8~25 滴/秒
+                dropNext -= 1 / rate;
+                if (dropNext <= 0) {
+                    dropDur = 0.0015 + Math.random() * 0.004;     // 1.5~5.5ms 极短促
+                    dropPhase = dropDur;
+                    dropEnv = 0.22 + Math.random() * 0.28;        // 响亮（近）
+                    dropNext = 0.04 + Math.random() * 0.085;      // 8~25 滴/秒
+                }
+                if (dropPhase > 0) {
+                    s = (nearHi.lp(w) - nearLo.lp(w)) * Math.exp(-(dropDur - dropPhase) * 600) * dropEnv;
+                    dropPhase -= 1 / rate;
+                }
             }
         } else if (key === 'dropsFar') {
             // 远处噼啪：密集轻柔中频脉冲，40~120 滴/秒，幅度小（远），
