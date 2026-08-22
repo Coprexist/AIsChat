@@ -95,15 +95,15 @@ function makeLayerBuffer(ctx, key, def) {
     // 深海涌动 LFO（唯一保留正弦：慢涌 0.035Hz ≈28s 一周期，潮汐感更缓更隐）
     const lfoFreq = key === 'swell' ? 0.035 : 0;
 
-    // 随机游走包络：每 6~14s 才换一次目标幅度（收窄到 0.6~1.0），
-    // 逼近更慢（τ≈4s）→ 音量几乎恒定，只剩极缓的"呼吸感"，不打扰专注
+    // 随机游走包络：每 10~22s 才换一次目标幅度（收窄到 0.6~1.0），
+    // 逼近更慢（τ≈5.7s）→ 音量几乎恒定，只剩极缓的"呼吸感"，不打扰专注
     const walkEnv = (i) => {
         envNext -= 1 / rate;
         if (envNext <= 0) {
             envTarget = 0.6 + Math.random() * 0.4;
-            envNext = 6 + Math.random() * 8;
+            envNext = 10 + Math.random() * 12;
         }
-        env += (envTarget - env) * 0.000006;
+        env += (envTarget - env) * 0.000004;
         return env;
     };
 
@@ -135,7 +135,7 @@ function makeLayerBuffer(ctx, key, def) {
                 dropPhase -= 1 / rate;
             }
         } else if (key === 'wind') {
-            s = windLo.lp(brown) * 2.6 * walkEnv(i);
+            s = windLo.lp(brown) * 2.4 * walkEnv(i);
         } else if (key === 'leaf') {
             s = leafLo.lp(w) * 0.35 * walkEnv(i);
         } else if (key === 'pink') {
@@ -245,7 +245,8 @@ function createLayer(def) {
         maxDistance: 100,
         rolloffFactor: 0,   // 无距离衰减：方位只决定方向，音量统一
     });
-    ly.panner.connect(masterGain);
+    // 风声层走 windBoost 节点（阵风调度），其他层直连 masterGain
+    ly.panner.connect(def.key === 'wind' && windBoost ? windBoost : masterGain);
     for (let i = 0; i < 2; i++) {
         ly.bufs[i] = makeLayerBuffer(audioCtx, def.key, def);
         ly.gains[i] = audioCtx.createGain();
@@ -330,6 +331,35 @@ function startSwellScheduler() {
     }, 100);
 }
 
+// ── 森林阵风调度器：主体保持稳定，偶尔来一阵风（阴风）再平静 ──
+// 只作用于风声层（windBoost 节点）；阵风增益 1.25~1.5 倍、平滑渐变（τ=1.5s），
+// 既"突然来一下"又不会过头；多数时间平静（18~48s）保持主体稳定
+const windGust = { phase: 'steady', remain: 0, target: 1 };
+let windTimer = null;
+let windBoost = null;
+
+function planWindGust() {
+    if (Math.random() < 0.3) {
+        windGust.phase = 'gust';
+        windGust.remain = 4 + Math.random() * 8;         // 阵风持续 4~12s
+        windGust.target = 1.25 + Math.random() * 0.25;   // 抬升 1.25~1.5 倍（不过头）
+    } else {
+        windGust.phase = 'steady';
+        windGust.remain = 18 + Math.random() * 30;       // 平静期 18~48s
+        windGust.target = 1;
+    }
+}
+
+function startWindScheduler() {
+    planWindGust();
+    windTimer = setInterval(() => {
+        if (!windBoost) return;
+        windBoost.gain.setTargetAtTime(windGust.target, audioCtx.currentTime, 1.5);
+        windGust.remain -= 0.1;
+        if (windGust.remain <= 0) planWindGust();
+    }, 100);
+}
+
 // 开始播放指定类型的噪声
 async function startNoise(type) {
     await initAudio();
@@ -348,7 +378,8 @@ async function startNoise(type) {
 
     const stereo = state.settings.stereo !== false;
 
-    // 总音量节点（海面后接高潮包络——浪涌来了又走；深海恒定水压，不挂包络）
+    // 总音量节点（海面后接高潮包络——浪涌来了又走；深海恒定水压，不挂包络；
+    // 森林后接阵风节点——风声偶发突袭，只作用于风声层）
     masterGain = audioCtx.createGain();
     masterGain.gain.value = state.settings.volume / 100;
     if (type === 'sea') {
@@ -357,6 +388,12 @@ async function startNoise(type) {
         masterGain.connect(swellGain);
         swellGain.connect(audioCtx.destination);
         startSwellScheduler();
+    } else if (type === 'forest') {
+        windBoost = audioCtx.createGain();
+        windBoost.gain.value = 1;
+        masterGain.connect(windBoost);
+        windBoost.connect(audioCtx.destination);
+        startWindScheduler();
     } else {
         masterGain.connect(audioCtx.destination);
     }
@@ -380,6 +417,7 @@ async function startNoise(type) {
 // 停止噪声
 function stopNoise() {
     if (swellTimer) { clearInterval(swellTimer); swellTimer = null; }
+    if (windTimer) { clearInterval(windTimer); windTimer = null; }
     for (const ly of layers) {
         if (ly.driftTimer) clearTimeout(ly.driftTimer);
         if (ly.swapTimer) clearTimeout(ly.swapTimer);
@@ -392,6 +430,7 @@ function stopNoise() {
     }
     layers = [];
     if (swellGain) { try { swellGain.disconnect(); } catch (e) {} swellGain = null; }
+    if (windBoost) { try { windBoost.disconnect(); } catch (e) {} windBoost = null; }
     if (masterGain) {
         try { masterGain.disconnect(); } catch (e) {}
         masterGain = null;
