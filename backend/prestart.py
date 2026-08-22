@@ -104,6 +104,22 @@ MIGRATIONS: list[tuple[str, str]] = [
             UNIQUE (user_id, date)
         )""",
     ),
+    (
+        "study_settings 表（自习室用户状态：时长设置+今日周期）",
+        """CREATE TABLE IF NOT EXISTS study_settings (
+            id SERIAL PRIMARY KEY,
+            user_id INT NOT NULL UNIQUE,
+            focus INT NOT NULL DEFAULT 25,
+            short INT NOT NULL DEFAULT 5,
+            long INT NOT NULL DEFAULT 15,
+            interval INT NOT NULL DEFAULT 4,
+            cycle_date VARCHAR(10),
+            cycles INT NOT NULL DEFAULT 0,
+            sessions INT NOT NULL DEFAULT 0,
+            created_at TIMESTAMP DEFAULT NOW(),
+            updated_at TIMESTAMP DEFAULT NOW()
+        )""",
+    ),
 ]
 
 

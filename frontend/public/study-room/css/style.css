@@ -159,12 +159,29 @@ body {
     font-family: var(--font);
     letter-spacing: 0.03em;
 }
+/* 开始/暂停按钮：固定宽度（按"开始专注"4 字），文字切换时不抖动；
+   颜色跟随当前模式主题色（专注=蓝 / 短休=绿 / 长休=紫） */
 .btn-primary {
+    min-width: 132px;
     background: var(--blue); color: #0b0e14;
     box-shadow: 0 4px 12px rgba(79, 156, 249, 0.3);
 }
-.btn-primary:hover { background: #3b82f6; }
-.btn-primary.running { background: var(--orange); }
+.mode-short .btn-primary {
+    background: var(--green);
+    box-shadow: 0 4px 12px rgba(74, 222, 128, 0.3);
+}
+.mode-long .btn-primary {
+    background: var(--purple);
+    box-shadow: 0 4px 12px rgba(167, 139, 250, 0.3);
+}
+.btn-primary:hover { filter: brightness(1.1); }
+/* 暂停态：同主题色的柔和实底，与"开始"区分但保持同色系 */
+.btn-primary.running {
+    background: var(--blue-soft); color: var(--blue);
+    box-shadow: none;
+}
+.mode-short .btn-primary.running { background: var(--green-soft); color: var(--green); }
+.mode-long .btn-primary.running { background: var(--purple-soft); color: var(--purple); }
 .btn-secondary {
     background: transparent; color: var(--text-secondary);
     border: 1px solid var(--border);
@@ -270,10 +287,32 @@ body {
 }
 .todo-clear-btn:hover { color: var(--red); }
 
-/* 白噪音 */
-.sound-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; margin-bottom: 10px; }
+/* 固定声音条（始终可见：音色切换 + 音量，不藏进设置） */
+.sound-bar {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 10px 16px;
+    flex-shrink: 0;
+}
+.sound-bar-label {
+    font-size: 0.8rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    color: var(--text-secondary);
+    white-space: nowrap;
+}
+.sound-bar .sound-row { display: flex; gap: 6px; flex-wrap: wrap; flex: 1; }
+.sound-bar .volume-row { width: 180px; }
+.sound-bar .volume-slider { width: 100%; }
+
+/* 白噪音按钮 */
 .sound-btn {
-    padding: 8px 10px;
+    padding: 8px 14px;
     border-radius: 8px;
     border: 1px solid var(--border);
     background: var(--bg);
@@ -286,7 +325,7 @@ body {
     border-color: var(--blue); color: var(--blue);
     background: var(--blue-soft);
 }
-.volume-row { display: flex; align-items: center; gap: 8px; }
+.volume-row { display: flex; align-items: center; gap: 8px; color: var(--text-secondary); }
 .volume-slider {
     flex: 1; -webkit-appearance: none; appearance: none;
     height: 4px; border-radius: 4px; background: var(--bg-hover);
@@ -341,8 +380,23 @@ body {
 }
 .ring-center .time-display { font-size: clamp(2.3rem, 6vw, 3.6rem); }
 
-/* 设置弹窗：白噪音按钮组 */
-.sound-row { display: flex; gap: 6px; flex-wrap: wrap; }
+/* 设置弹窗 */
+.form-hint {
+    font-size: 0.75rem;
+    color: var(--text-muted);
+    margin-top: 6px;
+    line-height: 1.6;
+}
+.cycle-help {
+    width: 16px; height: 16px;
+    border-radius: 50%;
+    background: var(--bg-hover);
+    color: var(--text-secondary);
+    font-size: 0.7rem;
+    display: inline-flex; align-items: center; justify-content: center;
+    cursor: help;
+    border: 1px solid var(--border);
+}
 
 /* 自定义滚动条（主题统一：细窄、圆角、hover 高亮） */
 *::-webkit-scrollbar { width: 6px; height: 6px; }
@@ -424,6 +478,8 @@ body {
 /* 响应式 */
 @media (max-width: 768px) {
     .app { padding: 10px; gap: 8px; }
+    .sound-bar { flex-wrap: wrap; gap: 8px; }
+    .sound-bar .volume-row { width: 100%; }
     .main { flex-direction: column; gap: 8px; }
     .sidebar { width: 100%; flex-direction: row; overflow-x: auto; }
     .sidebar .card { min-width: 220px; flex: 1; }

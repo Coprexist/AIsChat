@@ -22,7 +22,6 @@ const todoCount = $('todo-count');
 const todoClearBtn = $('todo-clear-btn');
 const soundButtons = document.querySelectorAll('.sound-btn');
 const volumeSlider = $('volume-slider');
-const volumeSliderModal = $('volume-slider-modal');
 const statSessions = $('stat-sessions');
 const statMinutes = $('stat-minutes');
 const statStreak = $('stat-streak');
@@ -42,24 +41,33 @@ const setAutoStart = $('set-auto-start');
 const setStereo = $('set-stereo');
 const setProgressMode = $('set-progress-mode');
 const setProgressCap = $('set-progress-cap');
-const soundModal = $('sound-modal');
-const soundModalClose = $('sound-modal-close');
-const soundModalSettings = $('sound-modal-settings');
 const modalCancel = $('modal-cancel');
 const modalSave = $('modal-save');
 
 // ---------- 存储 ----------
 function loadStorage() {
     try {
-        const s = localStorage.getItem('studyroom_settings');
-        if (s) state.settings = { ...DEFAULT_SETTINGS, ...JSON.parse(s) };
+        const raw = localStorage.getItem('studyroom_settings');
+        if (raw) {
+            const s = JSON.parse(raw);
+            // 设置版本：旧版存档（elapsed/round 默认、间隔限 2~8）→ 采用新版默认
+            if (!s._v || s._v < SETTINGS_VERSION) {
+                state.settings = { ...DEFAULT_SETTINGS };
+            } else {
+                state.settings = { ...DEFAULT_SETTINGS, ...s };
+            }
+        }
         const t = localStorage.getItem('studyroom_todos');
         if (t) state.todos = JSON.parse(t);
         const st = localStorage.getItem('studyroom_stats');
         if (st) state.stats = JSON.parse(st);
     } catch(e) {}
 }
-function saveSettings() { localStorage.setItem('studyroom_settings', JSON.stringify(state.settings)); }
+function saveSettings() {
+    state.settings._v = SETTINGS_VERSION;
+    localStorage.setItem('studyroom_settings', JSON.stringify(state.settings));
+    studySyncSettings();   // 设置变更 → 同步服务器
+}
 function saveTodos() { localStorage.setItem('studyroom_todos', JSON.stringify(state.todos)); }
 function saveStats() { localStorage.setItem('studyroom_stats', JSON.stringify(state.stats)); }
 
@@ -250,6 +258,7 @@ function handleComplete() {
     state.remainingSeconds = getModeSeconds(state.mode);
     state.totalSeconds = state.remainingSeconds;
     updateUI();
+    studySyncCycle();   // 周期进度变化 → 同步服务器（换设备续上）
     if (state.settings.autoStart) setTimeout(startTimer, 1000);
 }
 
@@ -352,19 +361,11 @@ function openSettings() {
 function closeSettings() {
     settingsModal.classList.remove('show');
 }
-// 声音弹窗（独立）：全屏/沉浸时从顶栏设置按钮展开，复用侧边栏白噪音控件
-function openSoundModal() {
-    if (volumeSliderModal) volumeSliderModal.value = state.settings.volume;
-    soundModal.classList.add('show');
-}
-function closeSoundModal() {
-    soundModal.classList.remove('show');
-}
 function saveSettingsFromModal() {
     state.settings.focus = Math.max(1, Math.min(120, parseInt(setFocus.value) || 25));
     state.settings.short = Math.max(1, Math.min(60, parseInt(setShort.value) || 5));
     state.settings.long = Math.max(1, Math.min(60, parseInt(setLong.value) || 15));
-    state.settings.interval = Math.max(2, Math.min(8, parseInt(setIntervalInput.value) || 4));
+    state.settings.interval = Math.max(1, Math.min(12, parseInt(setIntervalInput.value) || 4));
     state.settings.autoStart = setAutoStart.classList.contains('on');
     state.settings.stereo = setStereo.classList.contains('on');
     state.settings.progressMode = setProgressMode.classList.contains('on') ? 'remaining' : 'elapsed';
@@ -385,7 +386,7 @@ function saveSettingsFromModal() {
     }
     updateDots();
     closeSettings();
-    showToast('✅ 设置已保存');
+    showToast('设置已保存');
 }
 
 // ---------- 引用轮换 ----------
@@ -406,13 +407,10 @@ function bindEvents() {
     resetBtn.addEventListener('click', resetTimer);
     fullscreenBtn.addEventListener('click', toggleFullscreen);
     document.addEventListener('fullscreenchange', updateFullscreenBtn);
-    settingsBtn.addEventListener('click', openSoundModal);
+    settingsBtn.addEventListener('click', openSettings);
     modalCancel.addEventListener('click', closeSettings);
     modalSave.addEventListener('click', saveSettingsFromModal);
     settingsModal.addEventListener('click', e => { if (e.target === settingsModal) closeSettings(); });
-    soundModal.addEventListener('click', e => { if (e.target === soundModal) closeSoundModal(); });
-    soundModalClose.addEventListener('click', closeSoundModal);
-    soundModalSettings.addEventListener('click', () => { closeSoundModal(); openSettings(); });
     setAutoStart.addEventListener('click', () => setAutoStart.classList.toggle('on'));
     setStereo.addEventListener('click', () => setStereo.classList.toggle('on'));
     setProgressMode.addEventListener('click', () => setProgressMode.classList.toggle('on'));
@@ -448,18 +446,9 @@ function bindEvents() {
     }));
     volumeSlider.addEventListener('input', () => {
         state.settings.volume = parseInt(volumeSlider.value);
-        if (volumeSliderModal) volumeSliderModal.value = state.settings.volume;
         updateNoiseVolume();
         saveSettings();
     });
-    if (volumeSliderModal) {
-        volumeSliderModal.addEventListener('input', () => {
-            state.settings.volume = parseInt(volumeSliderModal.value);
-            volumeSlider.value = state.settings.volume;
-            updateNoiseVolume();
-            saveSettings();
-        });
-    }
 
     document.addEventListener('keydown', e => {
         if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') return;
@@ -478,6 +467,9 @@ function bindEvents() {
     studyLoadSummary();
     studyHeartbeat();
     setInterval(studyHeartbeat, 30000);
+
+    // ── 周期 & 设置：从服务器拉取（跨设备一致）──
+    studyLoadRemote();
 }
 
 // ---------- 初始化 ----------
@@ -595,6 +587,57 @@ async function studyRecord(minutes) {
         await studyFetch('/study/record', { method: 'POST', body: JSON.stringify({ minutes }) });
         studyLoadSummary();   // 刷新累计与 15 天图
     } catch (e) { /* 静默 */ }
+}
+
+// ── 周期 & 设置同步服务器（今日周期进度 + 时长设置，跨设备一致）──
+async function studySyncSettings() {
+    if (!studyToken()) return;
+    try {
+        await studyFetch('/study/settings', {
+            method: 'PUT',
+            body: JSON.stringify({
+                focus: state.settings.focus,
+                short: state.settings.short,
+                long: state.settings.long,
+                interval: state.settings.interval,
+            }),
+        });
+    } catch (e) { /* 静默：离线时下次再同步 */ }
+}
+
+async function studySyncCycle() {
+    if (!studyToken()) return;
+    try {
+        await studyFetch('/study/cycle', {
+            method: 'PUT',
+            body: JSON.stringify({ cycles: state.currentCycle, sessions: state.sessionsCompleted }),
+        });
+    } catch (e) { /* 静默 */ }
+}
+
+async function studyLoadRemote() {
+    if (!studyToken()) return;
+    try {
+        const d = await studyFetch('/study/settings');
+        if (!d) return;
+        // 服务器设置优先（跨设备一致），本地仅保留音量（不入服务器，纯设备级）
+        if (d.focus) state.settings.focus = d.focus;
+        if (d.short) state.settings.short = d.short;
+        if (d.long) state.settings.long = d.long;
+        if (d.interval) state.settings.interval = d.interval;
+        // 今日周期进度：服务器若已有今天的记录则采用（换设备续上）
+        if (d.cycle_date === getTodayKey()) {
+            state.currentCycle = d.cycles || 0;
+            state.sessionsCompleted = d.sessions || 0;
+        }
+        localStorage.setItem('studyroom_settings', JSON.stringify({ ...state.settings, _v: SETTINGS_VERSION }));
+        if (!state.isRunning && !state.isPaused) {
+            state.remainingSeconds = getModeSeconds(state.mode);
+            state.totalSeconds = state.remainingSeconds;
+        }
+        updateUI();
+        updateDots();
+    } catch (e) { /* 静默降级：离线直接用本地 */ }
 }
 
 init();

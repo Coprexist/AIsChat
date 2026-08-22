@@ -33,6 +33,22 @@
             </div>
         </header>
 
+    <!-- 固定声音条（始终可见：音色切换 + 音量，不藏进设置；全屏/沉浸时也直接可调） -->
+    <div class="sound-bar" id="sound-bar">
+        <span class="sound-bar-label">白噪音</span>
+        <div class="sound-row">
+            <button class="sound-btn" data-sound="rain">雨声</button>
+            <button class="sound-btn" data-sound="forest">森林</button>
+            <button class="sound-btn" data-sound="sea">海面</button>
+            <button class="sound-btn" data-sound="deep">深海</button>
+            <button class="sound-btn active" data-sound="off">静音</button>
+        </div>
+        <div class="volume-row">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/><path d="M15.54 8.46a5 5 0 0 1 0 7.07"/><path d="M19.07 4.93a10 10 0 0 1 0 14.14"/></svg>
+            <input type="range" class="volume-slider" id="volume-slider" min="0" max="100" value="30">
+        </div>
+    </div>
+
         <!-- 主内容 -->
         <div class="main">
             <!-- 计时器 -->
@@ -60,6 +76,7 @@
                     <span>今日周期</span>
                     <div class="dots" id="dots"></div>
                     <span id="cycle-count">0/4</span>
+                    <span class="cycle-help" title="每完成 N 个专注（可在设置中调整），进入一次长休息，然后开始新一轮。">?</span>
                 </div>
             </section>
 
@@ -77,24 +94,6 @@
                     </div>
                     <ul class="todo-list" id="todo-list"></ul>
                     <button class="todo-clear-btn" id="todo-clear-btn" style="display:none;">清除已完成</button>
-                </div>
-
-                <!-- 白噪音 -->
-                <div class="card">
-                    <h3>
-                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 18v-6a9 9 0 0 1 18 0v6"/><path d="M21 19a2 2 0 0 1-2 2h-1a2 2 0 0 1-2-2v-3a2 2 0 0 1 2-2h3zM3 19a2 2 0 0 0 2 2h1a2 2 0 0 0 2-2v-3a2 2 0 0 0-2-2H3z"/></svg>
-                        白噪音
-                    </h3>
-                    <div class="sound-grid">
-                        <button class="sound-btn" data-sound="rain">雨声</button>
-                        <button class="sound-btn" data-sound="forest">森林</button>
-                        <button class="sound-btn" data-sound="deep">深海</button>
-                        <button class="sound-btn active" data-sound="off">静音</button>
-                    </div>
-                    <div class="volume-row">
-                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/><path d="M15.54 8.46a5 5 0 0 1 0 7.07"/><path d="M19.07 4.93a10 10 0 0 1 0 14.14"/></svg>
-                        <input type="range" class="volume-slider" id="volume-slider" min="0" max="100" value="30">
-                    </div>
                 </div>
 
                 <!-- 统计 -->
@@ -144,7 +143,7 @@
         <footer class="footer" id="quote">"学如逆水行舟，不进则退。"</footer>
     </div>
 
-    <!-- 设置模态框 -->
+    <!-- 设置模态框（完整设置；白噪音已固定在主界面声音条） -->
     <div class="modal-overlay" id="settings-modal">
         <div class="modal">
             <h2>设置</h2>
@@ -162,7 +161,8 @@
             </div>
             <div class="form-group">
                 <label>长休息间隔（专注次数）</label>
-                <input type="number" id="set-interval" min="2" max="8" value="4">
+                <input type="number" id="set-interval" min="1" max="12" value="4">
+                <div class="form-hint">周期解释：每完成 N 个专注，进入一次长休息。例如 4 = 做满 4 个专注后休息 15 分钟，然后重新计一轮；改成 1 = 每次专注后都长休。可自由设 1~12。</div>
             </div>
             <div class="form-group toggle-row">
                 <span>自动开始下一个阶段</span>
@@ -183,30 +183,6 @@
             <div class="modal-actions">
                 <button class="btn btn-secondary" id="modal-cancel">取消</button>
                 <button class="btn btn-primary" id="modal-save">保存</button>
-            </div>
-        </div>
-    </div>
-
-    <!-- 声音弹窗（独立：全屏/沉浸时顶栏设置按钮展开，复用侧边栏白噪音控件） -->
-    <div class="modal-overlay" id="sound-modal">
-        <div class="modal">
-            <h2>声音</h2>
-            <div class="form-group">
-                <label>白噪音</label>
-                <div class="sound-row">
-                    <button class="sound-btn" data-sound="rain">雨声</button>
-                    <button class="sound-btn" data-sound="forest">森林</button>
-                    <button class="sound-btn" data-sound="deep">深海</button>
-                    <button class="sound-btn active" data-sound="off">静音</button>
-                </div>
-            </div>
-            <div class="form-group">
-                <label>音量</label>
-                <input type="range" class="volume-slider" id="volume-slider-modal" min="0" max="100" value="30">
-            </div>
-            <div class="modal-actions">
-                <button class="btn btn-secondary" id="sound-modal-close">关闭</button>
-                <button class="btn btn-primary" id="sound-modal-settings">完整设置</button>
             </div>
         </div>
     </div>

@@ -15,6 +15,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.database import get_db
 from app.utils.auth import get_current_user
 from app.models.study_record import StudyRecord
+from app.models.study_setting import StudySetting
 
 router = APIRouter(prefix="/study", tags=["自习室"])
 
@@ -32,6 +33,20 @@ def _prune_online() -> None:
 class RecordRequest(BaseModel):
     """学习时长上报（分钟，1~600）"""
     minutes: int = Field(1, ge=1, le=600)
+
+
+class SettingsRequest(BaseModel):
+    """番茄钟时长设置（focus/short/long/interval 跨设备同步）"""
+    focus: int = Field(25, ge=1, le=120)
+    short: int = Field(5, ge=1, le=60)
+    long: int = Field(15, ge=1, le=60)
+    interval: int = Field(4, ge=1, le=12)
+
+
+class CycleRequest(BaseModel):
+    """今日周期进度（换设备续上）"""
+    cycles: int = Field(0, ge=0, le=999)
+    sessions: int = Field(0, ge=0, le=99999)
 
 
 @router.post("/heartbeat")
@@ -109,3 +124,69 @@ async def summary(
         "days": days,
         "online_count": len(online_ids),
     }
+
+
+async def _get_or_create_setting(db: AsyncSession, uid: int) -> StudySetting:
+    """取用户状态行，不存在则建默认行。"""
+    row = (await db.execute(
+        select(StudySetting).where(StudySetting.user_id == uid),
+    )).scalar_one_or_none()
+    if row is None:
+        row = StudySetting(user_id=uid)
+        db.add(row)
+        await db.commit()
+        await db.refresh(row)
+    return row
+
+
+@router.get("/settings")
+async def get_settings(
+    current_user: dict = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """拉取用户的番茄钟设置 + 今日周期进度（跨设备同步用）。"""
+    row = await _get_or_create_setting(db, current_user["user_id"])
+    return {
+        "focus": row.focus,
+        "short": row.short,
+        "long": row.long,
+        "interval": row.interval,
+        "cycle_date": row.cycle_date,
+        "cycles": row.cycles,
+        "sessions": row.sessions,
+    }
+
+
+@router.put("/settings")
+async def put_settings(
+    req: SettingsRequest,
+    current_user: dict = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """保存番茄钟时长设置。"""
+    row = await _get_or_create_setting(db, current_user["user_id"])
+    row.focus = req.focus
+    row.short = req.short
+    row.long = req.long
+    row.interval = req.interval
+    await db.commit()
+    return {"ok": True}
+
+
+@router.put("/cycle")
+async def put_cycle(
+    req: CycleRequest,
+    current_user: dict = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """保存今日周期进度（跨设备续上；跨天自动清零）。"""
+    row = await _get_or_create_setting(db, current_user["user_id"])
+    today = date.today().isoformat()
+    if row.cycle_date != today:
+        row.cycle_date = today
+        row.cycles = 0
+        row.sessions = 0
+    row.cycles = req.cycles
+    row.sessions = req.sessions
+    await db.commit()
+    return {"ok": True, "cycle_date": today, "cycles": row.cycles, "sessions": row.sessions}

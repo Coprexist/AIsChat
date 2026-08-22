@@ -24,7 +24,7 @@ const SWAP_LEAD = 2;      // 额外余量（秒）：切换时旧声源至少还
 const SWAP_JITTER = 1;    // 每层 ±1s 随机错峰（秒）
 
 // ── 层配置：每个音色由若干声源层组成，az = 方位角（弧度，0=正前，+右 -左）──
-// drift: 声源方位随机漂移（浪花/水滴在声场中缓缓移动）
+// drift: 声源方位随机漂移（浪花/气泡在声场中缓缓移动）
 const LAYER_DEFS = {
     rain: [
         { key: 'rainbed', az: -0.7 },
@@ -36,9 +36,13 @@ const LAYER_DEFS = {
         { key: 'pink', az: 0 },
         { key: 'leaf', az: 0.8 },
     ],
-    deep: [
+    sea: [                       // 海面：涌动 + 浪花（原"深海"改名）
         { key: 'swell', az: 0 },
         { key: 'foam', drift: true },
+    ],
+    deep: [                      // 深海（水下）：低频水压底噪 + 气泡咕噜噜
+        { key: 'abyss', az: 0 },
+        { key: 'bubble', drift: true },
     ],
 };
 
@@ -74,11 +78,14 @@ function makeLayerBuffer(ctx, key) {
     const leafLo = S(lp(1500));                       // 叶沙低通
     const swellLo = S(lp(450));                       // 涌动低通
     const foamHi = S(lp(2500)), foamLo = S(lp(1500)); // 浪花带通
+    const abyssLo = S(lp(140));                       // 深海低频水压（极低通）
 
     let brown = 0;
     let k0 = 0, k1 = 0, k2 = 0, k3 = 0, k4 = 0, k5 = 0, k6 = 0;
     // 水滴脉冲状态
     let dropNext = 0, dropPhase = 0, dropDur = 0, dropEnv = 0;
+    // 深海气泡状态：成串出现（一串 1~4 个），单个气泡是短促扫频啁啾
+    let bubNext = 0.3, bubRemain = 0, bubPhase = 0, bubF0 = 0, bubF1 = 0, bubAmp = 0, bubT = 0;
     // 幅度包络状态（森林/浪花：随机游走，无固定周期——自然起伏而非规律涨落）
     let env = 0.6, envTarget = 0.6, envNext = 0;
     // 深海涌动 LFO（唯一保留正弦：慢涌 0.035Hz ≈28s 一周期，潮汐感更缓更隐）
@@ -134,6 +141,35 @@ function makeLayerBuffer(ctx, key) {
             s = swellLo.lp(brown) * 3.6 * lfo;
         } else if (key === 'foam') {
             s = (foamHi.lp(w) - foamLo.lp(w)) * 1.1 * walkEnv(i);
+        } else if (key === 'abyss') {
+            // 深海低频水压底噪：棕色噪声 → 140Hz 极低通，恒定、无起伏（水下压力感）
+            s = abyssLo.lp(brown) * 5.0;
+        } else if (key === 'bubble') {
+            // 气泡咕噜噜（参考水下氛围素材）：一串 1~4 个，随机间隔 0.25~2s；
+            // 单个气泡 = 短促扫频啁啾（频率从 f0 快速上滑到 f1，模拟气泡上升时
+            // 共振频率升高），包络快速起落，幅度随机
+            bubNext -= 1 / rate;
+            if (bubNext <= 0) {
+                bubRemain = 1 + Math.floor(Math.random() * 4);
+                bubNext = 0.25 + Math.random() * 1.75;
+            }
+            if (bubRemain > 0) {
+                bubPhase -= 1 / rate;
+                if (bubPhase <= 0) {
+                    bubF0 = 280 + Math.random() * 420;              // 起始频率 280~700Hz
+                    bubF1 = bubF0 * (2.0 + Math.random() * 1.5);    // 上滑到 2~3.5 倍
+                    bubAmp = 0.5 + Math.random() * 0.7;             // 幅度
+                    bubT = 0;
+                    bubPhase = 0.04 + Math.random() * 0.06;         // 单气泡时长 40~100ms
+                    bubRemain--;
+                } else if (bubT < bubPhase) {
+                    const p = bubT / bubPhase;
+                    const f = bubF0 + (bubF1 - bubF0) * p;
+                    const env = Math.sin(Math.PI * Math.min(1, p)); // 起落包络（两端 0）
+                    s = Math.sin(2 * Math.PI * f * bubT) * env * bubAmp * 0.5;
+                    bubT += 1 / rate;
+                }
+            }
         }
         data[i] = s;
     }
@@ -205,18 +241,30 @@ function scheduleLayerSwap(ly) {
     }, delay);
 }
 
+// 等功率交叉淡化曲线（sin/cos）：两段不相关噪声线性交叉（各 0.5 时功率 = 0.25+0.25 = 0.5）
+// 会在中间塌陷 -3dB——用户听到的"每 20 秒左右音量骤降 0.几秒"就是这个。
+// 等功率用 cos(θ) 淡出 + sin(θ) 淡入：cos²+sin²=1，任意时刻总功率恒定，听感无缝。
+const FADE_CURVE_LEN = 128;
+const EQ_FADE_OUT = new Float32Array(FADE_CURVE_LEN);
+const EQ_FADE_IN = new Float32Array(FADE_CURVE_LEN);
+for (let i = 0; i < FADE_CURVE_LEN; i++) {
+    const th = (i / (FADE_CURVE_LEN - 1)) * (Math.PI / 2);
+    EQ_FADE_OUT[i] = Math.cos(th);
+    EQ_FADE_IN[i] = Math.sin(th);
+}
+
 function swapLayer(ly) {
     const t = audioCtx.currentTime + 0.02;
     const next = 1 - ly.active;
     ly.gains[ly.active].gain.cancelScheduledValues(t);
     ly.gains[ly.active].gain.setValueAtTime(Math.max(ly.gains[ly.active].gain.value, 0.0001), t);
-    ly.gains[ly.active].gain.linearRampToValueAtTime(0, t + FADE);
+    ly.gains[ly.active].gain.setValueCurveAtTime(EQ_FADE_OUT, t, FADE);
     try { ly.srcs[next].stop(); } catch (e) {}
     try { ly.srcs[next].disconnect(); } catch (e) {}
     ly.srcs[next] = makeSource(ly.bufs[next], ly.gains[next], ly.panner);
     ly.gains[next].gain.cancelScheduledValues(t);
     ly.gains[next].gain.setValueAtTime(0, t);
-    ly.gains[next].gain.linearRampToValueAtTime(1, t + FADE);
+    ly.gains[next].gain.setValueCurveAtTime(EQ_FADE_IN, t, FADE);
     ly.active = next;
 }
 
@@ -274,10 +322,10 @@ async function startNoise(type) {
 
     const stereo = state.settings.stereo !== false;
 
-    // 总音量节点（deep 后接高潮包络）
+    // 总音量节点（海面后接高潮包络——浪涌来了又走；深海恒定水压，不挂包络）
     masterGain = audioCtx.createGain();
     masterGain.gain.value = state.settings.volume / 100;
-    if (type === 'deep') {
+    if (type === 'sea') {
         swellGain = audioCtx.createGain();
         swellGain.gain.value = 1;
         masterGain.connect(swellGain);

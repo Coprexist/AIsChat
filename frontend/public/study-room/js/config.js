@@ -33,8 +33,11 @@ const DEFAULT_SETTINGS = {
     volume: 30,
     autoStart: false,
     stereo: true,
-    progressMode: 'elapsed'   // elapsed=已过时间填充 | remaining=剩余时间递减
+    progressMode: 'remaining',   // elapsed=已过时间填充 | remaining=剩余时间递减（默认）
+    capStyle: 'butt'             // round=圆形端口 | butt=平直精确端口（默认）
 };
+// 设置存档版本：旧版存档（无版本号/版本过低）→ 启动时丢弃、采用新默认
+const SETTINGS_VERSION = 2;
 
 const MODES = {
     focus: { label: '专注', status: '专注中...' },
