@@ -308,7 +308,7 @@ async def _start_browser_service() -> None:
         from app.services.infrastructure.plugin_registry import PluginRegistry
         plugin = PluginRegistry.get("browser")
         if plugin is None:
-            logger.warning("[WARN] Browser 插件未注册，browser 命令将不可用")
+            logger.warning("Browser 插件未注册，browser 命令将不可用")
             return
         status = await plugin.get_status()
         if status.get("running"):
@@ -318,7 +318,7 @@ async def _start_browser_service() -> None:
         if ok:
             logger.info("[OK] Chromium CDP 已启动，所有 AI 共用")
         else:
-            logger.warning("[WARN] Chromium CDP 启动失败，browser 命令将不可用")
+            logger.warning("Chromium CDP 启动失败，browser 命令将不可用")
     except Exception as e:
         logger.warning(f"[WARN] 浏览器服务启动失败（非致命）: {e}", exc_info=True)
 

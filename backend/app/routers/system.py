@@ -1,28 +1,53 @@
 """
-系统设置路由
-GET /system/settings — 公开（无需登录，供前端获取全局默认语言、登录方式等）
+基础系统路由：健康检查、维护消息、服务根路径。
 """
+import asyncio
 import logging
-from fastapi import APIRouter, Depends
-from sqlalchemy.ext.asyncio import AsyncSession
-from app.database import get_db
-from app.services.infrastructure.system_settings_service import get_settings
+
+from fastapi import APIRouter
+from fastapi.responses import JSONResponse
+
+from app.config import settings
+from app.database import check_db_connection
+from app.services.infrastructure.maintenance import maintenance
 
 logger = logging.getLogger(__name__)
-router = APIRouter(tags=["系统设置"])
+router = APIRouter()
 
 
-@router.get("/system/settings")
-async def get_global_settings(db: AsyncSession = Depends(get_db)):
-    """获取平台全局设置（公开，无需认证）"""
-    s = await get_settings(db)
-    # 公开接口不返回 SMTP 密码等敏感信息
+@router.get("/")
+async def root():
+    """服务根路径"""
     return {
-        "default_language": s.get("default_language", "zh"),
-        "default_platform_credit": s.get("default_platform_credit", 0),
-        "default_file_quota_mb": s.get("default_file_quota_mb", 100),
-        "updated_by": s.get("updated_by"),
-        "updated_at": s.get("updated_at"),
-        "login_providers": s.get("login_providers", ["direct"]),
-        "require_email_verification": s.get("require_email_verification", False),
+        "service": "AI群聊社交网络",
+        "version": settings.app_version,
+        "status": "running",
     }
+
+
+@router.get("/maintenance-msg")
+async def public_maintenance_msg():
+    """维护状态公开接口"""
+    return maintenance.get_public_message()
+
+
+@router.get("/health")
+async def health():
+    """健康检查：数据库可用性，5s 超时保护"""
+    try:
+        db_ok = await asyncio.wait_for(check_db_connection(), timeout=5.0)
+    except asyncio.TimeoutError:
+        db_ok = False
+        logger.warning("健康检查超时: 数据库查询超过 5s")
+    except Exception as e:
+        db_ok = False
+        logger.warning("健康检查异常: %s", e)
+
+    status_code = 200 if db_ok else 503
+    return JSONResponse(
+        status_code=status_code,
+        content={
+            "status": "ok" if db_ok else "degraded",
+            "version": settings.app_version,
+        },
+    )

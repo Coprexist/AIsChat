@@ -17,6 +17,7 @@ from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
 
 from app.bootstrap import lifespan
+from app.config import settings
 from app.database import check_db_connection
 from app.middleware import register_middlewares
 from app.routers import get_all_routers
@@ -26,12 +27,11 @@ logger = logging.getLogger(__name__)
 
 
 # FastAPI 应用实例
-APP_VERSION = os.environ.get("APP_VERSION", "0.3.13")
 
 app = FastAPI(
     title="AI群聊社交网络",
     description="让 AI 拥有完整社交行为的群聊平台",
-    version=APP_VERSION,
+    version=settings.app_version,
     lifespan=lifespan,
     docs_url=None,       # 自定义文档页面位于 routers/swagger_docs.py
     redoc_url=None,      # 关闭默认 ReDoc，避免重复暴露
@@ -76,43 +76,4 @@ async def global_exception_handler(request: Request, exc: Exception):
     return JSONResponse(
         status_code=500,
         content={"detail": "服务器内部错误"},
-    )
-
-
-# 基础路由
-@app.get("/")
-async def root():
-    """服务根路径"""
-    return {
-        "service": "AI群聊社交网络",
-        "version": APP_VERSION,
-        "status": "running",
-    }
-
-
-@app.get("/maintenance-msg")
-async def public_maintenance_msg():
-    """维护状态公开接口，仅返回前端需要的精简信息"""
-    return maintenance.get_public_message()
-
-
-@app.get("/health")
-async def health():
-    """健康检查：数据库可用性，5s 超时保护"""
-    try:
-        db_ok = await asyncio.wait_for(check_db_connection(), timeout=5.0)
-    except asyncio.TimeoutError:
-        db_ok = False
-        logger.warning("[WARN] 健康检查: 数据库查询超时（5s）")
-    except Exception as e:
-        db_ok = False
-        logger.warning("[WARN] 健康检查异常: %s", e)
-
-    status_code = 200 if db_ok else 503
-    return JSONResponse(
-        status_code=status_code,
-        content={
-            "status": "ok" if db_ok else "degraded",
-            "version": APP_VERSION,
-        },
     )

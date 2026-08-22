@@ -17,6 +17,9 @@ logger = logging.getLogger(__name__)
 class Settings(BaseSettings):
     """全局应用配置 — 所有字段由 pydantic-settings 自动从环境变量读取"""
 
+    # ── 应用版本（可从环境变量 APP_VERSION 注入，默认 0.3.13）──
+    app_version: str = "0.3.13"
+
     # ── 数据库 ──
     db_backend: str = "postgres"
     sqlite_db_path: str = "./data/aischat.db"
