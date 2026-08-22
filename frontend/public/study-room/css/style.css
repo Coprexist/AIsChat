@@ -556,16 +556,17 @@ body {
     /* 按钮：收窄适配单列 */
     .controls .btn { min-width: 116px; padding: 9px 18px; }
 
-    /* 侧栏：小屏改为纵向堆叠（卡片上下排），避免横滚裁切按钮；main 里已可纵向滚动 */
+    /* 侧栏：小屏一字排开横向滚动（矮条），不占垂直空间——timer-card 保持大 */
     .sidebar {
         width: 100%;
-        flex-direction: column;
-        overflow-y: auto;
-        overflow-x: hidden;
-        flex: 0 0 auto;          /* 不抢占：按内容高度排，main 整体滚动 */
-        max-height: 45vh;        /* 上限：圆环卡仍占据主要屏幕 */
+        flex-direction: row;
+        overflow-x: auto;
+        overflow-y: hidden;
+        flex: 0 0 auto;
     }
-    .sidebar .card { min-width: 0; flex: none; width: 100%; }
+    .sidebar .card { min-width: 220px; flex: 1; }
+    /* 侧栏卡片收矮：待办列表限高，整条侧栏更矮，给计时卡让出高度 */
+    .sidebar .todo-list { max-height: 96px; }
 
     .footer { font-size: 0.78rem; }
 }
