@@ -402,9 +402,10 @@ async function startNoise(type) {
     layers = LAYER_DEFS[type].map((def) => {
         const ly = createLayer(def);
         if (!stereo) {
-            placePanner(ly.panner, 0);   // 单声道：全部居中
-        } else if (def.drift) {
-            scheduleDrift(ly);           // 漂移层：HRTF 方位连续渐变游走
+            placePanner(ly.panner, 0);      // 单声道：全部居中
+        } else {
+            placePanner(ly.panner, ly.az);  // 立体声：立即摆到初始方位（固定层到位、漂移层从起点开始）
+            if (def.drift) scheduleDrift(ly); // 漂移层：后续在此基础上缓慢游走
         }
         scheduleLayerSwap(ly);           // 每层独立切换（随机错峰）
         return ly;
