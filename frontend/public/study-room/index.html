@@ -42,8 +42,16 @@
                     <button class="mode-tab" data-mode="short">短休</button>
                     <button class="mode-tab" data-mode="long">长休</button>
                 </div>
-                <div class="time-display" id="time-display">25:00</div>
-                <div class="status-text" id="status-text">准备开始</div>
+                <div class="time-ring">
+                    <svg viewBox="0 0 200 200" class="ring-svg">
+                        <circle class="ring-bg" cx="100" cy="100" r="88"></circle>
+                        <circle class="ring-fg" id="progress-ring" cx="100" cy="100" r="88"></circle>
+                    </svg>
+                    <div class="ring-center">
+                        <div class="time-display" id="time-display">25:00</div>
+                        <div class="status-text" id="status-text">准备开始</div>
+                    </div>
+                </div>
                 <div class="controls">
                     <button class="btn btn-primary" id="start-btn">开始专注</button>
                     <button class="btn btn-secondary" id="reset-btn">重置</button>
@@ -109,6 +117,19 @@
                             <div class="stat-label">连续</div>
                         </div>
                     </div>
+                    <div class="study-meta">
+                        <div class="study-meta-row"><span>👥 在线同学</span><b id="stat-online">—</b></div>
+                        <div class="study-meta-row"><span>📈 累计学习</span><b id="stat-total">—</b></div>
+                    </div>
+                </div>
+
+                <!-- 近 15 天 -->
+                <div class="card">
+                    <h3>
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4M8 2v4M3 10h18"/></svg>
+                        近 15 天
+                    </h3>
+                    <div class="chart" id="study-chart"><div class="chart-hint">登录后可见</div></div>
                 </div>
             </aside>
         </div>
@@ -148,6 +169,30 @@
             <div class="modal-actions">
                 <button class="btn btn-secondary" id="modal-cancel">取消</button>
                 <button class="btn btn-primary" id="modal-save">保存</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- 声音弹窗（独立：全屏/沉浸时顶栏设置按钮展开，复用侧边栏白噪音控件） -->
+    <div class="modal-overlay" id="sound-modal">
+        <div class="modal">
+            <h2>声音</h2>
+            <div class="form-group">
+                <label>白噪音</label>
+                <div class="sound-row">
+                    <button class="sound-btn" data-sound="rain">🌧 雨声</button>
+                    <button class="sound-btn" data-sound="forest">🌲 森林</button>
+                    <button class="sound-btn" data-sound="deep">🌊 深海</button>
+                    <button class="sound-btn active" data-sound="off">静音</button>
+                </div>
+            </div>
+            <div class="form-group">
+                <label>音量</label>
+                <input type="range" class="volume-slider" id="volume-slider-modal" min="0" max="100" value="30">
+            </div>
+            <div class="modal-actions">
+                <button class="btn btn-secondary" id="sound-modal-close">关闭</button>
+                <button class="btn btn-primary" id="sound-modal-settings">完整设置</button>
             </div>
         </div>
     </div>
