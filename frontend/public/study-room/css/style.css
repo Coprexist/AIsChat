@@ -392,6 +392,7 @@ body {
     height: min(260px, 52vw);
     margin: 12px auto;
     flex-shrink: 0;
+    container-type: inline-size;   /* 容器查询：内部 cqw 单位跟随圆环宽度等比缩放 */
 }
 .ring-svg { position: absolute; inset: 0; width: 100%; height: 100%; }  /* 弧线 d 起点在顶部，无需旋转 */
 .ring-bg { fill: none; stroke: var(--border); stroke-width: 1.8; }
@@ -414,7 +415,11 @@ body {
     text-align: center;
     pointer-events: none;
 }
-.ring-center .time-display { font-size: clamp(2.3rem, 6vw, 3.6rem); }
+/* 时间文字：cqw 相对圆环宽度等比缩放（23% 圆环宽）——任何断点/尺寸下比例恒定统一 */
+.ring-center .time-display {
+    font-size: 23cqw;
+    line-height: 1;
+}
 
 /* 设置弹窗 */
 .form-hint {
@@ -543,14 +548,13 @@ body {
     .sound-bar .volume-row { width: 100%; }
 
     /* 圆环与文字：小屏圆环可收缩（flex-shrink:1）让位，保证按钮/周期全部可见；
-       尺寸更小（48vw），字随 vw 流式缩放 */
+       字体用 cqw 已自动等比，无需单独设置 */
     .time-ring {
         width: min(210px, 48vw);
         height: min(210px, 48vw);
         margin: 8px auto;
         flex-shrink: 1;          /* 空间不足时圆环先收缩，不让内容被挤走 */
     }
-    .ring-center .time-display { font-size: clamp(1.5rem, 8vw, 2.8rem); }
     .ring-center .status-text { font-size: 0.75rem; }
     .mode-tab { padding: 5px 14px; font-size: 0.85rem; }
 
@@ -577,7 +581,6 @@ body {
 /* 超窄屏（小尺寸竖屏手机，≤420px）：进一步收细 */
 @media (max-width: 420px) {
     .time-ring { width: min(180px, 52vw); height: min(180px, 52vw); flex-shrink: 1; }
-    .ring-center .time-display { font-size: clamp(1.3rem, 9vw, 2.2rem); }
     .controls .btn { min-width: 104px; padding: 8px 14px; font-size: 0.88rem; }
     .sound-bar .sound-btn { font-size: 0.72rem; padding: 6px 4px; }
     .brand span { font-size: 1.05rem; }
