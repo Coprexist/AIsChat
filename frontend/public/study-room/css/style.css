@@ -97,6 +97,11 @@ body {
 .timer-col .sound-bar { width: 100%; }
 .timer-col .timer-card { flex: 1; min-height: 0; }
 
+/* 内容体（桌面默认展开显示；小屏 media 内切换为折叠 grid） */
+.acc-body { display: contents; }
+/* 手风琴标题：仅小屏显示，桌面隐藏 */
+.acc-head { display: none; }
+
 /* 计时器卡片 */
 .timer-card {
     flex: 1;
@@ -574,7 +579,7 @@ body {
     }
     .sidebar .card { min-width: 0; width: 100%; }
 
-    /* ── 手风琴：计时卡 + 侧栏 3 卡统一 ── */
+    /* ── 手风琴：计时卡 + 侧栏 3 卡统一，grid 0fr→1fr 平滑展开 ── */
     .acc-head {
         display: flex;
         align-items: center;
@@ -598,19 +603,21 @@ body {
         color: var(--text-muted);
         transition: transform 0.2s;
     }
-    /* 默认折叠：标题外内容隐藏 */
-    .timer-card > :not(.acc-head),
-    .sidebar .card > :not(.acc-head) { display: none; }
-    /* 展开态：计时卡默认展开，侧栏卡点击展开 */
-    .timer-card.acc-open > :not(.acc-head),
-    .sidebar .card.acc-open > :not(.acc-head) { display: block; }
-    .timer-card.acc-open > .acc-head,
-    .sidebar .card.acc-open > .acc-head { margin-bottom: 12px; }
-    .timer-card.acc-open .acc-head::after,
-    .sidebar .card.acc-open .acc-head::after { content: '－'; }
-    .timer-card.acc-open .acc-head { color: var(--blue); }
-    /* 折叠状态保持卡片观感 */
-    .timer-card, .sidebar .card { flex-shrink: 0; }
+    /* 内容体：grid 行折叠动画（0fr→1fr），display 始终保留（不破坏内部 flex 布局） */
+    .acc-body {
+        display: grid;
+        grid-template-rows: 0fr;
+        transition: grid-template-rows 0.35s ease;
+    }
+    .acc-inner { overflow: hidden; min-height: 0; }
+    .acc-open > .acc-body { grid-template-rows: 1fr; }
+    .acc-open > .acc-head::after { content: '－'; }
+    .acc-open > .acc-head { color: var(--blue); }
+    /* 展开时恢复卡片内部纵向排布 */
+    .timer-card.acc-open > .acc-body > .acc-inner,
+    .sidebar .card.acc-open > .acc-body > .acc-inner { display: flex; flex-direction: column; gap: 12px; }
+    .timer-card.acc-open > .acc-body > .acc-inner { align-items: center; }
+    .sidebar .card.acc-open > .acc-body > .acc-inner { align-items: stretch; }
 
     /* 待办列表限高（展开时内部滚动） */
     .sidebar .todo-list { max-height: 160px; }

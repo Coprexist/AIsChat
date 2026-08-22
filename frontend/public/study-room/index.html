@@ -59,6 +59,7 @@
                     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="13" r="8"/><path d="M12 9v4l2.5 2.5"/><path d="M9 2h6"/></svg>
                     计时器
                 </div>
+                <div class="acc-body"><div class="acc-inner">
                 <div class="mode-tabs">
                     <button class="mode-tab active" data-mode="focus">专注</button>
                     <button class="mode-tab" data-mode="short">短休</button>
@@ -84,6 +85,7 @@
                     <span id="cycle-count">0/4</span>
                     <span class="cycle-help" title="每完成 N 个专注（可在设置中调整），进入一次长休息，然后开始新一轮。">?</span>
                 </div>
+                </div></div>
             </section>
             </div><!-- /timer-col -->
 
@@ -95,12 +97,14 @@
                         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg>
                         待办事项 <span id="todo-count">0</span>
                     </h3>
+                    <div class="acc-body"><div class="acc-inner">
                     <div class="todo-input-row">
                         <input type="text" class="todo-input" id="todo-input" placeholder="添加任务..." maxlength="200">
                         <button class="todo-add-btn" id="todo-add-btn">添加</button>
                     </div>
                     <ul class="todo-list" id="todo-list"></ul>
                     <button class="todo-clear-btn" id="todo-clear-btn" style="display:none;">清除已完成</button>
+                    </div></div>
                 </div>
 
                 <!-- 统计 -->
@@ -109,6 +113,7 @@
                         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 20V10M12 20V4M6 20v-6"/></svg>
                         今日统计
                     </h3>
+                    <div class="acc-body"><div class="acc-inner">
                     <div class="stats-grid">
                         <div class="stat-item">
                             <div class="stat-value" id="stat-sessions">0</div>
@@ -133,6 +138,7 @@
                             <div class="stat-label">累计学习</div>
                         </div>
                     </div>
+                    </div></div>
                 </div>
 
                 <!-- 近 15 天 -->
@@ -141,7 +147,9 @@
                         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4M8 2v4M3 10h18"/></svg>
                         近 15 天
                     </h3>
+                    <div class="acc-body"><div class="acc-inner">
                     <div class="chart" id="study-chart"><div class="chart-hint">登录后可见</div></div>
+                    </div></div>
                 </div>
             </aside>
         </div>
