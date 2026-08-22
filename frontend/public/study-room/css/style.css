@@ -611,8 +611,10 @@ body {
         color: var(--text-muted);
         transition: transform 0.2s;
     }
-    /* 内容体：max-height 0→大值 平滑展开，display 保留（不破坏内部 flex） */
+    /* 内容体：display:block 覆盖桌面全局的 contents（contents 下 max-height 无效导致全展开）！
+       max-height 0→大值 平滑展开 */
     .acc-body {
+        display: block;
         max-height: 0;
         overflow: hidden;
         transition: max-height 0.35s ease;
