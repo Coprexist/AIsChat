@@ -33,10 +33,11 @@ const LAYER_DEFS = {
         { key: 'dropsFar', drift: true },    // 远处噼啪：密集轻柔，中频（空气衰减高频）
         { key: 'dripGutter', az: 0.4 },      // 房檐滴水：慢速、短促中低频"嗒"
     ],
-    drizzle: [                   // 细雨：轻雨幕 + 稀疏滴答（无噼啪层/无房檐滴水）
+    drizzle: [                   // 细雨：连续沙沙雨幕 + 近清晰滴答 + 远轻柔噼啪（层次）
         { key: 'rainbed', az: -0.7, light: true },
         { key: 'rainbed', az: 0.7, light: true },
-        { key: 'dropsNear', drift: true, light: true },
+        { key: 'dropsNear', drift: true, light: true },   // 近处滴答：清晰可辨
+        { key: 'dropsFar', drift: true, light: true },    // 远处噼啪：轻柔密集颗粒底
     ],
     forest: [                    // 森林：以风声为主（左右两层立体风 + 粉噪 + 叶沙点缀）
         { key: 'wind', az: -0.8 },
@@ -142,7 +143,7 @@ function makeLayerBuffer(ctx, key, def) {
             // 叠加明显的缓慢起伏（真实雨幕能量变异 0.46~0.5：一阵一阵的波动感）；
             // 细雨（light）= 更轻更柔；暴雨 = 更厚
             const light = def && def.light;
-            const bw = light ? 0.5 : 1.0;   // 带宽/厚度
+            const bw = light ? 0.42 : 1.0;   // 带宽/厚度（细雨稍降，给雨点让位）
             // 雨幕独立起伏：目标幅度 0.55~1.15、每 5~10s 换一次（比森林呼吸更明显）
             rainNext -= 1 / rate;
             if (rainNext <= 0) {
@@ -162,15 +163,14 @@ function makeLayerBuffer(ctx, key, def) {
                 // 强度对数正态（远近层次）、活跃池允许偶尔重叠
                 dropNext -= 1 / rate;
                 if (dropNext <= 0) {
-                    // 对数正态间隔：中位约 0.18s，跨度 0.05~0.8s
-                    dropNext = Math.exp(Math.log(0.18) + (Math.random() * 2 - 1) * 1.1);
-                    dropNext = Math.max(0.05, Math.min(0.8, dropNext));
+                    // 近处滴答：10~25 滴/秒（清晰可辨，不是点缀）
+                    dropNext = 0.035 + Math.random() * 0.065;
                     if (lightDrops.length < 4) {
-                        // 单滴时长：短促噪声瞬态 15~60ms（无音高、无长尾，像"哒"不是"叮"）
-                        const dur = 0.015 + Math.random() * 0.045;
-                        // 强度：对数正态（远近距离层次）
-                        const amp = Math.max(0.06, Math.min(0.6,
-                            Math.exp(Math.log(0.16) + (Math.random() * 2 - 1) * 0.7)));
+                        // 单滴时长：短促噪声瞬态 12~45ms（无音高，像"哒"不是"叮"）
+                        const dur = 0.012 + Math.random() * 0.033;
+                        // 强度：明显凸出雨幕（近处响亮），带远近层次
+                        const amp = Math.max(0.22, Math.min(0.6,
+                            Math.exp(Math.log(0.34) + (Math.random() * 2 - 1) * 0.5)));
                         lightDrops.push({
                             f: 900 + Math.random() * 2000,       // 0.9~2.9kHz（中频为主）
                             amp,
@@ -205,18 +205,34 @@ function makeLayerBuffer(ctx, key, def) {
                 }
             }
         } else if (key === 'dropsFar') {
-            // 远处噼啪：密集轻柔中频脉冲，40~120 滴/秒，幅度小（远），
-            // 高频被空气吸收 → 中频带通——"噼噼啪啪"的颗粒底
-            farNext -= 1 / rate;
-            if (farNext <= 0) {
-                farDur = 0.001 + Math.random() * 0.0025;      // 1~3.5ms
-                farPhase = farDur;
-                farEnv = 0.05 + Math.random() * 0.07;         // 轻柔（远）
-                farNext = 0.008 + Math.random() * 0.017;      // 40~120 滴/秒
-            }
-            if (farPhase > 0) {
-                s = (farHi.lp(w) - farLo.lp(w)) * Math.exp(-(farDur - farPhase) * 800) * farEnv;
-                farPhase -= 1 / rate;
+            const farLight = def && def.light;
+            if (farLight) {
+                // 细雨远噼啪：轻柔密集颗粒底，25~70 滴/秒，幅度小（远），
+                // 与近处清晰滴答形成远近层次
+                farNext -= 1 / rate;
+                if (farNext <= 0) {
+                    farDur = 0.001 + Math.random() * 0.002;      // 1~3ms
+                    farPhase = farDur;
+                    farEnv = 0.04 + Math.random() * 0.05;        // 轻柔
+                    farNext = 0.014 + Math.random() * 0.026;     // 25~70 滴/秒
+                }
+                if (farPhase > 0) {
+                    s = (farHi.lp(w) - farLo.lp(w)) * Math.exp(-(farDur - farPhase) * 800) * farEnv;
+                    farPhase -= 1 / rate;
+                }
+            } else {
+                // 暴雨远噼啪：密集轻柔中频脉冲，40~120 滴/秒
+                farNext -= 1 / rate;
+                if (farNext <= 0) {
+                    farDur = 0.001 + Math.random() * 0.0025;      // 1~3.5ms
+                    farPhase = farDur;
+                    farEnv = 0.05 + Math.random() * 0.07;         // 轻柔（远）
+                    farNext = 0.008 + Math.random() * 0.017;      // 40~120 滴/秒
+                }
+                if (farPhase > 0) {
+                    s = (farHi.lp(w) - farLo.lp(w)) * Math.exp(-(farDur - farPhase) * 800) * farEnv;
+                    farPhase -= 1 / rate;
+                }
             }
         } else if (key === 'dripGutter') {
             // 房檐滴水：慢速（0.5~1.5s 一滴）、短促"嗒"——中低频噪声脉冲，
