@@ -42,8 +42,8 @@ const LAYER_DEFS = {
     ],
     deep: [                      // 深海（水下）：低频水压底噪 + 气泡咕噜噜
         { key: 'abyss', az: 0 },
-        { key: 'bubble', drift: true },
-        { key: 'bubble', drift: true, quiet: true },   // 小声的远层气泡群（背景层次）
+        { key: 'bubble', drift: true },                          // 主气泡组：声场中游走
+        { key: 'bubble', az: -0.8, quiet: true },                // 小声远层组：固定左远侧，与主组分声道
     ],
 };
 
@@ -156,10 +156,12 @@ function makeLayerBuffer(ctx, key, def) {
             const quiet = def && def.quiet;
             const ampScale = (quiet ? 0.12 : 0.3) * BUBBLE_VOLUME;
             const maxConc = quiet ? 3 : 4;
+            // 串内触发间隔：以 > 气泡时长（0.16~0.32s）为主 → 多数气泡一前一后，
+            // 少数间隔较短时偶尔重叠；不用短间隔全重叠
+            const inSerGap = quiet ? 0.3 + Math.pow(Math.random(), 2) * 0.4   // 0.3~0.7s
+                                   : 0.24 + Math.pow(Math.random(), 2) * 0.36; // 0.24~0.6s
             const serGap = quiet ? 1.4 + Math.pow(Math.random(), 2) * 4.5
                                  : 1.2 + Math.pow(Math.random(), 2) * 4;   // 串间隔
-            const inSerGap = quiet ? 0.1 + Math.random() * 0.25
-                                   : 0.08 + Math.random() * 0.2;           // 串内触发
             bubNext -= 1 / rate;
             if (bubNext <= 0) {
                 if (bubRemain <= 0) {
