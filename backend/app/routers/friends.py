@@ -135,7 +135,7 @@ async def create_friend_request(
         # 🎯 目标 AI 开启「自动响应好友申请」→ 触发 AI 自主处理（不建 DM 会话，通不通过由 AI 判断）
         if req.target_type == "ai" and result.get("auto_respond"):
             try:
-                                from app.ai.alarm import _process_friend_request_event
+                from app.ai.alarm import _process_friend_request_event
 
                 target_agent = await friend_repo.get_agent_by_user_id(req.target_id)
                 if target_agent:
