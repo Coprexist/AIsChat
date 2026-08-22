@@ -470,14 +470,32 @@ function init() {
 // ══════════════ 云端统计（在线同学 / 累计 / 近 15 天） ══════════════
 // 走 AIsChat 后端 /study API（登录态复用 localStorage access_token）；
 // 未登录或请求失败时静默降级为占位，不影响自习室本体。
-const STUDY_API = window.STUDY_API_BASE || '/api';
+// API 前缀自动探测：默认 /api（主站 Web），失败自动试 /aischat-api（嵌入场景），
+// 也兼容显式指定（window.STUDY_API_BASE）
+let studyApiBase = window.STUDY_API_BASE || null;
+function studyBase() {
+    if (studyApiBase) return studyApiBase;
+    try { if (new URLSearchParams(location.search).has('embed')) studyApiBase = '/aischat-api'; } catch (e) {}
+    return studyApiBase || '/api';
+}
 
-function studyToken() { return localStorage.getItem('access_token') || ''; }
+function studyToken() { return localStorage.getItem('access_token') || localStorage.getItem('aisc.token') || ''; }
 
-function studyFetch(path, opts) {
-    return fetch(STUDY_API + path, Object.assign({}, opts, {
-        headers: Object.assign({ 'Content-Type': 'application/json' }, opts && opts.headers, studyToken() ? { Authorization: 'Bearer ' + studyToken() } : {}),
+async function studyFetch(path, opts) {
+    const token = studyToken();
+    const doFetch = (base) => fetch(base + path, Object.assign({}, opts, {
+        headers: Object.assign({ 'Content-Type': 'application/json' }, opts && opts.headers, token ? { Authorization: 'Bearer ' + token } : {}),
     })).then(r => r.ok ? r.json() : Promise.reject(new Error('HTTP ' + r.status)));
+    try {
+        return await doFetch(studyBase());
+    } catch (e) {
+        // 非 401 且当前是 /api：自动换 /aischat-api 重试一次（覆盖嵌入场景）
+        if (!/401/.test(e.message) && studyBase() === '/api') {
+            studyApiBase = '/aischat-api';
+            return doFetch('/aischat-api');
+        }
+        throw e;
+    }
 }
 
 function studyFmtMinutes(min) {
@@ -488,20 +506,33 @@ function studyFmtMinutes(min) {
 
 function studyRenderChart(days) {
     if (!studyChart || !days || !days.length) return;
+    const W = 300, H = 88, PAD = 10;
     const max = Math.max(15, ...days.map(d => d.minutes));
-    studyChart.innerHTML = days.map(d => {
-        const h = Math.max(2, Math.round(d.minutes / max * 100));
-        const label = d.date.slice(5).replace('-', '/');
-        return `<div class="chart-col" title="${d.date} · ${d.minutes} 分钟">
-            <div class="chart-bar-wrap"><div class="chart-bar${d.minutes === 0 ? ' zero' : ''}" style="height:${h}%"></div></div>
-            <div class="chart-label">${label}</div></div>`;
-    }).join('');
+    const step = (W - PAD * 2) / (days.length - 1);
+    const y = (m) => H - PAD - (m / max) * (H - PAD * 2);
+    const pts = days.map((d, i) => [PAD + i * step, y(d.minutes)]);
+    const line = pts.map(p => p[0].toFixed(1) + ',' + p[1].toFixed(1)).join(' ');
+    const hasData = days.some(d => d.minutes > 0);
+    // 面积填充 + 折线 + 有数据的点；全 0 时只有基线 + 引导文案
+    const area = `${PAD},${H - PAD} ${line} ${W - PAD},${H - PAD}`;
+    studyChart.innerHTML = `
+        <svg viewBox="0 0 ${W} ${H}" class="lc" preserveAspectRatio="none">
+            <polygon points="${area}" class="lc-area"></polygon>
+            <polyline points="${line}" class="lc-line" fill="none"></polyline>
+            ${pts.map((p, i) => days[i].minutes > 0
+                ? `<circle cx="${p[0].toFixed(1)}" cy="${p[1].toFixed(1)}" r="2.5" class="lc-dot"></circle>`
+                : '').join('')}
+        </svg>
+        ${hasData ? '' : '<div class="chart-hint">完成一个专注周期后开始记录</div>'}
+        <div class="chart-axis">${days[0].date.slice(5).replace('-', '/')} — ${days[days.length - 1].date.slice(5).replace('-', '/')}</div>
+    `;
 }
 
-function studySetOffline() {
-    if (statOnline) statOnline.textContent = '未登录';
+function studySetOffline(err) {
+    const label = err ? ('加载失败' + (err.status ? ' (' + err.status + ')' : '')) : '未登录';
+    if (statOnline) statOnline.textContent = label;
     if (statTotal) statTotal.textContent = '—';
-    if (studyChart) studyChart.innerHTML = '<div class="chart-hint">登录后可见</div>';
+    if (studyChart) studyChart.innerHTML = '<div class="chart-hint">' + label + '，稍后自动重试</div>';
 }
 
 async function studyHeartbeat() {
@@ -511,7 +542,7 @@ async function studyHeartbeat() {
         if (d && d.online_count !== undefined && statOnline) {
             statOnline.textContent = d.online_count > 0 ? d.online_count + ' 人' : '0 人';
         }
-    } catch (e) { /* 静默 */ }
+    } catch (e) { console.warn('[自习室] 心跳失败:', e.message); }
 }
 
 async function studyLoadSummary() {
@@ -522,7 +553,12 @@ async function studyLoadSummary() {
         if (statOnline) statOnline.textContent = (d.online_count || 0) + ' 人';
         if (statTotal) statTotal.textContent = studyFmtMinutes(d.total_minutes || 0);
         studyRenderChart(d.days);
-    } catch (e) { /* 静默 */ }
+    } catch (e) {
+        console.warn('[自习室] 统计加载失败:', e.message);
+        studySetOffline(e);
+        // 15s 后自动重试一次（覆盖服务未就绪/时序问题）
+        setTimeout(studyLoadSummary, 15000);
+    }
 }
 
 async function studyRecord(minutes) {
