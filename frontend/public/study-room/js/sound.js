@@ -84,8 +84,10 @@ function makeLayerBuffer(ctx, key) {
     let k0 = 0, k1 = 0, k2 = 0, k3 = 0, k4 = 0, k5 = 0, k6 = 0;
     // 水滴脉冲状态
     let dropNext = 0, dropPhase = 0, dropDur = 0, dropEnv = 0;
-    // 深海气泡状态：成串出现（一串 3~8 个连续上升，串内短停顿），单个气泡是低频扫频啁啾
-    let bubNext = 1.2, bubRemain = 0, bubPhase = 0, bubGap = 0, bubF0 = 0, bubF1 = 0, bubAmp = 0, bubT = 0;
+    // 深海气泡：活跃气泡池（可重叠发声，不用等前一个播完）+ 串触发状态
+    // 一串 1~8 个（偏大分布）；串内密集触发（0.08~0.28s）→ 同时 2~4 个气泡叠响
+    let bubNext = 1.2, bubRemain = 0;
+    const bubbles = [];
     // 幅度包络状态（森林/浪花：随机游走，无固定周期——自然起伏而非规律涨落）
     let env = 0.6, envTarget = 0.6, envNext = 0;
     // 深海涌动 LFO（唯一保留正弦：慢涌 0.035Hz ≈28s 一周期，潮汐感更缓更隐）
@@ -145,37 +147,37 @@ function makeLayerBuffer(ctx, key) {
             // 深海低频水压底噪：棕色噪声 → 140Hz 极低通，恒定、无起伏（水下压力感）
             s = abyssLo.lp(brown) * 5.0;
         } else if (key === 'bubble') {
-            // 深海气泡（连续上升的咕噜串）：一串 3~8 个，串内短停顿 0.08~0.25s
-            // （连续的"咕噜咕噜咕噜"，不是零星单泡）；串间隔平方分布（多为短、偶有长）
-            // 打散规律感；单泡低频 140~300Hz 仅轻微上滑（上限 ~450Hz，无尖锐高频）
+            // 深海气泡（可重叠的咕噜串）：一串 1~8 个（偏大分布），串内密集触发，
+            // 新气泡不等旧气泡播完——多个气泡同时发声叠加，像水下气泡群一起冒；
+            // 并发上限 4 防过载；单泡低频 140~300Hz 轻微上滑，无尖锐高频
             bubNext -= 1 / rate;
             if (bubNext <= 0) {
-                // 串大小 1~8、偏大分布（pow<1 偏向大值）：多数 4~7 个的大串，
-                // 偶尔 1~2 个的短串点缀，变化更自然
-                bubRemain = 1 + Math.floor(Math.pow(Math.random(), 0.7) * 8);
-                bubNext = 1.2 + Math.pow(Math.random(), 2) * 4;      // 串间隔平方分布：1.2~5.2s
-            }
-            if (bubRemain > 0) {
-                if (bubGap > 0) {
-                    bubGap -= 1 / rate;      // 串内短停顿：连续但不连发
+                if (bubRemain <= 0) {
+                    bubRemain = 1 + Math.floor(Math.pow(Math.random(), 0.7) * 8); // 1~8 偏大
+                    bubNext = 1.2 + Math.pow(Math.random(), 2) * 4;   // 串间隔：1.2~5.2s
                 } else {
-                    bubPhase -= 1 / rate;
-                    if (bubPhase <= 0) {
-                        bubF0 = 140 + Math.random() * 160;          // 140~300Hz 低沉
-                        bubF1 = bubF0 * (1.2 + Math.random() * 0.4); // 轻微上滑 ≤1.6 倍
-                        bubAmp = 0.25 + Math.random() * 0.3;        // 轻幅度
-                        bubT = 0;
-                        bubPhase = 0.16 + Math.random() * 0.16;     // 单泡 160~320ms
-                        bubGap = 0.08 + Math.random() * 0.17;       // 下一泡停顿 0.08~0.25s
-                        bubRemain--;
-                    } else if (bubT < bubPhase) {
-                        const p = bubT / bubPhase;
-                        const f = bubF0 + (bubF1 - bubF0) * p;
-                        const env = Math.sin(Math.PI * Math.min(1, p)); // 起落包络（两端 0）
-                        s = Math.sin(2 * Math.PI * f * bubT) * env * bubAmp * 0.3;
-                        bubT += 1 / rate;
-                    }
+                    bubRemain--;
+                    bubNext = 0.08 + Math.random() * 0.2;             // 串内密集触发：0.08~0.28s
                 }
+                if (bubbles.length < 4) {                            // 并发上限 4
+                    bubbles.push({
+                        f0: 140 + Math.random() * 160,
+                        f1: (140 + Math.random() * 160) * (1.2 + Math.random() * 0.4),
+                        amp: 0.25 + Math.random() * 0.3,
+                        dur: 0.16 + Math.random() * 0.16,
+                        t: 0,
+                    });
+                }
+            }
+            // 渲染所有活跃气泡（各自独立推进，可同时发声）
+            for (let bi = bubbles.length - 1; bi >= 0; bi--) {
+                const b = bubbles[bi];
+                if (b.t >= b.dur) { bubbles.splice(bi, 1); continue; }
+                const p = b.t / b.dur;
+                const f = b.f0 + (b.f1 - b.f0) * p;
+                const env = Math.sin(Math.PI * Math.min(1, p));
+                s += Math.sin(2 * Math.PI * f * b.t) * env * b.amp * 0.3;
+                b.t += 1 / rate;
             }
         }
         data[i] = s;
