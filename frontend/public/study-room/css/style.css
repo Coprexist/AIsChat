@@ -574,8 +574,10 @@ body {
     .sidebar { display: contents; }
     .sidebar .card { min-width: 0; }
 
-    /* 4 卡默认折叠态：只占标题行高度 */
+    /* 4 卡默认折叠态：只占标题行高度；标题统一靠左、边距一致 */
     .timer-col, .sidebar .card { flex: 0 0 auto; }
+    .timer-card { align-items: stretch; padding: 16px; }
+    .timer-card .acc-head { align-self: stretch; }
     /* 展开态：占满 main 剩余高度（其它卡折叠只留标题）；内容超高时卡内滚动 */
     .timer-col:has(.acc-open), .sidebar .card.acc-open { flex: 1 1 0; min-height: 0; }
     .sidebar .card.acc-open { overflow-y: auto; }
@@ -613,12 +615,15 @@ body {
         display: grid;
         grid-template-rows: 0fr;
         transition: grid-template-rows 0.35s ease;
+        min-height: 0;
     }
     .acc-inner { display: block; overflow: hidden; min-height: 0; }
     .acc-open > .acc-body { grid-template-rows: 1fr; }
     .acc-open > .acc-head::after { content: '－'; }
     .acc-open > .acc-head { color: var(--blue); margin-bottom: 12px; }
     .card.acc-open > h3.acc-head { margin-bottom: 12px; }
+    /* 展开后内容超高时卡内滚动（不再硬裁剪按钮） */
+    .acc-open > .acc-body > .acc-inner { overflow-y: auto; }
     /* 展开时恢复卡片内部纵向排布 */
     .timer-card.acc-open > .acc-body > .acc-inner,
     .sidebar .card.acc-open > .acc-body > .acc-inner { display: flex; flex-direction: column; gap: 12px; }
