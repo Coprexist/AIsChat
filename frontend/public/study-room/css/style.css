@@ -587,7 +587,8 @@ body {
     .timer-col .timer-card { flex: 1 1 0; min-height: 0; }
 
     /* ── 手风琴：max-height 动画（JS 设置精确高度，0↔内容高 真正平滑）── */
-    .acc-head {
+    .acc-head,
+    .card h3.acc-head {
         display: flex;
         align-items: center;
         gap: 6px;
@@ -598,12 +599,12 @@ body {
         color: var(--text-secondary);
         cursor: pointer;
         user-select: none;
-        padding: 2px 0;
-        margin-bottom: 0;
-        line-height: 1.4;          /* 与侧栏 h3 默认行高一致，折叠态高度统一 */
+        padding: 0;
+        margin: 0 !important;     /* 强制清零：覆盖 .card h3 12px 下边距 & 浏览器 h3 默认 margin */
+        line-height: 1.4;
+        height: 24px;             /* 固定标题行高：计时器 div 与侧栏 h3 折叠态绝对等高 */
+        box-sizing: border-box;
     }
-    /* 侧栏卡标题是 h3（全局 .card h3 带 12px 下边距）——折叠态统一为 0，与计时器标题一致 */
-    .card h3.acc-head { margin-bottom: 0; }
     .acc-head svg { width: 14px; height: 14px; }
     .acc-head::after {
         content: '＋';
@@ -622,11 +623,11 @@ body {
     }
     .acc-open > .acc-body { max-height: 2000px; }   /* 兜底：JS 未运行时也能展开 */
     .acc-open > .acc-head::after { content: '－'; }
-    .acc-open > .acc-head { color: var(--blue); margin-bottom: 12px; }
-    .card.acc-open > h3.acc-head { margin-bottom: 12px; }
-    /* 展开时恢复卡片内部纵向排布 */
+    .acc-open > .acc-head,
+    .card.acc-open > h3.acc-head { color: var(--blue); }
+    /* 展开时恢复卡片内部纵向排布；acc-body 顶部留间距（标题 margin 已清零，用 padding 提供间隔） */
     .timer-card.acc-open > .acc-body,
-    .sidebar .card.acc-open > .acc-body { display: flex; flex-direction: column; gap: 12px; overflow-y: auto; }
+    .sidebar .card.acc-open > .acc-body { display: flex; flex-direction: column; gap: 12px; padding-top: 12px; overflow-y: auto; }
     .timer-card.acc-open > .acc-body { align-items: center; }
     .sidebar .card.acc-open > .acc-body { align-items: stretch; }
 
