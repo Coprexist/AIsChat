@@ -522,7 +522,6 @@ body {
     .main { flex-direction: column; gap: 8px; overflow-y: auto; }
     .timer-col { gap: 8px; }
     .timer-card { gap: 12px; padding: 16px 12px; justify-content: flex-start; overflow-y: auto; }
-
     /* 声音条：按钮 3 列均分两行 + 音量独占一行，窄屏整齐不溢出 */
     .sound-bar {
         flex-wrap: wrap;
@@ -543,18 +542,22 @@ body {
     }
     .sound-bar .volume-row { width: 100%; }
 
-    /* 圆环与文字：随屏收缩，环最大 58vw、字随 vw 流式缩放 */
+    /* 圆环与文字：小屏圆环可收缩（flex-shrink:1）让位，保证按钮/周期全部可见；
+       尺寸更小（48vw），字随 vw 流式缩放 */
     .time-ring {
-        width: min(250px, 58vw);
-        height: min(250px, 58vw);
+        width: min(210px, 48vw);
+        height: min(210px, 48vw);
         margin: 8px auto;
+        flex-shrink: 1;          /* 空间不足时圆环先收缩，不让内容被挤走 */
     }
-    .ring-center .time-display { font-size: clamp(1.7rem, 9vw, 3.2rem); }
+    .ring-center .time-display { font-size: clamp(1.5rem, 8vw, 2.8rem); }
     .ring-center .status-text { font-size: 0.75rem; }
     .mode-tab { padding: 5px 14px; font-size: 0.85rem; }
 
-    /* 按钮：收窄适配单列 */
+    /* 按钮：收窄适配单列，且永不收缩（优先圆环让位） */
+    .controls { flex-shrink: 0; }
     .controls .btn { min-width: 116px; padding: 9px 18px; }
+    .cycle-indicator { flex-shrink: 0; }
 
     /* 侧栏：小屏一字排开横向滚动（矮条），不占垂直空间——timer-card 保持大 */
     .sidebar {
@@ -573,8 +576,8 @@ body {
 
 /* 超窄屏（小尺寸竖屏手机，≤420px）：进一步收细 */
 @media (max-width: 420px) {
-    .time-ring { width: min(220px, 62vw); height: min(220px, 62vw); }
-    .ring-center .time-display { font-size: clamp(1.5rem, 10vw, 2.6rem); }
+    .time-ring { width: min(180px, 52vw); height: min(180px, 52vw); flex-shrink: 1; }
+    .ring-center .time-display { font-size: clamp(1.3rem, 9vw, 2.2rem); }
     .controls .btn { min-width: 104px; padding: 8px 14px; font-size: 0.88rem; }
     .sound-bar .sound-btn { font-size: 0.72rem; padding: 6px 4px; }
     .brand span { font-size: 1.05rem; }
