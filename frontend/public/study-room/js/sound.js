@@ -18,7 +18,10 @@ let layers = [];          // 当前音色的所有声源层
 // 避免"所有层同时切换"造成的周期性落差感
 const BUFFER_SECONDS = 20;
 const FADE = 0.8;
-const SWAP_JITTER = 4;    // 每层切换间隔额外 ±4s 随机错峰（秒）
+// 切换间隔必须 < buffer 时长 - FADE（旧声源需留 ≥FADE 余量做淡出），
+// 否则旧声源先播完 → 该层完全无声直到切换 → 可闻"陡变断点"
+const SWAP_LEAD = 2;      // 额外余量（秒）：切换时旧声源至少还剩 SWAP_LEAD 秒
+const SWAP_JITTER = 1;    // 每层 ±1s 随机错峰（秒）
 
 // ── 层配置：每个音色由若干声源层组成，az = 方位角（弧度，0=正前，+右 -左）──
 // drift: 声源方位随机漂移（浪花/水滴在声场中缓缓移动）
@@ -190,9 +193,11 @@ function createLayer(def) {
     return ly;
 }
 
-// 单层交叉淡化：该层独立切换，间隔带随机 jitter（错峰 → 任何时刻只一层在过渡）
+// 单层交叉淡化：该层独立切换，间隔带随机 jitter（错峰 → 任何时刻只一层在过渡）。
+// 间隔 = buffer - FADE - 余量 + jitter，保证切换发生时旧声源还剩 >FADE 的信号可淡出，
+// 新声源淡入前不会出现"无声间隙"。
 function scheduleLayerSwap(ly) {
-    const delay = (BUFFER_SECONDS - FADE + Math.random() * SWAP_JITTER) * 1000;
+    const delay = (BUFFER_SECONDS - FADE - SWAP_LEAD + Math.random() * SWAP_JITTER) * 1000;
     ly.swapTimer = setTimeout(() => {
         swapLayer(ly);
         scheduleLayerSwap(ly);
