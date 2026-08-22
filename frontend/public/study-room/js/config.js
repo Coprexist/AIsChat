@@ -50,6 +50,7 @@ const state = {
     totalSeconds: DEFAULT_SETTINGS.focus * 60,
     endTime: null,
     timerId: null,
+    rafId: null,
     sessionsCompleted: 0,
     currentCycle: 0,
     settings: { ...DEFAULT_SETTINGS },

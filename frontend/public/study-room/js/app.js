@@ -103,11 +103,11 @@ function formatTime(sec) {
 function updateTimerDisplay() {
     const sec = state.isRunning ? Math.max(0, (state.endTime - Date.now()) / 1000) : state.remainingSeconds;
     timeDisplay.textContent = formatTime(sec);
-    // 圆形进度：已过比例 → 环填充
+    // 圆形进度（标准方案：周长=100，dashoffset = 100 - 已过%）
     if (progressRing) {
         const total = state.totalSeconds || 1;
         const p = Math.min(1, Math.max(0, 1 - sec / total));
-        progressRing.style.strokeDashoffset = String(553 * (1 - p));
+        progressRing.style.strokeDashoffset = String(100 * (1 - p));
     }
     return sec;
 }
@@ -163,13 +163,25 @@ function startTimer() {
         const sec = updateTimerDisplay();
         if (sec <= 0) handleComplete();
     }, 200);
+    // 进度环用 rAF 逐帧平滑驱动（60fps，无 transition 滞后）
+    state.rafId = requestAnimationFrame(updateRing);
     updateUI();
+}
+// rAF 驱动的圆形进度：按毫秒剩余时间逐帧更新
+function updateRing() {
+    if (!state.isRunning) return;
+    const sec = Math.max(0, (state.endTime - Date.now()) / 1000);
+    const total = state.totalSeconds || 1;
+    const p = Math.min(1, Math.max(0, 1 - sec / total));
+    if (progressRing) progressRing.style.strokeDashoffset = String(100 * (1 - p));
+    state.rafId = requestAnimationFrame(updateRing);
 }
 function pauseTimer() {
     if (!state.isRunning) return;
     state.remainingSeconds = Math.max(0, (state.endTime - Date.now()) / 1000);
     clearInterval(state.timerId);
     state.timerId = null;
+    if (state.rafId) { cancelAnimationFrame(state.rafId); state.rafId = null; }
     state.isRunning = false;
     state.isPaused = true;
     state.endTime = null;
@@ -188,6 +200,7 @@ function toggleTimer() {
 function resetTimer() {
     clearInterval(state.timerId);
     state.timerId = null;
+    if (state.rafId) { cancelAnimationFrame(state.rafId); state.rafId = null; }
     state.isRunning = false;
     state.isPaused = false;
     state.endTime = null;
@@ -198,6 +211,7 @@ function resetTimer() {
 function stopTimer() {
     clearInterval(state.timerId);
     state.timerId = null;
+    if (state.rafId) { cancelAnimationFrame(state.rafId); state.rafId = null; }
     state.isRunning = false;
     state.isPaused = false;
     state.endTime = null;
@@ -205,6 +219,7 @@ function stopTimer() {
 function handleComplete() {
     clearInterval(state.timerId);
     state.timerId = null;
+    if (state.rafId) { cancelAnimationFrame(state.rafId); state.rafId = null; }
     state.isRunning = false;
     state.isPaused = false;
     playChime();
@@ -506,19 +521,26 @@ function studyFmtMinutes(min) {
 
 function studyRenderChart(days) {
     if (!studyChart || !days || !days.length) return;
-    // 15 天全 0：显示引导文案（而不是 15 根几乎看不见的暗条）
-    if (days.every(d => d.minutes === 0)) {
-        studyChart.innerHTML = '<div class="chart-hint">完成一个专注周期后开始记录</div>';
-        return;
-    }
+    const W = 300, H = 88, PAD = 10;
     const max = Math.max(15, ...days.map(d => d.minutes));
-    studyChart.innerHTML = days.map(d => {
-        const h = Math.max(4, Math.round(d.minutes / max * 100));
-        const label = d.date.slice(5).replace('-', '/');
-        return `<div class="chart-col" title="${d.date} · ${d.minutes} 分钟">
-            <div class="chart-bar-wrap"><div class="chart-bar${d.minutes === 0 ? ' zero' : ''}" style="height:${h}%"></div></div>
-            <div class="chart-label">${label}</div></div>`;
-    }).join('');
+    const step = (W - PAD * 2) / (days.length - 1);
+    const y = (m) => H - PAD - (m / max) * (H - PAD * 2);
+    const pts = days.map((d, i) => [PAD + i * step, y(d.minutes)]);
+    const line = pts.map(p => p[0].toFixed(1) + ',' + p[1].toFixed(1)).join(' ');
+    const hasData = days.some(d => d.minutes > 0);
+    // 面积填充 + 折线 + 有数据的点；全 0 时只有基线 + 引导文案
+    const area = `${PAD},${H - PAD} ${line} ${W - PAD},${H - PAD}`;
+    studyChart.innerHTML = `
+        <svg viewBox="0 0 ${W} ${H}" class="lc" preserveAspectRatio="none">
+            <polygon points="${area}" class="lc-area"></polygon>
+            <polyline points="${line}" class="lc-line" fill="none"></polyline>
+            ${pts.map((p, i) => days[i].minutes > 0
+                ? `<circle cx="${p[0].toFixed(1)}" cy="${p[1].toFixed(1)}" r="2.5" class="lc-dot"></circle>`
+                : '').join('')}
+        </svg>
+        ${hasData ? '' : '<div class="chart-hint">完成一个专注周期后开始记录</div>'}
+        <div class="chart-axis">${days[0].date.slice(5).replace('-', '/')} — ${days[days.length - 1].date.slice(5).replace('-', '/')}</div>
+    `;
 }
 
 function studySetOffline(err) {
