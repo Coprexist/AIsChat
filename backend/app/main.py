@@ -44,7 +44,7 @@ for router in get_all_routers():
 
 # 全局异常处理
 @app.exception_handler(RequestValidationError)
-async def validation_exception_handler(
+def validation_exception_handler(
     request: Request, exc: RequestValidationError
 ) -> JSONResponse:
     """参数校验失败时统一返回 422，并过滤 input 字段避免泄露请求体原始数据"""
@@ -60,10 +60,10 @@ async def validation_exception_handler(
 
 
 @app.exception_handler(Exception)
-async def global_exception_handler(request: Request, exc: Exception) -> JSONResponse:
+def global_exception_handler(request: Request, exc: Exception) -> JSONResponse:
     """未捕获异常统一返回 500；完整堆栈仅记录日志，不返回给客户端"""
-    # 不能使用 exc_info=True，因为异常处理器中 sys.exc_info() 已清空；
-    # 直接传入异常实例，logging 会自动提取类型和 traceback
+    # 直接传入异常实例，避免对 sys.exc_info() 的隐式依赖；
+    # logging 会自动提取类型和 traceback
     logger.error(
         "未捕获异常: %s %s",
         request.method,
