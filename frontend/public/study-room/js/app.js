@@ -506,9 +506,14 @@ function studyFmtMinutes(min) {
 
 function studyRenderChart(days) {
     if (!studyChart || !days || !days.length) return;
+    // 15 天全 0：显示引导文案（而不是 15 根几乎看不见的暗条）
+    if (days.every(d => d.minutes === 0)) {
+        studyChart.innerHTML = '<div class="chart-hint">完成一个专注周期后开始记录</div>';
+        return;
+    }
     const max = Math.max(15, ...days.map(d => d.minutes));
     studyChart.innerHTML = days.map(d => {
-        const h = Math.max(2, Math.round(d.minutes / max * 100));
+        const h = Math.max(4, Math.round(d.minutes / max * 100));
         const label = d.date.slice(5).replace('-', '/');
         return `<div class="chart-col" title="${d.date} · ${d.minutes} 分钟">
             <div class="chart-bar-wrap"><div class="chart-bar${d.minutes === 0 ? ' zero' : ''}" style="height:${h}%"></div></div>
