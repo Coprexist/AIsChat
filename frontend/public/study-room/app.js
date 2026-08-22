@@ -482,8 +482,8 @@ function studyFetch(path, opts) {
 
 function studyFmtMinutes(min) {
     if (min < 60) return min + ' 分';
-    const h = Math.floor(min / 60), m = min % 60;
-    return m ? h + ' 时 ' + m + ' 分' : h + ' 小时';
+    const h = Math.round(min / 60 * 10) / 10;
+    return h + ' 小时';
 }
 
 function studyRenderChart(days) {

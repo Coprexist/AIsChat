@@ -306,13 +306,8 @@ body {
 .stat-value { font-family: var(--mono); font-size: 1.3rem; font-weight: 700; }
 .stat-label { font-size: 0.65rem; color: var(--text-muted); text-transform: uppercase; }
 
-/* 云端统计（在线同学 / 累计 / 近 15 天柱状图） */
-.study-meta { margin-top: 10px; display: flex; flex-direction: column; gap: 5px; }
-.study-meta-row {
-    display: flex; justify-content: space-between; align-items: center;
-    font-size: 0.75rem; color: var(--text-muted); padding: 2px 4px;
-}
-.study-meta-row b { font-family: var(--mono); font-size: 0.8rem; color: var(--text); }
+/* 云端统计（在线同学 / 累计 / 近 15 天柱状图）——与 stats-grid 同风格 */
+.study-meta { margin-top: 10px; display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
 .chart { display: flex; gap: 3px; align-items: stretch; height: 88px; padding-top: 6px; }
 .chart-col { flex: 1; min-width: 0; display: flex; flex-direction: column; align-items: center; gap: 3px; }
 .chart-bar-wrap { width: 100%; flex: 1; display: flex; align-items: flex-end; }
@@ -326,13 +321,15 @@ body {
 
 
 
-/* 圆形进度环（计时） */
+/* 圆形进度环（计时）——固定尺寸容器 + 绝对定位，杜绝塌陷 */
 .time-ring {
-    position: relative; width: min(300px, 60vw); aspect-ratio: 1;
-    margin: 10px auto; display: flex; align-items: center; justify-content: center;
+    position: relative;
+    width: min(280px, 56vw);
+    aspect-ratio: 1 / 1;
+    margin: 12px auto;
 }
 .ring-svg { position: absolute; inset: 0; width: 100%; height: 100%; transform: rotate(-90deg); }
-.ring-bg { fill: none; stroke: var(--bg-hover); stroke-width: 9; }
+.ring-bg { fill: none; stroke: var(--border); stroke-width: 9; }
 .ring-fg {
     fill: none; stroke: var(--blue); stroke-width: 9; stroke-linecap: round;
     stroke-dasharray: 553; stroke-dashoffset: 553;
@@ -342,11 +339,12 @@ body {
 .mode-short .ring-fg { stroke: var(--green); }
 .mode-long .ring-fg { stroke: var(--purple); }
 .ring-center {
-    position: relative; display: flex; flex-direction: column;
-    align-items: center; justify-content: center; gap: 8px;
+    position: absolute; inset: 0;
+    display: flex; flex-direction: column;
+    align-items: center; justify-content: center;
+    gap: 8px; text-align: center;
 }
 .ring-center .time-display { font-size: clamp(3rem, 8vw, 5rem); }
-.ring-center .status-text { margin-top: 0; }
 
 /* 设置弹窗：白噪音按钮组 */
 .sound-row { display: flex; gap: 6px; flex-wrap: wrap; }
