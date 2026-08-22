@@ -9,6 +9,7 @@
 """
 import asyncio
 import logging
+import time
 from contextlib import asynccontextmanager
 from datetime import datetime, timedelta
 
@@ -27,6 +28,10 @@ logger = logging.getLogger("app.bootstrap")
 # ══════════════════════════════════════════════════════════════
 
 _BACKGROUND_TASKS: dict[str, asyncio.Task] = {}
+_DELAYED_RESTART_TASKS: set[asyncio.Task] = set()
+
+# 重启计数重置阈值（秒）：任务稳定运行超过此时间后，重启计数归零
+_RESTART_COUNT_RESET_SECONDS = 600
 
 
 def spawn_task(factory, name: str, *, restart: bool = False, max_restarts: int = 10) -> asyncio.Task:
@@ -38,8 +43,9 @@ def spawn_task(factory, name: str, *, restart: bool = False, max_restarts: int =
     restart=True 时，任务异常退出按指数退避自动重启（1,2,4...封顶 60s），
     连续超过 max_restarts 次放弃并记 CRITICAL，避免死循环狂重启。
     正常结束（return）不重启。
+    任务稳定运行超过 _RESTART_COUNT_RESET_SECONDS 后重启计数归零。
     """
-    state = {"restarts": 0, "task": None}
+    state = {"restarts": 0, "task": None, "last_restart_time": 0.0}
 
     def _done(t: asyncio.Task) -> None:
         if t.cancelled():
@@ -47,11 +53,18 @@ def spawn_task(factory, name: str, *, restart: bool = False, max_restarts: int =
         exc = t.exception()
         if exc is None:
             return
+
+        now = time.monotonic()
+        # 稳定运行超过阈值，重置重启计数（偶发故障恢复后允许重新重启）
+        if state["last_restart_time"] > 0 and now - state["last_restart_time"] > _RESTART_COUNT_RESET_SECONDS:
+            state["restarts"] = 0
+
         if restart and state["restarts"] < max_restarts:
             state["restarts"] += 1
+            state["last_restart_time"] = now
             delay = min(60, 2 ** state["restarts"])
             logger.error(
-                f"💥 后台任务 {name} 异常退出，{delay}s 后自动重启"
+                f"[RESTART] 后台任务 {name} 异常退出，{delay}s 后自动重启"
                 f"（第 {state['restarts']}/{max_restarts} 次）: {exc!r}",
                 exc_info=(type(exc), exc, exc.__traceback__),
             )
@@ -60,10 +73,12 @@ def spawn_task(factory, name: str, *, restart: bool = False, max_restarts: int =
                 await asyncio.sleep(delay)
                 _launch()
 
-            asyncio.create_task(_restart_later())
+            delay_task = asyncio.create_task(_restart_later())
+            _DELAYED_RESTART_TASKS.add(delay_task)
+            delay_task.add_done_callback(_DELAYED_RESTART_TASKS.discard)
         else:
             logger.critical(
-                f"💥 后台任务 {name} 异常退出且放弃重启: {exc!r}",
+                f"[CRITICAL] 后台任务 {name} 异常退出且放弃重启: {exc!r}",
                 exc_info=(type(exc), exc, exc.__traceback__),
             )
 
@@ -78,7 +93,18 @@ def spawn_task(factory, name: str, *, restart: bool = False, max_restarts: int =
 
 
 async def cancel_all_tasks() -> None:
-    """关闭时统一取消所有后台任务"""
+    """关闭时统一取消所有后台任务（含延迟重启任务）"""
+    # 先取消延迟重启任务（防止应用关闭后任务复活）
+    for t in list(_DELAYED_RESTART_TASKS):
+        t.cancel()
+    for t in list(_DELAYED_RESTART_TASKS):
+        try:
+            await t
+        except asyncio.CancelledError:
+            pass
+    _DELAYED_RESTART_TASKS.clear()
+
+    # 再取消主任务
     tasks = list(_BACKGROUND_TASKS.values())
     for t in tasks:
         t.cancel()
@@ -105,7 +131,7 @@ def sleep_until(hour: int, minute: int = 0) -> float:
 
 async def wait_for_db(timeout: float = 30.0) -> None:
     """等待数据库就绪：0.5s 轮询，超时抛 RuntimeError 快速失败（核心依赖不降级运行）"""
-    loop = asyncio.get_event_loop()
+    loop = asyncio.get_running_loop()
     deadline = loop.time() + timeout
     warned = False
     while True:
@@ -115,7 +141,7 @@ async def wait_for_db(timeout: float = 30.0) -> None:
             return
         except Exception:
             if not warned:
-                logger.warning(f"⏳ 等待数据库就绪（最多 {timeout:.0f}s，超时将中止启动）...")
+                logger.warning(f"[WAIT] 等待数据库就绪（最多 {timeout:.0f}s，超时将中止启动）...")
                 warned = True
             if loop.time() >= deadline:
                 raise RuntimeError(f"数据库在 {timeout:.0f}s 内未就绪，启动中止")
@@ -129,7 +155,7 @@ async def wait_for_db(timeout: float = 30.0) -> None:
 async def _startup_db() -> None:
     """数据库就绪 + 迁移 + DB 配置覆盖 + 在线用户活跃时间重置"""
     await wait_for_db()
-    logger.info("✅ 数据库连接正常")
+    logger.info("[OK] 数据库连接正常")
 
     from app.migration import run_migrations
     await run_migrations()  # 失败即抛，中止启动（快速失败）
@@ -140,7 +166,7 @@ async def _startup_db() -> None:
         async with async_session() as cfg_db:
             await load_all_configs(cfg_db)
     except Exception as e:
-        logger.warning(f"⚠️ 加载 DB 配置覆盖失败（使用 env 配置）: {e}")
+        logger.warning(f"[WARN] 加载 DB 配置覆盖失败（使用 env 配置）: {e}")
 
     # 启动时将 last_active_at=NULL 标记为当前时间（服务器重启前在线的用户）
     from sqlalchemy import update as sa_update, func
@@ -151,9 +177,9 @@ async def _startup_db() -> None:
                 sa_update(UserModel).where(UserModel.last_active_at.is_(None)).values(last_active_at=func.now())
             )
             await startup_db.commit()
-        logger.info("✅ 已重置在线用户的上次活跃时间")
+        logger.info("[OK] 已重置在线用户的上次活跃时间")
     except Exception as e:
-        logger.warning(f"⚠️ 重置在线用户活跃时间失败: {e}", exc_info=True)
+        logger.warning(f"[WARN] 重置在线用户活跃时间失败: {e}", exc_info=True)
 
 
 async def _startup_plugins() -> None:
@@ -164,18 +190,18 @@ async def _startup_plugins() -> None:
         async with async_session() as plugin_db:
             changed = await sync_plugins_to_db(plugin_db)
             await apply_skill_plugins(plugin_db)
-        logger.info(f"🧩 插件目录同步完成（{changed} 项变更）")
+        logger.info(f"[OK] 插件目录同步完成（{changed} 项变更）")
     except Exception as e:
-        logger.warning(f"⚠️ 插件目录同步失败（不影响启动）: {e}", exc_info=True)
+        logger.warning(f"[WARN] 插件目录同步失败（不影响启动）: {e}", exc_info=True)
 
     # 平台能力版本化（skills/tools 懒加载）：启动时对比内置工具定义，变更则写新版本
     try:
         async with async_session() as cap_db:
             from app.services.capability_versioning import ensure_platform_version
             v = await ensure_platform_version(cap_db)
-            logger.info(f"🧬 平台能力版本: v{v}")
+            logger.info(f"[OK] 平台能力版本: v{v}")
     except Exception as e:
-        logger.warning(f"⚠️ 平台能力版本化失败（不影响启动）: {e}", exc_info=True)
+        logger.warning(f"[WARN] 平台能力版本化失败（不影响启动）: {e}", exc_info=True)
 
 
 async def _startup_workers() -> None:
@@ -198,9 +224,9 @@ async def _startup_workers() -> None:
                 async with async_session() as clean_db:
                     result = await cleanup_old_logs(clean_db)
                     if result["deleted"]:
-                        logger.info(f"🧹 审计日志清理: 删除 {result['deleted']} 条")
+                        logger.info(f"[OK] 审计日志清理: 删除 {result['deleted']} 条")
             except Exception as e:
-                logger.warning(f"⚠️ 审计日志清理失败: {e}", exc_info=True)
+                logger.warning(f"[WARN] 审计日志清理失败: {e}", exc_info=True)
     spawn_task(audit_cleanup_loop, "audit_cleanup_loop", restart=True)
 
     # 每日数据库备份（管理员开关 daily_backup_enabled；保留份数 daily_backup_keep）
@@ -217,9 +243,9 @@ async def _startup_workers() -> None:
                 sql_bytes = await create_backup()
                 await save_backup(sql_bytes)
                 deleted = prune_backups(int(s.get("daily_backup_keep", 7) or 7))
-                logger.info(f"💾 每日备份完成（清理 {deleted} 份过期）")
+                logger.info(f"[OK] 每日备份完成（清理 {deleted} 份过期）")
             except Exception as e:
-                logger.warning(f"⚠️ 每日备份失败: {e}", exc_info=True)
+                logger.warning(f"[WARN] 每日备份失败: {e}", exc_info=True)
     spawn_task(daily_backup_loop, "daily_backup_loop", restart=True)
 
     from app.services.world.world_scheduler import world_scheduler
@@ -243,7 +269,7 @@ async def _startup_world() -> None:
             from app.services.world.world_resident import manager
             await manager.restore_all(restore_db)
     except Exception as e:
-        logger.warning(f"🌐 常驻世界恢复异常: {e}")
+        logger.warning(f"[WARN] 常驻世界恢复异常: {e}")
 
     # 世界商城 GitHub 自动同步（配置开启时启动拉取一次最新索引）
     try:
@@ -253,9 +279,9 @@ async def _startup_world() -> None:
         if _mcfg.get("auto_sync_enabled") and _mcfg.get("github_repo") and _mcfg.get("github_token"):
             async with async_session() as _mdb2:
                 r = await refresh_from_github(_mdb2)
-            logger.info(f"🏪 商城 GitHub 启动同步完成: +{r.get('added', 0)} 新增")
+            logger.info(f"[OK] 商城 GitHub 启动同步完成: +{r.get('added', 0)} 新增")
     except Exception as e:
-        logger.warning(f"🏪 商城 GitHub 启动同步失败（不影响启动）: {e}")
+        logger.warning(f"[WARN] 商城 GitHub 启动同步失败（不影响启动）: {e}")
 
 
 async def _startup_federation() -> None:
@@ -277,37 +303,24 @@ async def _startup_federation() -> None:
 
 
 async def _start_browser_service() -> None:
-    """启动共享 Chromium CDP 服务（等数据库就绪后重试，非致命）"""
-    try:
-        from app.database import check_db_connection
-        # 数据库就绪前不空等：0.5s 轮询，最多 30s
-        deadline = asyncio.get_event_loop().time() + 30
-        while not await check_db_connection():
-            if asyncio.get_event_loop().time() >= deadline:
-                logger.warning("⚠️ 浏览器服务启动跳过：数据库 30s 内未就绪")
-                return
-            await asyncio.sleep(0.5)
-    except Exception as e:
-        logger.warning(f"⚠️ 浏览器服务启动跳过（数据库探测失败）: {e}")
-        return
-
+    """启动共享 Chromium CDP 服务（非致命，数据库已由 _startup_db 确保就绪）"""
     try:
         from app.services.infrastructure.plugin_registry import PluginRegistry
         plugin = PluginRegistry.get("browser")
         if plugin is None:
-            logger.warning("⚠️ Browser 插件未注册，browser 命令将不可用")
+            logger.warning("[WARN] Browser 插件未注册，browser 命令将不可用")
             return
         status = await plugin.get_status()
         if status.get("running"):
-            logger.info(f"🔍 Chromium CDP 已在运行 (port {status.get('port')})")
+            logger.info(f"[OK] Chromium CDP 已在运行 (port {status.get('port')})")
             return
         ok = await plugin.start()
         if ok:
-            logger.info("🔍 Chromium CDP 已启动，所有 AI 共用")
+            logger.info("[OK] Chromium CDP 已启动，所有 AI 共用")
         else:
-            logger.warning("⚠️ Chromium CDP 启动失败，browser 命令将不可用")
+            logger.warning("[WARN] Chromium CDP 启动失败，browser 命令将不可用")
     except Exception as e:
-        logger.warning(f"⚠️ 浏览器服务启动失败（非致命）: {e}", exc_info=True)
+        logger.warning(f"[WARN] 浏览器服务启动失败（非致命）: {e}", exc_info=True)
 
 
 async def _stop_browser_service() -> None:
@@ -318,13 +331,22 @@ async def _stop_browser_service() -> None:
         if plugin is not None:
             await plugin.stop()
     except Exception as e:
-        logger.warning(f"⚠️ 停止 Chromium CDP 失败: {e}", exc_info=True)
+        logger.warning(f"[WARN] 停止 Chromium CDP 失败: {e}", exc_info=True)
 
 
 async def _startup_brain_and_skills() -> None:
     """薄大脑 + 技能运行时 + 时间触发器（一次性初始化）"""
     from app.services.brain.brain_controller import brain_controller
-    spawn_task(brain_controller.initialize, "brain_controller")
+    # 大脑初始化是关键步骤，失败则中止启动
+    try:
+        await brain_controller.initialize()
+        logger.info("[OK] 大脑控制器初始化完成")
+    except Exception as e:
+        logger.critical(
+            f"[CRITICAL] 大脑控制器初始化失败，启动中止: {e}",
+            exc_info=(type(e), e, e.__traceback__),
+        )
+        raise
 
     # 技能运行时：注册为 Skill 事件总线的派发器（自治 Skill 执行引擎）
     from app.services.skill.skill_runtime import skill_runtime
@@ -342,7 +364,7 @@ async def _startup_brain_and_skills() -> None:
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """应用生命周期管理"""
-    logger.info("🚀 AI群聊社交网络系统启动中...")
+    logger.info("[START] AI群聊社交网络系统启动中...")
     logger.info(f"  默认聊天模型: {settings.default_chat_model}")
     logger.info(f"  默认工作模型: {settings.default_work_model}")
 
@@ -360,7 +382,7 @@ async def lifespan(app: FastAPI):
 
     await _startup_brain_and_skills()
 
-    logger.info("✅ 后台 worker 已全部启动（含联邦通信）")
+    logger.info("[OK] 后台 worker 已全部启动（含联邦通信）")
 
     # 发出系统启动完成事件
     from app.services.brain.event_bus import event_bus, EventType
@@ -369,14 +391,14 @@ async def lifespan(app: FastAPI):
     # 启动完成，退出自动维护（但手动维护仍生效）
     if maintenance.clear_auto():
         logger.info(
-            "🟢 自动维护已关闭，服务就绪" if not maintenance.is_soft()
-            else "🟡 服务就绪但软维护仍开启"
+            "[OK] 自动维护已关闭，服务就绪" if not maintenance.is_soft()
+            else "[OK] 服务就绪但软维护仍开启"
         )
 
     yield
 
     # 进入关闭流程，自动维护
-    logger.info("👋 系统关闭，正在停止后台 worker...")
+    logger.info("[STOP] 系统关闭，正在停止后台 worker...")
     maintenance.set_auto()
 
     # 发出系统关闭事件
@@ -384,25 +406,29 @@ async def lifespan(app: FastAPI):
         from app.services.brain.event_bus import event_bus, EventType
         await event_bus.emit(EventType.SYSTEM_SHUTDOWN)
     except Exception as e:
-        logger.warning(f"⚠️ 系统关闭事件发送失败: {e}", exc_info=True)
+        logger.warning(f"[WARN] 系统关闭事件发送失败: {e}", exc_info=True)
 
     # 优雅关闭：排空记忆缓冲区
     try:
         from app.services.memory.memory_buffer import drain_buffer_on_shutdown
         await drain_buffer_on_shutdown()
     except Exception as e:
-        logger.warning(f"⚠️ 记忆缓冲区排空失败: {e}", exc_info=True)
+        logger.warning(f"[WARN] 记忆缓冲区排空失败: {e}", exc_info=True)
 
     # 先断开所有联邦连接
     try:
         from app.services.federation.federation_manager import federation_manager
         await federation_manager.disconnect_all()
     except Exception as e:
-        logger.warning(f"⚠️ 联邦连接断开失败: {e}", exc_info=True)
+        logger.warning(f"[WARN] 联邦连接断开失败: {e}", exc_info=True)
 
-    # 停止所有后台任务
+    # 停止所有后台任务（含延迟重启任务）
     await cancel_all_tasks()
 
     # 停止共享 Chromium
     await _stop_browser_service()
-    logger.info("后台 worker 已停止")
+
+    # 释放数据库连接池
+    await engine.dispose()
+    logger.info("[OK] 数据库连接池已释放")
+    logger.info("[OK] 后台 worker 已停止")

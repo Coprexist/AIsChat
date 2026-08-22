@@ -2,11 +2,14 @@
 数据库连接管理模块
 使用 SQLAlchemy 2.0 异步引擎，存储后端由 DB_BACKEND 选择（postgres | sqlite）。
 """
+import logging
+
+from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine, async_sessionmaker
 from sqlalchemy.orm import DeclarativeBase
+
 from app.config import settings
 from app.db_providers import get_provider
-import logging
 
 logger = logging.getLogger(__name__)
 
@@ -57,10 +60,14 @@ async def check_db_connection() -> bool:
     """检查数据库连接是否正常"""
     try:
         async with engine.connect() as conn:
-            await conn.execute(
-                __import__("sqlalchemy").text("SELECT 1")
-            )
+            await conn.execute(text("SELECT 1"))
         return True
     except Exception as e:
         logger.error(f"数据库连接失败: {e}")
         return False
+
+
+async def dispose_db() -> None:
+    """释放数据库连接池（应用关闭时调用）"""
+    await engine.dispose()
+    logger.info("数据库连接池已释放")

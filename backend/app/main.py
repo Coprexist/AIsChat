@@ -14,7 +14,7 @@ import os
 import time
 import uuid
 
-from fastapi import FastAPI, Request
+from fastapi import FastAPI, HTTPException, Request
 from fastapi.responses import JSONResponse
 
 from app.bootstrap import lifespan
@@ -32,7 +32,7 @@ logger = logging.getLogger(__name__)
 # ══════════════════════════════════════════════════════════════
 
 # 应用版本：优先读环境变量（CI/CD 注入），回退硬编码默认值
-APP_VERSION = os.environ.get("APP_VERSION", "0.3.11")
+APP_VERSION = os.environ.get("APP_VERSION", "0.3.12")
 
 app = FastAPI(
     title="AI群聊社交网络",
@@ -73,16 +73,25 @@ for _router in get_all_routers():
 # 全局异常处理器（统一 JSON 错误格式）
 # ══════════════════════════════════════════════════════════════
 
+@app.exception_handler(HTTPException)
+async def http_exception_handler(request: Request, exc: HTTPException):
+    """HTTPException 按原状态码返回 detail（保持 FastAPI 默认行为）"""
+    return JSONResponse(
+        status_code=exc.status_code,
+        content={"detail": exc.detail},
+    )
+
+
 @app.exception_handler(Exception)
 async def global_exception_handler(request: Request, exc: Exception):
-    """未捕获异常统一返回 JSON，记录完整堆栈"""
+    """未捕获异常统一返回模糊错误，详细堆栈仅记录日志"""
     logger.error(
         f"未捕获异常: {request.method} {request.url.path}",
         exc_info=(type(exc), exc, exc.__traceback__),
     )
     return JSONResponse(
         status_code=500,
-        content={"detail": "服务器内部错误", "error": str(exc)},
+        content={"detail": "服务器内部错误"},
     )
 
 
@@ -134,10 +143,10 @@ async def health():
         db_ok = await asyncio.wait_for(check_db_connection(), timeout=5.0)
     except asyncio.TimeoutError:
         db_ok = False
-        logger.warning("⚠️ 健康检查: 数据库查询超时（5s）")
+        logger.warning("[WARN] 健康检查: 数据库查询超时（5s）")
     except Exception as e:
         db_ok = False
-        logger.warning(f"⚠️ 健康检查异常: {e}")
+        logger.warning(f"[WARN] 健康检查异常: {e}")
 
     status_code = 200 if db_ok else 503
     return JSONResponse(

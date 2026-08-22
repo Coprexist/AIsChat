@@ -3,10 +3,37 @@
 本 CHANGELOG 遵循 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.0.0/) 规范，
 版本号遵守 [语义化版本](https://semver.org/lang/zh-CN/)。
 
-> **当前阶段**：v0.3.11 正式版 — 补丁版本号（第三位）递增。
+> **当前阶段**：v0.3.12 正式版 — 补丁版本号（第三位）递增。
 ---
 
-## [v0.3.11] - 2026-08-22
+## [v0.3.12] - 2026-08-22
+
+### Changed — 🏗️ 后端代码质量全面优化
+
+- **全局异常处理器安全增强**：区分 `HTTPException`（原样返回 detail）和未预期 `Exception`（只返回模糊"服务器内部错误"），
+  防止数据库表名、SQL 语句等敏感信息泄露给客户端。
+- **后台任务管理修复**：`spawn_task` 重启计数在任务稳定运行 10 分钟后自动重置（偶发故障恢复后可重新重启）；
+  延迟重启任务纳入 `_DELAYED_RESTART_TASKS` 集合，`cancel_all_tasks()` 统一取消，防止应用关闭后任务复活。
+- **大脑初始化改为同步等待**：`brain_controller.initialize` 从 `spawn_task` 包装改为直接 `await`，
+  失败则记录 CRITICAL 并中止启动（核心依赖快速失败原则）。
+- **删除重复数据库探测**：`_start_browser_service` 移除冗余的数据库就绪等待（lifespan 已确保）。
+- **数据库连接池释放**：lifespan 关闭流程末尾调用 `engine.dispose()` 释放连接池。
+- **异步 API 修正**：`wait_for_db` 中 `asyncio.get_event_loop()` → `asyncio.get_running_loop()`。
+- **配置管理 Pydantic 化**：`config.py` 移除所有 `os.getenv` 手动调用，改为 Pydantic 原生字段声明 +
+  `field_validator`（`db_backend`/`embedding_backend` 自动小写，整数字段自动类型转换），
+  支持 `.env` 文件和环境变量自动解析。
+- **加密密钥安全策略**：引入 `ENVIRONMENT` 环境变量（默认 development）；
+  生产环境未设置或复用 JWT 密钥时中止启动（RuntimeError）；
+  开发环境自动生成随机密钥并持久化到 `data/encryption_key`（文件权限 0600），
+  避免每次重启生成新密钥导致已加密数据无法解密。
+- **数据库模块清理**：`database.py` 移除 `__import__("sqlalchemy").text()` 动态导入，
+  改为顶层 `from sqlalchemy import text`；新增 `dispose_db()` 函数供外部调用。
+- **日志配置完善**：
+  - 统一 uvicorn 日志格式（`uvicorn`/`uvicorn.error`/`uvicorn.access` 纳入 dictConfig），
+    避免默认格式与应用日志不一致。
+  - 日志格式增加文件名和行号（`%(filename)s:%(lineno)d`），便于问题排查。
+  - 启动时自动创建日志目录，创建失败降级为仅控制台输出（不崩溃）。
+  - 日志 emoji 保留（信息设计），后续可通过 `LOG_EMOJI=false` 关闭。
 
 ### Changed — 🏗️ main.py 优雅化重构
 

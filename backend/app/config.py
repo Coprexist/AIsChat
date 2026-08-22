@@ -1,66 +1,64 @@
 """
 应用配置模块
-从环境变量读取配置，提供全局设置
+使用 pydantic-settings 自动从环境变量 / .env 文件解析配置。
+环境变量名默认为字段名大写（如 database_url → DATABASE_URL）。
 """
-import os
 import json
+import logging
+import os
+import secrets
+from pathlib import Path
+
+from pydantic import field_validator, model_validator
 from pydantic_settings import BaseSettings
+
+logger = logging.getLogger(__name__)
 
 
 class Settings(BaseSettings):
-    """全局应用配置"""
+    """全局应用配置 — 所有字段由 pydantic-settings 自动从环境变量读取"""
 
-    # 数据库
-    # 存储后端: postgres | sqlite | pglite（规划中）
-    db_backend: str = os.getenv("DB_BACKEND", "postgres").lower()
+    # ── 数据库 ──
+    db_backend: str = "postgres"
+    sqlite_db_path: str = "./data/aischat.db"
+    database_url: str = "postgresql+asyncpg://ai_chat:change_me@localhost:5432/ai_group_chat"
+    database_url_sync: str = "postgresql://ai_chat:change_me@localhost:5432/ai_group_chat"
 
-    # SQLite 数据文件路径（db_backend=sqlite 时使用）
-    sqlite_db_path: str = os.getenv(
-        "SQLITE_DB_PATH", "./data/aischat.db"
-    )
-
-    database_url: str = os.getenv(
-        "DATABASE_URL",
-        "postgresql+asyncpg://ai_chat:change_me@localhost:5432/ai_group_chat",
-    )
-    database_url_sync: str = os.getenv(
-        "DATABASE_URL_SYNC",
-        "postgresql://ai_chat:change_me@localhost:5432/ai_group_chat",
-    )
-
-    # JWT
-    jwt_secret_key: str = os.getenv("JWT_SECRET_KEY", "dev-secret-change-me")
+    # ── JWT ──
+    jwt_secret_key: str = "dev-secret-change-me"
     jwt_algorithm: str = "HS256"
     jwt_expire_days: int = 7
 
-    # API 默认配置
-    deepseek_base_url: str = os.getenv(
-        "DEEPSEEK_BASE_URL", "https://api.deepseek.com"
-    )
+    # ── API 默认配置 ──
+    deepseek_base_url: str = "https://api.deepseek.com"
     default_chat_model: str = "deepseek-v4-flash"
     default_work_model: str = "deepseek-v4-pro"
 
-    # ── Embedding 提供方插件化（独立于 chat，未来转 JS 契约不变）──
+    # ── Embedding 提供方插件化 ──
     # 后端: disabled | ollama | api | local
-    #   disabled = 不启用向量（默认，纯文本检索，行为与现状一致）
-    #   ollama   = 本地/远程 Ollama 实例（有 Ollama 直接复用）
-    #   api      = 任意 OpenAI 兼容 /v1/embeddings（OpenAI/硅基流动/智谱/阿里云）
-    #   local    = fastembed 本地模型（离线可用，pip install fastembed）
-    embedding_backend: str = os.getenv("EMBEDDING_BACKEND", "disabled").lower()
-    # 端点（ollama/api 共用）：Ollama 填 http://127.0.0.1:11434，API 填 https://host/v1
-    embedding_base_url: str = os.getenv("EMBEDDING_BASE_URL", "")
-    embedding_api_key: str = os.getenv("EMBEDDING_API_KEY", "")
-    # 模型：ollama 默认 nomic-embed-text；local 默认 bge-small-zh；api 需显式指定
-    embedding_model: str = os.getenv("EMBEDDING_MODEL", "")
-    # 向量维度（用户自选：存储速度 vs 检索质量的取舍）
-    #   - 与模型匹配：nomic-embed-text=768 / text-embedding-3-small=1536 / bge-large-zh=1024
-    #   - 默认 1536（兼容现状）；prestart 启动时自动把 PG 列对齐到此值（表空毫秒级）
-    #   - SQLite 后端忽略（JsonVectorType 存 JSON 数组，维度无关）
-    embedding_dimension: int = int(os.getenv("EMBEDDING_DIMENSION", "1536"))
-    # 旧配置兼容别名（显式直连自定义端点时使用的模型名）
-    default_embedding_model: str = os.getenv(
-        "EMBEDDING_MODEL", "text-embedding-3-small"
+    embedding_backend: str = "disabled"
+    embedding_base_url: str = ""
+    embedding_api_key: str = ""
+    embedding_model: str = ""
+    # 向量维度：默认 1536（兼容现状）
+    embedding_dimension: int = 1536
+    # 旧配置兼容别名
+    default_embedding_model: str = "text-embedding-3-small"
+
+    @field_validator("db_backend", "embedding_backend", mode="before")
+    @classmethod
+    def _lowercase(cls, v: str) -> str:
+        return v.lower() if isinstance(v, str) else v
+
+    @field_validator(
+        "embedding_dimension", "avatar_max_size_mb", "upload_max_size_mb",
+        "agent_metrics_retention_days", "credit_per_10k_tokens",
+        mode="before",
     )
+    @classmethod
+    def _coerce_int(cls, v):
+        """允许字符串形式的整数（环境变量都是字符串）"""
+        return int(v) if isinstance(v, str) else v
 
     @property
     def is_deepseek_api(self) -> bool:
@@ -101,66 +99,129 @@ class Settings(BaseSettings):
         """容器内文件存储路径（docker-compose bind mount 目标，非宿主机 DATA_DIR）"""
         return "/app/data"
 
-    # 头像
-    avatar_max_size_mb: int = int(os.getenv("AVATAR_MAX_SIZE_MB", "10"))
+    # ── 文件上传 ──
+    avatar_max_size_mb: int = 10
+    upload_max_size_mb: int = 32
 
-    # 单文件上传大小上限
-    upload_max_size_mb: int = int(os.getenv("UPLOAD_MAX_SIZE_MB", "32"))
-
-    # 防滥用
+    # ── 防滥用 ──
     rate_limit_per_second: int = 2  # 每个 AI 每秒最多发言次数
 
-    # 向量检索默认参数
+    # ── 向量检索默认参数 ──
     default_top_k: int = 10
     vector_weight: float = 0.6
     bm25_weight: float = 0.3
     time_decay_weight: float = 0.1
 
-    # 意愿评分 + 自动免打扰全局默认
-    default_auto_dnd_threshold: int = 20   # 意愿分数低于此值自动开 DND
-    default_auto_dnd_duration: int = 5     # 自动 DND 时长（分钟）
+    # ── 意愿评分 + 自动免打扰全局默认 ──
+    default_auto_dnd_threshold: int = 20
+    default_auto_dnd_duration: int = 5
 
-    # 摘要缓存 TTL（秒）
-    summary_cache_ttl: int = 600  # 10 分钟
+    # ── 摘要缓存 TTL（秒） ──
+    summary_cache_ttl: int = 600
 
-    # v0.1.4: 系统监控指标保留天数（默认 30，管理员通过环境变量调整）
-    agent_metrics_retention_days: int = int(os.getenv("AGENT_METRICS_RETENTION_DAYS", "30"))
+    # ── 系统监控指标保留天数 ──
+    agent_metrics_retention_days: int = 30
 
-    # v0.1.5: 额度消耗比例（1 credit = N tokens）
-    credit_per_10k_tokens: int = int(os.getenv("CREDIT_PER_TOKENS", "10000"))
+    # ── 额度消耗比例（1 credit = N tokens） ──
+    credit_per_10k_tokens: int = 10000
 
-    # OpenCLI 集成
+    # ── OpenCLI 集成 ──
     opencli_global_enabled: bool = False
-    opencli_default_rate_limit: int = 5     # 每分钟最多 N 次
-    opencli_timeout_seconds: int = 60       # 单个命令超时时间
-    opencli_stdout_max_chars: int = 2000    # stdout 截断长度
+    opencli_default_rate_limit: int = 5
+    opencli_timeout_seconds: int = 60
+    opencli_stdout_max_chars: int = 2000
 
-    # 加密密钥（用于 API Key 加密存储）
-    encryption_key: str = os.getenv(
-        "ENCRYPTION_KEY", jwt_secret_key
-    )  # 默认复用 JWT key
+    # ── 运行环境（development / production） ──
+    environment: str = "development"
 
-    # 显示时区（用于 AI 系统提示词中的当前时间）
-    display_timezone: str = os.getenv("DISPLAY_TIMEZONE", "Asia/Shanghai")
+    @field_validator("environment", mode="before")
+    @classmethod
+    def _lowercase_env(cls, v: str) -> str:
+        return v.lower() if isinstance(v, str) else v
 
-    # 联邦通信 — GitHub 注册表
-    github_token: str = os.getenv("GITHUB_TOKEN", "")
-    registry_repo: str = os.getenv("REGISTRY_REPO", "Coprexist/AIsChat")
-    registry_file: str = os.getenv("REGISTRY_FILE", "federation-registry.json")
+    @property
+    def is_production(self) -> bool:
+        return self.environment == "production"
 
-    # ── CORS 跨域（默认不启用；同源代理部署不需要 CORS）──
-    # 逗号分隔的允许来源；含 "*" 时允许所有来源，且不携带凭据
-    # （浏览器规范禁止 "*" 与凭据组合，带凭据跨域须显式列出具体域名）。
-    allowed_origins: list[str] = [
-        s.strip() for s in os.getenv("ALLOWED_ORIGINS", "").split(",") if s.strip()
-    ]
+    # ── 加密密钥（用于 API Key 加密存储） ──
+    # 生产环境必须显式设置；开发环境自动生成并持久化到 data/encryption_key
+    encryption_key: str = ""
 
-    # ── 维护模式标记目录（文件标记，Linux 容器部署，默认 /tmp）──
-    maintenance_dir: str = os.getenv("MAINTENANCE_DIR", "/tmp")
+    # 持久化密钥文件路径（开发环境自动生成时写入此文件，避免每次重启生成新密钥）
+    _ENCRYPTION_KEY_FILE = Path("/app/data/encryption_key")
+
+    # ── 显示时区 ──
+    display_timezone: str = "Asia/Shanghai"
+
+    # ── 联邦通信 — GitHub 注册表 ──
+    github_token: str = ""
+    registry_repo: str = "Coprexist/AIsChat"
+    registry_file: str = "federation-registry.json"
+
+    # ── CORS 跨域（默认不启用；同源代理部署不需要 CORS） ──
+    allowed_origins: list[str] = []
+
+    @field_validator("allowed_origins", mode="before")
+    @classmethod
+    def _parse_origins(cls, v):
+        """支持逗号分隔的字符串（环境变量常见格式）"""
+        if isinstance(v, str):
+            return [s.strip() for s in v.split(",") if s.strip()]
+        return v
+
+    # ── 维护模式标记目录 ──
+    maintenance_dir: str = "/tmp"
 
     class Config:
         env_file = ".env"
         extra = "allow"
+
+    @model_validator(mode="after")
+    def _check_encryption_key(self):
+        """启动时检查加密密钥安全性
+
+        策略：
+        - 生产环境（ENVIRONMENT=production）：未设置或等于 JWT 密钥 → 中止启动
+        - 开发环境：自动生成随机密钥并持久化到文件（避免每次重启生成新密钥导致已加密数据无法解密）
+        """
+        needs_generate = not self.encryption_key or self.encryption_key == self.jwt_secret_key
+
+        if needs_generate:
+            if self.is_production:
+                # 生产环境：中止启动
+                raise RuntimeError(
+                    "[SECURITY] 生产环境必须设置独立的 ENCRYPTION_KEY 环境变量！"
+                    "当前 ENCRYPTION_KEY 未设置或与 JWT_SECRET_KEY 相同，拒绝启动"
+                )
+
+            # 开发环境：尝试从持久化文件读取
+            key_file = self._ENCRYPTION_KEY_FILE
+            if key_file.exists():
+                try:
+                    self.encryption_key = key_file.read_text().strip()
+                    if self.encryption_key and len(self.encryption_key) == 64:
+                        logger.info("[SECURITY] 从持久化文件读取 ENCRYPTION_KEY")
+                        return self
+                except Exception:
+                    pass
+
+            # 文件不存在或无效：生成新密钥并持久化
+            self.encryption_key = secrets.token_hex(32)
+            try:
+                key_file.parent.mkdir(parents=True, exist_ok=True)
+                key_file.write_text(self.encryption_key)
+                key_file.chmod(0o600)
+                logger.warning(
+                    f"[SECURITY] ENCRYPTION_KEY 已自动生成并持久化到 {key_file}"
+                    f"（开发环境；生产环境请显式设置 ENCRYPTION_KEY）"
+                )
+            except OSError as e:
+                logger.warning(
+                    f"[SECURITY] ENCRYPTION_KEY 已自动生成但持久化失败: {e}"
+                    f"（每次重启将生成新密钥，已加密数据可能无法解密）"
+                )
+
+        return self
 
     @classmethod
     def settings_customise_sources(
