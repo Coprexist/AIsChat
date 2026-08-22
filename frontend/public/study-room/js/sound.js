@@ -84,8 +84,8 @@ function makeLayerBuffer(ctx, key) {
     let k0 = 0, k1 = 0, k2 = 0, k3 = 0, k4 = 0, k5 = 0, k6 = 0;
     // 水滴脉冲状态
     let dropNext = 0, dropPhase = 0, dropDur = 0, dropEnv = 0;
-    // 深海气泡状态：成串出现（一串 1~4 个），单个气泡是短促扫频啁啾
-    let bubNext = 0.3, bubRemain = 0, bubPhase = 0, bubF0 = 0, bubF1 = 0, bubAmp = 0, bubT = 0;
+    // 深海气泡状态：成串出现（一串 1~3 个，串内带随机停顿），单个气泡是低频扫频啁啾
+    let bubNext = 0.8, bubRemain = 0, bubPhase = 0, bubGap = 0, bubF0 = 0, bubF1 = 0, bubAmp = 0, bubT = 0;
     // 幅度包络状态（森林/浪花：随机游走，无固定周期——自然起伏而非规律涨落）
     let env = 0.6, envTarget = 0.6, envNext = 0;
     // 深海涌动 LFO（唯一保留正弦：慢涌 0.035Hz ≈28s 一周期，潮汐感更缓更隐）
@@ -145,30 +145,34 @@ function makeLayerBuffer(ctx, key) {
             // 深海低频水压底噪：棕色噪声 → 140Hz 极低通，恒定、无起伏（水下压力感）
             s = abyssLo.lp(brown) * 5.0;
         } else if (key === 'bubble') {
-            // 深海气泡（柔和咕噜）：一串 1~3 个，串间 0.6~2.8s；
-            // 单个气泡 = 低频扫频啁啾（频率从 f0 缓慢上滑，模拟气泡上升），
-            // 时长更长（140~300ms）、幅度更轻、起落包络圆润——
-            // 只留"咕噜"氛围，不做成脉冲噪音
+            // 深海气泡（柔和咕噜）：低频、圆润、无节拍——
+            // 单泡 160~320ms，频率 140~300Hz 仅轻微上滑（上限 ~450Hz，无尖锐高频）；
+            // 串内气泡间有随机停顿，串间隔用平方分布（多为短、偶有长），彻底打散规律感
             bubNext -= 1 / rate;
             if (bubNext <= 0) {
                 bubRemain = 1 + Math.floor(Math.random() * 3);
-                bubNext = 0.6 + Math.random() * 2.2;
+                bubNext = 0.8 + Math.pow(Math.random(), 2) * 3.5;   // 平方分布：0.8~4.3s
             }
             if (bubRemain > 0) {
-                bubPhase -= 1 / rate;
-                if (bubPhase <= 0) {
-                    bubF0 = 180 + Math.random() * 320;              // 起始频率 180~500Hz（低沉柔和）
-                    bubF1 = bubF0 * (1.6 + Math.random() * 1.0);    // 上滑到 1.6~2.6 倍
-                    bubAmp = 0.35 + Math.random() * 0.45;           // 轻幅度
-                    bubT = 0;
-                    bubPhase = 0.14 + Math.random() * 0.16;         // 单气泡时长 140~300ms
-                    bubRemain--;
-                } else if (bubT < bubPhase) {
-                    const p = bubT / bubPhase;
-                    const f = bubF0 + (bubF1 - bubF0) * p;
-                    const env = Math.sin(Math.PI * Math.min(1, p)); // 起落包络（两端 0）
-                    s = Math.sin(2 * Math.PI * f * bubT) * env * bubAmp * 0.35;
-                    bubT += 1 / rate;
+                if (bubGap > 0) {
+                    bubGap -= 1 / rate;      // 串内随机停顿，避免背靠背连发
+                } else {
+                    bubPhase -= 1 / rate;
+                    if (bubPhase <= 0) {
+                        bubF0 = 140 + Math.random() * 160;          // 140~300Hz 低沉
+                        bubF1 = bubF0 * (1.2 + Math.random() * 0.4); // 轻微上滑 ≤1.6 倍
+                        bubAmp = 0.25 + Math.random() * 0.3;        // 轻幅度
+                        bubT = 0;
+                        bubPhase = 0.16 + Math.random() * 0.16;     // 单泡 160~320ms
+                        bubGap = 0.15 + Math.random() * 0.4;        // 下一泡前停顿 0.15~0.55s
+                        bubRemain--;
+                    } else if (bubT < bubPhase) {
+                        const p = bubT / bubPhase;
+                        const f = bubF0 + (bubF1 - bubF0) * p;
+                        const env = Math.sin(Math.PI * Math.min(1, p)); // 起落包络（两端 0）
+                        s = Math.sin(2 * Math.PI * f * bubT) * env * bubAmp * 0.3;
+                        bubT += 1 / rate;
+                    }
                 }
             }
         }
