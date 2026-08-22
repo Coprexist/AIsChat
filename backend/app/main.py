@@ -27,7 +27,7 @@ app = FastAPI(
     description="让 AI 拥有完整社交行为的群聊平台",
     version=settings.app_version,
     lifespan=lifespan,
-    docs_url=None,       # 自定义文档页面位于 routers/swagger_docs.py
+    docs_url=None,       # 自定义文档路由由 routers/swagger_docs.py 挂载到 /docs
     redoc_url=None,      # 关闭默认 ReDoc，避免重复暴露
     # openapi_url 保留默认 /openapi.json，供调试与代码生成
 )
@@ -63,12 +63,12 @@ async def validation_exception_handler(
 async def global_exception_handler(request: Request, exc: Exception) -> JSONResponse:
     """未捕获异常统一返回 500；完整堆栈仅记录日志，不返回给客户端"""
     # 不能使用 exc_info=True，因为异常处理器中 sys.exc_info() 已清空；
-    # 也不能依赖 sys.exc_info()，因此显式传入异常元组
+    # 直接传入异常实例，logging 会自动提取类型和 traceback
     logger.error(
         "未捕获异常: %s %s",
         request.method,
         request.url.path,
-        exc_info=(type(exc), exc, exc.__traceback__),
+        exc_info=exc,
     )
     return JSONResponse(
         status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
