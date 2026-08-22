@@ -97,8 +97,9 @@ body {
 .timer-col .sound-bar { width: 100%; }
 .timer-col .timer-card { flex: 1; min-height: 0; }
 
-/* 内容体（桌面默认展开显示；小屏 media 内切换为折叠 grid） */
+/* 内容体（桌面：两层完全透明 contents，计时卡/侧栏卡布局原样；小屏 media 内切换为折叠 grid） */
 .acc-body { display: contents; }
+.acc-inner { display: contents; }
 /* 手风琴标题：仅小屏显示，桌面隐藏 */
 .acc-head { display: none; }
 
@@ -529,7 +530,7 @@ body {
 /* 竖屏手机：单列布局，圆环/字体/按钮/间距全部随视口收缩 */
 @media (max-width: 768px) {
     .app { padding: 10px 12px; gap: 8px; }
-    .main { flex-direction: column; gap: 8px; overflow-y: auto; }
+    .main { flex-direction: column; gap: 8px; overflow: hidden; }
     .timer-col { gap: 8px; }
     .timer-card { gap: 12px; padding: 16px 12px; justify-content: flex-start; overflow-y: auto; }
     /* 声音条：按钮 3 列均分两行 + 音量独占一行，窄屏整齐不溢出 */
@@ -568,16 +569,18 @@ body {
     .controls .btn { min-width: 116px; padding: 9px 18px; }
     .cycle-indicator { flex-shrink: 0; }
 
-    /* 侧栏：小屏竖直排列 + 4卡手风琴（计时卡默认展开，其余折叠，点标题切换） */
-    .sidebar {
-        width: 100%;
-        flex-direction: column;
-        overflow-y: visible;
-        overflow-x: hidden;
-        flex: 0 0 auto;
-        gap: 8px;
-    }
-    .sidebar .card { min-width: 0; width: 100%; }
+    /* 侧栏：小屏 display:contents 把 3 卡并入 main 纵向流，与计时列平级——
+       4 卡统一手风琴，谁展开谁 flex:1 撑满剩余高度（展开的+折叠标题=全屏） */
+    .sidebar { display: contents; }
+    .sidebar .card { min-width: 0; }
+
+    /* 4 卡默认折叠态：只占标题行高度 */
+    .timer-col, .sidebar .card { flex: 0 0 auto; }
+    /* 展开态：占满 main 剩余高度（其它卡折叠只留标题）；内容超高时卡内滚动 */
+    .timer-col:has(.acc-open), .sidebar .card.acc-open { flex: 1 1 0; min-height: 0; }
+    .sidebar .card.acc-open { overflow-y: auto; }
+    .timer-col .sound-bar { flex: 0 0 auto; }
+    .timer-col .timer-card { flex: 1 1 0; min-height: 0; }
 
     /* ── 手风琴：计时卡 + 侧栏 3 卡统一，grid 0fr→1fr 平滑展开 ── */
     .acc-head {
@@ -609,7 +612,7 @@ body {
         grid-template-rows: 0fr;
         transition: grid-template-rows 0.35s ease;
     }
-    .acc-inner { overflow: hidden; min-height: 0; }
+    .acc-inner { display: block; overflow: hidden; min-height: 0; }
     .acc-open > .acc-body { grid-template-rows: 1fr; }
     .acc-open > .acc-head::after { content: '－'; }
     .acc-open > .acc-head { color: var(--blue); }
