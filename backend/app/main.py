@@ -66,22 +66,26 @@ async def http_exception_handler(request: Request, exc: HTTPException):
 
 @app.exception_handler(RequestValidationError)
 async def validation_exception_handler(request: Request, exc: RequestValidationError):
-    """请求参数校验失败，返回统一格式，不暴露请求体内容"""
+    """请求参数校验失败，返回统一格式，过滤 input 字段避免泄露请求体内容"""
+    errors = [
+        {k: v for k, v in err.items() if k != "input"}
+        for err in exc.errors()
+    ]
     return JSONResponse(
         status_code=422,
-        content={"detail": exc.errors()},
+        content={"detail": errors},
     )
 
 
 @app.exception_handler(Exception)
 async def global_exception_handler(request: Request, exc: Exception):
     """未捕获异常统一返回模糊错误，详细堆栈仅记录日志"""
-    # 注意：不能使用 exc_info=True，因为异常处理器中 sys.exc_info() 可能已清空
+    # 注意：不能使用 exc_info=True，因为异常处理器中 sys.exc_info() 可能已清空；传异常实例即可
     logger.error(
         "未捕获异常: %s %s",
         request.method,
         request.url.path,
-        exc_info=(type(exc), exc, exc.__traceback__),
+        exc_info=exc,
     )
     return JSONResponse(
         status_code=500,
@@ -106,7 +110,7 @@ async def root():
 @app.get("/maintenance-msg")
 async def public_maintenance_msg():
     """维护状态（仅返回前端需要的精简信息）"""
-    msg = maintenance.get_msg()
+    msg = maintenance.get_msg() or {}
     return {
         "msg": msg.get("hard_body", ""),
         "hard": maintenance.hard_active(),
@@ -121,7 +125,7 @@ async def health():
     except asyncio.TimeoutError:
         db_ok = False
         logger.warning("[WARN] 健康检查: 数据库查询超时（5s）")
-    except Exception as e:
+    except Exception:
         db_ok = False
         logger.warning("[WARN] 健康检查异常", exc_info=True)
 
