@@ -138,22 +138,21 @@ function makeLayerBuffer(ctx, key, def) {
 
         let s = 0;
         if (key === 'rainbed') {
-            // 雨幕（参考 mynoise Cosy Rain/RAIN4 实测）：
-            // 连续不断的中低频沙沙声（低频为主、高频很少、重心~1.3kHz），
-            // 叠加明显的缓慢起伏（真实雨幕能量变异 0.46~0.5：一阵一阵的波动感）；
-            // 细雨（light）= 更轻更柔；暴雨 = 更厚
+            // 雨幕：极轻的连续暗底（低频沙沙为主），退到背景里——
+            // 细雨的主体是"滴答"雨点，雨幕只是让它连续的垫子
             const light = def && def.light;
-            const bw = light ? 0.42 : 1.0;   // 带宽/厚度（细雨稍降，给雨点让位）
-            // 雨幕独立起伏：目标幅度 0.55~1.15、每 5~10s 换一次（比森林呼吸更明显）
+            // 细雨：带宽大幅调低 + 低频垫也降 → 几乎听不见的底
+            const bw = light ? 0.14 : 1.0;
+            const loPad = light ? 0.16 : 0.9;
+            // 雨幕独立起伏（真实雨声能量波动）
             rainNext -= 1 / rate;
             if (rainNext <= 0) {
                 rainTarget = 0.55 + Math.random() * 0.6;
                 rainNext = 5 + Math.random() * 5;
             }
             rainEnv += (rainTarget - rainEnv) * 0.00001;
-            // 中低频沙沙（雨声主体）：600~2500Hz 带通 + 深低频垫
-            s = ((bedHi.lp(w) - bedLo.lp(w)) * 0.9 * bw
-                + swellLo.lp(brown) * (light ? 0.35 : 0.9)) * rainEnv;
+            s = ((bedHi.lp(w) - bedLo.lp(w)) * bw
+                + swellLo.lp(brown) * loPad) * rainEnv;
         } else if (key === 'dropsNear') {
             const light = def && def.light;
             if (light) {
@@ -163,14 +162,14 @@ function makeLayerBuffer(ctx, key, def) {
                 // 强度对数正态（远近层次）、活跃池允许偶尔重叠
                 dropNext -= 1 / rate;
                 if (dropNext <= 0) {
-                    // 近处滴答：10~25 滴/秒（清晰可辨，不是点缀）
-                    dropNext = 0.035 + Math.random() * 0.065;
+                    // 近处滴答：12~25 滴/秒（清晰可辨，主体）
+                    dropNext = 0.04 + Math.random() * 0.045;
                     if (lightDrops.length < 4) {
-                        // 单滴时长：短促噪声瞬态 12~45ms（无音高，像"哒"不是"叮"）
-                        const dur = 0.012 + Math.random() * 0.033;
-                        // 强度：明显凸出雨幕（近处响亮），带远近层次
-                        const amp = Math.max(0.22, Math.min(0.6,
-                            Math.exp(Math.log(0.34) + (Math.random() * 2 - 1) * 0.5)));
+                        // 单滴时长：25~70ms 饱满的噪声瞬态（足够长到能听见）
+                        const dur = 0.025 + Math.random() * 0.045;
+                        // 强度：响亮凸出（近处），带远近层次
+                        const amp = Math.max(0.3, Math.min(0.65,
+                            Math.exp(Math.log(0.42) + (Math.random() * 2 - 1) * 0.45)));
                         lightDrops.push({
                             f: 900 + Math.random() * 2000,       // 0.9~2.9kHz（中频为主）
                             amp,
