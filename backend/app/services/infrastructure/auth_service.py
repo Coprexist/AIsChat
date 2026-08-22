@@ -25,14 +25,14 @@ def _get_api_key_last4(user) -> str:
 
 
 async def register_user(
+    *,
     db: AsyncSession,
     username: str,
     password: str,
     email: str | None = None,
     verification_code: str | None = None,
-    *,
     admin_bypass: bool = False,
-    user_repo: UserRepository | None = None,
+    user_repo: UserRepository,
 ) -> User:
     """
     注册新用户。
@@ -41,8 +41,6 @@ async def register_user(
     如果 require_email_verification=OFF：email 选填。
     admin_bypass=True：管理员后台创建，跳过注册通道开关和邮箱验证。
     """
-    if user_repo is None:
-        user_repo = SQLAlchemyUserRepository(db)
     # 检查用户名是否已存在
     existing_user = await user_repo.get_by_username(username)
     if existing_user is not None:

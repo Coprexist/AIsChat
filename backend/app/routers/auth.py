@@ -7,6 +7,8 @@ from fastapi import APIRouter, Depends, HTTPException, status, Request
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, func
 from app.database import get_db
+from app.routers.deps import get_user_repo
+from app.repositories.user_repo import UserRepository, SQLAlchemyUserRepository
 from app.schemas.auth import (
     RegisterRequest, LoginRequest, TokenResponse, UserInfoResponse,
     EmailVerificationRequest, VerifyEmailRequest, RebindEmailRequest,
@@ -32,15 +34,16 @@ async def has_users(db: AsyncSession = Depends(get_db)):
 
 
 @router.post("/register", response_model=TokenResponse)
-async def register(req: RegisterRequest, request: Request, db: AsyncSession = Depends(get_db)):
+async def register(req: RegisterRequest, request: Request, db: AsyncSession = Depends(get_db), user_repo: UserRepository = Depends(get_user_repo)):
     """注册新用户。第一个注册的用户自动成为管理员。"""
     try:
         user = await register_user(
-            db,
-            req.username,
-            req.password,
+            db=db,
+            username=req.username,
+            password=req.password,
             email=req.email,
             verification_code=req.verification_code,
+            user_repo=user_repo,
         )
         from app.services.audit_service import log_user_action
         ip = request.client.host if request.client else None

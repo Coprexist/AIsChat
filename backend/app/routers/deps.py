@@ -7,6 +7,7 @@ from fastapi import Depends, HTTPException, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.database import get_db
+from app.repositories.user_repo import UserRepository, SQLAlchemyUserRepository
 from app.utils.auth import get_current_user
 from app.services.agent.agent_service import get_agent
 
@@ -24,3 +25,8 @@ async def require_agent_access(
     if agent.owner_id != current_user["user_id"] and current_user["role"] != "admin":
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="无权访问该 AI")
     return agent
+
+
+async def get_user_repo(db: AsyncSession = Depends(get_db)) -> UserRepository:
+    """依赖注入：构造用户仓库。"""
+    return SQLAlchemyUserRepository(db)
