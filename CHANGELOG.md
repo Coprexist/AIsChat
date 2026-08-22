@@ -3,8 +3,25 @@
 本 CHANGELOG 遵循 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.0.0/) 规范，
 版本号遵守 [语义化版本](https://semver.org/lang/zh-CN/)。
 
-> **当前阶段**：v0.3.12 正式版 — 补丁版本号（第三位）递增。
+> **当前阶段**：v0.3.13 正式版 — 补丁版本号（第三位）递增。
 ---
+
+## [v0.3.13] - 2026-08-22
+
+### Changed — 🏗️ 代码审查第二轮修复
+
+- **config.py `MODEL_OPTIONS` 清理**：移除 `get_model_options()` 中残留的 `os.getenv("MODEL_OPTIONS")`，
+  新增 `model_options: str = ""` 字段声明，Pydantic 自动从环境变量读取 JSON 字符串。
+- **加密密钥文件路径不再硬编码**：`_ENCRYPTION_KEY_FILE` 改为 `Path(self.data_dir) / "encryption_key"`，
+  开发环境（如 Windows/macOS）下不再依赖 `/app/data` 固定路径。
+- **请求日志中间件迁出 main.py**：`request_logging_middleware` 移入 `app/middleware.py`，
+  在 `register_middlewares()` 中统一注册，主文件只负责组装。
+- **Swagger UI 文档路由迁出 main.py**：`/docs`、`/docs/zh` 移入 `app/routers/swagger_docs.py`，
+  通过 `get_all_routers()` 自动发现注册，main.py 不再包含路由定义。
+- **Request ID 增强**：优先使用客户端透传的 `X-Request-ID` 请求头，否则生成完整 UUID（不再截断 8 位）。
+- **未识别配置字段警告**：启动时检测 `pydantic_extra` 中的未识别字段并记录 WARNING（帮助排查环境变量拼写错误），
+  保留 `extra = "allow"` 兼容 DB 覆盖层注入。
+- **清理误导注释**：`logging_config.py` 移除未实现的 `LOG_EMOJI=false` 开关描述。
 
 ## [v0.3.12] - 2026-08-22
 

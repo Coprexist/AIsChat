@@ -11,14 +11,11 @@ setup_logging()
 import asyncio
 import logging
 import os
-import time
-import uuid
 
 from fastapi import FastAPI, HTTPException, Request
 from fastapi.responses import JSONResponse
 
 from app.bootstrap import lifespan
-from app.config import settings
 from app.database import check_db_connection
 from app.middleware import register_middlewares
 from app.routers import get_all_routers
@@ -32,39 +29,22 @@ logger = logging.getLogger(__name__)
 # ══════════════════════════════════════════════════════════════
 
 # 应用版本：优先读环境变量（CI/CD 注入），回退硬编码默认值
-APP_VERSION = os.environ.get("APP_VERSION", "0.3.12")
+APP_VERSION = os.environ.get("APP_VERSION", "0.3.13")
 
 app = FastAPI(
     title="AI群聊社交网络",
     description="让 AI 拥有完整社交行为的群聊平台",
     version=APP_VERSION,
     lifespan=lifespan,
-    docs_url=None,  # 使用自定义文档页面
+    docs_url=None,  # 使用自定义文档页面（routers/swagger_docs.py）
 )
-
-
-# ── 自定义 Swagger UI（语言选择 + 快捷登录） ──
-
-@app.get("/docs", include_in_schema=False)
-async def custom_swagger_ui(req: Request):
-    from app.utils.docs_customizer import get_custom_swagger_html
-    lang = req.query_params.get("lang", "en")
-    if lang not in ("zh", "en"):
-        lang = "en"
-    return get_custom_swagger_html(openapi_url="/openapi.json", lang=lang)
-
-
-@app.get("/docs/zh", include_in_schema=False)
-async def swagger_ui_zh():
-    from app.utils.docs_customizer import get_custom_swagger_html
-    return get_custom_swagger_html(openapi_url="/openapi.json", lang="zh")
 
 
 # ── CORS + HTTP 中间件（统一注册） ──
 register_middlewares(app)
 
 
-# 注册路由 — 自动发现 routers/ 下所有模块
+# 注册路由 — 自动发现 routers/ 下所有模块（含 swagger_docs.py）
 for _router in get_all_routers():
     app.include_router(_router)
 
@@ -93,23 +73,6 @@ async def global_exception_handler(request: Request, exc: Exception):
         status_code=500,
         content={"detail": "服务器内部错误"},
     )
-
-
-# ── 请求日志 + Request ID 中间件 ──
-
-@app.middleware("http")
-async def request_logging_middleware(request: Request, call_next):
-    """为每个请求生成 Request ID，记录请求耗时"""
-    request_id = str(uuid.uuid4())[:8]
-    start = time.monotonic()
-    response = await call_next(request)
-    elapsed_ms = (time.monotonic() - start) * 1000
-    response.headers["X-Request-ID"] = request_id
-    logger.info(
-        f"[{request_id}] {request.method} {request.url.path} → "
-        f"{response.status_code} ({elapsed_ms:.0f}ms)"
-    )
-    return response
 
 
 # ══════════════════════════════════════════════════════════════

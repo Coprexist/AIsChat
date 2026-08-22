@@ -5,7 +5,6 @@
 """
 import json
 import logging
-import os
 import secrets
 from pathlib import Path
 
@@ -33,6 +32,8 @@ class Settings(BaseSettings):
     deepseek_base_url: str = "https://api.deepseek.com"
     default_chat_model: str = "deepseek-v4-flash"
     default_work_model: str = "deepseek-v4-pro"
+    # JSON 格式的自定义模型选项列表（优先于默认列表）
+    model_options: str = ""
 
     # ── Embedding 提供方插件化 ──
     # 后端: disabled | ollama | api | local
@@ -68,14 +69,13 @@ class Settings(BaseSettings):
     def get_model_options(self) -> list[dict]:
         """
         返回可用模型选项列表。
-        优先读环境变量 MODEL_OPTIONS（JSON），否则按 API 提供商给默认值。
+        优先读 model_options 字段（MODEL_OPTIONS 环境变量 JSON），否则按 API 提供商给默认值。
         """
-        raw = os.getenv("MODEL_OPTIONS", "")
-        if raw:
+        if self.model_options:
             try:
-                return json.loads(raw)
+                return json.loads(self.model_options)
             except json.JSONDecodeError:
-                pass
+                logger.warning("MODEL_OPTIONS 不是有效 JSON，使用默认模型列表")
         # 默认模型列表
         if self.is_deepseek_api:
             return [
@@ -147,9 +147,6 @@ class Settings(BaseSettings):
     # 生产环境必须显式设置；开发环境自动生成并持久化到 data/encryption_key
     encryption_key: str = ""
 
-    # 持久化密钥文件路径（开发环境自动生成时写入此文件，避免每次重启生成新密钥）
-    _ENCRYPTION_KEY_FILE = Path("/app/data/encryption_key")
-
     # ── 显示时区 ──
     display_timezone: str = "Asia/Shanghai"
 
@@ -177,6 +174,18 @@ class Settings(BaseSettings):
         extra = "allow"
 
     @model_validator(mode="after")
+    def _warn_extra_fields(self):
+        """启动时记录未识别的环境变量，帮助排查配置拼写错误"""
+        known_fields = set(self.model_fields.keys())
+        extra_fields = set(self.__pydantic_extra__ or {}) if hasattr(self, "__pydantic_extra__") else set()
+        if extra_fields:
+            logger.warning(
+                f"[CONFIG] 检测到未识别的配置字段（可能拼写错误或多余）: {extra_fields}"
+                f"（已知字段: {sorted(known_fields)}）"
+            )
+        return self
+
+    @model_validator(mode="after")
     def _check_encryption_key(self):
         """启动时检查加密密钥安全性
 
@@ -195,7 +204,7 @@ class Settings(BaseSettings):
                 )
 
             # 开发环境：尝试从持久化文件读取
-            key_file = self._ENCRYPTION_KEY_FILE
+            key_file = Path(self.data_dir) / "encryption_key"
             if key_file.exists():
                 try:
                     self.encryption_key = key_file.read_text().strip()

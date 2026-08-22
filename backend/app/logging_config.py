@@ -8,8 +8,7 @@
 - 配置 uvicorn 日志格式统一（避免默认格式冲突）
 - 多进程部署时 RotatingFileHandler 可能交错写——单 worker 部署无此问题，
   多 worker 生产环境建议用 stdout 由 ELK/Loki 收集
-- 日志 emoji 是信息设计（✅⚠️💥 是锚点，不是装饰），后续接入日志解析系统时
-  可通过 LOG_EMOJI=false 环境变量关闭
+- 日志 emoji 是信息设计（✅⚠️💥 是锚点，不是装饰）
 """
 import logging
 import logging.config

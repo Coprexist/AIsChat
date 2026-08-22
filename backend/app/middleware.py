@@ -1,5 +1,5 @@
 """
-HTTP 中间件 — CORS + 请求 IP 追踪 + 维护模式拦截。
+HTTP 中间件 — 请求日志/Request ID + CORS + 请求 IP 追踪 + 维护模式拦截。
 
 IP 追踪只取 uvicorn 解析后的 request.client，不自行解析 X-Forwarded-For：
 uvicorn 的 ProxyHeadersMiddleware 仅信任 --forwarded-allow-ips 内的代理
@@ -10,6 +10,8 @@ vite 看到的客户端源是网关 IP，后端审计 IP 为网关地址；要�
 需在宿主层加反向代理并配置 uvicorn --forwarded-allow-ips 指向该代理。
 """
 import logging
+import time
+import uuid
 
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
@@ -23,6 +25,21 @@ logger = logging.getLogger(__name__)
 # 硬维护放行路径：健康检查/文档/管理/认证/维护消息本身/维护弹窗公开图片
 _EXACT_BYPASS = ("/health", "/", "/docs", "/openapi.json")
 _PREFIX_BYPASS = ("/admin", "/auth", "/maintenance-msg", "/fs/public")
+
+
+async def request_logging_middleware(request: Request, call_next):
+    """为每个请求生成/透传 Request ID，记录请求耗时"""
+    # 优先使用客户端透传的 X-Request-ID，否则生成完整 UUID
+    request_id = request.headers.get("X-Request-ID") or str(uuid.uuid4())
+    start = time.monotonic()
+    response = await call_next(request)
+    elapsed_ms = (time.monotonic() - start) * 1000
+    response.headers["X-Request-ID"] = request_id
+    logger.info(
+        f"[{request_id}] {request.method} {request.url.path} → "
+        f"{response.status_code} ({elapsed_ms:.0f}ms)"
+    )
+    return response
 
 
 async def client_ip_middleware(request: Request, call_next):
@@ -60,12 +77,13 @@ async def maintenance_middleware(request: Request, call_next):
 
 
 def register_middlewares(app: FastAPI) -> None:
-    """统一注册所有 HTTP 中间件（CORS + IP 追踪 + 维护模式拦截）
+    """统一注册所有 HTTP 中间件（CORS + 请求日志 + IP 追踪 + 维护模式拦截）
 
     Starlette 后注册者先执行，执行顺序：
     1. maintenance_middleware（维护拦截，最先判断）
     2. client_ip_middleware（IP 追踪）
-    3. CORS（框架内置，最先注册）
+    3. request_logging_middleware（请求日志 + Request ID）
+    4. CORS（框架内置，最先注册）
     """
     # ── CORS（默认不启用：同源代理部署不需要跨域） ──
     # ALLOWED_ORIGINS（逗号分隔）配置后启用：
@@ -83,5 +101,6 @@ def register_middlewares(app: FastAPI) -> None:
         )
 
     # ── 自定义中间件（后注册者先执行） ──
+    app.middleware("http")(request_logging_middleware)
     app.middleware("http")(client_ip_middleware)
     app.middleware("http")(maintenance_middleware)
