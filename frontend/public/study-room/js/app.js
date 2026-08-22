@@ -478,37 +478,67 @@ function bindEvents() {
     studyLoadRemote();
 
     // ── 小屏手风琴（≤768px 生效）：点整张卡片互斥展开/收起 ──
-    const accHosts = document.querySelectorAll('.timer-card, .sidebar .card');
-    const accOpen = () => window.matchMedia('(max-width: 768px)').matches;
+    // 动画用 JS 精确控制 max-height（0↔内容实际高度），收起不再"停住再塌"；
+    // 撑满用 .acc-expanded 类（不依赖 :has 兼容性）；默认展开计时卡（HTML 也有 acc-open 双保险）
+    const accHosts = Array.from(document.querySelectorAll('.timer-card, .sidebar .card'));
+    const accIsMobile = () => window.matchMedia('(max-width: 768px)').matches;
+    const accBodyOf = (host) => host.querySelector(':scope > .acc-body');
+    const accBoxOf = (host) => host.classList.contains('timer-card') ? (host.closest('.timer-col') || host) : host;
+
+    function accCollapse(host) {
+        const body = accBodyOf(host);
+        if (body && body.style.maxHeight && body.style.maxHeight !== '0px') {
+            body.style.maxHeight = body.scrollHeight + 'px';   // 固定当前高度
+            void body.offsetHeight;                            // 强制重排后再归零 → 平滑收起
+            body.style.maxHeight = '0px';
+        }
+        host.classList.remove('acc-open');
+        accBoxOf(host).classList.remove('acc-expanded');
+    }
+    function accExpand(host) {
+        accHosts.forEach(h => { if (h !== host) accCollapse(h); });   // 互斥
+        host.classList.add('acc-open');
+        accBoxOf(host).classList.add('acc-expanded');
+        const body = accBodyOf(host);
+        if (body) {
+            // 等布局稳定后设置精确高度（从 0 平滑展开到内容高）
+            requestAnimationFrame(() => {
+                body.style.maxHeight = body.scrollHeight + 'px';
+            });
+        }
+    }
+
     if (accHosts.length) {
-        // 默认展开：小屏时若全部折叠，强制展开计时卡（双保险，不依赖 HTML class）
-        if (accOpen()) {
-            const anyOpen = document.querySelector('.timer-card.acc-open, .sidebar .card.acc-open');
-            if (!anyOpen) {
-                const t = document.getElementById('timer-card');
-                if (t) t.classList.add('acc-open');
+        // 默认展开：小屏时计时卡展开，其余折叠（HTML 已带 acc-open，这里统一状态）
+        if (accIsMobile()) {
+            accHosts.forEach(h => { h.classList.remove('acc-open'); accBoxOf(h).classList.remove('acc-expanded'); });
+            const t = document.getElementById('timer-card');
+            if (t) {
+                t.classList.add('acc-open');
+                accBoxOf(t).classList.add('acc-expanded');
+                const b = accBodyOf(t);
+                if (b) requestAnimationFrame(() => { b.style.maxHeight = b.scrollHeight + 'px'; });
             }
         }
         accHosts.forEach(host => host.addEventListener('click', (e) => {
-            if (!accOpen()) return;   // 桌面不启用折叠
+            if (!accIsMobile()) return;
             // 点击卡片内部交互元素（按钮/输入框等）不触发折叠
             if (e.target.closest('button, input, a, .todo-checkbox, .todo-delete, .todo-item')) return;
-            // 若已展开 → 收起
-            if (host.classList.contains('acc-open')) {
-                host.classList.remove('acc-open');
-                return;
-            }
-            // 互斥：收起所有，再展开当前
-            accHosts.forEach(c => c.classList.remove('acc-open'));
-            host.classList.add('acc-open');
+            if (host.classList.contains('acc-open')) accCollapse(host);
+            else accExpand(host);
         }));
         // 跨断点切换：进入小屏时若全部折叠则默认展开计时卡
         window.addEventListener('resize', () => {
-            if (accOpen()) {
+            if (accIsMobile()) {
                 const anyOpen = document.querySelector('.timer-card.acc-open, .sidebar .card.acc-open');
                 if (!anyOpen) {
-                    const timerCardEl = document.getElementById('timer-card');
-                    if (timerCardEl) timerCardEl.classList.add('acc-open');
+                    const t = document.getElementById('timer-card');
+                    if (t) {
+                        t.classList.add('acc-open');
+                        accBoxOf(t).classList.add('acc-expanded');
+                        const b = accBodyOf(t);
+                        if (b) requestAnimationFrame(() => { b.style.maxHeight = b.scrollHeight + 'px'; });
+                    }
                 }
             }
         });

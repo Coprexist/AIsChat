@@ -574,17 +574,19 @@ body {
     .sidebar { display: contents; }
     .sidebar .card { min-width: 0; }
 
-    /* 4 卡默认折叠态：只占标题行高度；标题统一靠左、边距一致 */
+    /* 4 卡默认折叠态：只占标题行高度；标题统一靠左、边距一致；
+       折叠时 gap 归零（否则隐藏的 acc-body 也吃间距，计时器比侧栏卡高） */
     .timer-col, .sidebar .card { flex: 0 0 auto; }
-    .timer-card { align-items: stretch; padding: 16px; }
+    .timer-card { align-items: stretch; padding: 16px; gap: 0; }
+    .timer-card.acc-open { gap: 12px; }
     .timer-card .acc-head { align-self: stretch; }
-    /* 展开态：占满 main 剩余高度（其它卡折叠只留标题）；内容超高时卡内滚动 */
-    .timer-col:has(.acc-open), .sidebar .card.acc-open { flex: 1 1 0; min-height: 0; }
-    .sidebar .card.acc-open { overflow-y: auto; }
+    /* 展开态（JS 加 .acc-expanded 控制撑满，不依赖 :has 兼容性）：占满剩余高度，内容超高卡内滚动 */
+    .timer-col.acc-expanded, .sidebar .card.acc-expanded { flex: 1 1 0; min-height: 0; }
+    .sidebar .card.acc-expanded { overflow-y: auto; }
     .timer-col .sound-bar { flex: 0 0 auto; }
     .timer-col .timer-card { flex: 1 1 0; min-height: 0; }
 
-    /* ── 手风琴：max-height 动画（兼容性优于 grid 0fr/1fr），点整卡互斥展开/收起 ── */
+    /* ── 手风琴：max-height 动画（JS 设置精确高度，0↔内容高 真正平滑）── */
     .acc-head {
         display: flex;
         align-items: center;
@@ -611,23 +613,20 @@ body {
         color: var(--text-muted);
         transition: transform 0.2s;
     }
-    /* 内容体：display:block 覆盖桌面全局的 contents（contents 下 max-height 无效导致全展开）！
-       max-height 0→大值 平滑展开 */
+    /* 内容体：display:block 覆盖桌面全局 contents；max-height 由 JS 精确控制（0↔内容高） */
     .acc-body {
         display: block;
         max-height: 0;
         overflow: hidden;
-        transition: max-height 0.35s ease;
+        transition: max-height 0.3s ease;
     }
-    .acc-open > .acc-body { max-height: 2000px; }
+    .acc-open > .acc-body { max-height: 2000px; }   /* 兜底：JS 未运行时也能展开 */
     .acc-open > .acc-head::after { content: '－'; }
     .acc-open > .acc-head { color: var(--blue); margin-bottom: 12px; }
     .card.acc-open > h3.acc-head { margin-bottom: 12px; }
     /* 展开时恢复卡片内部纵向排布 */
     .timer-card.acc-open > .acc-body,
-    .sidebar .card.acc-open > .acc-body { overflow-y: auto; }
-    .timer-card.acc-open > .acc-body,
-    .sidebar .card.acc-open > .acc-body { display: flex; flex-direction: column; gap: 12px; }
+    .sidebar .card.acc-open > .acc-body { display: flex; flex-direction: column; gap: 12px; overflow-y: auto; }
     .timer-card.acc-open > .acc-body { align-items: center; }
     .sidebar .card.acc-open > .acc-body { align-items: stretch; }
 
