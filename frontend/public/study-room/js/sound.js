@@ -145,28 +145,29 @@ function makeLayerBuffer(ctx, key) {
             // 深海低频水压底噪：棕色噪声 → 140Hz 极低通，恒定、无起伏（水下压力感）
             s = abyssLo.lp(brown) * 5.0;
         } else if (key === 'bubble') {
-            // 气泡咕噜噜（参考水下氛围素材）：一串 1~4 个，随机间隔 0.25~2s；
-            // 单个气泡 = 短促扫频啁啾（频率从 f0 快速上滑到 f1，模拟气泡上升时
-            // 共振频率升高），包络快速起落，幅度随机
+            // 深海气泡（柔和咕噜）：一串 1~3 个，串间 0.6~2.8s；
+            // 单个气泡 = 低频扫频啁啾（频率从 f0 缓慢上滑，模拟气泡上升），
+            // 时长更长（140~300ms）、幅度更轻、起落包络圆润——
+            // 只留"咕噜"氛围，不做成脉冲噪音
             bubNext -= 1 / rate;
             if (bubNext <= 0) {
-                bubRemain = 1 + Math.floor(Math.random() * 4);
-                bubNext = 0.25 + Math.random() * 1.75;
+                bubRemain = 1 + Math.floor(Math.random() * 3);
+                bubNext = 0.6 + Math.random() * 2.2;
             }
             if (bubRemain > 0) {
                 bubPhase -= 1 / rate;
                 if (bubPhase <= 0) {
-                    bubF0 = 280 + Math.random() * 420;              // 起始频率 280~700Hz
-                    bubF1 = bubF0 * (2.0 + Math.random() * 1.5);    // 上滑到 2~3.5 倍
-                    bubAmp = 0.5 + Math.random() * 0.7;             // 幅度
+                    bubF0 = 180 + Math.random() * 320;              // 起始频率 180~500Hz（低沉柔和）
+                    bubF1 = bubF0 * (1.6 + Math.random() * 1.0);    // 上滑到 1.6~2.6 倍
+                    bubAmp = 0.35 + Math.random() * 0.45;           // 轻幅度
                     bubT = 0;
-                    bubPhase = 0.04 + Math.random() * 0.06;         // 单气泡时长 40~100ms
+                    bubPhase = 0.14 + Math.random() * 0.16;         // 单气泡时长 140~300ms
                     bubRemain--;
                 } else if (bubT < bubPhase) {
                     const p = bubT / bubPhase;
                     const f = bubF0 + (bubF1 - bubF0) * p;
                     const env = Math.sin(Math.PI * Math.min(1, p)); // 起落包络（两端 0）
-                    s = Math.sin(2 * Math.PI * f * bubT) * env * bubAmp * 0.5;
+                    s = Math.sin(2 * Math.PI * f * bubT) * env * bubAmp * 0.35;
                     bubT += 1 / rate;
                 }
             }
