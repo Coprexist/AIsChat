@@ -5,8 +5,8 @@
 import logging
 from fastapi import APIRouter, Depends, HTTPException, status, Query
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select
 from app.database import get_db
+from app.repositories.friend_repo import FriendRepository
 from app.schemas.friendship import (
     FriendRequestCreate, FriendRequestResponse,
     FriendResponse, SearchResponse, SearchResult,
@@ -16,6 +16,7 @@ from app.services.social.friend_service import (
     remove_friend, list_friends, list_friend_requests, search_entities,
 )
 from app.utils.auth import get_current_user
+from app.routers.deps import get_friend_repo
 from app.routers.ws import manager
 
 logger = logging.getLogger(__name__)
@@ -45,10 +46,14 @@ async def _resolve_target_user_id(db: AsyncSession, target_type: str, target_id:
 async def search(
     q: str = Query(..., min_length=1, description="搜索关键词"),
     current_user: dict = Depends(get_current_user),
-    db: AsyncSession = Depends(get_db),
+    friend_repo: FriendRepository = Depends(get_friend_repo),
 ):
     """搜索用户和 AI（支持按用户名/AI名搜索）"""
-    results = await search_entities(db, q, current_user["user_id"])
+    results = await search_entities(
+        friend_repo=friend_repo,
+        query=q,
+        current_user_id=current_user["user_id"],
+    )
     return {"results": results, "query": q}
 
 
@@ -57,10 +62,15 @@ async def list_my_friends(
     limit: int = Query(50, ge=1, le=200),
     offset: int = Query(0, ge=0),
     current_user: dict = Depends(get_current_user),
-    db: AsyncSession = Depends(get_db),
+    friend_repo: FriendRepository = Depends(get_friend_repo),
 ):
     """获取我的好友列表"""
-    friends = await list_friends(db, current_user["user_id"], limit=limit, offset=offset)
+    friends = await list_friends(
+        friend_repo=friend_repo,
+        user_id=current_user["user_id"],
+        limit=limit,
+        offset=offset,
+    )
     # 注入在线状态（统一函数）
     from app.services.infrastructure.online_tracker import get_user_online_status
     for f in friends:
@@ -74,21 +84,14 @@ async def list_my_friends(
 async def toggle_friend_priority(
     friendship_id: int,
     current_user: dict = Depends(get_current_user),
-    db: AsyncSession = Depends(get_db),
+    friend_repo: FriendRepository = Depends(get_friend_repo),
 ):
     """切换特别关心状态"""
-    from app.models.friendship import Friendship
-    result = await db.execute(
-        select(Friendship).where(
-            Friendship.id == friendship_id,
-            Friendship.user_id == current_user["user_id"],
-        )
-    )
-    friendship = result.scalar_one_or_none()
+    friendship = await friend_repo.get_friendship_by_id(friendship_id, current_user["user_id"])
     if friendship is None:
         raise HTTPException(status_code=404, detail="好友关系不存在")
     friendship.is_priority = not friendship.is_priority
-    await db.commit()
+    await friend_repo.flush()
     return {"is_priority": friendship.is_priority}
 
 
@@ -96,12 +99,12 @@ async def toggle_friend_priority(
 async def create_friend_request(
     req: FriendRequestCreate,
     current_user: dict = Depends(get_current_user),
-    db: AsyncSession = Depends(get_db),
+    friend_repo: FriendRepository = Depends(get_friend_repo),
 ):
     """发送好友申请"""
     try:
         result = await send_friend_request(
-            db,
+            friend_repo=friend_repo,
             requester_id=current_user["user_id"],
             target_type=req.target_type,
             target_id=req.target_id,
@@ -132,13 +135,9 @@ async def create_friend_request(
         # 🎯 目标 AI 开启「自动响应好友申请」→ 触发 AI 自主处理（不建 DM 会话，通不通过由 AI 判断）
         if req.target_type == "ai" and result.get("auto_respond"):
             try:
-                from app.models.agent import Agent as AgentModel
-                from app.ai.alarm import _process_friend_request_event
+                                from app.ai.alarm import _process_friend_request_event
 
-                agent_res = await db.execute(
-                    select(AgentModel).where(AgentModel.user_id == req.target_id)
-                )
-                target_agent = agent_res.scalar_one_or_none()
+                target_agent = await friend_repo.get_agent_by_user_id(req.target_id)
                 if target_agent:
                     await _process_friend_request_event(db, {
                         "agent_id": target_agent.id,
@@ -165,10 +164,15 @@ async def list_requests(
     status_filter: str = Query("pending", description="pending | accepted | rejected"),
     received_only: bool = Query(False, description="仅返回收到的申请（用于红点计数）"),
     current_user: dict = Depends(get_current_user),
-    db: AsyncSession = Depends(get_db),
+    friend_repo: FriendRepository = Depends(get_friend_repo),
 ):
     """获取我的好友申请（默认收到 + 发出，received_only 仅返回收到的）"""
-    return await list_friend_requests(db, current_user["user_id"], status=status_filter, received_only=received_only)
+    return await list_friend_requests(
+        friend_repo=friend_repo,
+        user_id=current_user["user_id"],
+        status=status_filter,
+        received_only=received_only,
+    )
 
 
 @router.post("/friends/requests/{request_id}/accept")
@@ -176,18 +180,23 @@ async def accept_request(
     request_id: int,
     current_user: dict = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
+    friend_repo: FriendRepository = Depends(get_friend_repo),
 ):
     """接受好友申请"""
     try:
         # 先获取请求详情（用于后续 DM 附言注入）
-        f_req = await _get_friend_request(db, request_id)
+        f_req = await friend_repo.get_friend_request_by_id(request_id)
         req_message = f_req.message if f_req else None
         req_created_at = f_req.created_at if f_req else None
         req_requester_id = f_req.requester_id if f_req else None
         req_target_type = f_req.target_type if f_req else None
         req_target_id = f_req.target_id if f_req else None
 
-        result = await accept_friend_request(db, request_id, current_user["user_id"])
+        result = await accept_friend_request(
+            friend_repo=friend_repo,
+            request_id=request_id,
+            user_id=current_user["user_id"],
+        )
 
         # 通知发起者：申请已被接受
         if req_requester_id:
@@ -220,12 +229,17 @@ async def reject_request(
     request_id: int,
     current_user: dict = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
+    friend_repo: FriendRepository = Depends(get_friend_repo),
 ):
     """拒绝好友申请"""
     try:
-        result = await reject_friend_request(db, request_id, current_user["user_id"])
+        result = await reject_friend_request(
+            friend_repo=friend_repo,
+            request_id=request_id,
+            user_id=current_user["user_id"],
+        )
         # 通知发起者：申请已被拒绝
-        req = await _get_friend_request(db, request_id)
+        req = await friend_repo.get_friend_request_by_id(request_id)
         if req:
             await _notify_friend_request(db, "request_rejected", {
                 "request_id": request_id,
@@ -241,24 +255,22 @@ async def delete_friend(
     friend_type: str,
     friend_id: int,
     current_user: dict = Depends(get_current_user),
-    db: AsyncSession = Depends(get_db),
+    friend_repo: FriendRepository = Depends(get_friend_repo),
 ):
     """删除好友"""
     if friend_type not in ("human", "ai"):
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="无效的好友类型")
     try:
-        return await remove_friend(db, current_user["user_id"], friend_type, friend_id)
+        return await remove_friend(
+            friend_repo=friend_repo,
+            user_id=current_user["user_id"],
+            friend_type=friend_type,
+            friend_id=friend_id,
+        )
     except ValueError as e:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
 
 
-async def _get_friend_request(db: AsyncSession, request_id: int):
-    """获取好友申请（用于获取 requester_id 发送通知）"""
-    from app.models.friendship import FriendshipRequest
-    result = await db.execute(
-        select(FriendshipRequest).where(FriendshipRequest.id == request_id)
-    )
-    return result.scalar_one_or_none()
 
 
 async def _inject_friend_greeting(
