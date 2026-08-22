@@ -89,7 +89,7 @@ function makeNoiseBuffer(ctx, type) {
             let s = 0;
             if (type === 'rain') {
                 // 雨幕：白噪 → 二阶带通 400~3000Hz（雨落的"嘶"，主体）
-                s = (rainBedHi.lp(w) - rainBedLo.lp(w)) * 1.4 + brown * 0.06;
+                s = (rainBedHi.lp(w) - rainBedLo.lp(w)) * 1.3 + brown * 0.06;
             } else if (type === 'forest') {
                 const wind = windLo.lp(brown);
                 const leaf = leafLo.lp(w);
