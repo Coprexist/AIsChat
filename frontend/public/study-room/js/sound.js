@@ -156,10 +156,9 @@ function makeLayerBuffer(ctx, key, def) {
             const quiet = def && def.quiet;
             const ampScale = (quiet ? 0.12 : 0.3) * BUBBLE_VOLUME;
             const maxConc = quiet ? 3 : 4;
-            // 串内触发间隔：以 > 气泡时长（0.16~0.32s）为主 → 多数气泡一前一后，
-            // 少数间隔较短时偶尔重叠；不用短间隔全重叠
+            // 串内触发间隔：以 > 气泡时长为主 → 多数气泡一前一后，偶尔重叠
             const inSerGap = quiet ? 0.3 + Math.pow(Math.random(), 2) * 0.4   // 0.3~0.7s
-                                   : 0.24 + Math.pow(Math.random(), 2) * 0.36; // 0.24~0.6s
+                                   : 0.24 + Math.pow(Math.random(), 2) * 0.32; // 0.24~0.56s
             const serGap = quiet ? 1.4 + Math.pow(Math.random(), 2) * 4.5
                                  : 1.2 + Math.pow(Math.random(), 2) * 4;   // 串间隔
             bubNext -= 1 / rate;
@@ -174,12 +173,14 @@ function makeLayerBuffer(ctx, key, def) {
                     bubNext = inSerGap;
                 }
                 if (bubbles.length < maxConc) {
-                    const f0 = 140 + Math.random() * 160;
+                    // 低沉圆润的"咕噜"音：100~220Hz 几乎不扫频（1.05~1.3 倍）、
+                    // 时长 180~340ms——频率不猛跳就没有"啵"的清脆感
+                    const f0 = 100 + Math.random() * 120;
                     bubbles.push({
                         f0,
-                        f1: f0 * (1.4 + Math.random() * 0.6),
+                        f1: f0 * (1.05 + Math.random() * 0.25),
                         amp: (0.25 + Math.random() * 0.3) * ampScale,
-                        dur: 0.16 + Math.random() * 0.16,
+                        dur: 0.18 + Math.random() * 0.16,
                         t: 0,
                     });
                 }
