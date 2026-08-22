@@ -31,10 +31,11 @@ const LAYER_DEFS = {
         { key: 'rainbed', az: 0.7 },
         { key: 'raindrops', drift: true },
     ],
-    forest: [
+    forest: [                    // 森林：以风声为主（左右两层立体风 + 粉噪 + 叶沙点缀）
         { key: 'wind', az: -0.8 },
+        { key: 'wind', az: 0.8 },
         { key: 'pink', az: 0 },
-        { key: 'leaf', az: 0.8 },
+        { key: 'leaf', az: 0, drift: true },
     ],
     sea: [                       // 海面：涌动 + 浪花（原"深海"改名）
         { key: 'swell', az: 0 },
@@ -134,11 +135,11 @@ function makeLayerBuffer(ctx, key, def) {
                 dropPhase -= 1 / rate;
             }
         } else if (key === 'wind') {
-            s = windLo.lp(brown) * 1.6 * walkEnv(i);
+            s = windLo.lp(brown) * 2.6 * walkEnv(i);
         } else if (key === 'leaf') {
-            s = leafLo.lp(w) * 0.5 * walkEnv(i);
+            s = leafLo.lp(w) * 0.35 * walkEnv(i);
         } else if (key === 'pink') {
-            s = pink * 0.3 * walkEnv(i);
+            s = pink * 0.2 * walkEnv(i);
         } else if (key === 'swell') {
             const lfo = 0.75 + 0.25 * Math.sin(2 * Math.PI * lfoFreq * i / rate);
             s = swellLo.lp(brown) * 3.6 * lfo;
