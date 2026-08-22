@@ -150,13 +150,18 @@ function makeLayerBuffer(ctx, key, def) {
         } else if (key === 'bubble') {
             // 深海气泡（可重叠的咕噜串）：一串 1~8 个（偏大分布），串内密集触发，
             // 新气泡不等旧气泡播完——多个气泡同时发声叠加，像水下气泡群一起冒；
-            // quiet=小音量远层组：幅度更低、并发更少、串更小更稀，做背景层次
+            // quiet=小音量远层组：音量低 → 频率可更高、时长更短，保留清脆"啵"的气泡感，
+            // 同时串更小更稀，只做背景层次不抢主组
             const quiet = def && def.quiet;
-            const ampScale = quiet ? 0.12 : 0.3;          // 小声组约为主组的 40%
+            const ampScale = quiet ? 0.15 : 0.3;
             const maxConc = quiet ? 3 : 4;
-            const serGap = quiet ? 2.2 + Math.pow(Math.random(), 2) * 5
+            const f0min = quiet ? 350 : 140;                    // 小声组音调更高 → 气泡感
+            const f0span = quiet ? 450 : 160;
+            const durMin = quiet ? 0.09 : 0.16;                 // 小声组更短促 → "啵"
+            const durSpan = quiet ? 0.1 : 0.16;
+            const serGap = quiet ? 1.6 + Math.pow(Math.random(), 2) * 4
                                  : 1.2 + Math.pow(Math.random(), 2) * 4;   // 串间隔
-            const inSerGap = quiet ? 0.2 + Math.random() * 0.3
+            const inSerGap = quiet ? 0.12 + Math.random() * 0.22
                                    : 0.08 + Math.random() * 0.2;           // 串内触发
             bubNext -= 1 / rate;
             if (bubNext <= 0) {
@@ -170,11 +175,12 @@ function makeLayerBuffer(ctx, key, def) {
                     bubNext = inSerGap;
                 }
                 if (bubbles.length < maxConc) {
+                    const f0 = f0min + Math.random() * f0span;
                     bubbles.push({
-                        f0: 140 + Math.random() * 160,
-                        f1: (140 + Math.random() * 160) * (1.2 + Math.random() * 0.4),
+                        f0,
+                        f1: f0 * (1.4 + Math.random() * 0.6),
                         amp: (0.25 + Math.random() * 0.3) * ampScale,
-                        dur: 0.16 + Math.random() * 0.16,
+                        dur: durMin + Math.random() * durSpan,
                         t: 0,
                     });
                 }
