@@ -55,6 +55,10 @@
                 </div>
             <!-- 计时器 -->
             <section class="timer-card mode-focus" id="timer-card">
+                <div class="acc-head" data-acc="timer">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="13" r="8"/><path d="M12 9v4l2.5 2.5"/><path d="M9 2h6"/></svg>
+                    计时器
+                </div>
                 <div class="mode-tabs">
                     <button class="mode-tab active" data-mode="focus">专注</button>
                     <button class="mode-tab" data-mode="short">短休</button>
@@ -87,7 +91,7 @@
             <aside class="sidebar" id="sidebar">
                 <!-- 待办 -->
                 <div class="card">
-                    <h3>
+                    <h3 class="acc-head" data-acc="todo">
                         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg>
                         待办事项 <span id="todo-count">0</span>
                     </h3>
@@ -101,7 +105,7 @@
 
                 <!-- 统计 -->
                 <div class="card">
-                    <h3>
+                    <h3 class="acc-head" data-acc="stats">
                         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 20V10M12 20V4M6 20v-6"/></svg>
                         今日统计
                     </h3>
@@ -133,7 +137,7 @@
 
                 <!-- 近 15 天 -->
                 <div class="card">
-                    <h3>
+                    <h3 class="acc-head" data-acc="chart">
                         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4M8 2v4M3 10h18"/></svg>
                         近 15 天
                     </h3>

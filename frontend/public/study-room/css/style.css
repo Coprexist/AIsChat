@@ -563,17 +563,57 @@ body {
     .controls .btn { min-width: 116px; padding: 9px 18px; }
     .cycle-indicator { flex-shrink: 0; }
 
-    /* 侧栏：小屏一字排开横向滚动（矮条），不占垂直空间——timer-card 保持大 */
+    /* 侧栏：小屏竖直排列 + 4卡手风琴（计时卡默认展开，其余折叠，点标题切换） */
     .sidebar {
         width: 100%;
-        flex-direction: row;
-        overflow-x: auto;
-        overflow-y: hidden;
+        flex-direction: column;
+        overflow-y: visible;
+        overflow-x: hidden;
         flex: 0 0 auto;
+        gap: 8px;
     }
-    .sidebar .card { min-width: 220px; flex: 1; }
-    /* 侧栏卡片收矮：待办列表限高，整条侧栏更矮，给计时卡让出高度 */
-    .sidebar .todo-list { max-height: 96px; }
+    .sidebar .card { min-width: 0; width: 100%; }
+
+    /* ── 手风琴：计时卡 + 侧栏 3 卡统一 ── */
+    .acc-head {
+        display: flex;
+        align-items: center;
+        gap: 6px;
+        font-size: 0.8rem;
+        font-weight: 600;
+        text-transform: uppercase;
+        letter-spacing: 0.06em;
+        color: var(--text-secondary);
+        cursor: pointer;
+        user-select: none;
+        padding: 2px 0;
+        margin-bottom: 0;
+    }
+    .acc-head svg { width: 14px; height: 14px; }
+    .acc-head::after {
+        content: '＋';
+        margin-left: auto;
+        font-size: 0.85rem;
+        font-weight: 400;
+        color: var(--text-muted);
+        transition: transform 0.2s;
+    }
+    /* 默认折叠：标题外内容隐藏 */
+    .timer-card > :not(.acc-head),
+    .sidebar .card > :not(.acc-head) { display: none; }
+    /* 展开态：计时卡默认展开，侧栏卡点击展开 */
+    .timer-card.acc-open > :not(.acc-head),
+    .sidebar .card.acc-open > :not(.acc-head) { display: block; }
+    .timer-card.acc-open > .acc-head,
+    .sidebar .card.acc-open > .acc-head { margin-bottom: 12px; }
+    .timer-card.acc-open .acc-head::after,
+    .sidebar .card.acc-open .acc-head::after { content: '－'; }
+    .timer-card.acc-open .acc-head { color: var(--blue); }
+    /* 折叠状态保持卡片观感 */
+    .timer-card, .sidebar .card { flex-shrink: 0; }
+
+    /* 待办列表限高（展开时内部滚动） */
+    .sidebar .todo-list { max-height: 160px; }
 
     .footer { font-size: 0.78rem; }
 }
