@@ -273,10 +273,10 @@ class ResidentManager:
 
     async def restore_all(self, db) -> int:
         """后端启动时恢复所有常驻世界（config.resident=true 且 main.py 存在）"""
-        from sqlalchemy import select
+        from sqlalchemy import cast, select, String
         from app.models.world import World
         rows = (await db.execute(
-            select(World).where(World.config["resident"].astext == "true")
+            select(World).where(cast(World.config["resident"], String) == "true")
         )).scalars().all()
         started = 0
         for w in rows:
