@@ -12,13 +12,13 @@
 
 let audioCtx = null;
 let masterGain = null;
-let swapTimer = null;
 let layers = [];          // 当前音色的所有声源层
-let active = 0;           // 全局交叉淡化：所有层同一时刻切换
 
-const BUFFER_SECONDS = 10;
-const FADE = 0.3;
-const SWAP_INTERVAL = BUFFER_SECONDS - FADE;
+// 每层独立交叉淡化（错峰 + 随机 jitter）：任何时刻只有一层在过渡，
+// 避免"所有层同时切换"造成的周期性落差感
+const BUFFER_SECONDS = 20;
+const FADE = 0.8;
+const SWAP_JITTER = 4;    // 每层切换间隔额外 ±4s 随机错峰（秒）
 
 // ── 层配置：每个音色由若干声源层组成，az = 方位角（弧度，0=正前，+右 -左）──
 // drift: 声源方位随机漂移（浪花/水滴在声场中缓缓移动）
@@ -76,10 +76,21 @@ function makeLayerBuffer(ctx, key) {
     let k0 = 0, k1 = 0, k2 = 0, k3 = 0, k4 = 0, k5 = 0, k6 = 0;
     // 水滴脉冲状态
     let dropNext = 0, dropPhase = 0, dropDur = 0, dropEnv = 0;
-    // 浪花幅度包络（连续随机游走，非脉冲）
-    let env = 0.45, envTarget = 0.45, envNext = 0;
-    // 各层 LFO（风声/涌动）
-    const lfoFreq = key === 'swell' ? 0.07 : key === 'wind' || key === 'leaf' || key === 'pink' ? 0.11 : 0;
+    // 幅度包络状态（森林/浪花：随机游走，无固定周期——自然起伏而非规律涨落）
+    let env = 0.6, envTarget = 0.6, envNext = 0;
+    // 深海涌动 LFO（唯一保留正弦：慢涌 0.07Hz，深海底噪本来就要"潮汐感"）
+    const lfoFreq = key === 'swell' ? 0.07 : 0;
+
+    // 随机游走包络：每 1~4s 随机换目标幅度，慢逼近（τ≈1s）→ 无周期、平滑起伏
+    const walkEnv = (i) => {
+        envNext -= 1 / rate;
+        if (envNext <= 0) {
+            envTarget = 0.45 + Math.random() * 0.75;
+            envNext = 1 + Math.random() * 3;
+        }
+        env += (envTarget - env) * 0.00002;
+        return env;
+    };
 
     for (let i = 0; i < len; i++) {
         const w = Math.random() * 2 - 1;
@@ -109,25 +120,16 @@ function makeLayerBuffer(ctx, key) {
                 dropPhase -= 1 / rate;
             }
         } else if (key === 'wind') {
-            const lfo = 0.6 + 0.4 * Math.sin(2 * Math.PI * lfoFreq * i / rate);
-            s = windLo.lp(brown) * 1.6 * lfo;
+            s = windLo.lp(brown) * 1.6 * walkEnv(i);
         } else if (key === 'leaf') {
-            const lfo = 0.6 + 0.4 * Math.sin(2 * Math.PI * lfoFreq * i / rate + 1.2);
-            s = leafLo.lp(w) * 0.5 * lfo;
+            s = leafLo.lp(w) * 0.5 * walkEnv(i);
         } else if (key === 'pink') {
-            const lfo = 0.6 + 0.4 * Math.sin(2 * Math.PI * lfoFreq * i / rate + 2.4);
-            s = pink * 0.3 * lfo;
+            s = pink * 0.3 * walkEnv(i);
         } else if (key === 'swell') {
             const lfo = 0.65 + 0.35 * Math.sin(2 * Math.PI * lfoFreq * i / rate);
             s = swellLo.lp(brown) * 3.6 * lfo;
         } else if (key === 'foam') {
-            envNext -= 1 / rate;
-            if (envNext <= 0) {
-                envTarget = 0.22 + Math.random() * 0.7;
-                envNext = 0.08 + Math.random() * 0.17;
-            }
-            env += (envTarget - env) * 0.00005;
-            s = (foamHi.lp(w) - foamLo.lp(w)) * 1.1 * env;
+            s = (foamHi.lp(w) - foamLo.lp(w)) * 1.1 * walkEnv(i);
         }
         data[i] = s;
     }
@@ -153,17 +155,23 @@ function makeSource(buffer, gain, panner) {
     return s;
 }
 
-// 漂移层：每 2~6s 随机换一个方位（HRTF 平滑移动，声源在声场中缓缓游走）
+// 漂移层：每 1~2s 微调目标方位（±20°），HRTF 用 τ=2s 连续渐变跟随——
+// 声像永远在平滑渐变（如"左40% 5秒内渐到左48%"），不会跳到端点
 function scheduleDrift(ly) {
     ly.driftTimer = setTimeout(() => {
-        const az = (Math.random() * 2 - 1) * 1.0;   // ±57°
-        placePanner(ly.panner, az);
+        const az = Math.min(1.0, Math.max(-1.0, ly.az + (Math.random() - 0.5) * 0.7));
+        ly.az = az;
+        const t = audioCtx.currentTime;
+        ly.panner.positionX.setTargetAtTime(Math.sin(az), t, 2);
+        ly.panner.positionY.setTargetAtTime(0, t, 2);
+        ly.panner.positionZ.setTargetAtTime(-Math.cos(az), t, 2);
         scheduleDrift(ly);
-    }, 2000 + Math.random() * 4000);
+    }, 1000 + Math.random() * 1000);
 }
 
 function createLayer(def) {
-    const ly = { def, panner: null, bufs: [null, null], srcs: [null, null], gains: [null, null], driftTimer: null };
+    const ly = { def, panner: null, bufs: [null, null], srcs: [null, null], gains: [null, null], driftTimer: null, swapTimer: null, active: 0, az: def.az ?? 0 };
+    if (def.drift && ly.az === 0) ly.az = (Math.random() * 2 - 1) * 0.6;  // 漂移层随机起点
     ly.panner = new PannerNode(audioCtx, {
         panningModel: 'HRTF',
         distanceModel: 'inverse',
@@ -182,23 +190,28 @@ function createLayer(def) {
     return ly;
 }
 
-// 全局交叉淡化：所有层同一时刻切换
-function swapBuffers() {
-    if (!layers.length) return;
+// 单层交叉淡化：该层独立切换，间隔带随机 jitter（错峰 → 任何时刻只一层在过渡）
+function scheduleLayerSwap(ly) {
+    const delay = (BUFFER_SECONDS - FADE + Math.random() * SWAP_JITTER) * 1000;
+    ly.swapTimer = setTimeout(() => {
+        swapLayer(ly);
+        scheduleLayerSwap(ly);
+    }, delay);
+}
+
+function swapLayer(ly) {
     const t = audioCtx.currentTime + 0.02;
-    const next = 1 - active;
-    for (const ly of layers) {
-        ly.gains[active].gain.cancelScheduledValues(t);
-        ly.gains[active].gain.setValueAtTime(Math.max(ly.gains[active].gain.value, 0.0001), t);
-        ly.gains[active].gain.linearRampToValueAtTime(0, t + FADE);
-        try { ly.srcs[next].stop(); } catch (e) {}
-        try { ly.srcs[next].disconnect(); } catch (e) {}
-        ly.srcs[next] = makeSource(ly.bufs[next], ly.gains[next], ly.panner);
-        ly.gains[next].gain.cancelScheduledValues(t);
-        ly.gains[next].gain.setValueAtTime(0, t);
-        ly.gains[next].gain.linearRampToValueAtTime(1, t + FADE);
-    }
-    active = next;
+    const next = 1 - ly.active;
+    ly.gains[ly.active].gain.cancelScheduledValues(t);
+    ly.gains[ly.active].gain.setValueAtTime(Math.max(ly.gains[ly.active].gain.value, 0.0001), t);
+    ly.gains[ly.active].gain.linearRampToValueAtTime(0, t + FADE);
+    try { ly.srcs[next].stop(); } catch (e) {}
+    try { ly.srcs[next].disconnect(); } catch (e) {}
+    ly.srcs[next] = makeSource(ly.bufs[next], ly.gains[next], ly.panner);
+    ly.gains[next].gain.cancelScheduledValues(t);
+    ly.gains[next].gain.setValueAtTime(0, t);
+    ly.gains[next].gain.linearRampToValueAtTime(1, t + FADE);
+    ly.active = next;
 }
 
 // 三角分布 [min,max]，峰值在 mode（高潮持续时间：更多落在 ~40s）
@@ -268,19 +281,17 @@ async function startNoise(type) {
         masterGain.connect(audioCtx.destination);
     }
 
-    // 创建各声源层并摆位
+    // 创建各声源层并摆位，每层独立错峰交叉淡化
     layers = LAYER_DEFS[type].map((def) => {
         const ly = createLayer(def);
         if (!stereo) {
             placePanner(ly.panner, 0);   // 单声道：全部居中
         } else if (def.drift) {
-            scheduleDrift(ly);           // 漂移层：HRTF 方位随机游走
+            scheduleDrift(ly);           // 漂移层：HRTF 方位连续渐变游走
         }
+        scheduleLayerSwap(ly);           // 每层独立切换（随机错峰）
         return ly;
     });
-    active = 0;
-
-    swapTimer = setInterval(swapBuffers, SWAP_INTERVAL * 1000);
 
     state.soundType = type;
     updateSoundButtons();
@@ -288,10 +299,10 @@ async function startNoise(type) {
 
 // 停止噪声
 function stopNoise() {
-    if (swapTimer) { clearInterval(swapTimer); swapTimer = null; }
     if (swellTimer) { clearInterval(swellTimer); swellTimer = null; }
     for (const ly of layers) {
         if (ly.driftTimer) clearTimeout(ly.driftTimer);
+        if (ly.swapTimer) clearTimeout(ly.swapTimer);
         for (let i = 0; i < 2; i++) {
             if (ly.srcs[i]) { try { ly.srcs[i].stop(); } catch (e) {} try { ly.srcs[i].disconnect(); } catch (e) {} ly.srcs[i] = null; }
             if (ly.gains[i]) { try { ly.gains[i].disconnect(); } catch (e) {} ly.gains[i] = null; }
