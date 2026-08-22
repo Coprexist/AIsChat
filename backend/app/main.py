@@ -64,8 +64,10 @@ def global_exception_handler(request: Request, exc: Exception) -> JSONResponse:
     """未捕获异常统一返回 500；完整堆栈仅记录日志，不返回给客户端"""
     # 直接传入异常实例，避免对 sys.exc_info() 的隐式依赖；
     # logging 会自动提取类型和 traceback
+    request_id = getattr(request.state, "request_id", None)
     logger.error(
-        "未捕获异常: %s %s",
+        "未捕获异常 [request_id=%s]: %s %s",
+        request_id,
         request.method,
         request.url.path,
         exc_info=exc,

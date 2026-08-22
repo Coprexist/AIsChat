@@ -31,6 +31,8 @@ async def request_logging_middleware(request: Request, call_next):
     """为每个请求生成/透传 Request ID，记录请求耗时"""
     # 优先使用客户端透传的 X-Request-ID，否则生成完整 UUID
     request_id = request.headers.get("X-Request-ID") or str(uuid.uuid4())
+    # 存储到 state，供全局异常处理器关联日志
+    request.state.request_id = request_id
     start = time.monotonic()
     response = await call_next(request)
     elapsed_ms = (time.monotonic() - start) * 1000
