@@ -501,24 +501,18 @@ function bindEvents() {
         accBoxOf(host).classList.add('acc-expanded');
         const body = accBodyOf(host);
         if (body) {
-            // 等布局稳定后设置精确高度（从 0 平滑展开到内容高）
-            requestAnimationFrame(() => {
-                body.style.maxHeight = body.scrollHeight + 'px';
-            });
+            body.style.maxHeight = '';           // 清掉折叠残留的 inline 0px（否则盖过 CSS 兜底）
+            void body.offsetHeight;              // 强制布局：display:flex 生效后再量
+            body.style.maxHeight = body.scrollHeight + 'px';  // 同步精确高度，从 0 平滑展开
         }
     }
 
     if (accHosts.length) {
-        // 默认展开：小屏时计时卡展开，其余折叠（HTML 已带 acc-open，这里统一状态）
+        // 默认展开：小屏时计时卡展开，其余折叠（复用 accExpand：同步精确高度）
         if (accIsMobile()) {
             accHosts.forEach(h => { h.classList.remove('acc-open'); accBoxOf(h).classList.remove('acc-expanded'); });
             const t = document.getElementById('timer-card');
-            if (t) {
-                t.classList.add('acc-open');
-                accBoxOf(t).classList.add('acc-expanded');
-                const b = accBodyOf(t);
-                if (b) requestAnimationFrame(() => { b.style.maxHeight = b.scrollHeight + 'px'; });
-            }
+            if (t) accExpand(t);
         }
         accHosts.forEach(host => host.addEventListener('click', (e) => {
             if (!accIsMobile()) return;
@@ -533,12 +527,7 @@ function bindEvents() {
                 const anyOpen = document.querySelector('.timer-card.acc-open, .sidebar .card.acc-open');
                 if (!anyOpen) {
                     const t = document.getElementById('timer-card');
-                    if (t) {
-                        t.classList.add('acc-open');
-                        accBoxOf(t).classList.add('acc-expanded');
-                        const b = accBodyOf(t);
-                        if (b) requestAnimationFrame(() => { b.style.maxHeight = b.scrollHeight + 'px'; });
-                    }
+                    if (t) accExpand(t);
                 }
             }
         });

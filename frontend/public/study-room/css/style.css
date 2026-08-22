@@ -588,7 +588,8 @@ body {
 
     /* ── 手风琴：max-height 动画（JS 设置精确高度，0↔内容高 真正平滑）── */
     .acc-head,
-    .card h3.acc-head {
+    .card h3.acc-head,
+    .timer-card .acc-head {
         display: flex;
         align-items: center;
         gap: 6px;
