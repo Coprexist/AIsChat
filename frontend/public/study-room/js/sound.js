@@ -151,9 +151,10 @@ function makeLayerBuffer(ctx, key, def) {
             // 深海气泡（可重叠的咕噜串）：一串 1~8 个（偏大分布），串内密集触发，
             // 新气泡不等旧气泡播完——多个气泡同时发声叠加，像水下气泡群一起冒；
             // quiet=小音量远层组：音色与主组完全一致（低频咕噜、同样时长），
-            // 只是音量约主组 40%、串略小略稀——"远处也有一组同样的气泡"
+            // 只是音量更小、串略小略稀——"远处也有一组同样的气泡"
+            const BUBBLE_VOLUME = 0.25;   // 气泡整体音量：缩减 75%（保留 25%）
             const quiet = def && def.quiet;
-            const ampScale = quiet ? 0.12 : 0.3;
+            const ampScale = (quiet ? 0.12 : 0.3) * BUBBLE_VOLUME;
             const maxConc = quiet ? 3 : 4;
             const serGap = quiet ? 1.4 + Math.pow(Math.random(), 2) * 4.5
                                  : 1.2 + Math.pow(Math.random(), 2) * 4;   // 串间隔
