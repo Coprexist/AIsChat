@@ -344,6 +344,16 @@ body {
 /* 设置弹窗：白噪音按钮组 */
 .sound-row { display: flex; gap: 6px; flex-wrap: wrap; }
 
+/* 自定义滚动条（主题统一：细窄、圆角、hover 高亮） */
+*::-webkit-scrollbar { width: 6px; height: 6px; }
+*::-webkit-scrollbar-track { background: transparent; }
+*::-webkit-scrollbar-thumb {
+    background: var(--bg-hover);
+    border-radius: 3px;
+}
+*::-webkit-scrollbar-thumb:hover { background: var(--border); }
+* { scrollbar-width: thin; scrollbar-color: var(--bg-hover) transparent; }
+
 /* 底部引用 */
 .footer {
     text-align: center; font-size: 0.85rem;
