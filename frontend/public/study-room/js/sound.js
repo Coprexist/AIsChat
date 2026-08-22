@@ -26,10 +26,12 @@ const SWAP_JITTER = 1;    // 每层 ±1s 随机错峰（秒）
 // ── 层配置：每个音色由若干声源层组成，az = 方位角（弧度，0=正前，+右 -左）──
 // drift: 声源方位随机漂移（浪花/气泡在声场中缓缓移动）
 const LAYER_DEFS = {
-    rain: [
+    rain: [                      // 雨：雨幕 + 近滴答（石面）+ 远噼啪 + 房檐滴水（多层远近/材质）
         { key: 'rainbed', az: -0.7 },
         { key: 'rainbed', az: 0.7 },
-        { key: 'raindrops', drift: true },
+        { key: 'dropsNear', drift: true },   // 近处清晰滴答：短促高频，石面/硬面
+        { key: 'dropsFar', drift: true },    // 远处噼啪：密集轻柔，中频（空气衰减高频）
+        { key: 'dripGutter', az: 0.4 },      // 房檐滴水：慢速、低频共鸣"嗒"
     ],
     forest: [                    // 森林：以风声为主（左右两层立体风 + 粉噪 + 叶沙点缀）
         { key: 'wind', az: -0.8 },
@@ -75,7 +77,9 @@ function makeLayerBuffer(ctx, key, def) {
 
     // 各层滤波器
     const bedHi = S(lp(3000)), bedLo = S(lp(400));   // 雨幕带通
-    const dropHi = S(lp(4000)), dropLo = S(lp(1000)); // 水滴带通
+    const nearHi = S(lp(5200)), nearLo = S(lp(2400)); // 近滴答（石面/硬面：清脆高频）
+    const farHi = S(lp(1800)), farLo = S(lp(700));   // 远噼啪（高频被空气衰减：中频）
+    const gutLo = S(lp(900));                        // 房檐滴水（低频共鸣）
     const windLo = S(lp(800));                        // 风声低通
     const leafLo = S(lp(1500));                       // 叶沙低通
     const swellLo = S(lp(450));                       // 涌动低通
@@ -84,8 +88,10 @@ function makeLayerBuffer(ctx, key, def) {
 
     let brown = 0;
     let k0 = 0, k1 = 0, k2 = 0, k3 = 0, k4 = 0, k5 = 0, k6 = 0;
-    // 水滴脉冲状态
+    // 雨滴脉冲状态：近滴答（稀疏清脆）/ 远噼啪（密集轻柔）/ 房檐滴水（慢速低频）
     let dropNext = 0, dropPhase = 0, dropDur = 0, dropEnv = 0;
+    let farNext = 0, farPhase = 0, farDur = 0, farEnv = 0;
+    let gutNext = 1, gutPhase = 0, gutDur = 0, gutEnv = 0;
     // 深海气泡：活跃气泡池（可重叠发声，不用等前一个播完）+ 串触发状态
     // 一串 1~8 个（偏大分布）；串内密集触发（0.08~0.28s）→ 同时 2~4 个气泡叠响
     let bubNext = 1.2, bubRemain = 0;
@@ -122,17 +128,49 @@ function makeLayerBuffer(ctx, key, def) {
         let s = 0;
         if (key === 'rainbed') {
             s = (bedHi.lp(w) - bedLo.lp(w)) * 0.7 + brown * 0.04;
-        } else if (key === 'raindrops') {
+        } else if (key === 'dropsNear') {
+            // 近处清晰滴答（石面/硬面）：短促清脆高频脉冲，8~25 滴/秒，
+            // 少量但响亮、可辨——"滴答、滴答"
             dropNext -= 1 / rate;
             if (dropNext <= 0) {
-                dropDur = 0.002 + Math.random() * 0.006;
+                dropDur = 0.0015 + Math.random() * 0.004;     // 1.5~5.5ms 极短促
                 dropPhase = dropDur;
-                dropEnv = 0.12 + Math.random() * 0.18;
-                dropNext = 0.02 + Math.random() * 0.06;
+                dropEnv = 0.22 + Math.random() * 0.28;        // 响亮（近）
+                dropNext = 0.04 + Math.random() * 0.085;      // 8~25 滴/秒
             }
             if (dropPhase > 0) {
-                s = (dropHi.lp(w) - dropLo.lp(w)) * Math.exp(-(dropDur - dropPhase) * 400) * dropEnv;
+                s = (nearHi.lp(w) - nearLo.lp(w)) * Math.exp(-(dropDur - dropPhase) * 600) * dropEnv;
                 dropPhase -= 1 / rate;
+            }
+        } else if (key === 'dropsFar') {
+            // 远处噼啪：密集轻柔中频脉冲，40~120 滴/秒，幅度小（远），
+            // 高频被空气吸收 → 中频带通——"噼噼啪啪"的颗粒底
+            farNext -= 1 / rate;
+            if (farNext <= 0) {
+                farDur = 0.001 + Math.random() * 0.0025;      // 1~3.5ms
+                farPhase = farDur;
+                farEnv = 0.05 + Math.random() * 0.07;         // 轻柔（远）
+                farNext = 0.008 + Math.random() * 0.017;      // 40~120 滴/秒
+            }
+            if (farPhase > 0) {
+                s = (farHi.lp(w) - farLo.lp(w)) * Math.exp(-(farDur - farPhase) * 800) * farEnv;
+                farPhase -= 1 / rate;
+            }
+        } else if (key === 'dripGutter') {
+            // 房檐滴水：慢速（0.5~1.5s 一滴）、低频共鸣"嗒"——水从檐口落下
+            // 撞击积水，有体腔共鸣感，与石面滴答明显不同
+            gutNext -= 1 / rate;
+            if (gutNext <= 0) {
+                gutDur = 0.05 + Math.random() * 0.05;        // 50~100ms 共鸣
+                gutPhase = gutDur;
+                gutEnv = 0.3 + Math.random() * 0.35;         // 中等
+                gutNext = 0.5 + Math.random() * 1.0;         // 0.5~1.5s 一滴
+            }
+            if (gutPhase > 0) {
+                const pg = 1 - gutPhase / gutDur;            // 0→1
+                s = (gutLo.lp(w) * Math.exp(-(gutDur - gutPhase) * 28) * gutEnv
+                     + Math.sin(2 * Math.PI * 160 * pg * gutDur) * Math.exp(-(gutDur - gutPhase) * 22) * gutEnv * 0.8) * 0.75;
+                gutPhase -= 1 / rate;
             }
         } else if (key === 'wind') {
             s = windLo.lp(brown) * 2.4 * walkEnv(i);
