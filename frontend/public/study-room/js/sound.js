@@ -150,24 +150,20 @@ function makeLayerBuffer(ctx, key, def) {
         } else if (key === 'bubble') {
             // 深海气泡（可重叠的咕噜串）：一串 1~8 个（偏大分布），串内密集触发，
             // 新气泡不等旧气泡播完——多个气泡同时发声叠加，像水下气泡群一起冒；
-            // quiet=小音量远层组：音量低 → 频率可更高、时长更短，保留清脆"啵"的气泡感，
-            // 同时串更小更稀，只做背景层次不抢主组
+            // quiet=小音量远层组：音色与主组完全一致（低频咕噜、同样时长），
+            // 只是音量约主组 40%、串略小略稀——"远处也有一组同样的气泡"
             const quiet = def && def.quiet;
-            const ampScale = quiet ? 0.15 : 0.3;
+            const ampScale = quiet ? 0.12 : 0.3;
             const maxConc = quiet ? 3 : 4;
-            const f0min = quiet ? 350 : 140;                    // 小声组音调更高 → 气泡感
-            const f0span = quiet ? 450 : 160;
-            const durMin = quiet ? 0.09 : 0.16;                 // 小声组更短促 → "啵"
-            const durSpan = quiet ? 0.1 : 0.16;
-            const serGap = quiet ? 1.6 + Math.pow(Math.random(), 2) * 4
+            const serGap = quiet ? 1.4 + Math.pow(Math.random(), 2) * 4.5
                                  : 1.2 + Math.pow(Math.random(), 2) * 4;   // 串间隔
-            const inSerGap = quiet ? 0.12 + Math.random() * 0.22
+            const inSerGap = quiet ? 0.1 + Math.random() * 0.25
                                    : 0.08 + Math.random() * 0.2;           // 串内触发
             bubNext -= 1 / rate;
             if (bubNext <= 0) {
                 if (bubRemain <= 0) {
                     bubRemain = quiet
-                        ? 1 + Math.floor(Math.pow(Math.random(), 0.7) * 4)  // 小声组串小
+                        ? 1 + Math.floor(Math.pow(Math.random(), 0.7) * 5)  // 小声组串略小
                         : 1 + Math.floor(Math.pow(Math.random(), 0.7) * 8); // 主组串大
                     bubNext = serGap;
                 } else {
@@ -175,12 +171,12 @@ function makeLayerBuffer(ctx, key, def) {
                     bubNext = inSerGap;
                 }
                 if (bubbles.length < maxConc) {
-                    const f0 = f0min + Math.random() * f0span;
+                    const f0 = 140 + Math.random() * 160;
                     bubbles.push({
                         f0,
                         f1: f0 * (1.4 + Math.random() * 0.6),
                         amp: (0.25 + Math.random() * 0.3) * ampScale,
-                        dur: durMin + Math.random() * durSpan,
+                        dur: 0.16 + Math.random() * 0.16,
                         t: 0,
                     });
                 }
