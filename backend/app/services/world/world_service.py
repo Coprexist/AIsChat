@@ -7,18 +7,11 @@ import logging
 from datetime import datetime, timedelta, timezone
 
 from sqlalchemy import select
-from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.repositories.world_repo import WorldRepository, SQLAlchemyWorldRepository
+from app.repositories.world_repo import WorldRepository
 
 logger = logging.getLogger(__name__)
 
-
-def _ensure_repo(db_or_repo):
-    """兼容旧调用：传入 AsyncSession 时包装为 SQLAlchemyWorldRepository。"""
-    if isinstance(db_or_repo, AsyncSession):
-        return SQLAlchemyWorldRepository(db_or_repo)
-    return db_or_repo
 
 
 VALID_BIND_TYPES = {"group", "dm", "user", "agent"}  # agent = AI 直接绑定世界（个人专属能力）
@@ -64,7 +57,7 @@ def apply_time_compensation(world, now: datetime | None = None):
     world.status = "active"
 
 async def create_world(
-    db: AsyncSession,
+    repo: WorldRepository,
     owner_id: int,
     name: str,
     description: str = "",
@@ -75,7 +68,6 @@ async def create_world(
 
     群视界机器人 = 世界配置（worlds.creator_config），建世界即初始化，无需创建 agent/账号。
     """
-    db = _ensure_repo(db)
     from app.models.world import World
 
     world = World(
@@ -88,21 +80,21 @@ async def create_world(
         last_active_at=_now(),
         config=config or {"sleep_memory_mb": DEFAULT_SLEEP_MEMORY_MB},
     )
-    db.add(world)
-    await db.flush()
-    await db.refresh(world)
+    repo.add(world)
+    await repo.flush()
+    await repo.refresh(world)
 
     # 群视界机器人：默认就位（独立表 world_ais，身份 = world-{id}）
-    await ensure_world_ai(db, world.id)
+    await ensure_world_ai(repo, world.id)
 
     logger.info(f"🌐 世界创建: #{world.id} {name} (owner={owner_id}) + 世界 AI world-{world.id}")
     return world_to_dict(world)
 
 
-async def ensure_world_ai(db: AsyncSession, world_id: int):
+async def ensure_world_ai(repo: WorldRepository, world_id: int):
     """确保世界 AI 实体存在（幂等，独立表 world_ais），返回行"""
     from app.models.world import WorldAI
-    row = await db.execute(select(WorldAI).where(WorldAI.world_id == world_id))
+    row = await repo.execute(select(WorldAI).where(WorldAI.world_id == world_id))
     wai = row.scalar_one_or_none()
     if wai is None:
         wai = WorldAI(
@@ -114,8 +106,8 @@ async def ensure_world_ai(db: AsyncSession, world_id: int):
             thinking=False,
             max_tool_rounds=50,
         )
-        db.add(wai)
-        await db.flush()
+        repo.add(wai)
+        await repo.flush()
     return wai
 
 
@@ -123,19 +115,18 @@ async def ensure_world_ai(db: AsyncSession, world_id: int):
 # 世界详情 / 列表
 # ═══════════════════════════════════════════════════════════════
 
-async def get_world(db: AsyncSession, world_id: int) -> dict | None:
+async def get_world(repo: WorldRepository, world_id: int) -> dict | None:
     """世界详情（含绑定入口、居民 AI、群视界机器人配置）"""
-    db = _ensure_repo(db)
     from app.models.world import World, WorldBinding, WorldAgent
 
-    world = await db.get(World, world_id)
+    world = await repo.get(World, world_id)
     if world is None:
         return None
 
     result = world_to_dict(world)
-    wai = await ensure_world_ai(db, world_id)  # 老世界自动补默认实体（幂等）
+    wai = await ensure_world_ai(repo, world_id)  # 老世界自动补默认实体（幂等）
 
-    bindings = await db.execute(
+    bindings = await repo.execute(
         select(WorldBinding).where(WorldBinding.world_id == world_id)
     )
     result["bindings"] = [
@@ -144,7 +135,7 @@ async def get_world(db: AsyncSession, world_id: int) -> dict | None:
     ]
 
     # 居民 AI（真 agent 入驻世界；群视界机器人不在这个列表里）
-    agents = await db.execute(
+    agents = await repo.execute(
         select(WorldAgent).where(WorldAgent.world_id == world_id)
     )
     result["agents"] = [
@@ -178,12 +169,11 @@ def world_ai_to_dict(world_id: int, wai) -> dict:
     }
 
 
-async def list_worlds(db: AsyncSession, owner_id: int) -> list[dict]:
+async def list_worlds(repo: WorldRepository, owner_id: int) -> list[dict]:
     """我的世界列表（含绑定入口）"""
-    db = _ensure_repo(db)
     from app.models.world import World, WorldBinding
 
-    result = await db.execute(
+    result = await repo.execute(
         select(World).where(World.owner_id == owner_id).order_by(World.id.desc())
     )
     worlds = result.scalars().all()
@@ -192,7 +182,7 @@ async def list_worlds(db: AsyncSession, owner_id: int) -> list[dict]:
 
     # 批量查询绑定入口 + 世界 AI 实体，避免 N+1
     world_ids = [w.id for w in worlds]
-    bind_result = await db.execute(
+    bind_result = await repo.execute(
         select(WorldBinding).where(WorldBinding.world_id.in_(world_ids))
     )
     by_world: dict[int, list[dict]] = {}
@@ -201,7 +191,7 @@ async def list_worlds(db: AsyncSession, owner_id: int) -> list[dict]:
             {"entity_type": b.entity_type, "entity_id": b.entity_id}
         )
     from app.models.world import WorldAI
-    wai_result = await db.execute(select(WorldAI).where(WorldAI.world_id.in_(world_ids)))
+    wai_result = await repo.execute(select(WorldAI).where(WorldAI.world_id.in_(world_ids)))
     wai_by_world = {w.world_id: w for w in wai_result.scalars()}
 
     out = []
@@ -215,7 +205,7 @@ async def list_worlds(db: AsyncSession, owner_id: int) -> list[dict]:
 
 
 async def update_world(
-    db: AsyncSession,
+    repo: WorldRepository,
     world_id: int,
     owner_id: int,
     name: str | None = None,
@@ -224,10 +214,9 @@ async def update_world(
     config: dict | None = None,
 ) -> dict:
     """更新世界（仅创建者）"""
-    db = _ensure_repo(db)
     from app.models.world import World
 
-    world = await db.get(World, world_id)
+    world = await repo.get(World, world_id)
     if world is None:
         raise ValueError("世界不存在")
     if world.owner_id != owner_id:
@@ -241,48 +230,46 @@ async def update_world(
         world.time_flow_rate = time_flow_rate
     if config is not None:
         world.config = {**(world.config or {}), **config}
-    await db.flush()
+    await repo.flush()
     return world_to_dict(world)
 
 
 async def update_creator_config(
-    db: AsyncSession,
+    repo: WorldRepository,
     world_id: int,
     owner_id: int,
     patch: dict,
 ) -> dict:
     """更新群视界机器人配置（世界 AI 表单提交；仅创建者）"""
-    db = _ensure_repo(db)
     from app.models.world import World
 
-    world = await db.get(World, world_id)
+    world = await repo.get(World, world_id)
     if world is None:
         raise ValueError("世界不存在")
     if world.owner_id != owner_id:
         raise ValueError("仅创建者可配置世界 AI")
 
-    wai = await ensure_world_ai(db, world_id)
+    wai = await ensure_world_ai(repo, world_id)
     allowed = {"name", "system_prompt", "model", "temperature", "top_p", "thinking", "max_tool_rounds", "tools"}
     for k, v in patch.items():
         if k in allowed and k != "tools":  # tools 是派生字段，不落库
             setattr(wai, k, v)
-    await db.flush()
+    await repo.flush()
     return world_ai_to_dict(world_id, wai)
 
 
-async def delete_world(db: AsyncSession, world_id: int, owner_id: int) -> None:
+async def delete_world(repo: WorldRepository, world_id: int, owner_id: int) -> None:
     """删除世界（仅创建者）；世界 AI 是世界的配置，随世界一起消失"""
-    db = _ensure_repo(db)
     from app.models.world import World
 
-    world = await db.get(World, world_id)
+    world = await repo.get(World, world_id)
     if world is None:
         raise ValueError("世界不存在")
     if world.owner_id != owner_id:
         raise ValueError("仅创建者可删除世界")
 
-    await db.delete(world)
-    await db.flush()
+    await repo.delete(world)
+    await repo.flush()
     logger.info(f"🗑️ 世界删除: #{world_id}（世界 AI 随世界销毁）")
 
 
@@ -291,26 +278,25 @@ async def delete_world(db: AsyncSession, world_id: int, owner_id: int) -> None:
 # ═══════════════════════════════════════════════════════════════
 
 async def bind_entity(
-    db: AsyncSession,
+    repo: WorldRepository,
     world_id: int,
     owner_id: int,
     entity_type: str,
     entity_id: int,
 ) -> dict:
     """绑定入口（群聊/私信/用户 ↔ 世界）"""
-    db = _ensure_repo(db)
     from app.models.world import World, WorldBinding
 
     if entity_type not in VALID_BIND_TYPES:
         raise ValueError(f"无效入口类型: {entity_type}")
 
-    world = await db.get(World, world_id)
+    world = await repo.get(World, world_id)
     if world is None:
         raise ValueError("世界不存在")
     if world.owner_id != owner_id:
         raise ValueError("仅创建者可绑定入口")
 
-    existing = await db.execute(
+    existing = await repo.execute(
         select(WorldBinding).where(
             WorldBinding.world_id == world_id,
             WorldBinding.entity_type == entity_type,
@@ -318,45 +304,43 @@ async def bind_entity(
         )
     )
     if existing.scalar_one_or_none() is None:
-        db.add(WorldBinding(world_id=world_id, entity_type=entity_type, entity_id=entity_id))
-        await db.flush()
+        repo.add(WorldBinding(world_id=world_id, entity_type=entity_type, entity_id=entity_id))
+        await repo.flush()
         logger.info(f"🔗 世界 #{world_id} 绑定 {entity_type}:{entity_id}")
     return {"success": True}
 
 
 async def unbind_entity(
-    db: AsyncSession,
+    repo: WorldRepository,
     world_id: int,
     owner_id: int,
     entity_type: str,
     entity_id: int,
 ) -> None:
     """解绑入口"""
-    db = _ensure_repo(db)
     from app.models.world import World, WorldBinding
 
-    world = await db.get(World, world_id)
+    world = await repo.get(World, world_id)
     if world is None:
         raise ValueError("世界不存在")
     if world.owner_id != owner_id:
         raise ValueError("仅创建者可解绑入口")
 
-    await db.execute(
+    await repo.execute(
         WorldBinding.__table__.delete().where(
             WorldBinding.world_id == world_id,
             WorldBinding.entity_type == entity_type,
             WorldBinding.entity_id == entity_id,
         )
     )
-    await db.flush()
+    await repo.flush()
 
 
-async def find_world_by_entity(db: AsyncSession, entity_type: str, entity_id: int) -> int | None:
+async def find_world_by_entity(repo: WorldRepository, entity_type: str, entity_id: int) -> int | None:
     """按入口反查世界 id（群聊 id / 用户 id → 世界）"""
-    db = _ensure_repo(db)
     from app.models.world import WorldBinding
 
-    result = await db.execute(
+    result = await repo.execute(
         select(WorldBinding.world_id).where(
             WorldBinding.entity_type == entity_type,
             WorldBinding.entity_id == entity_id,
@@ -365,12 +349,11 @@ async def find_world_by_entity(db: AsyncSession, entity_type: str, entity_id: in
     return result.scalar_one_or_none()
 
 
-async def find_worlds_by_entity(db: AsyncSession, entity_type: str, entity_id: int) -> list:
+async def find_worlds_by_entity(repo: WorldRepository, entity_type: str, entity_id: int) -> list:
     """按入口反查多个世界（群/agent 可绑多个世界）"""
-    db = _ensure_repo(db)
     from app.models.world import World, WorldBinding
 
-    rows = (await db.execute(
+    rows = (await repo.execute(
         select(World).join(WorldBinding, WorldBinding.world_id == World.id).where(
             WorldBinding.entity_type == entity_type,
             WorldBinding.entity_id == entity_id,
@@ -383,12 +366,11 @@ async def find_worlds_by_entity(db: AsyncSession, entity_type: str, entity_id: i
 # 唤醒 / 休眠 / 世界时间
 # ═══════════════════════════════════════════════════════════════
 
-async def wake_world(db: AsyncSession, world_id: int) -> dict:
+async def wake_world(repo: WorldRepository, world_id: int) -> dict:
     """唤醒世界：应用离线时间补偿（世界时间 = 上次活跃 + 真实时间差 × 流速）"""
-    db = _ensure_repo(db)
     from app.models.world import World
 
-    world = await db.get(World, world_id)
+    world = await repo.get(World, world_id)
     if world is None:
         raise ValueError("世界不存在")
 
@@ -403,22 +385,21 @@ async def wake_world(db: AsyncSession, world_id: int) -> dict:
         world.world_time = now
     world.last_active_at = now
     world.status = "active"
-    await db.flush()
+    await repo.flush()
     logger.info(f"⏰ 世界 #{world_id} 唤醒，离线补偿 {delta.total_seconds() if 'delta' in dir() else 0:.0f}s")
     return world_to_dict(world)
 
 
-async def sleep_world(db: AsyncSession, world_id: int) -> dict:
+async def sleep_world(repo: WorldRepository, world_id: int) -> dict:
     """休眠世界"""
-    db = _ensure_repo(db)
     from app.models.world import World
 
-    world = await db.get(World, world_id)
+    world = await repo.get(World, world_id)
     if world is None:
         raise ValueError("世界不存在")
     world.status = "sleeping"
     world.last_active_at = _now()
-    await db.flush()
+    await repo.flush()
     return world_to_dict(world)
 
 
@@ -427,17 +408,16 @@ async def sleep_world(db: AsyncSession, world_id: int) -> dict:
 # ═══════════════════════════════════════════════════════════════
 
 async def add_pending_notice(
-    db: AsyncSession,
+    repo: WorldRepository,
     world_id: int,
     file_path: str,
     location: str,
     summary: str,
 ) -> None:
     """记录代码改动懒通知（不实时打扰，下次对话时附送）"""
-    db = _ensure_repo(db)
     from app.models.world import World
 
-    world = await db.get(World, world_id)
+    world = await repo.get(World, world_id)
     if world is None:
         raise ValueError("世界不存在")
 
@@ -449,20 +429,19 @@ async def add_pending_notice(
         "at": _now().isoformat(),
     })
     world.creator_notices = notices[-50:]  # 最多保留 50 条
-    await db.flush()
+    await repo.flush()
 
 
-async def take_pending_notices(db: AsyncSession, world_id: int) -> list[dict]:
+async def take_pending_notices(repo: WorldRepository, world_id: int) -> list[dict]:
     """取出并清空懒通知（对话开始时调用，附送给世界 AI）"""
-    db = _ensure_repo(db)
     from app.models.world import World
 
-    world = await db.get(World, world_id)
+    world = await repo.get(World, world_id)
     if world is None:
         return []
     notices = list(world.creator_notices or [])
     world.creator_notices = []
-    await db.flush()
+    await repo.flush()
     return notices
 
 
@@ -489,11 +468,10 @@ def world_to_dict(w) -> dict:
 # 世界数据（world_data）— 每世界 key-value，只经 API/skill ctx 读写
 # ═══════════════════════════════════════════════════════════════
 
-async def get_world_data(db: AsyncSession, world_id: int, key: str) -> dict | None:
+async def get_world_data(repo: WorldRepository, world_id: int, key: str) -> dict | None:
     """读世界数据；不存在返回 None"""
-    db = _ensure_repo(db)
     from app.models.world import WorldData
-    row = (await db.execute(
+    row = (await repo.execute(
         select(WorldData).where(WorldData.world_id == world_id, WorldData.key == key)
     )).scalar_one_or_none()
     if row is None:
@@ -501,34 +479,32 @@ async def get_world_data(db: AsyncSession, world_id: int, key: str) -> dict | No
     return {"key": row.key, "value": row.value}
 
 
-async def set_world_data(db: AsyncSession, world_id: int, key: str, value) -> dict:
+async def set_world_data(repo: WorldRepository, world_id: int, key: str, value) -> dict:
     """写世界数据（upsert）"""
-    db = _ensure_repo(db)
     from app.models.world import WorldData
-    row = (await db.execute(
+    row = (await repo.execute(
         select(WorldData).where(WorldData.world_id == world_id, WorldData.key == key)
     )).scalar_one_or_none()
     if row is None:
         row = WorldData(world_id=world_id, key=key, value=value)
-        db.add(row)
+        repo.add(row)
     else:
         row.value = value
-    await db.commit()
-    await db.refresh(row)
+    await repo.commit()
+    await repo.refresh(row)
     return {"key": row.key, "value": row.value}
 
 
-async def delete_world_data(db: AsyncSession, world_id: int, key: str) -> bool:
+async def delete_world_data(repo: WorldRepository, world_id: int, key: str) -> bool:
     """删世界数据；返回是否存在"""
-    db = _ensure_repo(db)
     from app.models.world import WorldData
-    row = (await db.execute(
+    row = (await repo.execute(
         select(WorldData).where(WorldData.world_id == world_id, WorldData.key == key)
     )).scalar_one_or_none()
     if row is None:
         return False
-    await db.delete(row)
-    await db.commit()
+    await repo.delete(row)
+    await repo.commit()
     return True
 
 

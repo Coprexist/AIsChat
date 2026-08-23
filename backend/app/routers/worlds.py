@@ -11,7 +11,9 @@ from sqlalchemy import select, func
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.database import get_db
+from app.repositories.world_repo import WorldRepository
 from app.utils.auth import get_current_user
+from app.routers.deps import get_world_repo
 
 logger = logging.getLogger(__name__)
 
@@ -119,11 +121,17 @@ async def create_world(
     req: WorldCreateRequest,
     current_user: dict = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
+    world_repo: WorldRepository = Depends(get_world_repo),
 ):
     """创建世界"""
     from app.services.world.world_service import create_world
     world = await create_world(
-        db, current_user["user_id"], req.name, req.description, req.time_flow_rate, req.config
+        repo=world_repo,
+        owner_id=current_user["user_id"],
+        name=req.name,
+        description=req.description,
+        time_flow_rate=req.time_flow_rate,
+        config=req.config,
     )
     await db.commit()
     return world
@@ -133,10 +141,11 @@ async def create_world(
 async def list_worlds(
     current_user: dict = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
+    world_repo: WorldRepository = Depends(get_world_repo),
 ):
     """我的世界列表"""
     from app.services.world.world_service import list_worlds
-    return await list_worlds(db, current_user["user_id"])
+    return await list_worlds(repo=world_repo, owner_id=current_user["user_id"])
 
 
 @router.get("/by-entity")
@@ -145,10 +154,11 @@ async def world_by_entity(
     entity_id: int,
     current_user: dict = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
+    world_repo: WorldRepository = Depends(get_world_repo),
 ):
     """按入口反查世界（群聊/私信/用户 → 世界 id）"""
     from app.services.world.world_service import find_world_by_entity
-    world_id = await find_world_by_entity(db, entity_type, entity_id)
+    world_id = await find_world_by_entity(repo=world_repo, entity_type=entity_type, entity_id=entity_id)
     if world_id is None:
         raise HTTPException(status_code=404, detail="该入口未绑定世界")
     return {"world_id": world_id}
@@ -159,6 +169,7 @@ async def get_world(
     world_id: int,
     current_user: dict = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
+    world_repo: WorldRepository = Depends(get_world_repo),
 ):
     """世界详情（仅创建者；沉浸界面走静态路由不依赖此接口）"""
     from app.services.world.world_service import get_world as _get_world
@@ -166,7 +177,7 @@ async def get_world(
     # 2.3：活跃埋点（动态限流按人数加成）
     from app.routers.world_proxy import record_world_activity
     record_world_activity(world_id, current_user["user_id"])
-    world = await _get_world(db, world_id)
+    world = await _get_world(repo=world_repo, world_id=world_id)
     if world is None:
         raise HTTPException(status_code=404, detail="世界不存在")
     return world
@@ -178,14 +189,19 @@ async def update_world(
     req: WorldUpdateRequest,
     current_user: dict = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
+    world_repo: WorldRepository = Depends(get_world_repo),
 ):
     """更新世界"""
     from app.services.world.world_service import update_world
     try:
         world = await update_world(
-            db, world_id, current_user["user_id"],
-            name=req.name, description=req.description,
-            time_flow_rate=req.time_flow_rate, config=req.config,
+            repo=world_repo,
+            world_id=world_id,
+            owner_id=current_user["user_id"],
+            name=req.name,
+            description=req.description,
+            time_flow_rate=req.time_flow_rate,
+            config=req.config,
         )
         await db.commit()
         return world
@@ -198,11 +214,12 @@ async def delete_world(
     world_id: int,
     current_user: dict = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
+    world_repo: WorldRepository = Depends(get_world_repo),
 ):
     """删除世界"""
     from app.services.world.world_service import delete_world
     try:
-        await delete_world(db, world_id, current_user["user_id"])
+        await delete_world(repo=world_repo, world_id=world_id, owner_id=current_user["user_id"])
         await db.commit()
         return {"success": True}
     except ValueError as e:
@@ -219,11 +236,18 @@ async def bind_entity(
     req: BindRequest,
     current_user: dict = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
+    world_repo: WorldRepository = Depends(get_world_repo),
 ):
     """绑定入口（群聊/私信/用户 ↔ 世界）"""
     from app.services.world.world_service import bind_entity
     try:
-        result = await bind_entity(db, world_id, current_user["user_id"], req.entity_type, req.entity_id)
+        result = await bind_entity(
+            repo=world_repo,
+            world_id=world_id,
+            owner_id=current_user["user_id"],
+            entity_type=req.entity_type,
+            entity_id=req.entity_id,
+        )
         await db.commit()
         return result
     except ValueError as e:
@@ -236,11 +260,18 @@ async def unbind_entity(
     req: BindRequest,
     current_user: dict = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
+    world_repo: WorldRepository = Depends(get_world_repo),
 ):
     """解绑入口"""
     from app.services.world.world_service import unbind_entity
     try:
-        await unbind_entity(db, world_id, current_user["user_id"], req.entity_type, req.entity_id)
+        await unbind_entity(
+            repo=world_repo,
+            world_id=world_id,
+            owner_id=current_user["user_id"],
+            entity_type=req.entity_type,
+            entity_id=req.entity_id,
+        )
         await db.commit()
         return {"success": True}
     except ValueError as e:
@@ -440,11 +471,12 @@ async def wake_world(
     world_id: int,
     current_user: dict = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
+    world_repo: WorldRepository = Depends(get_world_repo),
 ):
     """手动唤醒世界（应用离线时间补偿；resident 世界同时启动常驻进程）"""
     from app.services.world.world_service import wake_world
     try:
-        world = await wake_world(db, world_id)
+        world = await wake_world(repo=world_repo, world_id=world_id)
         await db.commit()
         # 2.5：常驻世界随唤醒启动（config.resident=true 且 main.py 存在）
         from app.models.world import World as _World
@@ -462,11 +494,12 @@ async def sleep_world(
     world_id: int,
     current_user: dict = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
+    world_repo: WorldRepository = Depends(get_world_repo),
 ):
     """手动休眠世界（resident 世界同时优雅停止常驻进程）"""
     from app.services.world.world_service import sleep_world
     try:
-        world = await sleep_world(db, world_id)
+        world = await sleep_world(repo=world_repo, world_id=world_id)
         await db.commit()
         from app.services.world.world_resident import manager
         await manager.stop(world_id)
@@ -500,12 +533,19 @@ async def add_notice(
     req: NoticeRequest,
     current_user: dict = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
+    world_repo: WorldRepository = Depends(get_world_repo),
 ):
     """记录代码改动懒通知（世界 AI 是默认收件人，无需 agent_id）"""
     await _require_owner(db, world_id, current_user["user_id"])
     from app.services.world.world_service import add_pending_notice
     try:
-        await add_pending_notice(db, world_id, req.file, req.location, req.summary)
+        await add_pending_notice(
+            repo=world_repo,
+            world_id=world_id,
+            file_path=req.file,
+            location=req.location,
+            summary=req.summary,
+        )
     except ValueError as e:
         await db.rollback()
         raise HTTPException(status_code=404, detail=str(e))
@@ -518,12 +558,13 @@ async def take_creator_notices(
     world_id: int,
     current_user: dict = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
+    world_repo: WorldRepository = Depends(get_world_repo),
 ):
     """取出并清空世界 AI 的懒通知（对话开始时调用，身份 = 世界，无需 agent_id）"""
 
     await _require_owner(db, world_id, current_user["user_id"])
     from app.services.world.world_service import take_pending_notices
-    notices = await take_pending_notices(db, world_id)
+    notices = await take_pending_notices(repo=world_repo, world_id=world_id)
     await db.commit()
     return {"notices": notices}
 
@@ -537,11 +578,12 @@ async def get_creator(
     world_id: int,
     current_user: dict = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
+    world_repo: WorldRepository = Depends(get_world_repo),
 ):
     """获取世界 AI 配置（就是世界配置的一部分）"""
     await _require_owner(db, world_id, current_user["user_id"])
     from app.services.world.world_service import get_world
-    world = await get_world(db, world_id)
+    world = await get_world(repo=world_repo, world_id=world_id)
     if world is None:
         raise HTTPException(status_code=404, detail="世界不存在")
     return world["creator"]
@@ -553,6 +595,7 @@ async def update_creator(
     req: CreatorConfigRequest,
     current_user: dict = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
+    world_repo: WorldRepository = Depends(get_world_repo),
 ):
     """更新世界 AI 配置（仅创建者）"""
 
@@ -560,7 +603,10 @@ async def update_creator(
     from app.services.world.world_service import update_creator_config
     try:
         creator = await update_creator_config(
-            db, world_id, current_user["user_id"], req.model_dump(exclude_none=True)
+            repo=world_repo,
+            world_id=world_id,
+            owner_id=current_user["user_id"],
+            patch=req.model_dump(exclude_none=True),
         )
     except ValueError as e:
         await db.rollback()
@@ -918,6 +964,7 @@ async def chat_suggest(
     world_id: int,
     current_user: dict = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
+    world_repo: WorldRepository = Depends(get_world_repo),
 ):
     """"你可以"建议：读取持久化的建议（AI 上次生成）；无存储且无对话历史 → 预设随机 4 个（首次进入/clear 后引导）"""
     await _require_owner(db, world_id, current_user["user_id"])
@@ -932,7 +979,7 @@ async def chat_suggest(
         return {"suggestions": await load_preset_suggestions(db)}
     # 有对话历史 → 用持久化的 AI 建议；没有 → 空（等 AI 下次回复生成）
     from app.services.world.world_service import get_world_data
-    row = await get_world_data(db, world_id, "ui.suggestions")
+    row = await get_world_data(repo=world_repo, world_id=world_id, key="ui.suggestions")
     if row and row.get("value"):
         return {"suggestions": row["value"]}
     return {"suggestions": []}
@@ -975,13 +1022,14 @@ async def list_files(
     prefix: str = "",
     current_user: dict = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
+    world_repo: WorldRepository = Depends(get_world_repo),
 ):
     """文件树（仅创建者）"""
     await _require_owner(db, world_id, current_user["user_id"])
     from app.services.world.world_service import get_world
     from app.services.world.world_file_service import list_files as fs_list
 
-    if await get_world(db, world_id) is None:
+    if await get_world(repo=world_repo, world_id=world_id) is None:
         raise HTTPException(status_code=404, detail="世界不存在")
     return {"files": fs_list(world_id, prefix)}
 
@@ -1113,11 +1161,12 @@ async def get_world_data(
     key: str,
     current_user: dict = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
+    world_repo: WorldRepository = Depends(get_world_repo),
 ):
     """读世界数据（不存在返回 value=null）"""
     await _require_owner(db, world_id, current_user["user_id"])
     from app.services.world.world_service import get_world_data
-    row = await get_world_data(db, world_id, key)
+    row = await get_world_data(repo=world_repo, world_id=world_id, key=key)
     return {"key": key, "value": row["value"] if row else None}
 
 
@@ -1128,13 +1177,14 @@ async def put_world_data(
     body: WorldDataRequest,
     current_user: dict = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
+    world_repo: WorldRepository = Depends(get_world_repo),
 ):
     """写世界数据（upsert；key 长度限制 200）"""
     await _require_owner(db, world_id, current_user["user_id"])
     if len(key) > 200:
         raise HTTPException(status_code=400, detail="key 过长（≤200）")
     from app.services.world.world_service import set_world_data
-    return await set_world_data(db, world_id, key, body.value)
+    return await set_world_data(repo=world_repo, world_id=world_id, key=key, value=body.value)
 
 
 @router.delete("/{world_id}/data/{key}")
@@ -1143,11 +1193,12 @@ async def delete_world_data(
     key: str,
     current_user: dict = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
+    world_repo: WorldRepository = Depends(get_world_repo),
 ):
     """删世界数据"""
     await _require_owner(db, world_id, current_user["user_id"])
     from app.services.world.world_service import delete_world_data
-    ok = await delete_world_data(db, world_id, key)
+    ok = await delete_world_data(repo=world_repo, world_id=world_id, key=key)
     if not ok:
         raise HTTPException(status_code=404, detail="数据不存在")
     return {"success": True}

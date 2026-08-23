@@ -12,6 +12,7 @@ from app.repositories.system_settings_repo import SystemSettingsRepository, SQLA
 from app.repositories.verification_repo import VerificationRepository, SQLAlchemyVerificationRepository
 from app.repositories.api_key_pool_repo import ApiKeyPoolRepository, SQLAlchemyApiKeyPoolRepository
 from app.repositories.friend_repo import FriendRepository, SQLAlchemyFriendRepository
+from app.repositories.world_repo import WorldRepository, SQLAlchemyWorldRepository
 from app.utils.auth import get_current_user
 from app.services.agent.agent_service import get_agent
 
@@ -54,3 +55,7 @@ async def get_api_key_pool_repo(db: AsyncSession = Depends(get_db)) -> ApiKeyPoo
 async def get_friend_repo(db: AsyncSession = Depends(get_db)) -> FriendRepository:
     """依赖注入：构造好友仓库。"""
     return SQLAlchemyFriendRepository(db)
+
+
+async def get_world_repo(db: AsyncSession = Depends(get_db)) -> WorldRepository:
+    return SQLAlchemyWorldRepository(db)
