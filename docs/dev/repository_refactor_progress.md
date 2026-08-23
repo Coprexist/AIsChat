@@ -160,3 +160,38 @@ def _ensure_repo(db_or_repo):
 
 ### 当前 Mode B 剩余（合理取舍，均为超大文件/运行时密集）
 memory(6文件) / skill(4) / agent配套(2) / infrastructure(8) / federation(1) / file_service / group_type_service(历史) / audit/__init__.py(ABC接口)
+
+---
+
+## 十、Round 9 — 扫描遗漏补齐（2026-08-23 全量 AST 复查后）
+
+用户跑 AST 扫描（services/ 下顶层 async def：有 db 参数 + 用 db + 无 _ensure_repo 重赋值）发现 13 文件 25 处遗漏，全部 Mode B 补齐：
+
+| 文件 | 函数 | 复用 repo |
+|---|---|---|
+| federation_manager.py | _apply_display_name_update / _apply_avatar_update | federation_repo |
+| context_compression_service.py | get_compression_threshold | memory_repo |
+| memory_buffer.py | _batch_write_memories / archive_low_value_memories | memory_repo |
+| vector_pipeline.py | _vectorize_message / hybrid_search / _hybrid_search_text_fallback | memory_repo |
+| plugin/catalog.py | sync_plugins_to_db | plugin_repo（新建） |
+| plugin/skill_bridge.py | apply_skill_plugins | plugin_repo |
+| decision_skill.py | get_decision_rules / save_decision_rule / delete_decision_rule | world_repo |
+| market_github.py | get_market_config / save_market_config / sync_item_to_github | infra_repo（execute 支持 params） |
+| skill_sandbox.py | _handle_call | world_repo + chat 桥接 db.session |
+| world_api_docs.py | ensure_sections_seeded / get_sections / sync_sections_from_docs / save_sections | world_repo |
+| world_blocks.py | update_block_for_all_worlds | world_repo |
+| world_event_hook.py | notify_group_message / _enqueue | world_repo |
+| world_scheduler.py | sweep_worlds | world_repo |
+
+要点：
+- 新建 `repositories/plugin_repo.py`（plugin 域通用 repo）
+- skill_sandbox._handle_call 内 chat.message 的 get_group/create_message 是纯 session 函数 → 传 `db.session` 桥接；
+  world_service 的 update_world/get_world_data 等已是 Mode A（repo 参数）→ 直接传 db
+- market_github 用 infra_repo（其 execute 支持 params，world_repo 不支持）；federation_manager 用 federation_repo（支持 params）
+- 验证：13 文件 + plugin_repo 全部 py_compile 通过；用户 AST 扫描脚本复跑 **No obvious db conversion issues found**
+- 调用面安全：bootstrap / routers（admin/market/plugins/api_docs/world_proxy）/ ai（executor/llm/response_worker）/ chat.message 等调用方传 session 或 repo 均幂等兼容
+- 本次改动 +143/-2（13 文件），**未提交 git**（等用户 review）
+
+### 更新后 Mode A/B 比例（估算）
+- 新增 Mode B ≈ 143 行（原 371 → ~514）；Mode A 985 行不变
+- A 占比 = 985 / (985+514) ≈ **65.7%**（仍接近 70%；若需严格达标，可把 plugin 2 文件或 memory 3 文件升 Mode A）

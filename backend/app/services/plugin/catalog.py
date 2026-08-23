@@ -19,7 +19,16 @@ import os
 from pathlib import Path
 from typing import Any
 
+from app.repositories.plugin_repo import PluginRepository, SQLAlchemyPluginRepository
+from sqlalchemy.ext.asyncio import AsyncSession
 logger = logging.getLogger(__name__)
+
+def _ensure_repo(db_or_repo):
+    """兼容旧调用：传入 AsyncSession 时包装为 SQLAlchemyPluginRepository。"""
+    if isinstance(db_or_repo, AsyncSession):
+        return SQLAlchemyPluginRepository(db_or_repo)
+    return db_or_repo
+
 
 # backend/app/services/plugin/catalog.py → backend/
 BACKEND_ROOT = Path(__file__).resolve().parents[3]
@@ -127,6 +136,7 @@ def get_skill_defs(manifest: dict[str, Any]) -> list[dict[str, Any]]:
 
 async def sync_plugins_to_db(db) -> int:
     """磁盘 → DB 同步：新增插入、存在更新、磁盘消失删除（幂等，返回变更数）"""
+    db = _ensure_repo(db)
     from sqlalchemy import select
     from app.models.plugin import Plugin
 

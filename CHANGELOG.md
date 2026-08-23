@@ -20,6 +20,11 @@
   worlds / world_proxy / conversation_log / invitations / search / dm / agents / brain / auth / ws 等路由改用 `Depends` 注入。
 - **调用面更新**：bootstrap、admin（19 处包装）、ai（llm / executor / response_worker）、world_turn / decision_skill、utils/error_handler 等调用点统一包装或注入仓储。
 - **不动点说明**：`memory_distribution.py`（死代码转发，无调用者）、`audit/__init__.py`（ABC 接口类型标注，实现已兼容）保持原样。
+- **扫描遗漏补齐（Round 9）**：全量 AST 复查（有 db 参数 + 直用 db + 无 `_ensure_repo` 包装）发现并修复 13 文件 25 处遗漏——
+  federation_manager（2）、memory（context_compression / memory_buffer / vector_pipeline，6）、plugin（catalog / skill_bridge，2）、
+  world（decision_skill / market_github / skill_sandbox / world_api_docs / world_blocks / world_event_hook / world_scheduler，15），
+  全部 Mode B 幂等包装；新建 `repositories/plugin_repo.py`；`skill_sandbox._handle_call` 内 chat 模块纯 session 调用改 `db.session` 桥接；
+  `market_github` 改用支持 params 的 infra_repo。复跑扫描脚本 **SCAN CLEAN**，全项目 py_compile 通过。
 - **验证**：67 个改动 .py 文件全部通过 `py_compile` 语法检查；重构细节与调用面清单见 `docs/dev/repository_refactor_progress.md`。
 
 ---

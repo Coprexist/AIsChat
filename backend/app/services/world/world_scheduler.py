@@ -20,7 +20,16 @@ from sqlalchemy import select
 from app.database import async_session
 from app.services.world.world_service import _now, apply_time_compensation
 
+from app.repositories.world_repo import WorldRepository, SQLAlchemyWorldRepository
+from sqlalchemy.ext.asyncio import AsyncSession
 logger = logging.getLogger(__name__)
+
+def _ensure_repo(db_or_repo):
+    """兼容旧调用：传入 AsyncSession 时包装为 SQLAlchemyWorldRepository。"""
+    if isinstance(db_or_repo, AsyncSession):
+        return SQLAlchemyWorldRepository(db_or_repo)
+    return db_or_repo
+
 
 SCAN_INTERVAL = 60            # 扫描间隔（秒）
 INACTIVE_TIMEOUT_MIN = 10     # 活跃超时（分钟）→ 休眠
@@ -29,6 +38,7 @@ AUTO_MANAGE = False           # 手动模式：世界状态只由手动 wake/sle
 
 async def sweep_worlds(db):
     """一轮扫描：休眠超时的活跃世界 + 唤醒有活动的休眠世界"""
+    db = _ensure_repo(db)
     if not AUTO_MANAGE:
         # 手动模式：状态切换全部交给手动 wake/sleep 端点
         return

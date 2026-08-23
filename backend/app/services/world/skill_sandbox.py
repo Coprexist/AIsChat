@@ -19,7 +19,16 @@ import signal
 import sys
 from pathlib import Path
 
+from app.repositories.world_repo import WorldRepository, SQLAlchemyWorldRepository
+from sqlalchemy.ext.asyncio import AsyncSession
 logger = logging.getLogger(__name__)
+
+def _ensure_repo(db_or_repo):
+    """兼容旧调用：传入 AsyncSession 时包装为 SQLAlchemyWorldRepository。"""
+    if isinstance(db_or_repo, AsyncSession):
+        return SQLAlchemyWorldRepository(db_or_repo)
+    return db_or_repo
+
 
 SKILL_RUNNER_PATH = Path(__file__).parent / "skill_runner.py"
 AI_SKILLS_DIR = Path("data/world_ai_skills")
@@ -65,6 +74,7 @@ def _truncate(obj, limit: int = MAX_REPLY_CHARS):
 
 # ── ctx 宿主侧执行（权限校验 + 路径隔离）──
 async def _handle_call(db, world, permissions: set[str], req: dict) -> dict:
+    db = _ensure_repo(db)
     op = req.get("op")
     try:
         if op == "log":
@@ -129,10 +139,10 @@ async def _handle_call(db, world, permissions: set[str], req: dict) -> dict:
             if not rows:
                 return {"ok": False, "error": "本世界未绑定任何群聊"}
             gid = rows[0]
-            group = await get_group(db, gid)
+            group = await get_group(db.session, gid)
             if not group:
                 return {"ok": False, "error": "绑定群不存在"}
-            msg = await create_message(db, gid, world.owner_id, str(req.get("content", "")),
+            msg = await create_message(db.session, gid, world.owner_id, str(req.get("content", "")),
                                        sender_type="user", sender_id=str(world.owner_id))
             return {"ok": True, "data": {"success": True, "message_id": getattr(msg, "id", None)}}
 

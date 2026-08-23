@@ -24,7 +24,16 @@ import asyncio
 import logging
 from dataclasses import dataclass, field
 
+from app.repositories.world_repo import WorldRepository, SQLAlchemyWorldRepository
+from sqlalchemy.ext.asyncio import AsyncSession
 logger = logging.getLogger(__name__)
+
+def _ensure_repo(db_or_repo):
+    """兼容旧调用：传入 AsyncSession 时包装为 SQLAlchemyWorldRepository。"""
+    if isinstance(db_or_repo, AsyncSession):
+        return SQLAlchemyWorldRepository(db_or_repo)
+    return db_or_repo
+
 
 DEFAULT_INTERVAL = 2.0  # 默认节流窗口（秒）
 
@@ -46,6 +55,7 @@ async def notify_group_message(db, group_id: int, message, source: str) -> None:
     - source="world"（世界程序自己发的消息）不触发，防死循环
     - 查绑定该群的世界 → 消息入队节流窗口（异步触发，不阻塞消息发送）
     """
+    db = _ensure_repo(db)
     if source == "world":
         return
     from sqlalchemy import select
@@ -73,6 +83,7 @@ async def _group_type_for_event(db, world_id: int, group_id: int) -> dict | None
 
 
 async def _enqueue(db, world_id: int, group_id: int, message) -> None:
+    db = _ensure_repo(db)
     from app.models.world import World
 
     world = await db.get(World, world_id)

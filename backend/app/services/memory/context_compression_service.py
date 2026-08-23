@@ -15,7 +15,16 @@
 import logging
 from typing import Optional
 
+from app.repositories.memory_repo import MemoryRepository, SQLAlchemyMemoryRepository
+from sqlalchemy.ext.asyncio import AsyncSession
 logger = logging.getLogger(__name__)
+
+def _ensure_repo(db_or_repo):
+    """兼容旧调用：传入 AsyncSession 时包装为 SQLAlchemyMemoryRepository。"""
+    if isinstance(db_or_repo, AsyncSession):
+        return SQLAlchemyMemoryRepository(db_or_repo)
+    return db_or_repo
+
 
 # 默认上下文窗口（DeepSeek V4 为 128K）
 DEFAULT_CONTEXT_WINDOW = 128_000
@@ -53,6 +62,7 @@ def estimate_tokens(messages: list[dict]) -> int:
 
 async def get_compression_threshold(db) -> float:
     """从 DB 配置读取压缩阈值（0.0-1.0），回退到硬编码默认值"""
+    db = _ensure_repo(db)
     try:
         from sqlalchemy import select
         from app.models.conversation_log import ConversationLogConfig

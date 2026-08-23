@@ -11,7 +11,16 @@ import json
 import logging
 from pathlib import Path
 
+from app.repositories.world_repo import WorldRepository, SQLAlchemyWorldRepository
+from sqlalchemy.ext.asyncio import AsyncSession
 logger = logging.getLogger(__name__)
+
+def _ensure_repo(db_or_repo):
+    """兼容旧调用：传入 AsyncSession 时包装为 SQLAlchemyWorldRepository。"""
+    if isinstance(db_or_repo, AsyncSession):
+        return SQLAlchemyWorldRepository(db_or_repo)
+    return db_or_repo
+
 
 BLOCKS_ROOT = Path("data/world_blocks")
 
@@ -158,6 +167,7 @@ def apply_block(world_id: int, block_id: str, prefix: str = "blocks") -> dict:
 async def update_block_for_all_worlds(db, block_id: str) -> dict:
     """平台侧批量更新积木：所有已应用该积木的世界重新 apply（跳过 diy/），
     并给每个世界写懒通知（下次对话注入世界 AI 上下文）。返回更新统计。"""
+    db = _ensure_repo(db)
     from sqlalchemy import select
     from app.models.world import World
     from app.services.world.world_service import add_pending_notice

@@ -24,7 +24,16 @@ import json
 import logging
 import re
 
+from app.repositories.world_repo import WorldRepository, SQLAlchemyWorldRepository
+from sqlalchemy.ext.asyncio import AsyncSession
 logger = logging.getLogger(__name__)
+
+def _ensure_repo(db_or_repo):
+    """兼容旧调用：传入 AsyncSession 时包装为 SQLAlchemyWorldRepository。"""
+    if isinstance(db_or_repo, AsyncSession):
+        return SQLAlchemyWorldRepository(db_or_repo)
+    return db_or_repo
+
 
 # ═══════════════════════════════════════════════════════════
 # 条件 DSL 解析（递归逻辑树 + 字段运算）
@@ -131,6 +140,7 @@ def validate_rule(rule: dict) -> tuple[bool, str]:
 
 async def get_decision_rules(db, kind: str, entity_id: int) -> list[dict]:
     """读某实体的决策技能列表。kind: group_assistant | agent"""
+    db = _ensure_repo(db)
     if kind == "group_assistant":
         from app.models.world import GroupAssistant
         ga = await db.get(GroupAssistant, entity_id)
@@ -150,6 +160,7 @@ async def get_decision_rules(db, kind: str, entity_id: int) -> list[dict]:
 
 async def save_decision_rule(db, kind: str, entity_id: int, rule: dict) -> tuple[bool, str]:
     """新增/更新（同名覆盖）一个决策技能。"""
+    db = _ensure_repo(db)
     ok, err = validate_rule(rule)
     if not ok:
         return False, err
@@ -198,6 +209,7 @@ async def save_decision_rule(db, kind: str, entity_id: int, rule: dict) -> tuple
 
 async def delete_decision_rule(db, kind: str, entity_id: int, name: str) -> bool:
     """删除一个决策技能。"""
+    db = _ensure_repo(db)
     if kind == "group_assistant":
         from app.models.world import GroupAssistant
         ga = await db.get(GroupAssistant, entity_id)

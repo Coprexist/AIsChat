@@ -26,7 +26,16 @@ from app.services.plugin.catalog import scan_disk, get_skill_defs
 from app.services.skill.skill_engine import _ACTION_HANDLERS, _INJECT_HANDLERS
 from app.utils.pure.skill_registry import SkillRegistry
 
+from app.repositories.plugin_repo import PluginRepository, SQLAlchemyPluginRepository
+from sqlalchemy.ext.asyncio import AsyncSession
 logger = logging.getLogger(__name__)
+
+def _ensure_repo(db_or_repo):
+    """兼容旧调用：传入 AsyncSession 时包装为 SQLAlchemyPluginRepository。"""
+    if isinstance(db_or_repo, AsyncSession):
+        return SQLAlchemyPluginRepository(db_or_repo)
+    return db_or_repo
+
 
 # {plugin_id: set(type_name)} — 由声明式插件注册的技能类型（行为式插件由 owner 追踪）
 _from_plugins: dict[str, set[str]] = {}
@@ -105,6 +114,7 @@ def _unload_plugin(plugin_id: str) -> None:
 
 async def apply_skill_plugins(db) -> None:
     """按 DB 全局开关应用/回收技能插件（启动 + 开关切换后调用）"""
+    db = _ensure_repo(db)
     from app.models.plugin import Plugin
 
     disk = scan_disk()

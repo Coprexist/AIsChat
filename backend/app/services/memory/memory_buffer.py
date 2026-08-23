@@ -27,7 +27,16 @@ import time
 import logging
 from dataclasses import dataclass, field
 
+from app.repositories.memory_repo import MemoryRepository, SQLAlchemyMemoryRepository
+from sqlalchemy.ext.asyncio import AsyncSession
 logger = logging.getLogger(__name__)
+
+def _ensure_repo(db_or_repo):
+    """兼容旧调用：传入 AsyncSession 时包装为 SQLAlchemyMemoryRepository。"""
+    if isinstance(db_or_repo, AsyncSession):
+        return SQLAlchemyMemoryRepository(db_or_repo)
+    return db_or_repo
+
 
 
 # ══════════════════════════════════════════════════════════════
@@ -213,6 +222,7 @@ async def _batch_write_memories(db, batch: list[PendingMemory]):
     2. 批量构建 RoughMemory + DetailMemory
     3. 一次 flush 提交（事务安全：全部成功或全部回滚）
     """
+    db = _ensure_repo(db)
     from app.models.memory import RoughMemory, DetailMemory
     from app.services.infrastructure.metrics_collector import metrics
 
@@ -291,6 +301,7 @@ async def archive_low_value_memories(db, agent_id: int, group_id: int | None = N
     - 同名记忆若已被后来的正常记忆覆盖 → 丢弃（status='discarded'）
     - 独特信息 → 提升为 active（status='active'）
     """
+    db = _ensure_repo(db)
     from sqlalchemy import select
     from app.models.memory import RoughMemory
 

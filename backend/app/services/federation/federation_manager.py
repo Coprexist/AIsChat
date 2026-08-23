@@ -37,7 +37,15 @@ from app.services.federation.federation_service import (
     register_federated_entity,
 )
 
+from app.repositories.federation_repo import FederationRepository, SQLAlchemyFederationRepository
 logger = logging.getLogger(__name__)
+
+def _ensure_repo(db_or_repo):
+    """兼容旧调用：传入 AsyncSession 时包装为 SQLAlchemyFederationRepository。"""
+    if isinstance(db_or_repo, AsyncSession):
+        return SQLAlchemyFederationRepository(db_or_repo)
+    return db_or_repo
+
 
 # 配置常量
 HEARTBEAT_INTERVAL = 30
@@ -74,6 +82,7 @@ class PeerConnection:
 
 async def _apply_display_name_update(db, entity_type: str, local_ref_id: str, new_value: str) -> None:
     """将远程 display_name 变更写入实际实体表"""
+    db = _ensure_repo(db)
     from sqlalchemy import text
     try:
         rid = int(local_ref_id)
@@ -89,6 +98,7 @@ async def _apply_display_name_update(db, entity_type: str, local_ref_id: str, ne
 
 async def _apply_avatar_update(db, entity_type: str, local_ref_id: str, new_value: str, peer=None) -> None:
     """将远程 avatar_url 变更写入实际实体表，并下载头像文件到本地"""
+    db = _ensure_repo(db)
     from sqlalchemy import text
     try:
         rid = int(local_ref_id)

@@ -28,7 +28,16 @@ from pathlib import Path
 
 import httpx
 
+from app.repositories.infra_repo import InfraRepository, SQLAlchemyInfraRepository
+from sqlalchemy.ext.asyncio import AsyncSession
 logger = logging.getLogger(__name__)
+
+def _ensure_repo(db_or_repo):
+    """兼容旧调用：传入 AsyncSession 时包装为 SQLAlchemyInfraRepository。"""
+    if isinstance(db_or_repo, AsyncSession):
+        return SQLAlchemyInfraRepository(db_or_repo)
+    return db_or_repo
+
 
 GITHUB_API = "https://api.github.com"
 INDEX_PATH = "worlds/index.json"
@@ -66,6 +75,7 @@ def mask_token(tok: str) -> str:
 async def get_market_config(db) -> dict:
     """读商城配置（含 GitHub 设置）——直接查 DB；token 解密供服务内使用。
     首次读取时若无机器人签名密钥 → 自动生成并保存（机器人负责社区仓库写入）。"""
+    db = _ensure_repo(db)
     from sqlalchemy import text
     row = (await db.execute(text("SELECT market_config FROM system_settings WHERE id=1"))).first()
     raw = row[0] if row else None
@@ -100,6 +110,7 @@ async def save_market_config(db, *, github_repo: str | None = None,
                              github_token: str | None = None,
                              auto_sync_enabled: bool | None = None) -> dict:
     """更新商城配置（仅更新传入的字段，其余保留）；token 加密存储"""
+    db = _ensure_repo(db)
     from sqlalchemy import text
     row = (await db.execute(text("SELECT market_config FROM system_settings WHERE id=1"))).first()
     raw = row[0] if row else None
@@ -332,6 +343,7 @@ async def sync_item_to_github(db, item) -> dict:
       作者是别人 → 拒绝（只能写自己的）
     - 双签名：作者签名（meta.signature）+ 机器人背书签名（bot_signature）
     - meta 记录：作者 GitHub id（身份锚）、来源仓库链接、zip 哈希"""
+    db = _ensure_repo(db)
     cfg = await get_market_config(db)
     parts = _repo_parts(cfg["github_repo"])
     if not parts:

@@ -12,7 +12,16 @@ import logging
 import re
 from pathlib import Path
 
+from app.repositories.world_repo import WorldRepository, SQLAlchemyWorldRepository
+from sqlalchemy.ext.asyncio import AsyncSession
 logger = logging.getLogger(__name__)
+
+def _ensure_repo(db_or_repo):
+    """兼容旧调用：传入 AsyncSession 时包装为 SQLAlchemyWorldRepository。"""
+    if isinstance(db_or_repo, AsyncSession):
+        return SQLAlchemyWorldRepository(db_or_repo)
+    return db_or_repo
+
 
 # 文档随代码走（git 跟踪；__file__ 相对，不依赖 cwd）
 DOCS_ROOT = Path(__file__).resolve().parent / "api_docs"
@@ -53,6 +62,7 @@ SECTIONS: list[dict] = _discover_sections()
 
 async def ensure_sections_seeded(db) -> None:
     """首次启动/访问：扫 md 源，把 DB 里没有的分区写入（md 种子，不覆盖已有值）。"""
+    db = _ensure_repo(db)
     try:
         from sqlalchemy import select
         from app.models.api_doc_section import ApiDocSection
@@ -68,6 +78,7 @@ async def ensure_sections_seeded(db) -> None:
 
 async def get_sections(db) -> list[dict]:
     """分区列表（运行时权威 = DB 快照；确保已 seed）——快，无文件解析。"""
+    db = _ensure_repo(db)
     from sqlalchemy import select
     from app.models.api_doc_section import ApiDocSection
     await ensure_sections_seeded(db)
@@ -77,6 +88,7 @@ async def get_sections(db) -> list[dict]:
 
 async def sync_sections_from_docs(db) -> dict:
     """「从文档中更新」：md → DB 全量同步（新增/更新/删除，以 md 为准）。"""
+    db = _ensure_repo(db)
     from sqlalchemy import select
     from app.models.api_doc_section import ApiDocSection
     docs = _discover_sections()
@@ -122,6 +134,7 @@ def _write_back_doc(section_id: str, title: str, intro: str) -> bool:
 
 async def save_sections(db, items: list[dict], write_back: bool = False) -> dict:
     """表单保存：items=[{id,title,intro}] 更新 DB；write_back=True 时同步写回 md。"""
+    db = _ensure_repo(db)
     from sqlalchemy import select
     from app.models.api_doc_section import ApiDocSection
     saved = 0

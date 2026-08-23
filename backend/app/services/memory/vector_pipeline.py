@@ -11,7 +11,16 @@ from app.models.message import Message, GroupMessageEmbedding
 from app.models.group import Group
 from app.config import settings
 
+from app.repositories.memory_repo import MemoryRepository, SQLAlchemyMemoryRepository
+from sqlalchemy.ext.asyncio import AsyncSession
 logger = logging.getLogger(__name__)
+
+def _ensure_repo(db_or_repo):
+    """兼容旧调用：传入 AsyncSession 时包装为 SQLAlchemyMemoryRepository。"""
+    if isinstance(db_or_repo, AsyncSession):
+        return SQLAlchemyMemoryRepository(db_or_repo)
+    return db_or_repo
+
 
 # 全局向量化任务队列
 embedding_queue: asyncio.Queue = asyncio.Queue(maxsize=1000)
@@ -42,6 +51,7 @@ async def vector_pipeline_worker():
 
 async def _vectorize_message(db, item: dict):
     """向量化单条消息"""
+    db = _ensure_repo(db)
     group_id = item["group_id"]
     message_id = item["message_id"]
 
@@ -93,6 +103,7 @@ async def hybrid_search(
 
     返回: [{"message_id": int, "content": str, "vector_score": float, "bm25_score": float, "combined_score": float, "sender_type": str, "sender_name": str, ...}]
     """
+    db = _ensure_repo(db)
     from app.utils.embedding import get_embedding
     from app.db_providers import get_provider
 
@@ -157,6 +168,7 @@ async def _hybrid_search_text_fallback(
     无向量相似度，纯文本匹配排序——保证功能可用，向量精度由 P1 的
     sqlite-vec 补齐。
     """
+    db = _ensure_repo(db)
     # 提取关键词（复用 memory_service 的 ngram 分词策略，中文友好）
     from app.services.memory.memory_service import extract_keywords
     parts = extract_keywords(query_text)
