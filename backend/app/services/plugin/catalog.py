@@ -165,7 +165,9 @@ async def sync_plugins_to_db(db) -> int:
         )
         existing = db_plugins.get(pid)
         if existing is None:
-            db.add(Plugin(id=pid, enabled=bool(m.get("default_enabled", True)), **defaults))
+            is_skin = defaults.get('category') == 'skin'
+            enabled = False if is_skin else bool(m.get('default_enabled', False))
+            db.add(Plugin(id=pid, enabled=enabled, **defaults))
             logger.info(f"插件发现: {pid} ({defaults['name']})")
             changed += 1
         else:
