@@ -9,7 +9,17 @@ from datetime import datetime, timedelta, timezone
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.repositories.world_repo import WorldRepository, SQLAlchemyWorldRepository
+
 logger = logging.getLogger(__name__)
+
+
+def _ensure_repo(db_or_repo):
+    """兼容旧调用：传入 AsyncSession 时包装为 SQLAlchemyWorldRepository。"""
+    if isinstance(db_or_repo, AsyncSession):
+        return SQLAlchemyWorldRepository(db_or_repo)
+    return db_or_repo
+
 
 VALID_BIND_TYPES = {"group", "dm", "user", "agent"}  # agent = AI 直接绑定世界（个人专属能力）
 DEFAULT_SLEEP_MEMORY_MB = 48  # 休眠配额（无人时默认 48MB/世界；24MB 连解释器都起不来，2026-08-05 实测）
@@ -65,6 +75,7 @@ async def create_world(
 
     群视界机器人 = 世界配置（worlds.creator_config），建世界即初始化，无需创建 agent/账号。
     """
+    db = _ensure_repo(db)
     from app.models.world import World
 
     world = World(
@@ -114,6 +125,7 @@ async def ensure_world_ai(db: AsyncSession, world_id: int):
 
 async def get_world(db: AsyncSession, world_id: int) -> dict | None:
     """世界详情（含绑定入口、居民 AI、群视界机器人配置）"""
+    db = _ensure_repo(db)
     from app.models.world import World, WorldBinding, WorldAgent
 
     world = await db.get(World, world_id)
@@ -168,6 +180,7 @@ def world_ai_to_dict(world_id: int, wai) -> dict:
 
 async def list_worlds(db: AsyncSession, owner_id: int) -> list[dict]:
     """我的世界列表（含绑定入口）"""
+    db = _ensure_repo(db)
     from app.models.world import World, WorldBinding
 
     result = await db.execute(
@@ -211,6 +224,7 @@ async def update_world(
     config: dict | None = None,
 ) -> dict:
     """更新世界（仅创建者）"""
+    db = _ensure_repo(db)
     from app.models.world import World
 
     world = await db.get(World, world_id)
@@ -238,6 +252,7 @@ async def update_creator_config(
     patch: dict,
 ) -> dict:
     """更新群视界机器人配置（世界 AI 表单提交；仅创建者）"""
+    db = _ensure_repo(db)
     from app.models.world import World
 
     world = await db.get(World, world_id)
@@ -257,6 +272,7 @@ async def update_creator_config(
 
 async def delete_world(db: AsyncSession, world_id: int, owner_id: int) -> None:
     """删除世界（仅创建者）；世界 AI 是世界的配置，随世界一起消失"""
+    db = _ensure_repo(db)
     from app.models.world import World
 
     world = await db.get(World, world_id)
@@ -282,6 +298,7 @@ async def bind_entity(
     entity_id: int,
 ) -> dict:
     """绑定入口（群聊/私信/用户 ↔ 世界）"""
+    db = _ensure_repo(db)
     from app.models.world import World, WorldBinding
 
     if entity_type not in VALID_BIND_TYPES:
@@ -315,6 +332,7 @@ async def unbind_entity(
     entity_id: int,
 ) -> None:
     """解绑入口"""
+    db = _ensure_repo(db)
     from app.models.world import World, WorldBinding
 
     world = await db.get(World, world_id)
@@ -335,6 +353,7 @@ async def unbind_entity(
 
 async def find_world_by_entity(db: AsyncSession, entity_type: str, entity_id: int) -> int | None:
     """按入口反查世界 id（群聊 id / 用户 id → 世界）"""
+    db = _ensure_repo(db)
     from app.models.world import WorldBinding
 
     result = await db.execute(
@@ -348,6 +367,7 @@ async def find_world_by_entity(db: AsyncSession, entity_type: str, entity_id: in
 
 async def find_worlds_by_entity(db: AsyncSession, entity_type: str, entity_id: int) -> list:
     """按入口反查多个世界（群/agent 可绑多个世界）"""
+    db = _ensure_repo(db)
     from app.models.world import World, WorldBinding
 
     rows = (await db.execute(
@@ -365,6 +385,7 @@ async def find_worlds_by_entity(db: AsyncSession, entity_type: str, entity_id: i
 
 async def wake_world(db: AsyncSession, world_id: int) -> dict:
     """唤醒世界：应用离线时间补偿（世界时间 = 上次活跃 + 真实时间差 × 流速）"""
+    db = _ensure_repo(db)
     from app.models.world import World
 
     world = await db.get(World, world_id)
@@ -389,6 +410,7 @@ async def wake_world(db: AsyncSession, world_id: int) -> dict:
 
 async def sleep_world(db: AsyncSession, world_id: int) -> dict:
     """休眠世界"""
+    db = _ensure_repo(db)
     from app.models.world import World
 
     world = await db.get(World, world_id)
@@ -412,6 +434,7 @@ async def add_pending_notice(
     summary: str,
 ) -> None:
     """记录代码改动懒通知（不实时打扰，下次对话时附送）"""
+    db = _ensure_repo(db)
     from app.models.world import World
 
     world = await db.get(World, world_id)
@@ -431,6 +454,7 @@ async def add_pending_notice(
 
 async def take_pending_notices(db: AsyncSession, world_id: int) -> list[dict]:
     """取出并清空懒通知（对话开始时调用，附送给世界 AI）"""
+    db = _ensure_repo(db)
     from app.models.world import World
 
     world = await db.get(World, world_id)
@@ -467,6 +491,7 @@ def world_to_dict(w) -> dict:
 
 async def get_world_data(db: AsyncSession, world_id: int, key: str) -> dict | None:
     """读世界数据；不存在返回 None"""
+    db = _ensure_repo(db)
     from app.models.world import WorldData
     row = (await db.execute(
         select(WorldData).where(WorldData.world_id == world_id, WorldData.key == key)
@@ -478,6 +503,7 @@ async def get_world_data(db: AsyncSession, world_id: int, key: str) -> dict | No
 
 async def set_world_data(db: AsyncSession, world_id: int, key: str, value) -> dict:
     """写世界数据（upsert）"""
+    db = _ensure_repo(db)
     from app.models.world import WorldData
     row = (await db.execute(
         select(WorldData).where(WorldData.world_id == world_id, WorldData.key == key)
@@ -494,6 +520,7 @@ async def set_world_data(db: AsyncSession, world_id: int, key: str, value) -> di
 
 async def delete_world_data(db: AsyncSession, world_id: int, key: str) -> bool:
     """删世界数据；返回是否存在"""
+    db = _ensure_repo(db)
     from app.models.world import WorldData
     row = (await db.execute(
         select(WorldData).where(WorldData.world_id == world_id, WorldData.key == key)
