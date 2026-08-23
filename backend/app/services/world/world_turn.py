@@ -197,7 +197,7 @@ class WorldTurnWorker:
                                             role="user", content=_t, session_id=sid,
                                         )
                                         _db.add(wm)
-                                        await _db.flush()
+                                        _db.flush()
                                         await tb.broadcast(f"data: [INSERT]{json.dumps({'msg_id': wm.id, 'content': _t}, ensure_ascii=False)}\n\n")
                                 await _db.commit()
                     except Exception as e:
@@ -255,7 +255,7 @@ class WorldTurnWorker:
                         content=_t, session_id=sid,
                     )
                     _db.add(wm)
-                    await _db.flush()
+                    _db.flush()
                     ids.append(wm.id)
                     await tb.broadcast(f"data: [INSERT]{json.dumps({'msg_id': wm.id, 'content': _t}, ensure_ascii=False)}\n\n")
                 await _db.commit()

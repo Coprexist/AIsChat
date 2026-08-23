@@ -234,7 +234,7 @@ async def _migrate_users_type(db):
     logger.info("  ➕ 添加 users.type 列")
     await db.execute(text("ALTER TABLE users ADD COLUMN type VARCHAR(10) DEFAULT 'human'"))
     await db.execute(text("UPDATE users SET type = 'human' WHERE type IS NULL"))
-    await db.flush()
+    db.flush()
 
 
 async def _migrate_agents_user_id(db):
@@ -244,7 +244,7 @@ async def _migrate_agents_user_id(db):
         return
     logger.info("  ➕ 添加 agents.user_id 列")
     await db.execute(text("ALTER TABLE agents ADD COLUMN user_id INT REFERENCES users(id)"))
-    await db.flush()
+    db.flush()
 
 
 async def _migrate_create_dm_tables(db):
@@ -284,7 +284,7 @@ async def _migrate_create_dm_tables(db):
     await db.execute(text("""
         CREATE INDEX IF NOT EXISTS idx_dm_messages_created_at ON dm_messages(created_at)
     """))
-    await db.flush()
+    db.flush()
 
 
 async def _migrate_agent_users(db):
@@ -311,10 +311,10 @@ async def _migrate_agent_users(db):
             is_active=True,
         )
         db.add(user)
-        await db.flush()
+        db.flush()
         agent.user_id = user.id
         logger.info(f"    agent {agent.name}({agent.id}) → user {user.id}")
-    await db.flush()
+    db.flush()
 
 
 async def _migrate_dm_messages(db):
@@ -388,7 +388,7 @@ async def _migrate_dm_messages(db):
                 user2_id=user_ids[1],
             )
             db.add(session)
-            await db.flush()
+            db.flush()
             imported_sessions += 1
 
         # 导入消息
@@ -425,7 +425,7 @@ async def _migrate_dm_messages(db):
             db.add(dm_msg)
             imported_messages += 1
 
-    await db.flush()
+    db.flush()
     logger.info(f"  ✅ 导入完成: {imported_sessions} 个会话, {imported_messages} 条消息")
 
 
@@ -446,7 +446,7 @@ async def _migrate_agent_alarms(db):
             fired_at TIMESTAMPTZ
         )
     """))
-    await db.flush()
+    db.flush()
     logger.info("  ✅ agent_alarms 表创建完成")
 
 
@@ -467,7 +467,7 @@ async def _migrate_workspace(db):
                 updated_at TIMESTAMP DEFAULT NOW()
             )
         """))
-        await db.flush()
+        db.flush()
         logger.info("  ✅ agent_workspace 表创建完成")
     else:
         logger.info("  ⏭ agent_workspace 表已存在，检查新列...")
@@ -485,7 +485,7 @@ async def _migrate_workspace(db):
             cols_added = True
             logger.info("  📝 添加 agent_workspace.journal 列")
         if cols_added:
-            await db.flush()
+            db.flush()
             logger.info("  ✅ agent_workspace 扩展完成")
         else:
             logger.info("  ⏭ agent_workspace 新列均已存在，跳过")
@@ -516,7 +516,7 @@ async def _migrate_agent_skills(db):
     await db.execute(text("""
         CREATE INDEX IF NOT EXISTS idx_agent_skills_agent ON agent_skills(agent_id)
     """))
-    await db.flush()
+    db.flush()
     logger.info("  ✅ agent_skills 表创建完成")
 
 
@@ -705,7 +705,7 @@ async def _migrate_federation_tables(db):
         logger.info("  ⏭ agents.discoverable 已存在，跳过")
 
     if created_any:
-        await db.flush()
+        db.flush()
 
 
 async def _migrate_conversation_logs(db):
@@ -732,7 +732,7 @@ async def _migrate_conversation_logs(db):
         created_any = True
 
     if created_any:
-        await db.flush()
+        db.flush()
 
 
     # 2. 日志表
@@ -784,7 +784,7 @@ async def _migrate_conversation_logs(db):
         logger.info("  ⏭ users.conversation_logs_limit 已存在，跳过")
 
     if created_any:
-        await db.flush()
+        db.flush()
         logger.info("  ✅ 对话日志系统迁移完成")
     else:
         logger.info("  ⏭ 对话日志系统均已存在，跳过")
@@ -813,7 +813,7 @@ async def _migrate_auto_dnd_fields(db):
         logger.info("  ⏭ agents.auto_dnd_duration 已存在，跳过")
 
     if created_any:
-        await db.flush()
+        db.flush()
         logger.info("  ✅ 自动免打扰字段迁移完成")
     else:
         logger.info("  ⏭ 自动免打扰字段均已存在，跳过")
@@ -960,7 +960,7 @@ async def _migrate_api_credit(db):
         logger.warning(f"  ⚠️ 兑换码 CHECK 约束更新跳过: {e}")
 
     if created_any:
-        await db.flush()
+        db.flush()
         logger.info("  ✅ API 额度/配置系统迁移完成")
     else:
         logger.info("  ⏭ API 额度/配置系统均已存在，跳过")
@@ -975,7 +975,7 @@ async def _migrate_config_profile(db):
     await db.execute(text(
         "ALTER TABLE agents ADD COLUMN config_profile VARCHAR(20) NOT NULL DEFAULT 'custom'"
     ))
-    await db.flush()
+    db.flush()
     logger.info("  ✅ config_profile 迁移完成")
 
 
@@ -987,7 +987,7 @@ async def _migrate_delay_reply_enabled(db):
         await db.execute(text(
             "ALTER TABLE agents ADD COLUMN delay_reply_enabled BOOLEAN DEFAULT NULL"
         ))
-        await db.flush()
+        db.flush()
         logger.info("  ✅ agents.delay_reply_enabled 迁移完成")
     else:
         logger.info("  ⏭ agents.delay_reply_enabled 已存在，跳过")
@@ -998,7 +998,7 @@ async def _migrate_delay_reply_enabled(db):
         await db.execute(text(
             "ALTER TABLE conversation_log_config ADD COLUMN default_delay_reply_enabled BOOLEAN NOT NULL DEFAULT false"
         ))
-        await db.flush()
+        db.flush()
         logger.info("  ✅ default_delay_reply_enabled 迁移完成")
     else:
         logger.info("  ⏭ conversation_log_config.default_delay_reply_enabled 已存在，跳过")
@@ -1011,7 +1011,7 @@ async def _migrate_max_tool_rounds(db):
         await db.execute(text(
             "ALTER TABLE agents ADD COLUMN max_tool_rounds INTEGER NOT NULL DEFAULT 3"
         ))
-        await db.flush()
+        db.flush()
         logger.info("  ✅ agents.max_tool_rounds 迁移完成")
     else:
         logger.info("  ⏭ agents.max_tool_rounds 已存在，跳过")
@@ -1021,7 +1021,7 @@ async def _migrate_max_tool_rounds(db):
         await db.execute(text(
             "ALTER TABLE agents ADD COLUMN alarm_max_tool_rounds INTEGER NOT NULL DEFAULT 10"
         ))
-        await db.flush()
+        db.flush()
         logger.info("  ✅ agents.alarm_max_tool_rounds 迁移完成")
     else:
         logger.info("  ⏭ agents.alarm_max_tool_rounds 已存在，跳过")
@@ -1031,7 +1031,7 @@ async def _migrate_max_tool_rounds(db):
         await db.execute(text(
             "ALTER TABLE agents ADD COLUMN force_alarm_on_end BOOLEAN NOT NULL DEFAULT false"
         ))
-        await db.flush()
+        db.flush()
         logger.info("  ✅ agents.force_alarm_on_end 迁移完成")
     else:
         logger.info("  ⏭ agents.force_alarm_on_end 已存在，跳过")
@@ -1041,7 +1041,7 @@ async def _migrate_max_tool_rounds(db):
         await db.execute(text(
             "ALTER TABLE agents ADD COLUMN max_alarms INTEGER NOT NULL DEFAULT 10"
         ))
-        await db.flush()
+        db.flush()
         logger.info("  ✅ agents.max_alarms 迁移完成")
     else:
         logger.info("  ⏭ agents.max_alarms 已存在，跳过")
@@ -1105,7 +1105,7 @@ async def _migrate_restore_friend_tables(db):
         logger.info("  ✅ friendships_archived → friendships")
         await db.execute(text("ALTER TABLE friendship_requests_archived RENAME TO friendship_requests"))
         logger.info("  ✅ friendship_requests_archived → friendship_requests")
-        await db.flush()
+        db.flush()
     except Exception as e:
         logger.warning(f"  ⚠️ 恢复好友表失败: {e}")
         await db.rollback()
@@ -1120,7 +1120,7 @@ async def _migrate_ai_types(db):
         await db.execute(text(
             "ALTER TABLE agents ADD COLUMN ai_type VARCHAR(20) NOT NULL DEFAULT 'resonance'"
         ))
-        await db.flush()
+        db.flush()
         logger.info("  ✅ agents.ai_type 迁移完成")
     else:
         logger.info("  ⏭ agents.ai_type 已存在，跳过")
@@ -1144,7 +1144,7 @@ async def _migrate_ai_types(db):
                 CONSTRAINT uq_agent_user_config UNIQUE (agent_id, user_id)
             )
         """))
-        await db.flush()
+        db.flush()
         logger.info("  ✅ agent_user_configs 表创建完成")
     else:
         logger.info("  ⏭ agent_user_configs 已存在，跳过")
@@ -1158,7 +1158,7 @@ async def _migrate_memory_user_isolation(db):
         await db.execute(text(
             "ALTER TABLE rough_memories ADD COLUMN user_id INTEGER REFERENCES users(id)"
         ))
-        await db.flush()
+        db.flush()
         logger.info("  ✅ rough_memories.user_id 迁移完成")
     else:
         logger.info("  ⏭ rough_memories.user_id 已存在，跳过")
@@ -1172,7 +1172,7 @@ async def _migrate_willingness_fields(db):
         await db.execute(text(
             "ALTER TABLE agents ADD COLUMN last_willingness_score INTEGER"
         ))
-        await db.flush()
+        db.flush()
         logger.info("  ✅ agents.last_willingness_score 迁移完成")
     else:
         logger.info("  ⏭ agents.last_willingness_score 已存在，跳过")
@@ -1181,7 +1181,7 @@ async def _migrate_willingness_fields(db):
         await db.execute(text(
             "ALTER TABLE agents ADD COLUMN last_willingness_reason TEXT"
         ))
-        await db.flush()
+        db.flush()
         logger.info("  ✅ agents.last_willingness_reason 迁移完成")
     else:
         logger.info("  ⏭ agents.last_willingness_reason 已存在，跳过")
@@ -1197,7 +1197,7 @@ async def _migrate_file_system(db):
             "ALTER TABLE file_metadata ADD COLUMN collaboration_mode VARCHAR(10) "
             "DEFAULT 'solo' NOT NULL CHECK (collaboration_mode IN ('solo', 'shared', 'open'))"
         ))
-        await db.flush()
+        db.flush()
         logger.info("  ✅ file_metadata.collaboration_mode 迁移完成")
     else:
         logger.info("  ⏭ file_metadata.collaboration_mode 已存在，跳过")
@@ -1207,7 +1207,7 @@ async def _migrate_file_system(db):
         await db.execute(text(
             "ALTER TABLE file_metadata ADD COLUMN updated_at TIMESTAMP DEFAULT NOW()"
         ))
-        await db.flush()
+        db.flush()
         logger.info("  ✅ file_metadata.updated_at 迁移完成")
     else:
         logger.info("  ⏭ file_metadata.updated_at 已存在，跳过")
@@ -1230,7 +1230,7 @@ async def _migrate_file_system(db):
         await db.execute(text(
             "CREATE INDEX IF NOT EXISTS idx_file_refs_ref ON file_references(referrer_type, referrer_id)"
         ))
-        await db.flush()
+        db.flush()
         logger.info("  ✅ file_references 表创建完成")
     else:
         logger.info("  ⏭ file_references 已存在，跳过")
@@ -1251,7 +1251,7 @@ async def _migrate_file_system(db):
         await db.execute(text(
             "CREATE INDEX IF NOT EXISTS idx_file_collabs_file ON file_collaborators(file_id)"
         ))
-        await db.flush()
+        db.flush()
         logger.info("  ✅ file_collaborators 表创建完成")
     else:
         logger.info("  ⏭ file_collaborators 已存在，跳过")
@@ -1260,7 +1260,7 @@ async def _migrate_file_system(db):
     await db.execute(text(
         "CREATE INDEX IF NOT EXISTS idx_file_metadata_owner ON file_metadata(owner_type, owner_id)"
     ))
-    await db.flush()
+    db.flush()
 
 
 async def _migrate_message_attachments(db):
@@ -1271,7 +1271,7 @@ async def _migrate_message_attachments(db):
         await db.execute(text(
             "ALTER TABLE messages ADD COLUMN attachments JSONB"
         ))
-        await db.flush()
+        db.flush()
         logger.info("  ✅ messages.attachments 迁移完成")
     else:
         logger.info("  ⏭ messages.attachments 已存在，跳过")
@@ -1280,7 +1280,7 @@ async def _migrate_message_attachments(db):
         await db.execute(text(
             "ALTER TABLE dm_messages ADD COLUMN attachments TEXT"
         ))
-        await db.flush()
+        db.flush()
         logger.info("  ✅ dm_messages.attachments 迁移完成")
     else:
         logger.info("  ⏭ dm_messages.attachments 已存在，跳过")
@@ -1294,7 +1294,7 @@ async def _migrate_message_sender_name(db):
         await db.execute(text(
             "ALTER TABLE messages ADD COLUMN sender_name VARCHAR(100)"
         ))
-        await db.flush()
+        db.flush()
         logger.info("  ✅ messages.sender_name 迁移完成")
     else:
         logger.info("  ⏭ messages.sender_name 已存在，跳过")
@@ -1308,7 +1308,7 @@ async def _migrate_sender_avatar_url(db):
         await db.execute(text(
             "ALTER TABLE messages ADD COLUMN sender_avatar_url TEXT DEFAULT ''"
         ))
-        await db.flush()
+        db.flush()
         logger.info("  ✅ messages.sender_avatar_url 迁移完成")
     else:
         logger.info("  ⏭ messages.sender_avatar_url 已存在，跳过")
@@ -1322,7 +1322,7 @@ async def _migrate_prompt_overrides(db):
         await db.execute(text(
             "ALTER TABLE system_settings ADD COLUMN system_prompt_overrides JSONB"
         ))
-        await db.flush()
+        db.flush()
         logger.info("  ✅ system_settings.system_prompt_overrides 迁移完成")
     else:
         logger.info("  ⏭ system_settings.system_prompt_overrides 已存在，跳过")
@@ -1340,7 +1340,7 @@ async def _migrate_memory_archive_columns(db):
             "ALTER TABLE rough_memories ADD CONSTRAINT ck_rough_status "
             "CHECK (status IN ('active', 'pending_archive', 'discarded'))"
         ))
-        await db.flush()
+        db.flush()
         logger.info("  ✅ rough_memories.status 迁移完成")
     else:
         logger.info("  ⏭ rough_memories.status 已存在，跳过")
@@ -1349,7 +1349,7 @@ async def _migrate_memory_archive_columns(db):
         await db.execute(text(
             "ALTER TABLE rough_memories ADD COLUMN value_score INTEGER DEFAULT 5"
         ))
-        await db.flush()
+        db.flush()
         logger.info("  ✅ rough_memories.value_score 迁移完成")
     else:
         logger.info("  ⏭ rough_memories.value_score 已存在，跳过")
@@ -1367,7 +1367,7 @@ async def _migrate_agent_metrics(db):
                 created_at TIMESTAMP DEFAULT NOW()
             )
         """))
-        await db.flush()
+        db.flush()
         logger.info("  ✅ agent_metrics 表创建完成")
     else:
         logger.info("  ⏭ agent_metrics 已存在，跳过")
@@ -1409,7 +1409,7 @@ async def _migrate_system_settings(db):
         logger.info("  ⏭ users.setup_completed 已存在，跳过")
 
     if created_any:
-        await db.flush()
+        db.flush()
         logger.info("  ✅ 系统设置迁移完成")
     else:
         logger.info("  ⏭ 系统设置均已存在，跳过")
@@ -1483,7 +1483,7 @@ async def _migrate_api_key_pool_tables(db):
         logger.info("  ⏭ api_key_pool.concurrent_limit 列已存在，跳过")
 
     if created_any:
-        await db.flush()
+        db.flush()
 
 
 async def _migrate_platform_credit(db):
@@ -1545,7 +1545,7 @@ async def _migrate_redemption_code_details(db):
         logger.info("  ⏭ redemption_codes.created_at 已存在，跳过")
 
     if created_any:
-        await db.flush()
+        db.flush()
 
 
 async def _migrate_friend_controls(db):
@@ -1572,7 +1572,7 @@ async def _migrate_friend_controls(db):
         logger.info("  ⏭ agents.auto_respond_friend_request 已存在，跳过")
 
     if created_any:
-        await db.flush()
+        db.flush()
 
 
 async def _migrate_memory_config_columns(db):
@@ -1608,7 +1608,7 @@ async def _migrate_memory_config_columns(db):
         logger.info("  ⏭ agents.memory_shared_scope 已存在，跳过")
 
     if created_any:
-        await db.flush()
+        db.flush()
 
 
 async def _fix_file_owner_type_check(db):
@@ -1638,7 +1638,7 @@ async def _fix_file_owner_type_check(db):
         "ALTER TABLE file_metadata ADD CONSTRAINT ck_file_owner_type "
         "CHECK (owner_type IN ('human', 'ai', 'group', 'system'))"
     ))
-    await db.flush()
+    db.flush()
     logger.info(f"  ✅ {conname} → ck_file_owner_type 修复完成")
 
 
@@ -1761,7 +1761,7 @@ async def _migrate_federation_v1(db):
         logger.info("  ⏭ system_settings.federation_sync_interval_minutes 已存在，跳过")
 
     if created_any:
-        await db.flush()
+        db.flush()
         logger.info("  ✅ 联邦 v0.2.0 迁移完成")
     else:
         logger.info("  ⏭ 联邦 v0.2.0 迁移均已完成，跳过")
@@ -1785,7 +1785,7 @@ async def _migrate_agent_collaborators(db):
             UNIQUE(agent_id, user_id)
         )
     """))
-    await db.flush()
+    db.flush()
     logger.info("  ✅ agent_collaborators 表创建完成")
 
 
@@ -1798,7 +1798,7 @@ async def _migrate_prompt_order(db):
     await db.execute(text(
         "ALTER TABLE system_settings ADD COLUMN system_prompt_order JSONB"
     ))
-    await db.flush()
+    db.flush()
     logger.info("  ✅ system_settings.system_prompt_order 列添加完成")
 
 
@@ -1827,7 +1827,7 @@ async def _fix_file_refs_referrer_type(db):
         "ALTER TABLE file_references ADD CONSTRAINT ck_ref_referrer_type "
         "CHECK (referrer_type IN ('human', 'ai', 'message', 'group'))"
     ))
-    await db.flush()
+    db.flush()
     logger.info("  ✅ file_references.referrer_type 约束已修复（添加 human）")
 
 
@@ -1838,7 +1838,7 @@ async def _migrate_content_hash(db):
         return
     logger.info("  🔐 添加 file_metadata.content_hash 列")
     await db.execute(text("ALTER TABLE file_metadata ADD COLUMN content_hash VARCHAR(64)"))
-    await db.flush()
+    db.flush()
     logger.info("  ✅ file_metadata.content_hash 迁移完成")
 
 
@@ -1866,7 +1866,7 @@ async def _migrate_forward_ref_type(db):
         "ALTER TABLE file_references ADD CONSTRAINT ck_ref_type "
         "CHECK (ref_type IN ('read', 'write', 'import', 'share', 'forward'))"
     ))
-    await db.flush()
+    db.flush()
     logger.info("  ✅ file_references.ref_type 已添加 forward")
 
 
@@ -1879,7 +1879,7 @@ async def _migrate_orphan_retention(db):
     await db.execute(text(
         "ALTER TABLE system_settings ADD COLUMN orphan_retention_days INTEGER NOT NULL DEFAULT 7"
     ))
-    await db.flush()
+    db.flush()
     logger.info("  ✅ system_settings.orphan_retention_days 迁移完成")
 
 
@@ -1910,7 +1910,7 @@ async def _migrate_default_file_quota(db):
         logger.info("  ⏭ users.file_quota_bonus_mb 已存在，跳过")
 
     if created_any:
-        await db.flush()
+        db.flush()
         logger.info("  ✅ default_file_quota / file_quota_bonus 迁移完成")
 
 
@@ -1947,7 +1947,7 @@ async def _migrate_bio_and_status(db):
         logger.info("  ⏭ users.status_color 已存在，跳过")
 
     if created_any:
-        await db.flush()
+        db.flush()
         logger.info("  ✅ bio/status_text 迁移完成")
 
 
@@ -2028,7 +2028,7 @@ async def _migrate_email_verification(db):
         logger.info("  ⏭ system_settings.login_providers 已存在，跳过")
 
     if created_any:
-        await db.flush()
+        db.flush()
         logger.info("  ✅ 邮箱认证迁移完成")
 
 
@@ -2074,7 +2074,7 @@ async def _migrate_smtp_configs_array(db):
         await db.execute(
             text("UPDATE system_settings SET smtp_config = '[]'::jsonb WHERE id = 1")
         )
-        await db.flush()
+        db.flush()
         return
 
     logger.info("  📦 迁移 smtp_config: 单对象 → 数组格式")
@@ -2086,7 +2086,7 @@ async def _migrate_smtp_configs_array(db):
         text("UPDATE system_settings SET smtp_config = CAST(:val AS jsonb) WHERE id = 1"),
         {"val": new_value},
     )
-    await db.flush()
+    db.flush()
     logger.info("  ✅ smtp_config 已迁移为数组格式")
 
 
@@ -2097,7 +2097,7 @@ async def _migrate_email_templates(db):
         return
     logger.info("  📧 添加 system_settings.email_templates 列")
     await db.execute(text("ALTER TABLE system_settings ADD COLUMN email_templates JSONB"))
-    await db.flush()
+    db.flush()
     logger.info("  ✅ system_settings.email_templates 列添加完成")
 
 
@@ -2120,7 +2120,7 @@ async def _migrate_structured_records(db):
             UNIQUE(agent_id, category, sub_key, field)
         )
     """))
-    await db.flush()
+    db.flush()
     logger.info("  ✅ structured_records 表创建完成")
 
 
@@ -2165,7 +2165,7 @@ async def _migrate_oracle_file_references(db):
         ALTER TABLE file_references
         ADD CONSTRAINT uq_file_ref UNIQUE (file_id, referrer_type, referrer_id)
     """))
-    await db.flush()
+    db.flush()
     logger.info("  ✅ file_references 幂等约束迁移完成")
 
 
@@ -2274,7 +2274,7 @@ async def _migrate_group_members_user_id(db):
         WHERE gm.member_type = 'human'
         AND (gm.member_id = a.user_id OR gm.member_id = a.id)
     """))
-    await db.flush()
+    db.flush()
     logger.info("    🔧 AI 类型修复完成（human → ai 还原）")
 
 
@@ -2317,10 +2317,10 @@ async def _migrate_fix_human_members_changed_to_ai(db):
             ), {"g": group_id, "m": member_id})
             updated += 1
 
-    await db.flush()
+    db.flush()
     logger.info(f"  ✅ 修复完成：删除 {deleted} 条重复 + 还原 {updated} 条人类成员")
 
-    await db.flush()
+    db.flush()
 
 
 async def _migrate_group_invitations(db):
@@ -2365,7 +2365,7 @@ async def _migrate_group_invitations(db):
         "ON group_invitations(group_id)"
     ))
 
-    await db.flush()
+    db.flush()
     logger.info("  ✅ 群邀请卡片系统迁移完成")
 
 
@@ -2432,7 +2432,7 @@ async def _migrate_agent_state_stack(db):
         return
     logger.info("  添加 agents.state_stack JSONB 列...")
     await db.execute(text("ALTER TABLE agents ADD COLUMN state_stack JSONB DEFAULT '[]'::jsonb"))
-    await db.flush()
+    db.flush()
     logger.info("  ✅ agents.state_stack 添加完成")
 
 
@@ -2443,7 +2443,7 @@ async def _migrate_group_muted_until(db):
         return
     logger.info("  🔊 添加 group_members.muted_until 列")
     await db.execute(text("ALTER TABLE group_members ADD COLUMN muted_until TIMESTAMP"))
-    await db.flush()
+    db.flush()
     logger.info("  ✅ group_members.muted_until 添加完成")
 
 
@@ -2458,7 +2458,7 @@ async def _migrate_personality_anchor_coefficient(db):
         return
     logger.info("  🧷 添加 personality_anchors.consistency_coefficient 列")
     await db.execute(text("ALTER TABLE personality_anchors ADD COLUMN consistency_coefficient FLOAT DEFAULT 0.7"))
-    await db.flush()
+    db.flush()
     logger.info("  ✅ personality_anchors.consistency_coefficient 添加完成")
 
 
@@ -2482,7 +2482,7 @@ async def _migrate_world_tables(db):
                 updated_at TIMESTAMP DEFAULT NOW()
             )
         """))
-        await db.flush()
+        db.flush()
     else:
         logger.info("  ⏭ worlds 已存在，跳过")
 
@@ -2499,7 +2499,7 @@ async def _migrate_world_tables(db):
                 CONSTRAINT uq_world_binding UNIQUE (world_id, entity_type, entity_id)
             )
         """))
-        await db.flush()
+        db.flush()
     else:
         logger.info("  ⏭ world_bindings 已存在，跳过")
 
@@ -2518,7 +2518,7 @@ async def _migrate_world_tables(db):
                 CONSTRAINT uq_world_agent UNIQUE (world_id, agent_id)
             )
         """))
-        await db.flush()
+        db.flush()
     else:
         logger.info("  ⏭ world_agents 已存在，跳过")
 
@@ -2566,7 +2566,7 @@ async def _widen_varchar(db, table: str, column: str, target_length: int):
             f'ALTER TABLE {table} ALTER COLUMN {column} TYPE VARCHAR({target_length})'
         ))
         # 注意：不在此处 commit，由外层 db.begin() 统一提交
-        await db.flush()
+        db.flush()
 
 
 async def _migrate_provider_config(db):
@@ -2611,7 +2611,7 @@ async def _migrate_system_user(db):
 
     # 重置序列（确保后续 ID 不受影响；排除 system 类型，让首个真实用户获得 id=1）
     await db.execute(text("SELECT setval('users_id_seq', COALESCE((SELECT MAX(id) FROM users WHERE type != 'system'), 0))"))
-    await db.flush()
+    db.flush()
 
 
 async def _migrate_others_chat_controls(db):
@@ -2654,7 +2654,7 @@ async def _migrate_others_chat_controls(db):
         logger.info("  ⏭ agents.disallow_mode 已存在，跳过")
 
     if created_any:
-        await db.flush()
+        db.flush()
         logger.info("  ✅ 对话权限/限额迁移完成")
 
 
@@ -2703,7 +2703,7 @@ async def _migrate_multi_provider(db):
     else:
         logger.info("  ⏭ api_key_pool.provider_name 已存在，跳过")
 
-    await db.flush()
+    db.flush()
 
 
 async def _migrate_provider_defaults(db):
@@ -2741,7 +2741,7 @@ async def _migrate_provider_defaults(db):
         })
     await db.execute(text("UPDATE system_settings SET provider_config = CAST(:val AS jsonb) WHERE id = 1"), {"val": json.dumps(configs, ensure_ascii=False)})
     logger.info(f"  ✅ provider_config 已填入 {len(configs)} 个默认供应商预设")
-    await db.flush()
+    db.flush()
 
 
 async def _migrate_unify_ai_user_id(db):
@@ -2797,7 +2797,7 @@ async def _migrate_unify_ai_user_id(db):
         WHERE dm.session_id = ds.session_id AND dm.sender_id NOT IN (ds.user1_id, ds.user2_id)
     """))
 
-    await db.flush()
+    db.flush()
     logger.info("  ✅ 全局 AI ID 统一为 user_id 完成")
 
 
@@ -2808,7 +2808,7 @@ async def _migrate_agent_status_color(db):
         return
     logger.info("  🎨 添加 agents.status_color 列")
     await db.execute(text("ALTER TABLE agents ADD COLUMN status_color VARCHAR(20)"))
-    await db.flush()
+    db.flush()
     logger.info("  ✅ agents.status_color 添加完成")
 
 
@@ -2821,7 +2821,7 @@ async def _migrate_opencli_default_enabled(db):
     await db.execute(text(
         "ALTER TABLE opencli_command_whitelist ADD COLUMN default_enabled BOOLEAN NOT NULL DEFAULT FALSE"
     ))
-    await db.flush()
+    db.flush()
     logger.info("  ✅ default_enabled 列已添加")
 
 
@@ -2876,7 +2876,7 @@ async def _migrate_group_concurrent_limit(db):
         return
     logger.info("  🔧 添加 groups.concurrent_ai_limit 列")
     await db.execute(text("ALTER TABLE groups ADD COLUMN concurrent_ai_limit INTEGER DEFAULT 3"))
-    await db.flush()
+    db.flush()
     logger.info("  ✅ groups.concurrent_ai_limit 添加完成")
 
 
@@ -2887,7 +2887,7 @@ async def _migrate_group_msg_display_len(db):
         return
     logger.info("  📏 添加 groups.max_msg_display_len 列")
     await db.execute(text("ALTER TABLE groups ADD COLUMN max_msg_display_len INTEGER DEFAULT 256"))
-    await db.flush()
+    db.flush()
     logger.info("  ✅ groups.max_msg_display_len 添加完成")
 
 
@@ -2898,7 +2898,7 @@ async def _migrate_agent_is_paused(db):
         return
     logger.info("  ⏸ 添加 agents.is_paused 列")
     await db.execute(text("ALTER TABLE agents ADD COLUMN is_paused BOOLEAN DEFAULT FALSE"))
-    await db.flush()
+    db.flush()
     logger.info("  ✅ agents.is_paused 添加完成")
 
 
@@ -2909,7 +2909,7 @@ async def _migrate_group_is_paused(db):
         return
     logger.info("  ⏸ 添加 groups.is_paused 列")
     await db.execute(text("ALTER TABLE groups ADD COLUMN is_paused BOOLEAN DEFAULT FALSE"))
-    await db.flush()
+    db.flush()
     logger.info("  ✅ groups.is_paused 添加完成")
 
 async def _migrate_agent_pending_prompt(db):
@@ -2919,7 +2919,7 @@ async def _migrate_agent_pending_prompt(db):
         return
     logger.info("  📝 添加 agents.pending_system_prompt 列")
     await db.execute(text("ALTER TABLE agents ADD COLUMN pending_system_prompt TEXT"))
-    await db.flush()
+    db.flush()
     logger.info("  ✅ agents.pending_system_prompt 添加完成")
 
 async def _migrate_friendship_priority(db):
@@ -2929,7 +2929,7 @@ async def _migrate_friendship_priority(db):
     else:
         logger.info("  ⭐ 添加 friendships.is_priority 列")
         await db.execute(text("ALTER TABLE friendships ADD COLUMN is_priority BOOLEAN DEFAULT FALSE"))
-        await db.flush()
+        db.flush()
         logger.info("  ✅ friendships.is_priority 添加完成")
 
     # friendship_requests 也加（ORM 模型有该列但迁移遗漏了）
@@ -2938,7 +2938,7 @@ async def _migrate_friendship_priority(db):
     else:
         logger.info("  ⭐ 添加 friendship_requests.is_priority 列")
         await db.execute(text("ALTER TABLE friendship_requests ADD COLUMN is_priority BOOLEAN DEFAULT FALSE"))
-        await db.flush()
+        db.flush()
         logger.info("  ✅ friendship_requests.is_priority 添加完成")
 
 
@@ -2949,7 +2949,7 @@ async def _migrate_concurrent_ai_limit_default(db):
     else:
         logger.info("  ⚙️ 添加 system_settings.default_concurrent_ai_limit 列")
         await db.execute(text("ALTER TABLE system_settings ADD COLUMN default_concurrent_ai_limit INTEGER NOT NULL DEFAULT 3"))
-        await db.flush()
+        db.flush()
         logger.info("  ✅ system_settings.default_concurrent_ai_limit 添加完成（默认 3）")
 
 
@@ -2958,7 +2958,7 @@ async def _migrate_drop_skill_type_constraint(db):
     # PostgreSQL 约束名固定为 ck_agent_skills_type
     try:
         await db.execute(text("ALTER TABLE agent_skills DROP CONSTRAINT IF EXISTS ck_agent_skills_type"))
-        await db.flush()
+        db.flush()
         logger.info("  ✅ 已删除 ck_agent_skills_type 约束（Skill 类型现由注册表管理）")
     except Exception as e:
         logger.warning(f"  ⚠️ 删除约束 ck_agent_skills_type 时出错（可能不存在）: {e}")
@@ -2971,5 +2971,5 @@ async def _migrate_prefer_own_key(db):
     else:
         logger.info("  ⚙️ 添加 users.prefer_own_key 列")
         await db.execute(text("ALTER TABLE users ADD COLUMN prefer_own_key BOOLEAN NOT NULL DEFAULT FALSE"))
-        await db.flush()
+        db.flush()
         logger.info("  ✅ users.prefer_own_key 添加完成（默认 FALSE）")

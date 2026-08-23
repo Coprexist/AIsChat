@@ -81,8 +81,8 @@ async def create_world(
         config=config or {"sleep_memory_mb": DEFAULT_SLEEP_MEMORY_MB},
     )
     repo.add(world)
-    await repo.flush()
-    await repo.refresh(world)
+    repo.flush()
+    repo.refresh(world)
 
     # 群视界机器人：默认就位（独立表 world_ais，身份 = world-{id}）
     await ensure_world_ai(repo, world.id)
@@ -107,7 +107,7 @@ async def ensure_world_ai(repo: WorldRepository, world_id: int):
             max_tool_rounds=50,
         )
         repo.add(wai)
-        await repo.flush()
+        repo.flush()
     return wai
 
 
@@ -230,7 +230,7 @@ async def update_world(
         world.time_flow_rate = time_flow_rate
     if config is not None:
         world.config = {**(world.config or {}), **config}
-    await repo.flush()
+    repo.flush()
     return world_to_dict(world)
 
 
@@ -254,7 +254,7 @@ async def update_creator_config(
     for k, v in patch.items():
         if k in allowed and k != "tools":  # tools 是派生字段，不落库
             setattr(wai, k, v)
-    await repo.flush()
+    repo.flush()
     return world_ai_to_dict(world_id, wai)
 
 
@@ -268,8 +268,8 @@ async def delete_world(repo: WorldRepository, world_id: int, owner_id: int) -> N
     if world.owner_id != owner_id:
         raise ValueError("仅创建者可删除世界")
 
-    await repo.delete(world)
-    await repo.flush()
+    repo.delete(world)
+    repo.flush()
     logger.info(f"🗑️ 世界删除: #{world_id}（世界 AI 随世界销毁）")
 
 
@@ -305,7 +305,7 @@ async def bind_entity(
     )
     if existing.scalar_one_or_none() is None:
         repo.add(WorldBinding(world_id=world_id, entity_type=entity_type, entity_id=entity_id))
-        await repo.flush()
+        repo.flush()
         logger.info(f"🔗 世界 #{world_id} 绑定 {entity_type}:{entity_id}")
     return {"success": True}
 
@@ -333,7 +333,7 @@ async def unbind_entity(
             WorldBinding.entity_id == entity_id,
         )
     )
-    await repo.flush()
+    repo.flush()
 
 
 async def find_world_by_entity(repo: WorldRepository, entity_type: str, entity_id: int) -> int | None:
@@ -385,7 +385,7 @@ async def wake_world(repo: WorldRepository, world_id: int) -> dict:
         world.world_time = now
     world.last_active_at = now
     world.status = "active"
-    await repo.flush()
+    repo.flush()
     logger.info(f"⏰ 世界 #{world_id} 唤醒，离线补偿 {delta.total_seconds() if 'delta' in dir() else 0:.0f}s")
     return world_to_dict(world)
 
@@ -399,7 +399,7 @@ async def sleep_world(repo: WorldRepository, world_id: int) -> dict:
         raise ValueError("世界不存在")
     world.status = "sleeping"
     world.last_active_at = _now()
-    await repo.flush()
+    repo.flush()
     return world_to_dict(world)
 
 
@@ -429,7 +429,7 @@ async def add_pending_notice(
         "at": _now().isoformat(),
     })
     world.creator_notices = notices[-50:]  # 最多保留 50 条
-    await repo.flush()
+    repo.flush()
 
 
 async def take_pending_notices(repo: WorldRepository, world_id: int) -> list[dict]:
@@ -441,7 +441,7 @@ async def take_pending_notices(repo: WorldRepository, world_id: int) -> list[dic
         return []
     notices = list(world.creator_notices or [])
     world.creator_notices = []
-    await repo.flush()
+    repo.flush()
     return notices
 
 
@@ -491,7 +491,7 @@ async def set_world_data(repo: WorldRepository, world_id: int, key: str, value) 
     else:
         row.value = value
     await repo.commit()
-    await repo.refresh(row)
+    repo.refresh(row)
     return {"key": row.key, "value": row.value}
 
 
@@ -503,7 +503,7 @@ async def delete_world_data(repo: WorldRepository, world_id: int, key: str) -> b
     )).scalar_one_or_none()
     if row is None:
         return False
-    await repo.delete(row)
+    repo.delete(row)
     await repo.commit()
     return True
 

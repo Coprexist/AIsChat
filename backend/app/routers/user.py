@@ -131,7 +131,7 @@ async def redeem_code(
     code_obj.used_by = current_user["user_id"]
     code_obj.used_at = datetime.now(timezone.utc).replace(tzinfo=None)
 
-    await db.flush()
+    db.flush()
 
     return {
         "message": msg,
@@ -271,7 +271,7 @@ async def upload_user_avatar(
 
     avatar_url = f"/api/fs/download-avatar/{filename}"
     user.avatar_url = avatar_url
-    await db.flush()
+    db.flush()
 
     # 入队联邦 profile 同步
     try:

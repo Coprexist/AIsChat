@@ -9,7 +9,9 @@ from pydantic import BaseModel, Field
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from app.database import get_db
+from app.repositories.content_repo import ContentRepository
 from app.utils.auth import get_current_user
+from app.routers.deps import get_content_repo
 from app.utils.pure.formatting import format_log_as_markdown
 from app.models.user import User
 

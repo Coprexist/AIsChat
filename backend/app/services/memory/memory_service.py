@@ -380,14 +380,14 @@ async def auto_store_memory(
         group_id=group_id if scope == "group" else None,
     )
     db.add(rough)
-    await db.flush()
+    db.flush()
 
     detail = DetailMemory(
         rough_id=rough.id,
         content=content,
     )
     db.add(detail)
-    await db.flush()
+    db.flush()
 
     logger.info(f"💾 AI agent_id={agent_id} 自动存储记忆: {title}")
     return {"success": True, "rough_id": rough.id, "title": title}

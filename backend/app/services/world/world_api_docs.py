@@ -105,7 +105,7 @@ async def sync_sections_from_docs(db) -> dict:
                 row.title, row.intro, row.doc_file = s["title"], s["intro"], s["file"]
                 updated += 1
     for leftover in by_id.values():
-        await db.delete(leftover)
+        db.delete(leftover)
         removed += 1
     await db.commit()
     return {"created": created, "updated": updated, "removed": removed}

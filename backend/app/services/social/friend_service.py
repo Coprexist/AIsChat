@@ -42,7 +42,7 @@ async def send_friend_request(
         r_target = reverse.target_id
         await friend_repo.add_friendship(requester_id, target_type, target_id)
         await friend_repo.add_friendship(r_user_id, r_type, r_target)
-        await friend_repo.flush()
+        friend_repo.flush()
 
         # 获取反向申请发起者的名称
         reverse_name = None
@@ -115,7 +115,7 @@ async def accept_friend_request(
     elif req.target_type == "ai":
         await friend_repo.add_friendship(req.target_id, "human", req.requester_id)
 
-    await friend_repo.flush()
+    friend_repo.flush()
     logger.info(f"好友申请 {request_id} 已接受")
     return {"status": "accepted"}
 
@@ -142,7 +142,7 @@ async def reject_friend_request(
     req.status = "rejected"
     req.resolved_at = datetime.now(timezone.utc).replace(tzinfo=None)
 
-    await friend_repo.flush()
+    friend_repo.flush()
     logger.info(f"好友申请 {request_id} 已拒绝")
     return {"status": "rejected"}
 
@@ -166,7 +166,7 @@ async def remove_friend(
         if reverse:
             await friend_repo.delete_friendship(reverse)
 
-    await friend_repo.flush()
+    friend_repo.flush()
     logger.info(f"用户 {user_id} 删除了好友 {friend_type}:{friend_id}")
     return {"status": "removed"}
 

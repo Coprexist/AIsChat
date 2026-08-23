@@ -91,7 +91,7 @@ async def toggle_friend_priority(
     if friendship is None:
         raise HTTPException(status_code=404, detail="好友关系不存在")
     friendship.is_priority = not friendship.is_priority
-    await friend_repo.flush()
+    friend_repo.flush()
     return {"is_priority": friendship.is_priority}
 
 

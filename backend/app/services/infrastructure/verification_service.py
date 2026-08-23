@@ -73,7 +73,7 @@ async def generate_and_send_code(
         ip_address=ip_address,
     )
     db.add(vc)
-    await db.flush()
+    db.flush()
 
     # 发送邮件
     from app.services.infrastructure.email_service import send_verification_code_email
@@ -106,7 +106,7 @@ async def verify_code(
         return False
 
     vc.used = True
-    await db.flush()
+    db.flush()
     return True
 
 

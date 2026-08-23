@@ -62,7 +62,7 @@ async def trigger_ai_chat(
             group_id=req.group_id,
             content=req.content,
         )
-        await db.flush()
+        db.flush()
 
         # 2. 触发 AI 回复
         group = await chat_api.get_group(db, req.group_id)

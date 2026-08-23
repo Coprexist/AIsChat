@@ -121,13 +121,13 @@ async def initialize_instance(db: AsyncSession) -> dict:
         )
         db.add(config)
         await db.commit()
-        await db.refresh(config)
+        db.refresh(config)
         logger.info(f"🌐 首次启动，实例子网 ID: {config.instance_id}, 公网 ID: {config.public_id}")
     elif not config.public_id:
         config.public_id = generate_public_id()
         config.updated_at = datetime.now(timezone.utc).replace(tzinfo=None)
         await db.commit()
-        await db.refresh(config)
+        db.refresh(config)
         logger.info(f"🌐 补生成公网 ID: {config.public_id}")
     return _instance_config_to_dict(config)
 
@@ -152,7 +152,7 @@ async def update_instance_info(
     if config is None:
         config = InstanceConfig(id=1, instance_id=str(uuid.uuid4()))
         db.add(config)
-        await db.flush()
+        db.flush()
 
     if display_name is not None and display_name.strip():
         name = display_name.strip()
@@ -172,7 +172,7 @@ async def update_instance_info(
 
     config.updated_at = datetime.now(timezone.utc).replace(tzinfo=None)
     await db.commit()
-    await db.refresh(config)
+    db.refresh(config)
     logger.info(f"🌐 更新实例信息: display_name={config.display_name}, public_id={config.public_id}")
     return {"success": True, "instance": _instance_config_to_dict(config)}
 
@@ -187,7 +187,7 @@ async def regenerate_public_id(db: AsyncSession) -> dict:
     config.public_id = generate_public_id()
     config.updated_at = datetime.now(timezone.utc).replace(tzinfo=None)
     await db.commit()
-    await db.refresh(config)
+    db.refresh(config)
     logger.info(f"🔄 更换公网 ID: {old_id} → {config.public_id}")
     return {"success": True, "old_public_id": old_id, "public_id": config.public_id}
 
@@ -458,7 +458,7 @@ async def add_peer(
     )
     db.add(peer)
     await db.commit()
-    await db.refresh(peer)
+    db.refresh(peer)
 
     logger.info(f"🌐 添加对等端: {display_name or peer_public_id} ({remote_url})")
     return {"success": True, "peer": _peer_to_dict(peer)}
@@ -503,7 +503,7 @@ async def update_peer(
 
     peer.updated_at = datetime.now(timezone.utc).replace(tzinfo=None)
     await db.commit()
-    await db.refresh(peer)
+    db.refresh(peer)
 
     # 如果 display_name 变更，级联更新 federated_entities 中的 federated_id
     if display_name and display_name != old_display_name and old_display_name:
@@ -534,7 +534,7 @@ async def remove_peer(db: AsyncSession, peer_id: int) -> dict:
         return {"error": True, "message": "对等端不存在"}
 
     peer_name = peer.peer_public_id
-    await db.delete(peer)
+    db.delete(peer)
     await db.commit()
 
     logger.info(f"🌐 移除对等端 #{peer_id}: {peer_name}")
@@ -618,7 +618,7 @@ async def register_federated_entity(
     )
     db.add(entity)
     await db.commit()
-    await db.refresh(entity)
+    db.refresh(entity)
     logger.info(f"🌐 注册联邦实体: {federated_id} → local {entity_type}={local_ref_id}")
     return {"success": True, "entity": _entity_to_dict(entity, peer.display_name)}
 
@@ -631,7 +631,7 @@ async def remove_federated_entity(db: AsyncSession, entity_id: int) -> dict:
     if entity is None:
         return {"error": True, "message": "联邦实体不存在"}
     fid = entity.federated_id
-    await db.delete(entity)
+    db.delete(entity)
     await db.commit()
     logger.info(f"🌐 移除联邦实体: {fid}")
     return {"success": True, "message": f"联邦实体「{fid}」已移除"}
@@ -702,7 +702,7 @@ async def update_federated_entity(
 
     entity.updated_at = datetime.now(timezone.utc).replace(tzinfo=None)
     await db.commit()
-    await db.refresh(entity)
+    db.refresh(entity)
 
     # 获取 peer display_name
     peer_result = await db.execute(select(FederationPeer).where(FederationPeer.id == entity.peer_id))
@@ -1042,7 +1042,7 @@ async def unshare_group_from_peers(
         peer_name = peer.display_name or (peer.peer_public_id if peer else str(peer_id))
 
         # 删除本地记录
-        await db.delete(entity)
+        db.delete(entity)
 
         # 如果对等端已连接，发送 entity_unannounce（只传 entity_type + local_id）
         if peer and peer.connection_state == "connected":
@@ -1096,7 +1096,7 @@ async def handle_remote_message(
             pass
 
     db.add(message)
-    await db.flush()
+    db.flush()
     logger.info(f"🌐 持久化远程消息: group={group_id} from={source_public_id} id={message.id}")
     return message
 
@@ -1123,7 +1123,7 @@ async def persist_remote_dm_message(
         except (ValueError, AttributeError):
             pass
     db.add(dm_msg)
-    await db.flush()
+    db.flush()
     return dm_msg
 
 

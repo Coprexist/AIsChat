@@ -87,8 +87,8 @@ class TriggerEngine:
             condition=condition,
         )
         db.add(new_trigger)
-        await db.flush()
-        await db.refresh(new_trigger)
+        db.flush()
+        db.refresh(new_trigger)
         logger.info(f"AI({agent_id}) 注册触发器 #{new_trigger.id} [{trigger_type}]: {new_trigger.task[:40]}")
         return self._to_dict(new_trigger)
 
@@ -103,7 +103,7 @@ class TriggerEngine:
                 AgentTrigger.id == trigger_id,
             )
         )
-        await db.flush()
+        db.flush()
 
     async def cancel_trigger(self, db: AsyncSession, agent_id: int, trigger_id: int) -> None:
         """取消触发器（软删除：状态置为 cancelled）"""
@@ -119,7 +119,7 @@ class TriggerEngine:
         trigger = result.scalar_one_or_none()
         if trigger is not None:
             trigger.status = "cancelled"
-            await db.flush()
+            db.flush()
 
     async def list_triggers(self, db: AsyncSession, agent_id: int, include_fired: bool = True) -> list[dict]:
         """触发器列表"""
@@ -161,7 +161,7 @@ class TriggerEngine:
                 matched.append(self._to_dict(t))
 
         if matched:
-            await db.flush()
+            db.flush()
         return matched
 
     async def fire_trigger(self, db: AsyncSession, agent_id: int, trigger_id: int) -> dict:
@@ -183,7 +183,7 @@ class TriggerEngine:
         trigger.fire_count += 1
         if trigger.max_fires > 0 and trigger.fire_count >= trigger.max_fires:
             trigger.status = "fired"
-        await db.flush()
+        db.flush()
         return self._to_dict(trigger)
 
     # ── 匹配逻辑 ──

@@ -99,7 +99,7 @@ async def _set_skill_enabled(db: AsyncSession, agent_id: int, skill_name: str, e
         db.add(relation)
     else:
         relation.is_enabled = enabled
-    await db.flush()
+    db.flush()
     return {"agent_id": agent_id, "skill_name": skill_name, "is_enabled": enabled}
 
 

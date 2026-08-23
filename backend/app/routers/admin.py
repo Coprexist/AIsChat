@@ -87,12 +87,18 @@ async def _log_admin_action(
     details: dict | None = None,
 ):
     """记录管理员操作（含哈希链），自动从 contextvar 获取客户端 IP"""
+    from app.repositories.audit_repo import SQLAlchemyAuditRepository
     from app.services.audit_service import create_audit_log
     from app.utils.auth import get_current_request_ip
     await create_audit_log(
-        db=db, log_type=log_type, operator_type="human",
-        operator_id=operator_id, target_type=target_type, target_id=target_id,
-        details=details or {}, ip_address=get_current_request_ip(),
+        SQLAlchemyAuditRepository(db),
+        log_type=log_type,
+        operator_type="human",
+        operator_id=operator_id,
+        target_type=target_type,
+        target_id=target_id,
+        details=details or {},
+        ip_address=get_current_request_ip(),
     )
 
 
@@ -177,7 +183,7 @@ async def ban_user(
         user_id,
         {"reason": req.reason, "duration_days": req.duration_days},
     )
-    await db.flush()
+    db.flush()
 
     return {
         "message": f"用户 {'已封禁' if not user.is_active else '已解封'}",
@@ -206,7 +212,7 @@ async def update_user_quota(
         db, admin["user_id"], "update_quota", "user", user_id,
         {"old_quota": old_quota, "new_quota": quota},
     )
-    await db.flush()
+    db.flush()
 
     return {"message": "额度已更新", "user_id": user_id, "ai_quota": quota}
 
@@ -231,7 +237,7 @@ async def update_user_api_credit(
         db, admin["user_id"], "update_api_credit", "user", user_id,
         {"old_credit": old_credit, "new_credit": credit},
     )
-    await db.flush()
+    db.flush()
 
     return {"message": "API 额度已更新", "user_id": user_id, "api_credit": credit}
 
@@ -259,7 +265,7 @@ async def update_user_role(
         db, admin["user_id"], "change_role", "user", user_id,
         {"old_role": old_role, "new_role": req.role},
     )
-    await db.flush()
+    db.flush()
 
     return {"message": f"用户角色已从 {old_role} 更新为 {req.role}", "user_id": user_id, "role": req.role}
 
@@ -281,7 +287,7 @@ async def reset_user_password(
     await _log_admin_action(
         db, admin["user_id"], "reset_password", "user", user_id, {},
     )
-    await db.flush()
+    db.flush()
 
     return {"message": "密码已重置", "user_id": user_id}
 
@@ -318,7 +324,7 @@ async def admin_create_user(
             db, admin["user_id"], "create_user", "user", user.id,
             {"username": req.username, "email": req.email or ""},
         )
-        await db.flush()
+        db.flush()
         return {"message": "用户创建成功", "user_id": user.id, "username": user.username}
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
@@ -384,7 +390,7 @@ async def admin_import_users_csv(
         db, admin["user_id"], "import_users_csv", "system", 1,
         {"total": len(results), "created": created, "failed": failed},
     )
-    await db.flush()
+    db.flush()
 
     return {
         "message": f"导入完成：成功 {created} 个，失败 {failed} 个",
@@ -451,7 +457,7 @@ async def toggle_ai_editable(
         db, admin["user_id"], "toggle_ai_editable", "agent", agent_id,
         {"is_ai_editable": req.is_ai_editable},
     )
-    await db.flush()
+    db.flush()
 
     return {
         "message": f"AI 自修改已{'开启' if req.is_ai_editable else '关闭'}",
@@ -506,9 +512,9 @@ async def disband_group(
     if group is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="群聊不存在")
 
-    await db.delete(group)
+    db.delete(group)
     await _log_admin_action(db, admin["user_id"], "disband_group", "group", group_id)
-    await db.flush()
+    db.flush()
 
     return {"message": "群聊已解散", "group_id": group_id}
 
@@ -541,7 +547,7 @@ async def generate_code(
         {"code": code_str, "quota_amount": req.quota_amount, "code_type": req.code_type,
          "note": req.note, "is_api_pool": req.is_api_pool},
     )
-    await db.flush()
+    db.flush()
 
     return {
         "code": code_str,
@@ -652,7 +658,7 @@ async def create_pool_key(
         db, admin["user_id"], "create_pool_key", "api_key_pool", 0,
         {"name": req.name, "priority": req.priority},
     )
-    await db.flush()
+    db.flush()
 
     return {
         "id": key_entry.id,
@@ -696,7 +702,7 @@ async def update_pool_key(
         db, admin["user_id"], "update_pool_key", "api_key_pool", key_id,
         {"changes": req.model_dump(exclude_none=True)},
     )
-    await db.flush()
+    db.flush()
 
     return {"message": "更新成功", "id": key_id}
 
@@ -720,15 +726,15 @@ async def delete_pool_key(
         select(UserApiAssignment).where(UserApiAssignment.pool_key_id == key_id)
     )
     for b in bindings.scalars().all():
-        await db.delete(b)
+        db.delete(b)
 
-    await db.delete(key_entry)
+    db.delete(key_entry)
 
     await _log_admin_action(
         db, admin["user_id"], "delete_pool_key", "api_key_pool", key_id,
         {"name": key_entry.name},
     )
-    await db.flush()
+    db.flush()
 
     return {"message": f"池 Key「{key_entry.name}」已删除"}
 
@@ -1427,7 +1433,7 @@ async def update_auth_settings(
                     )
             row.login_providers = req.login_providers
 
-        await db.flush()
+        db.flush()
         await _log_admin_action(
             db, admin["user_id"], "update_auth_settings", "system", 1,
             req.model_dump(exclude_none=True),
@@ -1481,7 +1487,7 @@ async def update_smtp_config(
         else:
             configs = [smtp]
         row.smtp_config = configs
-        await db.flush()
+        db.flush()
         await _log_admin_action(
             db, admin["user_id"], "update_smtp_config", "system", 1,
             {"host": req.host, "port": req.port, "username": req.username,
@@ -1598,7 +1604,7 @@ async def update_smtp_configs(
             new_configs.append(cfg)
 
         row.smtp_config = new_configs
-        await db.flush()
+        db.flush()
         await _log_admin_action(
             db, admin["user_id"], "update_smtp_configs", "system", 1,
             {"count": len(new_configs)},
@@ -1701,7 +1707,7 @@ async def update_email_templates(
             else:
                 raw = req.templates.model_dump()
             row.email_templates = raw  # type: ignore
-            await db.flush()
+            db.flush()
             await _log_admin_action(
                 db, admin["user_id"], "update_email_templates", "system", 1,
                 {"preset": raw.get("preset", "custom")},
@@ -1808,10 +1814,10 @@ async def cleanup_files(
         except (FileNotFoundError, ValueError):
             await db.execute(delete(FR).where(FR.file_id == fm.id))
             await db.execute(delete(FC).where(FC.file_id == fm.id))
-            await db.delete(fm)
+            db.delete(fm)
             orphan_cleaned += 1
 
-    await db.flush()
+    db.flush()
 
     stats = {
         "cleaned_files": cleaned_files,
@@ -1824,7 +1830,7 @@ async def cleanup_files(
     settings = settings_result.scalar_one_or_none()
     if settings:
         settings.last_cleanup_stats = stats
-    await db.flush()
+    db.flush()
 
     return stats
 
@@ -1854,8 +1860,8 @@ async def _get_or_create_settings(db: AsyncSession):
     if row is None:
         row = SystemSettings(id=1, default_language="en")
         db.add(row)
-        await db.flush()
-        await db.refresh(row)
+        db.flush()
+        db.refresh(row)
     return row
 
 
@@ -1995,7 +2001,7 @@ async def update_system_prompt(
         s.system_prompt_order = body.segment_order
         order_updated = True
 
-    await db.flush()
+    db.flush()
 
     log_detail = {"updated_keys": list(filtered.keys())}
     if order_updated:

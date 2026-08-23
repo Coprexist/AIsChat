@@ -221,7 +221,7 @@ async def bind_entry_with_type(
     if limit != -1 and bound >= limit:
         raise ValueError(f"群类型「{type_def['name']}」已达绑定上限（{limit}）")
     binding.group_type_slug = type_slug
-    await db.flush()
+    db.flush()
 
     created = []
     if entity_type == "group":
@@ -284,7 +284,7 @@ async def _create_group_assistant(
                 config={},
             )
             db.add(ga)
-            await db.flush()
+            db.flush()
             logger.info(f"🤖 群 {group_id} 创建群助手「{name}」(group_assistant {ga.id})")
             return ga.id
     except Exception as e:

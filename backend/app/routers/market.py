@@ -137,14 +137,14 @@ async def publish_item(
     )
     db.add(item)
     await db.commit()
-    await db.refresh(item)
+    db.refresh(item)
     logger.info(f"🏪 世界 #{world.id}「{title}」发布到商城（item {item.id}，{len(data)}B）")
     # 发布后同步 GitHub（可选；失败不影响站内发布）
     if req.sync_github:
         try:
             from app.services.world.market_github import sync_item_to_github
             await sync_item_to_github(db, item)
-            await db.refresh(item)
+            db.refresh(item)
         except Exception as e:
             logger.warning(f"🏪 商品 #{item.id} 同步 GitHub 失败（站内发布成功）: {e}")
     return _item_dict(item)
@@ -211,7 +211,7 @@ async def update_item(
     if req.tags is not None:
         item.tags = [str(t).strip()[:30] for t in req.tags if str(t).strip()][:10]
     await db.commit()
-    await db.refresh(item)
+    db.refresh(item)
     return _item_dict(item)
 
 

@@ -39,7 +39,7 @@ class CreateGroup(ToolPlugin):
         initial_ids = arguments.get("initial_member_ids", [])
 
         group = await create_group(db, name=name, owner_type="ai", owner_id=agent_id)
-        await db.flush()
+        db.flush()
 
         for human_id in initial_ids:
             try:

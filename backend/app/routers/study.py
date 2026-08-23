@@ -135,7 +135,7 @@ async def _get_or_create_setting(db: AsyncSession, uid: int) -> StudySetting:
         row = StudySetting(user_id=uid)
         db.add(row)
         await db.commit()
-        await db.refresh(row)
+        db.refresh(row)
     return row
 
 

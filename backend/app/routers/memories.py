@@ -47,8 +47,8 @@ async def store_rough_memory(
         group_id=req.group_id,
     )
     db.add(rough)
-    await db.flush()
-    await db.refresh(rough)
+    db.flush()
+    db.refresh(rough)
 
     # 存储详细记忆
     detail = DetailMemory(
@@ -56,7 +56,7 @@ async def store_rough_memory(
         content=req.content,
     )
     db.add(detail)
-    await db.flush()
+    db.flush()
 
     return {"rough_id": rough.id, "detail_id": detail.id, "title": req.title}
 

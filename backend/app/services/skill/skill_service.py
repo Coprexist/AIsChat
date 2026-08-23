@@ -60,7 +60,7 @@ async def add_skill(
     )
     db.add(skill)
     await db.commit()
-    await db.refresh(skill)
+    db.refresh(skill)
 
     logger.info(f"🧠 AI agent_id={agent_id} 添加技能: {name} (type={skill_type})")
     return {"success": True, "skill": _skill_to_dict(skill)}
@@ -99,7 +99,7 @@ async def update_skill(
 
     skill.updated_at = datetime.now(timezone.utc).replace(tzinfo=None)
     await db.commit()
-    await db.refresh(skill)
+    db.refresh(skill)
 
     logger.info(f"🧠 AI agent_id={agent_id} 更新技能 #{skill_id}: {skill.name}")
     return {"success": True, "skill": _skill_to_dict(skill)}
@@ -120,7 +120,7 @@ async def delete_skill(db: AsyncSession, agent_id: int, skill_id: int) -> dict:
         return {"error": True, "message": "无权删除此技能"}
 
     skill_name = skill.name
-    await db.delete(skill)
+    db.delete(skill)
     await db.commit()
 
     logger.info(f"🧠 AI agent_id={agent_id} 删除技能 #{skill_id}: {skill_name}")

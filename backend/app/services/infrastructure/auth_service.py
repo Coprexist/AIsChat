@@ -117,9 +117,9 @@ async def register_user(
         user.language = "zh"
         user.platform_gifted_credit = 0
         user.file_quota_mb = 100
-    await user_repo.add(user)
-    await user_repo.flush()
-    await user_repo.refresh(user)
+    user_repo.add(user)
+    user_repo.flush()
+    user_repo.refresh(user)
 
     if is_first:
         logger.info(f"🎉 首个用户 '{username}' 自动成为管理员")
@@ -280,8 +280,8 @@ async def rebind_email(
 
     user.email = email
     user.email_verified = True
-    await user_repo.flush()
-    await user_repo.refresh(user)
+    user_repo.flush()
+    user_repo.refresh(user)
 
     logger.info(f"用户 {user_id} 已换绑邮箱 → {email}")
     return await get_user_info(
@@ -312,8 +312,8 @@ async def unbind_email(
 
     user.email = None
     user.email_verified = False
-    await user_repo.flush()
-    await user_repo.refresh(user)
+    user_repo.flush()
+    user_repo.refresh(user)
 
     logger.info(f"用户 {user_id} 已解绑邮箱")
     return await get_user_info(
@@ -382,8 +382,8 @@ async def update_user_settings(
     if prefer_own_key is not None:
         user.prefer_own_key = prefer_own_key
 
-    await user_repo.flush()
-    await user_repo.refresh(user)
+    user_repo.flush()
+    user_repo.refresh(user)
     return await get_user_info(
         user_id=user_id,
         user_repo=user_repo,

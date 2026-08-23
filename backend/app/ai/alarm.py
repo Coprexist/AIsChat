@@ -54,7 +54,7 @@ async def set_alarm(
         created_at=datetime.utcnow(),  # ⚠️ TIMESTAMP WITHOUT TIME ZONE
     )
     db.add(alarm)
-    await db.flush()
+    db.flush()
 
     # 唤醒调度器重新计算等待时间
     notify_alarm_changed()
@@ -92,7 +92,7 @@ async def cancel_alarm(db: AsyncSession, agent_id: int, alarm_id: int) -> dict:
         return {"error": True, "message": f"闹钟 #{alarm_id} 已经是 {alarm.status} 状态，无法取消"}
 
     alarm.status = "cancelled"
-    await db.flush()
+    db.flush()
 
     # 唤醒调度器重新计算等待时间
     notify_alarm_changed()
@@ -142,7 +142,7 @@ async def update_alarm(
     if not changed:
         return {"error": True, "message": "没有需要修改的内容"}
 
-    await db.flush()
+    db.flush()
 
     # 唤醒调度器重新计算等待时间
     notify_alarm_changed()
@@ -212,7 +212,7 @@ async def fire_alarm(db: AsyncSession, alarm: AgentAlarm) -> None:
     """将闹钟标记为已触发"""
     alarm.status = "fired"
     alarm.fired_at = datetime.now(timezone.utc)
-    await db.flush()
+    db.flush()
     logger.info(f"⏰ 闹钟 #{alarm.id} (AI:{alarm.agent_id}) 已触发: 「{alarm.task[:80]}」")
 
 
@@ -362,7 +362,7 @@ async def _process_alarm_event(db, event: dict):
             target_state="active",
             reason=f"闹钟 #{alarm_id} 触发: {task[:50]}",
         )
-        await db.flush()
+        db.flush()
 
     api_key, api_base, credit_source, pool_key_id, provider_info = await _get_api_config(db, agent)
 

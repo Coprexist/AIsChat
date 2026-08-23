@@ -185,7 +185,7 @@ async def apply_config_profile(
     # 档位标记
     agent.config_profile = profile
 
-    await db.flush()
+    db.flush()
     logger.info(
         f"🎚️ AI({agent_id}) 切换预设: {old_profile} → {profile}"
         f"（{'升级' if _PRESET_ORDER.get(profile,0) > _PRESET_ORDER.get(old_profile,0) else '降级'}），"
@@ -269,7 +269,7 @@ async def create_agent(
         is_active=True,
     )
     db.add(ai_user)
-    await db.flush()
+    db.flush()
 
     # 通用 AI 默认隐藏 AI 身份
     if ai_type == "general":
@@ -331,8 +331,8 @@ async def create_agent(
         user_can_view_logs=user_can_view_logs,
     )
     db.add(agent)
-    await db.flush()
-    await db.refresh(agent)
+    db.flush()
+    db.refresh(agent)
 
     # v0.1.8: 记忆系统已迁移到数据库（structured_records 表）
     # 文件系统记忆目录（memory_index.py）已废弃，新 AI 不再创建
@@ -351,7 +351,7 @@ async def create_agent(
         db.add(Friendship(user_id=owner_id, friend_type="ai", friend_id=agent.user_id))
         # AI → 创建者
         db.add(Friendship(user_id=ai_user.id, friend_type="human", friend_id=owner_id))
-        await db.flush()
+        db.flush()
         logger.info(f"自动好友关系已建立: 用户#{owner_id} ↔ AI#{agent.id} (user_id={ai_user.id})")
 
     logger.info(f"AI '{name}' (id={agent.id}) 由用户 id={owner_id} 创建，api_credit_cost={api_credit_cost}")
@@ -515,11 +515,11 @@ async def delete_agent(
         ai_user_result = await db.execute(select(User).where(User.id == agent.user_id))
         ai_user = ai_user_result.scalar_one_or_none()
         if ai_user:
-            await db.delete(ai_user)
+            db.delete(ai_user)
 
     agent_name = agent.name
-    await db.delete(agent)
-    await db.flush()
+    db.delete(agent)
+    db.flush()
 
     logger.info(
         f"AI '{agent_name}' (id={agent_id}) 已删除，"
@@ -594,7 +594,7 @@ async def update_agent_config(
                 user_id=target_user_id,
             )
             db.add(user_cfg)
-            await db.flush()
+            db.flush()
 
         # 映射 update key → AgentUserConfig 列
         field_map = {
@@ -614,8 +614,8 @@ async def update_agent_config(
             f"AI '{agent.name}' (id={agent.id}, type={ai_type}) "
             f"per-user config 已更新 for user_id={target_user_id}"
         )
-        await db.flush()
-        await db.refresh(agent)
+        db.flush()
+        db.refresh(agent)
         return agent
 
     # 共振 AI / 无 target_user_id：直接写 agent 本体（现有逻辑）
@@ -758,8 +758,8 @@ async def update_agent_config(
     if "config_profile" in updates and updates["config_profile"] is not None:
         agent.config_profile = updates["config_profile"]
 
-    await db.flush()
-    await db.refresh(agent)
+    db.flush()
+    db.refresh(agent)
 
     logger.info(f"AI '{agent.name}' (id={agent.id}) 配置已更新")
     return agent
@@ -810,8 +810,8 @@ async def rollback_config(
     agent.current_presence_penalty = history.presence_penalty
     agent.current_frequency_penalty = history.frequency_penalty
 
-    await db.flush()
-    await db.refresh(agent)
+    db.flush()
+    db.refresh(agent)
 
     logger.info(f"AI '{agent.name}' (id={agent.id}) 配置已回滚到版本 {history.id}")
     return agent
@@ -854,8 +854,8 @@ async def switch_agent_state(
     old_state = agent.state
     agent.state = target_state
 
-    await db.flush()
-    await db.refresh(agent)
+    db.flush()
+    db.refresh(agent)
 
     logger.info(
         f"AI '{agent.name}' (id={agent.id}) 状态切换: {old_state} → {target_state}"
@@ -1227,7 +1227,7 @@ async def import_agent_soul(
                 group_id=m.get("group_id"),
             )
             db.add(rm)
-            await db.flush()
+            db.flush()
 
             dm = DetailMemory(
                 rough_id=rm.id,
@@ -1343,8 +1343,8 @@ async def add_collaborator(
         can_manage_collaborators=can_manage_collaborators,
     )
     db.add(collab)
-    await db.flush()
-    await db.refresh(collab)
+    db.flush()
+    db.refresh(collab)
     return collab
 
 
@@ -1354,8 +1354,8 @@ async def remove_collaborator(db: AsyncSession, agent_id: int, user_id: int):
     collab = await _get_collaborator(db, agent_id, user_id)
     if collab is None:
         raise ValueError("该用户不是此 AI 的合作者")
-    await db.delete(collab)
-    await db.flush()
+    db.delete(collab)
+    db.flush()
 
 
 async def update_collaborator(
@@ -1377,8 +1377,8 @@ async def update_collaborator(
         collab.can_delete = can_delete
     if can_manage_collaborators is not None:
         collab.can_manage_collaborators = can_manage_collaborators
-    await db.flush()
-    await db.refresh(collab)
+    db.flush()
+    db.refresh(collab)
     return collab
 
 
