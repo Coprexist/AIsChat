@@ -9,13 +9,22 @@ API Key 池管理服务 — 管理多个 API Key 的轮换和选择
 """
 import logging
 from sqlalchemy.ext.asyncio import AsyncSession
+from app.repositories.infra_repo import InfraRepository, SQLAlchemyInfraRepository
 
 logger = logging.getLogger(__name__)
+
+
+def _ensure_repo(db_or_repo):
+    """兼容旧调用：传入 AsyncSession 时包装为 SQLAlchemyInfraRepository。"""
+    if isinstance(db_or_repo, AsyncSession):
+        return SQLAlchemyInfraRepository(db_or_repo)
+    return db_or_repo
 
 
 class ApiKeyPoolService:
     async def get_next_key(self, db: AsyncSession, agent_id: int) -> dict | None:
         """获取下一个可用的 API Key"""
+        db = _ensure_repo(db)
         from app.models.api_key_pool import ApiKeyPool
         from sqlalchemy import select
         result = await db.execute(
@@ -37,6 +46,7 @@ class ApiKeyPoolService:
 
     async def add_key(self, db: AsyncSession, agent_id: int, provider: str, api_key: str, base_url: str = "", priority: int = 50) -> dict:
         """添加新的 API Key"""
+        db = _ensure_repo(db)
         from app.models.api_key_pool import ApiKeyPool
         new_key = ApiKeyPool(
             agent_id=agent_id,
@@ -52,6 +62,7 @@ class ApiKeyPoolService:
 
     async def deactivate_key(self, db: AsyncSession, key_id: int) -> None:
         """停用 API Key"""
+        db = _ensure_repo(db)
         from app.models.api_key_pool import ApiKeyPool
         await db.execute(
             ApiKeyPool.__table__.update()

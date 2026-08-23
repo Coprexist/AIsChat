@@ -13,9 +13,10 @@ from datetime import datetime
 from pathlib import Path
 
 from sqlalchemy import select
-from sqlalchemy.ext.asyncio import AsyncSession
+from app.repositories.world_repo import WorldRepository
 
 logger = logging.getLogger(__name__)
+
 
 # 实际请求日志（排查问题用）：每世界最近 10 条，落盘 data/world_llm_requests/{world_id}.jsonl
 LLM_REQUEST_LOG_DIR = Path("data/world_llm_requests")
@@ -93,7 +94,7 @@ def _mark(value: str) -> str:
     return ""
 
 
-async def build_memory_map(db: AsyncSession, world_id: int) -> str | None:
+async def build_memory_map(world_repo: WorldRepository, world_id: int) -> str | None:
     """记忆地图（缩进树）：clear/new/compact 后注入，让 AI 知道有什么记忆存档。
 
     格式（省 token + 软锚定）：
@@ -105,7 +106,7 @@ async def build_memory_map(db: AsyncSession, world_id: int) -> str | None:
     from app.models.world import WorldStructuredRecord
     from sqlalchemy import select as _sel
 
-    rows = (await db.execute(
+    rows = (await world_repo.execute(
         _sel(WorldStructuredRecord).where(
             WorldStructuredRecord.world_id == world_id
         ).order_by(WorldStructuredRecord.category, WorldStructuredRecord.sub_key, WorldStructuredRecord.field)
@@ -208,7 +209,7 @@ def _log_llm_request(world_id: int, turn_id: str, round_no: int, model: str, thi
         logger.warning(f"🌐 世界 #{world_id} 请求日志保存失败: {e}")
 
 
-async def _record_usage(db, world_id: int, turn_id: str, round_no, model: str, usage: dict | None, messages: list | None = None) -> None:
+async def _record_usage(world_repo, world_id: int, turn_id: str, round_no, model: str, usage: dict | None, messages: list | None = None) -> None:
     """LLM 用量落库：
     - world_llm_usage：每世界缓存命中统计（2.7）
     - conversation_log：归入用户「群视界 agent」（个人 API 用量页可见）
@@ -217,7 +218,7 @@ async def _record_usage(db, world_id: int, turn_id: str, round_no, model: str, u
         return
     try:
         from app.models.world import WorldLLMUsage
-        db.add(WorldLLMUsage(
+        world_repo.add(WorldLLMUsage(
             world_id=world_id,
             turn_id=turn_id,
             round_no=str(round_no),
@@ -227,15 +228,15 @@ async def _record_usage(db, world_id: int, turn_id: str, round_no, model: str, u
             reasoning_tokens=int(usage.get("reasoning_tokens") or 0),
             cached_tokens=_extract_cached_tokens(usage),
         ))
-        await db.flush()
+        await world_repo.flush()
         # 个人 API 用量：记账人 = 世界 AI 表单的世界主人（user_id 直记，查询时虚拟聚合「群视界 agent」）
         if messages:
             from app.services.content.conversation_log_service import save_conversation_log
             from app.models.world import World
-            world = await db.get(World, world_id)
+            world = await world_repo.get(World, world_id)
             if world is not None:
                 await save_conversation_log(
-                    db, None, messages, conversation_type="world",
+                    world_repo, None, messages, conversation_type="world",
                     token_usage=usage, model=model, thinking_enabled=False,
                     user_id=world.owner_id,
                 )
@@ -328,7 +329,7 @@ def touch_session(world) -> None:
     world.config = cfg
 
 
-async def ensure_session_lifecycle(db, world) -> dict:
+async def ensure_session_lifecycle(world_repo, world) -> dict:
     """懒加载会话生命周期检查（GET/POST /chat 入口调用，无定时器）：
 
     - auto_new：跨过每日 auto_new_time（默认 04:00）→ 自动开新会话（已 new 过不重复）
@@ -374,7 +375,7 @@ async def ensure_session_lifecycle(db, world) -> dict:
             cfg["sessions"] = sessions
             cfg["last_auto_new_at"] = local_now.isoformat()
             world.config = cfg
-            await db.commit()
+            await world_repo.commit()
             result["auto_newed"] = True
 
     # ── retention：清理过期未收藏会话 ──
@@ -402,16 +403,16 @@ async def ensure_session_lifecycle(db, world) -> dict:
                     WorldChatMessage.world_id == world.id,
                     WorldChatMessage.session_id == sid,
                 )
-                await db.execute(q)
+                await world_repo.execute(q)
                 sessions.pop(sid, None)
             cfg["sessions"] = sessions
             world.config = cfg
-            await db.commit()
+            await world_repo.commit()
             result["cleaned"] = len(expired)
     return result
 
 
-async def get_chat_history(db: AsyncSession, world_id: int, limit: int = 30, before_id: int | None = None, session_id: str | None = None) -> list[dict]:
+async def get_chat_history(world_repo: WorldRepository, world_id: int, limit: int = 30, before_id: int | None = None, session_id: str | None = None) -> list[dict]:
     """世界 AI 对话历史（最近 limit 条；before_id 传最旧 id 可翻更早；session_id 过滤会话）"""
     from app.models.world import WorldChatMessage
 
@@ -423,7 +424,7 @@ async def get_chat_history(db: AsyncSession, world_id: int, limit: int = 30, bef
     if before_id is not None:
         query = query.where(WorldChatMessage.id < before_id)
     query = query.order_by(WorldChatMessage.id.desc()).limit(limit)
-    result = await db.execute(query)
+    result = await world_repo.execute(query)
     return [
         {
             "id": m.id,
@@ -438,7 +439,7 @@ async def get_chat_history(db: AsyncSession, world_id: int, limit: int = 30, bef
 
 
 async def _save_note_separated(
-    db: AsyncSession, world_id: int, content: str, reasoning: str, session_id: str | None,
+    world_repo: WorldRepository, world_id: int, content: str, reasoning: str, session_id: str | None,
 ) -> None:
     """落库中间轮 note：正文/思考拆成两条独立 note（2026-08-13）。
 
@@ -450,40 +451,40 @@ async def _save_note_separated(
     # 顺序对齐流式：思考先落库、正文后落库（思考气泡在正文上方）——
     # 否则刷新后正文 note id < 思考 note id，渲染顺序反了
     if reasoning:
-        db.add(WorldChatMessage(
+        world_repo.add(WorldChatMessage(
             world_id=world_id, user_id=None, role="note",
             content="", reasoning=reasoning, session_id=session_id,
         ))
     if content:
-        db.add(WorldChatMessage(
+        world_repo.add(WorldChatMessage(
             world_id=world_id, user_id=None, role="note",
             content=content[:4000], reasoning=None, session_id=session_id,
         ))
-    await db.commit()
+    await world_repo.commit()
 
 
-async def _save_ai_reply(db: AsyncSession, world, content: str, reasoning: str, session_id: str | None = None) -> None:
+async def _save_ai_reply(world_repo: WorldRepository, world, content: str, reasoning: str, session_id: str | None = None) -> None:
     """落库 AI 回复（含思考过程）；内容为空则跳过"""
     from app.services.world.world_service import _now
     from app.models.world import WorldChatMessage
     if not content:
         return
-    db.add(WorldChatMessage(
+    world_repo.add(WorldChatMessage(
         world_id=world.id, user_id=None, role="ai",
         content=content, reasoning=reasoning or None,
         session_id=session_id,
     ))
     world.last_active_at = _now()
-    await db.commit()
+    await world_repo.commit()
 
 
-async def _resolve_world_credentials(db: AsyncSession, world) -> tuple[str | None, str]:
+async def _resolve_world_credentials(world_repo: WorldRepository, world) -> tuple[str | None, str]:
     """世界 AI 计费/凭证：账单人 = 世界主人（主人 Key → 池 Key → 全局默认 base）"""
     from app.config import settings
     from app.models.user import User
 
     api_key, api_base = None, settings.deepseek_base_url
-    owner = await db.get(User, world.owner_id) if world.owner_id else None
+    owner = await world_repo.get(User, world.owner_id) if world.owner_id else None
     if owner is not None:
         try:
             from app.utils.crypto import decrypt_api_key
@@ -492,7 +493,7 @@ async def _resolve_world_credentials(db: AsyncSession, world) -> tuple[str | Non
                 api_base = owner.api_base_url or settings.deepseek_base_url
             else:
                 from app.services.infrastructure.quota_service import find_best_pool_key
-                pool_key = await find_best_pool_key(db, owner.id)
+                pool_key = await find_best_pool_key(world_repo, owner.id)
                 if pool_key:
                     api_key = decrypt_api_key(pool_key.api_key_encrypted)
                     api_base = pool_key.api_base_url or settings.deepseek_base_url
@@ -640,7 +641,7 @@ async def _stream_llm_once(
 
 
 async def _inject_pending_user_messages(
-    db: AsyncSession, world_id: int, messages: list, sid_db: str | None,
+    world_repo: WorldRepository, world_id: int, messages: list, sid_db: str | None,
 ):
     """把插入中的普通消息拼进工具轮上下文（每轮 LLM 调用前调用）。
 
@@ -671,14 +672,14 @@ async def _inject_pending_user_messages(
                 continue
             # 落库（真实 msg_id → 前端 [INSERT] 画的气泡与历史一致，刷新不重复）
             if sid_db is None:
-                _w = await db.get(World, world_id)
+                _w = await world_repo.get(World, world_id)
                 sid_db = session_id_for_db(_w) if _w else None
             wm = WorldChatMessage(
                 world_id=world_id, user_id=user_id, role="user",
                 content=_m_text, session_id=sid_db,
             )
-            db.add(wm)
-            await db.flush()
+            world_repo.add(wm)
+            await world_repo.flush()
             ids.append(wm.id)
             if tb:
                 try:
@@ -688,11 +689,11 @@ async def _inject_pending_user_messages(
             # 注入 AI 上下文（真正"发送"给 AI）
             messages.append({"role": "user", "content": _m_text})
         _it["msg_ids"] = ids
-    await db.commit()
+    await world_repo.commit()
 
 
 async def _execute_tool_round(
-    db: AsyncSession, world, world_id: int, tool_call_acc: dict,
+    world_repo: WorldRepository, world, world_id: int, tool_call_acc: dict,
     messages: list, turn_state: dict, sid_db: str | None,
 ):
     """执行本轮所有工具调用：执行 → 摘要 → 注入上下文 → 落库 → 状态事件。
@@ -718,12 +719,12 @@ async def _execute_tool_round(
             progress_events.append(note)
         try:
             result = await _execute_world_tool(
-                db, world, acc["name"], acc["arguments"], turn_state,
+                world_repo, world, acc["name"], acc["arguments"], turn_state,
                 on_progress=_on_progress,
             )
         except TypeError:
             # 兼容：工具签名未支持 on_progress
-            result = await _execute_world_tool(db, world, acc["name"], acc["arguments"], turn_state)
+            result = await _execute_world_tool(world_repo, world, acc["name"], acc["arguments"], turn_state)
         summary = _tool_result_summary(acc["name"], result)
         turn_state["tools_done"].append(summary)
         messages.append({
@@ -737,7 +738,7 @@ async def _execute_tool_round(
         # ④ 执行后：done（同 tool_id，前端原地更新）
         yield f"data: [TOOL_UPDATE]{json.dumps({'tool_id': tool_id, 'status': 'done', 'name': acc['name'], 'success': bool(result.get('success')), 'summary': summary}, ensure_ascii=False)}\n\n"
         # ⑤ 落库：同 tool_id 更新最后一条（历史只留最终态）；无 tool_id 旧字段则新增
-        existing = (await db.execute(
+        existing = (await world_repo.execute(
             select(WorldChatMessage).where(
                 WorldChatMessage.world_id == world_id,
                 WorldChatMessage.tool_id == tool_id,
@@ -747,12 +748,12 @@ async def _execute_tool_round(
             existing.content = summary
             existing.is_error = not bool(result.get("success"))
         else:
-            db.add(WorldChatMessage(
+            world_repo.add(WorldChatMessage(
                 world_id=world_id, user_id=None, role="tool",
                 content=summary, session_id=sid_db, tool_id=tool_id,
                 is_error=not bool(result.get("success")),
             ))
-        await db.commit()
+        await world_repo.commit()
 
 
 
@@ -818,7 +819,7 @@ def _args_summary(arguments: str) -> str:
 
 
 async def _prepare_world_chat(
-    db: AsyncSession, world_id: int, user_id: int, message: str | list[str],
+    world_repo: WorldRepository, world_id: int, user_id: int, message: str | list[str],
 ) -> dict | None:
     """世界 AI 对话的准备阶段：世界加载/凭证/前缀/历史/消息列表/命令识别。
 
@@ -829,14 +830,14 @@ async def _prepare_world_chat(
     from app.config import settings
     from app.models.world import World
 
-    world = await db.get(World, world_id)
+    world = await world_repo.get(World, world_id)
     if world is None:
         return None
 
     # 对话 = 活跃信号：唤醒 + 离线时间补偿（让 AI 看到的世界时间准确）
     from app.services.world.world_service import apply_time_compensation
     apply_time_compensation(world)
-    await db.commit()
+    await world_repo.commit()
 
     # ── 会话空闲自动 compact（懒加载：发消息时检查；空闲超时先压缩再继续，趁缓存最大化利用）──
     try:
@@ -853,15 +854,15 @@ async def _prepare_world_chat(
                 _now = _dt.now(_tz.utc).replace(tzinfo=None)
                 if _now - _la_dt > _td(hours=hours):
                     from app.services.world.world_tools import _do_execute
-                    await _do_execute(db, world, "compact_context", "{}")
+                    await _do_execute(world_repo, world, "compact_context", "{}")
                     touch_session(world)
-                    await db.commit()
+                    await world_repo.commit()
                     logger.info(f"🌐 世界 #{world_id} 会话 {_key} 空闲 {hours}h 已自动压缩")
     except Exception as e:
         logger.warning(f"🌐 世界 #{world_id} 空闲自动压缩失败: {e}")
 
     from app.services.world.world_service import ensure_world_ai, take_pending_notices, CREATOR_DEFAULT_CONFIG
-    wai = await ensure_world_ai(db, world_id)
+    wai = await ensure_world_ai(world_repo, world_id)
     cfg = {
         "name": wai.name, "system_prompt": wai.system_prompt, "model": wai.model,
         "temperature": wai.temperature, "top_p": wai.top_p, "thinking": wai.thinking,
@@ -871,25 +872,27 @@ async def _prepare_world_chat(
     # ── 前缀文本版本化（2026-08-12 产品定：所有进前缀的内容必须保证缓存命中）──
     # 三个文本源：用户可改提示词（每世界）/ 强注入段（全局）/ 昵称（每世界）
     # 变更 → 写新版本 + 尾部 changelog 告知，不碰前缀；compact / clear 解锁后生效
+    from app.repositories.capability_repo import SQLAlchemyCapabilityRepository
     from app.services.capability_versioning import (
         ensure_text_source_version, get_effective_text,
     )
+    _cap_repo = SQLAlchemyCapabilityRepository(world_repo.session)
     user_prompt = cfg.get("system_prompt") or CREATOR_DEFAULT_CONFIG["system_prompt"]
     forced_prompt = build_forced_prompt()
     creator_name = cfg.get("name") or "群视界机器人"
-    await ensure_text_source_version(db, f"world-prompt-{world_id}", user_prompt, "世界AI提示词")
-    await ensure_text_source_version(db, "forced-prompt", forced_prompt, "强注入段")
-    await ensure_text_source_version(db, f"world-name-{world_id}", creator_name, "世界AI昵称")
-    eff_user_prompt = await get_effective_text(db, world.config, f"world-prompt-{world_id}", user_prompt)
-    eff_forced_prompt = await get_effective_text(db, world.config, "forced-prompt", forced_prompt)
-    eff_name = await get_effective_text(db, world.config, f"world-name-{world_id}", creator_name)
+    await ensure_text_source_version(_cap_repo, f"world-prompt-{world_id}", user_prompt, "世界AI提示词")
+    await ensure_text_source_version(_cap_repo, "forced-prompt", forced_prompt, "强注入段")
+    await ensure_text_source_version(_cap_repo, f"world-name-{world_id}", creator_name, "世界AI昵称")
+    eff_user_prompt = await get_effective_text(_cap_repo, world.config, f"world-prompt-{world_id}", user_prompt)
+    eff_forced_prompt = await get_effective_text(_cap_repo, world.config, "forced-prompt", forced_prompt)
+    eff_name = await get_effective_text(_cap_repo, world.config, f"world-name-{world_id}", creator_name)
 
     # ── 组装消息：静态 system 前缀保持稳定（prompt cache 友好）──
     system_prompt = world_context_block(world) + "\n\n" + eff_user_prompt
     system_prompt += eff_forced_prompt  # 强注入段：平台强约束，用户不可改
     system_prompt += f"\n【名字】你的名字是「{eff_name}」，对外标识 world-{world_id}。"
 
-    notices = await take_pending_notices(db, world_id)
+    notices = await take_pending_notices(world_repo, world_id)
     notice_lines = "\n".join(
         f"- {n['file']}（{n.get('location', '')}）: {n.get('summary', '')}"
         for n in notices
@@ -907,7 +910,7 @@ async def _prepare_world_chat(
             "\n\n【未完成工作流】上次对话在 " + str(wm.get("interrupted_at", ""))[:19] +
             " 中断，已执行：" + done + "。请继续完成剩余工作并给出总结，不要重复已完成的步骤。"
         )
-    history = await get_chat_history(db, world_id, WORLD_CHAT_KEEP_LAST if summary else CHAT_HISTORY_LIMIT, session_id=sid_db)
+    history = await get_chat_history(world_repo, world_id, WORLD_CHAT_KEEP_LAST if summary else CHAT_HISTORY_LIMIT, session_id=sid_db)
     hist_llm = [
         {"role": "assistant" if m["role"] == "ai" else m["role"], "content": m["content"]}
         for m in history if m["role"] not in ("tool", "note")
@@ -936,7 +939,7 @@ async def _prepare_world_chat(
     # 记忆地图：只在上下文起点（无摘要 = 新会话/clear 后）注入
     if not summary:
         try:
-            memory_map = await build_memory_map(db, world_id)
+            memory_map = await build_memory_map(world_repo, world_id)
             if memory_map:
                 messages.append({"role": "system", "content": memory_map})
         except Exception:
@@ -953,7 +956,7 @@ async def _prepare_world_chat(
     # 世界内访客（身份系统 identity_index 快照）→ AI 知道谁在玩这个世界
     try:
         from app.services.world.world_service import get_world_data
-        idx_row = await get_world_data(db, world_id, "identity_index")
+        idx_row = await get_world_data(world_repo, world_id, "identity_index")
         idx = (idx_row or {}).get("value")
         if isinstance(idx, dict) and idx:
             parts = []
@@ -967,8 +970,9 @@ async def _prepare_world_chat(
 
     # 能力变更通知（懒加载：增量 changelog 追加尾部，known 更新与注入同轮）
     try:
+        from app.repositories.capability_repo import SQLAlchemyCapabilityRepository
         from app.services.capability_versioning import build_change_notice
-        notice = await build_change_notice(db, world.config, [
+        notice = await build_change_notice(SQLAlchemyCapabilityRepository(world_repo.session), world.config, [
             "ai-skills",
             f"world-prompt-{world_id}",
             "forced-prompt",
@@ -976,31 +980,32 @@ async def _prepare_world_chat(
         ])
         if notice:
             messages.append({"role": "system", "content": notice})
-            await db.commit()
+            await world_repo.commit()
     except Exception:
         pass
 
     # 落库用户消息（批量 = 排队消息一起发，逐条气泡；先提交，即使流失败也不丢）
     from app.models.world import WorldChatMessage
     for m in msg_list:
-        db.add(WorldChatMessage(world_id=world_id, user_id=user_id, role="user", content=m, session_id=sid_db))
+        world_repo.add(WorldChatMessage(world_id=world_id, user_id=user_id, role="user", content=m, session_id=sid_db))
     try:
-        await db.commit()
+        await world_repo.commit()
     except Exception as e:
         logger.warning(f"🌐 世界 #{world_id} 用户消息落库失败: {e}")
 
     # 世界 AI（造物主）工具 = 平台内置 + 设计侧 skills（world_ai_skills/ 全局库；世界侧居民能力不注入）
     from app.services.world.world_tools import WORLD_TOOLS
     from app.services.world.world_skill_runtime import build_ai_tools
+    from app.repositories.capability_repo import SQLAlchemyCapabilityRepository
     from app.services.capability_versioning import ensure_source_version, get_effective_definitions
     skill_tools = build_ai_tools()
     if skill_tools:
-        await ensure_source_version(db, "ai-skills", skill_tools, "设计侧能力")
-    effective_skill_tools = await get_effective_definitions(db, world.config, "ai-skills", skill_tools)
+        await ensure_source_version(SQLAlchemyCapabilityRepository(world_repo.session), "ai-skills", skill_tools, "设计侧能力")
+    effective_skill_tools = await get_effective_definitions(SQLAlchemyCapabilityRepository(world_repo.session), world.config, "ai-skills", skill_tools)
     tools_for_world = [*WORLD_TOOLS, *effective_skill_tools]
 
     # 凭证 + 模型
-    api_key, api_base = await _resolve_world_credentials(db, world)
+    api_key, api_base = await _resolve_world_credentials(world_repo, world)
     model = cfg.get("model") or settings.default_chat_model
     thinking = bool(cfg.get("thinking", False))
 
@@ -1014,7 +1019,7 @@ async def _prepare_world_chat(
 
 
 async def stream_world_chat(
-    db: AsyncSession,
+    world_repo: WorldRepository,
     world_id: int,
     user_id: int,
     message: str | list[str],
@@ -1037,7 +1042,7 @@ async def stream_world_chat(
     import httpx  # 首轮流式（client.stream）用
     from app.models.world import WorldChatMessage
 
-    ctx = await _prepare_world_chat(db, world_id, user_id, message)
+    ctx = await _prepare_world_chat(world_repo, world_id, user_id, message)
     if ctx is None:
         yield "data: [ERROR]世界不存在\n\n"
         yield "data: [DONE]\n\n"
@@ -1057,15 +1062,15 @@ async def stream_world_chat(
     if cmd_text.startswith("/"):
         try:
             from app.services.world.world_chat_commands import run_slash_command
-            note = await run_slash_command(db, world, cmd_text, user_id=user_id)
+            note = await run_slash_command(world_repo, world, cmd_text, user_id=user_id)
         except Exception as e:
             logger.warning(f"🌐 世界 #{world_id} 命令执行失败: {e}")
             yield f"data: [ERROR]命令执行失败: {e}\n\n"
             yield "data: [DONE]\n\n"
             return
         if note is not None:
-            db.add(WorldChatMessage(world_id=world_id, user_id=None, role="tool", content=note, session_id=sid_db))
-            await db.commit()
+            world_repo.add(WorldChatMessage(world_id=world_id, user_id=None, role="tool", content=note, session_id=sid_db))
+            await world_repo.commit()
             yield f"data: [TOOL_UPDATE]{json.dumps({'tool_id': f't_{uuid.uuid4().hex[:8]}', 'status': 'done', 'name': cmd_text.lstrip('/'), 'success': True, 'summary': note}, ensure_ascii=False)}\n\n"
             yield "data: [DONE]\n\n"
             return
@@ -1074,7 +1079,7 @@ async def stream_world_chat(
     # ── 第一轮前注入插入消息（2026-08-16 修复：原来只在工具轮循环内注入——
     # 若 AI 第一轮不调工具直接收尾，插入消息永远进不了上下文，用户要等下一轮才被 AI 看到）──
     try:
-        await _inject_pending_user_messages(db, world_id, messages, sid_db)
+        await _inject_pending_user_messages(world_repo, world_id, messages, sid_db)
     except Exception as e:
         logger.warning(f"🌐 世界 #{world_id} 首轮插入消息注入失败（非致命）: {e}")
 
@@ -1201,7 +1206,7 @@ async def stream_world_chat(
         yield f"data: [ERROR]{str(e)[:200]}\n\n"
 
     # 2.7：首轮用量落库（缓存命中统计）
-    await _record_usage(db, world_id, turn_id, "0", model, first_usage, messages)
+    await _record_usage(world_repo, world_id, turn_id, "0", model, first_usage, messages)
 
     # ── 工具调用：多轮循环（list → write → …，最多 5 轮防死循环）──
     # 每轮：执行工具 → [TOOL] 事件显示 + 注入 AI → 继续带 tools 调 LLM，直到模型不再调工具
@@ -1226,7 +1231,7 @@ async def stream_world_chat(
                 # 第一轮过渡叙述 + 对应思考过程：给用户看（role=note，不进 AI 上下文）
                 # 2026-08-13：正文/思考拆两条独立 note（刷新后思考独立气泡，折叠生效）
                 if full_content or full_reasoning:
-                    await _save_note_separated(db, world_id, full_content, full_reasoning or "", sid_db)
+                    await _save_note_separated(world_repo, world_id, full_content, full_reasoning or "", sid_db)
                 # 第一轮正文重置（最终以收尾轮为准）
                 full_content = ""
                 # 首轮思考保留：后续轮有思考会覆盖；但工具轮 DeepSeek 常不输出 reasoning_content，
@@ -1254,11 +1259,11 @@ async def stream_world_chat(
                 for _r in range(max_rounds):
                     # 插入消息拼进上下文（气泡/落库已即时完成；无则零开销）
                     try:
-                        await _inject_pending_user_messages(db, world_id, messages, sid_db)
+                        await _inject_pending_user_messages(world_repo, world_id, messages, sid_db)
                     except Exception as e:
                         logger.warning(f"🌐 世界 #{world_id} 插入消息注入失败（非致命）: {e}")
                     # 执行本轮所有工具调用（执行→注入→落库→[TOOL] 事件）
-                    async for event in _execute_tool_round(db, world, world_id, tool_call_acc, messages, turn_state, sid_db):
+                    async for event in _execute_tool_round(world_repo, world, world_id, tool_call_acc, messages, turn_state, sid_db):
                         yield event
 
                     # 下一轮：继续带 tools，直到模型不再调用（同时捕获思考内容）
@@ -1274,7 +1279,7 @@ async def stream_world_chat(
                     ):
                         yield event
                     resp = out
-                    await _record_usage(db, world_id, turn_id, str(_r + 1), model, (resp or {}).get("usage"), messages)
+                    await _record_usage(world_repo, world_id, turn_id, str(_r + 1), model, (resp or {}).get("usage"), messages)
                     content = (resp or {}).get("content") or ""
                     reasoning = (resp or {}).get("reasoning_content") or ""
                     tcs = (resp or {}).get("tool_calls")
@@ -1291,7 +1296,7 @@ async def stream_world_chat(
                         # 中间轮思考也要落库（对齐首轮 note：reasoning 字段），否则刷新后「工具调用的思考」丢失
                         if content:
                             full_content = content
-                        await _save_note_separated(db, world_id, content or "", reasoning or "", sid_db)
+                        await _save_note_separated(world_repo, world_id, content or "", reasoning or "", sid_db)
                         if content:
                             yield f"data: {content.replace(chr(10), '{NL}')}\n\n"
                     # 模型还要继续调工具：记录真实 tool_calls，进入下一轮
@@ -1320,7 +1325,7 @@ async def stream_world_chat(
                     ):
                         yield event
                     resp_final = out_f
-                    await _record_usage(db, world_id, turn_id, "final", model, (resp_final or {}).get("usage"), messages)
+                    await _record_usage(world_repo, world_id, turn_id, "final", model, (resp_final or {}).get("usage"), messages)
                     final = (resp_final or {}).get("content") or "（工具执行完成）"
                     fr = (resp_final or {}).get("reasoning_content") or ""
                     if fr:
@@ -1355,7 +1360,7 @@ async def stream_world_chat(
                             full_content = full_content or "（工具执行中断）"
                     else:
                         full_content = _friendly_llm_error(turn_error) if turn_error else "（对话中断：工具执行出错，请重试或换个说法）"
-                await _save_ai_reply(db, world, full_content, full_reasoning, session_id=sid_db)
+                await _save_ai_reply(world_repo, world, full_content, full_reasoning, session_id=sid_db)
                 # 工作流记忆：完整结束（有最终回复）→ 清除；中断 → 记录已做步骤，下次对话继续
                 try:
                     cfg_all = dict(world.config or {})
@@ -1367,7 +1372,7 @@ async def stream_world_chat(
                             "tools_done": list(turn_state.get("tools_done", []))[-10:],
                         }
                     world.config = cfg_all
-                    await db.commit()
+                    await world_repo.commit()
                 except Exception as e:
                     logger.warning(f"🌐 世界 #{world_id} 工作流记忆保存失败: {e}")
 
@@ -1379,7 +1384,7 @@ async def stream_world_chat(
     else:
         # ── 非工具场景：落库 AI 回复（完整内容 + 思考过程）──
         try:
-            await _save_ai_reply(db, world, full_content, full_reasoning, session_id=sid_db)
+            await _save_ai_reply(world_repo, world, full_content, full_reasoning, session_id=sid_db)
         except Exception as e:
             logger.warning(f"🌐 世界 #{world_id} 回复落库失败: {e}")
 
@@ -1388,11 +1393,11 @@ async def stream_world_chat(
         suggestions = list(turn_state.get("suggestions") or []) if turn_state else []
         if not suggestions:
             from app.services.world.world_suggestions import suggest_fallback
-            suggestions = await suggest_fallback(db, world)
+            suggestions = await suggest_fallback(world_repo, world)
         if suggestions:
             try:
                 from app.services.world.world_service import set_world_data
-                await set_world_data(db, world_id, "ui.suggestions", suggestions[:5])
+                await set_world_data(world_repo, world_id, "ui.suggestions", suggestions[:5])
             except Exception:
                 pass
             yield f"data: [SUGGEST]{json.dumps(suggestions[:5], ensure_ascii=False)}\n\n"

@@ -23,7 +23,7 @@ import json
 import logging
 
 from sqlalchemy import select
-from sqlalchemy.ext.asyncio import AsyncSession
+from app.repositories.capability_repo import CapabilityRepository
 
 logger = logging.getLogger(__name__)
 
@@ -87,13 +87,13 @@ def _diff_changelog(old_defs: list | None, new_defs: list) -> str:
 # ── 版本写入（启动/变更检测时调用） ──
 
 async def ensure_source_version(
-    db: AsyncSession, source: str, definitions: list, label: str,
+    cap_repo: CapabilityRepository, source: str, definitions: list, label: str,
 ) -> int:
     """对比该源最新版本：内容变了 → 写新版本（diff 生成 changelog）；没变 → 返回当前版本号"""
     from app.models.agent import CapabilityVersion
 
     h = defs_hash(definitions)
-    latest = (await db.execute(
+    latest = (await cap_repo.execute(
         select(CapabilityVersion)
         .where(CapabilityVersion.source == source)
         .order_by(CapabilityVersion.version.desc())
@@ -107,34 +107,34 @@ async def ensure_source_version(
     changelog = f"[{label} v{new_version}] " + _diff_changelog(
         latest.definitions if latest else None, definitions
     )
-    db.add(CapabilityVersion(
+    cap_repo.add(CapabilityVersion(
         source=source, version=new_version, content_hash=h,
         changelog=changelog, definitions=definitions,
     ))
-    await db.commit()
+    await cap_repo.commit()
     logger.info(f"🧬 能力源 {source} 新版本 v{new_version}: {changelog[:120]}")
     return new_version
 
 
-async def ensure_platform_version(db: AsyncSession) -> int:
+async def ensure_platform_version(cap_repo: CapabilityRepository) -> int:
     """平台内置工具版本化（启动时调用）"""
     from app.tools.base import ToolRegistry
     return await ensure_source_version(
-        db, SOURCE_PLATFORM, ToolRegistry.get_all_definitions(), "平台工具"
+        cap_repo, SOURCE_PLATFORM, ToolRegistry.get_all_definitions(), "平台工具"
     )
 
 
-async def ensure_world_version(db: AsyncSession, world_id: int, skill_tools: list) -> int:
+async def ensure_world_version(cap_repo: CapabilityRepository, world_id: int, skill_tools: list) -> int:
     """世界 skills 工具版本化（世界 AI 对话时调用）"""
     source = f"world-{world_id}"
-    return await ensure_source_version(db, source, skill_tools, f"世界{world_id}")
+    return await ensure_source_version(cap_repo, source, skill_tools, f"世界{world_id}")
 
 
 # ── 查询 ──
 
-async def get_version(db: AsyncSession, source: str, version: int):
+async def get_version(cap_repo: CapabilityRepository, source: str, version: int):
     from app.models.agent import CapabilityVersion
-    return (await db.execute(
+    return (await cap_repo.execute(
         select(CapabilityVersion).where(
             CapabilityVersion.source == source,
             CapabilityVersion.version == version,
@@ -142,9 +142,9 @@ async def get_version(db: AsyncSession, source: str, version: int):
     )).scalar_one_or_none()
 
 
-async def get_latest_version(db: AsyncSession, source: str):
+async def get_latest_version(cap_repo: CapabilityRepository, source: str):
     from app.models.agent import CapabilityVersion
-    return (await db.execute(
+    return (await cap_repo.execute(
         select(CapabilityVersion)
         .where(CapabilityVersion.source == source)
         .order_by(CapabilityVersion.version.desc())
@@ -169,16 +169,16 @@ def _set_holder_map(holder, key: str, m: dict) -> None:
 
 
 async def get_effective_definitions(
-    db: AsyncSession, holder, source: str, fallback_definitions: list,
+    cap_repo: CapabilityRepository, holder, source: str, fallback_definitions: list,
 ) -> list:
     """请求用的工具定义：按 effective 版本取快照；无记录（新 AI/新源）→ 用当前定义并同步 effective"""
     ver = _holder_map(holder, "cap_effective_versions").get(source)
     if ver is not None:
-        row = await get_version(db, source, ver)
+        row = await get_version(cap_repo, source, ver)
         if row is not None and row.definitions is not None:
             return row.definitions
     # 新 AI：直接用当前（latest）定义，并把 effective 对齐最新版本
-    latest = await get_latest_version(db, source)
+    latest = await get_latest_version(cap_repo, source)
     if latest is not None:
         e = _holder_map(holder, "cap_effective_versions")
         e[source] = latest.version
@@ -188,7 +188,7 @@ async def get_effective_definitions(
     return fallback_definitions
 
 
-async def build_change_notice(db: AsyncSession, agent, sources: list[str]) -> str | None:
+async def build_change_notice(cap_repo: CapabilityRepository, agent, sources: list[str]) -> str | None:
     """增量变更通知：对比 known vs latest，落后则拼 changelog（只含新变化），并更新 known。
 
     返回通知文本（追加进 system 尾部）；无变化返回 None。
@@ -199,7 +199,7 @@ async def build_change_notice(db: AsyncSession, agent, sources: list[str]) -> st
     lines: list[str] = []
     changed = False
     for source in sources:
-        latest = (await db.execute(
+        latest = (await cap_repo.execute(
             select(CapabilityVersion)
             .where(CapabilityVersion.source == source)
             .order_by(CapabilityVersion.version.desc())
@@ -211,7 +211,7 @@ async def build_change_notice(db: AsyncSession, agent, sources: list[str]) -> st
         if known >= latest.version:
             continue
         # 取 known+1 .. latest 的 changelog（增量：只注入新变化）
-        rows = (await db.execute(
+        rows = (await cap_repo.execute(
             select(CapabilityVersion)
             .where(
                 CapabilityVersion.source == source,
@@ -232,12 +232,12 @@ async def build_change_notice(db: AsyncSession, agent, sources: list[str]) -> st
     return "\n\n".join(lines)
 
 
-async def mark_effective_latest(db: AsyncSession, agent, sources: list[str]) -> None:
+async def mark_effective_latest(cap_repo: CapabilityRepository, agent, sources: list[str]) -> None:
     """compact 后调用：effective 全部对齐最新（工具定义直接用最新的）"""
     from app.models.agent import CapabilityVersion
 
     for source in sources:
-        latest = (await db.execute(
+        latest = (await cap_repo.execute(
             select(CapabilityVersion)
             .where(CapabilityVersion.source == source)
             .order_by(CapabilityVersion.version.desc())
@@ -273,24 +273,24 @@ def defs_to_text(definitions: list | None) -> str | None:
 
 
 async def ensure_text_source_version(
-    db: AsyncSession, source: str, text: str, label: str,
+    cap_repo: CapabilityRepository, source: str, text: str, label: str,
 ) -> int:
     """文本内容版本化：内容变了 → 写新版本（复用 ensure_source_version + 文本 diff）"""
-    return await ensure_source_version(db, source, text_defs(text), label)
+    return await ensure_source_version(cap_repo, source, text_defs(text), label)
 
 
 async def get_effective_text(
-    db: AsyncSession, holder, source: str, fallback_text: str,
+    cap_repo: CapabilityRepository, holder, source: str, fallback_text: str,
 ) -> str:
     """锁定态取 effective 快照文本；无记录（新源）→ 用当前文本并同步 effective（与工具同语义）"""
     ver = _holder_map(holder, "cap_effective_versions").get(source)
     if ver is not None:
-        row = await get_version(db, source, ver)
+        row = await get_version(cap_repo, source, ver)
         if row is not None:
             t = defs_to_text(row.definitions)
             if t is not None:
                 return t
-    latest = await get_latest_version(db, source)
+    latest = await get_latest_version(cap_repo, source)
     if latest is not None:
         e = _holder_map(holder, "cap_effective_versions")
         e[source] = latest.version
@@ -301,7 +301,7 @@ async def get_effective_text(
     return fallback_text
 
 
-async def apply_pending_changes(db: AsyncSession, holder, sources: list[str]) -> None:
+async def apply_pending_changes(cap_repo: CapabilityRepository, holder, sources: list[str]) -> None:
     """解锁（compact / clear = 新对话）时调用：effective 全部对齐最新，变更正式生效。
 
     这是唯一合法的"应用变更"入口：它先进入解锁上下文再操作。
@@ -310,7 +310,7 @@ async def apply_pending_changes(db: AsyncSession, holder, sources: list[str]) ->
     token = _unlock_ctx.set(True)
     try:
         guard_apply_change(sources)  # 解锁上下文内校验通过（防御：万一 future 代码绕路）
-        await mark_effective_latest(db, holder, sources)
+        await mark_effective_latest(cap_repo, holder, sources)
     finally:
         _unlock_ctx.reset(token)
 

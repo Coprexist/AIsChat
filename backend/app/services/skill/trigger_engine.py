@@ -18,8 +18,16 @@ from datetime import datetime, timezone
 
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
+from app.repositories.skill_repo import SkillRepository, SQLAlchemySkillRepository
 
 logger = logging.getLogger(__name__)
+
+
+def _ensure_repo(db_or_repo):
+    """兼容旧调用：传入 AsyncSession 时包装为 SQLAlchemySkillRepository。"""
+    if isinstance(db_or_repo, AsyncSession):
+        return SQLAlchemySkillRepository(db_or_repo)
+    return db_or_repo
 
 VALID_TRIGGER_TYPES = {"time", "event", "semantic", "relational", "state", "composite"}
 
@@ -57,6 +65,7 @@ class TriggerEngine:
 
     async def register_trigger(self, db: AsyncSession, agent_id: int, trigger: dict) -> dict:
         """注册触发器，返回创建后的记录"""
+        db = _ensure_repo(db)
         from app.models.agent_trigger import AgentTrigger
 
         trigger_type = trigger.get("trigger_type", "event")
@@ -85,6 +94,7 @@ class TriggerEngine:
 
     async def unregister_trigger(self, db: AsyncSession, agent_id: int, trigger_id: int) -> None:
         """注销触发器（物理删除）"""
+        db = _ensure_repo(db)
         from app.models.agent_trigger import AgentTrigger
 
         await db.execute(
@@ -97,6 +107,7 @@ class TriggerEngine:
 
     async def cancel_trigger(self, db: AsyncSession, agent_id: int, trigger_id: int) -> None:
         """取消触发器（软删除：状态置为 cancelled）"""
+        db = _ensure_repo(db)
         from app.models.agent_trigger import AgentTrigger
 
         result = await db.execute(
@@ -112,6 +123,7 @@ class TriggerEngine:
 
     async def list_triggers(self, db: AsyncSession, agent_id: int, include_fired: bool = True) -> list[dict]:
         """触发器列表"""
+        db = _ensure_repo(db)
         from app.models.agent_trigger import AgentTrigger
 
         query = select(AgentTrigger).where(AgentTrigger.agent_id == agent_id)
@@ -129,6 +141,7 @@ class TriggerEngine:
         - event 为 None 时：仅检查到期的 time 触发器（周期扫描用）
         - event 提供时：检查 time（到期）+ 其余各维度的匹配
         """
+        db = _ensure_repo(db)
         from app.models.agent_trigger import AgentTrigger
 
         now = datetime.now(timezone.utc)
@@ -153,6 +166,7 @@ class TriggerEngine:
 
     async def fire_trigger(self, db: AsyncSession, agent_id: int, trigger_id: int) -> dict:
         """触发触发器：fire_count+1，达到 max_fires 后置为 fired"""
+        db = _ensure_repo(db)
         from app.models.agent_trigger import AgentTrigger
 
         result = await db.execute(

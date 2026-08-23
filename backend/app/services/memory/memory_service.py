@@ -6,8 +6,16 @@ import re
 import logging
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import text
+from app.repositories.memory_repo import MemoryRepository, SQLAlchemyMemoryRepository
 
 logger = logging.getLogger(__name__)
+
+
+def _ensure_repo(db_or_repo):
+    """兼容旧调用：传入 AsyncSession 时包装为 SQLAlchemyMemoryRepository。"""
+    if isinstance(db_or_repo, AsyncSession):
+        return SQLAlchemyMemoryRepository(db_or_repo)
+    return db_or_repo
 
 
 def merge_keyword_and_vector(
@@ -124,6 +132,7 @@ async def _text_search_memories(
     v0.1.3: user_id 过滤 — 通用/半通用 AI 仅检索该用户的记忆，
     共振 AI 检索 user_id IS NULL（全部记忆）。
     """
+    db = _ensure_repo(db)
     # 提取关键词：标点拆分 + ngram 滑窗（中文友好）
     parts = extract_keywords(query)
 
@@ -234,6 +243,7 @@ async def recall_relevant_memories(
 
     返回: [{id, title, content, scope, similarity, source}]
     """
+    db = _ensure_repo(db)
     from app.utils.embedding import get_embedding
     from app.db_providers import get_provider
 
@@ -350,6 +360,7 @@ async def auto_store_memory(
 
     返回: {"success": bool, "rough_id": int|None}
     """
+    db = _ensure_repo(db)
     from app.models.memory import RoughMemory, DetailMemory
     from app.utils.embedding import get_embedding
 
@@ -403,6 +414,7 @@ async def auto_extract_key_facts(
 
     返回: True 如果入队了记忆，False 如果跳过。
     """
+    db = _ensure_repo(db)
     import re
     from app.services.memory.memory_buffer import enqueue_memory
     from app.models.agent import Agent

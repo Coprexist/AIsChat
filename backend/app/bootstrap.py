@@ -197,8 +197,9 @@ async def _startup_plugins() -> None:
     # 平台能力版本化（skills/tools 懒加载）：启动时对比内置工具定义，变更则写新版本
     try:
         async with async_session() as cap_db:
+            from app.repositories.capability_repo import SQLAlchemyCapabilityRepository
             from app.services.capability_versioning import ensure_platform_version
-            v = await ensure_platform_version(cap_db)
+            v = await ensure_platform_version(SQLAlchemyCapabilityRepository(cap_db))
             logger.info(f"[OK] 平台能力版本: v{v}")
     except Exception as e:
         logger.warning(f"[WARN] 平台能力版本化失败（不影响启动）: {e}", exc_info=True)
@@ -222,7 +223,8 @@ async def _startup_workers() -> None:
             await asyncio.sleep(sleep_until(3, 0))
             try:
                 async with async_session() as clean_db:
-                    result = await cleanup_old_logs(clean_db)
+                    from app.repositories.audit_repo import SQLAlchemyAuditRepository
+                    result = await cleanup_old_logs(SQLAlchemyAuditRepository(clean_db))
                     if result["deleted"]:
                         logger.info(f"[OK] 审计日志清理: 删除 {result['deleted']} 条")
             except Exception as e:

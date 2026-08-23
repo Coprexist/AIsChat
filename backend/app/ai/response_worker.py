@@ -837,12 +837,13 @@ async def _maybe_trigger_ai_reply(
         messages.append({"role": "system", "content": delay_hint})
 
     # 7.5 获取工具（能力版本化：按 effective 版本取定义快照，前缀缓存稳定）
+    from app.repositories.capability_repo import SQLAlchemyCapabilityRepository
     from app.services.tool_registry import get_allowed_tools
     from app.services.capability_versioning import get_effective_definitions, SOURCE_PLATFORM
     delay_allowed = await _is_delay_reply_allowed(db, agent)
     current_tools = get_allowed_tools(agent.state, thinking_enabled=effective_cfg["thinking_enabled"], delay_reply_allowed=delay_allowed)
     allowed_names = {t["function"]["name"] for t in current_tools}
-    effective_defs = await get_effective_definitions(db, agent, SOURCE_PLATFORM, current_tools)
+    effective_defs = await get_effective_definitions(SQLAlchemyCapabilityRepository(db), agent, SOURCE_PLATFORM, current_tools)
     tools = [d for d in effective_defs if ((d or {}).get("function") or {}).get("name") in allowed_names]
 
     # + 绑定世界的世界侧 skills（居民能力；群绑定或 agent 直接绑定；effective 版本快照，版本化懒加载）
@@ -865,7 +866,8 @@ async def _maybe_trigger_ai_reply(
             seen_w.add(w.id)
             wtools = build_world_tools(w.id)
             if wtools:
-                await ensure_world_version(db, w.id, wtools)
+                from app.repositories.capability_repo import SQLAlchemyCapabilityRepository
+                await ensure_world_version(SQLAlchemyCapabilityRepository(db), w.id, wtools)
             eff = await _get_eff(db, agent, f"world-{w.id}", wtools)
             for d in eff:
                 nm = ((d or {}).get("function") or {}).get("name")
@@ -1041,12 +1043,13 @@ async def _trigger_dm_ai_reply(
     messages = await build_dm_messages(db, agent, session_id, api_base_url=api_base, api_key=api_key, trigger_user_id=sender_id, system_prompt_override=effective_cfg.get("system_prompt"))
 
     # 获取工具（能力版本化：按 effective 版本取定义快照）
+    from app.repositories.capability_repo import SQLAlchemyCapabilityRepository
     from app.services.tool_registry import get_allowed_tools
     from app.services.capability_versioning import get_effective_definitions, SOURCE_PLATFORM
     delay_allowed = await _is_delay_reply_allowed(db, agent)
     current_tools = get_allowed_tools(agent_state, thinking_enabled=effective_cfg["thinking_enabled"], delay_reply_allowed=delay_allowed)
     allowed_names = {t["function"]["name"] for t in current_tools}
-    effective_defs = await get_effective_definitions(db, agent, SOURCE_PLATFORM, current_tools)
+    effective_defs = await get_effective_definitions(SQLAlchemyCapabilityRepository(db), agent, SOURCE_PLATFORM, current_tools)
     tools = [d for d in effective_defs if ((d or {}).get("function") or {}).get("name") in allowed_names]
     model = resolve_model(agent, global_default_model=provider_info.get("global_default_chat_model"))
 

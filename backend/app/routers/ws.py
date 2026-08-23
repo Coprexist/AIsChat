@@ -499,11 +499,12 @@ async def _log_message_audit(user_id: int, conv_type: str, conv_id: int | str, m
     """审计日志：用户发送消息（只记 message_id，内容查消息表）"""
     try:
         from app.database import async_session
+        from app.repositories.audit_repo import SQLAlchemyAuditRepository
         from app.services.audit_service import log_user_action
         from app.utils.auth import get_current_request_ip
         async with async_session() as session:
             await log_user_action(
-                session, "send_message", user_id, conv_type,
+                SQLAlchemyAuditRepository(session), "send_message", user_id, conv_type,
                 target_id=conv_id if isinstance(conv_id, int) else 0,
                 details={"message_id": message_id},
                 ip=get_current_request_ip(),

@@ -13,6 +13,10 @@ from app.repositories.verification_repo import VerificationRepository, SQLAlchem
 from app.repositories.api_key_pool_repo import ApiKeyPoolRepository, SQLAlchemyApiKeyPoolRepository
 from app.repositories.friend_repo import FriendRepository, SQLAlchemyFriendRepository
 from app.repositories.world_repo import WorldRepository, SQLAlchemyWorldRepository
+from app.repositories.invitation_repo import InvitationRepository, SQLAlchemyInvitationRepository
+from app.repositories.search_repo import SearchRepository, SQLAlchemySearchRepository
+from app.repositories.export_repo import ExportRepository, SQLAlchemyExportRepository
+from app.repositories.content_repo import ContentRepository, SQLAlchemyContentRepository
 from app.utils.auth import get_current_user
 from app.services.agent.agent_service import get_agent
 
@@ -59,3 +63,23 @@ async def get_friend_repo(db: AsyncSession = Depends(get_db)) -> FriendRepositor
 
 async def get_world_repo(db: AsyncSession = Depends(get_db)) -> WorldRepository:
     return SQLAlchemyWorldRepository(db)
+
+
+async def get_invitation_repo(db: AsyncSession = Depends(get_db)) -> InvitationRepository:
+    """依赖注入：构造群邀请仓库。"""
+    return SQLAlchemyInvitationRepository(db)
+
+
+async def get_search_repo(db: AsyncSession = Depends(get_db)) -> SearchRepository:
+    """依赖注入：构造搜索仓库。"""
+    return SQLAlchemySearchRepository(db)
+
+
+async def get_export_repo(db: AsyncSession = Depends(get_db)) -> ExportRepository:
+    """依赖注入：构造导出仓库。"""
+    return SQLAlchemyExportRepository(db)
+
+
+async def get_content_repo(db: AsyncSession = Depends(get_db)) -> ContentRepository:
+    """依赖注入：构造内容仓库。"""
+    return SQLAlchemyContentRepository(db)

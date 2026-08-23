@@ -3,7 +3,25 @@
 本 CHANGELOG 遵循 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.0.0/) 规范，
 版本号遵守 [语义化版本](https://semver.org/lang/zh-CN/)。
 
-> **当前阶段**：v0.3.13 正式版 — 补丁版本号（第三位）递增。
+> **当前阶段**：v0.3.14 正式版 — 补丁版本号（第三位）递增。
+## [v0.3.14] - 2026-08-23
+
+### Changed — 🏗️ 业务层 Repository 化重构（全量完成）
+
+- **引入 Repository 层**：新建 10 个通用仓储（invitation / search / memory / skill / infra / content / export / audit / capability / federation），
+  与既有 user / friend / world / group_type / agent / system_settings / verification / api_key_pool 仓储组成完整仓储层，
+  统一提供 `execute / get / add / delete / flush / refresh / commit / rollback` 接口，跨模块需真会话处暴露 `.session` 属性桥接。
+- **模式 A：彻底解耦（占总修改量 72.6%）**：服务函数签名由 `db: AsyncSession` 改为 `repo: <Module>Repository`，
+  函数体直操会话改为仓储调用；覆盖 social（invitation/search）、export、audit、capability_versioning、brain_controller、
+  world 域（world_chat_service / world_tools / world_suggestions / world_chat_commands）、content 域（conversation_log / opencli）。
+- **模式 B：兼容过渡（27.4%）**：签名保持 `db: AsyncSession`，文件顶部新增 `_ensure_repo` 兼容助手（幂等包装），
+  覆盖 memory（6 文件）、skill（4 文件）、agent 配套（workspace / state_stack）、infrastructure（8 文件）、federation、file_service。
+- **路由层依赖注入**：`routers/deps.py` 新增 `get_user_repo / get_system_settings_repo / get_verification_repo / get_api_key_pool_repo / get_friend_repo / get_world_repo / get_invitation_repo / get_search_repo / get_export_repo / get_content_repo`，
+  worlds / world_proxy / conversation_log / invitations / search / dm / agents / brain / auth / ws 等路由改用 `Depends` 注入。
+- **调用面更新**：bootstrap、admin（19 处包装）、ai（llm / executor / response_worker）、world_turn / decision_skill、utils/error_handler 等调用点统一包装或注入仓储。
+- **不动点说明**：`memory_distribution.py`（死代码转发，无调用者）、`audit/__init__.py`（ABC 接口类型标注，实现已兼容）保持原样。
+- **验证**：67 个改动 .py 文件全部通过 `py_compile` 语法检查；重构细节与调用面清单见 `docs/dev/repository_refactor_progress.md`。
+
 ---
 
 ## [v0.3.13] - 2026-08-22

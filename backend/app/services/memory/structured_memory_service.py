@@ -12,8 +12,16 @@ from datetime import datetime, timezone
 from sqlalchemy import select, delete, func
 from sqlalchemy.ext.asyncio import AsyncSession
 from app.models.structured_record import StructuredRecord
+from app.repositories.memory_repo import MemoryRepository, SQLAlchemyMemoryRepository
 
 logger = logging.getLogger(__name__)
+
+
+def _ensure_repo(db_or_repo):
+    """兼容旧调用：传入 AsyncSession 时包装为 SQLAlchemyMemoryRepository。"""
+    if isinstance(db_or_repo, AsyncSession):
+        return SQLAlchemyMemoryRepository(db_or_repo)
+    return db_or_repo
 
 
 async def sr_set(
@@ -25,6 +33,7 @@ async def sr_set(
     value: str,
 ) -> dict:
     """写入一个字段（upsert：同路径重复写入自动覆盖）"""
+    db = _ensure_repo(db)
     try:
         result = await db.execute(
             select(StructuredRecord).where(
@@ -66,6 +75,7 @@ async def sr_get(
     field: str | None = None,
 ) -> dict:
     """读取一个子目录的所有字段（field=None 则返回全部），或指定单个字段"""
+    db = _ensure_repo(db)
     try:
         conditions = [
             StructuredRecord.agent_id == agent_id,
@@ -98,6 +108,7 @@ async def sr_list(
     category: str,
 ) -> dict:
     """列出某个 category 下的所有 sub_key（子目录）及其字段数"""
+    db = _ensure_repo(db)
     try:
         result = await db.execute(
             select(
@@ -135,6 +146,7 @@ async def sr_summary(
     sub_key: str,
 ) -> dict:
     """生成一个子目录的快照摘要（返回字段名 + 简短值预览）"""
+    db = _ensure_repo(db)
     try:
         result = await db.execute(
             select(StructuredRecord).where(
@@ -167,6 +179,7 @@ async def sr_categories(
     agent_id: int,
 ) -> dict:
     """列出该 AI 使用的所有 category"""
+    db = _ensure_repo(db)
     try:
         result = await db.execute(
             select(
@@ -201,6 +214,7 @@ async def sr_delete(
     field: str | None = None,
 ) -> dict:
     """删除记录（可按 field 删除单条，或删整个 sub_key，或删整个 category）"""
+    db = _ensure_repo(db)
     try:
         conditions = [StructuredRecord.agent_id == agent_id, StructuredRecord.category == category]
         if sub_key:
@@ -229,6 +243,7 @@ async def sr_rename(
     field: str | None = None,
 ) -> dict:
     """改名：category / sub_key / field 任一级（对齐世界版 2026-08-12）"""
+    db = _ensure_repo(db)
     try:
         new_name = (new_name or "").strip()
         if not new_name:
@@ -273,6 +288,7 @@ async def sr_move(
     field: str | None = None,
 ) -> dict:
     """移动：整组 sub_key 或单条 field 跨目录（对齐世界版 2026-08-12）"""
+    db = _ensure_repo(db)
     try:
         to_category = (to_category or "").strip()
         if not to_category or not sub_key:
@@ -313,6 +329,7 @@ async def format_db_records_for_prompt(db: AsyncSession, agent_id: int) -> str:
     规则：只注入有内容的路径（空目录不出现）；⭐=重要记忆 ❗=硬约束（value 前缀标记，软锚定）；
     详细内容用 manage_records get 按需取。
     """
+    db = _ensure_repo(db)
     def _mark(value: str) -> str:
         v = (value or "").strip()
         if v.startswith("❗"):

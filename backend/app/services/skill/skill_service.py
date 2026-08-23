@@ -6,12 +6,21 @@ import logging
 from datetime import datetime, timezone
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
+from app.repositories.skill_repo import SkillRepository, SQLAlchemySkillRepository
 
 logger = logging.getLogger(__name__)
 
 
+def _ensure_repo(db_or_repo):
+    """兼容旧调用：传入 AsyncSession 时包装为 SQLAlchemySkillRepository。"""
+    if isinstance(db_or_repo, AsyncSession):
+        return SQLAlchemySkillRepository(db_or_repo)
+    return db_or_repo
+
+
 async def list_skills(db: AsyncSession, agent_id: int) -> list[dict]:
     """获取某个 AI 的所有技能（按 priority 升序）"""
+    db = _ensure_repo(db)
     from app.models.agent_skill import AgentSkill
 
     result = await db.execute(
@@ -33,6 +42,7 @@ async def add_skill(
     priority: int = 0,
 ) -> dict:
     """添加一个技能"""
+    db = _ensure_repo(db)
     from app.models.agent_skill import AgentSkill
     from app.utils.pure.skill_registry import SkillRegistry
 
@@ -66,6 +76,7 @@ async def update_skill(
     priority: int | None = None,
 ) -> dict:
     """更新一个技能（仅 owner AI 可修改）"""
+    db = _ensure_repo(db)
     from app.models.agent_skill import AgentSkill
 
     result = await db.execute(
@@ -96,6 +107,7 @@ async def update_skill(
 
 async def delete_skill(db: AsyncSession, agent_id: int, skill_id: int) -> dict:
     """删除一个技能"""
+    db = _ensure_repo(db)
     from app.models.agent_skill import AgentSkill
 
     result = await db.execute(
@@ -122,6 +134,7 @@ async def toggle_skill(
     is_enabled: bool | None = None,
 ) -> dict:
     """启用/禁用技能（不传 is_enabled 则翻转）"""
+    db = _ensure_repo(db)
     from app.models.agent_skill import AgentSkill
 
     result = await db.execute(

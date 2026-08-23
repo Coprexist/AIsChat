@@ -10,8 +10,16 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, func
 
 from app.models.verification_code import VerificationCode
+from app.repositories.infra_repo import InfraRepository, SQLAlchemyInfraRepository
 
 logger = logging.getLogger(__name__)
+
+
+def _ensure_repo(db_or_repo):
+    """兼容旧调用：传入 AsyncSession 时包装为 SQLAlchemyInfraRepository。"""
+    if isinstance(db_or_repo, AsyncSession):
+        return SQLAlchemyInfraRepository(db_or_repo)
+    return db_or_repo
 
 CODE_EXPIRY_MINUTES = 5
 CODE_LENGTH = 6
@@ -32,6 +40,7 @@ async def generate_and_send_code(
     lang: str = "zh",
 ) -> str:
     """生成验证码并发送邮件。返回生成的验证码（用于日志），失败抛 ValueError。"""
+    db = _ensure_repo(db)
     # 频率限制（先查后插）
     await _check_rate_limit(db, email, ip_address)
 
@@ -81,6 +90,7 @@ async def verify_code(
     purpose: str,
 ) -> bool:
     """校验验证码。成功标记已使用并返回 True，失败返回 False。"""
+    db = _ensure_repo(db)
     now = datetime.now(timezone.utc)
     result = await db.execute(
         select(VerificationCode).where(
@@ -106,6 +116,7 @@ async def _check_rate_limit(
     ip_address: str | None = None,
 ) -> None:
     """检查频率限制：每邮箱+IP 每分钟 1 次，每小时 5 次。超限抛 HTTPException(429)。"""
+    db = _ensure_repo(db)
     from fastapi import HTTPException
     from starlette import status
 

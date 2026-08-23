@@ -56,9 +56,10 @@ async def register(
             settings_repo=settings_repo,
             verification_repo=verification_repo,
         )
+        from app.repositories.audit_repo import SQLAlchemyAuditRepository
         from app.services.audit_service import log_user_action
         ip = request.client.host if request.client else None
-        await log_user_action(db, "register", user.id, "user", details={"username": req.username}, ip=ip)
+        await log_user_action(SQLAlchemyAuditRepository(db), "register", user.id, "user", details={"username": req.username}, ip=ip)
         # 注册后自动登录（使用用户名+密码方式）
         return await login_user(
             login_id=req.username,
@@ -92,9 +93,10 @@ async def login(
             settings_repo=settings_repo,
             verification_repo=verification_repo,
         )
+        from app.repositories.audit_repo import SQLAlchemyAuditRepository
         from app.services.audit_service import log_user_action
         ip = request.client.host if request.client else None
-        await log_user_action(db, "login", result["user_id"], "user", details={"method": req.method or "password"}, ip=ip)
+        await log_user_action(SQLAlchemyAuditRepository(db), "login", result["user_id"], "user", details={"method": req.method or "password"}, ip=ip)
         return result
     except ValueError as e:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail=str(e))

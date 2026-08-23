@@ -6,6 +6,7 @@ import logging
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 from app.models.system_settings import SystemSettings
+from app.repositories.infra_repo import InfraRepository, SQLAlchemyInfraRepository
 from app.utils.pure.provider_config import (
     normalize_legacy_config, find_default_provider,
     find_provider_by_name, find_provider_for_pool_key,
@@ -14,8 +15,16 @@ from app.utils.pure.provider_config import (
 logger = logging.getLogger(__name__)
 
 
+def _ensure_repo(db_or_repo):
+    """兼容旧调用：传入 AsyncSession 时包装为 SQLAlchemyInfraRepository。"""
+    if isinstance(db_or_repo, AsyncSession):
+        return SQLAlchemyInfraRepository(db_or_repo)
+    return db_or_repo
+
+
 async def _get_or_create(db: AsyncSession) -> SystemSettings:
     """获取系统设置行，不存在则创建（懒初始化）"""
+    db = _ensure_repo(db)
     result = await db.execute(select(SystemSettings).where(SystemSettings.id == 1))
     row = result.scalar_one_or_none()
     if row is None:
@@ -35,6 +44,7 @@ async def get_provider_config(db: AsyncSession) -> dict:
 
 async def get_providers(db: AsyncSession) -> list[dict]:
     """获取所有 LLM 厂商配置数组（纯函数 normalize_legacy_config 处理旧格式兼容）"""
+    db = _ensure_repo(db)
     from app.models.system_settings import SystemSettings
     result = await db.execute(select(SystemSettings).where(SystemSettings.id == 1))
     row = result.scalar_one_or_none()
@@ -64,6 +74,7 @@ async def get_provider_for_pool_key(db: AsyncSession, pool_key) -> dict:
 
 async def get_settings(db: AsyncSession) -> dict:
     """获取系统设置"""
+    db = _ensure_repo(db)
     row = await _get_or_create(db)
     return {
         "id": row.id,
@@ -116,6 +127,7 @@ async def update_settings(
     修改 default_platform_credit 会批量更新所有用户的 platform_gifted_credit。
     修改 default_file_quota_mb 会同步调整所有用户的 file_quota_mb（保留兑换码加成）。
     """
+    db = _ensure_repo(db)
     row = await _get_or_create(db)
 
     if default_language is not None:

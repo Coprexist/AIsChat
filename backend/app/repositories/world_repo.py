@@ -1,4 +1,4 @@
-﻿"""
+"""
 世界仓库接口（Protocol）+ SQLAlchemy 实现。
 """
 from typing import Optional, Protocol
@@ -15,10 +15,15 @@ class WorldRepository(Protocol):
     async def commit(self): ...
     async def get(self, model, pk): ...
 
+    @property
+    def session(self) -> AsyncSession:
+        """底层会话——仅供跨模块辅助调用桥接（如 chat 模块）。"""
+        ...
+
 
 class SQLAlchemyWorldRepository:
     def __init__(self, session: AsyncSession):
-        self.session = session
+        self._session = session
 
     async def execute(self, stmt):
         return await self.session.execute(stmt)
@@ -40,3 +45,7 @@ class SQLAlchemyWorldRepository:
 
     async def get(self, model, pk):
         return await self.session.get(model, pk)
+
+    @property
+    def session(self) -> AsyncSession:
+        return self._session

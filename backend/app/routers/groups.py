@@ -38,6 +38,10 @@ from app.chat.delivery import (
     is_member_in_dnd,
 )
 from app.utils.auth import get_current_user
+from app.repositories.invitation_repo import InvitationRepository
+from app.repositories.export_repo import ExportRepository
+from app.routers.deps import get_invitation_repo
+from app.routers.deps import get_export_repo
 
 router = APIRouter(tags=["群聊"])
 
@@ -47,6 +51,7 @@ async def create_new_group(
     req: GroupCreateRequest,
     current_user: dict = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
+    invitation_repo: InvitationRepository = Depends(get_invitation_repo),
 ):
     """创建群聊"""
     # 必须至少选 1 个成员
@@ -76,7 +81,7 @@ async def create_new_group(
         for hm in human_members:
             try:
                 await send_group_invitation(
-                    db, group.id, current_user["user_id"], hm["id"],
+                    invitation_repo, group.id, current_user["user_id"], hm["id"],
                 )
                 invitations_sent += 1
             except ValueError:
@@ -203,6 +208,7 @@ async def invite_member(
     req: GroupInviteRequest,
     current_user: dict = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
+    invitation_repo: InvitationRepository = Depends(get_invitation_repo),
 ):
     """邀请成员加入群聊。AI 直接入群，人类发邀请卡片 DM。"""
     try:
@@ -217,7 +223,7 @@ async def invite_member(
         else:
             from app.services.social.invitation_service import send_group_invitation
             result = await send_group_invitation(
-                db, group_id, current_user["user_id"], req.member_id, req.message,
+                invitation_repo, group_id, current_user["user_id"], req.member_id, req.message,
             )
             return {
                 "message": "邀请已发送",
@@ -868,6 +874,7 @@ async def export_chat(
     date_to: str | None = Query(None),
     current_user: dict = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
+    export_repo: ExportRepository = Depends(get_export_repo),
 ):
     """导出群聊记录（json / txt / html）"""
     from app.services.content.export_service import export_chat_history
@@ -879,7 +886,7 @@ async def export_chat(
 
     try:
         content, media_type, filename = await export_chat_history(
-            db, group_id, fmt, date_from, date_to
+            export_repo, group_id, fmt, date_from, date_to
         )
     except ValueError as e:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))

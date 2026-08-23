@@ -13,8 +13,16 @@ from sqlalchemy import select, delete as sa_delete, and_, func, text
 from app.models.file import FileMetadata, FileReference, FileCollaborator
 from app.config import settings
 from app.db_providers import get_provider
+from app.repositories.content_repo import ContentRepository, SQLAlchemyContentRepository
 
 logger = logging.getLogger(__name__)
+
+
+def _ensure_repo(db_or_repo):
+    """兼容旧调用：传入 AsyncSession 时包装为 SQLAlchemyContentRepository。"""
+    if isinstance(db_or_repo, AsyncSession):
+        return SQLAlchemyContentRepository(db_or_repo)
+    return db_or_repo
 
 # ============================================================
 # 权限检查
@@ -76,6 +84,7 @@ def _normalize_collab_type(requester_type: str) -> str:
 
 async def check_file_access(db: AsyncSession, file_id: int, requester_type: str,
                             requester_id: int, required_perm: str = "read") -> FileMetadata | None:
+    db = _ensure_repo(db)
     """检查文件访问权限，返回 FileMetadata 或 None
 
     权限判定顺序：
@@ -164,6 +173,7 @@ async def check_file_access(db: AsyncSession, file_id: int, requester_type: str,
 async def _file_attached_to_visible_message(
     db: AsyncSession, file_id: int, requester_type: str, requester_id: int,
 ) -> bool:
+    db = _ensure_repo(db)
     """检查文件是否被附在请求者可见的消息中（群聊成员 或 DM 参与者）"""
     pattern = json.dumps([{"file_id": file_id}])
 
@@ -229,6 +239,7 @@ async def upload_file(
     owner_id: int,
     collaboration_mode: str = "solo",
 ) -> FileMetadata:
+    db = _ensure_repo(db)
     """上传文件到指定路径（含三级去重：文件名 → 大小 → 内容哈希）"""
     if not _check_path_safe(path):
         raise ValueError("路径不合法：仅支持相对路径")
@@ -297,6 +308,7 @@ async def list_files(
     requester_type: str,
     requester_id: int,
 ) -> list[dict]:
+    db = _ensure_repo(db)
     """列出目录内容（过滤无权条目）
 
     只查询请求者自身或有权限的文件，不加载全表。
@@ -335,6 +347,7 @@ async def list_files(
 
 
 async def get_file(db: AsyncSession, file_id: int) -> FileMetadata | None:
+    db = _ensure_repo(db)
     """获取文件元数据"""
     result = await db.execute(
         select(FileMetadata).where(FileMetadata.id == file_id)
@@ -362,6 +375,7 @@ async def delete_file(
     requester_type: str,
     requester_id: int,
 ) -> dict:
+    db = _ensure_repo(db)
     """删除文件（owner 删除时若有转发引用则过户给最早转发者，否则真删）"""
     result = await db.execute(
         select(FileMetadata).where(FileMetadata.id == file_id)
@@ -425,6 +439,7 @@ async def delete_file(
 # ============================================================
 
 async def _find_first_forwarder(db: AsyncSession, file_id: int) -> tuple[str, int] | None:
+    db = _ensure_repo(db)
     """查找文件的第一个转发者（FIFO 排序），用于过户接盘"""
     r = await db.execute(
         select(FileReference.referrer_type, FileReference.referrer_id).where(
@@ -442,6 +457,7 @@ async def track_forward_reference(
     referrer_type: str,
     referrer_id: int,
 ) -> bool:
+    db = _ensure_repo(db)
     """创建转发引用（幂等：同一人对同一文件只保留一条 forward 记录）。
     非 owner 发送含附件的消息时自动调用。
     返回 True 表示新创建（可用于扣配额），False 表示已存在或为 owner。
@@ -483,6 +499,7 @@ async def _remove_forward_reference(
     referrer_type: str,
     referrer_id: int,
 ) -> bool:
+    db = _ensure_repo(db)
     """删除转发者的引用记录（返还配额时调用），返回是否找到并删除"""
     r = await db.execute(
         sa_delete(FileReference).where(
@@ -500,6 +517,7 @@ async def _remove_forward_reference(
 
 
 async def _orphan_file(db: AsyncSession, file_id: int):
+    db = _ensure_repo(db)
     """将文件标记为孤儿（无主状态，宽限期后清理）"""
     meta = await db.get(FileMetadata, file_id)
     if meta:
@@ -511,6 +529,7 @@ async def _orphan_file(db: AsyncSession, file_id: int):
 
 
 async def cleanup_orphaned_files(db: AsyncSession, retention_days: int = 7):
+    db = _ensure_repo(db)
     """清理超过宽限期的孤儿文件（由定时任务调用）"""
     from datetime import timedelta
     cutoff = datetime.now(timezone.utc).replace(tzinfo=None) - timedelta(days=retention_days)
@@ -547,6 +566,7 @@ async def cleanup_orphaned_files(db: AsyncSession, retention_days: int = 7):
 
 
 async def get_user_forwarded_file_ids(db: AsyncSession, user_id: int) -> set[int]:
+    db = _ensure_repo(db)
     """获取用户所有转发引用的 file_id 集合（用于存储计算）"""
     r = await db.execute(
         select(FileReference.file_id).where(
@@ -589,6 +609,7 @@ async def track_file_reference(
     referrer_id: int,
     ref_type: str = "read",
 ) -> FileReference:
+    db = _ensure_repo(db)
     """记录文件引用（幂等：DB UNIQUE 约束保证唯一，同引用方只保留一条）"""
     result = await db.execute(
         select(FileReference).where(
@@ -618,6 +639,7 @@ async def track_file_reference(
 
 
 async def get_file_referrers(db: AsyncSession, file_id: int) -> list[dict]:
+    db = _ensure_repo(db)
     """获取文件的所有引用方（用于 O(n) 通知）"""
     result = await db.execute(
         select(FileReference).where(FileReference.file_id == file_id)
@@ -634,6 +656,7 @@ async def get_file_referrers(db: AsyncSession, file_id: int) -> list[dict]:
 
 
 async def get_ai_referenced_files(db: AsyncSession, ai_id: int) -> list[dict]:
+    db = _ensure_repo(db)
     """获取 AI 引用的所有文件"""
     result = await db.execute(
         select(FileReference, FileMetadata).join(
@@ -667,6 +690,7 @@ async def set_collaboration_mode(
     requester_type: str,
     requester_id: int,
 ) -> FileMetadata:
+    db = _ensure_repo(db)
     """修改文件的协作模式（仅 owner 可操作）"""
     result = await db.execute(
         select(FileMetadata).where(FileMetadata.id == file_id)
@@ -698,6 +722,7 @@ async def add_file_collaborator(
     requester_type: str | None = None,
     requester_id: int | None = None,
 ) -> FileCollaborator:
+    db = _ensure_repo(db)
     """添加文件协作者（仅 owner 可操作）"""
     # 权限检查
     result = await db.execute(
@@ -748,6 +773,7 @@ async def remove_file_collaborator(
     collaborator_type: str,
     collaborator_id: int,
 ) -> bool:
+    db = _ensure_repo(db)
     """移除文件协作者"""
     result = await db.execute(
         select(FileCollaborator).where(
@@ -767,6 +793,7 @@ async def remove_file_collaborator(
 
 
 async def get_file_collaborators(db: AsyncSession, file_id: int) -> list[dict]:
+    db = _ensure_repo(db)
     """获取文件的所有协作者"""
     result = await db.execute(
         select(FileCollaborator).where(FileCollaborator.file_id == file_id)
@@ -788,6 +815,7 @@ async def get_file_collaborators(db: AsyncSession, file_id: int) -> list[dict]:
 
 async def notify_file_changed(db: AsyncSession, file_id: int, change_type: str,
                               changed_by_type: str, changed_by_id: int):
+    db = _ensure_repo(db)
     """
     文件变更时通知所有引用方（O(n) 遍历）。
     通过 WebSocket 推送 file_changed 事件到每个在线 AI。
@@ -834,6 +862,7 @@ async def notify_file_changed(db: AsyncSession, file_id: int, change_type: str,
 # ============================================================
 
 async def ai_read_file(db: AsyncSession, agent_id: int, file_path: str) -> str:
+    db = _ensure_repo(db)
     """AI 读取文件（自动追踪引用）"""
     if not _check_path_safe(file_path):
         raise ValueError("路径不合法：仅支持相对路径")
@@ -871,6 +900,7 @@ async def ai_read_file(db: AsyncSession, agent_id: int, file_path: str) -> str:
 
 async def ai_write_file(db: AsyncSession, agent_id: int, file_path: str,
                         content: str, collaboration_mode: str = "solo") -> FileMetadata:
+    db = _ensure_repo(db)
     """AI 写入文件（创建或覆盖）"""
     if not _check_path_safe(file_path):
         raise ValueError("路径不合法：仅支持相对路径")
@@ -934,6 +964,7 @@ async def ai_list_files(db: AsyncSession, agent_id: int, path: str = "/") -> lis
 
 
 async def ai_delete_file(db: AsyncSession, agent_id: int, file_path: str) -> bool:
+    db = _ensure_repo(db)
     """AI 删除文件"""
     if not _check_path_safe(file_path):
         raise ValueError("路径不合法：仅支持相对路径")
@@ -950,6 +981,7 @@ async def ai_delete_file(db: AsyncSession, agent_id: int, file_path: str) -> boo
 
 async def ai_share_file(db: AsyncSession, agent_id: int, file_path: str,
                         target_type: str, target_id: int, role: str = "collaborator") -> dict:
+    db = _ensure_repo(db)
     """AI 分享文件给其他 AI 或用户"""
     if not _check_path_safe(file_path):
         raise ValueError("路径不合法：仅支持相对路径")

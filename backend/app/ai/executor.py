@@ -601,8 +601,9 @@ async def _tool_call_loop(
                             from app.services.agent.agent_service import apply_pending_config
                             await apply_pending_config(db, agent)
                             # 前缀版本化：compact 解锁，effective 对齐最新（工具定义 + agent 提示词）
+                            from app.repositories.capability_repo import SQLAlchemyCapabilityRepository
                             from app.services.capability_versioning import apply_pending_changes, SOURCE_PLATFORM
-                            await apply_pending_changes(db, agent, [SOURCE_PLATFORM, f"agent-prompt-{agent.id}"])
+                            await apply_pending_changes(SQLAlchemyCapabilityRepository(db), agent, [SOURCE_PLATFORM, f"agent-prompt-{agent.id}"])
                             await db.commit()
                         except Exception:
                             pass

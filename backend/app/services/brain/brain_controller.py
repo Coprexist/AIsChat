@@ -11,8 +11,8 @@
 """
 import logging
 from sqlalchemy import select
-from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.repositories.agent_repo import AgentRepository
 from app.services.brain.heartbeat_manager import heartbeat_manager
 from app.services.brain.state_stack_manager import state_stack_manager
 from app.services.brain.conflict_arbiter import conflict_arbiter
@@ -64,11 +64,11 @@ class BrainController:
 
     # ── 人格锚点（只读） ──
 
-    async def get_personality_anchor(self, db: AsyncSession, agent_id: int) -> dict | None:
+    async def get_personality_anchor(self, repo: AgentRepository, agent_id: int) -> dict | None:
         """获取人格锚点（只读，任何 Skill 都不可修改）"""
         from app.models.personality_anchor import PersonalityAnchor
 
-        result = await db.execute(
+        result = await repo.execute(
             select(PersonalityAnchor).where(PersonalityAnchor.agent_id == agent_id)
         )
         anchor = result.scalar_one_or_none()
@@ -86,7 +86,7 @@ class BrainController:
 
     async def upsert_personality_anchor(
         self,
-        db: AsyncSession,
+        repo: AgentRepository,
         agent_id: int,
         name: str,
         identity: str,
@@ -97,7 +97,7 @@ class BrainController:
         """创建或更新人格锚点（仅管理员/主人可调用，AI 自身不可改）"""
         from app.models.personality_anchor import PersonalityAnchor
 
-        result = await db.execute(
+        result = await repo.execute(
             select(PersonalityAnchor).where(PersonalityAnchor.agent_id == agent_id)
         )
         anchor = result.scalar_one_or_none()
@@ -114,7 +114,7 @@ class BrainController:
                 core_values="\n".join(core_values or []),
                 consistency_coefficient=consistency_coefficient,
             )
-            db.add(anchor)
+            repo.add(anchor)
         else:
             anchor.name = name
             anchor.identity = identity
@@ -122,8 +122,8 @@ class BrainController:
             anchor.core_values = "\n".join(core_values or [])
             anchor.consistency_coefficient = consistency_coefficient
 
-        await db.flush()
-        return await self.get_personality_anchor(db, agent_id)
+        await repo.flush()
+        return await self.get_personality_anchor(repo, agent_id)
 
 
 def _parse_core_values(raw: str | None) -> list[str]:

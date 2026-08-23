@@ -26,9 +26,17 @@ from sqlalchemy import select, delete, and_
 from app.utils.crypto import encrypt_api_key, decrypt_api_key
 from app.config import settings
 from app.models.federation import InstanceConfig, FederationPeer, FederatedEntity, PendingProfileUpdate
+from app.repositories.federation_repo import FederationRepository, SQLAlchemyFederationRepository
 import httpx
 
 logger = logging.getLogger(__name__)
+
+
+def _ensure_repo(db_or_repo):
+    """兼容旧调用：传入 AsyncSession 时包装为 SQLAlchemyFederationRepository。"""
+    if isinstance(db_or_repo, AsyncSession):
+        return SQLAlchemyFederationRepository(db_or_repo)
+    return db_or_repo
 
 
 # ── 错误码（结构化，前端可据此处理 UI 状态） ──
@@ -56,6 +64,7 @@ def _error(code: str, message: str, **extra) -> dict:
 # ── 实例配置查询辅助 ──
 
 async def _get_instance_config(db: AsyncSession):
+    db = _ensure_repo(db)
     """获取单例 InstanceConfig ORM 对象（复用，消除重复查询）"""
     result = await db.execute(select(InstanceConfig).where(InstanceConfig.id == 1))
     return result.scalar_one_or_none()
@@ -101,6 +110,7 @@ def parse_federated_id(federated_id: str) -> tuple[str, str, str]:
 # ── 实例身份 ──
 
 async def initialize_instance(db: AsyncSession) -> dict:
+    db = _ensure_repo(db)
     """首次启动生成子网 UUID v4 + 公网 ULID"""
     config = await _get_instance_config(db)
     if config is None:
@@ -136,6 +146,7 @@ async def update_instance_info(
     public_url: str | None = None,
     public_id: str | None = None,
 ) -> dict:
+    db = _ensure_repo(db)
     """更新实例身份信息"""
     config = await _get_instance_config(db)
     if config is None:
@@ -167,6 +178,7 @@ async def update_instance_info(
 
 
 async def regenerate_public_id(db: AsyncSession) -> dict:
+    db = _ensure_repo(db)
     """重新生成公网 ID"""
     config = await _get_instance_config(db)
     if config is None:
@@ -183,6 +195,7 @@ async def regenerate_public_id(db: AsyncSession) -> dict:
 # ── GitHub Token 管理（数据库存储，前端图形化配置） ──
 
 async def set_github_token(db: AsyncSession, token: str) -> dict:
+    db = _ensure_repo(db)
     """前端配置 GitHub Token（加密存储到 instance_config）"""
     config = await _get_instance_config(db)
     if config is None:
@@ -384,6 +397,7 @@ async def _validate_public_url(public_url: str, expected_public_id: str) -> str 
 # ── 对等端管理 ──
 
 async def list_peers(db: AsyncSession) -> list[dict]:
+    db = _ensure_repo(db)
     """列出所有对等端"""
     result = await db.execute(select(FederationPeer).order_by(FederationPeer.created_at.asc()))
     peers = result.scalars().all()
@@ -397,6 +411,7 @@ async def add_peer(
     shared_secret: str,
     display_name: str = "",
 ) -> dict:
+    db = _ensure_repo(db)
     """
     添加对等端（加密存储共享密钥）。display_name 唯一性校验。
 
@@ -457,6 +472,7 @@ async def update_peer(
     shared_secret: str | None = None,
     is_enabled: bool | None = None,
 ) -> dict:
+    db = _ensure_repo(db)
     """更新对等端配置。display_name 变更会级联更新 federated_entities 中的 federated_id。"""
     result = await db.execute(select(FederationPeer).where(FederationPeer.id == peer_id))
     peer = result.scalar_one_or_none()
@@ -510,6 +526,7 @@ async def update_peer(
 
 
 async def remove_peer(db: AsyncSession, peer_id: int) -> dict:
+    db = _ensure_repo(db)
     """移除对等端（级联删除联邦实体）"""
     result = await db.execute(select(FederationPeer).where(FederationPeer.id == peer_id))
     peer = result.scalar_one_or_none()
@@ -525,6 +542,7 @@ async def remove_peer(db: AsyncSession, peer_id: int) -> dict:
 
 
 async def get_peer_by_public_id(db: AsyncSession, public_id: str):
+    db = _ensure_repo(db)
     """根据公网 ID 查找对等端"""
     result = await db.execute(
         select(FederationPeer).where(FederationPeer.peer_public_id == public_id)
@@ -533,6 +551,7 @@ async def get_peer_by_public_id(db: AsyncSession, public_id: str):
 
 
 async def get_peer_by_display_name(db: AsyncSession, display_name: str):
+    db = _ensure_repo(db)
     """根据实例代号（display_name）查找对等端"""
     result = await db.execute(
         select(FederationPeer).where(FederationPeer.display_name == display_name)
@@ -546,6 +565,7 @@ async def get_decrypted_secret(peer) -> str:
 
 
 async def update_peer_connection_state(db: AsyncSession, peer_id: int, state: str) -> None:
+    db = _ensure_repo(db)
     """更新对等端连接状态"""
     result = await db.execute(select(FederationPeer).where(FederationPeer.id == peer_id))
     peer = result.scalar_one_or_none()
@@ -569,6 +589,7 @@ async def register_federated_entity(
     display_name: str = "",
     direction: str = "incoming",
 ) -> dict:
+    db = _ensure_repo(db)
     """
     注册一个新的联邦实体（接收端：管理员接受远端共享后调用）。
 
@@ -603,6 +624,7 @@ async def register_federated_entity(
 
 
 async def remove_federated_entity(db: AsyncSession, entity_id: int) -> dict:
+    db = _ensure_repo(db)
     """移除联邦实体"""
     result = await db.execute(select(FederatedEntity).where(FederatedEntity.id == entity_id))
     entity = result.scalar_one_or_none()
@@ -616,6 +638,7 @@ async def remove_federated_entity(db: AsyncSession, entity_id: int) -> dict:
 
 
 async def get_federated_entity_by_fid(db: AsyncSession, federated_id: str):
+    db = _ensure_repo(db)
     """根据联邦 ID 查找实体（返回 ORM 对象或 None）"""
     result = await db.execute(
         select(FederatedEntity).where(
@@ -629,6 +652,7 @@ async def get_federated_entity_by_fid(db: AsyncSession, federated_id: str):
 async def get_federated_entity_by_local(
     db: AsyncSession, entity_type: str, local_ref_id: str
 ):
+    db = _ensure_repo(db)
     """根据本地 ID 查找联邦实体（返回 ORM 对象或 None）"""
     result = await db.execute(
         select(FederatedEntity).where(
@@ -641,6 +665,7 @@ async def get_federated_entity_by_local(
 
 
 async def list_federated_entities(db: AsyncSession, peer_id: int | None = None) -> list[dict]:
+    db = _ensure_repo(db)
     """列出联邦实体，可选按 peer 过滤"""
     stmt = select(FederatedEntity, FederationPeer.display_name).join(
         FederationPeer, FederatedEntity.peer_id == FederationPeer.id
@@ -663,6 +688,7 @@ async def update_federated_entity(
     is_enabled: bool | None = None,
     direction: str | None = None,
 ) -> dict:
+    db = _ensure_repo(db)
     """更新联邦实体（管理员操作）"""
     result = await db.execute(select(FederatedEntity).where(FederatedEntity.id == entity_id))
     entity = result.scalar_one_or_none()
@@ -685,6 +711,7 @@ async def update_federated_entity(
 
 
 async def is_group_federated(db: AsyncSession, group_id: int) -> bool:
+    db = _ensure_repo(db)
     """检查群聊是否启用了联邦共享"""
     result = await db.execute(
         select(FederatedEntity).where(
@@ -697,6 +724,7 @@ async def is_group_federated(db: AsyncSession, group_id: int) -> bool:
 
 
 async def is_dm_federated(db: AsyncSession, session_id: str) -> bool:
+    db = _ensure_repo(db)
     """检查 DM 会话是否启用了联邦共享"""
     result = await db.execute(
         select(FederatedEntity).where(
@@ -711,6 +739,7 @@ async def is_dm_federated(db: AsyncSession, session_id: str) -> bool:
 async def get_federated_peers_for_entity(
     db: AsyncSession, entity_type: str, local_ref_id: str
 ) -> list:
+    db = _ensure_repo(db)
     """获取共享某实体的所有已连接对等端（返回 FederationPeer ORM 对象列表）"""
     result = await db.execute(
         select(FederationPeer)
@@ -736,6 +765,7 @@ async def enqueue_profile_update(
     field: str,
     new_value: str,
 ) -> None:
+    db = _ensure_repo(db)
     """记录本地实体变更到同步队列"""
     update = PendingProfileUpdate(
         entity_type=entity_type,
@@ -751,6 +781,7 @@ async def enqueue_profile_update(
 async def get_pending_updates(
     db: AsyncSession, entity_type: str | None = None
 ) -> list[PendingProfileUpdate]:
+    db = _ensure_repo(db)
     """获取待同步的 profile 变更。可选按类型过滤。"""
     stmt = select(PendingProfileUpdate).order_by(PendingProfileUpdate.changed_at.asc())
     if entity_type:
@@ -760,6 +791,7 @@ async def get_pending_updates(
 
 
 async def clear_pending_updates(db: AsyncSession, update_ids: list[int]) -> None:
+    db = _ensure_repo(db)
     """清除已同步的 profile 变更"""
     if not update_ids:
         return
@@ -770,6 +802,7 @@ async def clear_pending_updates(db: AsyncSession, update_ids: list[int]) -> None
 
 
 async def get_sync_interval_minutes(db: AsyncSession) -> int:
+    db = _ensure_repo(db)
     """获取联邦 profile 同步间隔（分钟），默认 30"""
     from app.models.system_settings import SystemSettings
     result = await db.execute(select(SystemSettings).where(SystemSettings.id == 1))
@@ -782,6 +815,7 @@ async def get_sync_interval_minutes(db: AsyncSession) -> int:
 # ── 群联邦共享控制（v0.2.0: 群主/AI制作者控制每个群的联邦共享）──
 
 async def can_manage_group_federation(db: AsyncSession, group_id: int, user_id: int) -> bool:
+    db = _ensure_repo(db)
     """检查用户是否有权管理群联邦共享设置"""
     from app.models.group import Group, GroupMember
     from app.models.agent import Agent
@@ -830,6 +864,7 @@ async def can_manage_group_federation(db: AsyncSession, group_id: int, user_id: 
 async def get_group_federation_peers(
     db: AsyncSession, group_id: int, user_id: int
 ) -> dict:
+    db = _ensure_repo(db)
     """
     获取群联邦共享状态：列出所有对等端，标记哪些已共享此群。
     需要 can_manage_group_federation 权限。
@@ -880,6 +915,7 @@ async def share_group_to_peers(
     peer_ids: list[int],
     user_id: int,
 ) -> dict:
+    db = _ensure_repo(db)
     """
     将群共享到指定对等端。
     - 创建 FederatedEntity 记录（direction=outgoing）
@@ -972,6 +1008,7 @@ async def unshare_group_from_peers(
     peer_ids: list[int],
     user_id: int,
 ) -> dict:
+    db = _ensure_repo(db)
     """
     取消群对指定对等端的联邦共享。
     - 删除 FederatedEntity 记录
@@ -1036,6 +1073,7 @@ async def handle_remote_message(
     msg_dict: dict,
     source_public_id: str,
 ) -> "Message":
+    db = _ensure_repo(db)
     """持久化来自远程实例的消息"""
     from app.models.message import Message
 
@@ -1066,6 +1104,7 @@ async def handle_remote_message(
 async def persist_remote_dm_message(
     db: AsyncSession, session_id: str, msg_dict: dict, source_public_id: str,
 ):
+    db = _ensure_repo(db)
     """持久化来自远程实例的 DM 消息"""
     from app.models.dm import DMMessage
     from datetime import datetime as dt
@@ -1130,6 +1169,7 @@ def validate_rotation_url(url: str, current_url: str) -> str | None:
 
 
 async def update_peer_url(db: AsyncSession, peer_id: int, new_url: str) -> bool:
+    db = _ensure_repo(db)
     """提交 URL 轮换"""
     from app.models.federation import FederationPeer as FP
     result = await db.execute(select(FP).where(FP.id == peer_id))
@@ -1147,6 +1187,7 @@ async def update_peer_url(db: AsyncSession, peer_id: int, new_url: str) -> bool:
 
 
 async def rollback_peer_url(db: AsyncSession, peer_id: int) -> bool:
+    db = _ensure_repo(db)
     """回退 URL 轮换"""
     result = await db.execute(select(FederationPeer).where(FederationPeer.id == peer_id))
     peer = result.scalar_one_or_none()

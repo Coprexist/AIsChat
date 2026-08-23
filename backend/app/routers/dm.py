@@ -9,6 +9,8 @@ from fastapi.responses import Response
 from pydantic import BaseModel
 from sqlalchemy.ext.asyncio import AsyncSession
 from app.database import get_db
+from app.repositories.export_repo import ExportRepository
+from app.routers.deps import get_export_repo
 from app.utils.auth import get_current_user
 from app.chat.dm import (
     get_or_create_dm_session,
@@ -222,6 +224,7 @@ async def export_dm_chat(
     date_to: str | None = Query(None),
     current_user: dict = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
+    export_repo: ExportRepository = Depends(get_export_repo),
 ):
     """导出私信记录（json / txt / html）"""
     from app.chat.dm import get_dm_session as _get_dm
@@ -235,7 +238,7 @@ async def export_dm_chat(
 
     try:
         content, media_type, filename = await export_dm_chat_history(
-            db, session_id, fmt, date_from, date_to
+            export_repo, session_id, fmt, date_from, date_to
         )
     except ValueError as e:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))

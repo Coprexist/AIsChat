@@ -702,6 +702,7 @@ async def get_chat(
     limit: int = 30,
     current_user: dict = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
+    world_repo: WorldRepository = Depends(get_world_repo),
 ):
     """世界 AI 对话历史（仅创建者；before_id 翻更早，has_more 判断是否还有；按当前会话过滤）"""
     await _require_owner(db, world_id, current_user["user_id"])
@@ -714,11 +715,11 @@ async def get_chat(
     if world is None:
         raise HTTPException(status_code=404, detail="世界不存在")
     # 懒加载会话生命周期（auto_new / 过期清理）
-    await ensure_session_lifecycle(db, world)
+    await ensure_session_lifecycle(world_repo, world)
     sid = session_id_for_db(world)
     limit = max(1, min(limit, 100))
     # 多取一条判断是否还有更早
-    msgs = await get_chat_history(db, world_id, limit=limit + 1, before_id=before_id, session_id=sid)
+    msgs = await get_chat_history(world_repo, world_id, limit=limit + 1, before_id=before_id, session_id=sid)
     has_more = len(msgs) > limit
     cfg = world.config or {}
     sessions = [
@@ -750,6 +751,7 @@ async def post_chat(
     req: ChatRequest,
     current_user: dict = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
+    world_repo: WorldRepository = Depends(get_world_repo),
 ):
     """世界 AI 对话：入队（服务器端全程执行，不依赖连接），返回 turn_id 用于订阅直播"""
     await _require_owner(db, world_id, current_user["user_id"])
@@ -761,7 +763,7 @@ async def post_chat(
     from app.services.world.world_chat_service import ensure_session_lifecycle, touch_session
     world = await db.get(World, world_id)
     if world is not None:
-        await ensure_session_lifecycle(db, world)
+        await ensure_session_lifecycle(world_repo, world)
         touch_session(world)
         await db.commit()
     from app.services.world.world_turn import get_world_worker
@@ -781,6 +783,7 @@ async def regenerate_chat(
     req: ChatSessionRequest,
     current_user: dict = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
+    world_repo: WorldRepository = Depends(get_world_repo),
 ):
     """重新生成：删除指定消息及其之后的所有消息（截断对话历史），返回剩余消息。
 
@@ -818,7 +821,7 @@ async def regenerate_chat(
     await db.execute(q)
     await db.commit()
 
-    return {"messages": await get_chat_history(db, world_id, limit=100, session_id=sid)}
+    return {"messages": await get_chat_history(world_repo, world_id, limit=100, session_id=sid)}
 
 
 @router.post("/{world_id}/chat/session")
@@ -827,6 +830,7 @@ async def switch_chat_session(
     req: ChatSessionRequest,
     current_user: dict = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
+    world_repo: WorldRepository = Depends(get_world_repo),
 ):
     """切换当前会话（id 一致：切回旧会话继续对话，上下文按会话隔离）"""
     await _require_owner(db, world_id, current_user["user_id"])
@@ -843,7 +847,7 @@ async def switch_chat_session(
     cfg["current_session"] = None if req.session_id == "default" else req.session_id
     world.config = cfg
     await db.commit()
-    msgs = await get_chat_history(db, world_id, 30, session_id=session_id_for_db(world))
+    msgs = await get_chat_history(world_repo, world_id, 30, session_id=session_id_for_db(world))
     from sqlalchemy import func as _f
     from app.models.world import WorldChatMessage as _WCM
     has_default = (await db.execute(
@@ -976,7 +980,7 @@ async def chat_suggest(
     )).scalar() or 0
     if cnt == 0:
         from app.services.world.world_suggestions import load_preset_suggestions
-        return {"suggestions": await load_preset_suggestions(db)}
+        return {"suggestions": await load_preset_suggestions(world_repo)}
     # 有对话历史 → 用持久化的 AI 建议；没有 → 空（等 AI 下次回复生成）
     from app.services.world.world_service import get_world_data
     row = await get_world_data(repo=world_repo, world_id=world_id, key="ui.suggestions")

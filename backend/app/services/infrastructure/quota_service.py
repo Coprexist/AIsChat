@@ -16,8 +16,16 @@ import logging
 from datetime import datetime, timezone
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, update, desc
+from app.repositories.infra_repo import InfraRepository, SQLAlchemyInfraRepository
 
 logger = logging.getLogger(__name__)
+
+
+def _ensure_repo(db_or_repo):
+    """兼容旧调用：传入 AsyncSession 时包装为 SQLAlchemyInfraRepository。"""
+    if isinstance(db_or_repo, AsyncSession):
+        return SQLAlchemyInfraRepository(db_or_repo)
+    return db_or_repo
 
 
 # ══════════════════════════════════════════════════════════════
@@ -36,6 +44,7 @@ async def find_best_pool_key(db: AsyncSession, user_id: int, exclude_pool_key_id
 
     返回: ApiKeyPool | None
     """
+    db = _ensure_repo(db)
     from app.models.api_key_pool import ApiKeyPool, UserApiAssignment
     from app.services.infrastructure.api_key_concurrency import concurrency_mgr
 
@@ -93,6 +102,7 @@ async def find_best_pool_key(db: AsyncSession, user_id: int, exclude_pool_key_id
 
 async def auto_assign_pool_key(db: AsyncSession, user_id: int, pool_key_id: int):
     """创建或更新用户→池 Key 绑定"""
+    db = _ensure_repo(db)
     from app.models.api_key_pool import UserApiAssignment
 
     assign_result = await db.execute(
@@ -138,6 +148,7 @@ async def deduct_credit(
 
     返回实际扣除的 credit 数（pool_key 模式下），或 0（user_key 模式下）。
     """
+    db = _ensure_repo(db)
     from app.config import settings
 
     if tokens_used <= 0:
@@ -215,6 +226,7 @@ async def record_api_usage(
     model: str | None = None,
 ):
     """写入 api_usage_log"""
+    db = _ensure_repo(db)
     from app.models.api_usage_log import ApiUsageLog
 
     log_entry = ApiUsageLog(
@@ -246,6 +258,7 @@ async def get_user_credit_status(db: AsyncSession, user_id: int) -> dict:
         monthly_consumed: 近 30 天已消费 credit
         assigned_key_name: 绑定的池 Key 名（或 None）
     """
+    db = _ensure_repo(db)
     from app.models.user import User
     from app.models.api_key_pool import ApiKeyPool, UserApiAssignment
 

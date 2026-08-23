@@ -21,10 +21,18 @@ from typing import Any
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.repositories.infra_repo import InfraRepository, SQLAlchemyInfraRepository
 from app.db_config_source import set_db_overrides, clear_db_overrides
 from app.utils.crypto import encrypt_api_key, decrypt_api_key
 
 logger = logging.getLogger(__name__)
+
+
+def _ensure_repo(db_or_repo):
+    """兼容旧调用：传入 AsyncSession 时包装为 SQLAlchemyInfraRepository。"""
+    if isinstance(db_or_repo, AsyncSession):
+        return SQLAlchemyInfraRepository(db_or_repo)
+    return db_or_repo
 
 
 def _refresh_settings() -> None:
@@ -139,6 +147,7 @@ def _editable_keys(group: str) -> list[str]:
 
 async def load_group_config(db: AsyncSession, group: str) -> None:
     """启动时加载某个配置组的 DB 覆盖进缓存（幂等）"""
+    db = _ensure_repo(db)
     schema = CONFIG_GROUPS.get(group)
     if not schema:
         return
@@ -166,12 +175,14 @@ async def load_group_config(db: AsyncSession, group: str) -> None:
 
 async def load_all_configs(db: AsyncSession) -> None:
     """启动时加载全部配置组（main.py lifespan 调用）"""
+    db = _ensure_repo(db)
     for group in CONFIG_GROUPS:
         await load_group_config(db, group)
 
 
 async def save_group_config(db: AsyncSession, group: str, values: dict) -> dict:
     """保存某组配置（DB 持久化 + 缓存热更新）。返回保存后的缓存值。"""
+    db = _ensure_repo(db)
     schema = CONFIG_GROUPS.get(group)
     if not schema:
         raise ValueError(f"未知配置组: {group}")
@@ -222,6 +233,7 @@ async def save_group_config(db: AsyncSession, group: str, values: dict) -> dict:
 
 async def clear_group_config(db: AsyncSession, group: str) -> dict:
     """恢复默认：清 DB 字段 + 清缓存（回到 env/默认值）"""
+    db = _ensure_repo(db)
     schema = CONFIG_GROUPS.get(group)
     if not schema:
         raise ValueError(f"未知配置组: {group}")
@@ -239,6 +251,7 @@ async def clear_group_config(db: AsyncSession, group: str) -> dict:
 
 async def get_effective_config(db: AsyncSession, group: str) -> dict:
     """返回某组当前生效配置（DB 覆盖 + env 兜底，敏感字段脱敏）"""
+    db = _ensure_repo(db)
     schema = CONFIG_GROUPS.get(group)
     if not schema:
         raise ValueError(f"未知配置组: {group}")

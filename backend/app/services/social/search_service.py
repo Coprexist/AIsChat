@@ -2,14 +2,15 @@
 搜索服务（v0.1.3: 从 friend_service 中提取，不再依赖好友系统）
 """
 import logging
-from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
+
+from app.repositories.search_repo import SearchRepository
 
 logger = logging.getLogger(__name__)
 
 
 async def search_entities(
-    db: AsyncSession,
+    search_repo: SearchRepository,
     query: str,
     current_user_id: int,
     limit: int = 20,
@@ -23,7 +24,7 @@ async def search_entities(
     like_pattern = f"%{query}%"
 
     # 搜索用户
-    user_result = await db.execute(
+    user_result = await search_repo.execute(
         select(User).where(
             User.username.ilike(like_pattern),
             User.is_active == True,
@@ -35,7 +36,7 @@ async def search_entities(
             continue
         # 检查是否已是好友
         is_friend = False
-        friend_check = await db.execute(
+        friend_check = await search_repo.execute(
             select(Friendship).where(
                 Friendship.user_id == current_user_id,
                 Friendship.friend_type == "human",
@@ -55,7 +56,7 @@ async def search_entities(
         })
 
     # 搜索 AI（仅返回 discoverable 的 AI）
-    agent_result = await db.execute(
+    agent_result = await search_repo.execute(
         select(Agent).where(
             Agent.name.ilike(like_pattern),
             Agent.discoverable == True,
@@ -63,13 +64,13 @@ async def search_entities(
     )
     for agent in agent_result.scalars().all():
         from app.models.user import User as UserModel
-        owner_result = await db.execute(
+        owner_result = await search_repo.execute(
             select(UserModel).where(UserModel.id == agent.owner_id)
         )
         owner = owner_result.scalar_one_or_none()
         # 检查是否已是好友（以 AI 的 unified user_id 为 friend_id）
         is_friend = False
-        friend_check = await db.execute(
+        friend_check = await search_repo.execute(
             select(Friendship).where(
                 Friendship.user_id == current_user_id,
                 Friendship.friend_type == "ai",

@@ -8,8 +8,16 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, and_
 from app.models.summary_cache import UnreadSummaryCache
 from app.config import settings
+from app.repositories.memory_repo import MemoryRepository, SQLAlchemyMemoryRepository
 
 logger = logging.getLogger(__name__)
+
+
+def _ensure_repo(db_or_repo):
+    """兼容旧调用：传入 AsyncSession 时包装为 SQLAlchemyMemoryRepository。"""
+    if isinstance(db_or_repo, AsyncSession):
+        return SQLAlchemyMemoryRepository(db_or_repo)
+    return db_or_repo
 
 
 async def get_cached_summary(
@@ -21,6 +29,7 @@ async def get_cached_summary(
     查询未过期的摘要缓存。
     返回 None 表示缓存未命中或已过期。
     """
+    db = _ensure_repo(db)
     now = datetime.now(timezone.utc)
     result = await db.execute(
         select(UnreadSummaryCache)
@@ -61,6 +70,7 @@ async def set_cached_summary(
     写入摘要缓存。
     先删除同一 agent+group 的旧缓存，再写入新记录。
     """
+    db = _ensure_repo(db)
     ttl = ttl_seconds or settings.summary_cache_ttl
     now = datetime.now(timezone.utc)
 
@@ -100,6 +110,7 @@ async def invalidate_cache(
     group_id: int | None = None,
 ):
     """使缓存失效（有新消息到达时调用）"""
+    db = _ensure_repo(db)
     query = select(UnreadSummaryCache).where(
         UnreadSummaryCache.agent_id == agent_id
     )

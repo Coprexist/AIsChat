@@ -39,6 +39,7 @@ from app.services.content.opencli_service import (
 )
 from app.utils.auth import hash_password, require_admin, get_current_user
 from app.services.infrastructure.auth_service import register_user
+from app.repositories.content_repo import SQLAlchemyContentRepository
 
 logger = logging.getLogger(__name__)
 
@@ -2052,7 +2053,7 @@ async def update_opencli_config_route(
     """更新 OpenCLI 全局配置"""
     try:
         result = await update_opencli_config(
-            db,
+            SQLAlchemyContentRepository(db),
             updated_by=admin["user_id"],
             global_enabled=req.global_enabled,
             default_rate_limit_per_minute=req.default_rate_limit_per_minute,
@@ -2073,7 +2074,7 @@ async def list_opencli_agents(
     db: AsyncSession = Depends(get_db),
 ):
     """获取所有 AI 的 OpenCLI 权限状态"""
-    return await list_agent_whitelist(db)
+    return await list_agent_whitelist(SQLAlchemyContentRepository(db))
 
 
 @router.put("/opencli/agents/{agent_id}")
@@ -2086,7 +2087,7 @@ async def update_opencli_agent(
     """开关某 AI 的 OpenCLI 权限"""
     try:
         result = await update_agent_whitelist(
-            db, agent_id=agent_id,
+            SQLAlchemyContentRepository(db), agent_id=agent_id,
             enabled=req.enabled,
             rate_limit_override=req.rate_limit_override,
         )
@@ -2105,7 +2106,7 @@ async def list_opencli_commands(
     db: AsyncSession = Depends(get_db),
 ):
     """获取命令白名单列表"""
-    return await list_command_whitelist(db)
+    return await list_command_whitelist(SQLAlchemyContentRepository(db))
 
 
 @router.post("/opencli/commands")
@@ -2117,7 +2118,7 @@ async def add_opencli_command(
     """添加命令白名单"""
     try:
         result = await add_command_whitelist(
-            db,
+            SQLAlchemyContentRepository(db),
             pattern=req.pattern,
             is_regex=req.is_regex,
             description=req.description,
@@ -2142,7 +2143,7 @@ async def toggle_opencli_command(
 ):
     """开关某条命令白名单"""
     try:
-        return await toggle_command_whitelist(db, cmd_id, enabled)
+        return await toggle_command_whitelist(SQLAlchemyContentRepository(db), cmd_id, enabled)
     except ValueError as e:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
 
@@ -2176,7 +2177,7 @@ async def delete_opencli_command(
 ):
     """删除命令白名单条目"""
     try:
-        await delete_command_whitelist(db, cmd_id)
+        await delete_command_whitelist(SQLAlchemyContentRepository(db), cmd_id)
         await _log_admin_action(
             db, admin["user_id"], "delete_opencli_command", "opencli_command", cmd_id,
         )
@@ -2224,7 +2225,7 @@ async def add_opencli_preset_commands(
     skipped = []
 
     # 先获取已有的白名单，用于去重
-    existing = await list_command_whitelist(db)
+    existing = await list_command_whitelist(SQLAlchemyContentRepository(db))
     existing_patterns = {(e["pattern"], e["is_regex"]) for e in existing}
 
     for p in presets:
@@ -2234,7 +2235,7 @@ async def add_opencli_preset_commands(
             continue
         try:
             entry = await add_command_whitelist(
-                db,
+                SQLAlchemyContentRepository(db),
                 pattern=p["pattern"],
                 is_regex=p["is_regex"],
                 description=p["description"],
@@ -2265,7 +2266,7 @@ async def get_opencli_logs(
     db: AsyncSession = Depends(get_db),
 ):
     """获取 OpenCLI 使用日志"""
-    return await get_usage_logs(db, agent_id=agent_id, page=page, page_size=page_size)
+    return await get_usage_logs(SQLAlchemyContentRepository(db), agent_id=agent_id, page=page, page_size=page_size)
 
 
 # ════════════════════════════════════════════════════════════
@@ -2569,7 +2570,7 @@ async def get_conv_log_config(
 ):
     """获取对话日志全局配置"""
     from app.services.content.conversation_log_service import get_config_dict
-    return await get_config_dict(db)
+    return await get_config_dict(SQLAlchemyContentRepository(db))
 
 
 @router.put("/conversation-log/config")
@@ -2582,7 +2583,7 @@ async def update_conv_log_config(
     from app.services.content.conversation_log_service import update_config
     try:
         result = await update_config(
-            db,
+            SQLAlchemyContentRepository(db),
             updated_by=admin["user_id"],
             max_conversation_logs=req.max_conversation_logs,
             default_user_conversation_logs=req.default_user_conversation_logs,
@@ -2608,7 +2609,7 @@ async def get_agent_conv_log_settings(
     """获取某 AI 的对话日志设置"""
     from app.services.content.conversation_log_service import get_agent_log_settings
     try:
-        return await get_agent_log_settings(db, agent_id)
+        return await get_agent_log_settings(SQLAlchemyContentRepository(db), agent_id)
     except ValueError as e:
         raise HTTPException(status_code=404, detail=str(e))
 
@@ -2624,7 +2625,7 @@ async def update_agent_conv_log_settings(
     from app.services.content.conversation_log_service import update_agent_log_settings
     try:
         result = await update_agent_log_settings(
-            db, agent_id,
+            SQLAlchemyContentRepository(db), agent_id,
             conversation_logs_limit=req.conversation_logs_limit,
             user_can_view_logs=req.user_can_view_logs,
         )
@@ -2648,7 +2649,7 @@ async def get_agent_conv_logs(
     """获取某 AI 的对话日志列表（管理员）"""
     from app.services.content.conversation_log_service import get_agent_logs
     try:
-        return await get_agent_logs(db, agent_id, is_admin=True, limit=limit, offset=offset)
+        return await get_agent_logs(SQLAlchemyContentRepository(db), agent_id, is_admin=True, limit=limit, offset=offset)
     except ValueError as e:
         raise HTTPException(status_code=404, detail=str(e))
 
@@ -2663,7 +2664,7 @@ async def get_agent_conv_log_detail(
     """获取单条对话日志详情（含完整 messages）"""
     from app.services.content.conversation_log_service import get_log_detail
     try:
-        detail = await get_log_detail(db, log_id, is_admin=True)
+        detail = await get_log_detail(SQLAlchemyContentRepository(db), log_id, is_admin=True)
         if detail is None:
             raise HTTPException(status_code=404, detail="日志不存在")
         return detail
@@ -2688,7 +2689,7 @@ async def get_global_usage(
     from app.services.content.conversation_log_service import get_admin_global_token_stats
     end_date = datetime.now(tz.utc).replace(tzinfo=None)
     start_date = end_date - timedelta(days=days)
-    return await get_admin_global_token_stats(db, start_date, end_date)
+    return await get_admin_global_token_stats(SQLAlchemyContentRepository(db), start_date, end_date)
 
 
 @router.get("/admin/usage/by-user")
@@ -2701,7 +2702,7 @@ async def get_usage_by_user(
     from app.services.content.conversation_log_service import get_admin_users_token_summary
     end_date = datetime.now(tz.utc).replace(tzinfo=None)
     start_date = end_date - timedelta(days=days)
-    return await get_admin_users_token_summary(db, start_date, end_date)
+    return await get_admin_users_token_summary(SQLAlchemyContentRepository(db), start_date, end_date)
 
 
 @router.get("/admin/usage/agents/{agent_id}/daily")
@@ -2715,7 +2716,7 @@ async def get_agent_daily_usage_admin(
     from app.services.content.conversation_log_service import get_agent_token_daily
     end_date = datetime.now(tz.utc).replace(tzinfo=None)
     start_date = end_date - timedelta(days=days)
-    return await get_agent_token_daily(db, agent_id, start_date, end_date)
+    return await get_agent_token_daily(SQLAlchemyContentRepository(db), agent_id, start_date, end_date)
 
 
 # ══════════════════════════════════════════════════════════════

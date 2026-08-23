@@ -10,9 +10,17 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 from app.models.system_settings import SystemSettings
 from app.services.infrastructure.system_settings_service import get_settings
+from app.repositories.infra_repo import InfraRepository, SQLAlchemyInfraRepository
 from app.utils.crypto import decrypt_api_key, encrypt_api_key
 
 logger = logging.getLogger(__name__)
+
+
+def _ensure_repo(db_or_repo):
+    """兼容旧调用：传入 AsyncSession 时包装为 SQLAlchemyInfraRepository。"""
+    if isinstance(db_or_repo, AsyncSession):
+        return SQLAlchemyInfraRepository(db_or_repo)
+    return db_or_repo
 
 # ── 邮件模板预设系统 ──
 # 三版预设：gradient（渐变版，默认）、simple（简版）、custom（自定义版）
@@ -209,6 +217,7 @@ class SafeDict(dict):
 
 
 async def _get_smtp_configs(db: AsyncSession) -> list[dict]:
+    db = _ensure_repo(db)
     """读取全部 SMTP 配置列表（密码解密）。未配置返回空列表。
 
     兼容三种格式：
@@ -266,6 +275,7 @@ def _pick_smtp_config(configs: list[dict]) -> dict | None:
 
 async def get_email_templates(db: AsyncSession) -> dict:
     """获取当前生效的邮件模板（按 preset 选择）"""
+    db = _ensure_repo(db)
     settings = await get_settings(db)
     raw = settings.get("email_templates")
     preset = _DEFAULT_PRESET
@@ -287,6 +297,7 @@ async def get_email_templates(db: AsyncSession) -> dict:
 
 async def get_email_template_preset(db: AsyncSession) -> str:
     """获取当前邮件模板预设名"""
+    db = _ensure_repo(db)
     settings = await get_settings(db)
     raw = settings.get("email_templates")
     if raw and isinstance(raw, dict):
@@ -296,6 +307,7 @@ async def get_email_template_preset(db: AsyncSession) -> str:
 
 async def set_email_template_preset(db: AsyncSession, preset: str, custom_templates: dict | None = None):
     """设置邮件模板预设（gradient/simple/custom）"""
+    db = _ensure_repo(db)
     if preset not in ("gradient", "simple", "custom"):
         raise ValueError(f"无效预设: {preset}")
     settings = await get_settings(db)

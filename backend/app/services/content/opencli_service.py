@@ -6,7 +6,6 @@ import re
 import logging
 import asyncio
 from datetime import datetime, timedelta, timezone
-from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, func, update
 from app.models.opencli import (
     OpenCLIConfig,
@@ -16,8 +15,10 @@ from app.models.opencli import (
     OpenCLIDeniedCommand,
 )
 from app.config import settings
+from app.repositories.content_repo import ContentRepository
 
 logger = logging.getLogger(__name__)
+
 
 # 输出截断长度
 STDOUT_MAX_CHARS = 2000
@@ -27,19 +28,19 @@ STDOUT_MAX_CHARS = 2000
 # 权限检查
 # ============================================================
 
-async def _get_config(db: AsyncSession) -> OpenCLIConfig:
+async def _get_config(content_repo: ContentRepository) -> OpenCLIConfig:
     """获取或创建全局配置（单行表）"""
-    result = await db.execute(select(OpenCLIConfig).where(OpenCLIConfig.id == 1))
+    result = await content_repo.execute(select(OpenCLIConfig).where(OpenCLIConfig.id == 1))
     config = result.scalar_one_or_none()
     if config is None:
         config = OpenCLIConfig(id=1, global_enabled=False)
-        db.add(config)
-        await db.flush()
+        content_repo.add(config)
+        await content_repo.flush()
     return config
 
 
 async def check_permission(
-    db: AsyncSession,
+    content_repo: ContentRepository,
     agent_id: int,
     command: str,
 ) -> tuple[bool, str]:
@@ -48,12 +49,12 @@ async def check_permission(
     检查顺序：全局开关 → AI 白名单 → 默认黑名单 → 命令白名单
     """
     # 1. 全局开关
-    config = await _get_config(db)
+    config = await _get_config(content_repo)
     if not config.global_enabled:
         return False, "OPENCLI_DISABLED: OpenCLI 全局未启用"
 
     # 2. 先查命令白名单（用于判断是否 default_enabled）
-    cmd_result = await db.execute(
+    cmd_result = await content_repo.execute(
         select(OpenCLICommandWhitelist).where(
             OpenCLICommandWhitelist.enabled == True
         )
@@ -75,7 +76,7 @@ async def check_permission(
 
     # 3. AI 白名单（默认命令可跳过）
     if not is_default_cmd:
-        result = await db.execute(
+        result = await content_repo.execute(
             select(OpenCLIAgentWhitelist).where(
                 OpenCLIAgentWhitelist.agent_id == agent_id
             )
@@ -85,7 +86,7 @@ async def check_permission(
             return False, "OPENCLI_AGENT_NOT_ALLOWED: 此 AI 未被授权使用 OpenCLI"
 
     # 4. 默认黑名单检查（无法被白名单覆盖）
-    denied_result = await db.execute(select(OpenCLIDeniedCommand))
+    denied_result = await content_repo.execute(select(OpenCLIDeniedCommand))
     denied_patterns = denied_result.scalars().all()
     for dp in denied_patterns:
         try:
@@ -116,7 +117,7 @@ async def check_permission(
 # ============================================================
 
 async def check_rate_limit(
-    db: AsyncSession,
+    content_repo: ContentRepository,
     agent_id: int,
 ) -> tuple[bool, str]:
     """
@@ -124,10 +125,10 @@ async def check_rate_limit(
     查询最近 1 分钟内的使用次数，与 AI 的限额比较。
     """
     # 获取该 AI 的限额
-    config = await _get_config(db)
+    config = await _get_config(content_repo)
     rate_limit = config.default_rate_limit_per_minute
 
-    wl_result = await db.execute(
+    wl_result = await content_repo.execute(
         select(OpenCLIAgentWhitelist).where(
             OpenCLIAgentWhitelist.agent_id == agent_id
         )
@@ -140,7 +141,7 @@ async def check_rate_limit(
     # ⚠️ executed_at 是 TIMESTAMP WITHOUT TIME ZONE，比较值必须去掉时区，
     #    否则 asyncpg 报错: can't subtract offset-naive and offset-aware datetimes
     one_minute_ago = (datetime.now(timezone.utc) - timedelta(minutes=1)).replace(tzinfo=None)
-    count_result = await db.execute(
+    count_result = await content_repo.execute(
         select(func.count(OpenCLIUsageLog.id)).where(
             OpenCLIUsageLog.agent_id == agent_id,
             OpenCLIUsageLog.executed_at >= one_minute_ago,
@@ -339,7 +340,7 @@ _FILE_HANDLERS: dict[str, callable] = {
 # ============================================================
 
 async def execute_opencli(
-    db: AsyncSession,
+    content_repo: ContentRepository,
     agent_id: int,
     command: str,
     args: list[str] | None = None,
@@ -355,12 +356,12 @@ async def execute_opencli(
     timeout = timeout or settings.opencli_timeout_seconds
 
     # 1. 权限检查
-    allowed, reason = await check_permission(db, agent_id, command)
+    allowed, reason = await check_permission(content_repo, agent_id, command)
     if not allowed:
         raise PermissionError(reason)
 
     # 2. 速率限制检查
-    rate_ok, rate_reason = await check_rate_limit(db, agent_id)
+    rate_ok, rate_reason = await check_rate_limit(content_repo, agent_id)
     if not rate_ok:
         raise PermissionError(rate_reason)
 
@@ -373,7 +374,7 @@ async def execute_opencli(
         try:
             exit_code, stdout, stderr = await file_handler(agent_id, args)
             duration_ms = int((datetime.now(timezone.utc) - start_time).total_seconds() * 1000)
-            await _log_usage(db, agent_id, command, args, exit_code, stdout, stderr, duration_ms)
+            await _log_usage(content_repo, agent_id, command, args, exit_code, stdout, stderr, duration_ms)
             logger.info(
                 f"OpenCLI(file): agent={agent_id} cmd={command} exit={exit_code} duration={duration_ms}ms"
             )
@@ -388,7 +389,7 @@ async def execute_opencli(
         except ValueError as e:
             # 路径校验失败等
             duration_ms = int((datetime.now(timezone.utc) - start_time).total_seconds() * 1000)
-            await _log_usage(db, agent_id, command, args, -1, "", str(e), duration_ms)
+            await _log_usage(content_repo, agent_id, command, args, -1, "", str(e), duration_ms)
             raise
 
     # 5. 非文件命令 —— 走 opencli 子进程
@@ -404,7 +405,7 @@ async def execute_opencli(
     except asyncio.TimeoutError:
         # 超时 → 杀死进程 → 记录日志
         duration_ms = int((datetime.now(timezone.utc) - start_time).total_seconds() * 1000)
-        await _log_usage(db, agent_id, command, args, None, "", "TIMEOUT", duration_ms)
+        await _log_usage(content_repo, agent_id, command, args, None, "", "TIMEOUT", duration_ms)
         raise TimeoutError(
             f"OPENCLI_TIMEOUT: 命令执行超时（{timeout}秒），已终止"
         )
@@ -416,7 +417,7 @@ async def execute_opencli(
     stderr = stderr_bytes.decode("utf-8", errors="replace")[:STDOUT_MAX_CHARS]
 
     # 6. 写入使用日志
-    await _log_usage(db, agent_id, command, args, exit_code, stdout, stderr, duration_ms)
+    await _log_usage(content_repo, agent_id, command, args, exit_code, stdout, stderr, duration_ms)
 
     logger.info(
         f"OpenCLI: agent={agent_id} cmd={command} exit={exit_code} duration={duration_ms}ms"
@@ -433,7 +434,7 @@ async def execute_opencli(
 
 
 async def _log_usage(
-    db: AsyncSession,
+    content_repo: ContentRepository,
     agent_id: int,
     command: str,
     args: list[str],
@@ -452,17 +453,17 @@ async def _log_usage(
         stderr_truncated=stderr[:STDOUT_MAX_CHARS] if stderr else None,
         duration_ms=duration_ms,
     )
-    db.add(log_entry)
-    await db.flush()
+    content_repo.add(log_entry)
+    await content_repo.flush()
 
 
 # ============================================================
 # 配置管理（供 admin router 使用）
 # ============================================================
 
-async def get_opencli_config(db: AsyncSession) -> dict:
+async def get_opencli_config(content_repo: ContentRepository) -> dict:
     """获取全局配置"""
-    config = await _get_config(db)
+    config = await _get_config(content_repo)
     return {
         "global_enabled": config.global_enabled,
         "default_rate_limit_per_minute": config.default_rate_limit_per_minute,
@@ -471,14 +472,14 @@ async def get_opencli_config(db: AsyncSession) -> dict:
 
 
 async def update_opencli_config(
-    db: AsyncSession,
+    content_repo: ContentRepository,
     updated_by: int,
     global_enabled: bool | None = None,
     default_rate_limit_per_minute: int | None = None,
     timeout_seconds: int | None = None,
 ) -> dict:
     """更新全局配置"""
-    config = await _get_config(db)
+    config = await _get_config(content_repo)
     if global_enabled is not None:
         config.global_enabled = global_enabled
     if default_rate_limit_per_minute is not None:
@@ -487,21 +488,21 @@ async def update_opencli_config(
         config.timeout_seconds = timeout_seconds
     config.updated_by = updated_by
     config.updated_at = datetime.now(timezone.utc).replace(tzinfo=None)
-    await db.flush()
-    return await get_opencli_config(db)
+    await content_repo.flush()
+    return await get_opencli_config(content_repo)
 
 
-async def list_agent_whitelist(db: AsyncSession) -> list[dict]:
+async def list_agent_whitelist(content_repo: ContentRepository) -> list[dict]:
     """获取所有 AI 的 OpenCLI 权限状态（含未在表中的 AI）"""
     from app.models.agent import Agent
-    config = await _get_config(db)
+    config = await _get_config(content_repo)
 
     # 获取所有 AI
-    agents_result = await db.execute(select(Agent).order_by(Agent.id))
+    agents_result = await content_repo.execute(select(Agent).order_by(Agent.id))
     agents = agents_result.scalars().all()
 
     # 获取已有的白名单记录
-    wl_result = await db.execute(select(OpenCLIAgentWhitelist))
+    wl_result = await content_repo.execute(select(OpenCLIAgentWhitelist))
     wl_map = {w.agent_id: w for w in wl_result.scalars().all()}
 
     items = []
@@ -523,13 +524,13 @@ async def list_agent_whitelist(db: AsyncSession) -> list[dict]:
 
 
 async def update_agent_whitelist(
-    db: AsyncSession,
+    content_repo: ContentRepository,
     agent_id: int,
     enabled: bool,
     rate_limit_override: int | None = None,
 ) -> dict:
     """更新某个 AI 的 OpenCLI 权限"""
-    result = await db.execute(
+    result = await content_repo.execute(
         select(OpenCLIAgentWhitelist).where(
             OpenCLIAgentWhitelist.agent_id == agent_id
         )
@@ -541,19 +542,19 @@ async def update_agent_whitelist(
             enabled=enabled,
             rate_limit_override=rate_limit_override,
         )
-        db.add(wl)
+        content_repo.add(wl)
     else:
         wl.enabled = enabled
         wl.rate_limit_override = rate_limit_override
 
-    await db.flush()
-    await db.refresh(wl)
+    await content_repo.flush()
+    await content_repo.refresh(wl)
     return {"agent_id": wl.agent_id, "enabled": wl.enabled}
 
 
-async def list_command_whitelist(db: AsyncSession) -> list[dict]:
+async def list_command_whitelist(content_repo: ContentRepository) -> list[dict]:
     """获取命令白名单"""
-    result = await db.execute(
+    result = await content_repo.execute(
         select(OpenCLICommandWhitelist).order_by(OpenCLICommandWhitelist.created_at.desc())
     )
     entries = result.scalars().all()
@@ -572,7 +573,7 @@ async def list_command_whitelist(db: AsyncSession) -> list[dict]:
 
 
 async def add_command_whitelist(
-    db: AsyncSession,
+    content_repo: ContentRepository,
     pattern: str,
     is_regex: bool,
     description: str | None,
@@ -594,9 +595,9 @@ async def add_command_whitelist(
         default_enabled=default_enabled,
         created_by=created_by,
     )
-    db.add(entry)
-    await db.flush()
-    await db.refresh(entry)
+    content_repo.add(entry)
+    await content_repo.flush()
+    await content_repo.refresh(entry)
     return {
         "id": entry.id,
         "pattern": entry.pattern,
@@ -608,36 +609,36 @@ async def add_command_whitelist(
 
 
 async def toggle_command_whitelist(
-    db: AsyncSession,
+    content_repo: ContentRepository,
     cmd_id: int,
     enabled: bool,
 ) -> dict:
     """开关某条命令白名单"""
-    result = await db.execute(
+    result = await content_repo.execute(
         select(OpenCLICommandWhitelist).where(OpenCLICommandWhitelist.id == cmd_id)
     )
     entry = result.scalar_one_or_none()
     if entry is None:
         raise ValueError("命令白名单条目不存在")
     entry.enabled = enabled
-    await db.flush()
+    await content_repo.flush()
     return {"id": entry.id, "enabled": entry.enabled}
 
 
-async def delete_command_whitelist(db: AsyncSession, cmd_id: int):
+async def delete_command_whitelist(content_repo: ContentRepository, cmd_id: int):
     """删除命令白名单"""
-    result = await db.execute(
+    result = await content_repo.execute(
         select(OpenCLICommandWhitelist).where(OpenCLICommandWhitelist.id == cmd_id)
     )
     entry = result.scalar_one_or_none()
     if entry is None:
         raise ValueError("命令白名单条目不存在")
-    await db.delete(entry)
-    await db.flush()
+    await content_repo.delete(entry)
+    await content_repo.flush()
 
 
 async def get_usage_logs(
-    db: AsyncSession,
+    content_repo: ContentRepository,
     agent_id: int | None = None,
     page: int = 1,
     page_size: int = 50,
@@ -651,8 +652,8 @@ async def get_usage_logs(
         query = query.where(OpenCLIUsageLog.agent_id == agent_id)
         count_query = count_query.where(OpenCLIUsageLog.agent_id == agent_id)
 
-    total = (await db.execute(count_query)).scalar()
-    result = await db.execute(
+    total = (await content_repo.execute(count_query)).scalar()
+    result = await content_repo.execute(
         query.order_by(OpenCLIUsageLog.executed_at.desc())
         .offset(offset)
         .limit(page_size)

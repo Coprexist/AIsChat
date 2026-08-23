@@ -4,18 +4,19 @@ AI 对话日志服务
 """
 import logging
 from datetime import datetime, timezone
-from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, delete, func, text
 
 from app.models.conversation_log import ConversationLogConfig, ConversationLog
+from app.repositories.content_repo import ContentRepository
 
 logger = logging.getLogger(__name__)
+
 
 
 # ── 保存 ──
 
 async def save_conversation_log(
-    db: AsyncSession,
+    content_repo: ContentRepository,
     agent_id: int,
     messages: list[dict],
     conversation_type: str = "group",
@@ -45,12 +46,12 @@ async def save_conversation_log(
             model=model,
             thinking_enabled=thinking_enabled,
         )
-        db.add(log)
-        await db.flush()
-        await db.refresh(log)
+        content_repo.add(log)
+        await content_repo.flush()
+        await content_repo.refresh(log)
 
         # 清理超出限制的旧记录
-        await _trim_old_logs(db, agent_id)
+        await _trim_old_logs(content_repo, agent_id)
 
         return log.id
     except Exception as e:
@@ -58,13 +59,13 @@ async def save_conversation_log(
         return None
 
 
-async def _trim_old_logs(db: AsyncSession, agent_id: int):
+async def _trim_old_logs(content_repo: ContentRepository, agent_id: int):
     """保留最近 N 条日志，删除更旧的"""
     # 获取此 AI 的保留上限
-    limit = await _get_agent_log_limit(db, agent_id)
+    limit = await _get_agent_log_limit(content_repo, agent_id)
 
     # 查询超出限制的旧记录 ID
-    result = await db.execute(
+    result = await content_repo.execute(
         select(ConversationLog.id)
         .where(ConversationLog.agent_id == agent_id)
         .order_by(ConversationLog.created_at.desc())
@@ -73,17 +74,17 @@ async def _trim_old_logs(db: AsyncSession, agent_id: int):
     )
     old_ids = [row[0] for row in result.all()]
     if old_ids:
-        await db.execute(
+        await content_repo.execute(
             delete(ConversationLog).where(ConversationLog.id.in_(old_ids))
         )
         logger.info(f"清理 agent={agent_id} 的 {len(old_ids)} 条旧对话日志（保留最近 {limit} 条）")
 
 
-async def _get_agent_log_limit(db: AsyncSession, agent_id: int) -> int:
+async def _get_agent_log_limit(content_repo: ContentRepository, agent_id: int) -> int:
     """获取某个 AI 的对话日志保留上限"""
     # 先查 per-AI 设置
     from app.models.agent import Agent
-    agent_result = await db.execute(
+    agent_result = await content_repo.execute(
         select(Agent.conversation_logs_limit).where(Agent.id == agent_id)
     )
     agent_limit = agent_result.scalar_one_or_none()
@@ -91,26 +92,26 @@ async def _get_agent_log_limit(db: AsyncSession, agent_id: int) -> int:
         return agent_limit
 
     # 回退到全局上限
-    config = await _get_config(db)
+    config = await _get_config(content_repo)
     return config.max_conversation_logs if config else 30
 
 
 # ── 配置 ──
 
-async def _get_config(db: AsyncSession) -> ConversationLogConfig:
+async def _get_config(content_repo: ContentRepository) -> ConversationLogConfig:
     """获取全局配置（保证返回有效对象）"""
-    result = await db.execute(select(ConversationLogConfig).where(ConversationLogConfig.id == 1))
+    result = await content_repo.execute(select(ConversationLogConfig).where(ConversationLogConfig.id == 1))
     config = result.scalar_one_or_none()
     if config is None:
         config = ConversationLogConfig(id=1)
-        db.add(config)
-        await db.flush()
+        content_repo.add(config)
+        await content_repo.flush()
     return config
 
 
-async def get_config_dict(db: AsyncSession) -> dict:
+async def get_config_dict(content_repo: ContentRepository) -> dict:
     """获取全局配置（字典格式，供 API 返回）"""
-    config = await _get_config(db)
+    config = await _get_config(content_repo)
     return {
         "max_conversation_logs": config.max_conversation_logs,
         "default_user_conversation_logs": config.default_user_conversation_logs,
@@ -121,7 +122,7 @@ async def get_config_dict(db: AsyncSession) -> dict:
 
 
 async def update_config(
-    db: AsyncSession,
+    content_repo: ContentRepository,
     updated_by: int,
     max_conversation_logs: int | None = None,
     default_user_conversation_logs: int | None = None,
@@ -130,7 +131,7 @@ async def update_config(
     compression_threshold: int | None = None,
 ) -> dict:
     """更新全局配置"""
-    config = await _get_config(db)
+    config = await _get_config(content_repo)
 
     if max_conversation_logs is not None:
         if max_conversation_logs < 1:
@@ -153,18 +154,18 @@ async def update_config(
 
     config.updated_by = updated_by
     config.updated_at = datetime.now(timezone.utc).replace(tzinfo=None)
-    await db.flush()
-    return await get_config_dict(db)
+    await content_repo.flush()
+    return await get_config_dict(content_repo)
 
 
 # ── 用户设置 ──
 
-async def get_user_log_limit(db: AsyncSession, user_id: int) -> dict:
+async def get_user_log_limit(content_repo: ContentRepository, user_id: int) -> dict:
     """获取用户的对话日志保留设置"""
     from app.models.user import User
-    config = await _get_config(db)
+    config = await _get_config(content_repo)
 
-    result = await db.execute(
+    result = await content_repo.execute(
         select(User.conversation_logs_limit).where(User.id == user_id)
     )
     user_limit = result.scalar_one_or_none()
@@ -180,9 +181,9 @@ async def get_user_log_limit(db: AsyncSession, user_id: int) -> dict:
     }
 
 
-async def update_user_log_limit(db: AsyncSession, user_id: int, limit: int) -> dict:
+async def update_user_log_limit(content_repo: ContentRepository, user_id: int, limit: int) -> dict:
     """更新用户的对话日志保留数"""
-    config = await _get_config(db)
+    config = await _get_config(content_repo)
 
     if limit < 1:
         raise ValueError("保留数至少为 1")
@@ -190,20 +191,20 @@ async def update_user_log_limit(db: AsyncSession, user_id: int, limit: int) -> d
         raise ValueError(f"不能超过管理员设定的系统上限 {config.max_conversation_logs}")
 
     from app.models.user import User
-    result = await db.execute(select(User).where(User.id == user_id))
+    result = await content_repo.execute(select(User).where(User.id == user_id))
     user = result.scalar_one_or_none()
     if user is None:
         raise ValueError("用户不存在")
 
     user.conversation_logs_limit = limit
-    await db.flush()
-    return await get_user_log_limit(db, user_id)
+    await content_repo.flush()
+    return await get_user_log_limit(content_repo, user_id)
 
 
 # ── 查询 ──
 
 async def get_agent_logs(
-    db: AsyncSession,
+    content_repo: ContentRepository,
     agent_id: int,
     user_id: int | None = None,
     is_admin: bool = False,
@@ -213,20 +214,20 @@ async def get_agent_logs(
     """获取 AI 的对话日志列表（摘要，不含完整 messages）"""
     # 权限检查
     if not is_admin:
-        if not await _user_can_view_agent_logs(db, agent_id, user_id):
+        if not await _user_can_view_agent_logs(content_repo, agent_id, user_id):
             raise ValueError("无权查看此 AI 的对话日志")
 
     # 确定有效保留数
     if is_admin:
-        effective_limit = await _get_agent_log_limit(db, agent_id)
+        effective_limit = await _get_agent_log_limit(content_repo, agent_id)
     else:
-        user_limit = await get_user_log_limit(db, user_id)
+        user_limit = await get_user_log_limit(content_repo, user_id)
         effective_limit = min(
             user_limit["effective"],
-            await _get_agent_log_limit(db, agent_id),
+            await _get_agent_log_limit(content_repo, agent_id),
         )
 
-    result = await db.execute(
+    result = await content_repo.execute(
         select(ConversationLog)
         .where(ConversationLog.agent_id == agent_id)
         .order_by(ConversationLog.created_at.desc())
@@ -239,13 +240,13 @@ async def get_agent_logs(
 
 
 async def get_log_detail(
-    db: AsyncSession,
+    content_repo: ContentRepository,
     log_id: int,
     user_id: int | None = None,
     is_admin: bool = False,
 ) -> dict | None:
     """获取单条对话日志的完整内容（含 messages）"""
-    result = await db.execute(
+    result = await content_repo.execute(
         select(ConversationLog).where(ConversationLog.id == log_id)
     )
     log = result.scalar_one_or_none()
@@ -253,19 +254,19 @@ async def get_log_detail(
         return None
 
     if not is_admin:
-        if not await _user_can_view_agent_logs(db, log.agent_id, user_id):
+        if not await _user_can_view_agent_logs(content_repo, log.agent_id, user_id):
             raise ValueError("无权查看此对话日志")
 
     return _log_to_detail(log)
 
 
-async def get_agent_log_stats(db: AsyncSession, agent_id: int) -> dict:
+async def get_agent_log_stats(content_repo: ContentRepository, agent_id: int) -> dict:
     """获取 AI 日志统计"""
-    result = await db.execute(
+    result = await content_repo.execute(
         select(func.count(ConversationLog.id)).where(ConversationLog.agent_id == agent_id)
     )
     total = result.scalar() or 0
-    limit = await _get_agent_log_limit(db, agent_id)
+    limit = await _get_agent_log_limit(content_repo, agent_id)
 
     return {
         "agent_id": agent_id,
@@ -277,7 +278,7 @@ async def get_agent_log_stats(db: AsyncSession, agent_id: int) -> dict:
 # ── Token 用量聚合查询 ──
 
 async def get_user_agents_token_summary(
-    db: AsyncSession,
+    content_repo: ContentRepository,
     user_id: int,
     start_date: datetime | None = None,
     end_date: datetime | None = None,
@@ -328,13 +329,13 @@ async def get_user_agents_token_summary(
         GROUP BY cl.model
         ORDER BY total_tokens DESC
     """)
-    result = await db.execute(stmt, params)
+    result = await content_repo.execute(stmt, params)
     rows = result.mappings().all()
     return [dict(r) for r in rows]
 
 
 async def get_agent_token_daily(
-    db: AsyncSession,
+    content_repo: ContentRepository,
     agent_id: int,
     start_date: datetime | None = None,
     end_date: datetime | None = None,
@@ -369,13 +370,13 @@ async def get_agent_token_daily(
         GROUP BY DATE(created_at)
         ORDER BY date ASC
     """)
-    result = await db.execute(stmt, params)
+    result = await content_repo.execute(stmt, params)
     rows = result.mappings().all()
     return [dict(r) for r in rows]
 
 
 async def get_admin_global_token_stats(
-    db: AsyncSession,
+    content_repo: ContentRepository,
     start_date: datetime | None = None,
     end_date: datetime | None = None,
 ) -> dict:
@@ -406,7 +407,7 @@ async def get_admin_global_token_stats(
         JOIN agents ag ON ag.id = cl.agent_id
         {where_sql}
     """)
-    result = await db.execute(stmt, params)
+    result = await content_repo.execute(stmt, params)
     row = result.mappings().first()
     if row:
         d = dict(row)
@@ -425,7 +426,7 @@ async def get_admin_global_token_stats(
 
 
 async def get_admin_users_token_summary(
-    db: AsyncSession,
+    content_repo: ContentRepository,
     start_date: datetime | None = None,
     end_date: datetime | None = None,
 ) -> list[dict]:
@@ -461,20 +462,20 @@ async def get_admin_users_token_summary(
         GROUP BY u.id, u.username, cl.agent_id, ag.name
         ORDER BY u.id, total_tokens DESC
     """)
-    result = await db.execute(stmt, params)
+    result = await content_repo.execute(stmt, params)
     rows = result.mappings().all()
     return [dict(r) for r in rows]
 
 
 # ── 权限 ──
 
-async def _user_can_view_agent_logs(db: AsyncSession, agent_id: int, user_id: int | None) -> bool:
+async def _user_can_view_agent_logs(content_repo: ContentRepository, agent_id: int, user_id: int | None) -> bool:
     """检查用户是否可以查看某 AI 的对话日志"""
     if user_id is None:
         return False
 
     from app.models.agent import Agent
-    agent_result = await db.execute(
+    agent_result = await content_repo.execute(
         select(Agent.owner_id, Agent.user_can_view_logs).where(Agent.id == agent_id)
     )
     agent_row = agent_result.one_or_none()
@@ -492,16 +493,16 @@ async def _user_can_view_agent_logs(db: AsyncSession, agent_id: int, user_id: in
         return per_ai_flag
 
     # 回退到全局默认
-    config = await _get_config(db)
+    config = await _get_config(content_repo)
     return config.default_user_log_access
 
 
 # ── Agent 管理 ──
 
-async def get_agent_log_settings(db: AsyncSession, agent_id: int) -> dict:
+async def get_agent_log_settings(content_repo: ContentRepository, agent_id: int) -> dict:
     """获取某 AI 的日志设置"""
     from app.models.agent import Agent
-    result = await db.execute(
+    result = await content_repo.execute(
         select(
             Agent.conversation_logs_limit,
             Agent.user_can_view_logs,
@@ -511,7 +512,7 @@ async def get_agent_log_settings(db: AsyncSession, agent_id: int) -> dict:
     if row is None:
         raise ValueError("AI 不存在")
 
-    config = await _get_config(db)
+    config = await _get_config(content_repo)
     return {
         "agent_id": agent_id,
         "conversation_logs_limit": row[0],
@@ -524,16 +525,16 @@ async def get_agent_log_settings(db: AsyncSession, agent_id: int) -> dict:
 
 
 async def update_agent_log_settings(
-    db: AsyncSession,
+    content_repo: ContentRepository,
     agent_id: int,
     conversation_logs_limit: int | None = None,
     user_can_view_logs: bool | None = None,
 ) -> dict:
     """更新某 AI 的日志设置"""
     from app.models.agent import Agent
-    config = await _get_config(db)
+    config = await _get_config(content_repo)
 
-    result = await db.execute(select(Agent).where(Agent.id == agent_id))
+    result = await content_repo.execute(select(Agent).where(Agent.id == agent_id))
     agent = result.scalar_one_or_none()
     if agent is None:
         raise ValueError("AI 不存在")
@@ -548,8 +549,8 @@ async def update_agent_log_settings(
     if user_can_view_logs is not None:
         agent.user_can_view_logs = user_can_view_logs
 
-    await db.flush()
-    return await get_agent_log_settings(db, agent_id)
+    await content_repo.flush()
+    return await get_agent_log_settings(content_repo, agent_id)
 
 
 # ── 内部工具 ──
@@ -620,13 +621,13 @@ def _summarize_message(msg: dict) -> dict:
 
 
 async def get_session_token_usage(
-    db: AsyncSession,
+    content_repo: ContentRepository,
     session_id: str,
     user_id: int,
 ) -> dict:
     """获取指定 DM 会话的 token 消耗汇总（用于前端自费聊天显示）"""
     from app.models.conversation_log import ConversationLog
-    result = await db.execute(
+    result = await content_repo.execute(
         text("""
             SELECT
                 COALESCE(SUM((token_usage->>'total_tokens')::int), 0) AS total_tokens,

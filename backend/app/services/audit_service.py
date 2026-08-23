@@ -7,8 +7,8 @@ audit_service — 审计日志服务（外观层）
 import logging
 from datetime import datetime, timedelta
 from typing import Any, Optional
-from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.repositories.audit_repo import AuditRepository
 from app.services.audit import get_backend, set_backend
 from app.services.audit.postgres_backend import PostgresAuditBackend
 
@@ -29,7 +29,7 @@ async def _ensure_backend() -> None:
 
 
 async def create_audit_log(
-    db: AsyncSession,
+    audit_repo: AuditRepository,
     log_type: str,
     operator_type: str,
     operator_id: int,
@@ -58,35 +58,35 @@ async def create_audit_log(
         "details": details or {},
         "_flush": True,
     }
-    await get_backend().write(entry, db=db)
+    await get_backend().write(entry, db=audit_repo)
     return entry
 
 
-async def verify_audit_chain(db: AsyncSession, limit: int = 1000) -> dict:
+async def verify_audit_chain(audit_repo: AuditRepository, limit: int = 1000) -> dict:
     """验证哈希链完整性"""
     await _ensure_backend()
-    return await get_backend().verify_chain(limit=limit, db=db)
+    return await get_backend().verify_chain(limit=limit, db=audit_repo)
 
 
-async def cleanup_old_logs(db: AsyncSession, days: int = LOG_RETENTION_DAYS) -> dict:
+async def cleanup_old_logs(audit_repo: AuditRepository, days: int = LOG_RETENTION_DAYS) -> dict:
     """删除超过保留天数的日志"""
     await _ensure_backend()
     cutoff = datetime.utcnow() - timedelta(days=days)
-    return await get_backend().cleanup(before=cutoff.isoformat(), db=db)
+    return await get_backend().cleanup(before=cutoff.isoformat(), db=audit_repo)
 
 
-async def should_log_actions(db: AsyncSession) -> bool:
+async def should_log_actions(audit_repo: AuditRepository) -> bool:
     """检查是否开启了用户行为日志记录"""
     from app.services.infrastructure.system_settings_service import get_settings
     try:
-        s = await get_settings(db)
+        s = await get_settings(audit_repo)
         return bool(s.get("audit_user_actions", False))
     except Exception:
         return False
 
 
 async def log_user_action(
-    db: AsyncSession,
+    audit_repo: AuditRepository,
     log_type: str,
     operator_id: int,
     target_type: str,
@@ -95,10 +95,10 @@ async def log_user_action(
     ip: str | None = None,
 ):
     """记录用户行为日志（仅当 audit_user_actions 开启时生效）"""
-    if not await should_log_actions(db):
+    if not await should_log_actions(audit_repo):
         return
     await create_audit_log(
-        db=db, log_type=log_type, operator_type="human",
+        audit_repo, log_type=log_type, operator_type="human",
         operator_id=operator_id, target_type=target_type,
         target_id=target_id, details=details or {}, ip_address=ip,
     )

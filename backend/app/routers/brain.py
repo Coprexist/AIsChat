@@ -140,9 +140,10 @@ async def brain_personality(
     db: AsyncSession = Depends(get_db),
 ):
     """获取人格锚点"""
+    from app.repositories.agent_repo import SQLAlchemyAgentRepository
     from app.services.brain.brain_controller import brain_controller
 
-    anchor = await brain_controller.get_personality_anchor(db, agent.id)
+    anchor = await brain_controller.get_personality_anchor(SQLAlchemyAgentRepository(db), agent.id)
     if anchor is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="该 AI 尚未设置人格锚点")
     return anchor
@@ -155,10 +156,11 @@ async def brain_personality_upsert(
     db: AsyncSession = Depends(get_db),
 ):
     """创建/更新人格锚点（AI 自身不可调用，仅主人/管理员）"""
+    from app.repositories.agent_repo import SQLAlchemyAgentRepository
     from app.services.brain.brain_controller import brain_controller
 
     anchor = await brain_controller.upsert_personality_anchor(
-        db,
+        SQLAlchemyAgentRepository(db),
         agent_id=agent.id,
         name=req.name,
         identity=req.identity,

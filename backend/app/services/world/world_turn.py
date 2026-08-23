@@ -142,10 +142,11 @@ class WorldTurnWorker:
             except Exception:
                 pass
             try:
+                from app.repositories.world_repo import SQLAlchemyWorldRepository
                 from app.services.world.world_chat_service import stream_world_chat
                 async with async_session() as db:
                     async for event in stream_world_chat(
-                        db, self.world_id, item["user_id"], item["message"], item["turn_id"]
+                        SQLAlchemyWorldRepository(db), self.world_id, item["user_id"], item["message"], item["turn_id"]
                     ):
                         if tb:
                             await tb.broadcast(event)

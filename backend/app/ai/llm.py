@@ -492,10 +492,11 @@ async def _inject_personality_anchor(db, agent, system_prompt: str, language: st
     注入发生在所有段落拼接之后、工作区/状态栈追加之前，保证锚点位于最前。
     """
     try:
+        from app.repositories.agent_repo import SQLAlchemyAgentRepository
         from app.services.brain.brain_controller import brain_controller
         from app.utils.pure.prompting import format_personality_anchor
 
-        anchor = await brain_controller.get_personality_anchor(db, agent.id)
+        anchor = await brain_controller.get_personality_anchor(SQLAlchemyAgentRepository(db), agent.id)
         if not anchor:
             return system_prompt
         anchor_text = format_personality_anchor(anchor, language)
@@ -790,11 +791,12 @@ async def _versioned_agent_prompt(db: AsyncSession, agent, system_prompt_overrid
         return system_prompt_override
     cur = getattr(agent, "current_system_prompt", None) or ""
     source = f"agent-prompt-{agent.id}"
+    from app.repositories.capability_repo import SQLAlchemyCapabilityRepository
     from app.services.capability_versioning import (
         ensure_text_source_version, get_effective_text,
     )
-    await ensure_text_source_version(db, source, cur, f"AI{agent.id}提示词")
-    return await get_effective_text(db, agent, source, cur)
+    await ensure_text_source_version(SQLAlchemyCapabilityRepository(db), source, cur, f"AI{agent.id}提示词")
+    return await get_effective_text(SQLAlchemyCapabilityRepository(db), agent, source, cur)
 
 
 async def build_messages(
@@ -1089,8 +1091,9 @@ async def build_messages(
 
     # 能力变更通知（懒加载：增量 changelog 追加尾部，known 更新与注入同轮；不影响前缀缓存）
     try:
+        from app.repositories.capability_repo import SQLAlchemyCapabilityRepository
         from app.services.capability_versioning import build_change_notice, SOURCE_PLATFORM
-        notice = await build_change_notice(db, agent, [SOURCE_PLATFORM, f"agent-prompt-{agent.id}"])
+        notice = await build_change_notice(SQLAlchemyCapabilityRepository(db), agent, [SOURCE_PLATFORM, f"agent-prompt-{agent.id}"])
         if notice:
             messages.append({"role": "system", "content": notice})
             await db.commit()
@@ -1161,8 +1164,9 @@ async def build_messages(
                     + wc_line
                     + "。命令会以你的名义出现在群里，可见可审计。"})
                 # 世界源能力变更通知（版本化懒加载：增量 changelog，known 更新同轮）
+                from app.repositories.capability_repo import SQLAlchemyCapabilityRepository
                 from app.services.capability_versioning import build_change_notice
-                notice = await build_change_notice(db, agent, [f"world-{w.id}"])
+                notice = await build_change_notice(SQLAlchemyCapabilityRepository(db), agent, [f"world-{w.id}"])
                 if notice:
                     messages.append({"role": "system", "content": notice})
                     await db.commit()
@@ -1442,8 +1446,9 @@ async def build_dm_messages(
 
     # 能力变更通知（懒加载：增量 changelog 追加尾部，known 更新与注入同轮；不影响前缀缓存）
     try:
+        from app.repositories.capability_repo import SQLAlchemyCapabilityRepository
         from app.services.capability_versioning import build_change_notice, SOURCE_PLATFORM
-        notice = await build_change_notice(db, agent, [SOURCE_PLATFORM, f"agent-prompt-{agent.id}"])
+        notice = await build_change_notice(SQLAlchemyCapabilityRepository(db), agent, [SOURCE_PLATFORM, f"agent-prompt-{agent.id}"])
         if notice:
             messages.append({"role": "system", "content": notice})
             await db.commit()

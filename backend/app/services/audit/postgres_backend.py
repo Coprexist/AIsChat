@@ -14,9 +14,17 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.database import AsyncSession as DBSession
 from app.models.system_log import SystemLog
+from app.repositories.audit_repo import AuditRepository, SQLAlchemyAuditRepository
 from . import AuditStorageBackend
 
 logger = logging.getLogger(__name__)
+
+
+def _ensure_repo(db_or_repo):
+    """兼容旧调用：传入 AsyncSession 时包装为 SQLAlchemyAuditRepository。"""
+    if isinstance(db_or_repo, AsyncSession):
+        return SQLAlchemyAuditRepository(db_or_repo)
+    return db_or_repo
 
 
 def _compute_hash(
@@ -55,11 +63,11 @@ class PostgresAuditBackend(AuditStorageBackend):
         pass
 
     async def write(self, entry: dict, db: AsyncSession | None = None) -> None:
-        session = db
-        if session is None:
+        db = _ensure_repo(db)
+        if db is None:
             raise ValueError("PostgresAuditBackend.write 需要 db 参数")
         prev = (
-            await session.execute(
+            await db.execute(
                 select(SystemLog.hash)
                 .order_by(SystemLog.id.desc())
                 .limit(1)
@@ -97,13 +105,13 @@ class PostgresAuditBackend(AuditStorageBackend):
             hash=current_hash,
             created_at=now,
         )
-        session.add(log)
+        db.add(log)
         if entry.get("_flush", True):
-            await session.flush()
+            await db.flush()
 
     async def query(self, filters: dict, page: int = 1, page_size: int = 50, db: AsyncSession | None = None) -> dict:
-        session = db
-        if session is None:
+        db = _ensure_repo(db)
+        if db is None:
             raise ValueError("PostgresAuditBackend.query 需要 db 参数")
         query = select(SystemLog).order_by(SystemLog.created_at.desc())
         if filters.get("log_type"):
@@ -118,18 +126,18 @@ class PostgresAuditBackend(AuditStorageBackend):
             query = query.where(SystemLog.success == filters["success"])
 
         offset = (page - 1) * page_size
-        result = await session.execute(query.offset(offset).limit(page_size))
+        result = await db.execute(query.offset(offset).limit(page_size))
         items = [log.to_dict() for log in result.scalars().all()]
 
         return {"items": items, "total": 0, "page": page, "page_size": page_size}
 
     async def cleanup(self, before: str, batch_size: int = 5000, db: AsyncSession | None = None) -> dict:
-        session = db
-        if session is None:
+        db = _ensure_repo(db)
+        if db is None:
             raise ValueError("PostgresAuditBackend.cleanup 需要 db 参数")
         total_deleted = 0
         while True:
-            result = await session.execute(
+            result = await db.execute(
                 delete(SystemLog)
                 .where(SystemLog.created_at < before)
                 .limit(batch_size)
@@ -141,10 +149,10 @@ class PostgresAuditBackend(AuditStorageBackend):
         return {"deleted": total_deleted, "cutoff": before}
 
     async def verify_chain(self, limit: int = 1000, db: AsyncSession | None = None) -> dict:
-        session = db
-        if session is None:
+        db = _ensure_repo(db)
+        if db is None:
             raise ValueError("PostgresAuditBackend.verify_chain 需要 db 参数")
-        result = await session.execute(
+        result = await db.execute(
             select(SystemLog).order_by(SystemLog.id.asc()).limit(limit)
         )
         logs = result.scalars().all()

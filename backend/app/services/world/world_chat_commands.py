@@ -14,14 +14,15 @@ from __future__ import annotations
 import logging
 from datetime import datetime, timezone
 
-from sqlalchemy.ext.asyncio import AsyncSession
+from app.repositories.world_repo import WorldRepository
 
 logger = logging.getLogger(__name__)
+
 
 MAX_PINNED_PER_USER = 16
 
 
-async def run_slash_command(db: AsyncSession, world, cmd_text: str, user_id: int | None = None) -> str | None:
+async def run_slash_command(world_repo: WorldRepository, world, cmd_text: str, user_id: int | None = None) -> str | None:
     """执行斜杠命令，返回结果 note；非命令返回 None（调用方继续走 LLM 流）"""
     from app.models.world import WorldChatMessage
 
@@ -34,19 +35,19 @@ async def run_slash_command(db: AsyncSession, world, cmd_text: str, user_id: int
             q = q.where(WorldChatMessage.session_id.is_(None))
         else:
             q = q.where(WorldChatMessage.session_id == sid_db)
-        await db.execute(q)
+        await world_repo.execute(q)
         cfg = dict(world.config or {})
         summaries = dict(cfg.get("chat_summaries") or {})
         summaries.pop(session_key(world), None)
         cfg["chat_summaries"] = summaries
         cfg["workflow_memory"] = None
         world.config = cfg
-        await db.commit()
+        await world_repo.commit()
         return "已清空当前会话上下文（历史消息+摘要+工作流记忆），其他会话保留；长期记忆保留——AI 将从记忆恢复工作状态。"
 
     if cmd_text.startswith("/compact"):
         from app.services.world.world_tools import _do_execute
-        result = await _do_execute(db, world, "compact_context", "{}")
+        result = await _do_execute(world_repo, world, "compact_context", "{}")
         if result.get("success"):
             return (f"上下文已压缩：{result.get('before_tokens')} → "
                     f"{result.get('after_tokens')} tokens"
@@ -63,7 +64,7 @@ async def run_slash_command(db: AsyncSession, world, cmd_text: str, user_id: int
         cfg["current_session"] = sid
         cfg["sessions"] = sessions
         world.config = cfg
-        await db.commit()
+        await world_repo.commit()
         return f"已开新对话（会话 {sid}）。旧对话已保存：/sessions 查看列表，/use <id> 切回继续。"
 
     if cmd_text.startswith("/sessions"):
@@ -88,7 +89,7 @@ async def run_slash_command(db: AsyncSession, world, cmd_text: str, user_id: int
             return f"会话不存在：`{target}`。用 /sessions 查看。"
         cfg["current_session"] = target
         world.config = cfg
-        await db.commit()
+        await world_repo.commit()
         return f"已切换到会话 `{target}`（id 一致，上下文按会话隔离，可继续对话）。"
 
     if cmd_text.startswith("/pin") or cmd_text.startswith("/unpin"):
@@ -114,7 +115,7 @@ async def run_slash_command(db: AsyncSession, world, cmd_text: str, user_id: int
         sessions[key] = meta
         cfg["sessions"] = sessions
         world.config = cfg
-        await db.commit()
+        await world_repo.commit()
         return f"已{'📌 收藏' if is_pin else '取消收藏'}会话 `{key}`（{len(pinned)}/{MAX_PINNED_PER_USER}）。收藏的会话不会被自动清理。"
 
     return None

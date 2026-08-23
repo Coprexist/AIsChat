@@ -14,17 +14,27 @@
 import logging
 from datetime import datetime
 from sqlalchemy.ext.asyncio import AsyncSession
+from app.repositories.memory_repo import MemoryRepository, SQLAlchemyMemoryRepository
 
 logger = logging.getLogger(__name__)
+
+
+def _ensure_repo(db_or_repo):
+    """兼容旧调用：传入 AsyncSession 时包装为 SQLAlchemyMemoryRepository。"""
+    if isinstance(db_or_repo, AsyncSession):
+        return SQLAlchemyMemoryRepository(db_or_repo)
+    return db_or_repo
 
 
 class ForgettingMechanism:
     async def decay_memory(self, db: AsyncSession, agent_id: int) -> None:
         """根据遗忘曲线衰减记忆重要性"""
+        db = _ensure_repo(db)
         await self._decay_vector_memories(db, agent_id)
 
     async def _decay_vector_memories(self, db: AsyncSession, agent_id: int) -> None:
         """衰减向量记忆"""
+        db = _ensure_repo(db)
         from app.models.memory import RoughMemory
         from sqlalchemy import update
         await db.execute(
@@ -41,6 +51,7 @@ class ForgettingMechanism:
         - 被引用：+2
         - 超过 10 封顶
         """
+        db = _ensure_repo(db)
         from app.models.memory import RoughMemory
         from sqlalchemy import select
         result = await db.execute(select(RoughMemory).where(RoughMemory.id == memory_id))

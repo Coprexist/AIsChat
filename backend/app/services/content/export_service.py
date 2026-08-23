@@ -3,15 +3,15 @@
 支持 JSON / TXT / HTML 三种格式
 """
 from datetime import datetime, timezone
-from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 from app.models.message import Message
 from app.models.user import User
 from app.models.agent import Agent
+from app.repositories.export_repo import ExportRepository
 
 
 async def query_all_messages(
-    db: AsyncSession,
+    export_repo: ExportRepository,
     group_id: int,
     date_from: str | None = None,
     date_to: str | None = None,
@@ -41,7 +41,7 @@ async def query_all_messages(
 
     stmt = stmt.order_by(Message.created_at.asc())
 
-    result = await db.execute(stmt)
+    result = await export_repo.execute(stmt)
     messages = result.scalars().all()
 
     if not messages:
@@ -65,19 +65,19 @@ async def query_all_messages(
     ai_names: dict[int, str] = {}
 
     if human_ids:
-        r = await db.execute(select(User.id, User.username).where(User.id.in_(human_ids)))
+        r = await export_repo.execute(select(User.id, User.username).where(User.id.in_(human_ids)))
         for uid, uname in r.all():
             human_names[uid] = uname
 
     if ai_ids:
-        r = await db.execute(select(Agent.id, Agent.name).where(Agent.id.in_(ai_ids)))
+        r = await export_repo.execute(select(Agent.id, Agent.name).where(Agent.id.in_(ai_ids)))
         for aid, aname in r.all():
             ai_names[aid] = aname
 
     # 批量查 reply_to 预览
     reply_previews: dict[int, str] = {}
     if reply_to_ids:
-        r = await db.execute(
+        r = await export_repo.execute(
             select(Message.id, Message.content).where(Message.id.in_(reply_to_ids))
         )
         for mid, content in r.all():
@@ -279,7 +279,7 @@ def _escape_html(text: str) -> str:
 
 
 async def query_all_dm_messages(
-    db: AsyncSession,
+    export_repo: ExportRepository,
     session_id: str,
     date_from: str | None = None,
     date_to: str | None = None,
@@ -306,7 +306,7 @@ async def query_all_dm_messages(
 
     stmt = stmt.order_by(DMMessage.created_at.asc())
 
-    result = await db.execute(stmt)
+    result = await export_repo.execute(stmt)
     messages = result.scalars().all()
 
     if not messages:
@@ -317,7 +317,7 @@ async def query_all_dm_messages(
     sender_names: dict[int, str] = {}
     sender_types: dict[int, str] = {}
     if sender_ids:
-        r = await db.execute(select(User.id, User.username, User.type).where(User.id.in_(sender_ids)))
+        r = await export_repo.execute(select(User.id, User.username, User.type).where(User.id.in_(sender_ids)))
         for uid, uname, utype in r.all():
             sender_names[uid] = uname
             sender_types[uid] = utype or "human"
@@ -336,14 +336,14 @@ async def query_all_dm_messages(
 
 
 async def export_dm_chat_history(
-    db: AsyncSession,
+    export_repo: ExportRepository,
     session_id: str,
     fmt: str = "json",
     date_from: str | None = None,
     date_to: str | None = None,
 ) -> tuple[bytes, str, str]:
     """编排：查询私信消息 → 格式化 → 返回 (content_bytes, media_type, filename)"""
-    messages = await query_all_dm_messages(db, session_id, date_from, date_to)
+    messages = await query_all_dm_messages(export_repo, session_id, date_from, date_to)
     chat_name = f"私信_{session_id}"
 
     if fmt == "txt":
@@ -366,7 +366,7 @@ async def export_dm_chat_history(
 
 
 async def export_chat_history(
-    db: AsyncSession,
+    export_repo: ExportRepository,
     group_id: int,
     fmt: str = "json",
     date_from: str | None = None,
@@ -377,10 +377,10 @@ async def export_chat_history(
     """
     from app.chat.message import get_group
 
-    group = await get_group(db, group_id)
+    group = await get_group(export_repo.session, group_id)
     group_name = group.name if group else f"群聊#{group_id}"
 
-    messages = await query_all_messages(db, group_id, date_from, date_to)
+    messages = await query_all_messages(export_repo, group_id, date_from, date_to)
 
     if fmt == "txt":
         content = format_messages_txt(messages, group_name)

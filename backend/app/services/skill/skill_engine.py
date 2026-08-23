@@ -13,8 +13,16 @@ from datetime import datetime, timedelta, timezone
 from dataclasses import dataclass, field
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
+from app.repositories.skill_repo import SkillRepository, SQLAlchemySkillRepository
 
 logger = logging.getLogger(__name__)
+
+
+def _ensure_repo(db_or_repo):
+    """兼容旧调用：传入 AsyncSession 时包装为 SQLAlchemySkillRepository。"""
+    if isinstance(db_or_repo, AsyncSession):
+        return SQLAlchemySkillRepository(db_or_repo)
+    return db_or_repo
 
 
 @dataclass
@@ -106,6 +114,7 @@ async def _handle_inject_prompt(
     prompts: list[str], now: datetime,
 ) -> None:
     """处理 inject_prompt 技能"""
+    db = _ensure_repo(db)
     insert_text = config.get("insert_text", "")
     if not insert_text:
         return
@@ -143,6 +152,7 @@ async def _handle_scene_trigger(
 
 async def _load_enabled_skills(db: AsyncSession, agent_id: int) -> list:
     """加载某个 agent 的所有启用技能（按 priority 升序）"""
+    db = _ensure_repo(db)
     from app.models.agent_skill import AgentSkill
 
     result = await db.execute(
@@ -199,6 +209,7 @@ async def _is_delay_reply_allowed(db: AsyncSession, agent) -> bool:
     检查 agent 级别是否允许延迟回复。
     agent.delay_reply_enabled: True=允许, False=禁止, NULL=继承全局默认。
     """
+    db = _ensure_repo(db)
     if agent.delay_reply_enabled is not None:
         return agent.delay_reply_enabled
 
@@ -224,6 +235,7 @@ async def evaluate_action_skills(
     在 ai_response_worker 中调用（build_messages 之前），
     用于控制回复时序和 WebSocket 事件。
     """
+    db = _ensure_repo(db)
     from app.models.agent_skill import AgentSkill
 
     result = SkillEvaluationResult()
@@ -275,6 +287,7 @@ async def evaluate_inject_skills(
 
     在 _build_injected_skills 中调用，返回注入到系统提示词中的文本列表。
     """
+    db = _ensure_repo(db)
     prompts: list[str] = []
 
     try:

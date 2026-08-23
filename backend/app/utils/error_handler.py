@@ -62,9 +62,10 @@ async def log_error(
     merged_details = details or {}
     merged_details["level"] = level
 
+    from app.repositories.audit_repo import SQLAlchemyAuditRepository
     from app.services.audit_service import create_audit_log
     await create_audit_log(
-        db=db, log_type=log_type, operator_type=operator_type,
+        SQLAlchemyAuditRepository(db), log_type=log_type, operator_type=operator_type,
         operator_id=operator_id, target_type=target_type or "system",
         target_id=target_id or 0,
         success=level != "ERROR",

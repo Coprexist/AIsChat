@@ -308,12 +308,13 @@ async def execute_do(db, world, do: dict, ctx: dict) -> dict:
         if action == "reply_template":
             return {"success": True, "reply": str(do.get("reply") or "").strip()}
         if action == "call_tool":
+            from app.repositories.world_repo import SQLAlchemyWorldRepository
             from app.services.world.world_tools import _do_execute
             import json as _json
             name = str(do.get("name") or "")
             arguments = do.get("arguments") or {}
             result = await _do_execute(
-                db, world, name,
+                SQLAlchemyWorldRepository(db), world, name,
                 _json.dumps(arguments, ensure_ascii=False) if isinstance(arguments, dict) else str(arguments),
             )
             return {"success": bool(result.get("success")), "result": result}

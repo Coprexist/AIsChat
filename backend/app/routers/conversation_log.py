@@ -24,10 +24,11 @@ class UserConvLogLimitBody(BaseModel):
 async def get_my_log_settings(
     current_user: dict = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
+    content_repo: ContentRepository = Depends(get_content_repo),
 ):
     """获取当前用户的对话日志保留设置"""
     from app.services.content.conversation_log_service import get_user_log_limit
-    return await get_user_log_limit(db, current_user["user_id"])
+    return await get_user_log_limit(content_repo, current_user["user_id"])
 
 
 @router.put("/conversation-log/settings")
@@ -35,11 +36,12 @@ async def update_my_log_settings(
     req: UserConvLogLimitBody,
     current_user: dict = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
+    content_repo: ContentRepository = Depends(get_content_repo),
 ):
     """更新当前用户的对话日志保留数"""
     from app.services.content.conversation_log_service import update_user_log_limit
     try:
-        return await update_user_log_limit(db, current_user["user_id"], req.limit)
+        return await update_user_log_limit(content_repo, current_user["user_id"], req.limit)
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
 
@@ -51,6 +53,7 @@ async def get_agent_logs_user(
     offset: int = Query(0, ge=0),
     current_user: dict = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
+    content_repo: ContentRepository = Depends(get_content_repo),
 ):
     """查看某 AI 的对话日志（需授权）"""
     from app.services.content.conversation_log_service import get_agent_logs
@@ -60,7 +63,7 @@ async def get_agent_logs_user(
     is_admin = db_role == "admin"
     try:
         return await get_agent_logs(
-            db, agent_id,
+            content_repo, agent_id,
             user_id=current_user["user_id"],
             is_admin=is_admin,
             limit=limit, offset=offset,
@@ -75,6 +78,7 @@ async def get_agent_log_detail_user(
     log_id: int,
     current_user: dict = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
+    content_repo: ContentRepository = Depends(get_content_repo),
 ):
     """查看单条对话日志详情（需授权）"""
     from app.services.content.conversation_log_service import get_log_detail
@@ -83,7 +87,7 @@ async def get_agent_log_detail_user(
     is_admin = db_role == "admin"
     try:
         detail = await get_log_detail(
-            db, log_id,
+            content_repo, log_id,
             user_id=current_user["user_id"],
             is_admin=is_admin,
         )
@@ -105,6 +109,7 @@ async def export_log_detail(
     format: str = Query("json", pattern=r"^(json|md|markdown)$"),
     current_user: dict = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
+    content_repo: ContentRepository = Depends(get_content_repo),
 ):
     """导出单条对话日志（JSON 或 Markdown）"""
     from app.services.content.conversation_log_service import get_log_detail
@@ -146,12 +151,13 @@ async def get_usage_overview(
     days: int = Query(30, ge=1, le=365),
     current_user: dict = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
+    content_repo: ContentRepository = Depends(get_content_repo),
 ):
     """获取当前用户所有 AI 的 token 消耗汇总（近 N 天）"""
     from app.services.content.conversation_log_service import get_user_agents_token_summary
     end_date = datetime.now(tz.utc).replace(tzinfo=None)
     start_date = end_date - timedelta(days=days)
-    return await get_user_agents_token_summary(db, current_user["user_id"], start_date, end_date)
+    return await get_user_agents_token_summary(content_repo, current_user["user_id"], start_date, end_date)
 
 
 @router.get("/conversation-log/usage/agents/{agent_id}/daily")
@@ -160,6 +166,7 @@ async def get_agent_daily_usage(
     days: int = Query(30, ge=1, le=365),
     current_user: dict = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
+    content_repo: ContentRepository = Depends(get_content_repo),
 ):
     """获取单个 AI 每日 token 消耗分布"""
     from app.services.content.conversation_log_service import get_agent_token_daily
@@ -172,4 +179,4 @@ async def get_agent_daily_usage(
             raise HTTPException(status_code=403, detail="无权查看此 AI 的用量数据")
     end_date = datetime.now(tz.utc).replace(tzinfo=None)
     start_date = end_date - timedelta(days=days)
-    return await get_agent_token_daily(db, agent_id, start_date, end_date, user_id=current_user["user_id"])
+    return await get_agent_token_daily(content_repo, agent_id, start_date, end_date, user_id=current_user["user_id"])

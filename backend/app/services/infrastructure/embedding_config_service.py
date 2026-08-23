@@ -13,10 +13,18 @@ import logging
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.repositories.infra_repo import InfraRepository, SQLAlchemyInfraRepository
 from app.db_config_source import set_db_overrides, clear_db_overrides
 from app.utils.crypto import encrypt_api_key, decrypt_api_key
 
 logger = logging.getLogger(__name__)
+
+
+def _ensure_repo(db_or_repo):
+    """兼容旧调用：传入 AsyncSession 时包装为 SQLAlchemyInfraRepository。"""
+    if isinstance(db_or_repo, AsyncSession):
+        return SQLAlchemyInfraRepository(db_or_repo)
+    return db_or_repo
 
 
 def _refresh_settings() -> None:
@@ -45,6 +53,7 @@ EDITABLE_KEYS = [
 
 async def load_db_config(db: AsyncSession) -> None:
     """启动时加载 DB 覆盖进缓存（幂等；无覆盖则保持 env 生效）"""
+    db = _ensure_repo(db)
     from app.models.system_settings import SystemSettings
     result = await db.execute(select(SystemSettings).where(SystemSettings.id == 1))
     row = result.scalar_one_or_none()
@@ -65,6 +74,7 @@ async def load_db_config(db: AsyncSession) -> None:
 
 async def save_db_config(db: AsyncSession, values: dict) -> dict:
     """保存 embedding 配置（DB 持久化 + 缓存热更新）。返回保存后的配置。"""
+    db = _ensure_repo(db)
     from app.models.system_settings import SystemSettings
 
     # 只接收允许的键
@@ -109,6 +119,7 @@ async def save_db_config(db: AsyncSession, values: dict) -> dict:
 
 async def clear_db_config(db: AsyncSession) -> dict:
     """恢复默认：清 DB 字段 + 清缓存（回到 env/默认值）"""
+    db = _ensure_repo(db)
     from app.models.system_settings import SystemSettings
     result = await db.execute(select(SystemSettings).where(SystemSettings.id == 1))
     row = result.scalar_one_or_none()
@@ -123,6 +134,7 @@ async def clear_db_config(db: AsyncSession) -> dict:
 
 async def get_effective_config(db: AsyncSession) -> dict:
     """返回当前生效的 embedding 配置（DB 覆盖 + env 兜底，api_key 脱敏）"""
+    db = _ensure_repo(db)
     from app.config import settings
     cfg = {
         "embedding_backend": settings.embedding_backend,

@@ -9,8 +9,8 @@ import logging
 from datetime import datetime, timezone
 
 from sqlalchemy import select, update
-from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.repositories.invitation_repo import InvitationRepository
 from app.models.group import GroupInvitation, GroupMember
 from app.models.user import User
 
@@ -98,13 +98,17 @@ def format_invitation_for_api(
 # ═══════════════════════════════════════════════════════════════
 
 async def send_group_invitation(
-    db: AsyncSession,
+    invitation_repo: InvitationRepository,
     group_id: int,
     inviter_id: int,
     invitee_id: int,
     message: str | None = None,
 ) -> dict:
     """发送群邀请：建记录 + 发卡片 DM。
+
+    Args:
+        invitation_repo: 群邀请数据访问仓库（不再直接依赖 AsyncSession）。
+            跨模块辅助调用（发 DM 卡片）通过 invitation_repo.session 桥接。
 
     Returns:
         dict with invitation_id and dm_message_id
@@ -113,7 +117,7 @@ async def send_group_invitation(
     from app.models.group import Group
 
     # 检查是否已有待处理邀请（幂等防重）
-    existing = await db.execute(
+    existing = await invitation_repo.execute(
         select(GroupInvitation).where(
             GroupInvitation.group_id == group_id,
             GroupInvitation.invitee_id == invitee_id,
@@ -124,12 +128,12 @@ async def send_group_invitation(
         raise ValueError("该用户已有待处理的群邀请，请等待对方处理后再试")
 
     # 获取群名和邀请人名称
-    group_result = await db.execute(select(Group).where(Group.id == group_id))
+    group_result = await invitation_repo.execute(select(Group).where(Group.id == group_id))
     group = group_result.scalar_one_or_none()
     if group is None:
         raise ValueError("群聊不存在")
 
-    inviter_result = await db.execute(
+    inviter_result = await invitation_repo.execute(
         select(User.username).where(User.id == inviter_id)
     )
     inviter_row = inviter_result.one_or_none()
@@ -143,13 +147,13 @@ async def send_group_invitation(
         status="pending",
         message=message,
     )
-    db.add(invitation)
-    await db.flush()
-    await db.refresh(invitation)
+    invitation_repo.add(invitation)
+    await invitation_repo.flush()
+    await invitation_repo.refresh(invitation)
 
     # 获取或创建 DM 会话（跳过好友校验——群邀请不要求已是好友）
     dm_session = await get_or_create_dm_session(
-        db, inviter_id, invitee_id, skip_friendship_check=True,
+        invitation_repo.session, inviter_id, invitee_id, skip_friendship_check=True,
     )
 
     # 构建卡片 DM
@@ -160,7 +164,7 @@ async def send_group_invitation(
 
     # 发 DM（跳过好友校验）
     dm_msg = await send_dm_message(
-        db,
+        invitation_repo.session,
         session_id=dm_session["session_id"],
         sender_id=inviter_id,
         content=content,
@@ -194,7 +198,7 @@ async def send_group_invitation(
 
 
 async def accept_invitation(
-    db: AsyncSession,
+    invitation_repo: InvitationRepository,
     invitation_id: int,
     user_id: int,
 ) -> dict:
@@ -205,7 +209,7 @@ async def accept_invitation(
     """
     from app.chat.message import add_member
 
-    invitation = await db.get(GroupInvitation, invitation_id)
+    invitation = await invitation_repo.get(GroupInvitation, invitation_id)
     if invitation is None:
         raise ValueError("邀请不存在")
     if invitation.invitee_id != user_id:
@@ -214,18 +218,18 @@ async def accept_invitation(
         raise ValueError(f"邀请状态为 {invitation.status}，无法接受")
 
     # 入群
-    await add_member(db, invitation.group_id, "human", user_id)
+    await add_member(invitation_repo.session, invitation.group_id, "human", user_id)
 
     # 更新邀请状态
     invitation.status = "accepted"
     invitation.resolved_at = datetime.now(timezone.utc).replace(tzinfo=None)
 
     # 更新 DM 卡片（attachments 中 status → accepted）
-    await _update_dm_card(db, invitation, "accepted")
+    await _update_dm_card(invitation_repo, invitation, "accepted")
 
     # 获取群名用于日志
     from app.models.group import Group
-    group = await db.get(Group, invitation.group_id)
+    group = await invitation_repo.get(Group, invitation.group_id)
     group_name = getattr(group, 'name', f"#{invitation.group_id}")
 
     logger.info(f"✅ 群邀请 #{invitation_id}: user#{user_id} 接受了「{group_name}」的邀请")
@@ -239,14 +243,14 @@ async def accept_invitation(
 
 
 async def reject_invitation(
-    db: AsyncSession,
+    invitation_repo: InvitationRepository,
     invitation_id: int,
     user_id: int,
 ) -> dict:
     """拒绝群邀请：校验 → 更新状态 → 更新卡片。
     不入群，仅更新卡片。
     """
-    invitation = await db.get(GroupInvitation, invitation_id)
+    invitation = await invitation_repo.get(GroupInvitation, invitation_id)
     if invitation is None:
         raise ValueError("邀请不存在")
     if invitation.invitee_id != user_id:
@@ -257,10 +261,10 @@ async def reject_invitation(
     invitation.status = "rejected"
     invitation.resolved_at = datetime.now(timezone.utc).replace(tzinfo=None)
 
-    await _update_dm_card(db, invitation, "rejected")
+    await _update_dm_card(invitation_repo, invitation, "rejected")
 
     from app.models.group import Group
-    group = await db.get(Group, invitation.group_id)
+    group = await invitation_repo.get(Group, invitation.group_id)
     group_name = getattr(group, 'name', f"#{invitation.group_id}")
 
     logger.info(f"❌ 群邀请 #{invitation_id}: user#{user_id} 拒绝了「{group_name}」的邀请")
@@ -274,11 +278,11 @@ async def reject_invitation(
 
 
 async def list_pending_invitations(
-    db: AsyncSession,
+    invitation_repo: InvitationRepository,
     user_id: int,
 ) -> list[dict]:
     """列出用户的所有待处理邀请"""
-    result = await db.execute(
+    result = await invitation_repo.execute(
         select(GroupInvitation).where(
             GroupInvitation.invitee_id == user_id,
             GroupInvitation.status == "pending",
@@ -290,18 +294,18 @@ async def list_pending_invitations(
     for inv in invitations:
         # 查群名
         from app.models.group import Group
-        group = await db.get(Group, inv.group_id)
+        group = await invitation_repo.get(Group, inv.group_id)
         group_name = getattr(group, 'name', f"群#{inv.group_id}") if group else f"群#{inv.group_id}"
 
         # 查邀请人名称
-        inviter_result = await db.execute(
+        inviter_result = await invitation_repo.execute(
             select(User.username).where(User.id == inv.inviter_id)
         )
         inviter_row = inviter_result.one_or_none()
         inviter_name = inviter_row[0] if inviter_row else f"用户{inv.inviter_id}"
 
         # 查被邀请人名称
-        invitee_result = await db.execute(
+        invitee_result = await invitation_repo.execute(
             select(User.username).where(User.id == inv.invitee_id)
         )
         invitee_row = invitee_result.one_or_none()
@@ -317,7 +321,7 @@ async def list_pending_invitations(
 # ═══════════════════════════════════════════════════════════════
 
 async def _update_dm_card(
-    db: AsyncSession,
+    invitation_repo: InvitationRepository,
     invitation: GroupInvitation,
     new_status: str,
 ):
@@ -330,14 +334,14 @@ async def _update_dm_card(
     from app.models.dm import DMMessage
     from app.models.group import Group
 
-    dm_msg = await db.get(DMMessage, invitation.dm_message_id)
+    dm_msg = await invitation_repo.get(DMMessage, invitation.dm_message_id)
     if dm_msg is None:
         return
 
-    group = await db.get(Group, invitation.group_id)
+    group = await invitation_repo.get(Group, invitation.group_id)
     group_name = getattr(group, 'name', f"群#{invitation.group_id}") if group else f"群#{invitation.group_id}"
 
-    inviter_result = await db.execute(
+    inviter_result = await invitation_repo.execute(
         select(User.username).where(User.id == invitation.inviter_id)
     )
     inviter_row = inviter_result.one_or_none()

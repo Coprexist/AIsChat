@@ -9,6 +9,7 @@ from datetime import datetime, timezone
 from sqlalchemy import text, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from app.models.agent import Agent
+from app.repositories.agent_repo import AgentRepository, SQLAlchemyAgentRepository
 from app.utils.pure.state_stack import (
     make_state_frame, format_state_stack_summary, MAX_STACK_DEPTH,
 )
@@ -17,12 +18,20 @@ from app.utils.pure.emotion import decay_emotion, apply_emotion_update
 logger = logging.getLogger(__name__)
 
 
+def _ensure_repo(db_or_repo):
+    """兼容旧调用：传入 AsyncSession 时包装为 SQLAlchemyAgentRepository。"""
+    if isinstance(db_or_repo, AsyncSession):
+        return SQLAlchemyAgentRepository(db_or_repo)
+    return db_or_repo
+
+
 # ═══════════════════════════════════════════════════════════════
 # DB 读写
 # ═══════════════════════════════════════════════════════════════
 
 async def _get_stack(db: AsyncSession, agent_id: int) -> list[dict]:
     """读取 agent 的状态栈（返回可修改的副本）。"""
+    db = _ensure_repo(db)
     result = await db.execute(
         select(Agent.state_stack).where(Agent.id == agent_id)
     )
@@ -34,6 +43,7 @@ async def _get_stack(db: AsyncSession, agent_id: int) -> list[dict]:
 
 async def _set_stack(db: AsyncSession, agent_id: int, stack: list[dict]) -> None:
     """写入 agent 的状态栈。"""
+    db = _ensure_repo(db)
     await db.execute(
         text("UPDATE agents SET state_stack = :stack WHERE id = :aid"),
         {"stack": json.dumps(stack, ensure_ascii=False), "aid": agent_id},
@@ -51,6 +61,7 @@ async def push_state(
     Push 新状态帧到栈顶。自动将原栈顶 active → paused。
     返回 (新栈, 消息)。
     """
+    db = _ensure_repo(db)
     stack = await _get_stack(db, agent_id)
 
     if len(stack) >= MAX_STACK_DEPTH:
@@ -109,6 +120,7 @@ async def pop_state(
     恢复帧记录 completed_handoff（刚完成啥 + 跳过层），摘要注入“回来的交接”。
     返回 (新栈, 消息)。
     """
+    db = _ensure_repo(db)
     stack = await _get_stack(db, agent_id)
 
     if not stack:
@@ -176,6 +188,7 @@ async def close_state(
     frame_id 为空时关闭栈顶。
     返回 (新栈, 消息)。
     """
+    db = _ensure_repo(db)
     stack = await _get_stack(db, agent_id)
 
     if not stack:
@@ -197,11 +210,13 @@ async def close_state(
 
 async def list_states(db: AsyncSession, agent_id: int) -> list[dict]:
     """获取当前状态栈（工具用）。"""
+    db = _ensure_repo(db)
     return await _get_stack(db, agent_id)
 
 
 async def get_state_stack_summary(db: AsyncSession, agent_id: int, max_chars: int | None = None) -> str:
     """获取状态栈摘要文本（注入 prompt 用）。max_chars 默认 500（可被 agent 配置覆盖）。"""
+    db = _ensure_repo(db)
     stack = await _get_stack(db, agent_id)
     if not stack:
         return ""
@@ -237,6 +252,7 @@ async def ensure_active_frame(
     注：超配额不触发回复时也会调用（帧记录「有人找过」），
     AI 切回其他会话时通过摘要感知未处理的消息。
     """
+    db = _ensure_repo(db)
     if conv_type not in ("dm", "group_chat"):
         return
     stack = await _get_stack(db, agent_id)
@@ -291,6 +307,7 @@ async def ensure_active_frame(
 async def bump_frame_call_count(db: AsyncSession, agent_id: int, calls: int = 1) -> None:
     """LLM 每次调用后：agent 总计数 +1；栈顶 active 帧 call_count +1 并做情感衰减
     （mood homeostasis——情感随该状态自己的调用次数回归基线）。"""
+    db = _ensure_repo(db)
     from sqlalchemy import text as _text
     # agent 总计数
     await db.execute(
@@ -311,6 +328,7 @@ async def bump_frame_call_count(db: AsyncSession, agent_id: int, calls: int = 1)
 async def update_active_emotion(db: AsyncSession, agent_id: int, update) -> dict:
     """更新栈顶帧情感（情感工具用）：增量（"+0.2"）/ 完整向量 / 概括词。
     无 active 帧时写 agent 级情感暂存（context_ref="" 的隐式帧不存在则忽略）。"""
+    db = _ensure_repo(db)
     stack = await _get_stack(db, agent_id)
     if not stack:
         return {}
@@ -323,6 +341,7 @@ async def update_active_emotion(db: AsyncSession, agent_id: int, update) -> dict
 
 async def set_active_emotion_text(db: AsyncSession, agent_id: int, text: str) -> None:
     """设置栈顶帧文字心情（未向量化模式）。"""
+    db = _ensure_repo(db)
     stack = await _get_stack(db, agent_id)
     if not stack:
         return
@@ -332,6 +351,7 @@ async def set_active_emotion_text(db: AsyncSession, agent_id: int, text: str) ->
 
 async def get_active_emotion(db: AsyncSession, agent_id: int) -> dict:
     """读栈顶帧情感（向量 + 文字），供注入/展示。"""
+    db = _ensure_repo(db)
     stack = await _get_stack(db, agent_id)
     if not stack:
         return {}
@@ -346,6 +366,7 @@ async def get_active_emotion(db: AsyncSession, agent_id: int) -> dict:
 
 async def get_active_frame_tools(db: AsyncSession, agent_id: int) -> tuple[list[str] | None, list[str] | None]:
     """读栈顶帧的工具/技能白名单（None = 不隔离，保持全局）。"""
+    db = _ensure_repo(db)
     stack = await _get_stack(db, agent_id)
     if not stack:
         return None, None
@@ -361,6 +382,7 @@ async def persist_last_task_as_state(
     end_turn 兜底：状态栈为空但有 last_task 时，自动 push 一个帧。
     防止 AI 在做的事在下次激活时丢失。
     """
+    db = _ensure_repo(db)
     stack = await _get_stack(db, agent_id)
 
     if not stack and last_task:
@@ -381,6 +403,7 @@ async def persist_last_task_as_state(
 
 async def _auto_journal(db: AsyncSession, agent_id: int, action: str, frame: dict) -> None:
     """push/pop 时自动写 JOURNAL。非致命——失败静默忽略。"""
+    db = _ensure_repo(db)
     try:
         from app.services.agent.workspace_service import get_workspace_file, set_workspace_file
     except ImportError:
@@ -408,6 +431,7 @@ async def _auto_journal(db: AsyncSession, agent_id: int, action: str, frame: dic
 
 async def _auto_todo(db: AsyncSession, agent_id: int, frame: dict) -> None:
     """push 时自动追加 TODO 项。非致命——失败静默忽略。"""
+    db = _ensure_repo(db)
     if not frame.get("todo"):
         return
     try:

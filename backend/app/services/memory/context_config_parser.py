@@ -11,8 +11,16 @@ from typing import Dict, Any, Optional
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.context_config import ContextConfig
+from app.repositories.memory_repo import MemoryRepository, SQLAlchemyMemoryRepository
 
 logger = logging.getLogger(__name__)
+
+
+def _ensure_repo(db_or_repo):
+    """兼容旧调用：传入 AsyncSession 时包装为 SQLAlchemyMemoryRepository。"""
+    if isinstance(db_or_repo, AsyncSession):
+        return SQLAlchemyMemoryRepository(db_or_repo)
+    return db_or_repo
 
 
 class ContextConfigParser:
@@ -26,6 +34,7 @@ class ContextConfigParser:
 
     @classmethod
     async def load_config_from_db(cls, db: AsyncSession, agent_id: int) -> ContextConfig:
+        db = _ensure_repo(db)
         try:
             from app.models.system_settings import SystemSettings
             result = await db.execute(SystemSettings.__table__.select().where(SystemSettings.id == 1))

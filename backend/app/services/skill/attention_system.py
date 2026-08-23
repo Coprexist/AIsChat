@@ -10,8 +10,16 @@
 import logging
 import re
 from sqlalchemy.ext.asyncio import AsyncSession
+from app.repositories.skill_repo import SkillRepository, SQLAlchemySkillRepository
 
 logger = logging.getLogger(__name__)
+
+
+def _ensure_repo(db_or_repo):
+    """兼容旧调用：传入 AsyncSession 时包装为 SQLAlchemySkillRepository。"""
+    if isinstance(db_or_repo, AsyncSession):
+        return SQLAlchemySkillRepository(db_or_repo)
+    return db_or_repo
 
 
 class AttentionSystem:
@@ -26,6 +34,7 @@ class AttentionSystem:
         Returns:
             匹配动作类型
         """
+        db = _ensure_repo(db)
         from app.models.agent_attention import AgentAttention
         from sqlalchemy import select
         result = await db.execute(
@@ -59,6 +68,7 @@ class AttentionSystem:
 
     async def update_attention(self, db: AsyncSession, agent_id: int, group_id: int, settings: dict) -> None:
         """更新注意力设置"""
+        db = _ensure_repo(db)
         from app.models.agent_attention import AgentAttention
         from sqlalchemy import select
         result = await db.execute(
@@ -89,6 +99,7 @@ class AttentionSystem:
 
     async def get_attention(self, db: AsyncSession, agent_id: int, group_id: int | None = None) -> list[dict]:
         """获取注意力设置列表（group_id 缺省时返回该 AI 全部）"""
+        db = _ensure_repo(db)
         from app.models.agent_attention import AgentAttention
         from sqlalchemy import select
 

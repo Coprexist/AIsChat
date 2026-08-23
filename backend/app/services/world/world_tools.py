@@ -14,11 +14,12 @@ import uuid
 from pathlib import Path
 
 from sqlalchemy import select
-from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.services.world.world_api_docs import section_intro_text, _discover_sections
+from app.repositories.world_repo import WorldRepository
 
 logger = logging.getLogger(__name__)
+
 
 
 WORLD_TOOLS = [
@@ -695,7 +696,7 @@ async def _web_download(world, arguments: str) -> dict:
         return {"success": False, "error": f"下载失败：{str(e)[:120]}"}
 
 
-async def _do_execute(db: AsyncSession, world, name: str, arguments: str, turn_state: dict | None = None, on_progress=None) -> dict:
+async def _do_execute(world_repo: WorldRepository, world, name: str, arguments: str, turn_state: dict | None = None, on_progress=None) -> dict:
     """实际执行世界 AI 的工具调用（以世界主人身份写操作；文件走隔离目录+白名单）
 
     on_progress：耗时工具分阶段回调（async (note) -> None），转发为 [TOOL_UPDATE] update 事件。
@@ -708,7 +709,7 @@ async def _do_execute(db: AsyncSession, world, name: str, arguments: str, turn_s
     if name == "get_group_types":
         try:
             from app.services.world.group_type_service import list_group_types
-            types = await list_group_types(db, world.id)
+            types = await list_group_types(world_repo, world.id)
             return {"success": True, "types": types}
         except Exception as e:
             return {"success": False, "error": str(e)}
@@ -721,7 +722,7 @@ async def _do_execute(db: AsyncSession, world, name: str, arguments: str, turn_s
         try:
             from app.services.world.group_type_service import save_group_types_config
             types = await save_group_types_config(
-                db, world.id, world.owner_id, args.get("types") or [],
+                world_repo, world.id, world.owner_id, args.get("types") or [],
             )
             return {"success": True, "types": types}
         except ValueError as e:
@@ -742,7 +743,7 @@ async def _do_execute(db: AsyncSession, world, name: str, arguments: str, turn_s
             return {"success": False, "error": "没有有效的 name/description 参数"}
         try:
             from app.services.world.world_service import update_world
-            updated = await update_world(db, world.id, world.owner_id, **patch)
+            updated = await update_world(world_repo, world.id, world.owner_id, **patch)
             return {"success": True, "name": updated["name"], "description": updated["description"]}
         except ValueError as e:
             return {"success": False, "error": str(e)}
@@ -756,7 +757,7 @@ async def _do_execute(db: AsyncSession, world, name: str, arguments: str, turn_s
         if mode not in ("mention_only", "all"):
             return {"success": False, "error": "mode 必须是 mention_only 或 all"}
         from app.services.world.world_service import update_world
-        await update_world(db, world.id, world.owner_id, config={"group_trigger_mode": mode})
+        await update_world(world_repo, world.id, world.owner_id, config={"group_trigger_mode": mode})
         return {"success": True, "group_trigger_mode": mode}
 
     from app.services.world.world_file_service import delete_file, list_files, write_file
@@ -780,7 +781,7 @@ async def _do_execute(db: AsyncSession, world, name: str, arguments: str, turn_s
             return {}
 
     async def _bound_group_ids() -> list[int]:
-        rows = (await db.execute(
+        rows = (await world_repo.execute(
             select(WorldBinding).where(
                 WorldBinding.world_id == world.id,
                 WorldBinding.entity_type == "group",
@@ -804,10 +805,10 @@ async def _do_execute(db: AsyncSession, world, name: str, arguments: str, turn_s
             from app.models.group import GroupMember
             out = []
             for gid in gids:
-                g = await _get_group(db, gid)
+                g = await _get_group(world_repo.session, gid)
                 if g is None:
                     continue
-                cnt = (await db.execute(
+                cnt = (await world_repo.execute(
                     select(_func.count()).select_from(GroupMember).where(GroupMember.group_id == gid)
                 )).scalar()
                 out.append({
@@ -829,17 +830,17 @@ async def _do_execute(db: AsyncSession, world, name: str, arguments: str, turn_s
                 return {"success": False, "error": "本世界未绑定任何群聊"}
             gid = gids[0]
             limit = max(1, min(int(args.get("limit") or 20), 50))
-            msgs = await _get_recent_messages(db, gid, limit)
+            msgs = await _get_recent_messages(world_repo.session, gid, limit)
             from app.models.user import User
             from app.models.agent import Agent
             all_ids = {m.sender_id for m in msgs}
             name_map = {}
             if all_ids:
-                u_res = await db.execute(select(User.id, User.username, User.type).where(User.id.in_(all_ids)))
+                u_res = await world_repo.execute(select(User.id, User.username, User.type).where(User.id.in_(all_ids)))
                 for uid, uname, utype in u_res.all():
                     name_map[uid] = uname
                     if utype == "ai":
-                        a = (await db.execute(select(Agent.name).where(Agent.user_id == uid))).first()
+                        a = (await world_repo.execute(select(Agent.name).where(Agent.user_id == uid))).first()
                         if a:
                             name_map[uid] = a[0]
             out = [{
@@ -859,18 +860,18 @@ async def _do_execute(db: AsyncSession, world, name: str, arguments: str, turn_s
             if not gids:
                 return {"success": False, "error": "本世界未绑定任何群聊"}
             gid = gids[0]
-            members = await _get_group_members(db, gid)
+            members = await _get_group_members(world_repo.session, gid)
             from app.models.user import User
             from app.models.agent import Agent
             out = []
             for m in members:
                 nm = None
                 if m.member_type == "human":
-                    u = await db.get(User, m.member_id)
+                    u = await world_repo.get(User, m.member_id)
                     if u:
                         nm = u.username
                 else:
-                    a = (await db.execute(select(Agent.name).where(Agent.user_id == m.member_id))).first()
+                    a = (await world_repo.execute(select(Agent.name).where(Agent.user_id == m.member_id))).first()
                     if a:
                         nm = a[0]
                 out.append({
@@ -893,7 +894,7 @@ async def _do_execute(db: AsyncSession, world, name: str, arguments: str, turn_s
             content = str(args.get("content") or "").strip()
             if not content:
                 return {"success": False, "error": "消息内容不能为空"}
-            msg = await _create_message(db, gid, "human", world.owner_id, content, source="world", allow_non_member=True)
+            msg = await _create_message(world_repo.session, gid, "human", world.owner_id, content, source="world", allow_non_member=True)
             try:
                 from app.routers.ws import manager
                 await manager.broadcast_to_group(gid, {"type": "message", "data": {"id": msg.id, "content": content}})
@@ -913,7 +914,7 @@ async def _do_execute(db: AsyncSession, world, name: str, arguments: str, turn_s
             mtype = str(args.get("member_type") or "")
             mid = int(args.get("member_id") or 0)
             role = str(args.get("role") or "")
-            await _change_member_role(db, gid, world.owner_id, mtype, mid, role)
+            await _change_member_role(world_repo.session, gid, world.owner_id, mtype, mid, role)
             return {"success": True, "member_id": mid, "role": role}
         except (ValueError, TypeError) as e:
             return {"success": False, "error": str(e)}
@@ -927,7 +928,7 @@ async def _do_execute(db: AsyncSession, world, name: str, arguments: str, turn_s
             gid = gids[0]
             mtype = str(args.get("member_type") or "")
             mid = int(args.get("member_id") or 0)
-            await _remove_member(db, gid, world.owner_id, mtype, mid)
+            await _remove_member(world_repo.session, gid, world.owner_id, mtype, mid)
             return {"success": True, "member_id": mid}
         except ValueError as e:
             return {"success": False, "error": str(e)}
@@ -998,7 +999,7 @@ async def _do_execute(db: AsyncSession, world, name: str, arguments: str, turn_s
                 try:
                     from app.services.world.world_service import add_pending_notice
                     await add_pending_notice(
-                        db, world.id, f"blocks/{block_id}/", "积木更新",
+                        world_repo, world.id, f"blocks/{block_id}/", "积木更新",
                         f"积木「{result.get('name', block_id)}」已更新 v{result['previous_version']} → v{result['version']}；"
                         f"你的 DIY（blocks/{block_id}/diy/）已保留，主文件旧版备份在 .bak/ 可回滚。",
                     )
@@ -1031,7 +1032,7 @@ async def _do_execute(db: AsyncSession, world, name: str, arguments: str, turn_s
             from app.models.world import WorldAIMemory
             from app.utils.embedding import get_embedding
             from app.services.world.world_chat_service import _resolve_world_credentials
-            api_key, api_base = await _resolve_world_credentials(db, world)
+            api_key, api_base = await _resolve_world_credentials(world_repo, world)
             embedding = None
             try:
                 embedding = await get_embedding(title + "\n" + content, api_base_url=api_base, api_key=api_key)
@@ -1039,7 +1040,7 @@ async def _do_execute(db: AsyncSession, world, name: str, arguments: str, turn_s
                 logger.warning(f"🌐 世界 #{world.id} 记忆向量化失败（将无向量存储）: {e}")
             # 同名 title 覆盖更新（记忆更新语义：执行改动/计划后用固定 title 刷新）
             from sqlalchemy import select as sa_select
-            existing = (await db.execute(
+            existing = (await world_repo.execute(
                 sa_select(WorldAIMemory).where(
                     WorldAIMemory.world_id == world.id, WorldAIMemory.title == title
                 )
@@ -1048,8 +1049,8 @@ async def _do_execute(db: AsyncSession, world, name: str, arguments: str, turn_s
                 existing.content = content
                 existing.embedding = embedding
             else:
-                db.add(WorldAIMemory(world_id=world.id, title=title, content=content, embedding=embedding))
-            await db.flush()
+                world_repo.add(WorldAIMemory(world_id=world.id, title=title, content=content, embedding=embedding))
+            await world_repo.flush()
             return {"success": True, "title": title, "embedded": embedding is not None, "updated": existing is not None}
         except (ValueError, TypeError, json.JSONDecodeError) as e:
             return {"success": False, "error": str(e)}
@@ -1064,13 +1065,13 @@ async def _do_execute(db: AsyncSession, world, name: str, arguments: str, turn_s
             from app.models.world import WorldAIMemory
             from app.utils.embedding import get_embedding
             from app.services.world.world_chat_service import _resolve_world_credentials
-            api_key, api_base = await _resolve_world_credentials(db, world)
+            api_key, api_base = await _resolve_world_credentials(world_repo, world)
             memories = []
             # 第一轮：向量语义检索（与主站 recall 同款：embedding <=> 余弦距离）
             try:
                 vec = await get_embedding(query, api_base_url=api_base, api_key=api_key)
                 emb_str = "[" + ",".join(str(x) for x in vec) + "]"
-                rows = (await db.execute(
+                rows = (await world_repo.execute(
                     select(WorldAIMemory)
                     .where(WorldAIMemory.world_id == world.id, WorldAIMemory.embedding != None)
                     .order_by(WorldAIMemory.embedding.op("<=>")(emb_str))
@@ -1084,7 +1085,7 @@ async def _do_execute(db: AsyncSession, world, name: str, arguments: str, turn_s
                 logger.warning(f"🌐 世界 #{world.id} 向量检索失败（走文本回退）: {e}")
             # 回退：文本包含匹配（向量不可用或无结果时）
             if not memories:
-                rows = (await db.execute(
+                rows = (await world_repo.execute(
                     select(WorldAIMemory)
                     .where(WorldAIMemory.world_id == world.id)
                     .order_by(WorldAIMemory.created_at.desc())
@@ -1108,7 +1109,7 @@ async def _do_execute(db: AsyncSession, world, name: str, arguments: str, turn_s
         try:
             args = json.loads(arguments or "{}")
             from app.tools.file_operations.web_search import WebSearch
-            return await WebSearch().execute(db, 0, None, args, {})
+            return await WebSearch().execute(world_repo.session, 0, None, args, {})
         except (ValueError, TypeError, json.JSONDecodeError) as e:
             return {"success": False, "error": str(e)}
 
@@ -1118,8 +1119,8 @@ async def _do_execute(db: AsyncSession, world, name: str, arguments: str, turn_s
             args = json.loads(arguments or "{}")
             # 确保沙箱 env 注入 WORLD_API_TOKEN / WORLD_API_BASE（懒生成，worlds.config.api_token）
             from app.routers.world_proxy import ensure_world_api_token
-            await ensure_world_api_token(db, world)
-            await db.commit()
+            await ensure_world_api_token(world_repo.session, world)
+            await world_repo.commit()
             from app.services.world.world_sandbox import run_world_code as _run_code, run_world_trigger as _run_trigger
             # 分阶段进度（2026-08-13：耗时工具多状态——创建→运行→返回）
             if on_progress:
@@ -1142,7 +1143,7 @@ async def _do_execute(db: AsyncSession, world, name: str, arguments: str, turn_s
         try:
             args = json.loads(arguments or "{}")
             from app.tools.file_operations.web_fetch import WebFetch
-            return await WebFetch().execute(db, 0, None, args, {})
+            return await WebFetch().execute(world_repo.session, 0, None, args, {})
         except (ValueError, TypeError, json.JSONDecodeError) as e:
             return {"success": False, "error": str(e)}
 
@@ -1218,12 +1219,12 @@ async def _do_execute(db: AsyncSession, world, name: str, arguments: str, turn_s
             from app.config import settings
             from app.services.memory.context_compression_service import compress_messages
             from app.services.world.world_chat_service import _resolve_world_credentials, get_chat_history, session_key, session_id_for_db, WORLD_CHAT_KEEP_LAST, WORLD_CONTEXT_MIN_MESSAGES
-            api_key, api_base = await _resolve_world_credentials(db, world)
+            api_key, api_base = await _resolve_world_credentials(world_repo, world)
             from app.models.world import WorldAI
-            wai = (await db.execute(select(WorldAI).where(WorldAI.world_id == world.id))).scalar_one_or_none()
+            wai = (await world_repo.execute(select(WorldAI).where(WorldAI.world_id == world.id))).scalar_one_or_none()
             model = (wai.model if wai else None) or settings.default_chat_model
             sid_db = session_id_for_db(world)
-            history = await get_chat_history(db, world.id, 200, session_id=sid_db)
+            history = await get_chat_history(world_repo, world.id, 200, session_id=sid_db)
             if len(history) < WORLD_CONTEXT_MIN_MESSAGES:
                 return {"success": False, "error": f"对话太短（{len(history)} 条），无需压缩"}
             msgs = [{"role": "system", "content": "世界 AI 对话"}]  # keep_system 保留
@@ -1254,8 +1255,9 @@ async def _do_execute(db: AsyncSession, world, name: str, arguments: str, turn_s
             world.config = cfg
             # 能力懒加载：压缩后解锁，effective 全部对齐最新（提示词/强注入/昵称/技能变更在此生效）
             try:
+                from app.repositories.capability_repo import SQLAlchemyCapabilityRepository
                 from app.services.capability_versioning import apply_pending_changes
-                await apply_pending_changes(db, world.config, [
+                await apply_pending_changes(SQLAlchemyCapabilityRepository(world_repo.session), world.config, [
                     "ai-skills",
                     f"world-prompt-{world.id}",
                     "forced-prompt",
@@ -1263,7 +1265,7 @@ async def _do_execute(db: AsyncSession, world, name: str, arguments: str, turn_s
                 ])
             except Exception:
                 pass
-            await db.flush()
+            await world_repo.flush()
             return {
                 "success": True,
                 "before_tokens": stats.get("before_tokens", 0),
@@ -1286,7 +1288,7 @@ async def _do_execute(db: AsyncSession, world, name: str, arguments: str, turn_s
                 q = q.where(WorldChatMessage.session_id.is_(None))
             else:
                 q = q.where(WorldChatMessage.session_id == sid_db)
-            await db.execute(q)
+            await world_repo.execute(q)
             cfg = dict(world.config or {})
             summaries = dict(cfg.get("chat_summaries") or {})
             summaries.pop(session_key(world), None)
@@ -1295,8 +1297,9 @@ async def _do_execute(db: AsyncSession, world, name: str, arguments: str, turn_s
             world.config = cfg
             # 解锁：清空 = 新对话，前缀变更（提示词/强注入/昵称）在此生效
             try:
+                from app.repositories.capability_repo import SQLAlchemyCapabilityRepository
                 from app.services.capability_versioning import apply_pending_changes
-                await apply_pending_changes(db, world.config, [
+                await apply_pending_changes(SQLAlchemyCapabilityRepository(world_repo.session), world.config, [
                     "ai-skills",
                     f"world-prompt-{world.id}",
                     "forced-prompt",
@@ -1304,7 +1307,7 @@ async def _do_execute(db: AsyncSession, world, name: str, arguments: str, turn_s
                 ])
             except Exception:
                 pass
-            await db.commit()
+            await world_repo.commit()
             return {"success": True, "note": "当前会话上下文已清空（历史消息+摘要+工作流记忆），其他会话保留；长期记忆保留，请从记忆恢复工作状态。"}
         except Exception as e:
             logger.warning(f"🌐 世界 #{world.id} 清空上下文失败: {e}")
@@ -1342,7 +1345,7 @@ async def _do_execute(db: AsyncSession, world, name: str, arguments: str, turn_s
             if action == "set":
                 if not sub_key or not field or not value:
                     return {"success": False, "error": "set 需要 sub_key/field/value"}
-                existing = (await db.execute(sa_select(WorldStructuredRecord).where(
+                existing = (await world_repo.execute(sa_select(WorldStructuredRecord).where(
                     WorldStructuredRecord.world_id == wid,
                     WorldStructuredRecord.category == category,
                     WorldStructuredRecord.sub_key == sub_key,
@@ -1351,8 +1354,8 @@ async def _do_execute(db: AsyncSession, world, name: str, arguments: str, turn_s
                 if existing:
                     existing.value = value
                 else:
-                    db.add(WorldStructuredRecord(world_id=wid, category=category, sub_key=sub_key, field=field, value=value))
-                await db.commit()
+                    world_repo.add(WorldStructuredRecord(world_id=wid, category=category, sub_key=sub_key, field=field, value=value))
+                await world_repo.commit()
                 return {"success": True, "action": "set", "category": category, "sub_key": sub_key, "field": field, "updated": existing is not None}
 
             if action == "get":
@@ -1361,14 +1364,14 @@ async def _do_execute(db: AsyncSession, world, name: str, arguments: str, turn_s
                     conds.append(WorldStructuredRecord.sub_key == sub_key)
                 if field:
                     conds.append(WorldStructuredRecord.field == field)
-                rows = (await db.execute(sa_select(WorldStructuredRecord).where(*conds))).scalars().all()
+                rows = (await world_repo.execute(sa_select(WorldStructuredRecord).where(*conds))).scalars().all()
                 return {"success": True, "records": [
                     {"sub_key": r.sub_key, "field": r.field, "value": r.value, "updated_at": str(r.updated_at) if r.updated_at else None}
                     for r in rows
                 ]}
 
             if action == "list":
-                rows = (await db.execute(sa_select(WorldStructuredRecord).where(
+                rows = (await world_repo.execute(sa_select(WorldStructuredRecord).where(
                     WorldStructuredRecord.world_id == wid,
                     WorldStructuredRecord.category == category,
                 ))).scalars().all()
@@ -1381,12 +1384,12 @@ async def _do_execute(db: AsyncSession, world, name: str, arguments: str, turn_s
                 conds = [WorldStructuredRecord.world_id == wid, WorldStructuredRecord.category == category]
                 if sub_key:
                     conds.append(WorldStructuredRecord.sub_key == sub_key)
-                rows = (await db.execute(sa_select(WorldStructuredRecord).where(*conds))).scalars().all()
+                rows = (await world_repo.execute(sa_select(WorldStructuredRecord).where(*conds))).scalars().all()
                 lines = [f"{r.sub_key}.{r.field}: {r.value[:200]}" for r in rows]
                 return {"success": True, "summary": chr(10).join(lines) or "（无记录）"}
 
             if action == "categories":
-                rows = (await db.execute(
+                rows = (await world_repo.execute(
                     sa_select(WorldStructuredRecord.category)
                     .where(WorldStructuredRecord.world_id == wid)
                     .distinct()
@@ -1399,8 +1402,8 @@ async def _do_execute(db: AsyncSession, world, name: str, arguments: str, turn_s
                     conds.append(WorldStructuredRecord.sub_key == sub_key)
                 if field:
                     conds.append(WorldStructuredRecord.field == field)
-                result = await db.execute(sa_delete(WorldStructuredRecord).where(*conds))
-                await db.commit()
+                result = await world_repo.execute(sa_delete(WorldStructuredRecord).where(*conds))
+                await world_repo.commit()
                 return {"success": True, "deleted": result.rowcount or 0}
 
             if action == "rename":
@@ -1410,7 +1413,7 @@ async def _do_execute(db: AsyncSession, world, name: str, arguments: str, turn_s
                 level = str(args.get("level", "category")).strip()
                 if not new_name:
                     return {"success": False, "error": "rename 需要 new_name"}
-                rows = (await db.execute(sa_select(WorldStructuredRecord).where(
+                rows = (await world_repo.execute(sa_select(WorldStructuredRecord).where(
                     WorldStructuredRecord.world_id == wid,
                     WorldStructuredRecord.category == category,
                 ))).scalars().all()
@@ -1435,7 +1438,7 @@ async def _do_execute(db: AsyncSession, world, name: str, arguments: str, turn_s
                         r.field = new_name
                 else:
                     return {"success": False, "error": f"未知 level: {level}（category|sub_key|field）"}
-                await db.commit()
+                await world_repo.commit()
                 return {"success": True, "action": "rename", "level": level, "new_name": new_name, "renamed": len(rows)}
 
             if action == "move":
@@ -1446,7 +1449,7 @@ async def _do_execute(db: AsyncSession, world, name: str, arguments: str, turn_s
                     return {"success": False, "error": "move 需要 to_category"}
                 if not sub_key:
                     return {"success": False, "error": "move 需要 sub_key 定位"}
-                rows = (await db.execute(sa_select(WorldStructuredRecord).where(
+                rows = (await world_repo.execute(sa_select(WorldStructuredRecord).where(
                     WorldStructuredRecord.world_id == wid,
                     WorldStructuredRecord.category == category,
                 ))).scalars().all()
@@ -1464,7 +1467,7 @@ async def _do_execute(db: AsyncSession, world, name: str, arguments: str, turn_s
                     for r in hit:
                         r.category = to_category
                     moved = len(hit)
-                await db.commit()
+                await world_repo.commit()
                 return {"success": True, "action": "move", "to_category": to_category, "moved": moved}
 
             return {"success": False, "error": f"未知 action: {action}"}
@@ -1473,7 +1476,7 @@ async def _do_execute(db: AsyncSession, world, name: str, arguments: str, turn_s
 
     # ── 文件式 skill（世界 AI 只用设计侧造物主工具；世界侧居民能力归群 AI）──
     from app.services.world.world_skill_runtime import execute_skill
-    skill_result = await execute_skill(db, world, name, arguments, scope='ai')
+    skill_result = await execute_skill(world_repo.session, world, name, arguments, scope='ai')
     if skill_result is not None:
         return skill_result
 
@@ -1481,7 +1484,7 @@ async def _do_execute(db: AsyncSession, world, name: str, arguments: str, turn_s
 
 
 async def _execute_world_tool(
-    db: AsyncSession, world, name: str, arguments: str, turn_state: dict | None = None,
+    world_repo: WorldRepository, world, name: str, arguments: str, turn_state: dict | None = None,
     on_progress=None,
 ) -> dict:
     """温和去重包装：5 分钟内重复调用且结果与上次完全一致才提示跳过。
@@ -1491,7 +1494,7 @@ async def _execute_world_tool(
     on_progress：耗时工具分阶段回调（async (note) -> None），转发为 [TOOL_UPDATE] update 事件。
     """
     import time as _time
-    result = await _do_execute(db, world, name, arguments, turn_state, on_progress=on_progress)
+    result = await _do_execute(world_repo, world, name, arguments, turn_state, on_progress=on_progress)
     if turn_state is not None:
         executed = turn_state.setdefault("executed", {})
         key = f"{name}|{arguments}"
