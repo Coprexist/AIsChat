@@ -4,6 +4,7 @@ AI 代理服务
 """
 import logging
 from sqlalchemy.ext.asyncio import AsyncSession
+from app.repositories.agent_repo import AgentRepository, SQLAlchemyAgentRepository
 from sqlalchemy import select, func, update
 from app.models.user import User
 from app.models.agent import Agent, AgentConfigHistory, AgentUserConfig, AgentCollaborator
@@ -17,6 +18,14 @@ from app.utils.pure.willingness import (
 )
 
 logger = logging.getLogger(__name__)
+
+
+def _ensure_repo(db_or_repo):
+    """兼容旧调用：传入 AsyncSession 时包装为 SQLAlchemyAgentRepository。"""
+    if isinstance(db_or_repo, AsyncSession):
+        return SQLAlchemyAgentRepository(db_or_repo)
+    return db_or_repo
+
 
 # 三档 AI 配置预设值
 CONFIG_PROFILES = {
@@ -107,6 +116,7 @@ async def apply_config_profile(
 
     设置 dry_run=True 返回预览 dict 而非实际写入。
     """
+    db = _ensure_repo(db)
     if profile not in CONFIG_PROFILES:
         raise ValueError(f"无效的配置档: {profile}，可选: {list(CONFIG_PROFILES.keys())}")
 
@@ -233,6 +243,7 @@ async def create_agent(
 
     通用 AI（general）自动设置 hide_ai_identity=True。
     """
+    db = _ensure_repo(db)
     # 查询用户（额度检查和日志都需要）
     result = await db.execute(select(User).where(User.id == owner_id))
     user = result.scalar_one_or_none()
@@ -349,6 +360,7 @@ async def create_agent(
 
 async def get_agent(db: AsyncSession, agent_id: int, owner_id: int | None = None) -> Result[Agent, str]:
     """获取单个 Agent，返回 Result[Agent, str]"""
+    db = _ensure_repo(db)
     from app.utils.result import Result
     query = select(Agent).where(Agent.id == agent_id)
     if owner_id is not None:
@@ -362,6 +374,7 @@ async def get_agent(db: AsyncSession, agent_id: int, owner_id: int | None = None
 
 async def list_agents(db: AsyncSession, owner_id: int) -> list[Agent]:
     """列出用户的所有 Agent（拥有的 + 参与合作的）"""
+    db = _ensure_repo(db)
     # 用户拥有的 AI
     owned_result = await db.execute(
         select(Agent).where(Agent.owner_id == owner_id)
@@ -400,6 +413,7 @@ async def get_effective_config(
     frequency_penalty, thinking_enabled, hide_ai_identity, ai_type 等
     （内部已用 get_agent() 的 unwrap，agent 不存在时抛 ValueError）
     """
+    db = _ensure_repo(db)
     agent = (await get_agent(db, agent_id)).unwrap()
 
     ai_type = agent.ai_type or "resonance"
@@ -476,6 +490,7 @@ async def delete_agent(
     删除 AI 代理，返还 api_credit_cost 给创建者。
     同时删除关联的 users 条目（type='ai'）。
     """
+    db = _ensure_repo(db)
     agent = (await get_agent(db, agent_id)).unwrap()
 
     # 权限检查：owner 或 can_delete 合作者
@@ -533,6 +548,7 @@ async def update_agent_config(
     v0.1.3: 通用/半通用 AI 的可覆盖字段写入 agent_user_configs，
     而非 agent 本体（实现 per-user 配置隔离）。
     """
+    db = _ensure_repo(db)
     agent = (await get_agent(db, agent_id)).unwrap()
 
     ai_type = agent.ai_type or "resonance"
@@ -759,6 +775,7 @@ async def rollback_config(
     回滚 AI 配置到历史版本。
     version_id 可以是 agent_config_history.id，或 -1 表示上一版本。
     """
+    db = _ensure_repo(db)
     agent = (await get_agent(db, agent_id)).unwrap()
 
     # 查询历史记录
@@ -810,6 +827,7 @@ async def switch_agent_state(
     """
     切换 AI 状态。
     """
+    db = _ensure_repo(db)
     valid_states = ["active", "dnd", "inactive", "blocked"]
     if target_state not in valid_states:
         raise ValueError(f"无效状态: {target_state}，可选: {valid_states}")
@@ -886,6 +904,7 @@ async def get_config_history(
     limit: int = 20,
 ) -> list[AgentConfigHistory]:
     """获取 AI 配置历史"""
+    db = _ensure_repo(db)
     result = await db.execute(
         select(AgentConfigHistory)
         .where(AgentConfigHistory.agent_id == agent_id)
@@ -961,6 +980,7 @@ async def calculate_willingness(
 
     编排器：负责 DB 查询 + 调用纯函数计算。
     """
+    db = _ensure_repo(db)
     from datetime import datetime, timedelta
     from app.models.message import Message
 
@@ -1018,6 +1038,7 @@ async def _calc_proactive_willingness(
 
     编排器：DB 查询群活跃度 → 纯函数计算。
     """
+    db = _ensure_repo(db)
     from app.models.message import Message
     from sqlalchemy import func as _sql_func
 
@@ -1045,6 +1066,7 @@ async def export_agent_soul(
     """
     导出 AI 灵魂档案：配置 + 历史 + 记忆
     """
+    db = _ensure_repo(db)
     from datetime import datetime, timezone as tz
 
     agent = (await get_agent(db, agent_id)).unwrap()
@@ -1136,6 +1158,7 @@ async def import_agent_soul(
     从灵魂档案导入 AI。
     创建新 Agent + 可选记忆导入。
     """
+    db = _ensure_repo(db)
     cfg = data.get("agent_config", {})
     orig = data.get("original_config", {})
     name = data.get("agent_name", "未命名")
@@ -1289,6 +1312,7 @@ def agent_to_dict(agent: Agent) -> dict:
 
 async def _get_collaborator(db: AsyncSession, agent_id: int, user_id: int) -> AgentCollaborator | None:
     """获取用户在指定 AI 上的合作者记录"""
+    db = _ensure_repo(db)
     result = await db.execute(
         select(AgentCollaborator).where(
             AgentCollaborator.agent_id == agent_id,
@@ -1307,6 +1331,7 @@ async def add_collaborator(
     can_manage_collaborators: bool = False,
 ) -> AgentCollaborator:
     """添加合作者（仅 owner 或 can_manage_collaborators 者可操作）"""
+    db = _ensure_repo(db)
     existing = await _get_collaborator(db, agent_id, user_id)
     if existing:
         raise ValueError("该用户已是此 AI 的合作者")
@@ -1325,6 +1350,7 @@ async def add_collaborator(
 
 async def remove_collaborator(db: AsyncSession, agent_id: int, user_id: int):
     """移除合作者"""
+    db = _ensure_repo(db)
     collab = await _get_collaborator(db, agent_id, user_id)
     if collab is None:
         raise ValueError("该用户不是此 AI 的合作者")
@@ -1341,6 +1367,7 @@ async def update_collaborator(
     can_manage_collaborators: bool | None = None,
 ) -> AgentCollaborator:
     """更新合作者权限"""
+    db = _ensure_repo(db)
     collab = await _get_collaborator(db, agent_id, user_id)
     if collab is None:
         raise ValueError("该用户不是此 AI 的合作者")
@@ -1357,6 +1384,7 @@ async def update_collaborator(
 
 async def list_collaborators(db: AsyncSession, agent_id: int) -> list[AgentCollaborator]:
     """列出 AI 的所有合作者"""
+    db = _ensure_repo(db)
     result = await db.execute(
         select(AgentCollaborator).where(AgentCollaborator.agent_id == agent_id)
         .order_by(AgentCollaborator.created_at)
@@ -1377,6 +1405,7 @@ def collaborator_to_dict(c: AgentCollaborator) -> dict:
 
 async def apply_pending_config(db, agent):
     """压缩时调用：将 pending_system_prompt 切到 current，清空 pending。"""
+    db = _ensure_repo(db)
     if not agent.pending_system_prompt:
         return
     old = agent.current_system_prompt
