@@ -1,6 +1,5 @@
 ﻿"""
-后端启动核心：设置环境、导入 FastAPI 应用、配置静态托管，并提供 run_server()。
-与 GUI 解耦，便于独立维护或替换前端。
+后端启动核心：设置环境、导入 FastAPI 应用、配置静态托管，并提供可优雅停止的服务器。
 """
 import os
 import sys
@@ -44,7 +43,6 @@ from fastapi.responses import FileResponse
 
 
 def _replace_root_route(app):
-    """递归查找并替换根路由处理函数，使 / 返回前端 index.html。"""
     def _walk(routes):
         for route in routes:
             if getattr(route, "path", None) == "/" and "GET" in getattr(route, "methods", set()):
@@ -81,8 +79,7 @@ async def serve_frontend(full_path: str):
     return FileResponse(STATIC_DIR / "index.html")
 
 
-def run_server(host="127.0.0.1", port=8000, log_level="info", log_config=None):
-    """启动 Uvicorn 服务器（阻塞）。"""
+def create_server(host="127.0.0.1", port=8000, log_level="info", log_config=None):
+    """创建并返回一个可优雅停止的 Uvicorn 服务器实例。"""
     config = uvicorn.Config(app, host=host, port=port, log_level=log_level, log_config=log_config)
-    server = uvicorn.Server(config)
-    server.run()
+    return uvicorn.Server(config)

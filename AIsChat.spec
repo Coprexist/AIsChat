@@ -1,3 +1,4 @@
+from PyInstaller.utils.hooks import collect_submodules, collect_data_files
 from PyInstaller.utils.hooks import collect_submodules
 # -*- mode: python ; coding: utf-8 -*-
 
@@ -10,8 +11,10 @@ a = Analysis(
     datas=[
         ('backend/app', 'app'),
         ('frontend/dist', 'frontend/dist'),
-    ],
+    ] + collect_data_files('customtkinter'),
     hiddenimports=[
+        'customtkinter',
+        'customtkinter',
         'pydantic_settings',
         'sqlalchemy',
         'sqlalchemy.dialects.sqlite',
