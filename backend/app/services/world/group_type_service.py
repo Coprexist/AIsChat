@@ -23,10 +23,19 @@ from pathlib import Path
 
 from sqlalchemy import select, func
 from sqlalchemy.ext.asyncio import AsyncSession
+from app.repositories.group_type_repo import GroupTypeRepository, SQLAlchemyGroupTypeRepository
 
 from app.models.world import World, WorldAgent, WorldBinding, GroupAssistant
 
 logger = logging.getLogger(__name__)
+
+
+def _ensure_repo(db_or_repo):
+    """兼容旧调用：传入 AsyncSession 时包装为 SQLAlchemyGroupTypeRepository。"""
+    if isinstance(db_or_repo, AsyncSession):
+        return SQLAlchemyGroupTypeRepository(db_or_repo)
+    return db_or_repo
+
 
 GROUP_TYPES_FILE = "group_types.json"          # 世界文件夹内（相对世界根目录）
 DEFAULT_ASSISTANT_SPEC = {"count": 1, "need_api": True, "default_name": "群助手"}
@@ -115,6 +124,7 @@ def _slugify(name: str) -> str:
 # ═══════════════════════════════════════════════════════════════
 
 async def _require_world_owner(db: AsyncSession, world_id: int, owner_id: int) -> World:
+    db = _ensure_repo(db)
     world = await db.get(World, world_id)
     if world is None:
         raise ValueError("世界不存在")
@@ -124,6 +134,7 @@ async def _require_world_owner(db: AsyncSession, world_id: int, owner_id: int) -
 
 
 async def list_group_types(db: AsyncSession, world_id: int, entity_type: str = "group") -> list[dict]:
+    db = _ensure_repo(db)
     """类型定义 + 每类型已绑定数（bound_count 按 entity_type 区分：group=群 / agent=AI）。"""
     types = load_group_types(world_id)
     result = []
@@ -142,6 +153,7 @@ async def list_group_types(db: AsyncSession, world_id: int, entity_type: str = "
 async def save_group_types_config(
     db: AsyncSession, world_id: int, owner_id: int, types: list[dict],
 ) -> list[dict]:
+    db = _ensure_repo(db)
     """世界作者（或群视界机器人）整体保存类型定义（全量替换，slug 幂等）。"""
     await _require_world_owner(db, world_id, owner_id)
     normalized = [_normalize_type(t) for t in types if t.get("name")]
@@ -161,6 +173,7 @@ async def save_group_types_config(
 async def bind_entry_with_type(
     db: AsyncSession, world_id: int, owner_id: int, entity_type: str, entity_id: int, type_slug: str,
 ) -> dict:
+    db = _ensure_repo(db)
     """把入口（群聊 group / AI agent）绑定到某类型（slug）：校验定义/上限 → 更新绑定。
 
     - group：按模板自动创建群助手（幂等）
@@ -235,6 +248,7 @@ async def bind_entry_with_type(
 async def bind_entries_with_type(
     db: AsyncSession, world_id: int, owner_id: int, entity_type: str, entity_ids: list[int], type_slug: str,
 ) -> dict:
+    db = _ensure_repo(db)
     """批量把多个入口（群/AI）绑定到同一类型（逐个复用 bind_entry_with_type，互不影响；返回逐条结果）"""
     results = []
     for eid in entity_ids:
@@ -251,6 +265,7 @@ async def _create_group_assistant(
     db: AsyncSession, world: World, group_id: int, type_slug: str,
     spec: dict, index: int,
 ) -> int | None:
+    db = _ensure_repo(db)
     """创建单个群助手：直接建 group_assistants 实体（不 create_agent、不入群成员、
     不建 WorldAgent——与群视界 AI 同形态：无账号、无好友）。"""
     try:
@@ -282,6 +297,7 @@ async def _create_group_assistant(
 # ═══════════════════════════════════════════════════════════════
 
 async def _get_assistant(db: AsyncSession, world_id: int, assistant_id: int) -> GroupAssistant:
+    db = _ensure_repo(db)
     ga = (await db.execute(
         select(GroupAssistant).where(GroupAssistant.world_id == world_id, GroupAssistant.id == assistant_id)
     )).scalar_one_or_none()
@@ -291,6 +307,7 @@ async def _get_assistant(db: AsyncSession, world_id: int, assistant_id: int) -> 
 
 
 async def _require_group_owner(db: AsyncSession, world_id: int, operator_id: int, assistant_id: int) -> GroupAssistant:
+    db = _ensure_repo(db)
     ga = await _get_assistant(db, world_id, assistant_id)
     from sqlalchemy import text as _t
     owner_row = (await db.execute(_t(
@@ -306,6 +323,7 @@ async def set_assistant_api(
     db: AsyncSession, world_id: int, operator_id: int, assistant_id: int,
     api_key: str | None = None, api_base_url: str | None = None,
 ) -> dict:
+    db = _ensure_repo(db)
     """群主为群助手设置 API（自定义 key，加密存储）。"""
     ga = await _require_group_owner(db, world_id, operator_id, assistant_id)
     from app.utils.crypto import encrypt_api_key
@@ -319,6 +337,7 @@ async def set_assistant_api(
 
 
 async def apply_global_api(db: AsyncSession, world_id: int, operator_id: int, assistant_id: int) -> dict:
+    db = _ensure_repo(db)
     """一键应用群主的默认全局 API。"""
     ga = await _require_group_owner(db, world_id, operator_id, assistant_id)
     from sqlalchemy import text as _t
@@ -337,6 +356,7 @@ async def apply_global_api(db: AsyncSession, world_id: int, operator_id: int, as
 
 
 async def clear_assistant_api(db: AsyncSession, world_id: int, operator_id: int, assistant_id: int) -> dict:
+    db = _ensure_repo(db)
     """清除群助手 API（回落世界/系统默认）。"""
     await _require_group_owner(db, world_id, operator_id, assistant_id)
     ga = await _get_assistant(db, world_id, assistant_id)
@@ -347,6 +367,7 @@ async def clear_assistant_api(db: AsyncSession, world_id: int, operator_id: int,
 
 
 async def assistant_api_status(db: AsyncSession, world_id: int, assistant_id: int) -> dict:
+    db = _ensure_repo(db)
     """群助手 API 状态（不回显 key）。"""
     ga = await _get_assistant(db, world_id, assistant_id)
     from app.models.user import User
@@ -370,6 +391,7 @@ async def assistant_api_status(db: AsyncSession, world_id: int, assistant_id: in
 # ═══════════════════════════════════════════════════════════════
 
 async def get_group_type_for_group(db: AsyncSession, world_id: int, group_id: int) -> dict | None:
+    db = _ensure_repo(db)
     """群消息事件注入用：查绑定 → 返回 {slug, name}（未绑定返回 None）。"""
     binding = (await db.execute(
         select(WorldBinding).where(
