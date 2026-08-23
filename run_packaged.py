@@ -17,9 +17,11 @@ import uvicorn
 if getattr(sys, "frozen", False):
     BASE_DIR = Path(sys._MEIPASS)
     APP_DIR = Path(sys.executable).resolve().parent
+    BACKEND_DIR = BASE_DIR
 else:
     BASE_DIR = Path(__file__).resolve().parent
     APP_DIR = BASE_DIR
+    BACKEND_DIR = BASE_DIR / "backend"
 
 DATA_DIR = APP_DIR / "data"
 DATA_DIR.mkdir(parents=True, exist_ok=True)
@@ -39,7 +41,6 @@ if not STATIC_DIR.exists():
 if not STATIC_DIR.exists():
     STATIC_DIR = APP_DIR / "_internal/frontend/dist"
 
-BACKEND_DIR = BASE_DIR / "backend"
 sys.path.insert(0, str(BACKEND_DIR))
 
 from app.main import app
@@ -99,11 +100,19 @@ async def serve_frontend(full_path: str):
     return FileResponse(STATIC_DIR / "index.html")
 
 
-def open_browser():
-    time.sleep(2)
+def open_browser_when_ready():
+    import urllib.request
+    for _ in range(60):
+        try:
+            urllib.request.urlopen("http://127.0.0.1:8000/health", timeout=2)
+            webbrowser.open("http://127.0.0.1:8000")
+            return
+        except Exception:
+            time.sleep(1)
+    # 如果等待超时，仍然打开浏览器
     webbrowser.open("http://127.0.0.1:8000")
 
 
 if __name__ == "__main__":
-    threading.Thread(target=open_browser, daemon=True).start()
+    threading.Thread(target=open_browser_when_ready, daemon=True).start()
     uvicorn.run(app, host="127.0.0.1", port=8000, log_level="info")
