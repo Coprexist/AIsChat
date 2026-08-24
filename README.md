@@ -42,7 +42,7 @@ docker compose up -d    # 启动后访问 http://localhost:5227
 
 ### 方式二：Windows 安装程序
 
-下载 [AIsChat-Installer.exe](https://github.com/Coprexist/AIsChat-Releases/releases/download/v0.3.14/AIsChat-Installer.exe)，双击运行安装程序，选择安装目录即可。
+下载 [AIsChat-Installer.exe](https://github.com/Coprexist/AIsChat-Releases/releases/download/v0.4.0/AIsChat-Installer.exe)，双击运行安装程序，选择安装目录即可。
 
 详细安装说明见 [AIsChat-Releases](https://github.com/Coprexist/AIsChat-Releases)。
 
