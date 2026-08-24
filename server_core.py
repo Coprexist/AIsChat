@@ -1,4 +1,4 @@
-﻿"""
+"""
 后端启动核心：设置环境、导入 FastAPI 应用、配置静态托管，并提供可优雅停止的服务器。
 """
 import os
@@ -73,6 +73,11 @@ app.mount("/assets", StaticFiles(directory=STATIC_DIR / "assets"), name="assets"
 
 @app.get("/{full_path:path}", include_in_schema=False)
 async def serve_frontend(full_path: str):
+    # 如果路径以 api/ 开头，说明是 API 请求，不应该由静态文件处理
+    if full_path.startswith("api/"):
+        from fastapi import HTTPException
+        raise HTTPException(status_code=404, detail="API endpoint not found")
+    
     file_path = STATIC_DIR / full_path
     if file_path.is_file():
         return FileResponse(file_path)
