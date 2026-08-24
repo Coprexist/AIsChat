@@ -11,10 +11,12 @@ a = Analysis(
     datas=[
         ('backend/app', 'app'),
         ('frontend/dist', 'frontend/dist'),
+        ('frontend/public/logo-transparent.ico', 'frontend/public'),
     ] + collect_data_files('customtkinter'),
     hiddenimports=[
         'customtkinter',
         'customtkinter',
+        'pystray',
         'pydantic_settings',
         'sqlalchemy',
         'sqlalchemy.dialects.sqlite',
@@ -80,7 +82,7 @@ exe = EXE(
     strip=False,
     upx=True,
     console=False,
-    icon='frontend/public/logo-transparent.png',
+    icon='frontend/public/logo-transparent.ico',
     disable_windowed_traceback=False,
     argv_emulation=False,
     target_arch=None,

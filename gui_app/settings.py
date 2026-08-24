@@ -9,7 +9,8 @@ import json
 import sys
 from pathlib import Path
 
-DEFAULTS = {"theme": "purple"}
+DEFAULTS = {"theme": "purple", "log_font_size": "13", "port": "8000",
+            "auto_start": False, "minimize_to_tray": True}
 
 
 def _data_dir() -> Path:

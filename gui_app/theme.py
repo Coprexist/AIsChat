@@ -7,7 +7,7 @@ AIsChat 启动器设计令牌（Design Tokens）
 
 颜色通过模块级动态属性读取（`theme.PRIMARY` 等），
 `theme.switch(name)` 切换后，调用方重新应用即可全局换肤。
-字体 / 圆角 / 服务地址为静态常量。
+字体 / 圆角 / 间距 / 服务地址为静态常量。
 """
 from __future__ import annotations
 
@@ -104,21 +104,41 @@ def __getattr__(name: str):
 
 # ── 静态常量 ──
 
-# 字体
+# 字体（整体加大）
 FONT_UI = "Microsoft YaHei UI"
 FONT_UI_FALLBACK = "Microsoft YaHei"
 FONT_MONO = "Consolas"
+FONT_LOG_SIZE = 13          # 日志文本框默认字号
+# 日志字号选项：(设置键值, 显示标签, 实际像素大小)
+LOG_FONT_SIZES = [("11", "小", 11), ("13", "中", 13), ("15", "大", 15)]
 
-# 圆角（对齐前端 rounded-xl / rounded-2xl / 胶囊）
+# 圆角
 RADIUS_CARD = 16
-RADIUS_BUTTON = 12
+RADIUS_BUTTON = 10
 RADIUS_PILL = 999
-RADIUS_TEXTBOX = 12
-RADIUS_CHIP = 999
+RADIUS_TEXTBOX = 10
+RADIUS_CHIP = 8
 
-# 服务地址
-BASE_URL = "http://127.0.0.1:8000"
-HEALTH_URL = BASE_URL + "/health"
+# 间距体系
+SPACING_XS = 4
+SPACING_SM = 8
+SPACING_MD = 12
+SPACING_LG = 16
+SPACING_XL = 24
+SPACING_2XL = 32
+
+# 默认端口（运行时由 settings 覆盖）
+DEFAULT_PORT = 8000
+
+
+def build_base_url(port: int | str | None = None) -> str:
+    """根据端口动态构建 BASE_URL。"""
+    p = int(port) if port else DEFAULT_PORT
+    return f"http://127.0.0.1:{p}"
+
+
+def build_health_url(port: int | str | None = None) -> str:
+    return build_base_url(port) + "/health"
 
 
 def is_brief_error(msg: str) -> bool:
