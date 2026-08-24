@@ -22,6 +22,55 @@
 - 数据目录自动创建（exe 同级 `data/`）
 - 强制 SQLite 模式，简化部署
 
+### 🐛 修复的 Bug
+
+#### GUI 启动优化
+- **健康检查**：从主线程同步阻塞改为后台线程异步探测，消除 GUI 卡顿
+- **日志面板**：批量渲染限制（60行/帧），防止单帧大量 Tk 重绘导致卡顿
+- **日志模式切换**：简要→详细增量追加，详细→简要全量重绘
+
+#### 后端优化
+- **数据库连接**：支持 SQLite 直连模式
+- **健康检查**：异步化，避免启动阻塞
+- **日志系统**：队列处理器支持，避免日志丢失
+
+### 🖥️ 桌面启动器 UI 改进
+
+#### 界面优化
+- **窗口图标**：使用真正的 `.ico` 文件（多尺寸 16/32/48/64/128/256），修复 Windows 蓝色方框问题
+- **标题**：改为「AIsChat 启动器」
+- **字号**：全局加大（标题 22px、状态 15px、设置 14px、页脚 11px）
+- **设置按钮**：emoji 改为纯文字（「设置」/「返回」）
+
+#### 功能增强
+- **设置页滚动**：支持小窗口下滚动查看
+- **单窗口视图切换**：主页 ↔ 设置页，顶栏常驻
+- **状态卡片**：有背景、圆角、微妙边框，层次分明
+- **日志面板**：浅灰背景，阅读舒适
+- **页脚**：显示版本号和端口
+
+### 📚 文档更新
+
+- **README**：添加安装程序下载链接
+- **CHANGELOG**：完整记录 v0.3.14 → v0.4.0 所有改动
+- **安装指南**：详细的安装和卸载步骤
+
+### 🔧 开发工具
+
+- **.gitignore**：更新（`.venv*`、`data/`、`*.log`、`__pycache__/`、`frontend/dist/`）
+
+### 📦 依赖更新
+
+- **bcrypt**：降级到 `4.0.1`（修复密码验证问题）
+- **PyInstaller**：添加 `pystray` 依赖（托盘功能）
+- **NSIS**：使用 3.09 编译安装程序
+
+---
+
+## [v0.3.14] - 2026-08-23
+
+### 🚀 新功能
+
 #### DSH 插件系统
 - **DSH 插件 v1**：同源代理 + 侧边栏 board + 完整聊天渲染
 - **沉浸式界面**：设置页 + 功能导航 + 消息渲染完善
@@ -47,6 +96,25 @@
 - **统一插件系统**：目录即插件，两级开关
 - **行为插件协议 v2**：@skill 装饰器 + owner 注册表
 - **插件关闭回退**：WS 广播 + 轮询 + 焦点恢复
+
+### 🏗️ 架构重构：Repository 化
+
+**新增 Repository 层**（`backend/app/repositories/`）：
+- `user_repo.py`、`friend_repo.py`、`world_repo.py`、`group_type_repo.py`、`agent_repo.py`
+- `system_settings_repo.py`、`verification_repo.py`、`api_key_pool_repo.py`
+- `audit_repo.py`、`capability_repo.py`、`content_repo.py`、`export_repo.py`
+- `federation_repo.py`、`infra_repo.py`、`invitation_repo.py`、`memory_repo.py`
+- `plugin_repo.py`、`search_repo.py`、`skill_repo.py`
+
+**彻底解耦模块**（业务函数签名改为 `repo: XxxRepository`）：
+- 用户、好友、世界核心、审计、能力版本、大脑控制器
+- 邀请、搜索、导出、内容（对话日志/OpenCLI）
+
+**兼容过渡模块**（`_ensure_repo` 幂等包装）：
+- 记忆、技能、AI 代理配套、基础设施、联邦、文件服务、插件、群类型
+
+**路由层依赖注入**（`app/routers/deps.py`）：
+- 新增 `get_user_repo`、`get_friend_repo`、`get_world_repo`、`get_group_type_repo`、`get_agent_repo`、`get_invitation_repo`、`get_search_repo`、`get_export_repo`、`get_content_repo` 等
 
 ### 🐛 修复的 Bug
 
