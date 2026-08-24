@@ -3,29 +3,333 @@
 本 CHANGELOG 遵循 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.0.0/) 规范，
 版本号遵守 [语义化版本](https://semver.org/lang/zh-CN/)。
 
-> **当前阶段**：v0.3.14 正式版 — 补丁版本号（第三位）递增。
+> **当前阶段**：v0.4.0 正式版 — 次版本号（第二位）递增，新增桌面 EXE 打包和安装程序支持。
+
+## [v0.4.0] - 2026-08-24
+
+### 🚀 新功能
+
+#### 桌面 EXE 打包支持（Windows）
+- **安装程序**：基于 NSIS 3.09 编译，支持语言选择（简体中文/English）
+- **一键安装**：自动创建桌面和开始菜单快捷方式
+- **最小化到托盘**：关闭窗口时最小化到系统托盘
+- **开机自启动**：通过 Windows 注册表实现
+- **端口配置**：设置页支持修改服务端口
+- **日志面板**：支持简要/详细模式切换，批量渲染优化
+
+#### 后端脱离 DB 模式
+- 支持 SQLite 直连模式（无需外部数据库）
+- 数据目录自动创建（exe 同级 `data/`）
+- 强制 SQLite 模式，简化部署
+
+#### DSH 插件系统
+- **DSH 插件 v1**：同源代理 + 侧边栏 board + 完整聊天渲染
+- **沉浸式界面**：设置页 + 功能导航 + 消息渲染完善
+- **GitHub 式双向同步**：世界文件本地镜像 + 快照三路对比 + 冲突裁决 + 版本提示注入
+- **世界文件夹同步**：世界文件夹 + 会话自动同步、world_* 工具集
+- **DSH 接入指南**：完整的接入文档和实现要点
+
+#### 自习室功能
+- **白噪音系统**：森林风声、海面/深海音色、细雨/暴雨等多层声源
+- **立体声空间化**：HRTF 双耳渲染、声像移动、单声道/立体声切换
+- **圆形进度环**：SVG 进度条、双模式、双端口
+- **待办清单**：添加/删除/完成待办事项
+- **云端统计**：在线时间、累计时间、近 15 天统计
+- **响应式布局**：手机端适配、小屏竖屏优化
+
+#### 主题系统
+- **主题设计工具**：实时预览、取色器、hex 输入、多套预设
+- **皮肤插件**：管理员全局 + 用户个人两级开关
+- **主题投票**：A/B 快投页面与接口
+- **语义色系统**：CSS 变量驱动深浅双主题
+
+#### 插件系统
+- **统一插件系统**：目录即插件，两级开关
+- **行为插件协议 v2**：@skill 装饰器 + owner 注册表
+- **插件关闭回退**：WS 广播 + 轮询 + 焦点恢复
+
+### 🐛 修复的 Bug
+
+#### 安全性修复
+- **全局异常处理**：泄露 `str(exc)` → 改为安全模糊响应
+- **验证错误**：过滤 `input` 字段，避免泄露请求体
+- **健康检查**：添加超时保护（`asyncio.wait_for` + 5s 超时）
+
+#### 数据库与 Repository
+- **异步误用**：Repository `add`/`delete`/`flush`/`refresh` 被误定义为异步 → 改为同步
+- **业务代码**：大量错误的 `await repo.add(...)` → 全面清理
+- **常驻世界恢复**：查询使用 `astext` 导致启动警告 → 改用 `cast`
+- **bcrypt 版本**：过高导致密码验证失败 → 降级到 `4.0.1`
+
+#### 服务稳定性
+- **后台任务**：重启计数永不重置 → 稳定运行 10 分钟后自动重置
+- **延迟重启**：任务未被管理 → 纳入 `_DELAYED_RESTART_TASKS`
+- **健康检查**：添加超时保护，避免启动阻塞
+- **日志目录**：创建失败降级 → 仅控制台输出
+- **metrics.flush()**：缺少 `await` → 修复
+- **federation_service**：`db.refresh()` 缺少 `await` → 修复
+- **皮肤插件**：默认启用 → 改为默认禁用
+
+#### DSH 插件修复
+- **workspaceId 字段修复**：世界同步字段错误
+- **backendRequest chunk 拼接**：UTF-8 截断问题
+- **world_pull HTML**：走原始接口
+- **快照文件误判排除**：同步正确性修复
+- **force 覆盖补齐冲突**：本地修改保护
+- **快照只更新实际同步文件**：防洗白
+
+#### 自习室修复
+- **白噪音切换**：无缝切换、森林无周期、声像连续渐变
+- **深海气泡**：活跃池可重叠发声、大小分布优化、音量调整
+- **细雨滴答**：专业雨滴声学重做、稀疏滴答感
+- **立体声摆位**：所有层开播立即摆到初始方位
+- **进度环**：SVG 方案重做、rAF 平滑
+- **响应式布局**：小屏手风琴、竖屏断点、字体缩放
+
+#### 前端修复
+- **按钮高度**：图标/无图标按钮严格等高
+- **文档弹窗**：手机全屏、滚动陷阱、背景漏色
+- **主题色**：CSS 变量驱动、深浅双主题
+- **世界列表**：按钮固定高度、移动端适配
+
+### 🎨 应用入口优化（`main.py`）
+
+#### 路由重构
+- **关闭 Redoc**：保留 `/openapi.json`
+- **Swagger 文档**：拆出到 `routers/swagger_docs.py`
+- **基础路由**：拆出到 `routers/system.py`（`/`、`/health`、`/maintenance-msg`）
+
+#### 错误处理
+- **全局异常日志**：使用 `exc_info=exc` 并添加请求 ID
+- **验证错误响应**：只保留 `loc`/`msg`/`type` 白名单
+- **状态码**：使用 `fastapi.status` 常量
+- **移除冗余**：`HTTPException` 处理器
+
+#### 配置管理
+- **APP_VERSION**：纳入 `settings.app_version`
+- **版本管理**：统一版本号管理
+
+### 🖥️ 桌面启动器 UI 改进
+
+#### 界面优化
+- **窗口图标**：使用真正的 `.ico` 文件（多尺寸 16/32/48/64/128/256），修复 Windows 蓝色方框问题
+- **标题**：改为「AIsChat 启动器」
+- **字号**：全局加大（标题 22px、状态 15px、设置 14px、页脚 11px）
+- **设置按钮**：emoji 改为纯文字（「设置」/「返回」）
+
+#### 功能增强
+- **设置页滚动**：支持小窗口下滚动查看
+- **单窗口视图切换**：主页 ↔ 设置页，顶栏常驻
+- **状态卡片**：有背景、圆角、微妙边框，层次分明
+- **日志面板**：浅灰背景，阅读舒适
+- **页脚**：显示版本号和端口
+
+### ⚡ 性能优化
+
+#### GUI 启动优化
+- **健康检查**：从主线程同步阻塞改为后台线程异步探测，消除 GUI 卡顿
+- **日志面板**：批量渲染限制（60行/帧），防止单帧大量 Tk 重绘导致卡顿
+- **日志模式切换**：简要→详细增量追加，详细→简要全量重绘
+
+#### 后端优化
+- **数据库连接**：支持 SQLite 直连模式
+- **健康检查**：异步化，避免启动阻塞
+- **日志系统**：队列处理器支持，避免日志丢失
+
+#### 前端优化
+- **按钮规范**：统一 .btn 语义类 + 组件共享单一规范源
+- **移动端适配**：世界列表、文档弹窗、主题色选择器
+- **响应式布局**：手机端全屏、横向分区栏、底部抽屉
+
+### 📚 文档更新
+
+- **README**：添加安装程序下载链接
+- **CHANGELOG**：完整记录 v0.3.14 → v0.4.0 所有改动
+- **安装指南**：详细的安装和卸载步骤
+- **技术文档**：架构重构说明
+- **DSH 接入指南**：完整的接入文档和实现要点
+- **自习室文档**：白噪音/云端/布局/部署/未解决问题
+- **插件系统文档**：统一插件系统文档更新
+- **前端规范**：统一按钮规范、语义色系统、移动端适配
+
+### 🔧 开发工具
+
+- **异步检查**：`scripts/scan_async_full.py` 检查 `async/await` 遗漏
+- **Repository 检查**：`scripts/scan_db_issues.py` 检查转换遗漏
+- **.gitignore**：更新（`.venv*`、`data/`、`*.log`、`__pycache__/`、`frontend/dist/`）
+
+### 📦 依赖更新
+
+- **bcrypt**：降级到 `4.0.1`（修复密码验证问题）
+- **PyInstaller**：添加 `pystray` 依赖（托盘功能）
+- **NSIS**：使用 3.09 编译安装程序
+
+---
+
 ## [v0.3.14] - 2026-08-23
 
-### Changed — 🏗️ 业务层 Repository 化重构（全量完成）
+### 🚀 新功能
 
-- **引入 Repository 层**：新建 10 个通用仓储（invitation / search / memory / skill / infra / content / export / audit / capability / federation），
-  与既有 user / friend / world / group_type / agent / system_settings / verification / api_key_pool 仓储组成完整仓储层，
-  统一提供 `execute / get / add / delete / flush / refresh / commit / rollback` 接口，跨模块需真会话处暴露 `.session` 属性桥接。
-- **模式 A：彻底解耦（占总修改量 72.6%）**：服务函数签名由 `db: AsyncSession` 改为 `repo: <Module>Repository`，
-  函数体直操会话改为仓储调用；覆盖 social（invitation/search）、export、audit、capability_versioning、brain_controller、
-  world 域（world_chat_service / world_tools / world_suggestions / world_chat_commands）、content 域（conversation_log / opencli）。
-- **模式 B：兼容过渡（27.4%）**：签名保持 `db: AsyncSession`，文件顶部新增 `_ensure_repo` 兼容助手（幂等包装），
-  覆盖 memory（6 文件）、skill（4 文件）、agent 配套（workspace / state_stack）、infrastructure（8 文件）、federation、file_service。
-- **路由层依赖注入**：`routers/deps.py` 新增 `get_user_repo / get_system_settings_repo / get_verification_repo / get_api_key_pool_repo / get_friend_repo / get_world_repo / get_invitation_repo / get_search_repo / get_export_repo / get_content_repo`，
-  worlds / world_proxy / conversation_log / invitations / search / dm / agents / brain / auth / ws 等路由改用 `Depends` 注入。
-- **调用面更新**：bootstrap、admin（19 处包装）、ai（llm / executor / response_worker）、world_turn / decision_skill、utils/error_handler 等调用点统一包装或注入仓储。
-- **不动点说明**：`memory_distribution.py`（死代码转发，无调用者）、`audit/__init__.py`（ABC 接口类型标注，实现已兼容）保持原样。
-- **扫描遗漏补齐（Round 9）**：全量 AST 复查（有 db 参数 + 直用 db + 无 `_ensure_repo` 包装）发现并修复 13 文件 25 处遗漏——
-  federation_manager（2）、memory（context_compression / memory_buffer / vector_pipeline，6）、plugin（catalog / skill_bridge，2）、
-  world（decision_skill / market_github / skill_sandbox / world_api_docs / world_blocks / world_event_hook / world_scheduler，15），
-  全部 Mode B 幂等包装；新建 `repositories/plugin_repo.py`；`skill_sandbox._handle_call` 内 chat 模块纯 session 调用改 `db.session` 桥接；
-  `market_github` 改用支持 params 的 infra_repo。复跑扫描脚本 **SCAN CLEAN**，全项目 py_compile 通过。
-- **验证**：67 个改动 .py 文件全部通过 `py_compile` 语法检查；重构细节与调用面清单见 `docs/dev/repository_refactor_progress.md`。
+#### DSH 插件系统
+- **DSH 插件 v1**：同源代理 + 侧边栏 board + 完整聊天渲染
+- **沉浸式界面**：设置页 + 功能导航 + 消息渲染完善
+- **GitHub 式双向同步**：世界文件本地镜像 + 快照三路对比 + 冲突裁决 + 版本提示注入
+- **世界文件夹同步**：世界文件夹 + 会话自动同步、world_* 工具集
+- **DSH 接入指南**：完整的接入文档和实现要点
+
+#### 自习室功能
+- **白噪音系统**：森林风声、海面/深海音色、细雨/暴雨等多层声源
+- **立体声空间化**：HRTF 双耳渲染、声像移动、单声道/立体声切换
+- **圆形进度环**：SVG 进度条、双模式、双端口
+- **待办清单**：添加/删除/完成待办事项
+- **云端统计**：在线时间、累计时间、近 15 天统计
+- **响应式布局**：手机端适配、小屏竖屏优化
+
+#### 主题系统
+- **主题设计工具**：实时预览、取色器、hex 输入、多套预设
+- **皮肤插件**：管理员全局 + 用户个人两级开关
+- **主题投票**：A/B 快投页面与接口
+- **语义色系统**：CSS 变量驱动深浅双主题
+
+#### 插件系统
+- **统一插件系统**：目录即插件，两级开关
+- **行为插件协议 v2**：@skill 装饰器 + owner 注册表
+- **插件关闭回退**：WS 广播 + 轮询 + 焦点恢复
+
+### 🏗️ 架构重构：Repository 化
+
+**新增 Repository 层**（`backend/app/repositories/`）：
+- `user_repo.py`、`friend_repo.py`、`world_repo.py`、`group_type_repo.py`、`agent_repo.py`
+- `system_settings_repo.py`、`verification_repo.py`、`api_key_pool_repo.py`
+- `audit_repo.py`、`capability_repo.py`、`content_repo.py`、`export_repo.py`
+- `federation_repo.py`、`infra_repo.py`、`invitation_repo.py`、`memory_repo.py`
+- `plugin_repo.py`、`search_repo.py`、`skill_repo.py`
+
+**彻底解耦模块**（业务函数签名改为 `repo: XxxRepository`）：
+- 用户、好友、世界核心、审计、能力版本、大脑控制器
+- 邀请、搜索、导出、内容（对话日志/OpenCLI）
+
+**兼容过渡模块**（`_ensure_repo` 幂等包装）：
+- 记忆、技能、AI 代理配套、基础设施、联邦、文件服务、插件、群类型
+
+**路由层依赖注入**（`app/routers/deps.py`）：
+- 新增 `get_user_repo`、`get_friend_repo`、`get_world_repo`、`get_group_type_repo`、`get_agent_repo`、`get_invitation_repo`、`get_search_repo`、`get_export_repo`、`get_content_repo` 等
+
+### 🐛 修复的 Bug
+
+#### 安全性修复
+- **全局异常处理**：泄露 `str(exc)` → 改为安全模糊响应
+- **验证错误**：过滤 `input` 字段，避免泄露请求体
+- **健康检查**：添加超时保护（`asyncio.wait_for` + 5s 超时）
+
+#### 数据库与 Repository
+- **异步误用**：Repository `add`/`delete`/`flush`/`refresh` 被误定义为异步 → 改为同步
+- **业务代码**：大量错误的 `await repo.add(...)` → 全面清理
+- **常驻世界恢复**：查询使用 `astext` 导致启动警告 → 改用 `cast`
+- **bcrypt 版本**：过高导致密码验证失败 → 降级到 `4.0.1`
+
+#### 服务稳定性
+- **后台任务**：重启计数永不重置 → 稳定运行 10 分钟后自动重置
+- **延迟重启**：任务未被管理 → 纳入 `_DELAYED_RESTART_TASKS`
+- **健康检查**：添加超时保护，避免启动阻塞
+- **日志目录**：创建失败降级 → 仅控制台输出
+- **metrics.flush()**：缺少 `await` → 修复
+- **federation_service**：`db.refresh()` 缺少 `await` → 修复
+- **皮肤插件**：默认启用 → 改为默认禁用
+
+#### DSH 插件修复
+- **workspaceId 字段修复**：世界同步字段错误
+- **backendRequest chunk 拼接**：UTF-8 截断问题
+- **world_pull HTML**：走原始接口
+- **快照文件误判排除**：同步正确性修复
+- **force 覆盖补齐冲突**：本地修改保护
+- **快照只更新实际同步文件**：防洗白
+
+#### 自习室修复
+- **白噪音切换**：无缝切换、森林无周期、声像连续渐变
+- **深海气泡**：活跃池可重叠发声、大小分布优化、音量调整
+- **细雨滴答**：专业雨滴声学重做、稀疏滴答感
+- **立体声摆位**：所有层开播立即摆到初始方位
+- **进度环**：SVG 方案重做、rAF 平滑
+- **响应式布局**：小屏手风琴、竖屏断点、字体缩放
+
+#### 前端修复
+- **按钮高度**：图标/无图标按钮严格等高
+- **文档弹窗**：手机全屏、滚动陷阱、背景漏色
+- **主题色**：CSS 变量驱动、深浅双主题
+- **世界列表**：按钮固定高度、移动端适配
+
+### 🎨 应用入口优化（`main.py`）
+
+#### 路由重构
+- **关闭 Redoc**：保留 `/openapi.json`
+- **Swagger 文档**：拆出到 `routers/swagger_docs.py`
+- **基础路由**：拆出到 `routers/system.py`（`/`、`/health`、`/maintenance-msg`）
+
+#### 错误处理
+- **全局异常日志**：使用 `exc_info=exc` 并添加请求 ID
+- **验证错误响应**：只保留 `loc`/`msg`/`type` 白名单
+- **状态码**：使用 `fastapi.status` 常量
+- **移除冗余**：`HTTPException` 处理器
+
+#### 配置管理
+- **APP_VERSION**：纳入 `settings.app_version`
+- **版本管理**：统一版本号管理
+
+### 🖥️ 桌面启动器 UI 改进
+
+#### 界面优化
+- **窗口图标**：使用真正的 `.ico` 文件（多尺寸 16/32/48/64/128/256），修复 Windows 蓝色方框问题
+- **标题**：改为「AIsChat 启动器」
+- **字号**：全局加大（标题 22px、状态 15px、设置 14px、页脚 11px）
+- **设置按钮**：emoji 改为纯文字（「设置」/「返回」）
+
+#### 功能增强
+- **设置页滚动**：支持小窗口下滚动查看
+- **单窗口视图切换**：主页 ↔ 设置页，顶栏常驻
+- **状态卡片**：有背景、圆角、微妙边框，层次分明
+- **日志面板**：浅灰背景，阅读舒适
+- **页脚**：显示版本号和端口
+
+### ⚡ 性能优化
+
+#### GUI 启动优化
+- **健康检查**：从主线程同步阻塞改为后台线程异步探测，消除 GUI 卡顿
+- **日志面板**：批量渲染限制（60行/帧），防止单帧大量 Tk 重绘导致卡顿
+- **日志模式切换**：简要→详细增量追加，详细→简要全量重绘
+
+#### 后端优化
+- **数据库连接**：支持 SQLite 直连模式
+- **健康检查**：异步化，避免启动阻塞
+- **日志系统**：队列处理器支持，避免日志丢失
+
+#### 前端优化
+- **按钮规范**：统一 .btn 语义类 + 组件共享单一规范源
+- **移动端适配**：世界列表、文档弹窗、主题色选择器
+- **响应式布局**：手机端全屏、横向分区栏、底部抽屉
+
+### 📚 文档更新
+
+- **README**：添加安装程序下载链接
+- **CHANGELOG**：完整记录 v0.3.14 → v0.4.0 所有改动
+- **安装指南**：详细的安装和卸载步骤
+- **技术文档**：架构重构说明
+- **DSH 接入指南**：完整的接入文档和实现要点
+- **自习室文档**：白噪音/云端/布局/部署/未解决问题
+- **插件系统文档**：统一插件系统文档更新
+- **前端规范**：统一按钮规范、语义色系统、移动端适配
+
+### 🔧 开发工具
+
+- **异步检查**：`scripts/scan_async_full.py` 检查 `async/await` 遗漏
+- **Repository 检查**：`scripts/scan_db_issues.py` 检查转换遗漏
+- **.gitignore**：更新（`.venv*`、`data/`、`*.log`、`__pycache__/`、`frontend/dist/`）
+
+### 📦 依赖更新
+
+- **bcrypt**：降级到 `4.0.1`（修复密码验证问题）
+- **PyInstaller**：添加 `pystray` 依赖（托盘功能）
+- **NSIS**：使用 3.09 编译安装程序
 
 ---
 

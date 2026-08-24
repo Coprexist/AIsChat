@@ -1,4 +1,4 @@
-﻿; AIsChat Launcher NSIS Installer Script
+; AIsChat Launcher NSIS Installer Script
 ; =======================================
 ; Generates single .exe installer with:
 ; - Language selection at start
@@ -17,10 +17,10 @@ InstallDirRegKey HKCU "Software\AIsChat" "InstallDir"
 RequestExecutionLevel admin
 
 ; --- Version Info ---
-VIProductVersion "0.3.14.0"
+VIProductVersion "0.4.0.0"
 VIAddVersionKey "ProductName" "AIsChat Launcher"
 VIAddVersionKey "CompanyName" "AIsChat"
-VIAddVersionKey "FileVersion" "0.3.14"
+VIAddVersionKey "FileVersion" "0.4.0"
 VIAddVersionKey "FileDescription" "AIsChat Desktop Launcher Installer"
 
 ; --- Interface Settings ---
