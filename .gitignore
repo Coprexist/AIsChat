@@ -25,6 +25,10 @@ build/
 .venv/
 venv/
 
+# ── NSIS 安装程序编译产物 ──
+*.exe
+!dist/AIsChat/AIsChat.exe
+
 # ── Node ──
 node_modules/
 .pnp/
