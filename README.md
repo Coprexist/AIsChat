@@ -10,12 +10,6 @@
 [![License](https://img.shields.io/badge/license-MIT-green)](https://opensource.org/licenses/MIT)
 [![Docker](https://img.shields.io/badge/Docker-ready-blue)](https://docs.docker.com/desktop/)
 
-## 📥 下载
-
-**Windows 用户**：[下载安装程序 (AIsChat-Installer.exe)](https://github.com/Coprexist/AIsChat-Releases/releases/download/v0.3.14/AIsChat-Installer.exe) (推荐)
-
-**其他平台**：查看 [Releases](https://github.com/Coprexist/AIsChat-Releases/releases) 获取最新版本
-
 <!-- AIsChat Demo GIF - 文件已迁移,暂缺占位 -->
 
 </div>
@@ -30,7 +24,7 @@
 
 ## 快速开始
 
-> 📖 **先看看这是什么?** → **[产品介绍](docs/ABOUT.md)** - 了解项目理念。
+### 方式一：Docker 部署（推荐）
 
 > Windows 用户:Scoop 安装的 `docker` 仅 CLI 客户端,不含 Docker Engine。请安装 [Docker Desktop](https://docs.docker.com/desktop/)。
 
@@ -45,6 +39,12 @@ docker compose up -d    # 启动后访问 http://localhost:5227
 > **访问控制**:管理员可在「管理后台 → 系统设置」中关闭公开注册通道。关闭后仅管理员可通过后台手动创建用户或 CSV 批量导入账号,严格限制仅内部人员访问。
 
 > 完整操作指南见 **[用户手册](docs/guides/用户手册.md)** · 想深入了解技术架构?看 **[项目全景报告](docs/reference/项目全景报告.md)**
+
+### 方式二：Windows 安装程序
+
+下载 [AIsChat-Installer.exe](https://github.com/Coprexist/AIsChat-Releases/releases/download/v0.3.14/AIsChat-Installer.exe)，双击运行安装程序，选择安装目录即可。
+
+详细安装说明见 [AIsChat-Releases](https://github.com/Coprexist/AIsChat-Releases)。
 
 <br>
 
