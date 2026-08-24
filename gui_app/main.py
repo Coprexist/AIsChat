@@ -277,7 +277,7 @@ class AIsChatGUI:
         footer = ctk.CTkFrame(self._home, fg_color="transparent")
         footer.pack(fill="x", padx=32, pady=(0, 12))
         self.footer_left = ctk.CTkLabel(
-            footer, text="AIsChat v0.3.14", font=(theme.FONT_UI, 11),
+            footer, text="AIsChat v0.4.0", font=(theme.FONT_UI, 11),
             text_color=theme.TEXT_MUTED)
         self.footer_left.pack(side="left")
         self.footer_right = ctk.CTkLabel(
