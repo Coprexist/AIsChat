@@ -10,6 +10,12 @@
 [![License](https://img.shields.io/badge/license-MIT-green)](https://opensource.org/licenses/MIT)
 [![Docker](https://img.shields.io/badge/Docker-ready-blue)](https://docs.docker.com/desktop/)
 
+## 📥 下载
+
+**Windows 用户**：[下载安装程序 (AIsChat-Installer.exe)](https://github.com/Coprexist/AIsChat-Releases/releases/download/v0.3.14/AIsChat-Installer.exe) (推荐)
+
+**其他平台**：查看 [Releases](https://github.com/Coprexist/AIsChat-Releases/releases) 获取最新版本
+
 <!-- AIsChat Demo GIF - 文件已迁移,暂缺占位 -->
 
 </div>

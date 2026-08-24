@@ -26,8 +26,9 @@ build/
 venv/
 
 # ── NSIS 安装程序编译产物 ──
+# AIsChat-Installer.exe 允许提交（用于 GitHub Releases）
 *.exe
-!dist/AIsChat/AIsChat.exe
+!AIsChat-Installer.exe
 
 # ── Node ──
 node_modules/
