@@ -3,7 +3,30 @@
 本 CHANGELOG 遵循 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.0.0/) 规范，
 版本号遵守 [语义化版本](https://semver.org/lang/zh-CN/)。
 
-> **当前阶段**：v0.4.0 正式版 — 次版本号（第二位）递增，新增桌面 EXE 打包和安装程序支持。
+> **当前阶段**：v0.4.0 正式版 — 备份服务策略模式重构，支持 SQLite 备份/恢复。
+
+## [v0.4.0] - 2026-08-24
+
+### 🚀 改进
+
+#### 备份服务策略模式重构
+- **策略模式**：`DatabaseBackupBackend` 抽象接口，支持 PostgreSQL / SQLite 双后端
+- **PostgreSQL 后端**：`PostgresBackupBackend`（pg_dump / psql），`.sql` 扩展名
+- **SQLite 后端**：`SQLiteBackupBackend`（sqlite3.backup API + WAL checkpoint），`.db` 扩展名
+- **原子恢复**：SQLite 恢复使用临时文件 + `shutil.move` 原子替换 + `PRAGMA integrity_check` 校验
+- **安全加固**：恢复后返回 `restart_required` 标志，前端明确提示"请重启应用生效"
+- **路径解析**：`_db_path()` 相对路径基于 `settings.data_dir` 解析
+- **异步改进**：`asyncio.to_thread()` 替代已弃用的 `get_event_loop().run_in_executor()`
+- **错误处理**：未知数据库后端直接抛出异常而非静默回退
+
+#### 前端备份页面
+- 新增 `/admin/backup/info` API 端点，返回当前数据库类型和文件扩展名
+- 备份页面顶部显示当前数据库类型（PostgreSQL/SQLite）和兼容性警告
+- 下载/上传文件扩展名由后端动态决定
+- 恢复操作支持 `.sql` 和 `.db` 两种文件格式
+- SQLite 恢复后提示"请重启应用生效"
+
+---
 
 ## [v0.4.0] - 2026-08-24
 
