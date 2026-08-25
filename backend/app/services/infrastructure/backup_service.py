@@ -213,17 +213,20 @@ async def create_full_backup() -> tuple[bytes, int, int]:
             tar.addfile(sql_info, io.BytesIO(sql_bytes))
             logger.info("  ✅ backup.sql 已打包")
 
-            # 添加 data/ 目录下所有文件
+            # 添加 data/ 目录下用户数据文件（跳过 PostgreSQL 数据目录）
             if os.path.isdir(data_dir):
+                SKIP_DIRS = {'postgres', 'pgdata', 'mysql', 'mariadb'}
                 for root, dirs, files in os.walk(data_dir):
+                    dirs[:] = [d for d in dirs if d not in SKIP_DIRS]
                     for fname in files:
                         fpath = os.path.join(root, fname)
-                        # 计算相对路径（在 tar 中以 data/ 为前缀）
-                        arcname = os.path.join("data", os.path.relpath(fpath, data_dir))
-                        # 替换 Windows 反斜杠为 Unix 正斜杠
-                        arcname = arcname.replace("\\", "/")
-                        tar.add(fpath, arcname=arcname)
-                        file_count += 1
+                        try:
+                            arcname = os.path.join("data", os.path.relpath(fpath, data_dir))
+                            arcname = arcname.replace("\\", "/")
+                            tar.add(fpath, arcname=arcname)
+                            file_count += 1
+                        except FileNotFoundError:
+                            logger.warning(f"跳过已消失的文件: {fpath}")
             logger.info(f"  ✅ {file_count} 个文件已打包")
 
     except Exception as e:
