@@ -40,6 +40,31 @@ from app.main import app
 
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse
+from starlette.middleware.base import BaseHTTPMiddleware
+from starlette.requests import Request
+
+
+class APIPrefixMiddleware(BaseHTTPMiddleware):
+    """移除 /api 前缀，与 vite 代理行为一致"""
+    async def dispatch(self, request: Request, call_next):
+        # 如果路径以 /api/ 开头，去掉 /api 前缀
+        if request.url.path.startswith("/api/"):
+            # 重写路径：/api/auth/login → /auth/login
+            new_path = request.url.path[4:]  # 去掉 "/api"
+            if request.url.query:
+                new_path += f"?{request.url.query}"
+            # 创建新的 URL
+            scope = request.scope
+            scope["path"] = scope["path"][4:]  # 去掉 "/api"
+            if scope.get("query_string"):
+                scope["path"] += f"?{scope['query_string'].decode()}"
+        
+        response = await call_next(request)
+        return response
+
+
+# 注册 API 前缀中间件
+app.add_middleware(APIPrefixMiddleware)
 
 
 def _replace_root_route(app):
@@ -73,11 +98,6 @@ app.mount("/assets", StaticFiles(directory=STATIC_DIR / "assets"), name="assets"
 
 @app.get("/{full_path:path}", include_in_schema=False)
 async def serve_frontend(full_path: str):
-    # 如果路径以 api/ 开头，说明是 API 请求，不应该由静态文件处理
-    if full_path.startswith("api/"):
-        from fastapi import HTTPException
-        raise HTTPException(status_code=404, detail="API endpoint not found")
-    
     file_path = STATIC_DIR / full_path
     if file_path.is_file():
         return FileResponse(file_path)
