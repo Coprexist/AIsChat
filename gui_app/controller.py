@@ -12,7 +12,7 @@ import threading
 import time
 import urllib.request
 
-import logging_utils
+from . import logging_utils
 
 # 注意：server_core 在导入时会加载整个后端（FastAPI 应用），
 # 因此改为在启动线程内延迟导入，保证启动器窗口能立刻出现。
