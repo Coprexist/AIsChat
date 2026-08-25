@@ -1039,36 +1039,53 @@ async def resolve_geoip(
 
 
 # ============================================================
-# 数据库备份/恢复
+# 数据库备份/恢复（策略模式，支持 PostgreSQL / SQLite）
 # ============================================================
+
+@router.get("/backup/info")
+async def backup_info(
+    admin: dict = Depends(require_admin),
+):
+    """返回当前数据库备份后端信息（类型、文件扩展名等），供前端展示"""
+    from app.services.infrastructure.backup_service import get_backup_info
+    return get_backup_info()
+
 
 @router.get("/backup/download")
 async def download_backup(
     admin: dict = Depends(require_admin),
     db: AsyncSession = Depends(get_db),
 ):
-    """下载数据库完整备份（.sql 文件）"""
-    from app.services.infrastructure.backup_service import create_backup
+    """下载数据库备份（.sql 或 .db，取决于当前后端）"""
+    from app.services.infrastructure.backup_service import create_backup, get_backup_backend
 
+    backend = get_backup_backend()
     try:
-        sql_bytes = await create_backup()
+        db_bytes = await create_backup()
     except RuntimeError as e:
         raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=str(e))
 
     timestamp = datetime.now(timezone.utc).strftime("%Y%m%d_%H%M%S")
+    ext = backend.backup_extension  # ".sql" or ".db"
+    media_type = "application/sql" if ext == ".sql" else "application/octet-stream"
+
     await _log_admin_action(
         db, admin["user_id"],
         "db_backup", "system", 0,
-        {"size_bytes": len(sql_bytes)},
+        {"size_bytes": len(db_bytes), "db_backend": backend.name},
     )
 
     return Response(
-        content=sql_bytes,
-        media_type="application/sql",
+        content=db_bytes,
+        media_type=media_type,
         headers={
-            "Content-Disposition": f'attachment; filename="aischat_backup_{timestamp}.sql"',
+            "Content-Disposition": f'attachment; filename="aischat_backup_{timestamp}{ext}"',
         },
     )
+
+
+# 接受的数据库备份扩展名
+_VALID_DB_EXTENSIONS = (".sql", ".db")
 
 
 @router.post("/backup/restore")
@@ -1077,13 +1094,13 @@ async def upload_restore(
     admin: dict = Depends(require_admin),
     db: AsyncSession = Depends(get_db),
 ):
-    """上传 .sql 备份文件并恢复数据库（⚠️ 覆盖当前所有数据）"""
-    from app.services.infrastructure.backup_service import restore_backup
+    """上传数据库备份文件并恢复（⚠️ 覆盖当前所有数据）"""
+    from app.services.infrastructure.backup_service import restore_backup, get_backup_backend
 
-    if not file.filename or not file.filename.endswith(".sql"):
+    if not file.filename or not file.filename.endswith(_VALID_DB_EXTENSIONS):
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail="仅支持 .sql 文件",
+            detail=f"仅支持 {_VALID_DB_EXTENSIONS} 备份文件（取决于当前数据库类型）",
         )
 
     try:
@@ -1092,9 +1109,10 @@ async def upload_restore(
     except RuntimeError as e:
         raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=str(e))
 
+    backend = get_backup_backend()
     await _log_admin_action(
         db, admin["user_id"], "db_restore", "system", 0,
-        {"filename": file.filename, "size_bytes": len(content)},
+        {"filename": file.filename, "size_bytes": len(content), "db_backend": backend.name},
     )
 
     return result
@@ -1133,15 +1151,18 @@ async def restore_local_backup(
     import gzip
     from app.services.infrastructure.backup_service import restore_backup, BACKUP_DIR
 
-    # 防路径穿越：只允许备份目录内的 aischat_*.sql.gz
+    # 防路径穿越：只允许备份目录内的 aischat_*.sql.gz 或 aischat_*.db.gz
     name = req.filename
     if (
         not name
         or "/" in name or "\\" in name or ".." in name
         or not name.startswith("aischat_")
-        or not name.endswith(".sql.gz")
+        or not (name.endswith(".sql.gz") or name.endswith(".db.gz"))
     ):
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="非法备份文件名")
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="非法备份文件名（仅允许 aischat_*.sql.gz 或 aischat_*.db.gz）",
+        )
 
     path = BACKUP_DIR / name
     if not path.exists():
@@ -1149,14 +1170,14 @@ async def restore_local_backup(
 
     try:
         with gzip.open(path, "rb") as f:
-            sql_bytes = f.read()
-        result = await restore_backup(sql_bytes)
+            db_bytes = f.read()
+        result = await restore_backup(db_bytes)
     except RuntimeError as e:
         raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=str(e))
 
     await _log_admin_action(
         db, admin["user_id"], "db_restore_local", "system", 0,
-        {"filename": name, "size_bytes": len(sql_bytes)},
+        {"filename": name, "size_bytes": len(db_bytes)},
     )
     return result
 
@@ -1166,11 +1187,11 @@ async def download_full_backup(
     admin: dict = Depends(require_admin),
     db: AsyncSession = Depends(get_db),
 ):
-    """下载完整备份（.tar.gz = 数据库 .sql + 文件目录 /app/data/）"""
+    """下载完整备份（.tar.gz = 数据库备份 + 文件目录 /app/data/）"""
     from app.services.infrastructure.backup_service import create_full_backup
 
     try:
-        tar_bytes, sql_size, file_count = await create_full_backup()
+        tar_bytes, db_size, file_count = await create_full_backup()
     except RuntimeError as e:
         raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=str(e))
 
@@ -1178,7 +1199,7 @@ async def download_full_backup(
     await _log_admin_action(
         db, admin["user_id"],
         "full_backup", "system", 0,
-        {"sql_size": sql_size, "file_count": file_count, "total_bytes": len(tar_bytes)},
+        {"db_size": db_size, "file_count": file_count, "total_bytes": len(tar_bytes)},
     )
 
     return Response(

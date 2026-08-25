@@ -2,7 +2,7 @@ import { useState, useEffect, useRef, useCallback } from 'react'
 import Modal from '../components/Modal'
 import { Link, useNavigate, useSearchParams, useOutletContext } from 'react-router-dom'
 import { api } from '../api/client'
-import { Users, Bot, MessageCircle, Ticket, FileText, Activity, Terminal, Database, Globe, BookOpen, ScrollText, ArrowLeft, BarChart3, ChevronRight, Key, Settings, Layers, Wrench, Shield, Plug, X, Eraser, Store } from 'lucide-react'
+import { Users, Bot, MessageCircle, Ticket, FileText, Activity, Terminal, Database, Globe, BookOpen, ScrollText, ArrowLeft, BarChart3, ChevronRight, Key, Settings, Layers, Wrench, Shield, Plug, X, Eraser, Store, AlertTriangle } from 'lucide-react'
 import { MANUAL_URL, ADMIN_MANUAL_URL } from '../constants'
 import Toggle from '../components/Toggle'
 import { useT } from '../i18n/I18nContext'
@@ -919,9 +919,27 @@ function BackupTab() {
   const fileInputRef = useRef<HTMLInputElement>(null)
   const fullFileInputRef = useRef<HTMLInputElement>(null)
 
+  // ── 备份后端信息（当前数据库类型等）──
+  const [backupInfo, setBackupInfo] = useState<{ db_backend: string; backup_extension: string; warning: string } | null>(null)
+
   // ── 本地自动备份（每日备份功能产生，可选回档）──
   const [localBackups, setLocalBackups] = useState<{ name: string; size_bytes: number; mtime: string }[]>([])
   const [restoringLocal, setRestoringLocal] = useState('')
+
+  const dbLabel = backupInfo?.db_backend === 'sqlite' ? 'SQLite' : 'PostgreSQL'
+  const dbExt = backupInfo?.backup_extension || '.sql'
+
+  const loadBackupInfo = useCallback(async () => {
+    try {
+      const token = localStorage.getItem('access_token')
+      const res = await fetch('/api/admin/backup/info', {
+        headers: { 'Authorization': `Bearer ${token}` },
+      })
+      if (res.ok) {
+        setBackupInfo(await res.json())
+      }
+    } catch { /* 信息拉不到不阻塞 */ }
+  }, [])
 
   const loadLocalBackups = useCallback(async () => {
     try {
@@ -936,7 +954,7 @@ function BackupTab() {
     } catch { /* 列表拉不到不阻塞 */ }
   }, [])
 
-  useEffect(() => { loadLocalBackups() }, [loadLocalBackups])
+  useEffect(() => { loadBackupInfo(); loadLocalBackups() }, [loadBackupInfo, loadLocalBackups])
 
   const formatBytes = (n: number) => {
     if (n >= 1024 * 1024) return `${(n / 1024 / 1024).toFixed(1)} MB`
@@ -960,7 +978,8 @@ function BackupTab() {
         const err = await res.json()
         throw new Error(err.detail || t('admin.restoreFailed'))
       }
-      setMessage(t('admin.dbRestoreSuccess'))
+      const data = await res.json()
+      setMessage(data.restart_required ? t('admin.dbRestoreRestart') : t('admin.dbRestoreSuccess'))
     } catch (e: any) {
       setError(e.message)
     } finally {
@@ -992,7 +1011,9 @@ function BackupTab() {
         throw new Error(err.detail || t('admin.downloadFailed'))
       }
       const blob = await res.blob()
-      downloadFile(blob, `aischat_backup_${new Date().toISOString().slice(0, 10)}.sql`)
+      // 文件扩展名由后端决定（.sql 或 .db）
+      const ext = blob.type === 'application/sql' ? '.sql' : dbExt
+      downloadFile(blob, `aischat_backup_${new Date().toISOString().slice(0, 10)}${ext}`)
       setMessage(t('admin.dbBackupSuccess'))
     } catch (e: any) {
       setError(e.message)
@@ -1046,7 +1067,8 @@ function BackupTab() {
         const err = await res.json()
         throw new Error(err.detail || t('admin.restoreFailed'))
       }
-      setMessage(t('admin.dbRestoreSuccess'))
+      const data = await res.json()
+      setMessage(data.restart_required ? t('admin.dbRestoreRestart') : t('admin.dbRestoreSuccess'))
     } catch (e: any) {
       setError(e.message)
     } finally {
@@ -1076,7 +1098,8 @@ function BackupTab() {
         const err = await res.json()
         throw new Error(err.detail || t('admin.restoreFailed'))
       }
-      setMessage(t('admin.fullRestoreSuccess'))
+      const data = await res.json()
+      setMessage(data.restart_required ? t('admin.fullRestoreRestart') : t('admin.fullRestoreSuccess'))
     } catch (e: any) {
       setError(e.message)
     } finally {
@@ -1087,6 +1110,20 @@ function BackupTab() {
 
   return (
     <div className="space-y-5">
+      {/* ========== 当前数据库后端信息 ========== */}
+      {backupInfo && (
+        <div className="bg-amber-400/5 border border-amber-400/20 rounded-xl p-4 flex items-start gap-3">
+          <AlertTriangle size={18} className="text-amber-400 shrink-0 mt-0.5" />
+          <div className="flex-1 min-w-0">
+            <p className="text-sm text-textPrimary">
+              {t('admin.currentDbBackend')}: <span className="font-semibold text-amber-400">{dbLabel}</span>
+              <span className="text-xs text-textMuted ml-2">({t('admin.backupFileExt')}: {dbExt})</span>
+            </p>
+            <p className="text-xs text-amber-400/80 mt-1">{backupInfo.warning}</p>
+          </div>
+        </div>
+      )}
+
       {/* ========== 导出区 ========== */}
       <div className="bg-surface rounded-xl border border-border p-5">
         <h3 className="font-semibold text-textPrimary mb-1">{t('admin.exportTitle')}</h3>
@@ -1197,7 +1234,7 @@ function BackupTab() {
               <input
                 ref={fileInputRef}
                 type="file"
-                accept=".sql"
+                accept=".sql,.db"
                 onChange={handleRestore}
                 disabled={restoring}
                 className="block mt-2 text-sm text-textPrimary file:mr-3 file:py-2 file:px-4 file:rounded-xl file:border-0 file:text-sm file:bg-elevated file:text-textPrimary hover:file:bg-border"
