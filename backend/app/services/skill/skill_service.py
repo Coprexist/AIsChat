@@ -60,7 +60,7 @@ async def add_skill(
     )
     db.add(skill)
     await db.commit()
-    db.refresh(skill)
+    await db.refresh(skill)
 
     logger.info(f"🧠 AI agent_id={agent_id} 添加技能: {name} (type={skill_type})")
     return {"success": True, "skill": _skill_to_dict(skill)}
@@ -99,7 +99,7 @@ async def update_skill(
 
     skill.updated_at = datetime.now(timezone.utc).replace(tzinfo=None)
     await db.commit()
-    db.refresh(skill)
+    await db.refresh(skill)
 
     logger.info(f"🧠 AI agent_id={agent_id} 更新技能 #{skill_id}: {skill.name}")
     return {"success": True, "skill": _skill_to_dict(skill)}

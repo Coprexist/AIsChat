@@ -245,7 +245,7 @@ async def websocket_endpoint(ws: WebSocket, token: str = Query(...)):
                                 sender_id=user_id, content=content, reply_to=reply_to,
                                 attachments=attachments,
                             )
-                            db.flush()
+                            await db.flush()
                         except Exception as e:
                             logger.error(f"消息持久化失败: {e}")
                             await ws.send_json(build_ws_error("SEND_FAILED", "消息发送失败"))

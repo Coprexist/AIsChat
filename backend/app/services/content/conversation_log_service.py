@@ -47,8 +47,8 @@ async def save_conversation_log(
             thinking_enabled=thinking_enabled,
         )
         content_repo.add(log)
-        content_repo.flush()
-        content_repo.refresh(log)
+        await content_repo.flush()
+        await content_repo.refresh(log)
 
         # 清理超出限制的旧记录
         await _trim_old_logs(content_repo, agent_id)
@@ -105,7 +105,7 @@ async def _get_config(content_repo: ContentRepository) -> ConversationLogConfig:
     if config is None:
         config = ConversationLogConfig(id=1)
         content_repo.add(config)
-        content_repo.flush()
+        await content_repo.flush()
     return config
 
 
@@ -154,7 +154,7 @@ async def update_config(
 
     config.updated_by = updated_by
     config.updated_at = datetime.now(timezone.utc).replace(tzinfo=None)
-    content_repo.flush()
+    await content_repo.flush()
     return await get_config_dict(content_repo)
 
 
@@ -197,7 +197,7 @@ async def update_user_log_limit(content_repo: ContentRepository, user_id: int, l
         raise ValueError("用户不存在")
 
     user.conversation_logs_limit = limit
-    content_repo.flush()
+    await content_repo.flush()
     return await get_user_log_limit(content_repo, user_id)
 
 
@@ -549,7 +549,7 @@ async def update_agent_log_settings(
     if user_can_view_logs is not None:
         agent.user_can_view_logs = user_can_view_logs
 
-    content_repo.flush()
+    await content_repo.flush()
     return await get_agent_log_settings(content_repo, agent_id)
 
 

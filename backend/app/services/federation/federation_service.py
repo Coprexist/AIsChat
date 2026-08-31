@@ -152,7 +152,7 @@ async def update_instance_info(
     if config is None:
         config = InstanceConfig(id=1, instance_id=str(uuid.uuid4()))
         db.add(config)
-        db.flush()
+        await db.flush()
 
     if display_name is not None and display_name.strip():
         name = display_name.strip()
@@ -1096,7 +1096,7 @@ async def handle_remote_message(
             pass
 
     db.add(message)
-    db.flush()
+    await db.flush()
     logger.info(f"🌐 持久化远程消息: group={group_id} from={source_public_id} id={message.id}")
     return message
 
@@ -1123,7 +1123,7 @@ async def persist_remote_dm_message(
         except (ValueError, AttributeError):
             pass
     db.add(dm_msg)
-    db.flush()
+    await db.flush()
     return dm_msg
 
 

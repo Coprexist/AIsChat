@@ -95,7 +95,7 @@ class AttentionSystem:
                 ignored_patterns=settings.get("ignored_patterns", []),
                 match_action=settings.get("match_action", "highlight"),
             ))
-        db.flush()
+        await db.flush()
 
     async def get_attention(self, db: AsyncSession, agent_id: int, group_id: int | None = None) -> list[dict]:
         """获取注意力设置列表（group_id 缺省时返回该 AI 全部）"""

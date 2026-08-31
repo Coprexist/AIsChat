@@ -35,7 +35,7 @@ async def _get_config(content_repo: ContentRepository) -> OpenCLIConfig:
     if config is None:
         config = OpenCLIConfig(id=1, global_enabled=False)
         content_repo.add(config)
-        content_repo.flush()
+        await content_repo.flush()
     return config
 
 
@@ -454,7 +454,7 @@ async def _log_usage(
         duration_ms=duration_ms,
     )
     content_repo.add(log_entry)
-    content_repo.flush()
+    await content_repo.flush()
 
 
 # ============================================================
@@ -488,7 +488,7 @@ async def update_opencli_config(
         config.timeout_seconds = timeout_seconds
     config.updated_by = updated_by
     config.updated_at = datetime.now(timezone.utc).replace(tzinfo=None)
-    content_repo.flush()
+    await content_repo.flush()
     return await get_opencli_config(content_repo)
 
 
@@ -547,8 +547,8 @@ async def update_agent_whitelist(
         wl.enabled = enabled
         wl.rate_limit_override = rate_limit_override
 
-    content_repo.flush()
-    content_repo.refresh(wl)
+    await content_repo.flush()
+    await content_repo.refresh(wl)
     return {"agent_id": wl.agent_id, "enabled": wl.enabled}
 
 
@@ -596,8 +596,8 @@ async def add_command_whitelist(
         created_by=created_by,
     )
     content_repo.add(entry)
-    content_repo.flush()
-    content_repo.refresh(entry)
+    await content_repo.flush()
+    await content_repo.refresh(entry)
     return {
         "id": entry.id,
         "pattern": entry.pattern,
@@ -621,7 +621,7 @@ async def toggle_command_whitelist(
     if entry is None:
         raise ValueError("命令白名单条目不存在")
     entry.enabled = enabled
-    content_repo.flush()
+    await content_repo.flush()
     return {"id": entry.id, "enabled": entry.enabled}
 
 
@@ -634,7 +634,7 @@ async def delete_command_whitelist(content_repo: ContentRepository, cmd_id: int)
     if entry is None:
         raise ValueError("命令白名单条目不存在")
     content_repo.delete(entry)
-    content_repo.flush()
+    await content_repo.flush()
 
 
 async def get_usage_logs(

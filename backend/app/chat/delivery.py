@@ -69,7 +69,7 @@ async def set_group_dnd(
         member.dnd_until = datetime(2099, 12, 31, 23, 59, 59)
         logger.info(f"用户 {agent_id} 在群聊 {group_id} 设置永久免打扰")
 
-    db.flush()
+    await db.flush()
     return member
 
 
@@ -105,7 +105,7 @@ async def cancel_group_dnd(
         raise ValueError(f"用户 {agent_id} 不在群聊 {group_id} 中")
 
     member.dnd_until = datetime(2000, 1, 1)
-    db.flush()
+    await db.flush()
     logger.info(f"用户 {agent_id} 在群聊 {group_id} 已取消免打扰")
     return member
 
@@ -174,8 +174,8 @@ async def store_pending_message(
         message_id=message_id,
     )
     db.add(pending)
-    db.flush()
-    db.refresh(pending)
+    await db.flush()
+    await db.refresh(pending)
     return pending
 
 
@@ -230,7 +230,7 @@ async def mark_pending_read(
 
     query = query.values(is_read=True)
     await db.execute(query)
-    db.flush()
+    await db.flush()
 
 
 # ============================================================

@@ -35,7 +35,7 @@ class ApiKeyPoolService:
         key = result.scalar_one_or_none()
         if key:
             key.last_used_at = __import__('datetime').datetime.now()
-            db.flush()
+            await db.flush()
             return {
                 "id": key.id,
                 "provider": key.provider,
@@ -57,7 +57,7 @@ class ApiKeyPoolService:
             is_active=True,
         )
         db.add(new_key)
-        db.flush()
+        await db.flush()
         return {"id": new_key.id, "provider": new_key.provider}
 
     async def deactivate_key(self, db: AsyncSession, key_id: int) -> None:
@@ -69,7 +69,7 @@ class ApiKeyPoolService:
             .where(ApiKeyPool.id == key_id)
             .values(is_active=False)
         )
-        db.flush()
+        await db.flush()
 
 
 api_key_pool_service = ApiKeyPoolService()

@@ -132,7 +132,7 @@ async def _decide_reply_action(db, agent, context: ActionContext) -> ActionDecis
             return ActionDecision(False, ActionType.NONE, 0, f"AI {agent.name} 离线且未被 @提及")
         # 唤醒
         await switch_agent_state(db, agent_id=agent_id, target_state="active", reason="被 @提及唤醒")
-        db.flush()
+        await db.flush()
 
     # Gate 2a: 屏蔽（无穿透，@/公告也不收）
     reachability = await chat_api.check_reachability(db, agent_id, context.group_id)

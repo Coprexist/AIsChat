@@ -107,7 +107,7 @@ class PostgresAuditBackend(AuditStorageBackend):
         )
         db.add(log)
         if entry.get("_flush", True):
-            db.flush()
+            await db.flush()
 
     async def query(self, filters: dict, page: int = 1, page_size: int = 50, db: AsyncSession | None = None) -> dict:
         db = _ensure_repo(db)

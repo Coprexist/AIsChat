@@ -139,7 +139,7 @@ async def complete_setup(
     # 标记向导完成
     if req.completed:
         user.setup_completed = True
-    db.flush()
+    await db.flush()
     return {"status": "ok", "setup_completed": True}
 
 
@@ -157,7 +157,7 @@ async def update_language(
     if user is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="用户不存在")
     user.language = req.language
-    db.flush()
+    await db.flush()
     return {"status": "ok", "language": req.language}
 
 

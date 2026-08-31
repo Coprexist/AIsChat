@@ -97,8 +97,8 @@ async def set_cached_summary(
         expires_at=now + timedelta(seconds=ttl),
     )
     db.add(cache)
-    db.flush()
-    db.refresh(cache)
+    await db.flush()
+    await db.refresh(cache)
 
     logger.debug(f"缓存写入: agent={agent_id}, group={group_id}, ttl={ttl}s")
     return cache

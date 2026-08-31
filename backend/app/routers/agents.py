@@ -641,7 +641,7 @@ async def generate_agent_token(
     agent = await _require_agent_access(agent_id, current_user, db)
     token = "at-" + secrets.token_hex(24)
     agent.api_token = token
-    db.flush()
+    await db.flush()
     return {"agent_id": agent_id, "api_token": token}
 
 
@@ -720,7 +720,7 @@ async def upload_agent_avatar(
 
     avatar_url = f"/api/fs/download-avatar/{filename}"
     agent.avatar_url = avatar_url
-    db.flush()
+    await db.flush()
 
     # 入队联邦 profile 同步
     try:
@@ -1010,7 +1010,7 @@ async def reset_others_chat_used(
     if agent.owner_id != current_user["user_id"] and current_user.get("role") != "admin":
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="仅 AI 主人或管理员可重置")
     agent.others_chat_used = 0
-    db.flush()
+    await db.flush()
     return {"ok": True, "others_chat_used": 0}
 
 

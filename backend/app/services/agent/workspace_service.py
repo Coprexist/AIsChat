@@ -49,7 +49,7 @@ async def save_current_task(
             updated_at=now,
         )
         db.add(ws)
-    db.flush()
+    await db.flush()
 
 
 async def mark_interrupted(
@@ -69,7 +69,7 @@ async def mark_interrupted(
         ws.interrupted_at = now
         ws.interruption_reason = reason[:200]
         ws.updated_at = now
-        db.flush()
+        await db.flush()
         logger.info(f"📋 AI({agent_id}) 任务被中断: 「{ws.current_task[:50]}」→ 原因: {reason}")
 
 
@@ -99,7 +99,7 @@ async def get_recovery_context(
         ws.current_task_at = None
         ws.interrupted_at = None
         ws.interruption_reason = None
-        db.flush()
+        await db.flush()
         return None
 
     task = ws.current_task
@@ -109,7 +109,7 @@ async def get_recovery_context(
     ws.interrupted_at = None
     ws.interruption_reason = None
     ws.updated_at = now
-    db.flush()
+    await db.flush()
 
     return (
         f"\n\n## ⚠️ 中断恢复提醒\n"
@@ -189,7 +189,7 @@ async def clear_task(db: AsyncSession, agent_id: int) -> None:
         ws.interrupted_at = None
         ws.interruption_reason = None
         ws.updated_at = datetime.utcnow()
-        db.flush()
+        await db.flush()
 
 
 async def _get_or_create_ws(db: AsyncSession, agent_id: int) -> AgentWorkspace:
@@ -202,7 +202,7 @@ async def _get_or_create_ws(db: AsyncSession, agent_id: int) -> AgentWorkspace:
     if ws is None:
         ws = AgentWorkspace(agent_id=agent_id, updated_at=datetime.utcnow())
         db.add(ws)
-        db.flush()
+        await db.flush()
     return ws
 
 
@@ -222,7 +222,7 @@ async def set_workspace_file(db: AsyncSession, agent_id: int, file_type: str, co
     ws = await _get_or_create_ws(db, agent_id)
     setattr(ws, file_type, content)
     ws.updated_at = datetime.utcnow()
-    db.flush()
+    await db.flush()
     logger.info(f"📝 AI({agent_id}) 更新工作区 {file_type}: {len(content)} 字符")
 
 

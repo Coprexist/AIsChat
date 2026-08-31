@@ -39,8 +39,8 @@ async def create_group(
         concurrent_ai_limit=default_limit,
     )
     db.add(group)
-    db.flush()
-    db.refresh(group)
+    await db.flush()
+    await db.refresh(group)
 
     owner_member = GroupMember(
         group_id=group.id,
@@ -60,7 +60,7 @@ async def create_group(
             )
             db.add(gm)
 
-    db.flush()
+    await db.flush()
     logger.info(f"群聊 '{name}' (id={group.id}) 由 {owner_type}:{owner_id} 创建")
     return group
 
@@ -243,7 +243,7 @@ async def add_member(
         if existing.member_type != resolved_type:
             if existing.member_type != "ai":
                 existing.member_type = resolved_type
-                db.flush()
+                await db.flush()
         return existing
 
     member = GroupMember(
@@ -253,7 +253,7 @@ async def add_member(
         role=role,
     )
     db.add(member)
-    db.flush()
+    await db.flush()
     return member
 
 
@@ -300,7 +300,7 @@ async def create_message(
         attachments=attachments,
     )
     db.add(message)
-    db.flush()
+    await db.flush()
 
     if attachments:
         from app.services.content.file_service import track_forward_reference
@@ -309,7 +309,7 @@ async def create_message(
             if fid:
                 await track_forward_reference(db, fid, sender_type, sender_id)
 
-    db.refresh(message)
+    await db.refresh(message)
 
     # 群消息钩子：群里有消息 → 异步喂给绑定世界的入口（世界程序感知）
     try:
@@ -435,7 +435,7 @@ async def remove_member(
     if operator.role == "admin" and target.role == "admin":
         raise ValueError("管理员不能踢其他管理员")
     db.delete(target)
-    db.flush()
+    await db.flush()
     logger.info(f"成员 {target_type}:{target_id} 已被踢出群聊 {group_id}")
 
 
@@ -454,7 +454,7 @@ async def leave_group(
         if group and not group.name.startswith("DM:"):
             raise ValueError("群主不能退群，请先将群主转让给其他成员")
     db.delete(member)
-    db.flush()
+    await db.flush()
     logger.info(f"成员 {member_type}:{member_id} 已退出群聊 {group_id}")
 
 
@@ -463,7 +463,7 @@ async def update_last_read(db: AsyncSession, group_id: int, member_type: str, me
     member = await _get_member(db, group_id, member_type, member_id)
     if member:
         member.last_read_at = datetime.now(timezone.utc).replace(tzinfo=None)
-        db.flush()
+        await db.flush()
         return True
     logger.warning(f"update_last_read: member not found group={group_id} {member_type}={member_id}")
     return False
@@ -493,7 +493,7 @@ async def update_group_settings(db: AsyncSession, group_id: int, operator_id: in
         elif hasattr(group, key):
             setattr(group, key, value)
 
-    db.flush()
+    await db.flush()
     if "name" in updates:
         from app.services.federation.federation_service import enqueue_profile_update
         await enqueue_profile_update(db, "group", group_id, "display_name", updates["name"])
@@ -517,7 +517,7 @@ async def change_member_role(db: AsyncSession, group_id: int, operator_id: int,
     if target.role == "owner":
         raise ValueError("不能修改群主的角色")
     target.role = new_role
-    db.flush()
+    await db.flush()
     logger.info(f"群 {group_id} 成员 {target_type}:{target_id} 角色变更为 {new_role}")
     return target
 
@@ -535,7 +535,7 @@ async def disband_group(db: AsyncSession, group_id: int, operator_id: int) -> Gr
     from app.models.conversation_log import ConversationLog
     await db.execute(delete(ConversationLog).where(ConversationLog.group_id == group_id))
     db.delete(group)
-    db.flush()
+    await db.flush()
     logger.info(f"群聊 '{group.name}' (id={group_id}) 已被群主 {operator_id} 解散")
     return group
 
@@ -597,7 +597,7 @@ async def set_announcement(
 
     group.announcement = content
     group.announcement_updated_at = datetime.now(timezone.utc).replace(tzinfo=None)
-    db.flush()
+    await db.flush()
     logger.info(f"群聊 {group_id} 公告已更新")
     return content
 
@@ -618,7 +618,7 @@ async def delete_announcement(
 
     group.announcement = None
     group.announcement_updated_at = None
-    db.flush()
+    await db.flush()
 
 
 async def get_unread_info(

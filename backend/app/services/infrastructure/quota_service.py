@@ -66,13 +66,13 @@ async def find_best_pool_key(db: AsyncSession, user_id: int, exclude_pool_key_id
         if cached_key:
             # 更新 last_used_at
             assignment.last_used_at = datetime.now(timezone.utc).replace(tzinfo=None)
-            db.flush()
+            await db.flush()
             return cached_key
         else:
             # Key 已失效，清除绑定
             logger.info(f"  🔄 用户 {user_id} 的池 Key {assignment.pool_key_id} 已失效，自动重新选择")
             db.delete(assignment)
-            db.flush()
+            await db.flush()
 
     # Step 3: 查询所有 active Key（排除指定 Key）
     query = select(ApiKeyPool).where(ApiKeyPool.is_active == True)
@@ -122,7 +122,7 @@ async def auto_assign_pool_key(db: AsyncSession, user_id: int, pool_key_id: int)
             assigned_at=now,
             last_used_at=now,
         ))
-    db.flush()
+    await db.flush()
 
 
 # ══════════════════════════════════════════════════════════════
@@ -184,7 +184,7 @@ async def deduct_credit(
             api_deducted = remaining
             user.api_credit = float(user.api_credit or 0) - api_deducted
 
-        db.flush()
+        await db.flush()
 
         # 记录日志
         total_deducted = platform_deducted + api_deducted

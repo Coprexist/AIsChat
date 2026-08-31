@@ -30,8 +30,8 @@ async def _get_or_create(db: AsyncSession) -> SystemSettings:
     if row is None:
         row = SystemSettings(id=1, default_language="en")
         db.add(row)
-        db.flush()
-        db.refresh(row)
+        await db.flush()
+        await db.refresh(row)
         logger.info("已初始化 system_settings（默认语言=en）")
     return row
 
@@ -223,8 +223,8 @@ async def update_settings(
     if updated_by is not None:
         row.updated_by = updated_by
 
-    db.flush()
-    db.refresh(row)
+    await db.flush()
+    await db.refresh(row)
     logger.info(f"系统设置已更新: default_language={row.default_language}, "
                 f"default_platform_credit={row.default_platform_credit}")
     return await get_settings(db)

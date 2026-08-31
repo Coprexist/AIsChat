@@ -262,7 +262,7 @@ async def upload_file(
         # 若已有文件未存哈希则补存
         if not existing.content_hash:
             existing.content_hash = content_hash
-            db.flush()
+            await db.flush()
         if existing.content_hash == content_hash:
             logger.info(f"文件去重复用: {relative_path} (SHA256={content_hash[:8]}…)")
             return existing
@@ -295,8 +295,8 @@ async def upload_file(
         },
     )
     db.add(metadata)
-    db.flush()
-    db.refresh(metadata)
+    await db.flush()
+    await db.refresh(metadata)
 
     logger.info(f"文件上传完成: {relative_path} ({len(content)} bytes) by {owner_type}:{owner_id}")
     return metadata
@@ -408,7 +408,7 @@ async def delete_file(
                 FileReference.ref_type == "forward",
             )
         )
-        db.flush()
+        await db.flush()
         logger.info(f"文件 {file_id} 已过户: {old_owner} → {successor[0]}:{successor[1]}")
         return {"action": "transferred", "file_id": file_id, "new_owner": f"{successor[0]}:{successor[1]}"}
 
@@ -429,7 +429,7 @@ async def delete_file(
     if os.path.exists(physical_path):
         os.remove(physical_path)
     db.delete(metadata)
-    db.flush()
+    await db.flush()
     logger.info(f"文件已物理删除: {metadata.path} by {requester_type}:{requester_id}")
     return {"action": "deleted", "file_id": file_id}
 
@@ -488,7 +488,7 @@ async def track_forward_reference(
         ref_type="forward",
     )
     db.add(ref)
-    db.flush()
+    await db.flush()
     logger.info(f"转发引用: file={file_id} → {referrer_type}:{referrer_id}")
     return True
 
@@ -509,7 +509,7 @@ async def _remove_forward_reference(
             FileReference.ref_type == "forward",
         )
     )
-    db.flush()
+    await db.flush()
     deleted = r.rowcount > 0
     if deleted:
         logger.info(f"转发引用已释放: file={file_id} ← {referrer_type}:{referrer_id}")
@@ -524,7 +524,7 @@ async def _orphan_file(db: AsyncSession, file_id: int):
         meta.owner_type = "system"
         meta.owner_id = 0
         meta.permissions = {"orphaned_at": datetime.now(timezone.utc).replace(tzinfo=None).isoformat()}
-        db.flush()
+        await db.flush()
         logger.info(f"文件已标记为孤儿: {file_id}")
 
 
@@ -560,7 +560,7 @@ async def cleanup_orphaned_files(db: AsyncSession, retention_days: int = 7):
             deleted += 1
 
     if deleted:
-        db.flush()
+        await db.flush()
         logger.info(f"已清理 {deleted} 个过期孤儿文件（宽限期 {retention_days} 天）")
     return deleted
 
@@ -623,7 +623,7 @@ async def track_file_reference(
         # 更新引用类型（如从 read 升级到 write）
         if existing.ref_type != ref_type:
             existing.ref_type = ref_type
-            db.flush()
+            await db.flush()
         return existing
 
     ref = FileReference(
@@ -633,8 +633,8 @@ async def track_file_reference(
         ref_type=ref_type,
     )
     db.add(ref)
-    db.flush()
-    db.refresh(ref)
+    await db.flush()
+    await db.refresh(ref)
     return ref
 
 
@@ -707,7 +707,7 @@ async def set_collaboration_mode(
 
     metadata.collaboration_mode = mode
     metadata.updated_at = datetime.now(timezone.utc).replace(tzinfo=None)
-    db.flush()
+    await db.flush()
 
     logger.info(f"文件 {file_id} 协作模式已更改为 {mode}")
     return metadata
@@ -754,14 +754,14 @@ async def add_file_collaborator(
         role=role,
     )
     db.add(collab)
-    db.flush()
-    db.refresh(collab)
+    await db.flush()
+    await db.refresh(collab)
 
     # 自动将协作模式设为 shared
     if metadata.collaboration_mode == "solo":
         metadata.collaboration_mode = "shared"
         metadata.updated_at = datetime.now(timezone.utc).replace(tzinfo=None)
-        db.flush()
+        await db.flush()
 
     logger.info(f"已添加协作者 {collaborator_type}:{collaborator_id} 到文件 {file_id}")
     return collab
@@ -787,7 +787,7 @@ async def remove_file_collaborator(
         raise ValueError("协作者不存在")
 
     db.delete(collab)
-    db.flush()
+    await db.flush()
     logger.info(f"已移除协作者 {collaborator_type}:{collaborator_id} 从文件 {file_id}")
     return True
 
@@ -928,7 +928,7 @@ async def ai_write_file(db: AsyncSession, agent_id: int, file_path: str,
         metadata.content_hash = content_hash
         metadata.updated_at = datetime.now(timezone.utc).replace(tzinfo=None)
         await track_file_reference(db, metadata.id, "ai", agent_id, "write")
-        db.flush()
+        await db.flush()
         # 通知引用方
         await notify_file_changed(db, metadata.id, "modified", "ai", agent_id)
     else:
@@ -951,8 +951,8 @@ async def ai_write_file(db: AsyncSession, agent_id: int, file_path: str,
             },
         )
         db.add(metadata)
-        db.flush()
-        db.refresh(metadata)
+        await db.flush()
+        await db.refresh(metadata)
         await track_file_reference(db, metadata.id, "ai", agent_id, "write")
 
     return metadata

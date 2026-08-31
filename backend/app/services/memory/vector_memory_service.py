@@ -29,7 +29,7 @@ class VectorMemoryService:
             embedding=embedding,
         )
         db.add(memory)
-        db.flush()
+        await db.flush()
         return {"id": memory.id, "title": memory.title}
 
     async def store_detail_memory(self, db: AsyncSession, agent_id: int, rough_memory_id: int, content: str, embedding: list[float]) -> dict:
@@ -41,7 +41,7 @@ class VectorMemoryService:
             embedding=embedding,
         )
         db.add(memory)
-        db.flush()
+        await db.flush()
         return {"id": memory.id, "rough_memory_id": memory.rough_id}
 
     async def search_memories(self, db: AsyncSession, agent_id: int, query_embedding: list[float], top_k: int = 5) -> list[dict]:
@@ -61,7 +61,7 @@ class VectorMemoryService:
         db = _ensure_repo(db)
         from app.models.memory import RoughMemory
         result = await db.execute(RoughMemory.__table__.delete().where(RoughMemory.id == memory_id))
-        db.flush()
+        await db.flush()
         return result.rowcount > 0
 
 

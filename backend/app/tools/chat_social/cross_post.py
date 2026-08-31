@@ -85,7 +85,7 @@ class CrossPost(ToolPlugin):
                     db, group_id=target_id, sender_type="ai",
                     sender_id=agent.user_id, content=full_content,
                 )
-                db.flush()
+                await db.flush()
                 manager = context.get("manager")
                 if manager:
                     msg_data = message_to_dict(message, sender_name=agent.name, sender_avatar_url=agent.avatar_url)
@@ -109,7 +109,7 @@ class CrossPost(ToolPlugin):
                     db, dm_session.session_id,
                     sender_id=agent.user_id, content=full_content,
                 )
-                db.flush()
+                await db.flush()
                 manager = context.get("manager")
                 if manager:
                     await manager.broadcast_to_dm(

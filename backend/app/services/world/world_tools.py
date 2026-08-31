@@ -1050,7 +1050,7 @@ async def _do_execute(world_repo: WorldRepository, world, name: str, arguments: 
                 existing.embedding = embedding
             else:
                 world_repo.add(WorldAIMemory(world_id=world.id, title=title, content=content, embedding=embedding))
-            world_repo.flush()
+            await world_repo.flush()
             return {"success": True, "title": title, "embedded": embedding is not None, "updated": existing is not None}
         except (ValueError, TypeError, json.JSONDecodeError) as e:
             return {"success": False, "error": str(e)}
@@ -1265,7 +1265,7 @@ async def _do_execute(world_repo: WorldRepository, world, name: str, arguments: 
                 ])
             except Exception:
                 pass
-            world_repo.flush()
+            await world_repo.flush()
             return {
                 "success": True,
                 "before_tokens": stats.get("before_tokens", 0),

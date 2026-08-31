@@ -46,7 +46,7 @@ async def pause_notifications(db: AsyncSession, agent_id: int) -> Agent:
     if agent is None:
         raise ValueError("AI 代理不存在")
     agent.is_paused = True
-    db.flush()
+    await db.flush()
     logger.info(f"AI {agent_id} 已暂停通知，消息将暂存")
     return agent
 
@@ -66,7 +66,7 @@ async def resume_and_fetch(
     pending = await get_pending_messages(db, agent_id, unread_only=True)
     await mark_pending_read(db, agent_id)
     agent.is_paused = False
-    db.flush()
+    await db.flush()
 
     logger.info(f"AI {agent_id} 已恢复通知，返回 {len(pending)} 条暂存消息")
     return agent, pending

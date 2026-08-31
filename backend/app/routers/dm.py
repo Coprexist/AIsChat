@@ -384,7 +384,7 @@ async def _maybe_trigger_dm_ai_reply(
             return
         dm_quota.consume(sender_agent, "send", now)
         dm_quota.consume(agent, "receive", now)
-        db.flush()
+        await db.flush()
 
     # ── v0.1.8: 对话权限与限额决策 ──
     is_owner = sender_id == agent.owner_id
@@ -418,7 +418,7 @@ async def _maybe_trigger_dm_ai_reply(
                 if used >= quota:
                     # 配额耗尽 → 自动关闭 + 通知主人
                     agent.allow_others_chat = False
-                    db.flush()
+                    await db.flush()
                     await _notify_owner_quota_exhausted(db, agent, used, quota)
                     # 进入禁止分支
                     if agent.disallow_mode == "own_key":
@@ -439,7 +439,7 @@ async def _maybe_trigger_dm_ai_reply(
                 else:
                     # 配额未满 → 计数 +1
                     agent.others_chat_used = used + 1
-                    db.flush()
+                    await db.flush()
 
     # ── v0.1.8: 余额检查（通用/半通用 AI，聊天者要付）──
     if not is_owner and not force_own_key and agent.ai_type in ("general", "semi_general"):
@@ -473,7 +473,7 @@ async def _maybe_trigger_dm_ai_reply(
     # ── v1.1.0: 自动重置配额 ──
     if getattr(agent, 'auto_reset_quota', False) and not is_owner:
         agent.others_chat_used = 0
-        db.flush()
+        await db.flush()
 
     # ── 忙时中断注入：AI 正在执行，直接注入当前 tool loop ──
     from app.ai.executor import add_pending_interrupt, is_agent_running

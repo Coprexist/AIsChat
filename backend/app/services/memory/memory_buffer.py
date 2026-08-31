@@ -257,7 +257,7 @@ async def _batch_write_memories(db, batch: list[PendingMemory]):
         db.add(rough)
         roughs.append(rough)
 
-    db.flush()  # 获取 rough.id
+    await db.flush()  # 获取 rough.id
 
     for rough, mem in zip(roughs, batch):
         detail = DetailMemory(
@@ -267,7 +267,7 @@ async def _batch_write_memories(db, batch: list[PendingMemory]):
         db.add(detail)
         details.append(detail)
 
-    db.flush()
+    await db.flush()
 
     # v0.1.4: 记录批量写入延迟
     elapsed = time.monotonic() - t0
@@ -341,6 +341,6 @@ async def archive_low_value_memories(db, agent_id: int, group_id: int | None = N
             mem.status = "active"
             kept += 1
 
-    db.flush()
+    await db.flush()
     if kept or discarded:
         logger.info(f"📝 延迟归档: agent={agent_id}, group={group_id}, 保留={kept}, 丢弃={discarded}")

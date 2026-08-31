@@ -486,7 +486,7 @@ async def _trigger_group_assistant(
                         from app.routers.ws import manager
                         msg = await _cm(db, group_id, "ai", -ga.id, dec["reply"],
                                         source="world", allow_non_member=True)
-                        db.flush()
+                        await db.flush()
                         try:
                             await manager.broadcast_to_group(group_id, {"type": "message", "data": {"id": msg.id, "content": dec["reply"]}})
                         except Exception:
@@ -561,7 +561,7 @@ async def _trigger_group_assistant(
             from app.chat.message import create_message as _cm
             from app.routers.ws import manager
             msg = await _cm(db, group_id, "ai", -ga.id, reply, source="world", allow_non_member=True)
-            db.flush()
+            await db.flush()
             try:
                 await manager.broadcast_to_group(group_id, {"type": "message", "data": {"id": msg.id, "content": reply}})
             except Exception:
@@ -674,7 +674,7 @@ async def _maybe_trigger_ai_reply(
                         from app.chat.message import create_message as _cm
                         from app.routers.ws import manager
                         msg = await _cm(db, group_id, "ai", agent.user_id or 0, dec["reply"])
-                        db.flush()
+                        await db.flush()
                         await manager.broadcast_to_group(group_id, {"type": "message", "data": {"id": msg.id, "content": dec["reply"]}})
                     except Exception:
                         pass

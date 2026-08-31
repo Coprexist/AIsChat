@@ -122,7 +122,7 @@ class BrainController:
             anchor.core_values = "\n".join(core_values or [])
             anchor.consistency_coefficient = consistency_coefficient
 
-        repo.flush()
+        await repo.flush()
         return await self.get_personality_anchor(repo, agent_id)
 
 

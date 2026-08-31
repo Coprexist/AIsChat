@@ -42,7 +42,7 @@ class ForgettingMechanism:
             .where(RoughMemory.owner_type == "ai", RoughMemory.owner_id == agent_id)
             .values(value_score=RoughMemory.value_score * 0.99)
         )
-        db.flush()
+        await db.flush()
 
     async def update_importance(self, db: AsyncSession, memory_id: int, accessed: bool = False, referenced: bool = False) -> None:
         """
@@ -63,7 +63,7 @@ class ForgettingMechanism:
             if referenced:
                 increment += 2
             memory.value_score = min(10, memory.value_score + increment)
-            db.flush()
+            await db.flush()
 
 
 forgetting_mechanism = ForgettingMechanism()

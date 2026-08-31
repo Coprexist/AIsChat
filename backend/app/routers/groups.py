@@ -358,7 +358,7 @@ async def send_group_message(
             sender_id=current_user["user_id"], content=content,
             reply_to=reply_to, attachments=attachments,
         )
-        db.flush()
+        await db.flush()
     except ValueError as e:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
 
@@ -557,7 +557,7 @@ async def upload_group_avatar(
     avatar_url = f"/api/fs/download-avatar/{filename}"
     group.avatar_url = avatar_url
     group.avatar_mode = "custom"
-    db.flush()
+    await db.flush()
 
     return {
         "avatar_url": avatar_url,
@@ -763,7 +763,7 @@ async def transfer_owner(
     target.role = "owner"
     group.owner_id = target_id
     group.owner_type = target_type
-    db.flush()
+    await db.flush()
     return {"message": "群主已转让", "new_owner": {"type": target_type, "id": target_id}}
 
 
@@ -792,7 +792,7 @@ async def mark_read(
                 group_id=group_id, member_type="human", member_id=current_user["user_id"],
                 role="member", last_read_at=datetime.now(timezone.utc).replace(tzinfo=None),
             ))
-            db.flush()
+            await db.flush()
             updated = True
         except Exception:
             pass

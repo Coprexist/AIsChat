@@ -228,7 +228,7 @@ async def _record_usage(world_repo, world_id: int, turn_id: str, round_no, model
             reasoning_tokens=int(usage.get("reasoning_tokens") or 0),
             cached_tokens=_extract_cached_tokens(usage),
         ))
-        world_repo.flush()
+        await world_repo.flush()
         # 个人 API 用量：记账人 = 世界 AI 表单的世界主人（user_id 直记，查询时虚拟聚合「群视界 agent」）
         if messages:
             from app.services.content.conversation_log_service import save_conversation_log
@@ -679,7 +679,7 @@ async def _inject_pending_user_messages(
                 content=_m_text, session_id=sid_db,
             )
             world_repo.add(wm)
-            world_repo.flush()
+            await world_repo.flush()
             ids.append(wm.id)
             if tb:
                 try:

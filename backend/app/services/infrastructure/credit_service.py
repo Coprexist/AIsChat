@@ -33,7 +33,7 @@ class CreditService:
             tokens_used=tokens_used,
         )
         db.add(log_entry)
-        db.flush()
+        await db.flush()
 
     async def get_remaining_credit(self, db: AsyncSession, user_id: int) -> float:
         """获取剩余额度"""

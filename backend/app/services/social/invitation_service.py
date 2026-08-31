@@ -148,8 +148,8 @@ async def send_group_invitation(
         message=message,
     )
     invitation_repo.add(invitation)
-    invitation_repo.flush()
-    invitation_repo.refresh(invitation)
+    await invitation_repo.flush()
+    await invitation_repo.refresh(invitation)
 
     # 获取或创建 DM 会话（跳过好友校验——群邀请不要求已是好友）
     dm_session = await get_or_create_dm_session(

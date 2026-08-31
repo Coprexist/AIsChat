@@ -91,8 +91,8 @@ async def get_or_create_dm_session(
             user2_id=user_ids[1],
         )
         db.add(session)
-        db.flush()
-        db.refresh(session)
+        await db.flush()
+        await db.refresh(session)
 
     partner = await _get_partner_info(db, target_user_id)
 
@@ -278,7 +278,7 @@ async def send_dm_message(
         created_at=created_at or now,
     )
     db.add(msg)
-    db.flush()
+    await db.flush()
 
     if attachments:
         from app.services.content.file_service import track_forward_reference
@@ -301,8 +301,8 @@ async def send_dm_message(
     session.last_message_id = msg.id
     session.last_message_at = now
 
-    db.flush()
-    db.refresh(msg)
+    await db.flush()
+    await db.refresh(msg)
 
     result = await db.execute(
         select(User.username, User.type, User.avatar_url).where(User.id == sender_id)
@@ -344,7 +344,7 @@ async def set_dm_dnd(db: AsyncSession, session_id: str, user_id: int,
     else:
         session.user2_dnd_until = dnd_until
 
-    db.flush()
+    await db.flush()
     return {
         "session_id": session_id,
         "dnd_until": str(dnd_until) if dnd_until else None,
@@ -368,7 +368,7 @@ async def cancel_dm_dnd(db: AsyncSession, session_id: str, user_id: int) -> dict
     else:
         session.user2_dnd_until = None
 
-    db.flush()
+    await db.flush()
     return {"session_id": session_id, "dnd_until": None}
 
 
