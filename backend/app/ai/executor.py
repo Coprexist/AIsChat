@@ -279,9 +279,9 @@ async def _get_api_config(
                 api_base = user.api_base_url or settings.deepseek_base_url
                 credit_source = "user_key"
                 provider_info = {"thinking_supported": "deepseek.com" in api_base, "base_url": api_base}
-        # force_own_key 场景：如果自有 Key 解密失败，降级但通知用户
+        # force_own_key 场景：解密失败 = 无法调用模型，通知用户重新配置
         if api_key is None and _decrypt_failures:
-            await _notify_key_degradation(db, agent, user, _decrypt_failures)
+            asyncio.create_task(_notify_force_own_key_failure(db, agent, user, _decrypt_failures))
         return api_key, api_base, credit_source, pool_key_id, provider_info
 
     effective_credit = max(0, (user.platform_gifted_credit or 0)) + (user.api_credit or 0)
@@ -326,9 +326,9 @@ async def _get_api_config(
                     provider_info = {"thinking_supported": "deepseek.com" in api_base, "base_url": api_base}
                     return api_key, api_base, credit_source, pool_key_id, provider_info
 
-    # 降级完成：如果发生了 Key 解密失败，通知用户
+    # 降级完成：如果发生了 Key 解密失败，通知用户（fire-and-forget，不阻塞回复）
     if _decrypt_failures:
-        await _notify_key_degradation(db, agent, user, _decrypt_failures)
+        asyncio.create_task(_notify_key_degradation(db, agent, user, _decrypt_failures))
 
     # 以上都不可用 → 返回空
     return api_key, api_base, credit_source, pool_key_id, provider_info
@@ -348,6 +348,22 @@ async def _notify_key_degradation(db, agent, user, failures: list[str]) -> None:
         logger.warning(f"降级通知已发送给 AI「{agent.name}」的 Owner({agent.owner_id})，失败来源: {failures}")
     except Exception as e:
         logger.error(f"发送降级通知失败: {e}")
+
+
+async def _notify_force_own_key_failure(db, agent, user, failures: list[str]) -> None:
+    """force_own_key 场景：解密失败 = 无法调用模型，通知用户重新配置"""
+    try:
+        failed_list = "\n".join(f"- {f}" for f in failures)
+        msg = (
+            f"⚠️ AI「{agent.name}」无法使用自有 API Key\n\n"
+            f"你开启了「强制使用自有 Key」，但以下 Key 解密失败：\n{failed_list}\n\n"
+            f"📌 **AI 暂时无法回复消息。**\n"
+            f"请前往 [AI 设置页](/agents/{agent.id}) 重新填写 API Key。"
+        )
+        await _send_system_error_notification(db, agent, msg)
+        logger.warning(f"force_own_key 解密失败通知已发送给 AI「{agent.name}」的 Owner({agent.owner_id})")
+    except Exception as e:
+        logger.error(f"发送 force_own_key 失败通知失败: {e}")
 
 
 # ============================================================
