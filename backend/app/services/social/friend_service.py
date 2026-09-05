@@ -379,3 +379,21 @@ async def search_entities(
         })
 
     return results[:limit]
+
+
+async def trigger_ai_auto_respond(
+    *,
+    friend_repo: FriendRepository,
+    agent: Agent,
+    requester_id: int,
+    requester_name: str,
+    message: str,
+) -> None:
+    """触发 AI 自动响应好友申请（由路由调用，封装 alarm 层的 db 访问）"""
+    from app.ai.alarm import _process_friend_request_event
+    await _process_friend_request_event(friend_repo.session, {
+        "agent_id": agent.id,
+        "requester_id": requester_id,
+        "requester_name": requester_name,
+        "message": message,
+    })

@@ -1,6 +1,7 @@
 """
 好友仓库接口（Protocol）+ SQLAlchemy 实现。
 """
+from datetime import datetime
 from typing import Optional, Protocol
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -8,7 +9,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.models.friendship import Friendship, FriendshipRequest
 from app.models.user import User
 from app.models.agent import Agent
-from app.models.dm import DMSession
+from app.models.dm import DMSession, DMMessage
 
 
 class FriendRepository(Protocol):
@@ -33,6 +34,8 @@ class FriendRepository(Protocol):
     async def list_friend_requests(self, user_id: int, status: str, received_only: bool) -> list[FriendshipRequest]: ...
     async def search_users_and_agents(self, query: str, current_user_id: int, limit: int) -> tuple[list[User], list[Agent]]: ...
     async def is_friend(self, user_id: int, friend_type: str, friend_id: int) -> bool: ...
+    async def get_or_create_dm_session(self, user_id_a: int, user_id_b: int, skip_friendship_check: bool = False) -> str: ...
+    async def send_dm_message(self, session_id: str, sender_id: int, content: str, created_at: datetime | None = None) -> None: ...
     async def flush(self) -> None: ...
     async def refresh(self, obj) -> None: ...
     def add(self, obj) -> None: ...
@@ -208,6 +211,62 @@ class SQLAlchemyFriendRepository:
     async def is_friend(self, user_id: int, friend_type: str, friend_id: int) -> bool:
         friendship = await self.get_friendship(user_id, friend_type, friend_id)
         return friendship is not None
+
+    async def get_or_create_dm_session(self, user_id_a: int, user_id_b: int, skip_friendship_check: bool = False) -> str:
+        """获取或创建 DM 会话，返回 session_id"""
+        from app.chat.dm import generate_dm_session_id, _require_friendship
+        if user_id_a == user_id_b:
+            raise ValueError("不能和自己私信")
+
+        target = await self.session.execute(select(User).where(User.id == user_id_b))
+        if target.scalar_one_or_none() is None:
+            raise ValueError("目标用户不存在")
+
+        session_id = generate_dm_session_id(user_id_a, user_id_b)
+        result = await self.session.execute(
+            select(DMSession).where(DMSession.session_id == session_id)
+        )
+        session = result.scalar_one_or_none()
+        if session is None:
+            if not skip_friendship_check:
+                await _require_friendship(self.session, user_id_a, user_id_b)
+            user_ids = sorted([user_id_a, user_id_b])
+            session = DMSession(
+                session_id=session_id,
+                user1_id=user_ids[0],
+                user2_id=user_ids[1],
+            )
+            self.session.add(session)
+            await self.session.flush()
+        return session_id
+
+    async def send_dm_message(
+        self, session_id: str, sender_id: int, content: str,
+        created_at: datetime | None = None,
+    ) -> None:
+        """发送 DM 消息（好友附言注入用，跳过好友校验）"""
+        from datetime import datetime as _dt, timezone
+        result = await self.session.execute(
+            select(DMSession).where(DMSession.session_id == session_id)
+        )
+        session = result.scalar_one_or_none()
+        if session is None:
+            raise ValueError("会话不存在")
+
+        now = _dt.now(timezone.utc).replace(tzinfo=None)
+        msg = DMMessage(
+            session_id=session_id,
+            sender_id=sender_id,
+            content=content.strip(),
+            message_type="normal",
+            created_at=created_at or now,
+        )
+        self.session.add(msg)
+        await self.session.flush()
+
+        session.last_message_id = msg.id
+        session.last_message_at = created_at or now
+        await self.session.flush()
 
     async def flush(self) -> None:
         await self.session.flush()

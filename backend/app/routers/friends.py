@@ -4,8 +4,6 @@
 """
 import logging
 from fastapi import APIRouter, Depends, HTTPException, status, Query
-from sqlalchemy.ext.asyncio import AsyncSession
-from app.database import get_db
 from app.repositories.friend_repo import FriendRepository
 from app.schemas.friendship import (
     FriendRequestCreate, FriendRequestResponse,
@@ -14,6 +12,7 @@ from app.schemas.friendship import (
 from app.services.social.friend_service import (
     send_friend_request, accept_friend_request, reject_friend_request,
     remove_friend, list_friends, list_friend_requests, search_entities,
+    trigger_ai_auto_respond,
 )
 from app.utils.auth import get_current_user
 from app.routers.deps import get_friend_repo
@@ -23,7 +22,7 @@ logger = logging.getLogger(__name__)
 router = APIRouter(tags=["好友"])
 
 
-async def _notify_friend_request(db: AsyncSession, event_type: str, data: dict, target_user_id: int):
+async def _notify_friend_request(event_type: str, data: dict, target_user_id: int):
     """通过 WebSocket 向目标用户推送好友相关通知"""
     try:
         await manager.send_to_user(target_user_id, {
@@ -35,11 +34,6 @@ async def _notify_friend_request(db: AsyncSession, event_type: str, data: dict, 
         })
     except Exception as e:
         logger.warning(f"推送好友通知给用户 {target_user_id} 失败: {e}")
-
-
-async def _resolve_target_user_id(db: AsyncSession, target_type: str, target_id: int) -> int | None:
-    """target_id 统一为 users.id（human 和 AI 都走统一 ID 空间），直接返回"""
-    return target_id
 
 
 @router.get("/search", response_model=SearchResponse)
@@ -110,47 +104,47 @@ async def create_friend_request(
             target_id=req.target_id,
             message=req.message,
         )
+        # target_id 统一为 users.id，直接使用
+        target_uid = req.target_id
+
         # WebSocket 通知目标用户
-        target_uid = await _resolve_target_user_id(db, req.target_type, req.target_id)
-        if target_uid:
-            await _notify_friend_request(db, "request_received", {
-                "request_id": result.get("request_id"),
-                "requester_id": current_user["user_id"],
-                "requester_name": current_user.get("username", ""),
-                "target_type": req.target_type,
-                "target_id": req.target_id,
-                "message": req.message,
-                "status": result.get("status", "pending"),
-                "auto_respond": result.get("auto_respond", False),
-            }, target_uid)
+        await _notify_friend_request("request_received", {
+            "request_id": result.get("request_id"),
+            "requester_id": current_user["user_id"],
+            "requester_name": current_user.get("username", ""),
+            "target_type": req.target_type,
+            "target_id": req.target_id,
+            "message": req.message,
+            "status": result.get("status", "pending"),
+            "auto_respond": result.get("auto_respond", False),
+        }, target_uid)
 
         # 双向自动接受：只发双方附言，不需要通知
         if result.get("auto") and target_uid:
             if req.message:
                 await _inject_friend_greeting(
-                    db, current_user["user_id"], target_uid,
+                    friend_repo, current_user["user_id"], target_uid,
                     req.message, prefix="",
                 )
 
         # 🎯 目标 AI 开启「自动响应好友申请」→ 触发 AI 自主处理（不建 DM 会话，通不通过由 AI 判断）
         if req.target_type == "ai" and result.get("auto_respond"):
             try:
-                from app.ai.alarm import _process_friend_request_event
-
                 target_agent = await friend_repo.get_agent_by_user_id(req.target_id)
                 if target_agent:
-                    await _process_friend_request_event(db, {
-                        "agent_id": target_agent.id,
-                        "requester_id": current_user["user_id"],
-                        "requester_name": current_user.get("username") or f"用户{current_user['user_id']}",
-                        "message": req.message or "",
-                    })
+                    await trigger_ai_auto_respond(
+                        friend_repo=friend_repo,
+                        agent=target_agent,
+                        requester_id=current_user["user_id"],
+                        requester_name=current_user.get("username") or f"用户{current_user['user_id']}",
+                        message=req.message or "",
+                    )
                     logger.info(f"🎯 AI「{target_agent.name}」自动响应好友申请（来自 {current_user.get('username')}）")
             except Exception as e:
                 logger.warning(f"AI 自动响应好友申请失败: {e}")
             if result.get("reverse_message"):
                 await _inject_friend_greeting(
-                    db, target_uid, current_user["user_id"],
+                    friend_repo, target_uid, current_user["user_id"],
                     result["reverse_message"], prefix="",
                 )
 
@@ -179,7 +173,6 @@ async def list_requests(
 async def accept_request(
     request_id: int,
     current_user: dict = Depends(get_current_user),
-    db: AsyncSession = Depends(get_db),
     friend_repo: FriendRepository = Depends(get_friend_repo),
 ):
     """接受好友申请"""
@@ -200,7 +193,7 @@ async def accept_request(
 
         # 通知发起者：申请已被接受
         if req_requester_id:
-            await _notify_friend_request(db, "request_accepted", {
+            await _notify_friend_request("request_accepted", {
                 "request_id": request_id,
                 "accepter_name": current_user.get("username", ""),
             }, req_requester_id)
@@ -210,12 +203,12 @@ async def accept_request(
             accepter_uid = current_user["user_id"]
             requester_uid = req_requester_id if req_target_type == "human" else req_requester_id
             await _inject_friend_greeting(
-                db, requester_uid, accepter_uid,
+                friend_repo, requester_uid, accepter_uid,
                 req_message, created_at=req_created_at,
                 prefix="",
             )
             await _inject_friend_greeting(
-                db, accepter_uid, requester_uid,
+                friend_repo, accepter_uid, requester_uid,
                 "好友申请已通过", created_at=req_created_at,
             )
 
@@ -228,7 +221,6 @@ async def accept_request(
 async def reject_request(
     request_id: int,
     current_user: dict = Depends(get_current_user),
-    db: AsyncSession = Depends(get_db),
     friend_repo: FriendRepository = Depends(get_friend_repo),
 ):
     """拒绝好友申请"""
@@ -241,7 +233,7 @@ async def reject_request(
         # 通知发起者：申请已被拒绝
         req = await friend_repo.get_friend_request_by_id(request_id)
         if req:
-            await _notify_friend_request(db, "request_rejected", {
+            await _notify_friend_request("request_rejected", {
                 "request_id": request_id,
                 "rejecter_name": current_user.get("username", ""),
             }, req.requester_id)
@@ -274,7 +266,7 @@ async def delete_friend(
 
 
 async def _inject_friend_greeting(
-    db: AsyncSession,
+    friend_repo: FriendRepository,
     from_user_id: int,
     to_user_id: int,
     greeting: str,
@@ -282,16 +274,10 @@ async def _inject_friend_greeting(
     prefix: str = "🤝 ",
 ):
     """好友通过后，将附言注入 DM 对话开头（使用申请时间戳）"""
-    from app.chat.dm import (
-        get_or_create_dm_session, send_dm_message,
-    )
     try:
-        dm = await get_or_create_dm_session(db, from_user_id, to_user_id)
-        await send_dm_message(
-            db, dm["session_id"],
-            sender_id=from_user_id,
-            content=f"{prefix}{greeting}",
-            created_at=created_at,
+        session_id = await friend_repo.get_or_create_dm_session(from_user_id, to_user_id)
+        await friend_repo.send_dm_message(
+            session_id, from_user_id, f"{prefix}{greeting}", created_at=created_at,
         )
     except Exception as e:
         logger.warning(f"注入好友附言到 DM 失败: {e}")
