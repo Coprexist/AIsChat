@@ -2,10 +2,13 @@
 加密工具模块
 使用 cryptography.fernet 加密用户的 API Key
 """
-from cryptography.fernet import Fernet
+import logging
+from cryptography.fernet import Fernet, InvalidToken
 import base64
 import hashlib
 from app.config import settings
+
+logger = logging.getLogger(__name__)
 
 
 def _get_fernet() -> Fernet:
@@ -25,4 +28,7 @@ def encrypt_api_key(api_key: str) -> str:
 def decrypt_api_key(encrypted_key: str) -> str:
     """解密 API Key"""
     fernet = _get_fernet()
-    return fernet.decrypt(encrypted_key.encode()).decode()
+    try:
+        return fernet.decrypt(encrypted_key.encode()).decode()
+    except InvalidToken:
+        raise ValueError("API Key 解密失败：密钥不匹配或数据已损坏，请重新填写 API Key")

@@ -514,7 +514,12 @@ async def _trigger_group_assistant(
             messages.append({"role": "user", "content": content})
 
             # API key 回落链：助手自定义 → 群主全局 → 系统默认（None 交给 chat_completion）
-            api_key = decrypt_api_key(ga.api_key_encrypted) if ga.api_key_encrypted else None
+            api_key = None
+            if ga.api_key_encrypted:
+                try:
+                    api_key = decrypt_api_key(ga.api_key_encrypted)
+                except Exception as e:
+                    logger.warning(f"群助手 {ga.id} API Key 解密失败: {e}")
             api_base = ga.api_base_url
             if not api_key:
                 try:

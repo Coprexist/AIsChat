@@ -245,11 +245,14 @@ async def _get_api_config(
 
     # Tier 1: Agent 自有 Key
     if "agent_key" not in excluded_sources and agent.api_key_encrypted:
-        api_key = decrypt_api_key(agent.api_key_encrypted)
-        api_base = agent.api_base_url or settings.deepseek_base_url
-        credit_source = "agent_key"
-        provider_info = {"thinking_supported": "deepseek.com" in api_base, "base_url": api_base}
-        return api_key, api_base, credit_source, pool_key_id, provider_info
+        try:
+            api_key = decrypt_api_key(agent.api_key_encrypted)
+            api_base = agent.api_base_url or settings.deepseek_base_url
+            credit_source = "agent_key"
+            provider_info = {"thinking_supported": "deepseek.com" in api_base, "base_url": api_base}
+            return api_key, api_base, credit_source, pool_key_id, provider_info
+        except Exception as e:
+            logger.warning(f"  ⚠️ Agent 自有 Key 解密失败: {e}")
 
     if user is None:
         return api_key, api_base, credit_source, pool_key_id, provider_info
@@ -259,10 +262,13 @@ async def _get_api_config(
     # force_own_key: 跳过池 Key
     if force_own_key:
         if "user_key" not in excluded_sources and user.api_key_encrypted:
-            api_key = decrypt_api_key(user.api_key_encrypted)
-            api_base = user.api_base_url or settings.deepseek_base_url
-            credit_source = "user_key"
-            provider_info = {"thinking_supported": "deepseek.com" in api_base, "base_url": api_base}
+            try:
+                api_key = decrypt_api_key(user.api_key_encrypted)
+                api_base = user.api_base_url or settings.deepseek_base_url
+                credit_source = "user_key"
+                provider_info = {"thinking_supported": "deepseek.com" in api_base, "base_url": api_base}
+            except Exception as e:
+                logger.warning(f"  ⚠️ 用户自有 Key 解密失败: {e}")
         return api_key, api_base, credit_source, pool_key_id, provider_info
 
     effective_credit = max(0, (user.platform_gifted_credit or 0)) + (user.api_credit or 0)
@@ -301,11 +307,15 @@ async def _get_api_config(
 
         elif source_name == "user_key":
             if user.api_key_encrypted:
-                api_key = decrypt_api_key(user.api_key_encrypted)
-                api_base = user.api_base_url or settings.deepseek_base_url
-                credit_source = "user_key"
-                provider_info = {"thinking_supported": "deepseek.com" in api_base, "base_url": api_base}
-                return api_key, api_base, credit_source, pool_key_id, provider_info
+                try:
+                    api_key = decrypt_api_key(user.api_key_encrypted)
+                    api_base = user.api_base_url or settings.deepseek_base_url
+                    credit_source = "user_key"
+                    provider_info = {"thinking_supported": "deepseek.com" in api_base, "base_url": api_base}
+                    return api_key, api_base, credit_source, pool_key_id, provider_info
+                except Exception as e:
+                    logger.warning(f"  ⚠️ 用户 Key 解密失败: {e}")
+                    continue
 
     # 以上都不可用 → 返回空
     return api_key, api_base, credit_source, pool_key_id, provider_info
