@@ -11,6 +11,11 @@ from app.config import settings
 logger = logging.getLogger(__name__)
 
 
+class APIKeyDecryptError(ValueError):
+    """API Key 解密失败（密钥不匹配或数据损坏）"""
+    pass
+
+
 def _get_fernet() -> Fernet:
     """从配置密钥生成 Fernet 实例"""
     # Fernet 要求 32 字节的 base64 编码密钥
@@ -31,4 +36,4 @@ def decrypt_api_key(encrypted_key: str) -> str:
     try:
         return fernet.decrypt(encrypted_key.encode()).decode()
     except InvalidToken:
-        raise ValueError("API Key 解密失败：密钥不匹配或数据已损坏，请重新填写 API Key")
+        raise APIKeyDecryptError("API Key 解密失败：密钥不匹配或数据已损坏，请重新填写 API Key")

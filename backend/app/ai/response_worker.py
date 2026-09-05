@@ -26,6 +26,7 @@ from app.config import settings
 from app.chat import chat_api
 from app.services.memory.context_compression_service import should_compress, inline_compress, get_compression_threshold
 from app.utils.text import extract_mentions as _extract_mentions, check_mention as _check_mention
+from app.utils.crypto import APIKeyDecryptError
 from app.ai.executor import _tool_call_loop, _get_api_config, _check_rate_limit, _send_system_error, _send_system_error_notification, add_pending_interrupt, is_agent_running, mark_agent_running, unmark_agent_running
 from app.ai.alarm import _process_alarm_event
 
@@ -518,7 +519,7 @@ async def _trigger_group_assistant(
             if ga.api_key_encrypted:
                 try:
                     api_key = decrypt_api_key(ga.api_key_encrypted)
-                except Exception as e:
+                except APIKeyDecryptError as e:
                     logger.warning(f"群助手 {ga.id} API Key 解密失败: {e}")
             api_base = ga.api_base_url
             if not api_key:

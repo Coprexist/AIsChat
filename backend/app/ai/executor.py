@@ -219,7 +219,7 @@ async def _get_api_config(
 
     返回: (api_key, api_base, credit_source, pool_key_id, provider_info)
     """
-    from app.utils.crypto import decrypt_api_key
+    from app.utils.crypto import decrypt_api_key, APIKeyDecryptError
     from app.models.user import User as UserModel
 
     api_key = None
@@ -230,6 +230,18 @@ async def _get_api_config(
 
     if excluded_sources is None:
         excluded_sources = set()
+
+    # 记录解密失败（用于降级通知）
+    _decrypt_failures: list[str] = []
+
+    def _try_decrypt(source_label: str, encrypted: str) -> str | None:
+        """尝试解密，失败时记录来源并返回 None"""
+        try:
+            return decrypt_api_key(encrypted)
+        except APIKeyDecryptError as e:
+            _decrypt_failures.append(source_label)
+            logger.warning(f"⚠️ {source_label} 解密失败: {e}")
+            return None
 
     # 确定账单人
     if conversation_type and conversation_type != "dm" and getattr(agent, 'group_owner_pays', True):
@@ -245,30 +257,31 @@ async def _get_api_config(
 
     # Tier 1: Agent 自有 Key
     if "agent_key" not in excluded_sources and agent.api_key_encrypted:
-        try:
-            api_key = decrypt_api_key(agent.api_key_encrypted)
+        key = _try_decrypt(f"Agent「{agent.name}」自有 Key", agent.api_key_encrypted)
+        if key:
+            api_key = key
             api_base = agent.api_base_url or settings.deepseek_base_url
             credit_source = "agent_key"
             provider_info = {"thinking_supported": "deepseek.com" in api_base, "base_url": api_base}
             return api_key, api_base, credit_source, pool_key_id, provider_info
-        except Exception as e:
-            logger.warning(f"  ⚠️ Agent 自有 Key 解密失败: {e}")
 
     if user is None:
         return api_key, api_base, credit_source, pool_key_id, provider_info
 
     prefer_own = getattr(user, 'prefer_own_key', False)
 
-    # force_own_key: 跳过池 Key
+    # force_own_key: 跳过池 Key，只用用户自有 Key
     if force_own_key:
         if "user_key" not in excluded_sources and user.api_key_encrypted:
-            try:
-                api_key = decrypt_api_key(user.api_key_encrypted)
+            key = _try_decrypt(f"用户「{user.username}」自有 Key", user.api_key_encrypted)
+            if key:
+                api_key = key
                 api_base = user.api_base_url or settings.deepseek_base_url
                 credit_source = "user_key"
                 provider_info = {"thinking_supported": "deepseek.com" in api_base, "base_url": api_base}
-            except Exception as e:
-                logger.warning(f"  ⚠️ 用户自有 Key 解密失败: {e}")
+        # force_own_key 场景：如果自有 Key 解密失败，降级但通知用户
+        if api_key is None and _decrypt_failures:
+            await _notify_key_degradation(db, agent, user, _decrypt_failures)
         return api_key, api_base, credit_source, pool_key_id, provider_info
 
     effective_credit = max(0, (user.platform_gifted_credit or 0)) + (user.api_credit or 0)
@@ -288,8 +301,9 @@ async def _get_api_config(
             pool_key = await find_best_pool_key(db, user.id, exclude_pool_key_id=exclude_pool_key_id)
             if not pool_key:
                 continue
-            try:
-                api_key = decrypt_api_key(pool_key.api_key_encrypted)
+            key = _try_decrypt(f"池 Key #{pool_key.id}", pool_key.api_key_encrypted)
+            if key:
+                api_key = key
                 api_base = pool_key.api_base_url or settings.deepseek_base_url
                 credit_source = "pool_key"
                 pool_key_id = pool_key.id
@@ -301,24 +315,39 @@ async def _get_api_config(
                     "provider_name": pool_provider.get("name", ""),
                 }
                 return api_key, api_base, credit_source, pool_key_id, provider_info
-            except Exception as e:
-                logger.warning(f"  ⚠️ 池 Key {pool_key.id} 解密失败: {e}")
-                continue
 
         elif source_name == "user_key":
             if user.api_key_encrypted:
-                try:
-                    api_key = decrypt_api_key(user.api_key_encrypted)
+                key = _try_decrypt(f"用户「{user.username}」自有 Key", user.api_key_encrypted)
+                if key:
+                    api_key = key
                     api_base = user.api_base_url or settings.deepseek_base_url
                     credit_source = "user_key"
                     provider_info = {"thinking_supported": "deepseek.com" in api_base, "base_url": api_base}
                     return api_key, api_base, credit_source, pool_key_id, provider_info
-                except Exception as e:
-                    logger.warning(f"  ⚠️ 用户 Key 解密失败: {e}")
-                    continue
+
+    # 降级完成：如果发生了 Key 解密失败，通知用户
+    if _decrypt_failures:
+        await _notify_key_degradation(db, agent, user, _decrypt_failures)
 
     # 以上都不可用 → 返回空
     return api_key, api_base, credit_source, pool_key_id, provider_info
+
+
+async def _notify_key_degradation(db, agent, user, failures: list[str]) -> None:
+    """Key 解密失败导致降级时，通知 AI 的 owner"""
+    try:
+        failed_list = "\n".join(f"- {f}" for f in failures)
+        msg = (
+            f"⚠️ API Key 解密失败，已回退到全局默认配置\n\n"
+            f"**失败来源**：\n{failed_list}\n\n"
+            f"📌 可能原因：系统加密密钥已变更。\n"
+            f"请前往 [AI 设置页](/agents/{agent.id}) 和 [个人设置](/settings) 重新填写 API Key。"
+        )
+        await _send_system_error_notification(db, agent, msg)
+        logger.warning(f"降级通知已发送给 AI「{agent.name}」的 Owner({agent.owner_id})，失败来源: {failures}")
+    except Exception as e:
+        logger.error(f"发送降级通知失败: {e}")
 
 
 # ============================================================
