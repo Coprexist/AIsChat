@@ -155,14 +155,10 @@ class ResidentManager:
     # ── 生命周期 ──
 
     async def start(self, db, world) -> bool:
-        # 确保常驻进程 env 注入 WORLD_API_TOKEN / WORLD_API_BASE（懒生成）
-        from app.routers.world_proxy import ensure_world_api_token
-        await ensure_world_api_token(db, world)
-        await db.commit()
         """启动常驻进程（已在跑则跳过）。返回是否新启动。"""
         if self.is_running(world.id):
             return False
-        # 受控 API token 必须存在（常驻进程 env 注入 WORLD_API_TOKEN/BASE 用）
+        # 确保常驻进程 env 注入 WORLD_API_TOKEN / WORLD_API_BASE（懒生成）
         try:
             from app.routers.world_proxy import ensure_world_api_token
             await ensure_world_api_token(db, world)
@@ -256,13 +252,30 @@ class ResidentManager:
     # ── 内部 ──
 
     async def _pump_stdout(self, world_id: int, proc) -> None:
-        """常驻进程 stdout → 后端日志（ready/result/tick_error/崩溃信息）"""
+        """常驻进程 stdout → 后端日志 + WebSocket 广播
+
+        行协议：{"type":"result","ok":true,"result":{...}} → 广播给所有 WebSocket 客户端
+        """
         try:
             async for line in proc.stdout:
                 text = line.decode("utf-8", errors="replace").strip()
                 if not text:
                     continue
                 logger.info(f"🌐 世界 #{world_id} 常驻: {text[:300]}")
+
+                # ── 关键桥接：result → WebSocket 广播 ──
+                try:
+                    msg = json.loads(text)
+                except Exception:
+                    continue
+                if msg.get("type") == "result" and msg.get("ok"):
+                    result = msg.get("result")
+                    if isinstance(result, dict):
+                        try:
+                            from app.services.world.realtime_connection_manager import realtime_manager
+                            await realtime_manager.broadcast_state(world_id, result)
+                        except Exception as e:
+                            logger.warning(f"🌐 世界 #{world_id} result→WS 广播失败: {e}")
         except Exception:
             pass
         finally:

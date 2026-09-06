@@ -33,10 +33,10 @@ async def world_realtime_ws(
 
     # ── JWT 校验 ──
     result = decode_access_token(token)
-    if result.is_failure():
+    if result.is_err():
         await websocket.close(code=4001, reason="无效 token")
         return
-    user_id = result.value.get("user_id")
+    user_id = result.ok.get("user_id")
     if user_id is None:
         await websocket.close(code=4001, reason="token 中无 user_id")
         return

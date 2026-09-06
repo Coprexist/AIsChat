@@ -66,15 +66,20 @@ _rate_buckets: dict[int, deque] = {}
 # 世界活跃用户（world_id → {user_id: 最近活跃时刻}），供动态限流按人数加成
 _ACTIVE_USERS: dict[int, dict[int, float]] = {}
 
-# ── 世界状态实时推送（2.5：世界代码发布 → 页面 SSE 订阅，零轮询） ──
-# 世界代码经受控 API POST /api/state 发布状态快照：后端存最新 + 广播给 SSE 订阅者
+# ── 世界状态实时推送（2.5：世界代码发布 → 页面 SSE + WebSocket 订阅，零轮询） ──
+# 世界代码经受控 API POST /api/state 发布状态快照：后端存最新 + 广播给 SSE 订阅者 + WebSocket 客户端
 _state_latest: dict[int, dict] = {}
 _state_subs: dict[int, set] = {}
 
 
 def _publish_state(world_id: int, state: dict) -> None:
-    """发布世界状态：更新最新快照 + 广播所有 SSE 订阅者（慢消费者只保留最新）"""
+    """发布世界状态：更新最新快照 + 广播所有 SSE 订阅者 + WebSocket 客户端
+
+    世界代码的每次 publish() 调用都会同时到达 SSE 和 WebSocket 两端，
+    世界程序 main.py 无需任何改动。
+    """
     _state_latest[world_id] = state
+    # SSE 广播（慢消费者只保留最新）
     for q in list(_state_subs.get(world_id, ())):
         try:
             q.get_nowait()
@@ -84,6 +89,13 @@ def _publish_state(world_id: int, state: dict) -> None:
             q.put_nowait(state)
         except asyncio.QueueFull:
             pass
+    # WebSocket 广播（非阻塞调度，不阻塞 HTTP 响应）
+    try:
+        loop = asyncio.get_running_loop()
+        from app.services.world.realtime_connection_manager import realtime_manager
+        loop.create_task(realtime_manager.broadcast_state(world_id, state))
+    except RuntimeError:
+        pass  # 无运行事件循环（理论上不会发生）
 
 
 def _cfg_int(cfg: dict, key: str, default: int, lo: int, hi: int) -> int:
