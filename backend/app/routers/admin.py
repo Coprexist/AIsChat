@@ -512,7 +512,7 @@ async def disband_group(
     if group is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="群聊不存在")
 
-    db.delete(group)
+    await db.delete(group)
     await _log_admin_action(db, admin["user_id"], "disband_group", "group", group_id)
     await db.flush()
 
@@ -726,9 +726,9 @@ async def delete_pool_key(
         select(UserApiAssignment).where(UserApiAssignment.pool_key_id == key_id)
     )
     for b in bindings.scalars().all():
-        db.delete(b)
+        await db.delete(b)
 
-    db.delete(key_entry)
+    await db.delete(key_entry)
 
     await _log_admin_action(
         db, admin["user_id"], "delete_pool_key", "api_key_pool", key_id,
@@ -1835,7 +1835,7 @@ async def cleanup_files(
         except (FileNotFoundError, ValueError):
             await db.execute(delete(FR).where(FR.file_id == fm.id))
             await db.execute(delete(FC).where(FC.file_id == fm.id))
-            db.delete(fm)
+            await db.delete(fm)
             orphan_cleaned += 1
 
     await db.flush()

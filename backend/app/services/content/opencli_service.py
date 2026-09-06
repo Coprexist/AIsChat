@@ -633,7 +633,7 @@ async def delete_command_whitelist(content_repo: ContentRepository, cmd_id: int)
     entry = result.scalar_one_or_none()
     if entry is None:
         raise ValueError("命令白名单条目不存在")
-    content_repo.delete(entry)
+    await content_repo.delete(entry)
     await content_repo.flush()
 
 

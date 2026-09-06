@@ -148,7 +148,7 @@ async def sync_plugins_to_db(db) -> int:
     # 磁盘消失 → 删除（卸载语义）
     for pid in list(db_plugins.keys()):
         if pid not in disk:
-            db.delete(db_plugins[pid])
+            await db.delete(db_plugins[pid])
             logger.info(f"插件卸载（目录消失）: {pid}")
             changed += 1
 

@@ -428,7 +428,7 @@ async def delete_file(
     physical_path = _get_physical_path(metadata.path)
     if os.path.exists(physical_path):
         os.remove(physical_path)
-    db.delete(metadata)
+    await db.delete(metadata)
     await db.flush()
     logger.info(f"文件已物理删除: {metadata.path} by {requester_type}:{requester_id}")
     return {"action": "deleted", "file_id": file_id}
@@ -556,7 +556,7 @@ async def cleanup_orphaned_files(db: AsyncSession, retention_days: int = 7):
             physical_path = _get_physical_path(meta.path)
             if os.path.exists(physical_path):
                 os.remove(physical_path)
-            db.delete(meta)
+            await db.delete(meta)
             deleted += 1
 
     if deleted:
@@ -786,7 +786,7 @@ async def remove_file_collaborator(
     if collab is None:
         raise ValueError("协作者不存在")
 
-    db.delete(collab)
+    await db.delete(collab)
     await db.flush()
     logger.info(f"已移除协作者 {collaborator_type}:{collaborator_id} 从文件 {file_id}")
     return True

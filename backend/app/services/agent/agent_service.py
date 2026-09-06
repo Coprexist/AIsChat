@@ -515,10 +515,10 @@ async def delete_agent(
         ai_user_result = await db.execute(select(User).where(User.id == agent.user_id))
         ai_user = ai_user_result.scalar_one_or_none()
         if ai_user:
-            db.delete(ai_user)
+            await db.delete(ai_user)
 
     agent_name = agent.name
-    db.delete(agent)
+    await db.delete(agent)
     await db.flush()
 
     logger.info(
@@ -1354,7 +1354,7 @@ async def remove_collaborator(db: AsyncSession, agent_id: int, user_id: int):
     collab = await _get_collaborator(db, agent_id, user_id)
     if collab is None:
         raise ValueError("该用户不是此 AI 的合作者")
-    db.delete(collab)
+    await db.delete(collab)
     await db.flush()
 
 

@@ -947,7 +947,7 @@ class FederationManager:
                 logger.warning(f"🌐 entity_unannounce peer 不匹配: {federated_id} from {from_public_id}")
                 return
 
-            db.delete(entity)
+            await db.delete(entity)
             await db.commit()
             logger.info(f"🌐 移除联邦实体（远端取消共享）: {federated_id}")
 

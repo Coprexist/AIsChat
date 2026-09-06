@@ -120,7 +120,7 @@ async def delete_skill(db: AsyncSession, agent_id: int, skill_id: int) -> dict:
         return {"error": True, "message": "无权删除此技能"}
 
     skill_name = skill.name
-    db.delete(skill)
+    await db.delete(skill)
     await db.commit()
 
     logger.info(f"🧠 AI agent_id={agent_id} 删除技能 #{skill_id}: {skill_name}")

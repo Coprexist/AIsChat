@@ -534,7 +534,7 @@ async def remove_peer(db: AsyncSession, peer_id: int) -> dict:
         return {"error": True, "message": "对等端不存在"}
 
     peer_name = peer.peer_public_id
-    db.delete(peer)
+    await db.delete(peer)
     await db.commit()
 
     logger.info(f"🌐 移除对等端 #{peer_id}: {peer_name}")
@@ -631,7 +631,7 @@ async def remove_federated_entity(db: AsyncSession, entity_id: int) -> dict:
     if entity is None:
         return {"error": True, "message": "联邦实体不存在"}
     fid = entity.federated_id
-    db.delete(entity)
+    await db.delete(entity)
     await db.commit()
     logger.info(f"🌐 移除联邦实体: {fid}")
     return {"success": True, "message": f"联邦实体「{fid}」已移除"}
@@ -1042,7 +1042,7 @@ async def unshare_group_from_peers(
         peer_name = peer.display_name or (peer.peer_public_id if peer else str(peer_id))
 
         # 删除本地记录
-        db.delete(entity)
+        await db.delete(entity)
 
         # 如果对等端已连接，发送 entity_unannounce（只传 entity_type + local_id）
         if peer and peer.connection_state == "connected":

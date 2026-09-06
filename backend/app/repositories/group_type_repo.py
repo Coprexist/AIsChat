@@ -1,4 +1,4 @@
-﻿"""
+"""
 群类型仓库接口（Protocol）+ SQLAlchemy 实现。
 """
 from typing import Any, Protocol

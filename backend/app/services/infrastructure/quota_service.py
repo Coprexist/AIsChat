@@ -71,7 +71,7 @@ async def find_best_pool_key(db: AsyncSession, user_id: int, exclude_pool_key_id
         else:
             # Key 已失效，清除绑定
             logger.info(f"  🔄 用户 {user_id} 的池 Key {assignment.pool_key_id} 已失效，自动重新选择")
-            db.delete(assignment)
+            await db.delete(assignment)
             await db.flush()
 
     # Step 3: 查询所有 active Key（排除指定 Key）

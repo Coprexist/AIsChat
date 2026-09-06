@@ -434,7 +434,7 @@ async def remove_member(
         raise ValueError("不能踢群主")
     if operator.role == "admin" and target.role == "admin":
         raise ValueError("管理员不能踢其他管理员")
-    db.delete(target)
+    await db.delete(target)
     await db.flush()
     logger.info(f"成员 {target_type}:{target_id} 已被踢出群聊 {group_id}")
 
@@ -453,7 +453,7 @@ async def leave_group(
         group = await db.get(Group, group_id)
         if group and not group.name.startswith("DM:"):
             raise ValueError("群主不能退群，请先将群主转让给其他成员")
-    db.delete(member)
+    await db.delete(member)
     await db.flush()
     logger.info(f"成员 {member_type}:{member_id} 已退出群聊 {group_id}")
 
@@ -534,7 +534,7 @@ async def disband_group(db: AsyncSession, group_id: int, operator_id: int) -> Gr
     await db.execute(update(RoughMemory).where(RoughMemory.group_id == group_id).values(group_id=None))
     from app.models.conversation_log import ConversationLog
     await db.execute(delete(ConversationLog).where(ConversationLog.group_id == group_id))
-    db.delete(group)
+    await db.delete(group)
     await db.flush()
     logger.info(f"群聊 '{group.name}' (id={group_id}) 已被群主 {operator_id} 解散")
     return group

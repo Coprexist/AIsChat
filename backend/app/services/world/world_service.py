@@ -268,7 +268,7 @@ async def delete_world(repo: WorldRepository, world_id: int, owner_id: int) -> N
     if world.owner_id != owner_id:
         raise ValueError("仅创建者可删除世界")
 
-    repo.delete(world)
+    await repo.delete(world)
     await repo.flush()
     logger.info(f"🗑️ 世界删除: #{world_id}（世界 AI 随世界销毁）")
 
@@ -503,7 +503,7 @@ async def delete_world_data(repo: WorldRepository, world_id: int, key: str) -> b
     )).scalar_one_or_none()
     if row is None:
         return False
-    repo.delete(row)
+    await repo.delete(row)
     await repo.commit()
     return True
 

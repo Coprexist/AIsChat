@@ -232,7 +232,7 @@ async def delete_decision_rule(db, kind: str, entity_id: int, name: str) -> bool
             )
         )).scalar_one_or_none()
         if row is not None:
-            db.delete(row)
+            await db.delete(row)
             await db.commit()
         return True
     return False

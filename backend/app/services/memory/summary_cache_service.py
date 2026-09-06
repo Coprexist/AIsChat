@@ -85,7 +85,7 @@ async def set_cached_summary(
         )
     )
     for old_cache in old.scalars().all():
-        db.delete(old_cache)
+        await db.delete(old_cache)
 
     # 写入新缓存
     cache = UnreadSummaryCache(
@@ -119,7 +119,7 @@ async def invalidate_cache(
 
     result = await db.execute(query)
     for cache in result.scalars().all():
-        db.delete(cache)
+        await db.delete(cache)
 
     if group_id:
         logger.debug(f"缓存已失效: agent={agent_id}, group={group_id}")
