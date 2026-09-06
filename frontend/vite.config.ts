@@ -36,6 +36,7 @@ export default defineConfig({
       '/world/': {
         target: 'http://backend:8000',
         changeOrigin: true,
+        ws: true,
       },
       '/ws': {
         target: 'ws://backend:8000',
