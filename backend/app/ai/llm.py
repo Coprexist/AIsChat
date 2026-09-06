@@ -949,7 +949,10 @@ async def build_messages(
     if getattr(agent, "ai_type", None) in ("resonance", "general", "semi_general"):
         try:
             from app.services.social.friend_service import get_pending_friend_requests_for_ai
-            reqs = await get_pending_friend_requests_for_ai(db, agent)
+            from app.repositories.friend_repo import SQLAlchemyFriendRepository
+            reqs = await get_pending_friend_requests_for_ai(
+                friend_repo=SQLAlchemyFriendRepository(db), agent_user_id=agent.user_id,
+            )
             if reqs:
                 lines = ["\n\n## 📨 待处理好友申请（有人申请加你为好友）"]
                 for r in reqs:
@@ -1327,7 +1330,10 @@ async def build_dm_messages(
     # 📨 待处理好友申请（AI 感知；动态内容沉底）
     try:
         from app.services.social.friend_service import get_pending_friend_requests_for_ai
-        reqs = await get_pending_friend_requests_for_ai(db, agent)
+        from app.repositories.friend_repo import SQLAlchemyFriendRepository
+        reqs = await get_pending_friend_requests_for_ai(
+            friend_repo=SQLAlchemyFriendRepository(db), agent_user_id=agent.user_id,
+        )
         if reqs:
             lines = ["\n\n## 📨 待处理好友申请（有人申请加你为好友）"]
             for r in reqs:

@@ -445,7 +445,7 @@ async def _tool_call_loop(
             inline_compress, compress_messages,
         )
         stale = _is_conversation_idle(messages, hours=12)
-        if stale and not getattr(_context, "_precompressed", False):
+        if stale and not getattr(context, "_precompressed", False):
             compressed_ok = False
             # 优先 LLM 总结压缩（保留关键信息，适合继续对话的场景）
             if api_key:
@@ -476,7 +476,7 @@ async def _tool_call_loop(
                     )
             if compressed_ok:
                 _auto_compressed = True
-                _context["_precompressed"] = True
+                context["_precompressed"] = True
     except Exception as e:
         logger.warning(f"调用前空闲压缩跳过（非致命）: {e}")
 
