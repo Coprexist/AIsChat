@@ -157,40 +157,10 @@ async def _startup_db() -> None:
     await wait_for_db()
     logger.info("[OK] 数据库连接正常")
 
-    from app.db_providers import get_provider
-    provider = get_provider()
-
-    if provider.name == "postgres":
-        # PostgreSQL: prestart.py 已处理旧库迁移（alembic upgrade head）。
-        # 新库由 bootstrap.py 处理：create_all 建表 + stamp head 标记完成。
-        from app.db_migrate import has_alembic_version_sync
-        from app.database import engine, Base
-        import app.models  # 确保全部模型注册到 Base.metadata
-
-        with engine.sync_engine.connect() as conn:
-            is_new = not has_alembic_version_sync(conn)
-
-        if is_new:
-            logger.info("[MIGRATE] 全新 PostgreSQL 库，执行 create_all + alembic stamp head...")
-            async with engine.begin() as conn:
-                await conn.run_sync(Base.metadata.create_all)
-            # 标记 Alembic 为 head（后续 alembic upgrade head 不再重复建表）
-            import subprocess, sys as _sys
-            backend_dir = str(__import__("pathlib").Path(__file__).resolve().parent.parent)
-            subprocess.run(
-                [_sys.executable, "-m", "alembic", "stamp", "head"],
-                cwd=backend_dir, check=True,
-            )
-            logger.info("[OK] 全新库建表完成，Alembic 已 stamp head")
-        else:
-            logger.info("[OK] PostgreSQL 旧库，Alembic 迁移已在 prestart 完成")
-    else:
-        # SQLite: ORM create_all 建表（幂等）
-        from app.database import engine, Base
-        import app.models
-        async with engine.begin() as conn:
-            await conn.run_sync(Base.metadata.create_all)
-        logger.info("[OK] SQLite 建表完成")
+    from app.database import engine
+    from app.db_migrate import prepare_database
+    await prepare_database(engine)
+    logger.info("[OK] 数据库初始化完成")
 
     # 加载 DB 覆盖配置（管理员前端图形化修改的配置组，覆盖 env）
     try:
