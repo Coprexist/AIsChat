@@ -57,8 +57,8 @@ router = APIRouter(prefix="/world", tags=["群视界入口"])
 # ═══════════════════════════════════════════════════════════════
 
 RATE_LIMIT_WINDOW = 10.0        # 秒
-RATE_LIMIT_MAX = 120            # 读/总配额基础值（10 秒）
-RATE_LIMIT_PER_USER = 60        # 每人加成（10 秒）
+RATE_LIMIT_MAX = 240            # 读/总配额基础值（10 秒）
+RATE_LIMIT_PER_USER = 120       # 每人加成（10 秒）
 GROUP_MSG_LIMIT = 20            # 写操作基础配额（10 秒）
 GROUP_MSG_LIMIT_PER_USER = 10   # 写操作每人加成（10 秒）
 ACTIVE_WINDOW = 600.0           # 活跃判定窗口（10 分钟）
