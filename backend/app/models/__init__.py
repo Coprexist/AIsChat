@@ -2,8 +2,8 @@
 SQLAlchemy ORM 模型
 """
 from app.models.user import User
-from app.models.agent import Agent, AgentConfigHistory, AgentUserConfig
-from app.models.group import Group, GroupMember
+from app.models.agent import Agent, AgentConfigHistory, AgentUserConfig, AgentCollaborator, CapabilityVersion
+from app.models.group import Group, GroupMember, GroupInvitation
 from app.models.message import Message, GroupMessageEmbedding, PendingMessage
 from app.models.memory import RoughMemory, DetailMemory
 from app.models.vector_request import VectorAccelerationRequest
@@ -41,7 +41,7 @@ from app.models.structured_record import StructuredRecord
 from app.models.workspace import AgentWorkspace
 from app.models.study_record import StudyRecord
 from app.models.study_setting import StudySetting
-from app.models.world import (World, WorldBinding, WorldAgent, WorldChatMessage, WorldAI, WorldAIMemory, WorldStructuredRecord, WorldLLMUsage, WorldMarketItem, GroupAssistant)
+from app.models.world import (World, WorldBinding, WorldAgent, WorldChatMessage, WorldAI, WorldAIMemory, WorldStructuredRecord, WorldLLMUsage, WorldMarketItem, GroupAssistant, WorldData)
 
 __all__ = [
     "User",
@@ -50,6 +50,7 @@ __all__ = [
     "AgentUserConfig",
     "Group",
     "GroupMember",
+    "GroupInvitation",
     "Message",
     "GroupMessageEmbedding",
     "PendingMessage",
@@ -89,6 +90,8 @@ __all__ = [
     "AgentTrigger",
     "AgentAttention",
     "AgentStateStack",
+    "AgentCollaborator",
+    "CapabilityVersion",
     "AgentSkillRelation",
     "AgentAlarm",
     "StructuredRecord",
@@ -102,6 +105,7 @@ __all__ = [
     "WorldStructuredRecord",
     "WorldLLMUsage",
     "GroupAssistant",
+    "WorldData",
     "UserGroupPreference",
     "UserDMPreference",
     "Plugin",

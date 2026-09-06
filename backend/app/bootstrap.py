@@ -167,7 +167,7 @@ async def _startup_db() -> None:
         from app.database import engine, Base
         import app.models  # 确保全部模型注册到 Base.metadata
 
-        with engine.connect() as conn:
+        with engine.sync_engine.connect() as conn:
             is_new = not has_alembic_version_sync(conn)
 
         if is_new:
