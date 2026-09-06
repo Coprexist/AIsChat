@@ -38,6 +38,7 @@ class WorldRealtimeManager:
     async def broadcast_state(self, world_id: int, state: dict[str, Any]) -> None:
         """向世界内所有连接广播状态"""
         world_conns = self._connections.get(world_id, {})
+        logger.info(f"[WS广播] world={world_id} state_keys={list(state.keys())} conns={len(world_conns)}")
         if not world_conns:
             return
         payload = json.dumps({"type": "state", "state": state}, ensure_ascii=False)

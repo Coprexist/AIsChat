@@ -10,7 +10,6 @@ import json
 import logging
 
 from fastapi import APIRouter, WebSocket, WebSocketDisconnect, Query
-from sqlalchemy import select
 
 from app.database import async_session
 from app.models.world import World
@@ -64,6 +63,7 @@ async def world_realtime_ws(
                 continue
 
             msg_type = msg.get("type", "")
+            logger.info(f"[WS输入] world={world_id} user={user_id} msg={msg}")
 
             if msg_type == "input":
                 # ── 实时输入事件 ──
@@ -77,10 +77,28 @@ async def world_realtime_ws(
                 seq = msg.get("seq")
                 input_data = msg.get("input", {})
 
+                # 前端 sendCommand 已经包装成 {type:"page_command", command:text}
+                # 将其重组为世界 handle() 识别的 page_command 事件结构：
+                #   {"type":"page_command", "payload":{...}, "user_id":uid, "user_name":name}
+                command_text = input_data.get("command", "")
+                if not command_text:
+                    await realtime_manager.send_to_user(world_id, user_id, {
+                        "type": "error", "code": "EMPTY_COMMAND",
+                        "message": "命令内容为空",
+                    })
+                    continue
+
+                # 查用户名（用于事件上下文）
+                async with async_session() as db:
+                    from app.models.user import User
+                    user = await db.get(User, user_id)
+                    user_name = (getattr(user, "nickname", None) or getattr(user, "username", None) or f"#{user_id}") if user else f"#{user_id}"
+
                 dispatched = await resident_manager.dispatch(world_id, {
-                    "type": "user_input",
+                    "type": "page_command",
+                    "payload": {"command": command_text},
                     "user_id": user_id,
-                    "input": input_data,
+                    "user_name": user_name,
                 })
 
                 if not dispatched:
