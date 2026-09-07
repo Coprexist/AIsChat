@@ -350,7 +350,7 @@ async def ensure_session_lifecycle(world_repo, world) -> dict:
     from app.config import settings as _settings
     tz = ZoneInfo(_settings.display_timezone)
     local_now = datetime.now(tz)
-    now_utc = datetime.now(timezone.utc).replace(tzinfo=None)
+    now_utc = datetime.now(timezone.utc)
     cfg = dict(world.config or {})
     st = session_settings(world)
     result = {"auto_newed": False, "cleaned": 0}
