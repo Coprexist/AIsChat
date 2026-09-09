@@ -166,7 +166,7 @@ def _friendly_llm_error(err) -> str:
 def _now_local() -> datetime:
     """本模块的时间戳（避免跨模块依赖 _now）"""
     from datetime import datetime as _dt, timezone as _tz
-    return _dt.now(_tz.utc).replace(tzinfo=None)
+    return _dt.now(_tz.utc)
 
 
 def _is_json_line(line: str) -> bool:
@@ -325,7 +325,7 @@ def touch_session(world) -> None:
     sessions = dict(cfg.get("sessions") or {})
     key = (cfg.get("current_session") or "default")
     meta = dict(sessions.get(key) or {})
-    meta["last_active_at"] = datetime.now(timezone.utc).replace(tzinfo=None).isoformat()
+    meta["last_active_at"] = datetime.now(timezone.utc).isoformat()
     sessions[key] = meta
     cfg["sessions"] = sessions
     world.config = cfg
@@ -853,7 +853,7 @@ async def _prepare_world_chat(
             _la = _meta.get("last_active_at")
             if _la:
                 _la_dt = _dt.fromisoformat(_la)
-                _now = _dt.now(_tz.utc).replace(tzinfo=None)
+                _now = _dt.now(_tz.utc)
                 if _now - _la_dt > _td(hours=hours):
                     from app.services.world.world_tools import _do_execute
                     await _do_execute(world_repo, world, "compact_context", "{}")
