@@ -169,6 +169,14 @@ def _now_local() -> datetime:
     return _dt.now(_tz.utc)
 
 
+def _ensure_aware(dt: datetime) -> datetime:
+    """确保 datetime 是 timezone-aware（旧数据存的是 naive UTC，补上 tzinfo）"""
+    from datetime import timezone as _tz
+    if dt.tzinfo is None:
+        return dt.replace(tzinfo=_tz.utc)
+    return dt
+
+
 def _is_json_line(line: str) -> bool:
     """行是否为完整可解析的 JSON（裁剪时跳过损坏行）"""
     try:
@@ -397,7 +405,7 @@ async def ensure_session_lifecycle(world_repo, world) -> dict:
                 la_dt = datetime.fromisoformat(la)
             except Exception:
                 continue
-            if now_utc - la_dt > timedelta(days=days):
+            if now_utc - _ensure_aware(la_dt) > timedelta(days=days):
                 expired.append(sid)
         if expired:
             for sid in expired:
@@ -854,7 +862,7 @@ async def _prepare_world_chat(
             if _la:
                 _la_dt = _dt.fromisoformat(_la)
                 _now = _dt.now(_tz.utc)
-                if _now - _la_dt > _td(hours=hours):
+                if _now - _ensure_aware(_la_dt) > _td(hours=hours):
                     from app.services.world.world_tools import _do_execute
                     await _do_execute(world_repo, world, "compact_context", "{}")
                     touch_session(world)
