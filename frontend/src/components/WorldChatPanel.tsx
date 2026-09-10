@@ -100,7 +100,7 @@ function ReasoningBubble({ text, running }: { text: string; running?: boolean })
     >
       <div className="flex items-center gap-1.5 px-2 py-1">
         <Brain size={12} className="shrink-0 text-textMuted" />
-        <span className="shrink-0 text-[10px] text-textMuted font-medium">{t('world.reasoning') || '思考'}</span>
+        <span className="shrink-0 text-[10px] text-textMuted font-medium">{t('tool:world.reasoning') || '思考'}</span>
         <span className="shrink-0 w-px h-2.5 bg-border/60 mx-0.5" aria-hidden />
         <span
           ref={summaryRef}
