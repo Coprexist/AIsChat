@@ -727,6 +727,7 @@ async def _execute_tool_round(
         progress_events: list[str] = []
         async def _on_progress(note: str) -> None:
             progress_events.append(note)
+        result = None
         try:
             result = await _execute_world_tool(
                 world_repo, world, acc["name"], acc["arguments"], turn_state,
@@ -734,7 +735,14 @@ async def _execute_tool_round(
             )
         except TypeError:
             # 兼容：工具签名未支持 on_progress
-            result = await _execute_world_tool(world_repo, world, acc["name"], acc["arguments"], turn_state)
+            try:
+                result = await _execute_world_tool(world_repo, world, acc["name"], acc["arguments"], turn_state)
+            except Exception as e2:
+                logger.warning(f"🌐 世界 #{world_id} 工具 {acc['name']} 执行失败: {e2}")
+                result = {"success": False, "error": str(e2)[:500]}
+        except Exception as e:
+            logger.warning(f"🌐 世界 #{world_id} 工具 {acc['name']} 执行失败: {e}")
+            result = {"success": False, "error": str(e)[:500]}
         summary = _tool_result_summary(acc["name"], result)
         turn_state["tools_done"].append(summary)
         messages.append({
