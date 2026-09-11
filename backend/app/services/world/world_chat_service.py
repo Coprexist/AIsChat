@@ -1308,15 +1308,13 @@ async def stream_world_chat(
                         # 收尾轮：正文作为最终回复（finally 落库 ai），不进 note
                         final = content
                         break
-                    # 中间轮（还要继续调工具）：正文也流式展示 + 落库 note（历史可见、不进 AI 上下文）——
-                    # 2026-08-13：正文/思考拆两条独立 note（刷新后思考独立气泡，折叠生效）
+                    # 中间轮（还要继续调工具）：正文已由 _stream_llm_once 逐 chunk yield，
+                    # 此处只落库 note（历史可见、不进 AI 上下文）——不再重复 yield 正文，
+                    # 否则前端 full 变量拼接导致内容重复显示
                     if content or reasoning:
-                        # 中间轮思考也要落库（对齐首轮 note：reasoning 字段），否则刷新后「工具调用的思考」丢失
                         if content:
                             full_content = content
                         await _save_note_separated(world_repo, world_id, content or "", reasoning or "", sid_db)
-                        if content:
-                            yield f"data: {content.replace(chr(10), '{NL}')}\n\n"
                     # 模型还要继续调工具：记录真实 tool_calls，进入下一轮
                     # ⚠️ DeepSeek thinking 模式硬性要求：assistant 消息必须回传 reasoning_content，
                     # 否则 400 invalid_request_error（2026-08-13 修复）
@@ -1353,7 +1351,7 @@ async def stream_world_chat(
                     # ⚠️ 正常收尾轮（模型不再调工具 → final=content 已 break）：收尾总结也必须进 full_content，
                     # 否则流式显示正常但落库的是中间轮最后一段叙述 → 刷新后总结消失
                     full_content = final
-                yield f"data: {final.replace(chr(10), '{NL}')}\n\n"
+                # 正文已由 _stream_llm_once 逐 chunk yield，不再重复 yield（避免前端 full 拼接导致重复）
             except Exception as e:
                 had_error = True
                 turn_error = e

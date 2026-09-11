@@ -96,7 +96,7 @@ export function useWorldChat({ wid, onRefresh, onMsg }: UseWorldChatOptions) {
   const [chatMsgs, setChatMsgs] = useState<ChatMsg[]>([])
   const [chatInput, setChatInput] = useState('')
   const [chatSending, setChatSending] = useState(false)
-  const [chatProcessing, setChatProcessing] = useState(false)  // 刷新后恢复：后台轮次仍在执行
+  const [chatProcessing, setChatProcessing] = useState(true)  // 初始 true：状态检查完成前消息走排队，避免与运行中 AI 冲突
   const [pendingItems, setPendingItems] = useState<{ kind: 'msg' | 'cmd'; text: string }[]>([])  // AI 处理中排队消息（msg 一起发；cmd 串行执行）
   const [suggestions, setSuggestions] = useState<string[]>([])  // "你可以"建议（AI 生成 / 兜底 / 预设）
   // 会话（/new 开新对话、可切回；展示当前会话 id + 列表）
@@ -108,7 +108,7 @@ export function useWorldChat({ wid, onRefresh, onMsg }: UseWorldChatOptions) {
   const forceScrollToBottomRef = useRef<() => void>(() => {})
   const sessionListRef = useRef(sessionList)
   sessionListRef.current = sessionList
-  const chatProcessingRef = useRef(false)
+  const chatProcessingRef = useRef(true)
   const [chatHasMore, setChatHasMore] = useState(false)
   const [chatLoadingOlder, setChatLoadingOlder] = useState(false)
   // 移动/桌面双面板都渲染 renderChatInner → ref 收集所有实例，滚动作用在全部（否则只滚到隐藏的那个）
@@ -594,18 +594,26 @@ export function useWorldChat({ wid, onRefresh, onMsg }: UseWorldChatOptions) {
   const submitText = (text: string) => {
     const t = text.trim()
     if (!t) return
-    // AI 忙（本条发送中 / 后台轮次执行中）：进队列——不画占位气泡（位置不对，
-    // 且会被 loadChat 冲掉），只显示在排队弹窗；真正插入后（[INSERT] 回执）才进对话流
-    if (chatSending || chatProcessing) {
+    // 前端正在发送中（上一条还没入队）→ 排队等 sendMessages 完成
+    if (chatSending) {
       setPendingItems((items) => [...items, { kind: t.startsWith('/') ? 'cmd' : 'msg', text: t }])
       setChatInput('')
       setCmdActive(false)
-      setSuggestions([])  // 开始新工作流 → 旧建议隐藏，等新回复生成新的
+      setSuggestions([])
       return
     }
-    // 直接发送：也先画用户气泡，再由 sendMessages 发送
+    // AI 正在处理（后台轮次执行中）→ 直接发到后端（走 insert 队列注入 AI 上下文）
+    // 不画占位用户气泡——[INSERT] 事件到达时才画真实气泡（带 DB id，刷新不丢）
+    if (chatProcessing) {
+      setChatInput('')
+      setCmdActive(false)
+      setSuggestions([])
+      sendMessages([t])
+      return
+    }
+    // 空闲状态：直接发送 + 画用户气泡
     setChatMsgs((msgs) => [...msgs, { id: -(++msgSeqRef.current), role: 'user', content: t }])
-    setSuggestions([])  // 用户发送（点了预设等）→ 建议收起
+    setSuggestions([])
     sendMessages([t])
   }
 
