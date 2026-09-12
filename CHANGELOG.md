@@ -18,6 +18,29 @@
 - 改为 `get_providers()`（返回数组）。线上有 11 个世界（22/25/35/37/40/44-49）
   正处于该路径，新注册用户（无用户级覆盖）必然踩中
 
+### 🐛 修复的 Bug
+
+#### 插入消息回执被丢弃（排队弹窗清不掉）
+- **根因**：插入消息的广播代理在入队时绑定当时的活跃 turn（T1）。若消息在 T1 进行中入队、
+  却在 T1 结束之后才被 T2 的首轮前注入取走，广播会转发给已结束的 T1，
+  被 `TurnBroadcast.broadcast` 的 `ended` 检查**直接丢弃** → 前端收不到
+  `[INSERTED]`/`[INSERT]`，排队弹窗永远不清、真实气泡也不出现（要等轮次结束 `loadChat` 才补上）
+- **修复**：`drain_inserts()` 取出时把插入 turn 的 proxy 重指到**当前活跃 turn**
+- 该缺陷在 2026-08-13 引入代理机制时就存在，但当时中途消息走排队弹窗、不走插入通道，
+  直到恢复"普通消息立即插入"设计后才被触发
+
+#### 轮次收尾的插入消息兜底长期失效
+- `_run` 的 finally 里先调 `tb.end()`（置 `ended=True`）再 `tb.broadcast([INSERTED])`，
+  广播同样被丢弃。已抽成 `_flush_leftover_inserts(tb)` 并**提前到 `tb.end()` 之前**调用
+
+#### active_turn 标记读写全部抛 UnboundLocalError
+- `_run` 内后段有 `from app.models.world import World, WorldChatMessage`，
+  使 `World` 成为整个函数的局部名，导致前段 `_db.get(World, ...)` 抛
+  `cannot access local variable 'World'` → `active_turn` 永远写不进也清不掉
+  → `/chat/status` 无法据此判断"有轮次进行中"
+- **此前被静默吞掉**（`except Exception: pass`），是本轮把静默异常改为 `logger.warning` 后才暴露
+- 修复：`WorldChatMessage` 提到模块级导入，删除两处函数内导入
+
 ### 🏗️ 架构重构：stream_world_chat 分阶段拆分
 
 按"小步 + 每步验证"推进（383 行 → 分三段），已完成阶段 1-3：

@@ -17,7 +17,7 @@ from datetime import datetime, timezone
 from sqlalchemy import select
 
 from app.database import async_session
-from app.models.world import World
+from app.models.world import World, WorldChatMessage
 
 logger = logging.getLogger(__name__)
 
@@ -30,7 +30,6 @@ async def recover_orphaned_turn(world_id: int) -> None:
     - 幂等：已闭合（最后一条是 ai）则不动
     """
     try:
-        from app.models.world import World, WorldChatMessage
         async with async_session() as db:
             rows = (await db.execute(
                 select(WorldChatMessage)
@@ -170,42 +169,50 @@ class WorldTurnWorker:
                     # 清不掉会残留 → status 永远报 processing，前端卡在"处理中"
                     logger.warning(f"🌐 世界 #{self.world_id} active_turn 标记清除失败: {e}")
                 if tb:
+                    # ⚠️ 顺序关键：残留插入消息的补发必须在 tb.end() **之前**。
+                    # end() 会置 ended=True，之后 broadcast 会被 TurnBroadcast.broadcast
+                    # 的 ended 检查直接丢弃——这个兜底因此长期形同虚设（前端弹窗清不掉）
+                    await self._flush_leftover_inserts(tb)
                     tb.end()
                     # 清理本 turn + 代理到它的插入 turn（插入消息广播随活跃 turn 收尾）
                     self.turns.pop(item["turn_id"], None)
                     for _tid in [t for t, _tb in self.turns.items() if _tb.proxy is tb]:
                         self.turns.pop(_tid, None)
-                    # 兜底：轮次先结束时，_inject_pending_user_messages（world_chat_service）
-                    # 还没来得及处理的插入消息，在这里补落库 + 广播
-                    # （已落库的 msg_ids 非空则跳过，避免重复）
-                    try:
-                        if self._inserts:
-                            async with async_session() as _db:
-                                from app.models.world import World, WorldChatMessage
-                                from app.services.world.world_chat_service import session_id_for_db
-                                world_row = await _db.get(World, self.world_id)
-                                sid = session_id_for_db(world_row) if world_row else None
-                                pending = self._inserts
-                                self._inserts = []
-                                for _it in pending:
-                                    if len(_it.get("msg_ids") or []) == len([m for m in _it["messages"] if str(m).strip()]):
-                                        continue  # 已由 _inject_pending_user_messages 落库
-                                    total = len(_it["messages"])
-                                    await tb.broadcast(f"data: [INSERTED]{json.dumps({'count': total})}\n\n")
-                                    for _m in _it["messages"]:
-                                        _t = str(_m).strip()
-                                        if not _t:
-                                            continue
-                                        wm = WorldChatMessage(
-                                            world_id=self.world_id, user_id=_it["user_id"],
-                                            role="user", content=_t, session_id=sid,
-                                        )
-                                        _db.add(wm)
-                                        await _db.flush()
-                                        await tb.broadcast(f"data: [INSERT]{json.dumps({'msg_id': wm.id, 'content': _t}, ensure_ascii=False)}\n\n")
-                                await _db.commit()
-                    except Exception as e:
-                        logger.warning(f"🌐 世界 #{self.world_id} 残留插入消息补发失败（非致命）: {e}")
+
+    async def _flush_leftover_inserts(self, tb: "TurnBroadcast") -> None:
+        """轮次收尾兜底：把 _inserts 里还没被 _inject_pending_user_messages 处理的插入消息
+        补落库 + 补广播（已落库的 msg_ids 非空则跳过，避免重复）。
+
+        ⚠️ 调用方必须在 tb.end() 之前调用，否则广播会被 ended 检查丢弃。
+        """
+        if not self._inserts:
+            return
+        try:
+            from app.services.world.world_chat_service import session_id_for_db
+            async with async_session() as _db:
+                world_row = await _db.get(World, self.world_id)
+                sid = session_id_for_db(world_row) if world_row else None
+                pending = self._inserts
+                self._inserts = []
+                for _it in pending:
+                    if len(_it.get("msg_ids") or []) == len([m for m in _it["messages"] if str(m).strip()]):
+                        continue  # 已由 _inject_pending_user_messages 落库
+                    total = len(_it["messages"])
+                    await tb.broadcast(f"data: [INSERTED]{json.dumps({'count': total})}\n\n")
+                    for _m in _it["messages"]:
+                        _t = str(_m).strip()
+                        if not _t:
+                            continue
+                        wm = WorldChatMessage(
+                            world_id=self.world_id, user_id=_it["user_id"],
+                            role="user", content=_t, session_id=sid,
+                        )
+                        _db.add(wm)
+                        await _db.flush()
+                        await tb.broadcast(f"data: [INSERT]{json.dumps({'msg_id': wm.id, 'content': _t}, ensure_ascii=False)}\n\n")
+                await _db.commit()
+        except Exception as e:
+            logger.warning(f"🌐 世界 #{self.world_id} 残留插入消息补发失败（非致命）: {e}")
 
     def enqueue(self, user_id: int, message: str | list[str]) -> str:
         """消息入队（支持批量：排队消息一起发给 AI），返回 turn_id（订阅直播用）。
@@ -243,13 +250,27 @@ class WorldTurnWorker:
         return turn_id
 
     async def drain_inserts(self, user_id: int | None = None) -> list[dict]:
-        """取走待插入的普通消息（工具轮每轮调用前调用；user_id=None 取全部）"""
+        """取走待插入的普通消息（工具轮每轮调用前调用；user_id=None 取全部）。
+
+        ⚠️ 取出时把插入 turn 的广播代理**重指到当前活跃 turn**：
+        消息可能在 T1 进行中入队（那时 proxy=T1），却在 T1 结束、T2 开始后才被
+        T2 的首轮前注入取走。此时若仍转发给已结束的 T1，TurnBroadcast.broadcast 会因
+        T1.ended=True 直接丢弃事件 → 前端收不到 [INSERTED]/[INSERT]，
+        排队弹窗永远清不掉、真实气泡也不出现（只能等轮次结束 loadChat 才补上）。
+        """
         async with self._inserts_lock:
             if user_id is None:
                 items, self._inserts = self._inserts, []
             else:
                 items = [i for i in self._inserts if i["user_id"] == user_id]
                 self._inserts = [i for i in self._inserts if i["user_id"] != user_id]
+        # 重指代理：取当前未结束且自身不是代理的 turn（即真正的活跃 turn）
+        active = next((tb for tb in self.turns.values() if not tb.ended and tb.proxy is None), None)
+        if active is not None:
+            for _it in items:
+                _tb = _it.get("tb")
+                if _tb is not None:
+                    _tb.proxy = active
         return items
 
     @property
