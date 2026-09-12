@@ -44,8 +44,13 @@ function parseEvent<T>(payload: string, prefix: string): T | null {
   }
 }
 
-// 斜杠命令列表（输入 / 弹出，像 @ 提及；仅世界设计页——主站保持人性化不加）
-export const WORLD_COMMANDS = [
+// 斜杠命令列表兜底（后端 COMMAND_SPECS 未下发时的首帧默认值）
+// 权威来源是后端 world_chat_commands.COMMAND_SPECS，经 GET /chat 的 commands 字段下发——
+// 新增命令只改后端一处，前端不再需要同步维护
+// mid_turn：能否在 AI 工具轮进行中直接插入本轮（缺省 false = 等本轮结束）
+export interface CmdSpec { cmd: string; desc: string; mid_turn?: boolean }
+
+export const WORLD_COMMANDS: CmdSpec[] = [
   { cmd: '/new', desc: '开新对话（旧对话保存，可切回）' },
   { cmd: '/sessions', desc: '列出所有会话（id + 时间 + 收藏）' },
   { cmd: '/use <id>', desc: '切回指定会话继续对话' },
@@ -82,7 +87,9 @@ export interface UseWorldChatReturn {
   setCmdQuery: (v: string) => void
   cmdIdx: number
   setCmdIdx: Dispatch<SetStateAction<number>>
-  cmdFiltered: { cmd: string; desc: string }[]
+  cmdFiltered: CmdSpec[]
+  /** 命令目录（后端 COMMAND_SPECS 下发，供补全与路由判定共用） */
+  worldCommands: CmdSpec[]
   submitText: (text: string) => void
   insertSuggestion: (q: string) => void
   isAtBottom: boolean
@@ -153,9 +160,19 @@ export function useWorldChat({ wid, onRefresh, onMsg }: UseWorldChatOptions) {
   const [cmdActive, setCmdActive] = useState(false)
   const [cmdQuery, setCmdQuery] = useState('')
   const [cmdIdx, setCmdIdx] = useState(0)
+  // 命令目录：以后端 COMMAND_SPECS 为准（loadChat 随历史下发），未下发前用本地兜底
+  const [worldCommands, setWorldCommands] = useState<CmdSpec[]>(WORLD_COMMANDS)
   const cmdFiltered = useMemo(() =>
-    cmdQuery ? WORLD_COMMANDS.filter((c) => c.cmd.startsWith('/' + cmdQuery)) : WORLD_COMMANDS
-  , [cmdQuery])
+    cmdQuery ? worldCommands.filter((c) => c.cmd.startsWith('/' + cmdQuery)) : worldCommands
+  , [cmdQuery, worldCommands])
+  // 该条能否在 AI 工具轮进行中直接插入本轮——与后端 world_chat_commands.may_insert_mid_turn 同一规则：
+  // 普通消息恒可；命令看后端声明的 mid_turn；未声明/未知命令保守按"必须等本轮结束"
+  // 注意：这是**路由判定**，与弹窗里的 kind（'cmd'/'msg'，纯显示标签）是两回事
+  const mayInsertMidTurn = useCallback((text: string) => {
+    const head = (text.trim().split(/\s+/) || [''])[0]
+    if (!head.startsWith('/')) return true
+    return !!worldCommands.find((c) => (c.cmd.split(/\s+/)[0] || '') === head)?.mid_turn
+  }, [worldCommands])
 
   // ── 历史加载 ──
   const loadChat = useCallback(async (opts?: { before_id?: number; append?: boolean }) => {
@@ -163,9 +180,11 @@ export function useWorldChat({ wid, onRefresh, onMsg }: UseWorldChatOptions) {
       const q = opts?.before_id ? `?before_id=${opts.before_id}&limit=30` : '?limit=30'
       // 翻页时记录原滚动位置（prepend 后补回，作用于所有面板实例）
       const heights = listElsRef.current.map((el) => el.scrollHeight)
-      const r = await api.get<{ messages: ChatMsg[]; has_more: boolean; current_session?: string; sessions?: { id: string; last_active_at?: string; pinned?: boolean }[] }>(`/worlds/${wid}/chat${q}`)
+      const r = await api.get<{ messages: ChatMsg[]; has_more: boolean; current_session?: string; sessions?: { id: string; last_active_at?: string; pinned?: boolean }[]; commands?: CmdSpec[] }>(`/worlds/${wid}/chat${q}`)
       if (r.current_session) setCurrentSession(r.current_session)
       if (Array.isArray(r.sessions)) setSessionList(r.sessions)
+      // 命令目录以后端为准（唯一来源）；空数组不下发时保留本地兜底
+      if (Array.isArray(r.commands) && r.commands.length) setWorldCommands(r.commands)
       if (opts?.append && opts.before_id) {
         setChatMsgs((msgs) => [...(r.messages || []), ...msgs])
         requestAnimationFrame(() => {
@@ -405,13 +424,14 @@ export function useWorldChat({ wid, onRefresh, onMsg }: UseWorldChatOptions) {
           if (payload.startsWith(EV.INSERTED)) {
             // 信号（不计入历史）：后端已把 count 条普通消息注入 AI 上下文
             // → 按 FIFO 从排队弹窗移除这些消息（设计 §7.7）
-            // 只匹配 kind==='msg'：命令永远走"本轮结束后逐条发送"，不会出现在插入回执里；
-            // 若直接 slice(count)，夹在中间的命令会被一并误删
+            // 清除依据是"这条当初是否走了插入通道"（mayInsertMidTurn），而不是 kind——
+            // kind 只是弹窗显示标签（'cmd' 显示成"命令"），与路由无关。
+            // 未走插入通道的命令必须留着，否则 drain effect 会漏发。
             const sig = parseEvent<{ count?: number }>(payload, EV.INSERTED)
             if (sig) {
               let left = sig.count || 0
               setPendingItems((items) => items.filter((it) => {
-                if (left > 0 && it.kind === 'msg') { left -= 1; return false }
+                if (left > 0 && mayInsertMidTurn(it.text)) { left -= 1; return false }
                 return true
               }))
             }
@@ -648,9 +668,9 @@ export function useWorldChat({ wid, onRefresh, onMsg }: UseWorldChatOptions) {
       setChatInput('')
       setCmdActive(false)
       setSuggestions([])  // 开始新工作流 → 旧建议隐藏，等新回复生成新的
-      // 普通消息立即发后端（进插入队列，下一轮 LLM 前注入）；
-      // 命令不能提前发——必须等本轮结束，由 drain effect 一次发一条，剩下的继续排队
-      if (!isCmd) sendInsertMessage(t)
+      // 可中途插入的（普通消息 + 后端声明 mid_turn 的命令）立即发后端进插入队列；
+      // 其余命令不能提前发——必须等本轮结束，由 drain effect 一次发一条，剩下的继续排队
+      if (mayInsertMidTurn(t)) sendInsertMessage(t)
       return
     }
     // 空闲状态：直接发送 + 画用户气泡
@@ -693,7 +713,7 @@ export function useWorldChat({ wid, onRefresh, onMsg }: UseWorldChatOptions) {
     chatMsgs, chatInput, setChatInput, setChatMsgs,
     chatSending, chatProcessing, chatHasMore, chatLoadingOlder,
     chatListRef, chatInputRef, pendingItems, setPendingItems, suggestions,
-    cmdActive, setCmdActive, cmdQuery, setCmdQuery, cmdIdx, setCmdIdx, cmdFiltered,
+    cmdActive, setCmdActive, cmdQuery, setCmdQuery, cmdIdx, setCmdIdx, cmdFiltered, worldCommands,
     submitText, insertSuggestion, isAtBottom, chatCanScroll, scrollToBottom, forceScrollToBottom,
     currentSession, sessionList, switchSession, togglePin, unreadCount,
   }

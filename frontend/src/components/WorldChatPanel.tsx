@@ -1,7 +1,7 @@
 import { memo, useState, useRef, useCallback, useMemo, forwardRef, useImperativeHandle, useEffect } from 'react'
 import { Send, Plus, X, ChevronRight, Brain, ArrowDown, FileText, Search, Globe, Terminal, Package, Clock, Wrench, Eraser, Pin, ChevronDown, Copy, RefreshCw } from 'lucide-react'
 import MarkdownContent from './shared/MarkdownContent'
-import { useWorldChat, WORLD_COMMANDS, type ChatMsg } from '../hooks/useWorldChat'
+import { useWorldChat, type ChatMsg } from '../hooks/useWorldChat'
 import { api } from '../api/client'
 import { useT } from '../i18n/I18nContext'
 
@@ -191,8 +191,8 @@ const WorldChatPanel = memo(forwardRef<WorldChatHandle, WorldChatPanelProps>(({ 
   const [localCmdQuery, setLocalCmdQuery] = useState('')
   const [localCmdIdx, setLocalCmdIdx] = useState(0)
   const localCmdFiltered = useMemo(() =>
-    localCmdQuery ? WORLD_COMMANDS.filter((c) => c.cmd.startsWith('/' + localCmdQuery)) : WORLD_COMMANDS
-  , [localCmdQuery])
+    localCmdQuery ? chat.worldCommands.filter((c) => c.cmd.startsWith('/' + localCmdQuery)) : chat.worldCommands
+  , [localCmdQuery, chat.worldCommands])
 
   const clearLocalInput = useCallback(() => {
     setLocalInput('')

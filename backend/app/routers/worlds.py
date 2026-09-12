@@ -737,11 +737,15 @@ async def get_chat(
     )).scalar() or 0
     if has_default:
         sessions.insert(0, {"id": "default", "last_active_at": None, "pinned": bool((cfg.get("sessions") or {}).get("default", {}).get("pinned_by"))})
+    # 命令目录随历史一起下发：前端输入框补全 + 排队/插入分流都以此为准
+    # （COMMAND_SPECS 是唯一来源，前端不再自己维护一份命令表）
+    from app.services.world.world_chat_commands import COMMAND_SPECS
     return {
         "messages": msgs[-limit:],
         "has_more": has_more,
         "current_session": cfg.get("current_session") or "default",
         "sessions": sessions,
+        "commands": COMMAND_SPECS,
     }
 
 

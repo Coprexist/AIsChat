@@ -215,8 +215,11 @@ class WorldTurnWorker:
         turn_id = uuid.uuid4().hex[:12]
         # 判定是否插入：基于已有 turns（不含本次新建的），排除代理 turn（插入消息的广播，无独立生命周期）
         busy = any(not tb.ended and tb.proxy is None for tb in self.turns.values())
-        all_commands = all(str(m).lstrip().startswith("/") for m in messages)
-        if not all_commands and busy:
+        # "能否中途插入"由命令声明决定（world_chat_commands.COMMAND_SPECS.mid_turn），
+        # 不再硬编码 startswith('/')——后续新增"可中途发给 AI"的命令只需改声明
+        from app.services.world.world_chat_commands import may_insert_mid_turn
+        insertable = all(may_insert_mid_turn(m) for m in messages)
+        if insertable and busy:
             # 有正在执行的轮次 + 含普通消息 → 走插入通道（工具轮下一轮 LLM 调用前注入）
             # 插入消息的广播代理到当前活跃 turn（前端订阅插入 turn = 收到当前轮流事件含 [INSERT] 回执）
             active_tb = next((tb for tb in self.turns.values() if not tb.ended), None)

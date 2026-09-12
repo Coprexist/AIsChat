@@ -22,6 +22,53 @@ logger = logging.getLogger(__name__)
 MAX_PINNED_PER_USER = 16
 
 
+# ═══════════════════════════════════════════════════════════════
+# 命令能力声明 —— **前后端唯一来源**
+#
+# 前端不再自己用 startswith('/') 猜"是不是命令、能不能中途发"：
+#   · 输入框 / 自动补全列表  → GET /worlds/{id}/chat 的 commands 字段
+#   · 排队/插入分流          → world_turn.enqueue() 调 may_insert_mid_turn()
+#
+# mid_turn：
+#   False（默认）= 必须等当前轮次结束再执行（/clear /compact 等会改上下文的命令）
+#   True        = 允许 AI 工具轮进行中直接送进本轮上下文
+# 新增命令时只改这里一处，并在 run_slash_command 里加对应分支。
+# ═══════════════════════════════════════════════════════════════
+COMMAND_SPECS: list[dict] = [
+    {"cmd": "/new", "desc": "开新对话（旧对话保存，可切回）", "mid_turn": False},
+    {"cmd": "/sessions", "desc": "列出所有会话（id + 时间 + 收藏）", "mid_turn": False},
+    {"cmd": "/use <id>", "desc": "切回指定会话继续对话", "mid_turn": False},
+    {"cmd": "/pin", "desc": "收藏当前会话（最多 16 个，不被清理）", "mid_turn": False},
+    {"cmd": "/unpin", "desc": "取消收藏当前会话", "mid_turn": False},
+    {"cmd": "/clear", "desc": "清空当前会话上下文（保留长期记忆）", "mid_turn": False},
+    {"cmd": "/compact", "desc": "压缩当前会话上下文为摘要", "mid_turn": False},
+]
+
+
+def command_head(text: str) -> str:
+    """取命令头：'/use <id>' 与 '/use w1:abc' 都归一到 '/use'；非命令返回 ''"""
+    s = str(text).lstrip()
+    if not s.startswith("/"):
+        return ""
+    return (s.split() or [""])[0]
+
+
+def may_insert_mid_turn(text: str) -> bool:
+    """该条消息能否在 AI 工具轮进行中直接插入本轮上下文。
+
+    - 普通消息：恒可（设计 docs/group_world/design/group_world_design.md §7.7）
+    - 已声明命令：按 mid_turn 决定
+    - 未声明的斜杠命令：保守当作"必须等待"（宁可让用户多等，也不误插）
+    """
+    head = command_head(text)
+    if not head:
+        return True
+    for spec in COMMAND_SPECS:
+        if command_head(spec["cmd"]) == head:
+            return bool(spec.get("mid_turn"))
+    return False
+
+
 async def run_slash_command(world_repo: WorldRepository, world, cmd_text: str, user_id: int | None = None) -> str | None:
     """执行斜杠命令，返回结果 note；非命令返回 None（调用方继续走 LLM 流）"""
     from app.models.world import WorldChatMessage
