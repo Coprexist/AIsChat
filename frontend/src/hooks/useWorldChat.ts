@@ -554,6 +554,22 @@ export function useWorldChat({ wid, onRefresh, onMsg }: UseWorldChatOptions) {
     } catch { return false }
   }, [wid])
 
+  // ── 插入消息（AI 运行中中途发送，不阻塞等待整轮结束）──
+  const sendInsertMessage = async (text: string) => {
+    try {
+      // 先画用户气泡（临时 id，[INSERT] 事件到达时会用真实 DB id 替换）
+      const tmpId = -(++msgSeqRef.current)
+      setChatMsgs((msgs) => [...msgs, { id: tmpId, role: 'user', content: text }])
+      requestAnimationFrame(() => forceScrollToBottomRef.current?.())
+      // 发到后端（走 insert 队列，不等 [DONE]）
+      await api.post<{ turn_id: string; queued: boolean }>(`/worlds/${wid}/chat`, { messages: [text] })
+      // 不 await subscribeTurnStream——插入消息通过活跃 turn 的 SSE 事件（[INSERT]/[INSERTED]）到达
+    } catch (e: any) {
+      const errText = e?.message || '发送失败'
+      setChatMsgs((msgs) => [...msgs, { id: -(++msgSeqRef.current), role: 'ai', content: errText, error: true }])
+    }
+  }
+
   // ── 发送 ──
   const sendMessages = async (texts: string[]) => {
     const list = texts.map((t) => t.trim()).filter(Boolean)
@@ -605,12 +621,11 @@ export function useWorldChat({ wid, onRefresh, onMsg }: UseWorldChatOptions) {
       return
     }
     // AI 正在处理（后台轮次执行中）→ 直接发到后端（走 insert 队列注入 AI 上下文）
-    // 不画占位用户气泡——[INSERT] 事件到达时才画真实气泡（带 DB id，刷新不丢）
     if (chatProcessing) {
       setChatInput('')
       setCmdActive(false)
       setSuggestions([])
-      sendMessages([t])
+      sendInsertMessage(t)
       return
     }
     // 空闲状态：直接发送 + 画用户气泡
