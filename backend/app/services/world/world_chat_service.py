@@ -1123,10 +1123,9 @@ async def stream_world_chat(
     messages = ctx["messages"]
     msg_list = ctx["msg_list"]
     sid_db = ctx["sid_db"]
-    cmd_text = ctx["cmd_text"]
+    cmd_text = ctx["cmd_text"]  # 单条消息时即命令文本；_prepare_world_chat 已算好
 
-    # ── 用户斜杠命令（不走 LLM，仅单条）    # ── 用户斜杠命令（不走 LLM，仅单条）：命令注册表在 world_chat_commands（/clear /compact /new /sessions /use /pin /unpin）──
-    cmd_text = msg_list[0] if len(msg_list) == 1 else ""
+    # ── 用户斜杠命令（不走 LLM，仅单条）；命令注册表见 world_chat_commands._COMMANDS ──
     if cmd_text.startswith("/"):
         try:
             from app.services.world.world_chat_commands import run_slash_command
@@ -1192,8 +1191,7 @@ async def stream_world_chat(
     full_content, full_reasoning = "", ""
     first_usage: dict | None = None  # 2.7：首轮 usage（流结束块捕获）
     tool_call_acc: dict = {}  # id → {id, name, arguments}
-    index_to_id: dict[int, str] = {}  # index → id 桥（arguments 无 id 分片定位用）
-    index_to_id: dict[int, str] = {}  # index → id 桥
+    index_to_id: dict[int, str] = {}  # index → id 桥（arguments 分片不带 id 时定位用）
     try:
         _log_llm_request(world_id, turn_id, 0, model, thinking, messages)
         async with httpx.AsyncClient(timeout=300.0) as client:
@@ -1235,25 +1233,23 @@ async def stream_world_chat(
                             if not choices:
                                 continue
                             delta = choices[0].get("delta") or {}
-                            t = delta.get("content")
-                            # 出现工具调用后正文不再透传（模型可能把工具调用写成文本；最终以工具执行后的第二轮为准）
                             rt = delta.get("reasoning_content")
                             if rt:
                                 full_reasoning += rt
                                 yield f"data: [REASONING]{rt.replace(chr(10), '{NL}')}\n\n"
+                            # 出现工具调用后正文不再透传（模型可能把工具调用写成文本；最终以工具执行后的第二轮为准）
                             t = delta.get("content")
                             if t and not tool_call_acc:
                                 full_content += t
                                 yield f"data: {t.replace(chr(10), '{NL}')}\n\n"
                             # 工具调用（function calling 分片到达）
                             # ⚠️ DeepSeek 流式坑（2026-08-13）：name 分片带 id、arguments 分片常不带 id——
-                            # 统一按 index 聚合（同一 index 的 name/arguments 分片拼一起；id 只作最终输出）。
+                            # 用 id 主 key（区分并行调用）+ index 桥（无 id 的分片靠 index 定位）。
                             tcs = delta.get("tool_calls")
                             if tcs:
                                 for item in tcs:
                                     cid = item.get("id") or ""
                                     idx = item.get("index", 0)
-                                    # ⚠️ DeepSeek 流式坑：name 带 id、arguments 常不带 id——id 主 key + index 桥
                                     key = cid or index_to_id.get(idx) or f"idx_{idx}"
                                     acc = tool_call_acc.setdefault(key, {"id": "", "name": "", "arguments": "", "index": idx})
                                     if cid:
@@ -1294,7 +1290,6 @@ async def stream_world_chat(
     if tool_call_acc:
         try:
             try:
-                from app.ai.llm import chat_completion
                 from app.services.world.world_tools import _execute_world_tool, _tool_result_summary
                 # 第一轮过渡叙述 + 对应思考过程：给用户看（role=note，不进 AI 上下文）
                 # 2026-08-13：正文/思考拆两条独立 note（刷新后思考独立气泡，折叠生效）
@@ -1304,7 +1299,6 @@ async def stream_world_chat(
                 full_content = ""
                 # 首轮思考保留：后续轮有思考会覆盖；但工具轮 DeepSeek 常不输出 reasoning_content，
                 # 若清空则落库无思考（刷新后「思考过程」丢失）——保留首轮思考作兜底
-                # full_reasoning = ""
                 # 第一轮流式里收集到的 tool_calls（重构为 API 格式；content 用空串而非 None，避免部分接口/思考模式异常）
                 # ⚠️ DeepSeek thinking 模式：首轮 assistant 也要回传 reasoning_content（2026-08-13 修复）
                 messages.append({
@@ -1420,7 +1414,6 @@ async def stream_world_chat(
                 if tool_call_acc and not full_content:
                     if not had_error:
                         try:
-                            from app.ai.llm import chat_completion
                             resp = await _llm(messages, None, "finalize")
                             full_content = (resp or {}).get("content") or "（工具执行完成）"
                             fr = (resp or {}).get("reasoning_content") or ""
@@ -1461,7 +1454,7 @@ async def stream_world_chat(
 
     # ── "你可以"建议：AI 调过 suggest_questions → 用它；否则轻量 LLM 兜底（用世界 key）；再不行预设 ──
     try:
-        suggestions = list(turn_state.get("suggestions") or []) if turn_state else []
+        suggestions = list(turn_state.get("suggestions") or [])
         if not suggestions:
             from app.services.world.world_suggestions import suggest_fallback
             suggestions = await suggest_fallback(world_repo, world)
