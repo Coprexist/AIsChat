@@ -36,8 +36,13 @@ async def _get_or_create(db: AsyncSession) -> SystemSettings:
     return row
 
 
-async def get_provider_config(db: AsyncSession) -> dict:
-    """[兼容旧代码] 获取默认 LLM 厂商配置（数组第一个 is_default 的项，或空 dict）"""
+async def get_default_provider(db: AsyncSession) -> dict:
+    """获取**默认**厂商配置：数组里第一个 is_default 的项（没有则第一项），空配置返回 {}。
+
+    ⚠️ 返回的是**单个 dict**，用于"取默认值"（如默认 base_url）。
+    需要按 base_url / name **匹配**某个厂商时，必须用 get_providers()（返回 list[dict]）——
+    把本函数的 dict 直接喂给 find_provider_by_base_url 之类，迭代出来是字符串键，会抛 AttributeError。
+    """
     providers = await get_providers(db)
     return find_default_provider(providers) or {}
 

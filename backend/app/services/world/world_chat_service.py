@@ -545,7 +545,7 @@ async def resolve_world_chat_model(
     if model:
         return model
 
-    # 2. 管理员配置的提供商（get_providers 返回数组；get_provider_config 只返回默认项，不能用于匹配）
+    # 2. 管理员配置的提供商（get_providers 返回数组；get_default_provider 只返回默认项，不能用于匹配）
     from app.services.infrastructure.system_settings_service import get_providers
     from app.services.agent.provider_presets import PRESETS
 

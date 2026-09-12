@@ -11,6 +11,7 @@ from __future__ import annotations
 import json
 import logging
 import random
+import re
 
 from sqlalchemy import select
 from app.repositories.world_repo import WorldRepository
@@ -75,7 +76,10 @@ async def suggest_fallback(world_repo: WorldRepository, world) -> list[str]:
             temperature=0.9, max_tokens=200,
         )
         text = (resp or {}).get("content") or ""
-        arr = json.loads(text.strip().strip("`").lstrip("json").strip())
+        # 模型可能把数组包在 json 代码围栏或解释性文字里，直接定位首个 [...] 片段最稳。
+        # （原先的 .lstrip("json") 是**字符集**剥离不是前缀剥离："null" 会被削成 "ull"）
+        m = re.search(r"\[.*\]", text, re.S)
+        arr = json.loads(m.group(0)) if m else None
         if isinstance(arr, list):
             return [str(q).strip()[:40] for q in arr if str(q).strip()][:5]
         return await load_preset_suggestions(world_repo)

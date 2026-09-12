@@ -66,7 +66,7 @@ async def get_available_models(
 ):
     """返回可用模型选项列表（所有供应商的全部模型，供前端下拉框分组展示）"""
     from app.config import settings
-    from app.services.infrastructure.system_settings_service import get_providers, get_provider_config
+    from app.services.infrastructure.system_settings_service import get_providers, get_default_provider
     from app.utils.pure.provider_config import (
         collect_all_models, build_provider_summaries,
         get_default_models, get_thinking_supported,
@@ -99,7 +99,7 @@ async def get_available_models(
     all_models = collect_all_models(providers)
     provider_list = build_provider_summaries(providers)
     chat_model, work_model = get_default_models(providers)
-    default_provider = await get_provider_config(db)
+    default_provider = await get_default_provider(db)
     api_base = (default_provider.get("base_url") or settings.deepseek_base_url) if default_provider else settings.deepseek_base_url
 
     return {
