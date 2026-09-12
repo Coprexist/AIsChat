@@ -53,6 +53,16 @@ def upgrade() -> None:
             {"val": json.dumps(configs, ensure_ascii=False)},
         )
 
+    # 同步修正 users 表里用户自己绑定的 api_base_url
+    for old_suffix, new_url in [
+        ("https://api.xiaomimimo.com/v1", "https://api.xiaomimimo.com"),
+        ("https://token-plan-cn.xiaomimimo.com/v1", "https://token-plan-cn.xiaomimimo.com"),
+    ]:
+        conn.execute(
+            sa.text("UPDATE users SET api_base_url = :new WHERE api_base_url = :old"),
+            {"new": new_url, "old": old_suffix},
+        )
+
 
 def downgrade() -> None:
     # 加回 /v1（还原错误状态，仅回退用）
