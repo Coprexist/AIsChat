@@ -31,9 +31,18 @@
 - **阶段 3**：抽出 `_stream_first_round()`（payload/headers 构造 + SSE 解析 + tool_calls
   分片聚合），结果经 `out=` 回传，沿用本文件 `_stream_llm_once` 的既有约定；
   非 200 时置 `out["aborted"]` 由调用方收尾
-- **阶段 4（待做）**：`_run_tool_loop()` 工具多轮循环（约 180 行）。该段含
-  `nonlocal` + `finally` + `asyncio.shield` 的落库闭环，需真实 LLM 调用才能端到端验证，
-  故未在无人确认时推进
+- **阶段 4**：抽出 `_run_tool_loop()` 工具多轮循环。**保守切分**——只搬循环体，
+  `finally` + `_closing()` + `asyncio.shield` 的落库闭环刻意留在 `stream_world_chat`；
+  结果经 `result=` 回传，且**写在 helper 自己的 `finally` 里**，保证异常路径也把已生成内容
+  交回调用方落库。异常仍向上抛，由调用方统一置 `had_error` / `turn_error` 并下发 `[ERROR]`
+
+**切分中抓到两个自己引入的 bug**（均由 review diff / 单测发现，已修）：
+- 搬运时把非 200 分支的 `return` 覆盖掉，会导致错误响应体被当 SSE 解析
+- helper 的 `out` 参数与循环体内既有局部变量 `out` 同名遮蔽，`finally` 回写进了错误对象，
+  **成功路径的 AI 回复将不被落库**——改名 `result` 解决
+
+验证：以 monkeypatch 打桩 `_stream_llm_once` / `_execute_tool_round` 做单测，覆盖
+单轮收尾 / 多轮后收尾 / 异常路径（异常时仍交回已生成内容）三条路径
 
 ### 🏗️ 架构重构：世界 AI 模型解析统一入口
 
