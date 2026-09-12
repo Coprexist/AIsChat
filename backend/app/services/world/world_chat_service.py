@@ -1135,57 +1135,17 @@ async def _emit_suggestions(world_repo: WorldRepository, world, world_id: int, t
         logger.warning(f"🌐 世界 #{world_id} 建议问题生成失败: {e}")
 
 
-async def stream_world_chat(
-    world_repo: WorldRepository,
-    world_id: int,
-    user_id: int,
-    message: str | list[str],
-    turn_id: str = "",
+async def _stream_first_round(
+    world_id: int, turn_id: str, model: str, thinking: bool,
+    api_base: str, api_key: str | None, cfg: dict, tools_for_world: list,
+    messages: list, out: dict,
 ):
-    """世界 AI 对话（SSE 流式，参考大同差异分析流式实现）。
+    """首轮流式调用：正文/思考逐 chunk 透传，收集 tool_calls 与 usage。
 
-    事件格式（text/event-stream）：
-      data: <内容增量>          — 正文逐 token
-      data: [REASONING]<增量>   — 思考内容逐 token（开启 thinking 时）
-      data: [ERROR]<信息>       — 错误
-      data: [DONE]              — 结束
-    内容里的换行用 {NL} 占位（SSE 行内不能有裸换行），前端还原。
-    用户消息先落库；AI 回复流结束后落库（客户端中断也尽量保存已生成部分）。
-
-    编排：准备（_prepare_world_chat）→ 命令/首轮流式 → 工具多轮循环（内联在本函数）→ 建议。
+    结果写入 out：full_content / full_reasoning / usage / tool_calls；
+    上游若因非 200 提前收尾，置 out["aborted"]=True（调用方直接 return）。
     """
-    import httpx  # 首轮流式（client.stream）用
-    from app.models.world import WorldChatMessage
-
-    ctx = await _prepare_world_chat(world_repo, world_id, user_id, message)
-    if ctx is None:
-        yield "data: [ERROR]世界不存在\n\n"
-        yield "data: [DONE]\n\n"
-        return
-    world = ctx["world"]
-    cfg = ctx["cfg"]
-    api_key, api_base = ctx["api_key"], ctx["api_base"]
-    model, thinking = ctx["model"], ctx["thinking"]
-    tools_for_world = ctx["tools_for_world"]
-    messages = ctx["messages"]
-    msg_list = ctx["msg_list"]
-    sid_db = ctx["sid_db"]
-    cmd_text = ctx["cmd_text"]  # 单条消息时即命令文本；_prepare_world_chat 已算好
-
-    # ── 用户斜杠命令（不走 LLM，仅单条）；命令注册表见 world_chat_commands._COMMANDS ──
-    if cmd_text.startswith("/"):
-        _cmd_out: dict = {}
-        async for event in _handle_slash_command(world_repo, world, world_id, cmd_text, user_id, sid_db, out=_cmd_out):
-            yield event
-        if _cmd_out.get("handled"):
-            return
-
-    # ── 第一轮前注入插入消息（2026-08-16 修复：原来只在工具轮循环内注入——
-    # 若 AI 第一轮不调工具直接收尾，插入消息永远进不了上下文，用户要等下一轮才被 AI 看到）──
-    try:
-        await _inject_pending_user_messages(world_repo, world_id, messages, sid_db)
-    except Exception as e:
-        logger.warning(f"🌐 世界 #{world_id} 首轮插入消息注入失败（非致命）: {e}")
+    import httpx  # client.stream 用
 
     # ── 请求 DeepSeek（stream=true，透传 SSE）──
     payload: dict = {
@@ -1206,25 +1166,6 @@ async def stream_world_chat(
     if api_key:
         headers["Authorization"] = f"Bearer {api_key}"
 
-    # 本轮对话状态（温和去重 + 工作流记忆收集）
-    turn_state: dict = {"executed": {}, "tools_done": []}
-
-    # LLM 调用统一入口（工具轮/收尾共用）：与主系统一致走流式，规避非流式+tools+thinking 挂起
-    async def _llm(messages: list, tools, round_no):
-        from app.ai.llm import chat_completion
-        _log_llm_request(world_id, turn_id, round_no, model, thinking, messages)
-        return await chat_completion(
-            messages=messages,
-            model=model,
-            api_base_url=api_base,
-            api_key=api_key,
-            temperature=cfg.get("temperature", 0.8),
-            top_p=cfg.get("top_p", 0.9),
-            thinking_enabled=thinking,
-            stream=True,
-            tools=tools,
-        )
-
     full_content, full_reasoning = "", ""
     first_usage: dict | None = None  # 2.7：首轮 usage（流结束块捕获）
     tool_call_acc: dict = {}  # id → {id, name, arguments}
@@ -1237,6 +1178,7 @@ async def stream_world_chat(
                     err = (await resp.aread()).decode(errors="replace")[:300]
                     yield f"data: [ERROR]{_friendly_llm_error(f'{resp.status_code}: {err}')}\n\n"
                     yield "data: [DONE]\n\n"
+                    out["aborted"] = True
                     return
 
                 buffer = ""
@@ -1305,6 +1247,95 @@ async def stream_world_chat(
     except Exception as e:
         logger.warning(f"🌐 世界 #{world_id} 流式对话异常: {e}")
         yield f"data: [ERROR]{str(e)[:200]}\n\n"
+    out["full_content"] = full_content
+    out["full_reasoning"] = full_reasoning
+    out["usage"] = first_usage
+    out["tool_calls"] = tool_call_acc
+
+
+async def stream_world_chat(
+    world_repo: WorldRepository,
+    world_id: int,
+    user_id: int,
+    message: str | list[str],
+    turn_id: str = "",
+):
+    """世界 AI 对话（SSE 流式，参考大同差异分析流式实现）。
+
+    事件格式（text/event-stream）：
+      data: <内容增量>          — 正文逐 token
+      data: [REASONING]<增量>   — 思考内容逐 token（开启 thinking 时）
+      data: [ERROR]<信息>       — 错误
+      data: [DONE]              — 结束
+    内容里的换行用 {NL} 占位（SSE 行内不能有裸换行），前端还原。
+    用户消息先落库；AI 回复流结束后落库（客户端中断也尽量保存已生成部分）。
+
+    编排：准备（_prepare_world_chat）→ 命令/首轮流式 → 工具多轮循环（内联在本函数）→ 建议。
+    """
+    from app.models.world import WorldChatMessage
+
+    ctx = await _prepare_world_chat(world_repo, world_id, user_id, message)
+    if ctx is None:
+        yield "data: [ERROR]世界不存在\n\n"
+        yield "data: [DONE]\n\n"
+        return
+    world = ctx["world"]
+    cfg = ctx["cfg"]
+    api_key, api_base = ctx["api_key"], ctx["api_base"]
+    model, thinking = ctx["model"], ctx["thinking"]
+    tools_for_world = ctx["tools_for_world"]
+    messages = ctx["messages"]
+    msg_list = ctx["msg_list"]
+    sid_db = ctx["sid_db"]
+    cmd_text = ctx["cmd_text"]  # 单条消息时即命令文本；_prepare_world_chat 已算好
+
+    # ── 用户斜杠命令（不走 LLM，仅单条）；命令注册表见 world_chat_commands._COMMANDS ──
+    if cmd_text.startswith("/"):
+        _cmd_out: dict = {}
+        async for event in _handle_slash_command(world_repo, world, world_id, cmd_text, user_id, sid_db, out=_cmd_out):
+            yield event
+        if _cmd_out.get("handled"):
+            return
+
+    # ── 第一轮前注入插入消息（2026-08-16 修复：原来只在工具轮循环内注入——
+    # 若 AI 第一轮不调工具直接收尾，插入消息永远进不了上下文，用户要等下一轮才被 AI 看到）──
+    try:
+        await _inject_pending_user_messages(world_repo, world_id, messages, sid_db)
+    except Exception as e:
+        logger.warning(f"🌐 世界 #{world_id} 首轮插入消息注入失败（非致命）: {e}")
+
+    # 本轮对话状态（温和去重 + 工作流记忆收集）
+    turn_state: dict = {"executed": {}, "tools_done": []}
+
+    # LLM 调用统一入口（工具轮/收尾共用）：与主系统一致走流式，规避非流式+tools+thinking 挂起
+    async def _llm(messages: list, tools, round_no):
+        from app.ai.llm import chat_completion
+        _log_llm_request(world_id, turn_id, round_no, model, thinking, messages)
+        return await chat_completion(
+            messages=messages,
+            model=model,
+            api_base_url=api_base,
+            api_key=api_key,
+            temperature=cfg.get("temperature", 0.8),
+            top_p=cfg.get("top_p", 0.9),
+            thinking_enabled=thinking,
+            stream=True,
+            tools=tools,
+        )
+
+    # ── 首轮流式：正文/思考逐 chunk 透传，收集 tool_calls 与 usage ──
+    _r1: dict = {}
+    async for event in _stream_first_round(
+        world_id, turn_id, model, thinking, api_base, api_key, cfg, tools_for_world, messages, out=_r1,
+    ):
+        yield event
+    if _r1.get("aborted"):
+        return
+    full_content = _r1.get("full_content") or ""
+    full_reasoning = _r1.get("full_reasoning") or ""
+    first_usage = _r1.get("usage")
+    tool_call_acc = _r1.get("tool_calls") or {}
+
 
     # 2.7：首轮用量落库（缓存命中统计）
     await _record_usage(world_repo, world_id, turn_id, "0", model, first_usage, messages)
