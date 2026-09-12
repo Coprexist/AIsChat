@@ -12,7 +12,7 @@ import logging
 import re
 from pathlib import Path
 
-from app.repositories.world_repo import WorldRepository, SQLAlchemyWorldRepository
+from app.repositories.world_repo import SQLAlchemyWorldRepository
 from sqlalchemy.ext.asyncio import AsyncSession
 logger = logging.getLogger(__name__)
 

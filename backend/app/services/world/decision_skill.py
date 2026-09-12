@@ -20,11 +20,10 @@
 """
 from __future__ import annotations
 
-import json
 import logging
 import re
 
-from app.repositories.world_repo import WorldRepository, SQLAlchemyWorldRepository
+from app.repositories.world_repo import SQLAlchemyWorldRepository
 from sqlalchemy.ext.asyncio import AsyncSession
 logger = logging.getLogger(__name__)
 

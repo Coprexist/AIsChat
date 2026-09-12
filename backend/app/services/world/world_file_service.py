@@ -5,8 +5,6 @@
 路径安全：拒绝 ../ 越界，所有操作限定在世界目录内。
 """
 import logging
-import os
-import re
 import shutil
 import json
 from pathlib import Path

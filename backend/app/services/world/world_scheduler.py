@@ -20,7 +20,7 @@ from sqlalchemy import select
 from app.database import async_session
 from app.services.world.world_service import _now, apply_time_compensation
 
-from app.repositories.world_repo import WorldRepository, SQLAlchemyWorldRepository
+from app.repositories.world_repo import SQLAlchemyWorldRepository
 from sqlalchemy.ext.asyncio import AsyncSession
 logger = logging.getLogger(__name__)
 

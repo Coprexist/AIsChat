@@ -172,7 +172,8 @@ class WorldTurnWorker:
                     self.turns.pop(item["turn_id"], None)
                     for _tid in [t for t, _tb in self.turns.items() if _tb.proxy is tb]:
                         self.turns.pop(_tid, None)
-                    # 兜底：_publish_insert 未完成（轮次先结束）的插入消息补落库 + 广播
+                    # 兜底：轮次先结束时，_inject_pending_user_messages（world_chat_service）
+                    # 还没来得及处理的插入消息，在这里补落库 + 广播
                     # （已落库的 msg_ids 非空则跳过，避免重复）
                     try:
                         if self._inserts:
@@ -185,7 +186,7 @@ class WorldTurnWorker:
                                 self._inserts = []
                                 for _it in pending:
                                     if len(_it.get("msg_ids") or []) == len([m for m in _it["messages"] if str(m).strip()]):
-                                        continue  # 已由 _publish_insert 落库
+                                        continue  # 已由 _inject_pending_user_messages 落库
                                     total = len(_it["messages"])
                                     await tb.broadcast(f"data: [INSERTED]{json.dumps({'count': total})}\n\n")
                                     for _m in _it["messages"]:
@@ -209,7 +210,8 @@ class WorldTurnWorker:
         产品定（2026-08-16 改）：非命令消息在 AI 工具轮进行中时**进插入队列**（
         不立即绘制气泡）；等 AI 真正收到（_inject_pending_user_messages 注入上下文）时
         才落库 + 广播 [INSERTED]/[INSERT] 绘制气泡——用户看到"已发送" = AI 已看到。
-        只有命令（/ 开头，如 /compact /clear）需要当前轮次结束后再发送。
+        哪些消息必须等本轮结束，由命令声明决定（world_chat_commands.COMMAND_SPECS.mid_turn）；
+        默认为 False 即等待，需要中途插入的命令单独标 True。
         """
         messages = message if isinstance(message, list) else [message]
         turn_id = uuid.uuid4().hex[:12]
@@ -236,39 +238,6 @@ class WorldTurnWorker:
             "message": messages,
         })
         return turn_id
-
-    async def _publish_insert(self, world_id: int, tb: TurnBroadcast, user_id: int, messages: list) -> None:
-        """插入消息即时落库 + 广播（2026-08-13 产品定改：发消息立即插入，不等下一轮）。
-        先 [INSERTED] 信号清前端排队弹窗，再逐条落库 + [INSERT] 画真实气泡；
-        落库 id 回填 _inserts（供 drain 时跳过重复落库）。"""
-        try:
-            await tb.broadcast(f"data: [INSERTED]{json.dumps({'count': len(messages)}, ensure_ascii=False)}\n\n")
-            async with async_session() as _db:
-                from app.models.world import World, WorldChatMessage
-                from app.services.world.world_chat_service import session_id_for_db
-                world_row = await _db.get(World, world_id)
-                sid = session_id_for_db(world_row) if world_row else None
-                ids: list[int] = []
-                for _m in messages:
-                    _t = str(_m).strip()
-                    if not _t:
-                        continue
-                    wm = WorldChatMessage(
-                        world_id=world_id, user_id=user_id, role="user",
-                        content=_t, session_id=sid,
-                    )
-                    _db.add(wm)
-                    await _db.flush()
-                    ids.append(wm.id)
-                    await tb.broadcast(f"data: [INSERT]{json.dumps({'msg_id': wm.id, 'content': _t}, ensure_ascii=False)}\n\n")
-                await _db.commit()
-                async with self._inserts_lock:
-                    for _it in self._inserts:
-                        if _it["user_id"] == user_id and _it["messages"] == messages:
-                            _it["msg_ids"] = ids
-                            break
-        except Exception as e:
-            logger.warning(f"🌐 世界 #{world_id} 插入消息即时落库失败（非致命）: {e}")
 
     async def drain_inserts(self, user_id: int | None = None) -> list[dict]:
         """取走待插入的普通消息（工具轮每轮调用前调用；user_id=None 取全部）"""

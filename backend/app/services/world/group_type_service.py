@@ -23,9 +23,9 @@ from pathlib import Path
 
 from sqlalchemy import select, func
 from sqlalchemy.ext.asyncio import AsyncSession
-from app.repositories.group_type_repo import GroupTypeRepository, SQLAlchemyGroupTypeRepository
+from app.repositories.group_type_repo import SQLAlchemyGroupTypeRepository
 
-from app.models.world import World, WorldAgent, WorldBinding, GroupAssistant
+from app.models.world import World, WorldBinding, GroupAssistant
 
 logger = logging.getLogger(__name__)
 

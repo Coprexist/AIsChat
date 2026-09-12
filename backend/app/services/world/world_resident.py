@@ -145,9 +145,6 @@ class ResidentManager:
         p = self._procs.get(world_id)
         return p is not None and p.returncode is None
 
-    def running_count(self) -> int:
-        return sum(1 for p in self._procs.values() if p.returncode is None)
-
     @staticmethod
     def is_resident(world) -> bool:
         return bool((world.config or {}).get("resident"))

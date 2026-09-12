@@ -8,7 +8,6 @@
 """
 import asyncio
 import logging
-import re
 import time
 import uuid
 from pathlib import Path

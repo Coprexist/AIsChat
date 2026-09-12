@@ -191,19 +191,6 @@ def build_world_tools_for_type(world_id: int, type_slug: str | None) -> list[dic
     return _to_tools(skills, world_id=world_id)
 
 
-def find_skill(name: str, scope: str | None = None) -> SkillDef | None:
-    """按名字找 skill；scope='ai'（设计侧）/ 'world'（世界侧）/ None（都要，执行时按调用方限定）"""
-    pools = []
-    if scope in (None, 'ai'):
-        pools.extend(list_ai_skills())
-    if scope in (None, 'world'):
-        pools.extend(list_world_skills(0))  # 占位，实际 world_id 由 execute 侧处理
-    for skill in pools:
-        if skill.name == name:
-            return skill
-    return None
-
-
 # ── 安全加载 ──
 class SkillSecurityError(ValueError):
     pass

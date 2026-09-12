@@ -28,7 +28,7 @@ from pathlib import Path
 
 import httpx
 
-from app.repositories.infra_repo import InfraRepository, SQLAlchemyInfraRepository
+from app.repositories.infra_repo import SQLAlchemyInfraRepository
 from sqlalchemy.ext.asyncio import AsyncSession
 logger = logging.getLogger(__name__)
 
@@ -177,21 +177,6 @@ def sign_meta(meta: dict, privkey_pem: str) -> str:
     import base64
     priv = _load_privkey(privkey_pem)
     return base64.b64encode(priv.sign(_sign_payload(meta).encode())).decode()
-
-
-def verify_meta_signature(meta: dict) -> bool:
-    """用 meta 内的公钥验签（签名缺失/公钥缺失 → False）"""
-    import base64
-    sig = meta.get("signature")
-    pub_pem = meta.get("author_public_key")
-    if not sig or not pub_pem:
-        return False
-    try:
-        pub = _load_pubkey(pub_pem)
-        pub.verify(base64.b64decode(sig), _sign_payload(meta).encode())
-        return True
-    except Exception:
-        return False
 
 
 # ─────────────────────────── GitHub HTTP ───────────────────────────
