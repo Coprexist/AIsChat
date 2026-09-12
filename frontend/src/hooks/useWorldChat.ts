@@ -515,7 +515,9 @@ export function useWorldChat({ wid, onRefresh, onMsg }: UseWorldChatOptions) {
         }
       } catch { /* 失败静默重试 */ if (!cancelled) timer = window.setTimeout(check, 8000) }
     }
-    chatProcessingRef.current = false
+    // 初始 ref = true（与 useState(true) 对齐）：状态检查发现无活跃 turn 时 else 分支
+    // 才能进入 `if (chatProcessingRef.current)` 把 setChatProcessing(false) 执行掉
+    chatProcessingRef.current = true
     check()
     return () => { cancelled = true; if (timer) clearTimeout(timer) }
   }, [wid, loadChat, subscribeTurnStream])
