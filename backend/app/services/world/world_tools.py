@@ -897,8 +897,9 @@ async def _do_execute(world_repo: WorldRepository, world, name: str, arguments: 
             try:
                 from app.routers.ws import manager
                 await manager.broadcast_to_group(gid, {"type": "message", "data": {"id": msg.id, "content": content}})
-            except Exception:
-                pass
+            except Exception as e:
+                # 消息已入库，但实时推送失败 → 群成员当下看不到（刷新才有）。必须留痕
+                logger.warning(f"🌐 世界 #{world.id} 群消息实时推送失败（group={gid}, msg_id={msg.id}）: {e}")
             return {"success": True, "message_id": msg.id}
         except Exception as e:
             return {"success": False, "error": str(e)}
@@ -1002,8 +1003,9 @@ async def _do_execute(world_repo: WorldRepository, world, name: str, arguments: 
                         f"积木「{result.get('name', block_id)}」已更新 v{result['previous_version']} → v{result['version']}；"
                         f"你的 DIY（blocks/{block_id}/diy/）已保留，主文件旧版备份在 .bak/ 可回滚。",
                     )
-                except Exception:
-                    pass
+                except Exception as e:
+                    # 通知丢失 → AI 不会知道积木变了；必须留痕
+                    logger.warning(f"🌐 世界 #{world.id} 积木更新通知写入失败（block={block_id}）: {e}")
             return result
         except ValueError as e:
             return {"success": False, "error": str(e)}
@@ -1261,8 +1263,9 @@ async def _do_execute(world_repo: WorldRepository, world, name: str, arguments: 
                     "forced-prompt",
                     f"world-name-{world.id}",
                 ])
-            except Exception:
-                pass
+            except Exception as e:
+                # 压缩成功但能力变更没生效 → 用户以为已生效；必须留痕
+                logger.warning(f"🌐 世界 #{world.id} compact 后应用能力变更失败: {e}")
             await world_repo.flush()
             return {
                 "success": True,
@@ -1303,8 +1306,9 @@ async def _do_execute(world_repo: WorldRepository, world, name: str, arguments: 
                     "forced-prompt",
                     f"world-name-{world.id}",
                 ])
-            except Exception:
-                pass
+            except Exception as e:
+                # 同上：清空成功但能力变更没生效
+                logger.warning(f"🌐 世界 #{world.id} clear 后应用能力变更失败: {e}")
             await world_repo.commit()
             return {"success": True, "note": "当前会话上下文已清空（历史消息+摘要+工作流记忆），其他会话保留；长期记忆保留，请从记忆恢复工作状态。"}
         except Exception as e:

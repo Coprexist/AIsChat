@@ -139,8 +139,10 @@ class WorldTurnWorker:
                             "started_at": datetime.now(timezone.utc).replace(tzinfo=None).isoformat(),
                         }}
                         await _db.commit()
-            except Exception:
-                pass
+            except Exception as e:
+                # active_turn 写不进 DB → status 接口会把"排队/AI 思考中"误判成中断，
+                # recover_orphaned_turn 也可能误收尾。降级可接受但必须留痕
+                logger.warning(f"🌐 世界 #{self.world_id} active_turn 标记写入失败: {e}")
             try:
                 from app.repositories.world_repo import SQLAlchemyWorldRepository
                 from app.services.world.world_chat_service import stream_world_chat
@@ -164,8 +166,9 @@ class WorldTurnWorker:
                             _cfg.pop("active_turn", None)
                             _w.config = _cfg
                             await _db.commit()
-                except Exception:
-                    pass
+                except Exception as e:
+                    # 清不掉会残留 → status 永远报 processing，前端卡在"处理中"
+                    logger.warning(f"🌐 世界 #{self.world_id} active_turn 标记清除失败: {e}")
                 if tb:
                     tb.end()
                     # 清理本 turn + 代理到它的插入 turn（插入消息广播随活跃 turn 收尾）

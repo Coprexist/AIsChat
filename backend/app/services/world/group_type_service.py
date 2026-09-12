@@ -68,8 +68,9 @@ def load_group_types(world_id: int) -> list[dict]:
         types = [t for t in types if isinstance(t, dict) and t.get("slug")]
         if types:
             return types
-    except (OSError, json.JSONDecodeError):
-        pass
+    except (OSError, json.JSONDecodeError) as e:
+        # 读坏就静默回默认 → 用户会以为"我配的类型没了"，必须留痕
+        logger.warning(f"🌐 世界 #{world_id} 群类型配置读取失败，回退默认: {e}")
     return copy.deepcopy(DEFAULT_GROUP_TYPES)
 
 

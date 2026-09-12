@@ -251,8 +251,9 @@ def load_snapshot() -> dict:
         data = json.loads(_snapshot_file().read_text(encoding="utf-8"))
         if isinstance(data, dict) and isinstance(data.get("worlds"), list):
             return data
-    except (OSError, json.JSONDecodeError):
-        pass
+    except (OSError, json.JSONDecodeError) as e:
+        # 快照损坏静默当空 → 商城看起来"东西全没了"，必须留痕
+        logger.warning(f"🌐 商城快照读取失败，按空处理: {e}")
     return {"synced_at": None, "worlds": []}
 
 

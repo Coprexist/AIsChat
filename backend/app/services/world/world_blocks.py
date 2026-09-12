@@ -131,8 +131,9 @@ def apply_block(world_id: int, block_id: str, prefix: str = "blocks") -> dict:
             if old.is_file():
                 try:
                     write_file(world_id, f"{prefix}/{block_id}/.bak/{fname}", old.read_text(encoding="utf-8", errors="replace"))
-                except Exception:
-                    pass
+                except Exception as e:
+                    # 备份失败 → 用户以为可回滚，实际没有；必须留痕
+                    logger.warning(f"🌐 世界 #{world_id} 积木旧版备份失败（{block_id}/{fname}）: {e}")
 
     # 写主文件（平台管）
     applied = []
@@ -190,6 +191,7 @@ async def update_block_for_all_worlds(db, block_id: str) -> dict:
                 + (f" v{result['previous_version']} → v{result['version']}" if result.get("version") and result.get("previous_version") and result["version"] != result["previous_version"] else "")
                 + f"；你的 DIY（blocks/{block_id}/diy/）已保留，主文件旧版备份在 .bak/ 可回滚。",
             )
-        except Exception:
-            pass
+        except Exception as e:
+            # 批量更新：某个世界的通知丢了，其余照常
+            logger.warning(f"🌐 世界 #{wid} 积木更新通知写入失败（block={block_id}）: {e}")
     return {"block_id": block_id, "updated_worlds": updated, "count": len(updated)}

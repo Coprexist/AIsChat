@@ -403,7 +403,9 @@ async def ensure_session_lifecycle(world_repo, world) -> dict:
                 continue
             try:
                 la_dt = datetime.fromisoformat(la)
-            except Exception:
+            except Exception as e:
+                # 解析不了就跳过该会话的过期判定 → 可能永远不被清理，留痕便于排查
+                logger.warning(f"🌐 会话 {sid} 的 last_active_at 无法解析，跳过过期清理: {la!r} ({e})")
                 continue
             if now_utc - _ensure_aware(la_dt) > timedelta(days=days):
                 expired.append(sid)
@@ -721,8 +723,9 @@ async def _inject_pending_user_messages(
         if tb:
             try:
                 await tb.broadcast(f"data: [INSERTED]{json.dumps({'count': len(msgs)}, ensure_ascii=False)}\n\n")
-            except Exception:
-                pass
+            except Exception as e:
+                # 回执发不出去 = 前端排队弹窗永远清不掉（用户可见），必须留痕
+                logger.warning(f"🌐 世界 #{world_id} [INSERTED] 回执广播失败: {e}")
         ids: list[int] = []
         for _m in msgs:
             _m_text = str(_m).strip()
@@ -742,8 +745,9 @@ async def _inject_pending_user_messages(
             if tb:
                 try:
                     await tb.broadcast(f"data: [INSERT]{json.dumps({'msg_id': wm.id, 'content': _m_text}, ensure_ascii=False)}\n\n")
-                except Exception:
-                    pass
+                except Exception as e:
+                    # 同上：气泡画不出来（用户可见）。消息已落库，下次 loadChat 会补上
+                    logger.warning(f"🌐 世界 #{world_id} [INSERT] 回执广播失败（msg_id={wm.id}）: {e}")
             # 注入 AI 上下文（真正"发送"给 AI）
             messages.append({"role": "user", "content": _m_text})
         _it["msg_ids"] = ids
@@ -1465,8 +1469,9 @@ async def stream_world_chat(
             try:
                 from app.services.world.world_service import set_world_data
                 await set_world_data(world_repo, world_id, "ui.suggestions", suggestions[:5])
-            except Exception:
-                pass
+            except Exception as e:
+                # 本次仍会把建议推给前端；留痕便于排查"刷新后建议就没了"
+                logger.warning(f"🌐 世界 #{world_id} 建议持久化失败（本次仍下发）: {e}")
             yield f"data: [SUGGEST]{json.dumps(suggestions[:5], ensure_ascii=False)}\n\n"
     except Exception as e:
         logger.warning(f"🌐 世界 #{world_id} 建议问题生成失败: {e}")
