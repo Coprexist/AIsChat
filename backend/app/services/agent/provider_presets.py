@@ -160,7 +160,7 @@ PRESETS: dict[str, ProviderPreset] = {
     "xiaomi-mimo": {
         "key": "xiaomi-mimo",
         "label": "Xiaomi MiMo",
-        "base_url": "https://api.xiaomimimo.com/v1",
+        "base_url": "https://api.xiaomimimo.com",
         "api_key_url": "https://platform.xiaomimimo.com/#/console/api-keys",
         "chat_model": "mimo-v2.5",
         "work_model": "mimo-v2.5-pro",
@@ -179,7 +179,7 @@ PRESETS: dict[str, ProviderPreset] = {
     "xiaomi-mimo-tp": {
         "key": "xiaomi-mimo-tp",
         "label": "Xiaomi MiMo（Token Plan 订阅）",
-        "base_url": "https://token-plan-cn.xiaomimimo.com/v1",
+        "base_url": "https://token-plan-cn.xiaomimimo.com",
         "api_key_url": "https://platform.xiaomimimo.com/#/console/api-keys",
         "chat_model": "mimo-v2.5",
         "work_model": "mimo-v2.5-pro",

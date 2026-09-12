@@ -23,7 +23,7 @@ MIMO_PRESETS = [
     {
         "name": "Xiaomi MiMo",
         "provider": "xiaomi-mimo",
-        "base_url": "https://api.xiaomimimo.com/v1",
+        "base_url": "https://api.xiaomimimo.com",
         "chat_model": "mimo-v2.5",
         "work_model": "mimo-v2.5-pro",
         "embedding_model": "",
@@ -41,7 +41,7 @@ MIMO_PRESETS = [
     {
         "name": "Xiaomi MiMo（Token Plan 订阅）",
         "provider": "xiaomi-mimo-tp",
-        "base_url": "https://token-plan-cn.xiaomimimo.com/v1",
+        "base_url": "https://token-plan-cn.xiaomimimo.com",
         "chat_model": "mimo-v2.5",
         "work_model": "mimo-v2.5-pro",
         "embedding_model": "",
