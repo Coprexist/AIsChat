@@ -1,4 +1,4 @@
-﻿"""
+"""
 用户模型
 """
 from sqlalchemy import Column, Integer, String, Boolean, Text, DateTime, func, BigInteger
@@ -48,6 +48,10 @@ class User(Base):
 
     # 优先使用本人 API Key（跳过池 Key，先用自己的）
     prefer_own_key = Column(Boolean, default=False, comment="优先使用本人API Key")
+
+    # 用户级全局默认模型覆盖（留空=跟提供商/系统默认）
+    global_chat_model = Column(String(100), nullable=True, comment="用户全局默认聊天模型覆盖")
+    global_work_model = Column(String(100), nullable=True, comment="用户全局默认工作模型覆盖")
 
     # AI 包断额度（创建 AI 时一次性支付 api_credit_cost，该 AI 后续调用全免）
     agent_bundle_credit = Column(Integer, default=0)

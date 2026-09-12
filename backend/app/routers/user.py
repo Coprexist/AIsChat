@@ -35,6 +35,8 @@ class UpdateSettingsRequest(BaseModel):
     bio: str | None = None
     status_text: str | None = None
     status_color: str | None = None
+    global_chat_model: str | None = None
+    global_work_model: str | None = None
 
     @field_validator("status_text")
     @classmethod
@@ -74,6 +76,8 @@ async def update_settings(
             status_text=req.status_text,
             status_color=req.status_color,
             prefer_own_key=req.prefer_own_key,
+            global_chat_model=req.global_chat_model,
+            global_work_model=req.global_work_model,
         )
     except ValueError as e:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))

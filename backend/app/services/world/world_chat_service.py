@@ -1026,16 +1026,25 @@ async def _prepare_world_chat(
     api_key, api_base = await _resolve_world_credentials(world_repo, world)
     model = cfg.get("model")
     if not model:
-        # 世界 AI 未指定模型 → 按用户绑定的 API 提供商选默认模型
-        # 优先查管理员配置的 provider_config（设置页可改），再 fallback 硬编码预设
-        from app.utils.pure.provider_config import find_provider_by_base_url
-        from app.services.infrastructure.system_settings_service import get_provider_config
-        provider_config = await get_provider_config(world_repo)
-        provider = find_provider_by_base_url(provider_config, api_base)
-        if not provider:
-            from app.services.agent.provider_presets import PRESETS
-            provider = find_provider_by_base_url(list(PRESETS.values()), api_base)
-        model = (provider or {}).get("global_default_chat_model") or (provider or {}).get("chat_model") or settings.default_chat_model
+        # 世界 AI 未指定模型 → 按优先级选默认模型：
+        # 1. 世界主人的用户级覆盖（/settings 里配的）
+        # 2. 提供商的 global_default_chat_model（管理员配的）
+        # 3. 提供商的 chat_model（预设默认）
+        # 4. 平台全局默认
+        from app.models.user import User
+        owner = await world_repo.get(User, world.owner_id) if world.owner_id else None
+        model = getattr(owner, "global_chat_model", None) if owner else None
+        if not model:
+            from app.utils.pure.provider_config import find_provider_by_base_url
+            from app.services.infrastructure.system_settings_service import get_provider_config
+            provider_config = await get_provider_config(world_repo)
+            provider = find_provider_by_base_url(provider_config, api_base)
+            if not provider:
+                from app.services.agent.provider_presets import PRESETS
+                provider = find_provider_by_base_url(list(PRESETS.values()), api_base)
+            model = (provider or {}).get("global_default_chat_model") or (provider or {}).get("chat_model")
+        if not model:
+            model = settings.default_chat_model
     thinking = bool(cfg.get("thinking", False))
 
     cmd_text = msg_list[0] if len(msg_list) == 1 else ""

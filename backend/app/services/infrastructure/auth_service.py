@@ -342,6 +342,8 @@ async def update_user_settings(
     status_text: str | None = None,
     status_color: str | None = None,
     prefer_own_key: bool | None = None,
+    global_chat_model: str | None = None,
+    global_work_model: str | None = None,
 ) -> dict:
     """更新用户设置（含用户名和密码修改）"""
     user = await user_repo.get_by_id(user_id)
@@ -381,6 +383,10 @@ async def update_user_settings(
         user.status_color = status_color
     if prefer_own_key is not None:
         user.prefer_own_key = prefer_own_key
+    if global_chat_model is not None:
+        user.global_chat_model = global_chat_model or None
+    if global_work_model is not None:
+        user.global_work_model = global_work_model or None
 
     await user_repo.flush()
     await user_repo.refresh(user)
