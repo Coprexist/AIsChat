@@ -514,6 +514,54 @@ async def _resolve_world_credentials(world_repo: WorldRepository, world) -> tupl
     return api_key, api_base
 
 
+async def resolve_world_chat_model(
+    world_repo: WorldRepository, world, api_base: str, wai=None,
+) -> str:
+    """世界 AI 未显式指定模型时的默认模型解析——**唯一入口**。
+
+    world_chat_service / world_tools / world_suggestions 三处共用，
+    避免同一段优先级链被手抄多份后各自漂移。
+
+    优先级（高 → 低）：
+      1. 世界AI 自己指定的模型（wai.model）
+      2. 世界主人的用户级覆盖 users.global_chat_model（用户在 /settings 里配的）
+      3. 提供商配置 system_settings.provider_config 的 global_default_chat_model（管理员配的）
+      4. 提供商预设 provider_presets.PRESETS 的 chat_model
+      5. 平台全局默认 settings.default_chat_model
+
+    提供商一律按 base_url 匹配 api_base；管理员配置优先于内置预设。
+    """
+    from app.config import settings
+    from app.models.user import User
+    from app.utils.pure.provider_config import find_provider_by_base_url
+
+    model = getattr(wai, "model", None)
+    if model:
+        return model
+
+    # 1. 世界主人的用户级覆盖
+    owner = await world_repo.get(User, world.owner_id) if world.owner_id else None
+    model = getattr(owner, "global_chat_model", None) if owner else None
+    if model:
+        return model
+
+    # 2. 管理员配置的提供商（get_providers 返回数组；get_provider_config 只返回默认项，不能用于匹配）
+    from app.services.infrastructure.system_settings_service import get_providers
+    from app.services.agent.provider_presets import PRESETS
+
+    provider = find_provider_by_base_url(await get_providers(world_repo), api_base)
+    # 3. 管理员没配这个 base_url → 回退内置预设
+    if provider is None:
+        provider = find_provider_by_base_url(list(PRESETS.values()), api_base)
+    if provider:
+        model = provider.get("global_default_chat_model") or provider.get("chat_model")
+        if model:
+            return model
+
+    # 4. 平台全局默认
+    return settings.default_chat_model
+
+
 async def _stream_llm_once(
     world_id: int, turn_id: str, round_no: int,
     model: str, thinking: bool, api_base: str, api_key: str | None,
@@ -1024,27 +1072,7 @@ async def _prepare_world_chat(
 
     # 凭证 + 模型
     api_key, api_base = await _resolve_world_credentials(world_repo, world)
-    model = cfg.get("model")
-    if not model:
-        # 世界 AI 未指定模型 → 按优先级选默认模型：
-        # 1. 世界主人的用户级覆盖（/settings 里配的）
-        # 2. 提供商的 global_default_chat_model（管理员配的）
-        # 3. 提供商的 chat_model（预设默认）
-        # 4. 平台全局默认
-        from app.models.user import User
-        owner = await world_repo.get(User, world.owner_id) if world.owner_id else None
-        model = getattr(owner, "global_chat_model", None) if owner else None
-        if not model:
-            from app.utils.pure.provider_config import find_provider_by_base_url
-            from app.services.infrastructure.system_settings_service import get_provider_config
-            provider_config = await get_provider_config(world_repo)
-            provider = find_provider_by_base_url(provider_config, api_base)
-            if not provider:
-                from app.services.agent.provider_presets import PRESETS
-                provider = find_provider_by_base_url(list(PRESETS.values()), api_base)
-            model = (provider or {}).get("global_default_chat_model") or (provider or {}).get("chat_model")
-        if not model:
-            model = settings.default_chat_model
+    model = await resolve_world_chat_model(world_repo, world, api_base, wai)
     thinking = bool(cfg.get("thinking", False))
 
     cmd_text = msg_list[0] if len(msg_list) == 1 else ""
@@ -1295,13 +1323,13 @@ async def stream_world_chat(
                 max_rounds = max(1, min(max_rounds, 200))
                 final = ""
                 for _r in range(max_rounds):
-                    # ⚠️ 顺序关键：先执行工具（tool_response 跟在 assistant(tool_calls) 后面），
-                    # 再注入用户插入消息（user 消息在 tool_response 之后）——
-                    # 反了会破坏 DeepSeek 消息链：assistant(tool_calls) → user → tool → 400
+                    # ⚠️ 顺序不可颠倒：必须先执行工具、再注入插入消息。
+                    # 反了会把 user 消息插进 assistant(tool_calls) 与其 tool_response 之间，
+                    # 破坏 DeepSeek 消息链 → API 400。
                     # 执行本轮所有工具调用（执行→落库→[TOOL] 事件）
                     async for event in _execute_tool_round(world_repo, world, world_id, tool_call_acc, messages, turn_state, sid_db):
                         yield event
-                    # 工具执行完毕后注入插入消息（此时 tool_response 已在 messages 里，user 追加在后面不会破坏消息链）
+                    # 此时 tool_response 已入 messages，user 追加在其后是合法链
                     try:
                         await _inject_pending_user_messages(world_repo, world_id, messages, sid_db)
                     except Exception as e:
@@ -1334,10 +1362,12 @@ async def stream_world_chat(
                     # 中间轮（还要继续调工具）：正文已由 _stream_llm_once 逐 chunk yield，
                     # 此处只落库 note（历史可见、不进 AI 上下文）——不再重复 yield 正文，
                     # 否则前端 full 变量拼接导致内容重复显示
+                    # full_content 在此赋值是异常路径兜底：后续轮次若抛错，
+                    # finally 里"full_content 非空则不覆盖"，落库的就是这段中间叙述
+                    if content:
+                        full_content = content
                     if content or reasoning:
-                        if content:
-                            full_content = content
-                        await _save_note_separated(world_repo, world_id, content or "", reasoning or "", sid_db)
+                        await _save_note_separated(world_repo, world_id, content, reasoning or "", sid_db)
                     # 模型还要继续调工具：记录真实 tool_calls，进入下一轮
                     # ⚠️ DeepSeek thinking 模式硬性要求：assistant 消息必须回传 reasoning_content，
                     # 否则 400 invalid_request_error（2026-08-13 修复）

@@ -5,6 +5,10 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type RefObject, type Dispatch, type SetStateAction, type UIEvent } from 'react'
 import { api } from '../api/client'
 
+// AI 处理中状态的初始值：状态检查（/chat/status）返回前一律按"处理中"对待，
+// 消息走插入队列，避免与仍在运行的 turn 冲突。
+const CHAT_PROCESSING_INITIAL = true
+
 // 世界 AI 对话消息（世界级会话，非 DM；reasoning = 思考过程；tool = 工具执行结果；note = 中间叙述）
 export interface ChatMsg {
   id: number
@@ -96,7 +100,7 @@ export function useWorldChat({ wid, onRefresh, onMsg }: UseWorldChatOptions) {
   const [chatMsgs, setChatMsgs] = useState<ChatMsg[]>([])
   const [chatInput, setChatInput] = useState('')
   const [chatSending, setChatSending] = useState(false)
-  const [chatProcessing, setChatProcessing] = useState(true)  // 初始 true：状态检查完成前消息走排队，避免与运行中 AI 冲突
+  const [chatProcessing, setChatProcessing] = useState(CHAT_PROCESSING_INITIAL)
   const [pendingItems, setPendingItems] = useState<{ kind: 'msg' | 'cmd'; text: string }[]>([])  // AI 处理中排队消息（msg 一起发；cmd 串行执行）
   const [suggestions, setSuggestions] = useState<string[]>([])  // "你可以"建议（AI 生成 / 兜底 / 预设）
   // 会话（/new 开新对话、可切回；展示当前会话 id + 列表）
@@ -108,7 +112,13 @@ export function useWorldChat({ wid, onRefresh, onMsg }: UseWorldChatOptions) {
   const forceScrollToBottomRef = useRef<() => void>(() => {})
   const sessionListRef = useRef(sessionList)
   sessionListRef.current = sessionList
-  const chatProcessingRef = useRef(true)
+  const chatProcessingRef = useRef(CHAT_PROCESSING_INITIAL)
+  // ref 是 state 的镜像（供状态检查闭包读最新值）——只经此入口写入。
+  // 两处分别赋值必然漂移：初始值一度不一致，导致 else 分支永不执行 → 前端永久"处理中"
+  const applyProcessing = useCallback((v: boolean) => {
+    chatProcessingRef.current = v
+    setChatProcessing(v)
+  }, [])
   const [chatHasMore, setChatHasMore] = useState(false)
   const [chatLoadingOlder, setChatLoadingOlder] = useState(false)
   // 移动/桌面双面板都渲染 renderChatInner → ref 收集所有实例，滚动作用在全部（否则只滚到隐藏的那个）
@@ -487,8 +497,7 @@ export function useWorldChat({ wid, onRefresh, onMsg }: UseWorldChatOptions) {
         })
         const s = await r.json()
         if (s && s.processing) {
-          chatProcessingRef.current = true
-          setChatProcessing(true)
+          applyProcessing(true)
           // 有进行中的 turn → 订阅 SSE 直播，实时看到流式内容（不用等整轮跑完才一次性更新）
           if (s.turn_id && !cancelled) {
             try {
@@ -496,8 +505,7 @@ export function useWorldChat({ wid, onRefresh, onMsg }: UseWorldChatOptions) {
               if (cancelled) return
               if (done) {
                 // 直播正常结束：拉权威历史收尾 + 刷新用量（缓存命中率）
-                chatProcessingRef.current = false
-                setChatProcessing(false)
+                applyProcessing(false)
                 loadChat()
                 onRefreshRef.current()
                 return
@@ -507,20 +515,18 @@ export function useWorldChat({ wid, onRefresh, onMsg }: UseWorldChatOptions) {
           timer = window.setTimeout(check, 4000)
         } else {
           if (chatProcessingRef.current) {
-            chatProcessingRef.current = false
-            setChatProcessing(false)
+            applyProcessing(false)
             loadChat()  // 处理完成：拉最新历史（含 AI 回复）
             onRefreshRef.current()  // 刷新用量（缓存命中率）——普通对话也要更新，不只工具场景
           }
         }
       } catch { /* 失败静默重试 */ if (!cancelled) timer = window.setTimeout(check, 8000) }
     }
-    // 初始 ref = true（与 useState(true) 对齐）：状态检查发现无活跃 turn 时 else 分支
-    // 才能进入 `if (chatProcessingRef.current)` 把 setChatProcessing(false) 执行掉
-    chatProcessingRef.current = true
+    // 重新检查前先回到"处理中"：无活跃 turn 时 else 分支据此收敛为 false
+    applyProcessing(true)
     check()
     return () => { cancelled = true; if (timer) clearTimeout(timer) }
-  }, [wid, loadChat, subscribeTurnStream])
+  }, [wid, loadChat, subscribeTurnStream, applyProcessing])
 
   // 卸载清理（节流刷新定时器）
   useEffect(() => {

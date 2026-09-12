@@ -125,9 +125,21 @@ export default function SettingsPage() {
   // ── 预设供应商列表 ──
   interface ProviderPreset { name: string; provider: string; base_url: string; api_key_url: string; chat_model: string; work_model: string; is_default: boolean; models: { value: string; label: string }[] }
   const [providerPresets, setProviderPresets] = useState<ProviderPreset[]>([])
-  // 用户是否手动改过模型（手动改过则选预设时不覆盖）
-  const [chatModelManual, setChatModelManual] = useState(false)
-  const [workModelManual, setWorkModelManual] = useState(false)
+  // 当前 base_url 对应的预设 + 模型下拉候选（预设模型列表 ∪ 当前值，去重）
+  const curPreset = providerPresets.find(p => p.base_url === apiBaseUrl)
+  const presetModelValues = (curPreset?.models || []).map(m => m.value)
+  const allChatOptions = [...new Set([curPreset?.chat_model, ...presetModelValues, globalChatModel].filter(Boolean))]
+  const allWorkOptions = [...new Set([curPreset?.work_model, ...presetModelValues, globalWorkModel].filter(Boolean))]
+  // 选预设：填 base_url + 自动填模型。仅当当前值为空、或值本身来自某个预设时才覆盖，
+  // 用户手写的自定义模型不被冲掉。判定无状态 → 刷新页面后依然成立
+  // （此前用 chatModelManual 记忆"是否手动改过"，刷新即丢失，自定义模型会被预设冲掉）
+  const isPresetModel = (v: string, kind: 'chat' | 'work') =>
+    !v || providerPresets.some(p => (kind === 'chat' ? p.chat_model : p.work_model) === v)
+  const applyPreset = (p: ProviderPreset) => {
+    setApiBaseUrl(p.base_url)
+    if (p.chat_model && isPresetModel(globalChatModel, 'chat')) setGlobalChatModel(p.chat_model)
+    if (p.work_model && isPresetModel(globalWorkModel, 'work')) setGlobalWorkModel(p.work_model)
+  }
 
   // ── 桌面端设置 ──
   const [autoStart, setAutoStart] = useState(false)
@@ -576,12 +588,7 @@ export default function SettingsPage() {
                 {providerPresets.map(p => (
                   <button
                     key={p.name}
-                    onClick={() => {
-                      setApiBaseUrl(p.base_url)
-                      // 自动填模型（用户没手动改过才填）
-                      if (!chatModelManual && p.chat_model) setGlobalChatModel(p.chat_model)
-                      if (!workModelManual && p.work_model) setGlobalWorkModel(p.work_model)
-                    }}
+                    onClick={() => applyPreset(p)}
                     className={`px-3 py-1.5 text-xs rounded-lg font-medium transition-colors border truncate ${
                       apiBaseUrl === p.base_url
                         ? 'bg-primary-500/15 border-primary-500/40 text-primary-500'
@@ -592,9 +599,9 @@ export default function SettingsPage() {
                   </button>
                 ))}
               </div>
-              {(() => { const cur = providerPresets.find(p => p.base_url === apiBaseUrl); return cur ? (
-                <p className="text-[10px] text-mint-400">{t('settings.currentPreset')}：{cur.name} · {cur.base_url}</p>
-              ) : null })()}
+              {curPreset && (
+                <p className="text-[10px] text-mint-400">{t('settings.currentPreset')}：{curPreset.name} · {curPreset.base_url}</p>
+              )}
             </div>
           )}
           <div>
@@ -662,51 +669,42 @@ export default function SettingsPage() {
           </div>
 
           {/* 全局默认模型覆盖 */}
-          {(() => {
-            const curPreset = providerPresets.find(p => p.base_url === apiBaseUrl)
-            // 合并预设模型列表 + 当前已填的值，去重
-            const presetModels = (curPreset?.models || []).map(m => m.value)
-            const allChatOptions = [...new Set([curPreset?.chat_model, ...presetModels, globalChatModel].filter(Boolean))]
-            const allWorkOptions = [...new Set([curPreset?.work_model, ...presetModels, globalWorkModel].filter(Boolean))]
-            return (
-              <div className="grid grid-cols-2 gap-3 pt-3 border-t border-border">
-                <div>
-                  <label className="block text-xs font-medium mb-1.5 text-textSecondary">
-                    全局默认聊天模型（覆盖）
-                  </label>
-                  <input
-                    type="text"
-                    value={globalChatModel}
-                    onChange={(e) => { setGlobalChatModel(e.target.value); setChatModelManual(true) }}
-                    list="chat-model-options"
-                    className="w-full px-3.5 py-2.5 rounded-xl border border-border bg-canvas text-sm text-textPrimary placeholder:text-textMuted focus:outline-none focus:ring-2 focus:ring-primary-500/50"
-                    placeholder="例如：mimo-v2.5"
-                  />
-                  <datalist id="chat-model-options">
-                    {allChatOptions.map(m => <option key={m} value={m} />)}
-                  </datalist>
-                  <p className="text-[10px] text-textMuted mt-1">留空则使用系统全局默认</p>
-                </div>
-                <div>
-                  <label className="block text-xs font-medium mb-1.5 text-textSecondary">
-                    全局默认工作模型（覆盖）
-                  </label>
-                  <input
-                    type="text"
-                    value={globalWorkModel}
-                    onChange={(e) => { setGlobalWorkModel(e.target.value); setWorkModelManual(true) }}
-                    list="work-model-options"
-                    className="w-full px-3.5 py-2.5 rounded-xl border border-border bg-canvas text-sm text-textPrimary placeholder:text-textMuted focus:outline-none focus:ring-2 focus:ring-primary-500/50"
-                    placeholder="例如：mimo-v2.5-pro"
-                  />
-                  <datalist id="work-model-options">
-                    {allWorkOptions.map(m => <option key={m} value={m} />)}
-                  </datalist>
-                  <p className="text-[10px] text-textMuted mt-1">留空则使用系统全局默认</p>
-                </div>
-              </div>
-            )
-          })()}
+          <div className="grid grid-cols-2 gap-3 pt-3 border-t border-border">
+            <div>
+              <label className="block text-xs font-medium mb-1.5 text-textSecondary">
+                全局默认聊天模型（覆盖）
+              </label>
+              <input
+                type="text"
+                value={globalChatModel}
+                onChange={(e) => setGlobalChatModel(e.target.value)}
+                list="chat-model-options"
+                className="w-full px-3.5 py-2.5 rounded-xl border border-border bg-canvas text-sm text-textPrimary placeholder:text-textMuted focus:outline-none focus:ring-2 focus:ring-primary-500/50"
+                placeholder="例如：mimo-v2.5"
+              />
+              <datalist id="chat-model-options">
+                {allChatOptions.map(m => <option key={m} value={m} />)}
+              </datalist>
+              <p className="text-[10px] text-textMuted mt-1">留空则使用系统全局默认</p>
+            </div>
+            <div>
+              <label className="block text-xs font-medium mb-1.5 text-textSecondary">
+                全局默认工作模型（覆盖）
+              </label>
+              <input
+                type="text"
+                value={globalWorkModel}
+                onChange={(e) => setGlobalWorkModel(e.target.value)}
+                list="work-model-options"
+                className="w-full px-3.5 py-2.5 rounded-xl border border-border bg-canvas text-sm text-textPrimary placeholder:text-textMuted focus:outline-none focus:ring-2 focus:ring-primary-500/50"
+                placeholder="例如：mimo-v2.5-pro"
+              />
+              <datalist id="work-model-options">
+                {allWorkOptions.map(m => <option key={m} value={m} />)}
+              </datalist>
+              <p className="text-[10px] text-textMuted mt-1">留空则使用系统全局默认</p>
+            </div>
+          </div>
 
           {/* 优先使用本人 API Key 开关 */}
           <div className="flex items-center justify-between py-3 border-t border-border mt-3">

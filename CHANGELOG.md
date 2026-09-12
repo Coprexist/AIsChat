@@ -5,6 +5,39 @@
 
 > **当前阶段**：v0.4.0 正式版 — 桌面 EXE 打包 + 备份服务策略模式重构。
 
+## [Unreleased]
+
+### 🐛 修复的 Bug
+
+#### 世界 AI 默认模型解析崩溃（b68c8b9 引入的回归）
+- `world_chat_service` 把 `get_provider_config()`（返回**单个**默认供应商 dict）喂给
+  `find_provider_by_base_url()`（期望 `list[dict]`）——迭代 dict 得到的是字符串键，
+  `p.get()` 直接抛 `AttributeError: 'str' object has no attribute 'get'`
+- 触发条件：世界 AI 未指定模型 **且** 世界主人未配用户级覆盖 —— 此时该轮在
+  `_prepare_world_chat` 即崩，被 `world_turn` 兜住后广播 `[ERROR]`，AI 完全不回复
+- 改为 `get_providers()`（返回数组）。线上有 11 个世界（22/25/35/37/40/44-49）
+  正处于该路径，新注册用户（无用户级覆盖）必然踩中
+
+### 🏗️ 架构重构：世界 AI 模型解析统一入口
+
+#### 后端
+- 新增 `resolve_world_chat_model()` 作为**唯一入口**，优先级：
+  世界AI 指定 → 用户级覆盖 `users.global_chat_model` → 管理员提供商配置
+  `provider_config.global_default_chat_model` → 内置预设 `PRESETS[].chat_model` → 平台默认
+- `world_chat_service` / `world_tools` / `world_suggestions` 三处改调同一函数，
+  删除各自手抄的副本。后两处此前**缺少"用户级覆盖"与"管理员提供商配置"两层**，
+  与主对话实际并不一致（管理员配置的自定义供应商匹配不到时会静默掉到平台默认）
+- 顺带清理：替换后不再使用的 `from app.config import settings` 局部导入
+
+#### 前端
+- `useWorldChat`：`chatProcessing` 的 state 与 ref 是同一语义的两份真相源，
+  收敛为唯一写入口 `applyProcessing()`，初始值提取为常量 `CHAT_PROCESSING_INITIAL`
+  （此前两处分别初始化，漂移过一次导致状态检查 else 分支永不执行 → 永久"处理中"）
+- `SettingsPage`：删除 `chatModelManual` / `workModelManual` 两个标志位
+  （刷新即丢失，导致刷新后自定义模型会被预设冲掉），改为无状态判定
+  "值为空或值本身来自某个预设"；模型下拉候选与当前预设提到组件顶部，
+  移除两处 JSX 立即执行函数
+
 ## [v0.4.0] - 2026-08-24
 
 ### 🚀 新功能

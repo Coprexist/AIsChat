@@ -1216,18 +1216,12 @@ async def _do_execute(world_repo: WorldRepository, world, name: str, arguments: 
     if name == "compact_context":
         # 复用主对话的压缩服务：总结中间消息 → 存 worlds.config.chat_summaries[会话] → 下次只发摘要+最近 N 条
         try:
-            from app.config import settings
             from app.services.memory.context_compression_service import compress_messages
-            from app.services.world.world_chat_service import _resolve_world_credentials, get_chat_history, session_key, session_id_for_db, WORLD_CHAT_KEEP_LAST, WORLD_CONTEXT_MIN_MESSAGES
+            from app.services.world.world_chat_service import _resolve_world_credentials, resolve_world_chat_model, get_chat_history, session_key, session_id_for_db, WORLD_CHAT_KEEP_LAST, WORLD_CONTEXT_MIN_MESSAGES
             api_key, api_base = await _resolve_world_credentials(world_repo, world)
             from app.models.world import WorldAI
             wai = (await world_repo.execute(select(WorldAI).where(WorldAI.world_id == world.id))).scalar_one_or_none()
-            model = wai.model if wai else None
-            if not model:
-                from app.services.agent.provider_presets import PRESETS
-                from app.utils.pure.provider_config import find_provider_by_base_url
-                provider = find_provider_by_base_url(list(PRESETS.values()), api_base)
-                model = (provider or {}).get("chat_model") or settings.default_chat_model
+            model = await resolve_world_chat_model(world_repo, world, api_base, wai)
             sid_db = session_id_for_db(world)
             history = await get_chat_history(world_repo, world.id, 200, session_id=sid_db)
             if len(history) < WORLD_CONTEXT_MIN_MESSAGES:
