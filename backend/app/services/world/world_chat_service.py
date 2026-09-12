@@ -1253,6 +1253,145 @@ async def _stream_first_round(
     out["tool_calls"] = tool_call_acc
 
 
+async def _run_tool_loop(
+    world_repo: WorldRepository, ctx: dict, world_id: int, turn_id: str,
+    tool_call_acc: dict, turn_state: dict,
+    first_content: str, first_reasoning: str, result: dict,
+):
+    """工具多轮循环：执行工具 → 注入插入消息 → 继续带 tools 调 LLM，直到不再调工具。
+
+    ctx 为 _prepare_world_chat 的返回值；首轮正文/思考经 first_content / first_reasoning 传入。
+    结果写回 result（full_content / full_reasoning）——**写在 finally 里**，异常路径也要把已生成
+    的部分交回调用方落库，否则中断场景下 AI 回复会丢。
+    异常直接向上抛，由调用方统一置 had_error / turn_error 并下发 [ERROR]。
+    """
+    world = ctx["world"]
+    cfg = ctx["cfg"]
+    api_key, api_base = ctx["api_key"], ctx["api_base"]
+    model, thinking = ctx["model"], ctx["thinking"]
+    tools_for_world = ctx["tools_for_world"]
+    messages = ctx["messages"]
+    sid_db = ctx["sid_db"]
+    full_content = first_content
+    full_reasoning = first_reasoning
+    try:
+        from app.services.world.world_tools import _execute_world_tool, _tool_result_summary
+        # 第一轮过渡叙述 + 对应思考过程：给用户看（role=note，不进 AI 上下文）
+        # 2026-08-13：正文/思考拆两条独立 note（刷新后思考独立气泡，折叠生效）
+        if full_content or full_reasoning:
+            await _save_note_separated(world_repo, world_id, full_content, full_reasoning or "", sid_db)
+        # 第一轮正文重置（最终以收尾轮为准）
+        full_content = ""
+        # 首轮思考保留：后续轮有思考会覆盖；但工具轮 DeepSeek 常不输出 reasoning_content，
+        # 若清空则落库无思考（刷新后「思考过程」丢失）——保留首轮思考作兜底
+        # 第一轮流式里收集到的 tool_calls（重构为 API 格式；content 用空串而非 None，避免部分接口/思考模式异常）
+        # ⚠️ DeepSeek thinking 模式：首轮 assistant 也要回传 reasoning_content（2026-08-13 修复）
+        messages.append({
+            "role": "assistant",
+            "content": "",
+            "tool_calls": [
+                {
+                    "id": acc["id"] or f"call_{idx}",
+                    "type": "function",
+                    "function": {"name": acc["name"], "arguments": acc["arguments"] or "{}"},
+                }
+                for idx, acc in sorted(tool_call_acc.items())
+            ],
+            **({"reasoning_content": full_reasoning} if full_reasoning else {}),
+        })
+        # 工具循环上限：creator_config.max_tool_rounds（默认 50，设计页可改）
+        max_rounds = int(cfg.get("max_tool_rounds") or DEFAULT_MAX_TOOL_ROUNDS)
+        max_rounds = max(1, min(max_rounds, 200))
+        final = ""
+        for _r in range(max_rounds):
+            # ⚠️ 顺序不可颠倒：必须先执行工具、再注入插入消息。
+            # 反了会把 user 消息插进 assistant(tool_calls) 与其 tool_response 之间，
+            # 破坏 DeepSeek 消息链 → API 400。
+            # 执行本轮所有工具调用（执行→落库→[TOOL] 事件）
+            async for event in _execute_tool_round(world_repo, world, world_id, tool_call_acc, messages, turn_state, sid_db):
+                yield event
+            # 此时 tool_response 已入 messages，user 追加在其后是合法链
+            try:
+                await _inject_pending_user_messages(world_repo, world_id, messages, sid_db)
+            except Exception as e:
+                logger.warning(f"🌐 世界 #{world_id} 插入消息注入失败（非致命）: {e}")
+
+            # 下一轮：继续带 tools，直到模型不再调用（同时捕获思考内容）
+            # 最后 3 轮：提醒尽快收尾总结
+            remaining = max_rounds - _r
+            if remaining <= 3:
+                messages.append({"role": "system", "content": f"⚠️ 你还有最后 {remaining} 轮工具调用机会，请尽快结束当前工作并给出总结！"})
+            # 2026-08-13：工具轮流式化——逐 chunk 转发正文/思考（之前等整次调用结束一次性出）
+            out: dict = {}
+            async for event in _stream_llm_once(
+                world_id, turn_id, _r + 1, model, thinking, api_base, api_key,
+                messages, tools_for_world, cfg, out=out,
+            ):
+                yield event
+            resp = out
+            await _record_usage(world_repo, world_id, turn_id, str(_r + 1), model, (resp or {}).get("usage"), messages)
+            content = (resp or {}).get("content") or ""
+            reasoning = (resp or {}).get("reasoning_content") or ""
+            tcs = (resp or {}).get("tool_calls")
+            if reasoning:
+                # 思考已在 _stream_llm_once 流式逐 chunk yield（[REASONING] 分片），此处只记录不重复发
+                full_reasoning = reasoning
+            if not tcs:
+                # 收尾轮：正文作为最终回复（finally 落库 ai），不进 note
+                final = content
+                break
+            # 中间轮（还要继续调工具）：正文已由 _stream_llm_once 逐 chunk yield，
+            # 此处只落库 note（历史可见、不进 AI 上下文）——不再重复 yield 正文，
+            # 否则前端 full 变量拼接导致内容重复显示
+            # full_content 在此赋值是异常路径兜底：后续轮次若抛错，
+            # finally 里"full_content 非空则不覆盖"，落库的就是这段中间叙述
+            if content:
+                full_content = content
+            if content or reasoning:
+                await _save_note_separated(world_repo, world_id, content, reasoning or "", sid_db)
+            # 模型还要继续调工具：记录真实 tool_calls，进入下一轮
+            # ⚠️ DeepSeek thinking 模式硬性要求：assistant 消息必须回传 reasoning_content，
+            # 否则 400 invalid_request_error（2026-08-13 修复）
+            messages.append({
+                "role": "assistant", "content": content or "",
+                "tool_calls": tcs,
+                **({"reasoning_content": reasoning} if reasoning else {}),
+            })
+            tool_call_acc = {
+                i: {"id": tc.get("id", ""), "name": tc["function"]["name"], "arguments": tc["function"].get("arguments") or ""}
+                for i, tc in enumerate(tcs)
+            }
+        else:
+            final = ""  # 达到轮次上限：走强制收尾轮
+
+        # 强制收尾轮：不带 tools，保证必有最终回复（含思考捕获）
+        if not final:
+            _log_llm_request(world_id, turn_id, "final", model, thinking, messages)
+            # 2026-08-13：收尾轮流式化（之前等整次结束一次性出）
+            out_f: dict = {}
+            async for event in _stream_llm_once(
+                world_id, turn_id, "final", model, thinking, api_base, api_key,
+                messages, None, cfg, out=out_f,
+            ):
+                yield event
+            resp_final = out_f
+            await _record_usage(world_repo, world_id, turn_id, "final", model, (resp_final or {}).get("usage"), messages)
+            final = (resp_final or {}).get("content") or "（工具执行完成）"
+            fr = (resp_final or {}).get("reasoning_content") or ""
+            if fr:
+                full_reasoning = fr
+            full_content = final
+        else:
+            # ⚠️ 正常收尾轮（模型不再调工具 → final=content 已 break）：收尾总结也必须进 full_content，
+            # 否则流式显示正常但落库的是中间轮最后一段叙述 → 刷新后总结消失
+            full_content = final
+        # 正文已由 _stream_llm_once 逐 chunk yield，不再重复 yield（避免前端 full 拼接导致重复）
+    finally:
+        # 异常路径也要把已生成内容交回：调用方 finally 里的落库依赖它
+        result["full_content"] = full_content
+        result["full_reasoning"] = full_reasoning
+
+
 async def stream_world_chat(
     world_repo: WorldRepository,
     world_id: int,
@@ -1356,125 +1495,24 @@ async def stream_world_chat(
     had_error = False
     turn_error = None
     if tool_call_acc:
+        _loop: dict = {}
         try:
-            try:
-                from app.services.world.world_tools import _execute_world_tool, _tool_result_summary
-                # 第一轮过渡叙述 + 对应思考过程：给用户看（role=note，不进 AI 上下文）
-                # 2026-08-13：正文/思考拆两条独立 note（刷新后思考独立气泡，折叠生效）
-                if full_content or full_reasoning:
-                    await _save_note_separated(world_repo, world_id, full_content, full_reasoning or "", sid_db)
-                # 第一轮正文重置（最终以收尾轮为准）
-                full_content = ""
-                # 首轮思考保留：后续轮有思考会覆盖；但工具轮 DeepSeek 常不输出 reasoning_content，
-                # 若清空则落库无思考（刷新后「思考过程」丢失）——保留首轮思考作兜底
-                # 第一轮流式里收集到的 tool_calls（重构为 API 格式；content 用空串而非 None，避免部分接口/思考模式异常）
-                # ⚠️ DeepSeek thinking 模式：首轮 assistant 也要回传 reasoning_content（2026-08-13 修复）
-                messages.append({
-                    "role": "assistant",
-                    "content": "",
-                    "tool_calls": [
-                        {
-                            "id": acc["id"] or f"call_{idx}",
-                            "type": "function",
-                            "function": {"name": acc["name"], "arguments": acc["arguments"] or "{}"},
-                        }
-                        for idx, acc in sorted(tool_call_acc.items())
-                    ],
-                    **({"reasoning_content": full_reasoning} if full_reasoning else {}),
-                })
-                # 工具循环上限：creator_config.max_tool_rounds（默认 50，设计页可改）
-                max_rounds = int(cfg.get("max_tool_rounds") or DEFAULT_MAX_TOOL_ROUNDS)
-                max_rounds = max(1, min(max_rounds, 200))
-                final = ""
-                for _r in range(max_rounds):
-                    # ⚠️ 顺序不可颠倒：必须先执行工具、再注入插入消息。
-                    # 反了会把 user 消息插进 assistant(tool_calls) 与其 tool_response 之间，
-                    # 破坏 DeepSeek 消息链 → API 400。
-                    # 执行本轮所有工具调用（执行→落库→[TOOL] 事件）
-                    async for event in _execute_tool_round(world_repo, world, world_id, tool_call_acc, messages, turn_state, sid_db):
-                        yield event
-                    # 此时 tool_response 已入 messages，user 追加在其后是合法链
-                    try:
-                        await _inject_pending_user_messages(world_repo, world_id, messages, sid_db)
-                    except Exception as e:
-                        logger.warning(f"🌐 世界 #{world_id} 插入消息注入失败（非致命）: {e}")
-
-                    # 下一轮：继续带 tools，直到模型不再调用（同时捕获思考内容）
-                    # 最后 3 轮：提醒尽快收尾总结
-                    remaining = max_rounds - _r
-                    if remaining <= 3:
-                        messages.append({"role": "system", "content": f"⚠️ 你还有最后 {remaining} 轮工具调用机会，请尽快结束当前工作并给出总结！"})
-                    # 2026-08-13：工具轮流式化——逐 chunk 转发正文/思考（之前等整次调用结束一次性出）
-                    out: dict = {}
-                    async for event in _stream_llm_once(
-                        world_id, turn_id, _r + 1, model, thinking, api_base, api_key,
-                        messages, tools_for_world, cfg, out=out,
-                    ):
-                        yield event
-                    resp = out
-                    await _record_usage(world_repo, world_id, turn_id, str(_r + 1), model, (resp or {}).get("usage"), messages)
-                    content = (resp or {}).get("content") or ""
-                    reasoning = (resp or {}).get("reasoning_content") or ""
-                    tcs = (resp or {}).get("tool_calls")
-                    if reasoning:
-                        # 思考已在 _stream_llm_once 流式逐 chunk yield（[REASONING] 分片），此处只记录不重复发
-                        full_reasoning = reasoning
-                    if not tcs:
-                        # 收尾轮：正文作为最终回复（finally 落库 ai），不进 note
-                        final = content
-                        break
-                    # 中间轮（还要继续调工具）：正文已由 _stream_llm_once 逐 chunk yield，
-                    # 此处只落库 note（历史可见、不进 AI 上下文）——不再重复 yield 正文，
-                    # 否则前端 full 变量拼接导致内容重复显示
-                    # full_content 在此赋值是异常路径兜底：后续轮次若抛错，
-                    # finally 里"full_content 非空则不覆盖"，落库的就是这段中间叙述
-                    if content:
-                        full_content = content
-                    if content or reasoning:
-                        await _save_note_separated(world_repo, world_id, content, reasoning or "", sid_db)
-                    # 模型还要继续调工具：记录真实 tool_calls，进入下一轮
-                    # ⚠️ DeepSeek thinking 模式硬性要求：assistant 消息必须回传 reasoning_content，
-                    # 否则 400 invalid_request_error（2026-08-13 修复）
-                    messages.append({
-                        "role": "assistant", "content": content or "",
-                        "tool_calls": tcs,
-                        **({"reasoning_content": reasoning} if reasoning else {}),
-                    })
-                    tool_call_acc = {
-                        i: {"id": tc.get("id", ""), "name": tc["function"]["name"], "arguments": tc["function"].get("arguments") or ""}
-                        for i, tc in enumerate(tcs)
-                    }
-                else:
-                    final = ""  # 达到轮次上限：走强制收尾轮
-
-                # 强制收尾轮：不带 tools，保证必有最终回复（含思考捕获）
-                if not final:
-                    _log_llm_request(world_id, turn_id, "final", model, thinking, messages)
-                    # 2026-08-13：收尾轮流式化（之前等整次结束一次性出）
-                    out_f: dict = {}
-                    async for event in _stream_llm_once(
-                        world_id, turn_id, "final", model, thinking, api_base, api_key,
-                        messages, None, cfg, out=out_f,
-                    ):
-                        yield event
-                    resp_final = out_f
-                    await _record_usage(world_repo, world_id, turn_id, "final", model, (resp_final or {}).get("usage"), messages)
-                    final = (resp_final or {}).get("content") or "（工具执行完成）"
-                    fr = (resp_final or {}).get("reasoning_content") or ""
-                    if fr:
-                        full_reasoning = fr
-                    full_content = final
-                else:
-                    # ⚠️ 正常收尾轮（模型不再调工具 → final=content 已 break）：收尾总结也必须进 full_content，
-                    # 否则流式显示正常但落库的是中间轮最后一段叙述 → 刷新后总结消失
-                    full_content = final
-                # 正文已由 _stream_llm_once 逐 chunk yield，不再重复 yield（避免前端 full 拼接导致重复）
-            except Exception as e:
-                had_error = True
-                turn_error = e
-                logger.warning(f"🌐 世界 #{world_id} 工具执行/后续轮失败: {e}")
-                yield f"data: [ERROR]{_friendly_llm_error(e)}\n\n"
+            # 循环体已抽到 _run_tool_loop；finally/_closing/shield 的落库闭环刻意留在本函数
+            async for event in _run_tool_loop(
+                world_repo, ctx, world_id, turn_id, tool_call_acc, turn_state,
+                full_content, full_reasoning, result=_loop,
+            ):
+                yield event
+        except Exception as e:
+            had_error = True
+            turn_error = e
+            logger.warning(f"🌐 世界 #{world_id} 工具执行/后续轮失败: {e}")
+            yield f"data: [ERROR]{_friendly_llm_error(e)}\n\n"
         finally:
+            # 从循环结果回填——成功与异常两条路径都要：
+            # _run_tool_loop 在自己的 finally 里写入 out，异常时也带回已生成内容
+            full_content = _loop.get("full_content", full_content)
+            full_reasoning = _loop.get("full_reasoning", full_reasoning)
             # ── 落库 AI 回复（finally + shield：页面关闭/刷新导致任务取消，收尾照跑）──
             async def _closing():
                 nonlocal full_content, full_reasoning  # 闭包内赋值：必须声明 nonlocal，否则 UnboundLocalError → 回复永不落库
