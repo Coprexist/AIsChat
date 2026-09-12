@@ -18,6 +18,23 @@
 - 改为 `get_providers()`（返回数组）。线上有 11 个世界（22/25/35/37/40/44-49）
   正处于该路径，新注册用户（无用户级覆盖）必然踩中
 
+### 🏗️ 架构重构：stream_world_chat 分阶段拆分
+
+按"小步 + 每步验证"推进（383 行 → 分三段），已完成阶段 1-3：
+
+- **阶段 1（零行为变化）**：清掉内联屎——注释被拼接两遍、`index_to_id` 重复声明、
+  `t = delta.get("content")` 连续两遍且中间夹着挂错位置的注释、「DeepSeek 流式坑」
+  同一段解释 8 行内写两遍；删除 2 处未使用的重复导入与 1 行死注释；
+  删除 `cmd_text` 冗余重算与 `turn_state` 多余存在性判断
+- **阶段 2**：抽出 `_handle_slash_command()`（经 `out["handled"]` 回传是否已处理）
+  与 `_emit_suggestions()`
+- **阶段 3**：抽出 `_stream_first_round()`（payload/headers 构造 + SSE 解析 + tool_calls
+  分片聚合），结果经 `out=` 回传，沿用本文件 `_stream_llm_once` 的既有约定；
+  非 200 时置 `out["aborted"]` 由调用方收尾
+- **阶段 4（待做）**：`_run_tool_loop()` 工具多轮循环（约 180 行）。该段含
+  `nonlocal` + `finally` + `asyncio.shield` 的落库闭环，需真实 LLM 调用才能端到端验证，
+  故未在无人确认时推进
+
 ### 🏗️ 架构重构：世界 AI 模型解析统一入口
 
 #### 后端
