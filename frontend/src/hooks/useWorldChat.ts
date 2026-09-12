@@ -403,10 +403,18 @@ export function useWorldChat({ wid, onRefresh, onMsg }: UseWorldChatOptions) {
             continue
           }
           if (payload.startsWith(EV.INSERTED)) {
-            // 信号（不计入历史）：后端已把插入消息送进工具轮上下文。
-            // ⚠️ 不据此裁剪 pendingItems：中途发送现在走 sendInsertMessage，压根不进排队队列，
-            // 按 count 裁剪会误删用户真正在排队、尚未发出的消息。
-            // 排队弹窗由下方 drain effect 在消息发出时清空。
+            // 信号（不计入历史）：后端已把 count 条普通消息注入 AI 上下文
+            // → 按 FIFO 从排队弹窗移除这些消息（设计 §7.7）
+            // 只匹配 kind==='msg'：命令永远走"本轮结束后逐条发送"，不会出现在插入回执里；
+            // 若直接 slice(count)，夹在中间的命令会被一并误删
+            const sig = parseEvent<{ count?: number }>(payload, EV.INSERTED)
+            if (sig) {
+              let left = sig.count || 0
+              setPendingItems((items) => items.filter((it) => {
+                if (left > 0 && it.kind === 'msg') { left -= 1; return false }
+                return true
+              }))
+            }
             continue
           }
           if (payload.startsWith(EV.INSERT)) {
@@ -415,9 +423,10 @@ export function useWorldChat({ wid, onRefresh, onMsg }: UseWorldChatOptions) {
             const ins = parseEvent<{ msg_id: number; content: string }>(payload, EV.INSERT)
             if (ins) {
               setChatMsgs((msgs) => {
-                // sendInsertMessage 已预先画过临时气泡（负数 id）→ 必须原地换成真实 id，
-                // 否则同一条消息显示两遍（loadChat 要到回合结束才归一）。
-                // 按内容匹配最早一条临时气泡：后端 drain_inserts 是 FIFO，顺序一致。
+                // 正常路径：中途发送只挂排队弹窗、不画气泡，这里直接追加真实气泡。
+                // 兜底分支：前端以为空闲（chatProcessing 尚未刷新）→ 画了气泡并走 sendMessages，
+                // 后端其实仍忙 → 该 POST 被插进队列 → 此处若不替换就会重复显示，故按内容
+                // 匹配最早一条临时气泡原地换 id（后端 drain_inserts 是 FIFO，顺序一致）
                 const i = msgs.findIndex((m) => m.id < 0 && m.role === 'user' && m.content === ins.content)
                 if (i === -1) return [...msgs, { id: ins.msg_id, role: 'user', content: ins.content }]
                 const next = [...msgs]
@@ -569,19 +578,23 @@ export function useWorldChat({ wid, onRefresh, onMsg }: UseWorldChatOptions) {
     } catch { return false }
   }, [wid])
 
-  // ── 插入消息（AI 运行中中途发送，不阻塞等待整轮结束）──
+  // ── 插入消息（AI 运行中中途发送的普通消息，不阻塞等整轮结束）──
+  // 设计见 docs/group_world/design/group_world_design.md §7.7：
+  //   普通消息 → 立即发后端进插入队列 → 后端在下一轮 LLM 调用前注入
+  //   → 回 [INSERTED]{count} 清排队弹窗 + [INSERT] 画真实气泡
+  // 这里**不预先画占位气泡**：气泡必须等 AI 真正收到才出现
+  //（"用户看到已发送" == "AI 已看到"），否则等于"还没被 AI 收到就已经显示成发出去了"
   const sendInsertMessage = async (text: string) => {
     try {
-      // 先画用户气泡（临时 id，[INSERT] 事件到达时会用真实 DB id 替换）
-      const tmpId = -(++msgSeqRef.current)
-      setChatMsgs((msgs) => [...msgs, { id: tmpId, role: 'user', content: text }])
-      requestAnimationFrame(() => forceScrollToBottomRef.current?.())
-      // 发到后端（走 insert 队列，不等 [DONE]）
       await api.post<{ turn_id: string; queued: boolean }>(`/worlds/${wid}/chat`, { messages: [text] })
-      // 不 await subscribeTurnStream——插入消息通过活跃 turn 的 SSE 事件（[INSERT]/[INSERTED]）到达
+      // 不 await subscribeTurnStream——回执走活跃 turn 的 SSE（[INSERTED]/[INSERT]）
     } catch (e: any) {
-      const errText = e?.message || '发送失败'
-      setChatMsgs((msgs) => [...msgs, { id: -(++msgSeqRef.current), role: 'ai', content: errText, error: true }])
+      // 发送失败：从排队弹窗摘掉这条，否则 drain 会把它当普通排队消息再发一次
+      setPendingItems((items) => {
+        const i = items.findIndex((it) => it.kind === 'msg' && it.text === text)
+        return i === -1 ? items : [...items.slice(0, i), ...items.slice(i + 1)]
+      })
+      setChatMsgs((msgs) => [...msgs, { id: -(++msgSeqRef.current), role: 'ai', content: e?.message || '发送失败', error: true }])
     }
   }
 
@@ -627,20 +640,17 @@ export function useWorldChat({ wid, onRefresh, onMsg }: UseWorldChatOptions) {
   const submitText = (text: string) => {
     const t = text.trim()
     if (!t) return
-    // 前端正在发送中（上一条还没入队）→ 排队等 sendMessages 完成
-    if (chatSending) {
-      setPendingItems((items) => [...items, { kind: t.startsWith('/') ? 'cmd' : 'msg', text: t }])
+    const isCmd = t.startsWith('/')
+    // AI 忙（本条发送中 / 后台轮次执行中）：一律进排队弹窗——不画占位气泡
+    //（位置不对，且会被 loadChat 冲掉），真正插入后（[INSERT] 回执）才进对话流
+    if (chatSending || chatProcessing) {
+      setPendingItems((items) => [...items, { kind: isCmd ? 'cmd' : 'msg', text: t }])
       setChatInput('')
       setCmdActive(false)
-      setSuggestions([])
-      return
-    }
-    // AI 正在处理（后台轮次执行中）→ 直接发到后端（走 insert 队列注入 AI 上下文）
-    if (chatProcessing) {
-      setChatInput('')
-      setCmdActive(false)
-      setSuggestions([])
-      sendInsertMessage(t)
+      setSuggestions([])  // 开始新工作流 → 旧建议隐藏，等新回复生成新的
+      // 普通消息立即发后端（进插入队列，下一轮 LLM 前注入）；
+      // 命令不能提前发——必须等本轮结束，由 drain effect 一次发一条，剩下的继续排队
+      if (!isCmd) sendInsertMessage(t)
       return
     }
     // 空闲状态：直接发送 + 画用户气泡
