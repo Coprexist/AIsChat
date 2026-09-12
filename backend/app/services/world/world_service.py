@@ -507,23 +507,3 @@ async def delete_world_data(repo: WorldRepository, world_id: int, key: str) -> b
     await repo.commit()
     return True
 
-
-# ═══════════════════════════════════════════════════════════════
-# 拆分模块再导出（世界 AI 对话 → world_chat_service；工具 → world_tools）
-# 路由等外部引用保持不变
-# ═══════════════════════════════════════════════════════════════
-
-from app.services.world.world_chat_service import (  # noqa: E402
-    CHAT_HISTORY_LIMIT,
-    WORLD_CHAT_KEEP_LAST,
-    WORLD_CONTEXT_MIN_MESSAGES,
-    world_context_block,
-    get_chat_history,
-    _resolve_world_credentials,
-    stream_world_chat,
-)
-from app.services.world.world_tools import (  # noqa: E402
-    WORLD_TOOLS,
-    _execute_world_tool,
-    _tool_result_summary,
-)
