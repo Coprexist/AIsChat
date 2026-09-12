@@ -1088,6 +1088,53 @@ async def _prepare_world_chat(
     }
 
 
+async def _handle_slash_command(
+    world_repo: WorldRepository, world, world_id: int, cmd_text: str,
+    user_id: int | None, sid_db: str | None, out: dict,
+):
+    """执行斜杠命令并下发事件；已处理时置 out["handled"]=True（调用方直接收尾返回）。
+
+    note 为 None = 非注册命令 → 不处理，继续走 LLM（未知斜杠当普通消息处理）。
+    """
+    try:
+        from app.services.world.world_chat_commands import run_slash_command
+        note = await run_slash_command(world_repo, world, cmd_text, user_id=user_id)
+    except Exception as e:
+        logger.warning(f"🌐 世界 #{world_id} 命令执行失败: {e}")
+        yield f"data: [ERROR]命令执行失败: {e}\n\n"
+        yield "data: [DONE]\n\n"
+        out["handled"] = True
+        return
+    if note is None:
+        return
+    from app.models.world import WorldChatMessage
+    world_repo.add(WorldChatMessage(world_id=world_id, user_id=None, role="tool", content=note, session_id=sid_db))
+    await world_repo.commit()
+    yield f"data: [TOOL_UPDATE]{json.dumps({'tool_id': f't_{uuid.uuid4().hex[:8]}', 'status': 'done', 'name': cmd_text.lstrip('/'), 'success': True, 'summary': note}, ensure_ascii=False)}\n\n"
+    yield "data: [DONE]\n\n"
+    out["handled"] = True
+
+
+async def _emit_suggestions(world_repo: WorldRepository, world, world_id: int, turn_state: dict):
+    """下发「你可以」建议：AI 调过 suggest_questions 就用它，否则轻量 LLM 兜底，再不行预设。"""
+    try:
+        suggestions = list(turn_state.get("suggestions") or [])
+        if not suggestions:
+            from app.services.world.world_suggestions import suggest_fallback
+            suggestions = await suggest_fallback(world_repo, world)
+        if not suggestions:
+            return
+        try:
+            from app.services.world.world_service import set_world_data
+            await set_world_data(world_repo, world_id, "ui.suggestions", suggestions[:5])
+        except Exception as e:
+            # 本次仍会把建议推给前端；留痕便于排查"刷新后建议就没了"
+            logger.warning(f"🌐 世界 #{world_id} 建议持久化失败（本次仍下发）: {e}")
+        yield f"data: [SUGGEST]{json.dumps(suggestions[:5], ensure_ascii=False)}\n\n"
+    except Exception as e:
+        logger.warning(f"🌐 世界 #{world_id} 建议问题生成失败: {e}")
+
+
 async def stream_world_chat(
     world_repo: WorldRepository,
     world_id: int,
@@ -1127,21 +1174,11 @@ async def stream_world_chat(
 
     # ── 用户斜杠命令（不走 LLM，仅单条）；命令注册表见 world_chat_commands._COMMANDS ──
     if cmd_text.startswith("/"):
-        try:
-            from app.services.world.world_chat_commands import run_slash_command
-            note = await run_slash_command(world_repo, world, cmd_text, user_id=user_id)
-        except Exception as e:
-            logger.warning(f"🌐 世界 #{world_id} 命令执行失败: {e}")
-            yield f"data: [ERROR]命令执行失败: {e}\n\n"
-            yield "data: [DONE]\n\n"
+        _cmd_out: dict = {}
+        async for event in _handle_slash_command(world_repo, world, world_id, cmd_text, user_id, sid_db, out=_cmd_out):
+            yield event
+        if _cmd_out.get("handled"):
             return
-        if note is not None:
-            world_repo.add(WorldChatMessage(world_id=world_id, user_id=None, role="tool", content=note, session_id=sid_db))
-            await world_repo.commit()
-            yield f"data: [TOOL_UPDATE]{json.dumps({'tool_id': f't_{uuid.uuid4().hex[:8]}', 'status': 'done', 'name': cmd_text.lstrip('/'), 'success': True, 'summary': note}, ensure_ascii=False)}\n\n"
-            yield "data: [DONE]\n\n"
-            return
-        # note 为 None = 非注册命令：继续走 LLM（未知斜杠当普通消息处理）
 
     # ── 第一轮前注入插入消息（2026-08-16 修复：原来只在工具轮循环内注入——
     # 若 AI 第一轮不调工具直接收尾，插入消息永远进不了上下文，用户要等下一轮才被 AI 看到）──
@@ -1452,22 +1489,8 @@ async def stream_world_chat(
         except Exception as e:
             logger.warning(f"🌐 世界 #{world_id} 回复落库失败: {e}")
 
-    # ── "你可以"建议：AI 调过 suggest_questions → 用它；否则轻量 LLM 兜底（用世界 key）；再不行预设 ──
-    try:
-        suggestions = list(turn_state.get("suggestions") or [])
-        if not suggestions:
-            from app.services.world.world_suggestions import suggest_fallback
-            suggestions = await suggest_fallback(world_repo, world)
-        if suggestions:
-            try:
-                from app.services.world.world_service import set_world_data
-                await set_world_data(world_repo, world_id, "ui.suggestions", suggestions[:5])
-            except Exception as e:
-                # 本次仍会把建议推给前端；留痕便于排查"刷新后建议就没了"
-                logger.warning(f"🌐 世界 #{world_id} 建议持久化失败（本次仍下发）: {e}")
-            yield f"data: [SUGGEST]{json.dumps(suggestions[:5], ensure_ascii=False)}\n\n"
-    except Exception as e:
-        logger.warning(f"🌐 世界 #{world_id} 建议问题生成失败: {e}")
+    async for event in _emit_suggestions(world_repo, world, world_id, turn_state):
+        yield event
 
     yield "data: [DONE]\n\n"
 
