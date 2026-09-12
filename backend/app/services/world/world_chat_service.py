@@ -1275,14 +1275,17 @@ async def stream_world_chat(
                 max_rounds = max(1, min(max_rounds, 200))
                 final = ""
                 for _r in range(max_rounds):
-                    # 插入消息拼进上下文（气泡/落库已即时完成；无则零开销）
+                    # ⚠️ 顺序关键：先执行工具（tool_response 跟在 assistant(tool_calls) 后面），
+                    # 再注入用户插入消息（user 消息在 tool_response 之后）——
+                    # 反了会破坏 DeepSeek 消息链：assistant(tool_calls) → user → tool → 400
+                    # 执行本轮所有工具调用（执行→落库→[TOOL] 事件）
+                    async for event in _execute_tool_round(world_repo, world, world_id, tool_call_acc, messages, turn_state, sid_db):
+                        yield event
+                    # 工具执行完毕后注入插入消息（此时 tool_response 已在 messages 里，user 追加在后面不会破坏消息链）
                     try:
                         await _inject_pending_user_messages(world_repo, world_id, messages, sid_db)
                     except Exception as e:
                         logger.warning(f"🌐 世界 #{world_id} 插入消息注入失败（非致命）: {e}")
-                    # 执行本轮所有工具调用（执行→注入→落库→[TOOL] 事件）
-                    async for event in _execute_tool_round(world_repo, world, world_id, tool_call_acc, messages, turn_state, sid_db):
-                        yield event
 
                     # 下一轮：继续带 tools，直到模型不再调用（同时捕获思考内容）
                     # 最后 3 轮：提醒尽快收尾总结

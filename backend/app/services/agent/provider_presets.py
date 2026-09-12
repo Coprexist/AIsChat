@@ -155,6 +155,44 @@ PRESETS: dict[str, ProviderPreset] = {
             {"value": "meta-llama/Llama-4-Maverick-17B-128E-Instruct", "label": "Llama 4 Maverick"},
         ],
     },
+
+    # ── Xiaomi MiMo（按量付费）──
+    "xiaomi-mimo": {
+        "key": "xiaomi-mimo",
+        "label": "Xiaomi MiMo",
+        "base_url": "https://api.xiaomimimo.com/v1",
+        "api_key_url": "https://platform.xiaomimimo.com/#/console/api-keys",
+        "chat_model": "mimo-v2.5",
+        "work_model": "mimo-v2.5-pro",
+        "embedding_model": "",
+        "thinking_supported": True,
+        "models": [
+            {"value": "mimo-v2.5", "label": "MiMo V2.5（多模态，推荐）"},
+            {"value": "mimo-v2.5-pro", "label": "MiMo V2.5 Pro（高质量）"},
+            {"value": "mimo-v2-pro", "label": "MiMo V2 Pro（文本推理）"},
+            {"value": "mimo-v2-omni", "label": "MiMo V2 Omni（多模态推理）"},
+            {"value": "mimo-v2-flash", "label": "MiMo V2 Flash（快速）"},
+        ],
+    },
+
+    # ── Xiaomi MiMo Token Plan（订阅制）──
+    "xiaomi-mimo-tp": {
+        "key": "xiaomi-mimo-tp",
+        "label": "Xiaomi MiMo（Token Plan 订阅）",
+        "base_url": "https://token-plan-cn.xiaomimimo.com/v1",
+        "api_key_url": "https://platform.xiaomimimo.com/#/console/api-keys",
+        "chat_model": "mimo-v2.5",
+        "work_model": "mimo-v2.5-pro",
+        "embedding_model": "",
+        "thinking_supported": True,
+        "models": [
+            {"value": "mimo-v2.5", "label": "MiMo V2.5（多模态，推荐）"},
+            {"value": "mimo-v2.5-pro", "label": "MiMo V2.5 Pro（高质量）"},
+            {"value": "mimo-v2-pro", "label": "MiMo V2 Pro（文本推理）"},
+            {"value": "mimo-v2-omni", "label": "MiMo V2 Omni（多模态推理）"},
+            {"value": "mimo-v2-flash", "label": "MiMo V2 Flash（快速）"},
+        ],
+    },
 }
 
 
