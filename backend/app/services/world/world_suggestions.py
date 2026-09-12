@@ -66,7 +66,12 @@ async def suggest_fallback(world_repo: WorldRepository, world) -> list[str]:
         api_key, api_base = await _resolve_world_credentials(world_repo, world)
         wai = (await world_repo.execute(select(WorldAI).where(WorldAI.world_id == world.id))).scalar_one_or_none()
         from app.config import settings
-        model = (wai.model if wai else None) or settings.default_chat_model
+        model = wai.model if wai else None
+        if not model:
+            from app.services.agent.provider_presets import PRESETS
+            from app.utils.pure.provider_config import find_provider_by_base_url
+            provider = find_provider_by_base_url(list(PRESETS.values()), api_base)
+            model = (provider or {}).get("chat_model") or settings.default_chat_model
         resp = await chat_completion(
             messages=[
                 {"role": "system", "content": '你是对话引导助手。基于以下对话，生成 3-4 个建议给用户（每个 ≤20 字）：可以是问题、陈述性要求或下一步选项，具体、好玩、引导探索。只输出 JSON 数组，如 ["建议1","建议2","建议3"]，不要其它文字。'},
