@@ -92,6 +92,8 @@ def build_provider_summaries(providers: list[dict]) -> list[dict]:
             "provider": provider_key,
             "base_url": p.get("base_url", ""),
             "api_key_url": api_key_url,
+            "chat_model": p.get("chat_model", ""),
+            "work_model": p.get("work_model", ""),
             "thinking_supported": p.get("thinking_supported", False),
             "is_default": p.get("is_default", False),
             "models": p.get("model_options", []),
