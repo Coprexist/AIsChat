@@ -403,10 +403,10 @@ export function useWorldChat({ wid, onRefresh, onMsg }: UseWorldChatOptions) {
             continue
           }
           if (payload.startsWith(EV.INSERTED)) {
-            // 信号（不计入历史）：后端已把排队消息真正插入工具轮（FIFO）——
-            // 从排队弹窗移除 count 条成功的消息，弹窗只留还没发出的
-            const sig = parseEvent<{ count?: number }>(payload, EV.INSERTED)
-            if (sig) setPendingItems((items) => items.slice(sig.count || 0))
+            // 信号（不计入历史）：后端已把插入消息送进工具轮上下文。
+            // ⚠️ 不据此裁剪 pendingItems：中途发送现在走 sendInsertMessage，压根不进排队队列，
+            // 按 count 裁剪会误删用户真正在排队、尚未发出的消息。
+            // 排队弹窗由下方 drain effect 在消息发出时清空。
             continue
           }
           if (payload.startsWith(EV.INSERT)) {
@@ -414,7 +414,16 @@ export function useWorldChat({ wid, onRefresh, onMsg }: UseWorldChatOptions) {
             // 与历史一致，loadChat 后不会重复/错位）
             const ins = parseEvent<{ msg_id: number; content: string }>(payload, EV.INSERT)
             if (ins) {
-              setChatMsgs((msgs) => [...msgs, { id: ins.msg_id, role: 'user', content: ins.content }])
+              setChatMsgs((msgs) => {
+                // sendInsertMessage 已预先画过临时气泡（负数 id）→ 必须原地换成真实 id，
+                // 否则同一条消息显示两遍（loadChat 要到回合结束才归一）。
+                // 按内容匹配最早一条临时气泡：后端 drain_inserts 是 FIFO，顺序一致。
+                const i = msgs.findIndex((m) => m.id < 0 && m.role === 'user' && m.content === ins.content)
+                if (i === -1) return [...msgs, { id: ins.msg_id, role: 'user', content: ins.content }]
+                const next = [...msgs]
+                next[i] = { id: ins.msg_id, role: 'user', content: ins.content }
+                return next
+              })
               requestAnimationFrame(() => forceScrollToBottomRef.current?.())
             }
             continue

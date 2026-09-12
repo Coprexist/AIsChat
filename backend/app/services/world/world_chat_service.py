@@ -762,8 +762,6 @@ async def _execute_tool_round(
     - 执行后 yield 同 id [TOOL_UPDATE]{status:done}（前端按 id 原地更新气泡）
     - 落库：同 tool_id 更新最后一条（历史只留最终态）
     """
-    import json
-    import uuid
     from app.models.world import WorldChatMessage
     from app.services.world.world_tools import _execute_world_tool, _tool_result_summary
     for idx, acc in sorted(tool_call_acc.items()):
@@ -869,7 +867,6 @@ def _json_safe_dump(obj) -> str:
 
 def _args_summary(arguments: str) -> str:
     """工具参数摘要（展示用）：取 path/code/event 等关键字段，避免全量刷屏"""
-    import json
     try:
         args = json.loads(arguments or "{}")
     except (json.JSONDecodeError, TypeError):
@@ -892,7 +889,6 @@ async def _prepare_world_chat(
     返回上下文 dict（供 stream_world_chat 编排）；世界不存在返回 None。
     斜杠命令不在这里执行（需 yield SSE），只识别 cmd_text 供主编排处理。
     """
-    import httpx  # noqa: F401（_stream_llm_once 用，保留模块级导入习惯）
     from app.config import settings
     from app.models.world import World
 
@@ -1008,8 +1004,10 @@ async def _prepare_world_chat(
             memory_map = await build_memory_map(world_repo, world_id)
             if memory_map:
                 messages.append({"role": "system", "content": memory_map})
-        except Exception:
-            pass
+        except Exception as e:
+            # 降级可接受（本轮少一份记忆上下文），但必须留痕：
+            # 静默会让人误判成"这个世界没有记忆"，排查时无从下手
+            logger.warning(f"🌐 世界 #{world_id} 记忆地图注入失败（本轮降级）: {e}")
     if needs_compress:
         messages.append({"role": "system", "content": "⚠️ 上下文已接近上限，请调用 compact_context 工具压缩对话历史后再继续。"})
     from zoneinfo import ZoneInfo
@@ -1031,8 +1029,9 @@ async def _prepare_world_chat(
                     parts.append(f"{v.get('name', '?')}" + (f"（{v.get('role', '未绑定角色')}）" if v.get('role') else ""))
             if parts:
                 messages.append({"role": "system", "content": "## 世界内访客\n" + "、".join(parts[:20])})
-    except Exception:
-        pass
+    except Exception as e:
+        # 降级可接受（AI 本轮不知道访客名单），但必须留痕
+        logger.warning(f"🌐 世界 #{world_id} 访客名单注入失败（本轮降级）: {e}")
 
     # 能力变更通知（懒加载：增量 changelog 追加尾部，known 更新与注入同轮）
     try:
@@ -1047,8 +1046,9 @@ async def _prepare_world_chat(
         if notice:
             messages.append({"role": "system", "content": notice})
             await world_repo.commit()
-    except Exception:
-        pass
+    except Exception as e:
+        # 降级可接受（本轮不发能力变更通知），但必须留痕
+        logger.warning(f"🌐 世界 #{world_id} 能力变更通知注入失败（本轮降级）: {e}")
 
     # 落库用户消息（批量 = 排队消息一起发，逐条气泡；先提交，即使流失败也不丢）
     from app.models.world import WorldChatMessage
@@ -1101,10 +1101,8 @@ async def stream_world_chat(
     内容里的换行用 {NL} 占位（SSE 行内不能有裸换行），前端还原。
     用户消息先落库；AI 回复流结束后落库（客户端中断也尽量保存已生成部分）。
 
-    编排：准备（_prepare_world_chat）→ 命令/首轮流式 → 工具轮（_run_tool_loop）→ 建议。
+    编排：准备（_prepare_world_chat）→ 命令/首轮流式 → 工具多轮循环（内联在本函数）→ 建议。
     """
-    import json
-
     import httpx  # 首轮流式（client.stream）用
     from app.models.world import WorldChatMessage
 

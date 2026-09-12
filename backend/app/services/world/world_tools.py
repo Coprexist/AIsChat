@@ -629,13 +629,13 @@ async def _web_download(world, arguments: str) -> dict:
     阶段 1（无 confirm_id）：SSRF 检查 + 登记待确认 → need_confirm + confirm_id
     阶段 2（confirmed=true + confirm_id）：校验匹配 → 下载 → 白名单/大小校验 → 写世界文件夹
     """
-    import json as _json
+    import json
     import httpx
     from app.tools.file_operations.web_fetch import _is_private_url
 
     try:
-        args = _json.loads(arguments or "{}")
-    except _json.JSONDecodeError:
+        args = json.loads(arguments or "{}")
+    except json.JSONDecodeError:
         return {"success": False, "error": "参数解析失败"}
 
     url = str(args.get("url") or "").strip()
