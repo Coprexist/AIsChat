@@ -86,7 +86,7 @@
 | [群视界实现文档](./group_world/implementation.md) | 开发者 | 实现现状 + 阶段 2 架构决策与踩坑（ADR 风格） |
 | [群视界阶段 2 规划](./group_world/plan_phase2.md) | 开发者 | 阶段 2 清单（2.1-2.5 已完成）与估算 |
 | [接口文档服务](./group_world/design/api_docs_service.md) | 开发者 / 管理员 | /kb 接口 + docx 导出 + pandoc 安装、路径规则、422 local_kw 坑 |
-| [群视界 API 文档](./group_world/api/world_api_docs.md) | 开发者 / 世界 AI | 9 大分区接口手册（变量/文件/积木/群聊/受控 API…） |
+| [群视界 API 文档](./group_world/api/world_api_docs.md) | 开发者 / 世界 AI | 10 大分区接口手册（变量/文件/积木/群聊/同步限流/受控 API…） |
 | [世界 Skill 机制](./group_world/design/world_skill_design.md) | 开发者 | 文件式 skill/tool 机制（world skill runtime） |
 | [世界决策技能](./group_world/design/world_decision_skill.md) | 开发者 | Decision Skill 与触发模式 |
 | [世界能力注入](./group_world/design/world_agent_capabilities.md) | 开发者 | 群 AI / 世界 AI 的能力边界与路径 |
