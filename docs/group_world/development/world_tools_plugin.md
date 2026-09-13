@@ -35,7 +35,7 @@ backend/app/tools/world/
 | `exposed` | ➖ | `False` = 只给斜杠命令用，不发给 LLM |
 | `execute(ctx)` | ✅ | 返回 dict，成功带 `success=True`；失败带 `error` |
 | `summary(result)` | ✅ | **卡片折叠时那一行**：刚做了什么、结果如何 |
-| `detail(args, result)` | ➖ | 点开卡片后的详细说明；默认渲染「参数 + 结果」 |
+| `detail(args, result)` | ➖ | 点开卡片后的详细说明；默认渲染「参数 + 结果」。它会随消息落库（`tool_detail` 列），刷新后仍可展开 |
 
 **为什么要强制 `summary`**：不强制就会有人漏写，卡片上只剩一句没有信息量的兜底文案，
 用户根本不知道刚才发生了什么。注册表因此在类定义时就检查，缺了直接抛 `TypeError`，
@@ -129,7 +129,7 @@ to register and raises `TypeError` immediately):
 | `parameters` / `required` | ✅ | JSON Schema properties and required names; use `{}` / `[]` when empty |
 | `execute(ctx)` | ✅ | Returns a dict; `success=True` on success, `error` on failure |
 | `summary(result)` | ✅ | **The one line shown when the card is collapsed** |
-| `detail(args, result)` | ➖ | Text shown when the card is expanded; defaults to args + result |
+| `detail(args, result)` | ➖ | Text shown when the card is expanded; defaults to args + result. It is persisted with the message (`tool_detail`), so it survives a reload |
 | `exposed = False` | ➖ | Internal tool: dispatchable by slash commands, not sent to the LLM |
 
 `summary` is mandatory on purpose: without it the chat card degrades to a meaningless

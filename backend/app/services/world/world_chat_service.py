@@ -454,6 +454,7 @@ async def ensure_session_lifecycle(world_repo, world) -> dict:
 async def get_chat_history(world_repo: WorldRepository, world_id: int, limit: int = 30, before_id: int | None = None, session_id: str | None = None) -> list[dict]:
     """世界 AI 对话历史（最近 limit 条；before_id 传最旧 id 可翻更早；session_id 过滤会话）"""
     from app.models.world import WorldChatMessage
+    from app.tools.world import tool_label
 
     query = select(WorldChatMessage).where(WorldChatMessage.world_id == world_id)
     if session_id is None:
@@ -471,6 +472,10 @@ async def get_chat_history(world_repo: WorldRepository, world_id: int, limit: in
             "content": m.content,
             "reasoning": m.reasoning if m.role in ("ai", "note") else None,
             "is_error": bool(m.is_error) if m.role == "tool" else None,
+            # 工具卡片：是哪个工具 + 点开看详情（历史行 tool_name 为空的是老数据，前端自动退化）
+            "tool_name": m.tool_name if m.role == "tool" else None,
+            "tool_label": (tool_label(m.tool_name) or None) if m.role == "tool" else None,
+            "tool_detail": m.tool_detail if m.role == "tool" else None,
             "attachments": m.attachments,
             "created_at": m.created_at.isoformat() if m.created_at else None,
         }
@@ -801,7 +806,7 @@ async def _execute_tool_round(
     - 落库：同 tool_id 更新最后一条（历史只留最终态）
     """
     from app.models.world import WorldChatMessage
-    from app.tools.world import execute_world_tool, tool_result_summary
+    from app.tools.world import execute_world_tool, tool_label, tool_result_detail, tool_result_summary
     for idx, acc in sorted(tool_call_acc.items()):
         tool_id = f"t_{uuid.uuid4().hex[:8]}"
         args_summary = _args_summary(acc.get("arguments") or "")
@@ -828,6 +833,8 @@ async def _execute_tool_round(
             logger.warning(f"🌐 世界 #{world_id} 工具 {acc['name']} 执行失败: {e}")
             result = {"success": False, "error": str(e)[:500]}
         summary = tool_result_summary(acc["name"], result)
+        # 卡片详情（UI 专用）：和 summary 一起算好，随事件下发 + 落库；不进 LLM 上下文
+        detail = tool_result_detail(acc["name"], acc["arguments"], result)
         turn_state["tools_done"].append(summary)
         messages.append({
             "role": "tool",
@@ -838,7 +845,7 @@ async def _execute_tool_round(
         for note in progress_events:
             yield f"data: [TOOL_UPDATE]{json.dumps({'tool_id': tool_id, 'status': 'update', 'name': acc['name'], 'summary': note}, ensure_ascii=False)}\n\n"
         # ④ 执行后：done（同 tool_id，前端原地更新）
-        yield f"data: [TOOL_UPDATE]{json.dumps({'tool_id': tool_id, 'status': 'done', 'name': acc['name'], 'success': bool(result.get('success')), 'summary': summary}, ensure_ascii=False)}\n\n"
+        yield f"data: [TOOL_UPDATE]{json.dumps({'tool_id': tool_id, 'status': 'done', 'name': acc['name'], 'label': tool_label(acc['name']), 'success': bool(result.get('success')), 'summary': summary, 'detail': detail}, ensure_ascii=False)}\n\n"
         # ⑤ 落库：同 tool_id 更新最后一条（历史只留最终态）；无 tool_id 旧字段则新增
         existing = (await world_repo.execute(
             select(WorldChatMessage).where(
@@ -849,11 +856,14 @@ async def _execute_tool_round(
         if existing is not None:
             existing.content = summary
             existing.is_error = not bool(result.get("success"))
+            existing.tool_name = acc["name"]
+            existing.tool_detail = detail
         else:
             world_repo.add(WorldChatMessage(
                 world_id=world_id, user_id=None, role="tool",
                 content=summary, session_id=sid_db, tool_id=tool_id,
                 is_error=not bool(result.get("success")),
+                tool_name=acc["name"], tool_detail=detail,
             ))
         await world_repo.commit()
 

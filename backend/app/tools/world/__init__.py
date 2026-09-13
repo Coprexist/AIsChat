@@ -94,12 +94,22 @@ def tool_result_summary(name: str, result: dict) -> str:
     return f"{name}：{gist}" if gist else f"{name} 执行完成"
 
 
-def tool_result_detail(name: str, args: dict, result: dict) -> str:
-    """卡片展开后的详情。插件可自定义；技能走通用渲染。"""
+def tool_result_detail(name: str, arguments, result: dict) -> str:
+    """卡片展开后的详情。插件可自定义；技能走通用渲染。
+
+    arguments 可为原始 JSON 字符串或已解析的 dict——调用方通常只有原始那份。
+    """
+    args = _parse_args(arguments) if isinstance(arguments, str) else (arguments or {})
     plugin = WorldToolRegistry.get(name)
     if plugin is not None:
         return plugin.detail(args, result)
     return default_detail(args, result)
+
+
+def tool_label(name: str) -> str:
+    """工具的中文名（卡片标题；世界自定义 skill 没有 label，返回空串让前端回退）"""
+    plugin = WorldToolRegistry.get(name)
+    return plugin.label if plugin is not None else ""
 
 
 def _parse_args(arguments: str) -> dict:
@@ -117,6 +127,7 @@ __all__ = [
     "WorldToolRegistry",
     "execute_world_tool",
     "run_world_tool",
+    "tool_label",
     "tool_result_detail",
     "tool_result_summary",
 ]

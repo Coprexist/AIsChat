@@ -124,6 +124,8 @@ class WorldChatMessage(Base):
     reasoning = Column(Text, nullable=True, comment="AI 思考过程（thinking 模式产生，展示用，不进上下文）")
     tool_id = Column(String(32), nullable=True, index=True, comment="工具执行 id（同 id 多状态更新，历史只留最终态；2026-08-13 新增）")
     is_error = Column(Boolean, nullable=True, default=False, comment="工具执行失败标记（刷新后保持红色展示；2026-08-13 新增）")
+    tool_name = Column(String(64), nullable=True, comment="工具名（role=tool；刷新后卡片标题与详情用）")
+    tool_detail = Column(Text, nullable=True, comment="工具调用详情（点开卡片展开；UI 专用，不进 LLM 上下文）")
     attachments = Column(json_column(), nullable=True, comment="消息附件 [{file_id, path, name, size, mime_type}]；图片会注入 LLM 多模态（2026-09-13 新增）")
 
     created_at = Column(DateTime, server_default=func.now())

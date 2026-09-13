@@ -26,8 +26,12 @@ export interface ChatMsg {
   /** 工具状态事件（2026-08-13）：tool_id 定位气泡，多状态原地更新 */
   tool_id?: string
   tool_name?: string
+  /** 工具中文名（后端插件自带；前端 i18n 有词条时优先用词条） */
+  tool_label?: string
   tool_status?: 'running' | 'update' | 'done'
   tool_args?: string
+  /** 点开卡片后的详细说明（参数 + 结果；UI 专用，不进 LLM 上下文） */
+  tool_detail?: string
   /** 工具执行失败（落库后刷新保持红色；2026-08-13） */
   is_error?: boolean
   /** 消息附件（图片在气泡里渲染成图；2026-09-13 新增） */
@@ -530,8 +534,8 @@ export function useWorldChat({ wid, onRefresh, onMsg }: UseWorldChatOptions) {
                 // 按 tool_id 定位：有则更新（status 变化原地替换），无则创建
                 const base = {
                   role: 'tool' as const, tool_id: tId,
-                  tool_name: tu.name, tool_status: tu.status as any,
-                  tool_args: tu.args_summary,
+                  tool_name: tu.name, tool_label: tu.label, tool_status: tu.status as any,
+                  tool_args: tu.args_summary, tool_detail: tu.detail,
                   error: tu.status === 'done' ? !tu.success : false,
                 }
                 setChatMsgs((msgs) => {

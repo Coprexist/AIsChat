@@ -24,12 +24,16 @@ function toolIcon(content: string) {
 /** 工具状态行（DSH 式 GenericCommandCard，2026-08-16 借鉴）：
  * 单行折叠条：图标 + 工具名 + 状态点(running/ok/error) + 摘要；可展开看详情
  */
-function ToolBubble({ label, error, icon, running }: { label: string; error?: boolean; icon: React.ReactNode; running?: boolean }) {
+function ToolBubble({ name, label, detail, error, icon, running }: {
+  name?: string; label: string; detail?: string; error?: boolean; icon: React.ReactNode; running?: boolean
+}) {
   const [expanded, setExpanded] = useState(false)
   const state = error ? 'error' : running ? 'running' : 'ok'
   // 运行中显示 "进行中…" 摘要；完成显示结果摘要（截断）
   const summary = label.length > 60 ? label.slice(0, 60) + '…' : label
-  const multiline = label.includes('\n')
+  // 展开看详情（详情比那一行更全）；没有详情时退化成展开完整摘要
+  const body = detail || label
+  const expandable = !!detail || label.includes('\n')
   return (
     <div
       className={`world-msg max-w-[90%] mx-auto text-[11px] rounded-lg overflow-hidden border ${
@@ -39,8 +43,8 @@ function ToolBubble({ label, error, icon, running }: { label: string; error?: bo
       }`}
     >
       <div
-        className={`flex items-center gap-1.5 px-2 py-1 ${(multiline || expanded) ? 'cursor-pointer' : ''}`}
-        onClick={() => (multiline || expanded) && setExpanded((v) => !v)}
+        className={`flex items-center gap-1.5 px-2 py-1 ${expandable ? 'cursor-pointer' : ''}`}
+        onClick={() => expandable && setExpanded((v) => !v)}
       >
         <span className="shrink-0 flex items-center justify-center w-3.5 h-3.5 rounded-full border border-current/20" style={{ color: state === 'error' ? 'rgb(var(--tw-rose-400))' : 'rgb(var(--tw-mint-400))' }}>
           {running ? <span className="w-1.5 h-1.5 rounded-full bg-current animate-pulse" /> :
@@ -51,17 +55,20 @@ function ToolBubble({ label, error, icon, running }: { label: string; error?: bo
           {icon}
           <span className="font-medium">{running ? '执行中' : error ? '执行失败' : '已完成'}</span>
         </span>
+        {name && (
+          <span className="shrink-0 px-1 rounded bg-current/10 font-medium" title={name}>{name}</span>
+        )}
         <span className="shrink-0 w-px h-2.5 bg-current/20 mx-0.5" aria-hidden />
         <span className="flex-1 min-w-0 truncate" style={{ color: state === 'error' ? 'rgb(var(--tw-rose-400))' : 'rgb(var(--tw-mint-400))' }}>
           {summary}
         </span>
-        {multiline && (
+        {expandable && (
           <ChevronDown size={11} className={`shrink-0 text-current/60 transition-transform ${expanded ? 'rotate-180' : ''}`} />
         )}
       </div>
       {expanded && (
         <div className="px-2 pb-1.5 whitespace-pre-wrap text-current max-h-48 overflow-y-auto border-t border-current/10 pt-1.5" style={{ color: state === 'error' ? 'rgb(var(--tw-rose-400))' : 'rgb(var(--tw-mint-400))' }}>
-          {label}
+          {body}
         </div>
       )}
     </div>
@@ -274,10 +281,11 @@ const WorldChatPanel = memo(forwardRef<WorldChatHandle, WorldChatPanelProps>(({ 
       // 工具状态气泡：running（正在执行 XX）→ update（进度）→ done（完成）
       // 结构化字段走 i18n（tool:toolName.{name} + tool:tool.{status} 模板插值）；旧格式直接显示 content
       let label = m.content
+      // 工具中文名：i18n 词条优先（可本地化），没有词条就用插件自带的 label，再回退原始工具名
+      const nameKey = m.tool_name ? `tool:toolName.${m.tool_name}` : ''
+      const nameLabel = nameKey ? t(nameKey) : ''
+      const toolName = nameLabel && nameLabel !== nameKey ? nameLabel : (m.tool_label || m.tool_name || '')
       if (m.tool_name) {
-        const nameKey = `tool:toolName.${m.tool_name}`
-        const nameLabel = t(nameKey)
-        const toolName = nameLabel !== nameKey ? nameLabel : m.tool_name
         if (m.tool_status === 'running') {
           label = t('tool:tool.running', { name: `${toolName}${m.tool_args ? `：${m.tool_args}` : ''}` })
         } else if (m.tool_status === 'update') {
@@ -289,7 +297,10 @@ const WorldChatPanel = memo(forwardRef<WorldChatHandle, WorldChatPanelProps>(({ 
       return (
         <ToolBubble
           key={m.id}
+          // 完成态才单独挂工具名（运行/进度态的文案里已含名字，避免重复）
+          name={m.tool_status === 'running' || m.tool_status === 'update' ? '' : toolName}
           label={label}
+          detail={m.tool_detail}
           error={m.error ?? m.is_error}
           running={m.tool_status === 'running' || m.tool_status === 'update'}
           icon={toolIcon(m.content)}
