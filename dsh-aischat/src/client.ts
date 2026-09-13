@@ -28,6 +28,21 @@ const { useEffect, useState, useRef, useCallback, useMemo } = React
 // AIsChat。
 const { MarkdownText, IconNewChatOutline16 } = require('@deepseek-ai/dsh-client-ui-primitives')
 
+/**
+ * MarkdownText 的代码块 / 脚注文案。
+ *
+ * 外壳的 MarkdownText 强制要求这个 labels 包：渲染围栏代码块时会直接读
+ * labels.code.copyLabel，整包缺失就在渲染期抛 TypeError。异常发生在
+ * shell.overlay 槽内，会被外壳的错误边界整块摘掉——表现出来就是
+ * 「点开某个含代码块的会话，AIsChat 界面直接消失」。
+ * 外壳自己的对话页从 locale seat 生成同一份文案（markdownLabels(t)）；
+ * 客户端插件没有这个 seat，这里给等价文案。
+ */
+const MARKDOWN_LABELS = {
+  code: { copyLabel: '复制', copiedLabel: '已复制' },
+  footnotes: '脚注',
+}
+
 /** Plugin identity. */
 const PLUGIN_ID = 'dsh-aischat'
 
@@ -775,6 +790,25 @@ function DmSettings({ active }) {
   )
 }
 
+/**
+ * 单条消息的渲染兜底。
+ *
+ * 正文走外壳的 MarkdownText，它的渲染异常会一路冒到 shell.overlay 的错误边界，
+ * 结果是整块 AIsChat 面板被摘掉（而不是只有这一条消息显示不出来）。
+ * 这里按条兜住：失败就降级成纯文本，面板其余部分照常可用。
+ */
+class MessageBoundary extends React.Component {
+  constructor(props) { super(props); this.state = { failed: false } }
+  static getDerivedStateFromError() { return { failed: true } }
+  componentDidCatch(error) { console.warn('[aischat] 消息渲染失败，已降级为纯文本', error) }
+  render() {
+    if (this.state.failed) {
+      return h('div', { style: { ...style.msgOtherBubble, whiteSpace: 'pre-wrap' } }, String(this.props.text || ''))
+    }
+    return this.props.children
+  }
+}
+
 function MsgList({ messages, user }) {
   const listRef = useRef(null)
   // 对话默认到底：消息列表变化（切换对话/新消息/加载历史）时滚到底部
@@ -803,7 +837,7 @@ function MsgList({ messages, user }) {
       } else {
         if (hasText) {
           body = h('div', { style: mine ? style.msgMineBubble : style.msgOtherBubble },
-            h(MarkdownText, { text: mdText(m.content) }),
+            h(MarkdownText, { text: mdText(m.content), labels: MARKDOWN_LABELS }),
           )
         }
         if (images.length > 0) {
@@ -827,7 +861,7 @@ function MsgList({ messages, user }) {
         !mine && avatarSrc ? h('img', { src: avatarSrc, style: { ...style.avatar, width: 26, height: 26 }, alt: '' }) : null,
         h('div', { style: { ...style.msgCol, ...(mine ? style.msgColMine : {}) } },
           h('div', { style: style.msgMeta }, name + (m.created_at ? ' · ' + fmtTime(m.created_at) : '')),
-          body,
+          h(MessageBoundary, { text: m.content }, body),
         ),
       )
     }),

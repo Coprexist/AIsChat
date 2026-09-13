@@ -5,6 +5,10 @@ var module = { exports: {} }; var exports = module.exports;
 var React = require("react");
 var { useEffect, useState, useRef, useCallback, useMemo } = React;
 var { MarkdownText, IconNewChatOutline16 } = require("@deepseek-ai/dsh-client-ui-primitives");
+var MARKDOWN_LABELS = {
+  code: { copyLabel: "\u590D\u5236", copiedLabel: "\u5DF2\u590D\u5236" },
+  footnotes: "\u811A\u6CE8"
+};
 var API = "/aischat-api";
 var WS_BASE = "/aischat-ws";
 var PLUGIN_API = "/aischat-plugin";
@@ -680,6 +684,24 @@ function DmSettings({ active }) {
     )
   );
 }
+var MessageBoundary = class extends React.Component {
+  constructor(props) {
+    super(props);
+    this.state = { failed: false };
+  }
+  static getDerivedStateFromError() {
+    return { failed: true };
+  }
+  componentDidCatch(error) {
+    console.warn("[aischat] \u6D88\u606F\u6E32\u67D3\u5931\u8D25\uFF0C\u5DF2\u964D\u7EA7\u4E3A\u7EAF\u6587\u672C", error);
+  }
+  render() {
+    if (this.state.failed) {
+      return h("div", { style: { ...style.msgOtherBubble, whiteSpace: "pre-wrap" } }, String(this.props.text || ""));
+    }
+    return this.props.children;
+  }
+};
 function MsgList({ messages, user }) {
   const listRef = useRef(null);
   useEffect(() => {
@@ -707,7 +729,7 @@ function MsgList({ messages, user }) {
           body = h(
             "div",
             { style: mine ? style.msgMineBubble : style.msgOtherBubble },
-            h(MarkdownText, { text: mdText(m.content) })
+            h(MarkdownText, { text: mdText(m.content), labels: MARKDOWN_LABELS })
           );
         }
         if (images.length > 0) {
@@ -733,7 +755,7 @@ function MsgList({ messages, user }) {
           "div",
           { style: { ...style.msgCol, ...mine ? style.msgColMine : {} } },
           h("div", { style: style.msgMeta }, name + (m.created_at ? " \xB7 " + fmtTime(m.created_at) : "")),
-          body
+          h(MessageBoundary, { text: m.content }, body)
         )
       );
     })
