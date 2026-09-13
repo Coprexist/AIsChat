@@ -81,7 +81,7 @@ GET /worlds/{id}/chat/stream?turn_id= ──订阅直播（30s 心跳；断开�
 | `POST /worlds/{id}/run`（端点） | **py 沙箱（2.1 MVP）**：subprocess + rlimit（有人在线 128MB / 无人后台 24MB）+ 超时 killpg 强杀 + env 白名单（不泄漏 DATABASE_URL/JWT 等）；配额 worlds.config 可配；生产加固后置（seccomp/Landlock） |
 | `POST /worlds/{id}/trigger` + 工具 `run_world_code` | **触发文件（2.2）**：世界 `main.py` 实现 `handle(event)`（可 async），平台 harness 导入调用（世界代码零框架依赖）；世界 AI 可自测代码（code 脚本 / event 触发模式） |
 
-**温和去重**（`_execute_world_tool` 包装）：
+**温和去重**（`execute_world_tool` 包装）：
 - 同工具同参数、**5 分钟内**重复且**结果完全一致** → 提示「⏭ 已跳过…」不硬拦
 - 结果变化（如写完文件后 list 看到新文件=验证场景）→ 正常执行
 - 超过 5 分钟（用户可能改了文件）→ 允许重跑
@@ -204,7 +204,7 @@ window.WorldUI = {              // UI 桥（postMessage → 宿主 Layout）
 - 测试（临时世界 20，已删）：常驻进程启动✅、tick 2s 推演推送✅、群消息→handle→状态 SSE 实时✅、sleep 优雅停止 code=0✅
 
 **2.3+2.4 详情**（2026-08-05）：
-- 数据面：GET /world/{id}/api/{world,chat,memories,usage,groups} + POST /api/memories（复用 get_chat_history / world_tools._do_execute 同一份逻辑）
+- 数据面：GET /world/{id}/api/{world,chat,memories,usage,groups} + POST /api/memories（复用 get_chat_history / app.tools.world.run_world_tool 同一份逻辑）
 - 群聊写面：GET /api/group/{messages,members} + POST /api/group/{messages,roles,kick}（身份=世界自身，底层借世界主人权限并做群角色检查；作用域=仅绑定群 _check_bound_group；写操作独立限流）
 - 鉴权：Authorization: Bearer <WORLD_API_TOKEN> 或 X-World-Token；secrets.compare_digest 常量时间比较
 - 活跃埋点：对话/设计页端点 record_world_activity（worlds.py），动态限流按活跃人数加成

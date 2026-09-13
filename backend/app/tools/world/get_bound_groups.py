@@ -3,6 +3,7 @@
 查本世界绑定了哪些群聊（返回群名/成员数/是否暂停）。用于了解本世界的群聊入口。
 """
 from app.tools.world.base import WorldToolPlugin, WorldToolContext
+from app.tools.world.shared import bound_group_ids
 from app.chat.gm import get_group as _get_group
 from sqlalchemy import func as _func
 from sqlalchemy import select

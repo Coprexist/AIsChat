@@ -822,14 +822,8 @@ async def _execute_tool_round(
                 world_repo, world, acc["name"], acc["arguments"], turn_state,
                 on_progress=_on_progress,
             )
-        except TypeError:
-            # 兼容：工具签名未支持 on_progress
-            try:
-                result = await execute_world_tool(world_repo, world, acc["name"], acc["arguments"], turn_state)
-            except Exception as e2:
-                logger.warning(f"🌐 世界 #{world_id} 工具 {acc['name']} 执行失败: {e2}")
-                result = {"success": False, "error": str(e2)[:500]}
         except Exception as e:
+            # 工具/技能自己抛异常：如实回传错误，交给 AI 决定下一步（别重试——副作用可能已发生）
             logger.warning(f"🌐 世界 #{world_id} 工具 {acc['name']} 执行失败: {e}")
             result = {"success": False, "error": str(e)[:500]}
         summary = tool_result_summary(acc["name"], result)

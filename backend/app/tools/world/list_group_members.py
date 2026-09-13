@@ -3,6 +3,7 @@
 列出群聊成员（谁是谁 + 角色：owner/admin/member + 在线状态）。默认操作本世界绑定的群。
 """
 from app.tools.world.base import WorldToolPlugin, WorldToolContext
+from app.tools.world.shared import resolve_group_ids
 from app.chat.gm import get_group_members as _get_group_members
 from sqlalchemy import select
 

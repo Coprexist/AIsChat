@@ -3,6 +3,7 @@
 读取群聊的最近消息（含发送者名字），了解群里最近聊了什么。默认操作本世界绑定的群，不需要传群 id。
 """
 from app.tools.world.base import WorldToolPlugin, WorldToolContext
+from app.tools.world.shared import resolve_group_ids
 from app.chat.gm import get_gm_messages
 from sqlalchemy import select
 

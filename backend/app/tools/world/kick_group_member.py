@@ -3,6 +3,7 @@
 把某成员移出群聊。仅群主/管理员可操作。默认操作本世界绑定的群。
 """
 from app.tools.world.base import WorldToolPlugin, WorldToolContext
+from app.tools.world.shared import resolve_group_ids
 from app.chat.gm import remove_member as _remove_member
 
 

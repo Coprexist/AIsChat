@@ -182,6 +182,14 @@
 - 兼容性：工具定义与原来**逐字一致**，唯一差异是 `required` 为空时显式给出 `[]`（与群 AI 侧
   `ToolPlugin.to_definition()` 对齐）；旧入口 `app.services.world.world_tools._do_execute` 等
   已删除，13 处调用点切到 `run_world_tool` / `execute_world_tool` / `tool_result_summary`
+- 收尾审计抓到三类"机械拆分后遗症"，全部已修：
+  1. 7 个工具漏了 `shared` 的 import（读群消息 / 发群消息 / 群成员 / 改角色 / 移出 / 查绑定群 / 下载文件）
+     ——一调用就 `NameError`，注册与测试都发现不了
+  2. `send_group_message` 的 import 用了别名，函数体却按原名调用
+  3. 工具循环里那条"工具签名未支持 on_progress"的 `except TypeError` 兼容分支已成死代码，
+     且会在工具内部抛 `TypeError` 时把工具**再执行一遍**（副作用翻倍）——删除，异常如实回传
+- 新增 `tests/test_world_tool_plugins.py`：标准库 `symtable` 作用域分析，把"引用了但没定义的名字"
+  挡在 CI（这类错误只在真正调用时炸；社区作者手写插件同样受益），并断言每个工具文件都注册出同名插件
 
 #### 群视界设计页的对话栏被挤成一条缝（保底值 + 上限算错 + 压缩值被写回存储）
 - 现象：设计页对话栏常年 200px 上下，输入提示与建议卡换行成一列

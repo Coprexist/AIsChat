@@ -5,7 +5,8 @@
 import logging
 
 from app.tools.world.base import WorldToolPlugin, WorldToolContext
-from app.chat.gm import send_gm_message as _send_gm_message
+from app.tools.world.shared import resolve_group_ids
+from app.chat.gm import send_gm_message
 
 
 logger = logging.getLogger(__name__)

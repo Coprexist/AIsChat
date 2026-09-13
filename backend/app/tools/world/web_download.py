@@ -3,6 +3,7 @@
 下载网络文件（网页 HTML / CSS / JS / 图片等）保存到世界文件夹。
 """
 from app.tools.world.base import WorldToolPlugin, WorldToolContext
+from app.tools.world.shared import web_download
 
 
 class WebDownloadTool(WorldToolPlugin):
