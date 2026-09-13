@@ -9,6 +9,21 @@
 
 ### ✨ 新增功能
 
+#### 新增 lockfile 本地依赖路径修复工具，并记录 DSH_HOME 符号链接的两个坑
+- `dsh-aischat/scripts/fix-profile-links.mjs`：DSH_HOME 为符号链接时，pnpm 写 lockfile
+  按符号链接路径算相对路径、解析却按真实路径算，`file:` 依赖会指向不存在的
+  `/data_s001/tmp/...`。工具按 bug 模型精确重算两边形式并替换，**幂等**、
+  带 `--dry-run`、自动备份。真机四步验证：真实 profile 报 0 改动；造出次品能修回且与
+  线上逐字节一致；连续两次运行都 0 改动；dry-run 不写盘
+- 开发过程中自测抓到一个危险 bug：4 层的错误形式恰好是 5 层正确形式的**子串**，
+  用 `split/join` 会在已正确的文件上"匹配 4 处"并每跑一次多加一层。改为带边界的整词匹配
+- 文档 `docs/DSH接入指南.md` 新增 §8.1：两类故障（`ERR_PNPM_UNEXPECTED_STORE`、
+  lockfile 少一层）的成因与修法，并写明**为什么不动符号链接**——改 `DSH_HOME` 会让
+  DSH 持久化的 `session_projcache` 路径失配；换 bind mount 则要处理挂载顺序，
+  且失败时会静默启动到空目录，比悬空软链更危险
+- 手工 `sed` 修 lockfile 容易漏：同一路径出现三次（`version: file:`、`name@file:` 键、
+  `resolution: {directory:}`），漏掉最后一处 pnpm 照样报错——这也记进了文档
+
 #### 修 dsh-aischat 打包遗漏 dist，并给自更新加装完整性检测
 - **打包 bug**：`package.json` 的 `files` 只有 `["lib","cordis.patch.yml","README.md"]`，
   漏了 `dist`。文档教的"手动拷 lib 与 dist 到 profile"一直掩盖着它；这次走正规
