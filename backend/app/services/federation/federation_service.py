@@ -23,6 +23,7 @@ from urllib.parse import urlparse
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, delete, and_
 
+from app.database import async_session
 from app.utils.crypto import encrypt_api_key, decrypt_api_key
 from app.config import settings
 from app.models.federation import InstanceConfig, FederationPeer, FederatedEntity, PendingProfileUpdate
@@ -37,6 +38,69 @@ def _ensure_repo(db_or_repo):
     if isinstance(db_or_repo, AsyncSession):
         return SQLAlchemyFederationRepository(db_or_repo)
     return db_or_repo
+
+
+# ── 出站 HTTP 与联邦头像同步（统一入口，manager 与 ws 路由共用） ──
+
+def peer_http_base(remote_url: str) -> str:
+    """对端 WebSocket 地址 → HTTP 基地址（wss://host/federation/ws → https://host）"""
+    base = remote_url.replace("wss://", "https://").replace("ws://", "http://")
+    return base.replace("/federation/ws", "")
+
+
+def peer_http_client() -> httpx.AsyncClient:
+    """联邦出站 HTTP 客户端 — TLS 校验策略的唯一来源。
+
+    默认校验证书；对端使用自签证书时用 FEDERATION_CA_BUNDLE 指定 CA，
+    而不是全局 verify=False 把中间人风险平摊给所有对端。
+    """
+    return httpx.AsyncClient(
+        verify=settings.federation_ca_bundle or settings.federation_tls_verify,
+        timeout=15,
+    )
+
+
+async def download_peer_avatar(remote_url: str, avatar_url: str, entity_type: str, local_id: int) -> str | None:
+    """从对端下载头像文件到本地，返回本地路径；参数不全或下载失败返回 None。"""
+    if not avatar_url or not avatar_url.startswith("/") or not remote_url:
+        return None
+    download_url = f"{peer_http_base(remote_url)}{avatar_url}"
+    try:
+        async with peer_http_client() as client:
+            resp = await client.get(download_url)
+        if resp.status_code != 200:
+            logger.warning(f"🖼️ 下载联邦头像失败（HTTP {resp.status_code}）: {download_url}")
+            return None
+        ext = os.path.splitext(avatar_url)[1] or ".png"
+        fname = f"{entity_type}_{local_id}_{uuid.uuid4().hex[:8]}{ext}"
+        os.makedirs(settings.avatars_dir, exist_ok=True)
+        with open(os.path.join(settings.avatars_dir, fname), "wb") as f:
+            f.write(resp.content)
+        logger.info(f"🖼️ 下载联邦头像: {download_url} → {fname}")
+        return f"/api/fs/download-avatar/{fname}"
+    except Exception as e:
+        logger.warning(f"🖼️ 下载联邦头像失败: {e}")
+        return None
+
+
+async def sync_peer_avatar(remote_url: str, avatar_url: str, entity_type: str, local_id: int) -> str | None:
+    """下载对端头像 → 落库 → 推送前端（返回本地路径；失败 None）。"""
+    local_path = await download_peer_avatar(remote_url, avatar_url, entity_type, local_id)
+    if not local_path:
+        return None
+    from sqlalchemy import text
+    async with async_session() as db:
+        if entity_type == "user":
+            await db.execute(text("UPDATE users SET avatar_url = :v WHERE id = :i"), {"v": local_path, "i": local_id})
+        elif entity_type == "agent":
+            await db.execute(text("UPDATE agents SET avatar_url = :v WHERE id = :i"), {"v": local_path, "i": local_id})
+        await db.commit()
+    try:
+        from app.routers.ws import manager as ws_manager
+        await ws_manager.broadcast_avatar_updated(entity_type, local_id, local_path)
+    except Exception:
+        logger.warning("🖼️ 联邦头像更新推送失败（前端稍后自然刷新）", exc_info=True)
+    return local_path
 
 
 # ── 错误码（结构化，前端可据此处理 UI 状态） ──

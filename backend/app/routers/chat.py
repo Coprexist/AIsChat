@@ -3,7 +3,7 @@
 
 群聊消息见 routers/gm.py，私信见 routers/dm.py，群管理见 routers/groups.py。
 """
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, status
 from pydantic import BaseModel
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -17,31 +17,27 @@ router = APIRouter(prefix="/chat", tags=["chat"])
 @router.get("/user/{user_id}")
 async def get_user_info(
     user_id: int,
+    current_user: dict = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
-    """获取用户信息"""
-    try:
-        user = await chat_api.get_user_info(db, user_id)
-        if not user:
-            raise HTTPException(status_code=404, detail="User not found")
-        return user
-    except HTTPException:
-        raise
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+    """获取用户信息（需登录）：只回展示用字段，避免 user_id 枚举拖用户表"""
+    user = await chat_api.get_user_info(db, user_id)
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+    return user
 
 
 @router.get("/user/{user_id}/friends")
 async def get_friend_list(
     user_id: int,
+    current_user: dict = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
-    """获取好友列表"""
-    try:
-        friends = await chat_api.get_friend_list(db, user_id)
-        return {"friends": friends}
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+    """获取好友列表（仅本人）"""
+    if user_id != current_user["user_id"]:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="只能查看自己的好友列表")
+    friends = await chat_api.get_friend_list(db, user_id)
+    return {"friends": friends}
 
 
 class FriendRequestSend(BaseModel):

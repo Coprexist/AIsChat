@@ -35,6 +35,8 @@ from app.services.federation.federation_service import (
     enqueue_profile_update,
     list_peers,
     register_federated_entity,
+    download_peer_avatar,
+    sync_peer_avatar,
 )
 
 from app.repositories.federation_repo import FederationRepository, SQLAlchemyFederationRepository
@@ -105,27 +107,10 @@ async def _apply_avatar_update(db, entity_type: str, local_ref_id: str, new_valu
     except (ValueError, TypeError):
         return
 
+    # 相对路径 → 从对端把文件抓到本地；抓不到就退回远端相对路径（由对端 URL 兜底）
     local_path = new_value
-    # 如果是相对路径，尝试从远端下载头像文件
-    if new_value and new_value.startswith("/") and peer and peer.remote_url:
-        try:
-            base = peer.remote_url.replace("wss://", "https://").replace("ws://", "http://")
-            base = base.replace("/federation/ws", "")
-            download_url = f"{base}{new_value}"
-            import httpx
-            async with httpx.AsyncClient(verify=False, timeout=15) as client:
-                resp = await client.get(download_url)
-                if resp.status_code == 200:
-                    import os, uuid
-                    fname = f"user_{rid}_{uuid.uuid4().hex[:8]}.png"
-                    os.makedirs("/app/uploads/avatars", exist_ok=True)
-                    fpath = os.path.join("/app/uploads/avatars", fname)
-                    with open(fpath, "wb") as f:
-                        f.write(resp.content)
-                    local_path = f"/api/fs/download-avatar/{fname}"
-                    logger.info(f"🖼️ 下载远端头像: {download_url} → {fname}")
-        except Exception as e:
-            logger.warning(f"🖼️ 下载远端头像失败: {e}")
+    if peer and peer.remote_url:
+        local_path = await download_peer_avatar(peer.remote_url, new_value, entity_type, rid) or new_value
 
     if entity_type == "user":
         await db.execute(text("UPDATE users SET avatar_url = :v WHERE id = :i"), {"v": local_path, "i": rid})
@@ -135,40 +120,9 @@ async def _apply_avatar_update(db, entity_type: str, local_ref_id: str, new_valu
 
 async def _download_federated_avatar(avatar_url: str, entity_type: str, local_id: int, peer) -> None:
     """后台下载联邦头像（fire-and-forget，供 asyncio.create_task 调用）"""
-    if not avatar_url or not avatar_url.startswith("/") or not peer or not peer.remote_url:
+    if not peer or not peer.remote_url:
         return
-    import os, uuid
-    try:
-        base = peer.remote_url.replace("wss://", "https://").replace("ws://", "http://")
-        base = base.replace("/federation/ws", "")
-        download_url = f"{base}{avatar_url}"
-        import httpx
-        async with httpx.AsyncClient(verify=False, timeout=15) as client:
-            resp = await client.get(download_url)
-            if resp.status_code == 200:
-                ext = os.path.splitext(avatar_url)[1] or ".png"
-                fname = f"{entity_type}_{local_id}_{uuid.uuid4().hex[:8]}{ext}"
-                os.makedirs("/app/uploads/avatars", exist_ok=True)
-                fpath = os.path.join("/app/uploads/avatars", fname)
-                with open(fpath, "wb") as f:
-                    f.write(resp.content)
-                local_path = f"/api/fs/download-avatar/{fname}"
-                from sqlalchemy import text
-                async with async_session() as _db:
-                    if entity_type == "user":
-                        await _db.execute(text("UPDATE users SET avatar_url = :v WHERE id = :i"), {"v": local_path, "i": local_id})
-                    elif entity_type == "agent":
-                        await _db.execute(text("UPDATE agents SET avatar_url = :v WHERE id = :i"), {"v": local_path, "i": local_id})
-                    await _db.commit()
-                logger.info(f"🖼️ 下载联邦头像: {download_url} → {fname}")
-                # 推送头像更新通知
-                try:
-                    from app.routers.ws import manager as ws_manager
-                    await ws_manager.broadcast_avatar_updated(entity_type, local_id, local_path)
-                except Exception:
-                    pass
-    except Exception as e:
-        logger.warning(f"🖼️ 下载联邦头像失败: {e}")
+    await sync_peer_avatar(peer.remote_url, avatar_url, entity_type, local_id)
 
 
 class FederationManager:

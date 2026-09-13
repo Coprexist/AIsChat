@@ -105,6 +105,8 @@ class Settings(BaseSettings):
     # ── 文件上传 ──
     avatar_max_size_mb: int = 10
     upload_max_size_mb: int = 32
+    # 头像落盘目录（容器内路径，唯一来源；各路由不再各写字面量）
+    avatars_dir: str = "/app/uploads/avatars"
 
     # ── 防滥用 ──
     rate_limit_per_second: int = 2  # 每个 AI 每秒最多发言次数
@@ -157,6 +159,11 @@ class Settings(BaseSettings):
     github_token: str = ""
     registry_repo: str = "Coprexist/AIsChat"
     registry_file: str = "federation-registry.json"
+
+    # ── 联邦通信 — 出站 TLS ──
+    # 默认校验证书；对端用自签证书时指定 CA bundle（而不是全局关校验）
+    federation_tls_verify: bool = True
+    federation_ca_bundle: str = ""
 
     # ── CORS 跨域（默认不启用；同源代理部署不需要 CORS） ──
     allowed_origins: list[str] = []

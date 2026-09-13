@@ -6,6 +6,7 @@ from fastapi import APIRouter, Depends, HTTPException, status, Query, UploadFile
 from fastapi.responses import Response
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
+from app.config import settings
 from app.database import get_db
 from app.schemas.group import (
     GroupCreateRequest, GroupInviteRequest, GroupResponse,
@@ -39,6 +40,7 @@ from app.repositories.invitation_repo import InvitationRepository
 from app.repositories.export_repo import ExportRepository
 from app.routers.deps import get_invitation_repo
 from app.routers.deps import get_export_repo
+from app.routers.deps import require_group_member
 
 router = APIRouter(tags=["群聊"])
 
@@ -165,10 +167,10 @@ async def pin_group(
 @router.get("/groups/{group_id}", response_model=GroupResponse)
 async def get_group_detail(
     group_id: int,
-    current_user: dict = Depends(get_current_user),
+    current_user: dict = Depends(require_group_member),
     db: AsyncSession = Depends(get_db),
 ):
-    """获取群聊详情"""
+    """获取群聊详情（仅群成员）"""
     group = await get_group(db, group_id)
     if group is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="群聊不存在")
@@ -235,10 +237,10 @@ async def invite_member(
 @router.get("/groups/{group_id}/members")
 async def list_members(
     group_id: int,
-    current_user: dict = Depends(get_current_user),
+    current_user: dict = Depends(require_group_member),
     db: AsyncSession = Depends(get_db),
 ):
-    """获取群成员列表（含名称和在线状态，用于 @提及自动补全）"""
+    """获取群成员列表（含名称和在线状态，用于 @提及自动补全；仅群成员）"""
     from app.models.user import User
     from app.models.agent import Agent as AgentModel
     members = await get_group_members(db, group_id)
@@ -412,7 +414,7 @@ async def upload_group_avatar(
 
     import os
     import uuid
-    upload_dir = "/app/uploads/avatars/"
+    upload_dir = settings.avatars_dir
     os.makedirs(upload_dir, exist_ok=True)
 
     # 删除旧文件

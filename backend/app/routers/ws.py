@@ -16,7 +16,7 @@ from app.utils.auth import decode_access_token
 from app.utils.error_handler import build_ws_error, log_error
 from app.chat.connection import ConnectionManager
 from app.chat import chat_api
-from app.chat.gm import send_gm_message, gm_message_to_dict
+from app.chat.gm import send_gm_message, gm_message_to_dict, is_group_member
 from app.chat.delivery import store_pending_message
 
 logger = logging.getLogger(__name__)
@@ -114,6 +114,11 @@ async def websocket_endpoint(ws: WebSocket, token: str = Query(...)):
                     manager.disconnect_dm(current_session_id, user_id)
 
                 if conversation_type == "group":
+                    # 群订阅：校验成员身份（与 DM 分支同口径，防止越权订阅任意群直播）
+                    async with async_session() as verify_db:
+                        if not await is_group_member(verify_db, group_id, "human", user_id):
+                            await ws.send_json(build_ws_error("FORBIDDEN", "你不是该群成员"))
+                            continue
                     await manager.connect(ws, group_id, user_id)
                     current_group_id = group_id
                     await ws.send_json({

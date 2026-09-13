@@ -7,8 +7,6 @@
 import asyncio
 import json
 import logging
-import os
-import uuid
 from fastapi import APIRouter, WebSocket, WebSocketDisconnect, Depends
 from sqlalchemy.ext.asyncio import AsyncSession
 from app.database import async_session, get_db
@@ -21,6 +19,7 @@ from app.services.federation.federation_service import (
     get_instance_info,
     get_federated_entity_by_fid,
     persist_remote_dm_message,
+    sync_peer_avatar,
 )
 
 logger = logging.getLogger(__name__)
@@ -255,42 +254,9 @@ async def _handle_forwarded_message(from_public_id: str, data: dict) -> None:
 
     # 从发送端下载头像到本地，返回本地路径（避免浏览器跨域/证书问题）
     async def _download_remote_avatar(avatar_url: str, entity_type: str, local_id: int, peer) -> str:
-        if not avatar_url or not avatar_url.startswith("/") or not peer or not peer.remote_url:
+        if not peer or not peer.remote_url:
             return avatar_url
-        try:
-            base = peer.remote_url.replace("wss://", "https://").replace("ws://", "http://")
-            base = base.replace("/federation/ws", "")
-            download_url = f"{base}{avatar_url}"
-            import httpx
-            async with httpx.AsyncClient(verify=False, timeout=15) as client:
-                resp = await client.get(download_url)
-                if resp.status_code == 200:
-                    ext = os.path.splitext(avatar_url)[1] or ".png"
-                    fname = f"{entity_type}_{local_id}_{uuid.uuid4().hex[:8]}{ext}"
-                    os.makedirs("/app/uploads/avatars", exist_ok=True)
-                    fpath = os.path.join("/app/uploads/avatars", fname)
-                    with open(fpath, "wb") as f:
-                        f.write(resp.content)
-                    local_path = f"/api/fs/download-avatar/{fname}"
-                    # 更新本地实体表
-                    from sqlalchemy import text
-                    async with async_session() as _db:
-                        if entity_type == "user":
-                            await _db.execute(text("UPDATE users SET avatar_url = :v WHERE id = :i"), {"v": local_path, "i": local_id})
-                        elif entity_type == "agent":
-                            await _db.execute(text("UPDATE agents SET avatar_url = :v WHERE id = :i"), {"v": local_path, "i": local_id})
-                        await _db.commit()
-                    logger.info(f"Downloaded federated avatar: {download_url} -> {fname}")
-                    # 推送头像更新通知，前端收到后更新已渲染消息中的头像 URL
-                    try:
-                        from app.routers.ws import manager as ws_manager
-                        await ws_manager.broadcast_avatar_updated(entity_type, local_id, local_path)
-                    except Exception:
-                        pass
-                    return local_path
-        except Exception as e:
-            logger.warning(f"Failed to download federated avatar: {e}")
-        return avatar_url
+        return await sync_peer_avatar(peer.remote_url, avatar_url, entity_type, local_id) or avatar_url
 
     if conversation_type == "group":
         group_id = data.get("group_id")

@@ -1782,22 +1782,16 @@ async def reset_email_templates(
 
 @router.post("/cleanup/files")
 async def cleanup_files(
-    current_user: dict = Depends(get_current_user),
+    admin: dict = Depends(require_admin),
     db: AsyncSession = Depends(get_db),
 ):
     """扫描并清理：1) 已无引用的头像文件  2) 物理文件已丢失的 metadata 记录"""
-    # 检查管理员权限：current_user 来自 get_current_user，需独立查库确认角色
-    from app.models.user import User as UserCheck
-    r = await db.execute(select(UserCheck).where(UserCheck.id == current_user["user_id"]))
-    admin_user = r.scalar_one()
-    if not admin_user or admin_user.role != "admin":
-        raise HTTPException(403, "仅管理员可操作")
 
     from app.models.file import FileMetadata as FMD, FileReference as FR, FileCollaborator as FC
     from app.models.system_settings import SystemSettings as SS
     from app.services.content.file_service import _get_physical_path
 
-    avatar_dir = "/app/uploads/avatars"
+    avatar_dir = settings.avatars_dir
     cleaned_files = 0
     cleaned_refs = 0
     orphan_cleaned = 0
@@ -1858,15 +1852,10 @@ async def cleanup_files(
 
 @router.get("/cleanup/stats")
 async def get_cleanup_stats(
-    current_user: dict = Depends(get_current_user),
+    admin: dict = Depends(require_admin),
     db: AsyncSession = Depends(get_db),
 ):
     """获取上次清理统计"""
-    from app.models.user import User as UserCheck
-    r = await db.execute(select(UserCheck).where(UserCheck.id == current_user["user_id"]))
-    admin_user = r.scalar_one()
-    if not admin_user or admin_user.role != "admin":
-        raise HTTPException(403, "仅管理员可操作")
     from app.models.system_settings import SystemSettings as SS
     r = await db.execute(select(SS).where(SS.id == 1))
     row = r.scalar_one_or_none()
@@ -2819,6 +2808,7 @@ async def admin_get_tools(
 
 @router.get("/tools/backpack")
 async def get_skill_backpack(
+    admin: dict = Depends(require_admin),
     agent_id: int | None = None,
     db: AsyncSession = Depends(get_db),
 ):
@@ -3257,38 +3247,21 @@ async def add_preset(body: MaintenancePresetBody, admin: dict = Depends(require_
 
 
 # 维护图片库（独立于预设）
-_IMG_FILE = os.path.join(settings.data_dir, "maintenance_images.json")
-
-def _load_images() -> list[str]:
-    try:
-        if os.path.exists(_IMG_FILE):
-            with open(_IMG_FILE) as f: return json.loads(f.read())
-    except: pass
-    return []
-
-
 @router.get("/maintenance/images")
 async def list_images(admin: dict = Depends(require_admin)):
-    return {"images": _load_images()}
+    return {"images": maintenance.list_images()}
 
 
 @router.post("/maintenance/images")
 async def add_image(admin: dict = Depends(require_admin), url: str = ""):
     if not url: raise HTTPException(400, "缺少 url")
-    imgs = _load_images()
-    if url not in imgs:
-        imgs.insert(0, url)
-    with open(_IMG_FILE, "w") as f: f.write(json.dumps(imgs, ensure_ascii=False))
-    return {"ok": True, "images": imgs}
+    return {"ok": True, "images": maintenance.add_image(url)}
 
 
 @router.delete("/maintenance/images")
 async def del_image(admin: dict = Depends(require_admin), url: str = ""):
     if not url: raise HTTPException(400, "缺少 url")
-    imgs = _load_images()
-    new_list = [i for i in imgs if i != url]
-    with open(_IMG_FILE, "w") as f: f.write(json.dumps(new_list, ensure_ascii=False))
-    return {"ok": True, "images": new_list}
+    return {"ok": True, "images": maintenance.remove_image(url)}
 
 
 @router.post("/plugins/browser/test")

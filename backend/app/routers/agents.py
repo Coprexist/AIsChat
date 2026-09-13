@@ -694,7 +694,7 @@ async def upload_agent_avatar(
     ext = "png" if content[:4] == b'\x89PNG' else "jpg"
 
     # 头像存储目录
-    upload_dir = "/app/uploads/avatars"
+    upload_dir = settings.avatars_dir
     os.makedirs(upload_dir, exist_ok=True)
 
     # 清理旧头像文件

@@ -12,6 +12,7 @@ from app.database import get_db
 from app.models.file import FileMetadata, FileReference, FileCollaborator
 from app.utils.auth import get_current_user
 from app.config import settings
+from app.services.infrastructure.maintenance import maintenance
 from app.services.content.file_service import (
     upload_file, list_files, get_file, get_file_physical_path,
     delete_file, check_file_access, track_file_reference,
@@ -176,15 +177,15 @@ async def serve_avatar(filename: str, thumb: bool = Query(False)):
     from fastapi.responses import FileResponse
     if thumb:
         thumb_name = f"thumb_{filename}"
-        thumb_path = os.path.join("/app/uploads/avatars", thumb_name)
+        thumb_path = os.path.join(settings.avatars_dir, thumb_name)
         if os.path.isfile(thumb_path):
             return FileResponse(thumb_path, headers={"Cache-Control": "public, max-age=604800"})
         # 无缩略图时降级到原图
-        filepath = os.path.join("/app/uploads/avatars", filename)
+        filepath = os.path.join(settings.avatars_dir, filename)
         if os.path.isfile(filepath):
             return FileResponse(filepath, headers={"Cache-Control": "public, max-age=604800"})
         raise HTTPException(status_code=404, detail="头像不存在")
-    filepath = os.path.join("/app/uploads/avatars", filename)
+    filepath = os.path.join(settings.avatars_dir, filename)
     if not os.path.isfile(filepath):
         raise HTTPException(status_code=404, detail="头像不存在")
     return FileResponse(filepath, headers={"Cache-Control": "public, max-age=604800"})
@@ -233,7 +234,15 @@ async def download_file(
 
 @router.get("/public/{file_id}")
 async def download_public_file(file_id: int, db: AsyncSession = Depends(get_db)):
-    """公开下载（无需登录，供维护弹窗等场景）"""
+    """公开下载（无需登录）— 仅限维护弹窗引用的图片，其余一律 403。
+
+    免鉴权是场景决定的：硬维护时用户未登录，弹窗里的 <img> 也带不了 Authorization。
+    因此把「能匿名下载」收敛成维护图片白名单（MaintenanceManager.is_public_file），
+    而不是放开整张 file_metadata 表。
+    """
+    if not maintenance.is_public_file(file_id):
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="该文件不对外公开")
+
     metadata = await get_file(db, file_id)
     if metadata is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="文件不存在")

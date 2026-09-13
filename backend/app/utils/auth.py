@@ -120,20 +120,23 @@ async def get_current_user(
     return {"user_id": int(user_id), "username": username, "role": role}
 
 
+async def load_user_role(db: AsyncSession, user_id: int) -> str | None:
+    """从 DB 读取用户当前角色。
+
+    权限判定的唯一角色来源：JWT 里的 role 是签发时的快照，降权后旧 token 在
+    有效期内仍带 admin，所以凡是以角色为条件的校验都必须走这里。
+    """
+    from app.models.user import User as UserModel
+    result = await db.execute(select(UserModel.role).where(UserModel.id == user_id))
+    return result.scalar_one_or_none()
+
+
 async def require_admin(
     current_user: dict = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ) -> dict:
-    """
-    FastAPI 依赖：要求管理员权限。
-    注意：必须从 DB 重新读取角色，因为 JWT 中的 role 可能是提权前的旧值。
-    """
-    from app.models.user import User as UserModel
-    result = await db.execute(
-        select(UserModel).where(UserModel.id == current_user["user_id"])
-    )
-    db_user = result.scalar_one_or_none()
-    if db_user is None or db_user.role != "admin":
+    """FastAPI 依赖：要求管理员权限（角色以 DB 为准）"""
+    if await load_user_role(db, current_user["user_id"]) != "admin":
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="需要管理员权限",

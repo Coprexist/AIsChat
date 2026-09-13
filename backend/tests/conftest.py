@@ -1,7 +1,8 @@
 """
 pytest 全局配置 — 测试用独立数据库 ai_group_chat_test（不碰生产数据）
 
-- 所有测试通过 TEST_DATABASE_URL 连测试库
+- 连接串**必须由环境变量提供**：真实口令不进仓库（历史版本曾把口令写死在此文件，
+  已进 git 历史，口令没轮换过就等于公开）
 - fixture `test_db`：每个测试独立事务回滚（或建表）
 - 迁移测试需要真实建表：用 alembic upgrade head 到测试库
 """
@@ -14,13 +15,22 @@ import pytest
 BACKEND_DIR = Path(__file__).parent.parent  # backend/
 sys.path.insert(0, str(BACKEND_DIR))
 
-TEST_DATABASE_URL = os.environ.get(
-    "TEST_DATABASE_URL",
-    "postgresql+asyncpg://ai_chat:lmwu0yIBxAiAqAP0pYfeFjMAEe8@localhost:5432/ai_group_chat_test",
-)
-TEST_DATABASE_URL_SYNC = os.environ.get(
-    "TEST_DATABASE_URL_SYNC",
-    "postgresql://ai_chat:lmwu0yIBxAiAqAP0pYfeFjMAEe8@localhost:5432/ai_group_chat_test",
+
+def _require_test_database_url() -> str:
+    """测试库连接串必须显式传入（跑法见 docs/guides/test_strategy.md）。"""
+    url = os.environ.get("TEST_DATABASE_URL", "").strip()
+    if not url:
+        raise RuntimeError(
+            "缺少 TEST_DATABASE_URL：测试会 drop_all + TRUNCATE，必须显式指向测试库；"
+            "跑法见 docs/guides/test_strategy.md"
+        )
+    return url
+
+
+TEST_DATABASE_URL = _require_test_database_url()
+# sync 驱动由 async 连接串推导：少传一个环境变量，也少一处可写错的地方
+TEST_DATABASE_URL_SYNC = (
+    os.environ.get("TEST_DATABASE_URL_SYNC") or TEST_DATABASE_URL.replace("+asyncpg", "")
 )
 
 os.environ["DATABASE_URL"] = TEST_DATABASE_URL

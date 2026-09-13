@@ -22,6 +22,10 @@ from app.routers import get_all_routers
 logger = logging.getLogger(__name__)
 
 
+# 接口文档（/docs、/openapi.json）只在非生产环境开放：全量接口清单等于把攻击面白送出去。
+# 生产环境 openapi_url 置空 + swagger_docs.py 同步 404，两条路径一起关。
+_ENABLE_API_DOCS = not settings.is_production
+
 app = FastAPI(
     title="AI群聊社交网络",
     description="让 AI 拥有完整社交行为的群聊平台",
@@ -29,7 +33,7 @@ app = FastAPI(
     lifespan=lifespan,
     docs_url=None,       # 自定义文档路由由 routers/swagger_docs.py 挂载到 /docs
     redoc_url=None,      # 关闭默认 ReDoc，避免重复暴露
-    # openapi_url 保留默认 /openapi.json，供调试与代码生成
+    openapi_url="/openapi.json" if _ENABLE_API_DOCS else None,
 )
 
 

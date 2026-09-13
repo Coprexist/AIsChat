@@ -17,7 +17,7 @@ from app.repositories.invitation_repo import InvitationRepository, SQLAlchemyInv
 from app.repositories.search_repo import SearchRepository, SQLAlchemySearchRepository
 from app.repositories.export_repo import ExportRepository, SQLAlchemyExportRepository
 from app.repositories.content_repo import ContentRepository, SQLAlchemyContentRepository
-from app.utils.auth import get_current_user
+from app.utils.auth import get_current_user, load_user_role
 from app.services.agent.agent_service import get_agent
 
 
@@ -31,9 +31,25 @@ async def require_agent_access(
     if result.is_err():
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=result.error)
     agent = result.ok
-    if agent.owner_id != current_user["user_id"] and current_user["role"] != "admin":
+    is_admin = await load_user_role(db, current_user["user_id"]) == "admin"
+    if agent.owner_id != current_user["user_id"] and not is_admin:
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="无权访问该 AI")
     return agent
+
+
+async def require_group_member(
+    group_id: int,
+    current_user: dict = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+) -> dict:
+    """依赖注入：要求当前用户是该群成员（读接口防越权）。
+
+    写接口另由 chat.gm.send_gm_message 校验，两边共用 is_group_member 判定。
+    """
+    from app.chat.gm import is_group_member
+    if not await is_group_member(db, group_id, "human", current_user["user_id"]):
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="你不是该群成员")
+    return current_user
 
 
 async def get_user_repo(db: AsyncSession = Depends(get_db)) -> UserRepository:

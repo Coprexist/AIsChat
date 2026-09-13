@@ -289,7 +289,7 @@ async def send_gm_message(
     任意登录用户不能给任意群灌水；allow_non_member=True 供
     世界 AI 给绑定群发消息（群绑定校验在 world_tools 层已有）。
     """
-    if not allow_non_member and not await _is_group_member(db, group_id, sender_type, sender_id):
+    if not allow_non_member and not await is_group_member(db, group_id, sender_type, sender_id):
         raise ValueError("你不是该群成员，无法发送消息")
     message = Message(
         group_id=group_id,
@@ -321,7 +321,7 @@ async def send_gm_message(
     return message
 
 
-async def _is_group_member(db: AsyncSession, group_id: int, sender_type: str, sender_id: int) -> bool:
+async def is_group_member(db: AsyncSession, group_id: int, sender_type: str, sender_id: int) -> bool:
     """发送者是否为群成员（human/ai 两种成员类型）"""
     from app.models.group import GroupMember
     row = (await db.execute(

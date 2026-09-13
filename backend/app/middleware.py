@@ -37,6 +37,13 @@ async def request_logging_middleware(request: Request, call_next):
     response = await call_next(request)
     elapsed_ms = (time.monotonic() - start) * 1000
     response.headers["X-Request-ID"] = request_id
+    # 安全响应头（只加零风险的两项）：
+    #   nosniff   —— 禁止浏览器按内容嗅探类型（上传文件/世界文件防被当脚本执行）
+    #   Referrer-Policy —— 外链（联邦、世界里的第三方资源）不携带完整路径
+    # 刻意不加：X-Frame-Options（世界页面允许被其它实例 iframe 嵌入）、
+    # CSP（世界 HTML 依赖内联脚本，需先做 nonce 体系）、HSTS（后端只见 http，应在 TLS 终结层加）
+    response.headers["X-Content-Type-Options"] = "nosniff"
+    response.headers["Referrer-Policy"] = "no-referrer"
     if request.url.path != "/health":
         logger.info(
             f"[{request_id}] {request.method} {request.url.path} → "

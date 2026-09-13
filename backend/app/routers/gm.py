@@ -14,6 +14,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.chat.gm import get_gm_messages, gm_message_to_dict, send_gm_message
 from app.database import get_db
+from app.routers.deps import require_group_member
 from app.schemas.message import MessageResponse
 from app.utils.auth import get_current_user
 
@@ -26,10 +27,10 @@ async def get_gm_message_list(
     limit: int = Query(20, ge=1, le=200),
     before_id: int | None = Query(None),
     after_id: int | None = Query(None),
-    current_user: dict = Depends(get_current_user),
+    current_user: dict = Depends(require_group_member),
     db: AsyncSession = Depends(get_db),
 ):
-    """获取群聊消息历史（游标分页）"""
+    """获取群聊消息历史（游标分页，仅群成员）"""
     from app.models.user import User
     from app.models.agent import Agent
 

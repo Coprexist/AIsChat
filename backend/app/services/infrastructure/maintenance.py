@@ -17,6 +17,17 @@ from app.config import settings
 
 logger = logging.getLogger(__name__)
 
+# 维护图片 URL 中指向文件表的形态：/fs/public/{file_id}
+_PUBLIC_FILE_PREFIX = "/fs/public/"
+
+
+def parse_public_file_id(url: str) -> int | None:
+    """从 /fs/public/{file_id} 形态的 URL 解析文件编号；不是该形态返回 None"""
+    if _PUBLIC_FILE_PREFIX not in (url or ""):
+        return None
+    tail = url.split(_PUBLIC_FILE_PREFIX, 1)[1].split("/", 1)[0].split("?", 1)[0]
+    return int(tail) if tail.isdigit() else None
+
 _DEFAULT_MSG = {
     "hard_title": "正在更新",
     "hard_body": "服务器正在更新，稍等一下就好~",
@@ -41,6 +52,7 @@ class MaintenanceManager:
         self._hard = os.path.join(self._dir, "maintenance_admin_hard")
         self._msg_file = os.path.join(data_dir or settings.data_dir, "maintenance_msg.json")
         self._legacy_msg = os.path.join(self._dir, "maintenance_msg.json")
+        self._images_file = os.path.join(data_dir or settings.data_dir, "maintenance_images.json")
         self._cache: dict[str, tuple[float, bool]] = {}
         self._migrate_legacy_msg()
 
@@ -139,6 +151,44 @@ class MaintenanceManager:
         Path(settings.data_dir).mkdir(parents=True, exist_ok=True)
         with open(self._msg_file, "w", encoding="utf-8") as f:
             f.write(json.dumps(msg, ensure_ascii=False))
+
+    # ── 维护弹窗图片（唯一允许匿名下载的文件集合） ──
+
+    def list_images(self) -> list[str]:
+        """维护弹窗可选的图片 URL 列表"""
+        try:
+            if os.path.exists(self._images_file):
+                with open(self._images_file, encoding="utf-8") as f:
+                    return json.loads(f.read())
+        except Exception:
+            logger.warning("⚠️ 维护图片列表读取失败，按空列表处理", exc_info=True)
+        return []
+
+    def _save_images(self, images: list[str]) -> None:
+        Path(settings.data_dir).mkdir(parents=True, exist_ok=True)
+        with open(self._images_file, "w", encoding="utf-8") as f:
+            f.write(json.dumps(images, ensure_ascii=False))
+
+    def add_image(self, url: str) -> list[str]:
+        """新增图片 URL（去重，最新在前）"""
+        images = [u for u in self.list_images() if u != url]
+        images.insert(0, url)
+        self._save_images(images)
+        return images
+
+    def remove_image(self, url: str) -> list[str]:
+        """移除图片 URL"""
+        images = [u for u in self.list_images() if u != url]
+        self._save_images(images)
+        return images
+
+    def is_public_file(self, file_id: int) -> bool:
+        """file_id 是否被维护弹窗引用 = 是否允许匿名下载。
+
+        维护弹窗要在硬维护（用户必然未登录）时显示图片，所以 /fs/public 必须免鉴权；
+        白名单只此一处，避免这条路径变成「按自增 ID 拖走全站文件」。
+        """
+        return any(parse_public_file_id(url) == file_id for url in self.list_images())
 
     def _migrate_legacy_msg(self) -> None:
         """旧版本文案在 MAINTENANCE_DIR（/tmp）→ 迁移到持久化数据目录"""
