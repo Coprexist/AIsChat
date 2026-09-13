@@ -218,7 +218,7 @@ def test_url_guard_marks_internal_targets():
     from app.utils.pure.url_guard import host_port, is_private_target
 
     for u in ("http://localhost:11434", "http://127.0.0.1:8000", "http://172.18.0.1:11434",
-              "http://192.168.1.5:11434", "http://169.254.169.254/latest/meta-data",
+              "http://192.168.1.5:11434", "http://169.254.10.10/latest/meta-data",
               "http://10.0.0.5", "http://[::1]:8000"):
         assert is_private_target(u), u
     for u in ("https://api.deepseek.com", "https://api.xiaomimimo.com", "http://8.8.8.8:80"):

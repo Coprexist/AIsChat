@@ -40,7 +40,7 @@ def _ip_is_internal(ip: str) -> bool:
         a = ipaddress.ip_address(ip)
     except ValueError:
         return False
-    # is_private 覆盖 10/8、172.16/12、192.168/16、100.64/10、169.254/16(含云元数据)、
+    # is_private 覆盖 10/8、172.16/12、192.168/16、100.64/10、169.254/16(链路本地，含云元数据段)、
     # fd00::/8 等；回环/保留/组播/未指定再单独兜一遍
     return bool(
         a.is_private or a.is_loopback or a.is_link_local

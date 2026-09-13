@@ -94,7 +94,7 @@ class WebFetch(ToolPlugin):
         if not url.startswith(("http://", "https://")):
             return build_tool_error(ToolErrorCode.TOOL_EXEC_FAILED, "URL 必须以 http:// 或 https:// 开头")
 
-        # SSRF 防护：禁止访问内网/本机地址（localhost/私有网段/云元数据 169.254.169.254 等）
+        # SSRF 防护：禁止访问内网/本机地址（localhost、私有网段、链路本地 169.254.0.0/16 的云元数据段等）
         # DNS 解析是同步阻塞的，丢线程池避免卡事件循环
         block_reason = await asyncio.to_thread(_is_private_url, url)
         if block_reason:

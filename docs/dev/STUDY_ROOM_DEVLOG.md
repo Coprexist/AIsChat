@@ -82,5 +82,5 @@
 
 ## 七、隐私红线与偏好
 
-- 绝不暴露公网域名（aischat.datangai.top / dsh.datangai.top / 118.112.190.144）到代码/UI/聊天；loopback OK
+- 绝不把公网域名与入口 IP 写进代码/UI/聊天（需要举例就用 <your-domain> / <entry-ip> 占位符）；loopback OK
 - 用户偏好：先完全理解需求再动手（别埋头瞎改）；及时汇报；UI 精确统一无 emoji；音效专业平滑；"别按简单的来"
