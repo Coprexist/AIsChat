@@ -161,6 +161,23 @@
 
 ### 🐛 修复的 Bug
 
+#### dsh-aischat：点开含代码块的会话，整个 AIsChat 面板消失
+- 现象：在 DSH 侧 AIsChat 面板点开某个会话，面板整块消失，控制台报
+  `TypeError: Cannot read properties of undefined (reading 'code')` 与
+  `slot entry crashed in 'shell.overlay'`
+- 根因：面板正文用外壳的 `MarkdownText` 渲染，而它**强制要求一个 labels 包**——
+  渲染围栏代码块时直接读 `labels.code.copyLabel`（外壳自己的对话页从 locale seat
+  生成 `markdownLabels(t)`，客户端插件没有这个 seat）。插件没传 labels，于是
+  **任何含三反引号围栏的消息**都会在渲染期抛异常；异常冒到 `shell.overlay` 的错误边界，
+  把整块面板摘掉。这解释了两个现象：只有像「化学老师」这种含围栏代码块的会话会炸，
+  没有围栏的会话一切正常
+- 修：插件侧补上等价文案（`MARKDOWN_LABELS`）传给 `MarkdownText`
+- 另加**逐条消息的渲染兜底**（`MessageBoundary`）：将来外壳的 markdown 渲染再抛异常时，
+  只把这一条降级成纯文本，面板其余部分照常可用，不再整块消失
+- 验证：headless Chrome 走真实面板点开该会话（最近 50 条里含 5 条围栏代码块）——
+  换回修复前的产物稳定复现同一条 `slot entry crashed`；修复后 50 条消息全部渲染、
+  零异常日志。`scripts/smoke.mjs` 与 `scripts/update-test.mjs` 均通过
+
 #### 世界工具全面插件化：一个工具一个文件，展示文案随工具走
 - 病根：29 个世界工具全塞在 `world_tools.py`（1606 行）——schema 清单、执行 if 链、展示 if 链三张
   并列的表，靠"人工保持三处一致"。漏写的工具卡片上就只剩一句**零信息量的「工具执行成功」**
@@ -412,7 +429,67 @@
   "值为空或值本身来自某个预设"；模型下拉候选与当前预设提到组件顶部，
   移除两处 JSX 立即执行函数
 
+### 🔒 安全
+
+#### 公网自测报告整改：权限判定收敛成统一入口，匿名下载改为白名单
+- 一轮「无凭据 / 任意注册用户」视角的公网自测报了 12 项。本轮把仓库内可修的做完，
+  并把「漏挂权限」变成会红的用例（`backend/tests/test_security_guards.py`，10 条）
+- **`/fs/public/{file_id}` 匿名拖全站文件（最严重）**：这条路径为了维护弹窗的 `<img>`
+  （硬维护时用户必然未登录，`<img>` 也带不了 Authorization）把 `check_file_access`
+  整段丢掉了，自增 ID 枚举 250 个命中 58 个。改法不是加开关，而是把「能匿名下载的文件」
+  定义成**维护图片白名单本身**：`MaintenanceManager.is_public_file()` 只放行维护弹窗
+  引用过的 `file_id`，其余一律 403。顺带把维护图片的读写从 `admin.py` 裸写 JSON
+  收进 `MaintenanceManager`（它本就是维护状态的唯一入口，图片列表当时漏在外面）
+- **越权读群（BOLA）**：`GET /gm/{group_id}/messages`、`GET /groups/{group_id}`、
+  `GET /groups/{group_id}/members` 只有登录校验、没有成员校验，任意账号可读任意群全部历史。
+  新增依赖 `require_group_member`（判定复用 `chat/gm.py:is_group_member`，与写路径同一出处）。
+  **报告漏掉的实时入口一并堵上**：`WS /ws` 的 `subscribe {group_id}` 同样没有成员校验，
+  等于可订阅任意群看直播；DM 分支本来就有校验，现在群分支同口径
+- **角色不能再信 JWT**：`require_agent_access` 拿 `current_user["role"]` 判管理员，而降权后
+  旧 token 在 7 天有效期内仍带 `admin`（`require_admin` 早已改成回查 DB，只有它没跟着改）。
+  抽出 `load_user_role()` 作为唯一的角色来源，两处共用
+- **两条未鉴权接口**：`GET /chat/user/{user_id}`（自增 ID 可枚举全站用户名/头像）、
+  `GET /chat/user/{user_id}/friends`（除未鉴权外，还因 `list_friends()` 是 keyword-only
+  而被当成位置参数调用 —— 这个接口其实一直是 500）。现在都要求登录，friends 限本人；
+  顺手清掉路由内 `raise HTTPException(500, detail=str(e))` 这类内部异常外泄，
+  统一交给 `main.py` 的全局处理器（脱敏 + 记录）
+- **`GET /admin/tools/backpack` 漏挂 `require_admin`**：131 条 admin 路由里唯一的例外。
+  补依赖的同时加了静态守卫，守卫当场又抓出两条**内联手写校验**的 admin 路由
+  （`/admin/cleanup/files`、`/admin/cleanup/stats`）——功能上没漏，但正是「逐个手写」的典型，
+  一并折进 `require_admin`
+- **生产环境不再暴露接口文档**：`/openapi.json` 加自定义 `/docs` 共 319 个接口，
+  等于把攻击面白送。改为由 `settings.is_production` 统一决定（`openapi_url=None` +
+  `/docs` 404），不新增开关。⚠️ 需在 `.env` 设 `ENVIRONMENT=production` 才生效；
+  **同时必须设 `ENCRYPTION_KEY`**（未设会拒绝启动）且要与现存的 `data/encryption_key`
+  一致，否则已加密的 API Key 全部解不开
+- **联邦出站不再关闭 TLS 校验**：三处 `verify=False`（对端头像下载）让传输层可被中间人替换。
+  改为 `peer_http_client()` 单一入口，默认校验证书，自签对端用 `FEDERATION_CA_BUNDLE`；
+  三处几乎逐字重复的「下载头像 + 落库 + 推送前端」收成 `download_peer_avatar` /
+  `sync_peer_avatar`
+- **安全响应头**：加 `X-Content-Type-Options: nosniff` 与 `Referrer-Policy: no-referrer`。
+  刻意**不加** `X-Frame-Options`（世界页面要能被其它实例 iframe 嵌入）、CSP（世界 HTML
+  依赖内联脚本，要做得先有 nonce 体系）、HSTS（后端只见 http，应在 TLS 终结层加）
+- **测试库口令不再写死在仓库**：`backend/tests/conftest.py` 的 `TEST_DATABASE_URL` 默认值
+  带着真实口令（已进 git 历史）。改为必须由环境变量提供，sync 连接串由 async 推导。
+  该口令建议轮换——它已存在于历史提交里
+- 明确保留、本轮不动的项：生产用 Vite dev server（部署决策）、`/world/{id}/files/*`
+  匿名可读（世界页面即可分享链接，且无草稿概念）、frpc 弱 token 与 SSH 公网（基础设施，不在仓库范围）
+- 头像目录字面量 7 处收敛为 `settings.avatars_dir`（单一来源）
+
 ### 📚 文档更新
+
+#### 新增《安全与权限模型》，并给演示截图流水线补上手文档
+- `docs/guides/安全与权限模型.md`：三条铁律（群成员统一依赖 / 角色以 DB 为准 /
+  匿名文件走维护图片白名单）、受保护入口速查表、生产加固清单（含 `ENVIRONMENT` 与
+  `ENCRYPTION_KEY` 的先后关系）、可整段复制的自查命令，以及**明确保留的取舍与理由**
+- `docs/SUMMARY.md` 收录该指南与 `scripts/screenshot/README.md`（文档集版本 v3.4.0 → v3.5.0）；
+  `docs/CODE_WIKI.md` 的 API 表补权限口径说明；`README.md` 文档表收录本指南，
+  顺手修掉「群视界 API 文档 = 9 大分区」这条过期描述（早已是 10 分区）
+- `docs/guides/test_strategy.md` 与实际套件对齐：用例文件表补齐到 **9 个文件 / 66 条**
+  （此前只列了 5 个文件 47 条，世界工具插件与群私信对称两个文件一直没进表），
+  并同步 conftest 的新契约（连接串必填、sync 由 async 推导）
+- `docs/dev/ROADMAP.md` 补 v0.4.0 已实现项并纳入本轮的权限收敛；同时修掉三处指向
+  不存在的根目录 `ROADMAP.md` 的链接（README、`docs/SUMMARY.md`、`docs/ABOUT.md`）
 
 #### 群视界 API 文档索引补齐第 10 分区
 - 分区文档实际已有 10 区（08-21 新增「10 同步与限流机制」），但仓库侧文档仍写「9 大分区」、
@@ -465,6 +542,16 @@
 
 ### 🔧 开发工具
 
+#### 演示截图流水线：一条命令产出脱敏的 README 演示图
+- 新增 `scripts/screenshot/`：headless Chrome + CDP 走一遍主站各界面，1440×900 @2x 出
+  2880×1800 的图，产物落 `docs/assets/screenshots/`（`--only <名字>` 可只重拍一张）
+- **演示数据一律脱敏**：`Fetch` 在响应阶段拦 `/api/*` 的 JSON —— 人名按值哈希映射到虚构名单，
+  邮箱、密钥、提示词字段一律替换；AI 头像用团队自绘头像 `docs/assets/brand/avatar.png`，
+  人类用户用脚本生成的字母头像（不引用任何第三方头像，规避版权与肖像权）
+- 拦截顺序是「先脱敏、再按路由套固定 fixture」，避免 fixture 被二次改写；流式接口
+  （`/worlds/*/chat/stream`、`/worlds/*/chat/status`）不拦，保证世界页照常渲染
+- 跑法、环境变量、怎么加一张图：见 `scripts/screenshot/README.md`（中英双语）
+
 #### 接入覆盖率：增量当门禁、整体只当报表
 - 首次实测基线：**行覆盖率 8%**（27,726 语句 / 25,534 未执行；267 个文件里 **180 个**是 0%）
 - CI 每次跑 `pytest --cov=app --cov-report=term-missing --cov-report=xml` 出报表，
@@ -498,6 +585,14 @@
   （文档写错 CI 内容，等于给人一张假地图）
 
 ### 🧪 测试
+
+#### 新增授权边界静态守卫（10 条）
+- `backend/tests/test_security_guards.py`：把「权限漏挂」变成会红的用例 —— 路由依赖链上少
+  `require_admin` / `require_group_member` 即失败；同时锁住 WS 群订阅校验、
+  `/chat/user/*` 登录校验、角色必须回查 DB、`/fs/public` 必须走白名单、
+  联邦出站不得出现 `verify=False`
+- 白名单语义用纯函数用例覆盖（`parse_public_file_id` + `is_public_file`，临时目录，不连库）
+- 这套守卫当场抓到两条内联手写校验的 admin 路由；加完后全量 **66 passed / 0 failed**
 
 #### 修 CI 失败：测试不得写生产数据目录（本地绿、CI 红）
 - 首次推送后 CI 立刻红了：`4 failed, 43 passed`，

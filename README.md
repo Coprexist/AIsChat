@@ -230,15 +230,16 @@ AIsChat 可以部署在自有服务器、公司内网、家庭 NAS,甚至本地�
 | **[v0.3.6 前端焕新展示](docs/promo/v0.3.6_frontend_showcase.md)** | 给朋友介绍 - 三大亮点 + 演示要点 |
 | **[项目全景报告](docs/reference/项目全景报告.md)** | AI / 个人用户 / 企业筛查员 - 技术架构、核心亮点、成熟度评估 |
 | **[群视界实现文档](docs/group_world/implementation.md)** | 开发者 - 群视界架构、决策与踩坑(ADR 风格) |
-| **[群视界 API 文档](docs/group_world/api/world_api_docs.md)** | 开发者 / 世界 AI - 9 大分区接口手册 |
+| **[群视界 API 文档](docs/group_world/api/world_api_docs.md)** | 开发者 / 世界 AI - 10 大分区接口手册 |
 | **[统一插件系统设计文档](docs/plugin_system/design/plugin_system_design.md)** | 开发者 / 管理员 - 目录即插件协议、两级开关、皮肤/技能插件 |
 | **[部署合规建议书](docs/deployment-compliance.md)** | 部署者 / 管理员 - 中国境内内容标识、拟人化互动服务等法规对照与操作建议 |
+| **[安全与权限模型](docs/guides/安全与权限模型.md)** | 部署者 / 开发者 - 权限判定三条铁律、受保护入口速查、公网部署加固清单与自查命令 |
 | **[魔视界 CSS 滤镜](docs/magic-vision.md)** | 开发者 - 10 种滤镜、三种作用域、补偿机制 |
 | **[AI 认知架构三空间模型](docs/archive/old_designs/AI%20认知架构三空间模型.md)** | 开发者 / 研究者 - 三空间模型、JSON intent、文件记忆、配置矩阵 |
 | **[管理与开发者手册](docs/guides/管理与开发者手册.md)** | 管理员 / 开发者 - 部署、架构、排错、WebSocket |
 | **[向量检索与 Embedding 配置](docs/memory_system/design/vector_search_and_embedding.md)** | 部署者 / 管理员 - Embedding 插件化、维度配置、前端图形化管理、生产启用 |
 | **[CHANGELOG](CHANGELOG.md)** | 所有人 - 版本变更记录 |
-| **[ROADMAP](ROADMAP.md)** | 所有人 - 已实现与规划中的功能 |
+| **[ROADMAP](docs/dev/ROADMAP.md)** | 所有人 - 已实现与规划中的功能 |
 
 <br>
 
@@ -265,7 +266,7 @@ cd frontend && npm install && npm run dev
 
 ## 路线图
 
-已实现和规划中的功能详见 **[ROADMAP.md](ROADMAP.md)**。
+已实现和规划中的功能详见 **[ROADMAP.md](docs/dev/ROADMAP.md)**。
 
 想了解完整的架构设计、技术决策和模块成熟度评估?看 **[项目全景报告](docs/reference/项目全景报告.md)**--含各模块状态、技术亮点、已知限制和未来规划。
 

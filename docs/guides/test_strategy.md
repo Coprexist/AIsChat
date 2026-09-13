@@ -40,9 +40,15 @@
 |------|------|--------|------|
 | `backend/tests/test_api_probe.py` | 单元（零网络） | 17 | 供应商探针判定、错误文案、响应脱敏、内网地址围栏 |
 | `backend/tests/test_multimodal.py` | 单元（零网络 + 临时真文件） | 16 | 附件 → 多模态 content、便签、视觉降级（**P0 源头**）|
+| `backend/tests/test_security_guards.py` | 静态 + 单元（不连库） | 10 | 授权边界：依赖漏挂、维护图片白名单、生产关闭接口文档、联邦出站 TLS |
 | `backend/tests/test_llm_endpoint.py` | 单元（零网络） | 7 | 端点拼接 `/vN` 规则 + 全部 9 个预设全覆盖 |
 | `backend/tests/test_world_chat_images.py` | 集成（真库 + 真文件） | 5 | 群视界发图链路：真调 `_prepare_world_chat`，零 LLM 消耗 |
+| `backend/tests/test_world_tool_summaries.py` | 单元（零网络） | 4 | 世界工具插件契约：自报 `label/segment/summary`、文案可读、注册表覆盖 schema |
+| `backend/tests/test_gm_dm_symmetry.py` | 静态（路由表） | 3 | 群/私信接口命名对称，已删除的重复入口不得回归 |
+| `backend/tests/test_world_tool_plugins.py` | 静态（`symtable`） | 2 | 插件文件"引用了但没定义"的名字错误 |
 | `backend/tests/test_agent_resolution.py` | 集成（真库） | 2 | 群成员 `member_id` 解析优先级 |
+
+合计 **66 条**（`run_without_pytest.py` 全量约 50s）。
 
 辅助文件：
 
@@ -276,6 +282,7 @@ graph TD
 | `app/services/agent/base_url_registry.py` | 「已登记私网地址」的允许清单 | `backend/tests/test_api_probe.py` |
 | `app/utils/multimodal.py` | 附件 → 多模态 content、便签与视觉降级 | `backend/tests/test_multimodal.py` |
 | `app/utils/pure/llm_endpoint.py` | 端点拼接（`/vN` 规则）+ 全部预设 | `backend/tests/test_llm_endpoint.py` |
+| `app/routers/deps.py`、`app/utils/auth.py`、`app/routers/files.py` | 权限依赖：群成员、角色以 DB 为准、匿名文件白名单、生产关闭文档 | `backend/tests/test_security_guards.py` |
 
 ### 4.2 尚未覆盖（把缺口写出来，别让它不可见）
 
@@ -370,9 +377,11 @@ async def test_image_turn_injects_multimodal_parts_and_note(migrated_db):
 
 ```python
 # backend/tests/conftest.py（节选）
-TEST_DATABASE_URL = os.environ.get(
-    "TEST_DATABASE_URL",
-    "postgresql+asyncpg://ai_chat:<pwd>@localhost:5432/ai_group_chat_test",
+# 连接串必须由环境变量提供：真实口令不进仓库（历史版本曾把口令写死为默认值）
+TEST_DATABASE_URL = _require_test_database_url()
+# sync 驱动由 async 连接串推导，少传一个环境变量
+TEST_DATABASE_URL_SYNC = (
+    os.environ.get("TEST_DATABASE_URL_SYNC") or TEST_DATABASE_URL.replace("+asyncpg", "")
 )
 os.environ["DATABASE_URL"] = TEST_DATABASE_URL
 os.environ["DATABASE_URL_SYNC"] = TEST_DATABASE_URL_SYNC
@@ -391,7 +400,8 @@ async def migrated_db():
 
 ### 5.4 运行
 
-需要 `TEST_DATABASE_URL` 指向测试库。在容器里用 1.1 的运行器（它会替你推导 URL 并加闸）。
+需要 `TEST_DATABASE_URL` 指向测试库（**必填**：conftest 不再有默认值，缺了会直接报错说明跑法）。
+`TEST_DATABASE_URL_SYNC` 可省略，由 async 连接串推导。在容器里用 1.1 的运行器（它会替你推导 URL 并加闸）。
 
 ### 5.5 发图链路的脚手架：怎么加第 6 条用例
 

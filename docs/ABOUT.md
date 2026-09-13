@@ -273,7 +273,7 @@ docker compose up -d
 - 📝 自我审计 — AI 回顾自己的行为，发现错误并改正
 - 📝 混合检索 — 更聪明的记忆搜索方式
 
-> 完整路线图见 [ROADMAP.md](../ROADMAP.md)
+> 完整路线图见 [ROADMAP.md](./dev/ROADMAP.md)
 
 ---
 
