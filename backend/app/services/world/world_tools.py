@@ -437,6 +437,64 @@ WORLD_TOOLS = [
 ]
 
 
+_GIST_KEYS = ("result", "message", "output", "summary", "note", "data", "stdout")
+
+
+def _result_gist(result: dict, limit: int = 120) -> str:
+    """从工具返回值里抠一句人话（兜底展示用；取不到就退化成截断的 JSON）"""
+    for key in _GIST_KEYS:
+        value = result.get(key)
+        if value in (None, "", [], {}):
+            continue
+        text = value if isinstance(value, str) else json.dumps(value, ensure_ascii=False)
+        text = " ".join(text.split())
+        if text:
+            return text[:limit] + ("…" if len(text) > limit else "")
+    rest = {k: v for k, v in result.items() if k not in ("success", "skipped")}
+    if not rest:
+        return ""
+    text = " ".join(json.dumps(rest, ensure_ascii=False).split())
+    return text[:limit] + ("…" if len(text) > limit else "")
+
+
+def _records_summary(result: dict) -> str:
+    """manage_records 动作多、返回字段各异，单独收口，免得主分派函数继续膨胀"""
+    if not result.get("success"):
+        return f"结构化记忆操作失败：{result.get('error', '未知错误')}"
+    action = result.get("action")
+    category = result.get("category") or "-"
+    sub_key = result.get("sub_key") or ""
+    if action == "set":
+        state = "已更新" if result.get("updated") else "已写入"
+        return f"结构化记忆{state}：{category}/{sub_key}/{result.get('field', '')}"
+    if action == "get":
+        records = result.get("records") or []
+        if not records:
+            return f"结构化记忆 {category} 没有匹配记录"
+        shown = "、".join(
+            f"{r.get('sub_key')}.{r.get('field')}={str(r.get('value'))[:40]}" for r in records[:5]
+        )
+        return f"结构化记忆 {category} 命中 {len(records)} 条：{shown}"
+    if action == "list":
+        subs = result.get("sub_keys") or {}
+        fields = sum(len(v) for v in subs.values())
+        return f"结构化记忆 {category}：{len(subs)} 个子目录 / {fields} 条记录"
+    if action == "categories":
+        cats = result.get("categories") or []
+        if not cats:
+            return "结构化记忆还是空的"
+        return f"结构化记忆目录（{len(cats)} 个）：" + "、".join(cats[:10])
+    if action == "summary":
+        return "结构化记忆摘要：" + " ".join((result.get("summary") or "").split())[:120]
+    if action == "delete":
+        return f"结构化记忆已删除 {result.get('deleted', 0)} 条"
+    if action == "rename":
+        return f"结构化记忆已重命名（{result.get('level')} → {result.get('new_name')}，{result.get('renamed', 0)} 条）"
+    if action == "move":
+        return f"结构化记忆已移动到 {result.get('to_category')}（{result.get('moved', 0)} 条）"
+    return f"结构化记忆操作完成（{action or '未知动作'}）"
+
+
 def _tool_result_summary(name: str, result: dict) -> str:
     """工具执行结果的展示文案（前端 [TOOL] 事件 + 落库 role=tool）"""
     ok = bool(result.get("success"))
@@ -587,9 +645,25 @@ def _tool_result_summary(name: str, result: dict) -> str:
         return f"已把成员 {result.get('member_id')} 的角色设为 {result.get('role')}" if ok else f"改角色失败：{result.get('error', '未知错误')}"
     if name == "kick_group_member":
         return f"已把成员 {result.get('member_id')} 移出群聊" if ok else f"移出失败：{result.get('error', '未知错误')}"
+    if name == "update_trigger_mode":
+        if ok:
+            mode = result.get("group_trigger_mode")
+            return "群触发模式已改为" + ("仅 @ 时响应" if mode == "mention_only" else "响应所有消息")
+        return f"改群触发模式失败：{result.get('error', '未知错误')}"
+    if name == "suggest_questions":
+        if ok:
+            return f"已生成 {result.get('count', 0)} 条建议问题（回复末尾展示给用户）"
+        return f"生成建议问题失败：{result.get('error', '未知错误')}"
+    if name == "manage_records":
+        return _records_summary(result)
     if result.get("skipped"):
         return "⏭ 已跳过（该操作本次对话已执行过），请直接总结或执行新操作"
-    return f"工具执行{'成功' if ok else '失败'}"
+    # 兜底：世界自定义 skill 的名字和返回值都不固定，这里至少要给出工具名 + 一句结果摘要。
+    # 曾经的「工具执行成功」零信息量——用户看不出刚发生了什么（manage_records 等就掉在这）。
+    if not ok:
+        return f"{name} 失败：{result.get('error', '未知错误')}"
+    gist = _result_gist(result)
+    return f"{name}：{gist}" if gist else f"{name} 执行完成"
 
 
 # ── web_download：网络文件下载到世界文件夹（两阶段：先确认后下载）──
