@@ -148,7 +148,7 @@ data/worlds/{id}/
 
 - `world_chat_service.py`：`tools_for_world = [*WORLD_TOOLS, *build_skill_tools(world_id)]`
   → LLM function calling 定义动态合并（首轮 + 工具循环都带）
-- `world_tools.py` `_do_execute`：未知平台工具 → `execute_skill()` 分发（找不到返回 None 走兜底）
+- `app/tools/world/__init__.py` `run_world_tool`：未知平台工具 → `execute_skill()` 分发（找不到返回 None 走兜底）
 
 ## 六、路线图
 

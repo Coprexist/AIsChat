@@ -45,8 +45,17 @@ dsh plugin --profile web add file:/path/to/dsh-aischat
 # 3. 重启 DSH web 进程使插件生效
 ```
 
-开发态改动：改 `src/*.ts` → build → 复制 `lib/` 与 `dist/` 到 profile 的
+开发态改动：改 `src/*.ts` → `node scripts/build.mjs` → 复制 `lib/` 与 `dist/` 到 profile 的
 `node_modules/dsh-aischat/`；Host 改动需重启 dsh-web，Client 改动刷新页面即可。
+
+前端产物（`dist/`）也会被插件打包分发，所以改了 `frontend/` 下的东西要重新同步，
+且**只走一个入口**——它会排除只属于仓库的素材（`docs/assets` 的 README/推广图）：
+
+```bash
+docker exec -w /app ai_group_frontend sh -c "BASE_URL=/aischat-ui/ node_modules/.bin/vite build"
+node scripts/sync-dist.mjs
+node scripts/build.mjs   # 重建清单里的产物哈希
+```
 
 ## 配置
 

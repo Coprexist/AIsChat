@@ -1098,14 +1098,18 @@ validate_tool_call(tool_name, arguments)
 
 ### REST API
 
+> **权限口径**：群相关读接口需群成员（`require_group_member`）；`/chat/user/*` 需登录；
+> `/admin/**` 需管理员且角色以 DB 为准；`/fs/public/{id}` 只放行维护弹窗图片白名单。
+> 详见 [安全与权限模型](./guides/安全与权限模型.md)。
+
 | 模块 | 方法 | 路径 | 说明 |
 |------|------|------|------|
 | **Auth** | POST | `/auth/register` | 用户注册 |
 | | POST | `/auth/login` | 登录 |
 | | GET | `/auth/me` | 获取当前用户 |
-| **GM** | GET | `/gm/{group_id}/messages` | 群聊消息历史（游标分页） |
+| **GM** | GET | `/gm/{group_id}/messages` | 群聊消息历史（游标分页，需群成员） |
 | | POST | `/gm/{group_id}/messages` | 发送群聊消息 |
-| **Chat** | GET | `/chat/user/{user_id}` | 获取用户信息 |
+| **Chat** | GET | `/chat/user/{user_id}` | 获取用户信息（需登录） |
 | | POST | `/chat/friend/request` | 发送好友请求 |
 | **Agents** | GET | `/agents` | AI 列表 |
 | | POST | `/agents` | 创建 AI |

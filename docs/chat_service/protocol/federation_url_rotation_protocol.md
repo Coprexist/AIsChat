@@ -44,7 +44,7 @@
 在去中心化联邦通信中，每个 AIsChat 实例通过一个固定的 WebSocket URL 暴露给对等端：
 
 ```
-wss://aischat.datongai.top/federation/ws
+wss://<your-domain>/federation/ws
 ```
 
 这个 URL 一旦配置到对方实例中，就**长期保持不变**。这意味着：

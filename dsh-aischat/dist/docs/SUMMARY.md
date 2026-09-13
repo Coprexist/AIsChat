@@ -1,6 +1,6 @@
 # AIsChat 文档目录
 
-> **版本**: v3.4.0 | **更新**: 2026-09-13
+> **版本**: v3.5.0 | **更新**: 2026-09-13
 
 ---
 
@@ -12,7 +12,7 @@
 |------|---------|------|
 | [README.md](../README.md) | 所有人 | 项目入口，快速开始、核心能力、技术栈 |
 | [ABOUT.md](./ABOUT.md) | 所有人 | 产品理念介绍，适合分享给朋友 |
-| [ROADMAP.md](../ROADMAP.md) | 所有人 | 路线图，已实现和规划中的功能 |
+| [ROADMAP.md](./dev/ROADMAP.md) | 所有人 | 路线图，已实现和规划中的功能 |
 
 ### 二、用户指南
 
@@ -25,6 +25,7 @@
 | [备份与恢复指南.md](./guides/backup_and_recovery.md) | 管理员 | 3-2-1 备份策略、时点恢复、灾难恢复方案 |
 | [WebSocket 事件文档.md](./guides/ws_events.md) | 前端/集成开发者 | 所有 WS 事件的 payload 格式、时序图、重连策略 |
 | [测试策略文档.md](./guides/test_strategy.md) | 开发者/QA | 当前套件与两种跑法、单/集成测试规范、覆盖率口径与基线、CI/CD；含「写完用例必须证明它会红」与排查踩坑 |
+| [安全与权限模型.md](./guides/安全与权限模型.md) | 管理员/开发者 | 三条权限铁律（群成员/角色/匿名文件）、受保护入口速查、生产加固清单、可复制的自查命令、保留取舍与自动化守卫 |
 | [部署合规建议书.md](./deployment-compliance.md) | 管理员/部署者 | 中国境内内容标识 / 拟人化互动服务法规对照与操作建议 |
 
 ### 三、服务模块设计
@@ -88,6 +89,7 @@
 | [接口文档服务](./group_world/design/api_docs_service.md) | 开发者 / 管理员 | /kb 接口 + docx 导出 + pandoc 安装、路径规则、422 local_kw 坑 |
 | [群视界 API 文档](./group_world/api/world_api_docs.md) | 开发者 / 世界 AI | 10 大分区接口手册（变量/文件/积木/群聊/同步限流/受控 API…） |
 | [世界 Skill 机制](./group_world/design/world_skill_design.md) | 开发者 | 文件式 skill/tool 机制（world skill runtime） |
+| [世界工具插件开发](./group_world/development/world_tools_plugin.md) | 开发者 / 社区 | 一个工具一个文件：契约、注册、展示文案、外部插件目录、性能 |
 | [世界决策技能](./group_world/design/world_decision_skill.md) | 开发者 | Decision Skill 与触发模式 |
 | [世界能力注入](./group_world/design/world_agent_capabilities.md) | 开发者 | 群 AI / 世界 AI 的能力边界与路径 |
 
@@ -125,6 +127,7 @@
 | [技术规格书](./dev/cpec.md) | 开发者 | AI 群聊社交网络系统技术规格 |
 | [自习室插件开发文档](./dev/STUDY_ROOM_DEVLOG.md) | 开发者 | study-room 插件开发记录 |
 | [开发待办](./dev/TODO.md) | 开发者 | 待办清单 |
+| [演示截图流水线](../scripts/screenshot/README.md) | 文档/推广维护者 | 一键生成 README 演示图：演示数据脱敏规则、CDP 截图与新增一张图的做法（中英双语） |
 
 ### 九、宣传与文章
 
@@ -215,4 +218,4 @@
 
 ---
 
-*文档版本: v3.4.0 | 最后更新: 2026-09-13*
+*文档版本: v3.5.0 | 最后更新: 2026-09-13*

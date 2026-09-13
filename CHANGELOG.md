@@ -478,6 +478,21 @@
 
 ### 📚 文档更新
 
+#### 去地址化第二轮：源码、示例文案与打包产物一并清掉
+- 上一轮清的是"点名道姓"的那几处；这轮把**拼写正确的生产域名**也处理掉
+- **文档 / 历史**（`CHANGELOG`、项目全景报告、联邦 URL 轮换协议）：换成 `<your-domain>` 占位符
+- **示例文案**（`translations.ts` 三语的实例地址 placeholder、`FederationTab.tsx` 的输入框
+  placeholder）：换成通用示例域名 `example.com`——它们是给用户看的填写示例，不该出现真实域名
+- **打包产物**：前端产物带着上面这些 i18n 文案，所以按 `BASE_URL=/aischat-ui/` 重建前端，
+  再整体同步进 `dsh-aischat/dist`（现在与 `frontend/dist` 逐文件一致），
+  `dist/docs` 镜像随之刷新；插件清单重建（262 个产物）并热更新到 profile
+- **刻意保留**：`federation-registry.json` 里的 `public_url`。它就是这个实例**对外公告的联邦
+  接入地址**（对等端靠它发现并连过来），删了联邦即失效；要改就得改产品口径，不是清理文案
+- 顺带把"前端产物 → 插件包"的同步收成一个入口 `scripts/sync-dist.mjs`：手抄 `cp -a` 会把
+  `docs/assets`（README/推广图，只属于仓库）一起打进插件包，这次重建就多带了 3.8MB 文档；
+  现在排除清单写在脚本里一处，README 的开发者流程也改成走它
+- 验证：`tsc --noEmit` 通过、`update-test.mjs` 通过、仓库里除联邦注册表外 0 命中
+
 #### 去地址化：仓库里的公网域名与入口 IP 一律换占位符
 - `docs/dev/STUDY_ROOM_DEVLOG.md` 那条"绝不暴露公网域名"的规则本身就把**两个公网域名和一个公网 IP**
   写在了括号里——规则与做法自相矛盾。改成只留 `<your-domain>` / `<entry-ip>` 占位符
@@ -1729,7 +1744,7 @@
 - 🔒 **手动链接 SPA 跳转**：`DocLink` 组件拦截 Markdown 内部链接，匹配路由后 SPA 导航，外部链接新窗口打开。
 - 🖼️ **AI 头像上传统一**：AI 头像也走 WebP/GIF 魔数检测跳过裁剪，统一使用 `api.upload()` 获得友好 413 错误提示。
 - 📉 **Mermaid 渲染失败友好降级**：显示具体错误信息 + 语法高亮原始代码回退，不再只报「渲染失败」。
-- ✅ **Nginx 413 修复**：`aischat.datongai.top.conf` 补上 `client_max_body_size 20m`。
+- ✅ **Nginx 413 修复**：`aischat.<your-domain>.conf` 补上 `client_max_body_size 20m`。
 - 🔤 **Svg 中文不乱码**：Mermaid iframe base64 解码改用 `TextDecoder('utf-8')` 替代 `atob`。
 
 ### Changed

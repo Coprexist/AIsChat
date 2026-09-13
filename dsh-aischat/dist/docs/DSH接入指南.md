@@ -117,6 +117,25 @@ DSH 设置页的 **AIsChat** 分区底部新增一行插件版本信息，检测
 `reason: incomplete`，而不是拿两份清单比对说"已是最新"。内容哈希留给换入阶段，那条路径
 本来就要读全量文件。
 
+**谁负责更新：按安装来源分三条通道**
+
+本地构建与分发出去的副本不是一回事，硬用一套版本语义去管会互相覆盖。插件读
+profile 的 `package.json` 判断自己是怎么装的，据此决定该由谁更新：
+
+| 安装来源 | `installKind` | 通道 | 界面行为 |
+|---|---|---|---|
+| 本地目录（`file:` / `link:`） | `local-file` | `self` | 走本文这套内容寻址换入，出「更新」按钮 |
+| npm 包，**且装了插件市场** | `npm` | `market` | 显示「推荐在设置 → 插件市场更新」，**不出手** |
+| git 源，**且装了插件市场** | `git` | `market` | 同上 |
+| npm / git 源，**没装市场** | `npm` / `git` | `package-manager` | 出「检查更新」，由 `dsh plugin update` 从原来源更新 |
+
+第三、四行的判据是「市场（`dshmarket`）是否在 profile 的 dependencies 里」。本地安装
+**永远优先走 `self`**——开发机上装了市场，也不该让市场去接管本地源码。
+
+`package-manager` 通道**不重复实现版本比对**：npm 的 semver、git 的 ref 解析都归 pnpm，
+插件只负责调用并如实回传输出。这和插件市场自己遵循的同一条原则一致——它也曾专门修过
+「用 npm 包名去比对私有 git 源，结果把 git 安装覆盖掉」的问题。
+
 **两种生效方式，界面会如实告知**：
 
 | 变更范围 | applyMode | 生效方式 |
@@ -131,7 +150,8 @@ DSH 设置页的 **AIsChat** 分区底部新增一行插件版本信息，检测
 | 方法 | 路径 | 说明 |
 |------|------|------|
 | GET | `/aischat-plugin/status` | 已装/可用的身份、更新源解析依据、applyMode、后端版本漂移 |
-| POST | `/aischat-plugin/apply` | 执行换入 |
+| POST | `/aischat-plugin/apply` | 用本地构建执行换入（`self` 通道） |
+| POST | `/aischat-plugin/update` | 调 `dsh plugin update` 从原来源更新（`package-manager` 通道） |
 | POST | `/aischat-plugin/rollback` | 回滚到上一次换入前 |
 
 **后端版本漂移检测**：构建时把后端 `/health` 的 `version` 写进清单，运行时再比一次。
@@ -256,6 +276,53 @@ $DSH_HOME/aischat-worlds/AIC群视界-<世界名>/
 | 世界页打不开/显示宿主界面 | 世界无 index.html（提示"让群视界机器人生成"）；或路径未走 `/aischat-api` |
 | token 丢了（重启后） | 重新打开 AIsChat 面板触发同步 |
 | 工具报"不属于任何 AIsChat 世界" | 会话 cwd 需在 `aischat-worlds` 目录下（打开 AIC群视界-* 会话） |
+| 装插件报 `ERR_PNPM_UNEXPECTED_STORE` | 见下方「DSH_HOME 是符号链接时的两个坑」第 1 条 |
+| 装插件报 `ENOENT ... /data_s001/tmp/...` 或 `.../relocated/dsh-session-recovery` | 见下方第 2 条 |
+
+### 8.1 DSH_HOME 是符号链接时的两个坑
+
+如果 `~/.dsh` 是指向另一块盘（如 `/data_s001/...`）的**符号链接**，DSH 本身工作正常，
+但 pnpm 会把"进程看到的路径"和"文件系统的真实路径"混用，于是出两类故障：
+
+**1. store 位置不一致 → `ERR_PNPM_UNEXPECTED_STORE`**
+
+pnpm 默认挑「与项目同盘」的 store。符号链接让项目真实落在另一块盘上，pnpm 就会选一个
+与现有 `node_modules` 不同的 store。对策是在 profile 自己的配置里 pin 住（不动全局）：
+
+```yaml
+# ~/.dsh/profiles/web/pnpm-workspace.yaml
+storeDir: /root/.local/share/pnpm/store
+```
+
+改完用 `pnpm store path` 确认解析结果的**版本子目录**与现有 `node_modules` 记录的一致。
+
+**2. lockfile 里的相对路径少一层 → `ENOENT`**
+
+pnpm 写 lockfile 按**符号链接路径**计算 `file:` 依赖的相对路径，解析时却按**真实路径**计算，
+于是 `file:/tmp/x` 被记成 `../../../../tmp/x` 而不是 `../../../../../tmp/x`，
+解析结果指向并不存在的 `/data_s001/tmp/x`。
+
+修法是按 bug 模型重算（错误形式 = `relative(符号链接路径, 目标)`，正确形式 =
+`relative(真实路径, 目标)`），工具已随插件提供：
+
+```bash
+node dsh-aischat/scripts/fix-profile-links.mjs --dry-run   # 先看会改什么
+node dsh-aischat/scripts/fix-profile-links.mjs             # 修（自动备份 .bak-links）
+```
+
+它是幂等的：路径已正确时报 0 处改动，连续运行不会叠加。
+
+> 注意手工 `sed` 修容易漏：同一条路径在 lockfile 里出现三次——`version: file:...`、
+> 键 `name@file:...`、以及 `resolution: {directory: ...}`。漏掉最后一处 pnpm 照样报错。
+
+**为什么不干脆改掉符号链接？** 两个更"彻底"的方案都被否决：
+
+- 把 `DSH_HOME` 指到真实路径：`/root/.dsh` 这个字符串被 DSH 自己持久化在
+  `storages/session_projcache*` 里，改路径会让历史会话的项目缓存对不上。
+- 把符号链接换成 bind mount：需要改 fstab 并处理 `/data_s001` 的挂载顺序；而且一旦挂载
+  失败会**静默启动到空目录**，比现在悬空软链（起不来、至少会失败）更危险。
+
+结论是保留符号链接，按需跑上面的修复工具。
 
 ---
 
