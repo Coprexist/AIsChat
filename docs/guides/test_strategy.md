@@ -5,6 +5,15 @@
 >
 > 本文档只描述**仓库里真实存在**的东西。尚未落地的能力一律显式标注「目标」/「未落地」，
 > 不写成既有事实——目录结构与命令必须能原样粘贴执行。
+>
+> **Quick start (EN).** The backend suite lives flat in `backend/tests/` — there are no `unit/`,
+> `integration/` or `e2e/` subdirectories. Run it with `cd backend && python -m pytest tests/ -q`;
+> the shipped container image has no pytest, so `python tests/run_without_pytest.py` is a
+> dependency-free runner for it (it refuses to start unless the target database name ends in `_test`).
+> Coverage is a report only; diff coverage gates pull requests. **Every new test must be proven to
+> fail first** — put the bug back and watch it go red (see §1.2).
+> Commands are written in their official form; China-network mirror variants are marked separately
+> (see §9.5).
 
 ---
 
@@ -81,6 +90,61 @@ docker exec -w /app \
 
 **第一版是假覆盖**：只跑了首轮，而首轮历史是空的、`None` 根本不会出现——
 P0 只在「上一轮存过不带附件的消息」时才触发。是变异测试把这个漏洞逼出来的。
+
+### 1.3 排查手法与踩过的坑
+
+下面每一条都是这一轮**真实踩出来的**，写下来的理由是它还会再咬人。
+
+#### ① 校验命令时，别用管道后面的 `$?` 和 `&&`
+
+自查"这个包能不能装"时，我写的是：
+
+```bash
+pip download coverage | tail -2 && echo PIP_OK    # ❌ 永远打印 PIP_OK
+```
+
+`&&` 绑的是 `tail`（几乎总是成功），**不是** `pip`；`echo $?` 同理，取的是管道**最后一环**的退出码。
+这一条让我把"能装"误判了、白跑一轮。正确写法是重定向到文件、紧接着单独取 `$?`：
+
+```bash
+cmd > /tmp/out.txt 2>&1
+echo "rc=$?"        # 这才是 cmd 的退出码
+tail -3 /tmp/out.txt
+```
+
+#### ② 需要装依赖的验证，用一次性容器，别污染正在跑的生产容器
+
+```bash
+docker run -i --rm --network <compose 网络> --entrypoint sh \
+  -v "$PWD/backend:/app" -w /app <镜像名> <<'INNER'
+pip install -q -i <镜像> coverage
+coverage run --source=app tests/run_without_pytest.py
+INNER
+```
+
+`--rm` 让装进去的东西随容器消失，生产容器一个字节都不变。
+**但注意**：容器挂载了 `./backend`，覆盖率运行会在**仓库里**写出 `.coverage`，跑完记得删
+（已加进 `.gitignore`）。
+
+#### ③ 断言前先问一句：这条用例会不会永远为绿
+
+见 1.2。只跑首轮的用例看着在测发图，实际上 `None` 那条分支根本没进去。
+**永远绿 + 断言齐全 + 覆盖率好看**，是假覆盖的三个特征。
+
+#### ④ 覆盖率的高分要怀疑
+
+`app/models` 92% 是 import 出来的（见 9.3）。任何"某层覆盖率特别高、却明显没人写过测试"的地方，
+先怀疑是导入副作用，而不是质量真的好。
+
+#### ⑤ 文档引用代码，能自动校验就别手抄
+
+第十节的 workflow 是**逐字节引用**真实文件的，并用脚本校验过：
+
+```python
+assert doc_yaml_block.rstrip() == open(".github/workflows/test.yml").read().rstrip()
+```
+
+手抄一份 workflow 进文档，等于给自己留一张迟早过期的假地图——而看文档的人不会去核对。
 
 ---
 
@@ -517,14 +581,27 @@ repo 里的 admin 最大但风险最低（管理员专用、输入可信），**
 
 增量门禁只能拦住**新增**的坏味道，拦不住已经烂在那儿的部分——所以 4.2 的缺口仍要单独补。
 
-### 9.5 本机装工具必须用国内镜像
+### 9.5 装工具：官方写法 + 国内镜像（两套都给）
 
-这台 NAS 上 `pypi.org` **解析超时**（`curl: (28) Resolving timed out`），
-`pip download` 直接 30 秒超时。清华/阿里镜像正常（200，0.5 秒级）。
-所以任何 `pip install` 都要显式带 `-i https://pypi.tuna.tsinghua.edu.cn/simple`，
-容器内也一样（容器 DNS 同样解析不了 pypi.org）。
+**官方默认写法（国际网络直接用这个）**：
 
-CI 在 GitHub 上跑，不受此限制，不需要镜像。
+```bash
+pip install coverage
+```
+
+**国内网络（本机必须加，否则会卡死）**：这台 NAS 上 `pypi.org` **DNS 解析超时**
+（`curl: (28) Resolving timed out after 15000 ms`），`pip download` 30 秒被杀（rc=124）。
+注意这**不是"没有外网"**——`api.deepseek.com` 100 ms 可达。容器 DNS 同样解析不了 pypi.org。
+
+```bash
+pip install -i https://pypi.tuna.tsinghua.edu.cn/simple coverage
+```
+
+可用的国内镜像（实测 200 / 亚秒级）：清华 `https://pypi.tuna.tsinghua.edu.cn/simple`、
+阿里 `https://mirrors.aliyun.com/pypi/simple/`。
+
+**不要把镜像写成唯一写法**：国际用户照抄会失败。官方源才是默认，国内镜像只是中国网络下的变体，
+所以要并排给、并标明适用条件。CI 跑在 GitHub 上，用官方源，**不要**加镜像。
 
 ---
 

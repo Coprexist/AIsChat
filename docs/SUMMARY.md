@@ -24,7 +24,7 @@
 | [故障排查手册.md](./guides/troubleshooting.md) | 管理员/开发者 | 常见问题诊断流程图、错误码速查、一键诊断脚本 |
 | [备份与恢复指南.md](./guides/backup_and_recovery.md) | 管理员 | 3-2-1 备份策略、时点恢复、灾难恢复方案 |
 | [WebSocket 事件文档.md](./guides/ws_events.md) | 前端/集成开发者 | 所有 WS 事件的 payload 格式、时序图、重连策略 |
-| [测试策略文档.md](./guides/test_strategy.md) | 开发者/QA | 测试金字塔、单/集成/E2E 测试规范、CI/CD 集成 |
+| [测试策略文档.md](./guides/test_strategy.md) | 开发者/QA | 当前套件与两种跑法、单/集成测试规范、覆盖率口径与基线、CI/CD；含「写完用例必须证明它会红」与排查踩坑 |
 
 ### 三、服务模块设计
 
