@@ -17,6 +17,7 @@ import WorldCreatorConfig, { type WorldCreator, type WorldUsageStats } from '../
 import { getCodeLang, isMarkdownFile } from '../utils/mime'
 import { tryOpenWorldWindow } from '../utils/worldView'
 import { useResizableSidebar } from '../hooks/useResizableSidebar'
+import { useElementWidth } from '../hooks/useElementWidth'
 
 interface World {
   id: number
@@ -40,22 +41,26 @@ export default function WorldDesignPage() {
   // 可拖拽面板（复用侧边栏 hook：左=文件树，右=对话）
   const fileTreeRef = useRef<HTMLDivElement>(null)
   const chatPanelRef = useRef<HTMLDivElement>(null)
-  // 三栏动态保底：文件树 100 / 编辑区 160 / 对话 200；上限按其他区域保底实时反推（防负：窗口过窄时至少 = 自身保底）
+  // 三栏动态保底：文件树 100 / 编辑区 160 / 对话 360（对话栏要塞得下输入提示与建议卡，不能再按 200 压）；
+  // 上限按其他区域保底实时反推（防负：空间不足时至少 = 自身保底）
   const MIN_TREE = 100
   const MIN_EDITOR = 160
-  const MIN_CHAT = 200
+  const MIN_CHAT = 360
+  const HANDLES = 8  // 两个拖拽手柄
+  // 上限必须按「设计区实际宽度」反推：外层还有 AIsChat 导航栏占位，用 window.innerWidth 会多算约 240px，
+  // 结果是文件树能拖到把对话栏挤出可视区。容器首帧未测量时退回 innerWidth。
+  const [containerRef, containerWidth] = useElementWidth()
+  const available = containerWidth || window.innerWidth
   const { sidebarWidth: fileWidth, handleResizeStart: fileResizeStart } = useResizableSidebar('world_files_width', fileTreeRef, {
-    min: MIN_TREE, max: () => Math.max(MIN_TREE, window.innerWidth - MIN_EDITOR - MIN_CHAT - 8), // 8 = 两个拖拽手柄
+    min: MIN_TREE, max: () => Math.max(MIN_TREE, available - MIN_EDITOR - MIN_CHAT - HANDLES),
   })
   // 聊天栏上限按「当前文件树实际宽度」实时反推（不是保底值）：文件树拖宽后，聊天栏同样不会被挤出右侧
+  const chatMax = () => Math.max(MIN_CHAT, available - fileWidth - MIN_EDITOR - HANDLES)
   const { sidebarWidth: chatWidth, handleResizeStart: chatResizeStart } = useResizableSidebar('world_chat_width', chatPanelRef, {
-    side: 'right', min: MIN_CHAT, max: () => Math.max(MIN_CHAT, window.innerWidth - fileWidth - MIN_EDITOR - 8),
+    side: 'right', min: MIN_CHAT, max: chatMax,
   })
-  // 渲染层兜底：无论拖拽/hook 状态怎么变，聊天栏实际宽度绝不超过可用空间（否则会被挤出屏幕右侧）
-  const effectiveChatWidth = Math.min(
-    chatWidth,
-    Math.max(MIN_CHAT, window.innerWidth - fileWidth - MIN_EDITOR - 8),
-  )
+  // 渲染层兜底：无论拖拽/hook 状态怎么变，聊天栏实际宽度绝不超过可用空间（否则会被挤出可视区）
+  const effectiveChatWidth = Math.min(chatWidth, chatMax())
 
   const [world, setWorld] = useState<World | null>(null)
   const [files, setFiles] = useState<WorldFile[]>([])
@@ -721,7 +726,7 @@ export default function WorldDesignPage() {
       </div>}
 
       {/* ═══ 桌面端（≥lg）：标题栏 + 三栏（分隔线贯穿，拖拽手柄覆盖标题栏与内容区） ═══ */}
-      {!isMobile && <div className="flex flex-col h-full">
+      {!isMobile && <div ref={containerRef} className="flex flex-col h-full">
         {/* 顶部工具栏 */}
         <div className="flex items-center gap-3 px-4 h-14 bg-surface border-b border-border shrink-0">
           <button onClick={() => navigate('/worlds')} className="inline-flex items-center gap-1 text-sm text-textMuted hover:text-textPrimary transition-colors">

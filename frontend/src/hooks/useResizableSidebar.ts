@@ -1,17 +1,32 @@
-import { useState, useCallback, useEffect, useRef } from 'react'
+import { useState, useCallback, useEffect, useRef, useMemo, useSyncExternalStore } from 'react'
 
 export const SIDEBAR_MIN = 200
 export const SIDEBAR_MAX = 500
 const SIDEBAR_DEFAULT = 320
 const RIGHT_DEFAULT = 480
 
+/** 宽度收敛到 [min, max] 并取整 */
+export function clampWidth(value: number, min: number, max: number): number {
+  return Math.round(Math.max(min, Math.min(max, value)))
+}
+
+const subscribeViewport = (onChange: () => void) => {
+  window.addEventListener('resize', onChange)
+  return () => window.removeEventListener('resize', onChange)
+}
+
 /**
  * 可拖拽侧边栏宽度 Hook。
  * 桌面端 mousedown 拖拽手柄 → 调整宽度 → 持久化到 localStorage。
+ *
+ * 宽度分两层：`preferredWidth` 是用户意图（唯一被持久化的值），渲染宽度每次按当前上限收敛。
+ * 上限常是动态的（按邻栏保底反推），所以窄屏或拖宽邻栏只会临时压缩面板，压小的值不写回存储——
+ * 否则面板被挤小一次就再也回不来。
+ *
  * @param storageKey localStorage 存储键
  * @param sidebarRef 侧边栏容器 DOM ref，用于计算锚点边缘的偏移
  * @param options.side 'left'（默认，锚点=左边缘）| 'right'（锚点=右边缘，右侧面板用）
- * @param options.min/max 宽度范围（默认 200-500）
+ * @param options.min/max 宽度范围（默认 200-500；max 可为函数，按当前布局实时求值）
  */
 export function useResizableSidebar(
   storageKey: string,
@@ -23,18 +38,19 @@ export function useResizableSidebar(
   // max 支持 number 或函数（动态上限：拖动/窗口变化时实时算，如按其他区域保底反推）
   const max: number | (() => number) = options?.max ?? SIDEBAR_MAX
   const resolveMax = () => (typeof max === 'function' ? max() : max)
-  const [sidebarWidth, setSidebarWidth] = useState(() => {
-    // max 可能是函数（动态上限）——初始化时先 resolve，避免 Math.min(函数, 值) = NaN
-    const maxVal = typeof max === 'function' ? max() : max
-    const saved = localStorage.getItem(storageKey)
-    if (saved) return Math.max(min, Math.min(maxVal, Number(saved)))
+  const [preferredWidth, setPreferredWidth] = useState(() => {
+    const saved = Number(localStorage.getItem(storageKey))
+    if (saved > 0) return saved
     return side === 'left' ? SIDEBAR_DEFAULT : RIGHT_DEFAULT
   })
   const resizing = useRef(false)
   const anchorRef = useRef(0)
-  // 最新 max 解析器（max 可能是函数，闭包引用会随渲染变化；用 ref 保证监听器里取到最新）
-  const resolveMaxRef = useRef(resolveMax)
-  resolveMaxRef.current = resolveMax
+  // 视口宽度只作「重新收敛」的信号：窗口变小后收敛上限可能变小，需要重算渲染宽度
+  const viewportWidth = useSyncExternalStore(subscribeViewport, () => window.innerWidth, () => 0)
+  const sidebarWidth = useMemo(
+    () => clampWidth(preferredWidth, min, resolveMax()),
+    [preferredWidth, min, max, viewportWidth],
+  )
 
   const handleResizeStart = useCallback((e: React.MouseEvent) => {
     e.preventDefault()
@@ -50,31 +66,14 @@ export function useResizableSidebar(
     document.body.style.userSelect = 'none'
   }, [sidebarRef, side])
 
-  // 窗口 resize 时按最新上限回收宽度：防止宽屏拖宽后换小屏（仍桌面断点）把面板挤出屏幕
-  useEffect(() => {
-    const onResize = () => {
-      setSidebarWidth((w) => {
-        const maxVal = resolveMaxRef.current()
-        if (w > maxVal) {
-          const clamped = Math.max(min, maxVal)
-          localStorage.setItem(storageKey, String(clamped))
-          return clamped
-        }
-        return w
-      })
-    }
-    window.addEventListener('resize', onResize)
-    return () => window.removeEventListener('resize', onResize)
-  }, [storageKey, min])
-
   useEffect(() => {
     const onMove = (e: MouseEvent) => {
       if (!resizing.current) return
       const w = side === 'left'
         ? e.clientX - anchorRef.current
         : anchorRef.current - e.clientX
-      const clamped = Math.round(Math.max(min, Math.min(resolveMax(), w)))
-      setSidebarWidth(clamped)
+      const clamped = clampWidth(w, min, resolveMax())
+      setPreferredWidth(clamped)
       localStorage.setItem(storageKey, String(clamped))
     }
     const onUp = () => {
