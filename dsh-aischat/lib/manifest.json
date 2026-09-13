@@ -1,7 +1,7 @@
 {
   "name": "dsh-aischat",
   "version": "0.1.0",
-  "buildStamp": "2026-09-13T10:52:21.085Z",
+  "buildStamp": "2026-09-13T10:53:49.644Z",
   "backendVersion": "0.4.0",
   "files": {
     "dist/assets/AdminPage-B4SZKIas.js": "4b8da9e451fcae524aa674fa995e01d7839cb8b438597ce9f18307627eb5ac03",
@@ -188,7 +188,7 @@
     "dist/color-picker.html": "a31e4c1d0ace2b68606eae90f8acd051157bfef5f63d34bf42514b8ea93d0b9a",
     "dist/docs/ABOUT.md": "8ae7484e266a916579ad032a02d2298a4195901a7542994a0c9c14a319a260e7",
     "dist/docs/CODE_WIKI.md": "a902bef3d8ab9a6c3cb5b2f721a833a1bea5b69ba47f2c5f63c4a247fdcb71be",
-    "dist/docs/DSH接入指南.md": "0a9b6fe501b3b6c8e7679487974508a9aa21f8ed9474a4516912659a218c7353",
+    "dist/docs/DSH接入指南.md": "bdb853afef93f8ade99a6d6174017fc00f377dabb3110284d88e0509d9856daf",
     "dist/docs/LEARNING_ROADMAP.md": "98c5b51cca130573fcaa2ce6728c2931592f328fb9b42f3c5673c81297f3247f",
     "dist/docs/SUMMARY.md": "060ea0a01a4a7596c10f10f5e5b913aae9e5b8928dcf492655bfb2e95217757e",
     "dist/docs/ai_service/design/ai_service_design.md": "512e42193ede0e3bebf90d64fe978e23fba35a7e88f428593c134f87f81f981a",
