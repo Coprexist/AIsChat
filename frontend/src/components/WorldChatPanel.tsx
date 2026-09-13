@@ -292,7 +292,9 @@ const WorldChatPanel = memo(forwardRef<WorldChatHandle, WorldChatPanelProps>(({ 
     }
 
     return (
-      <div key={m.id} className="space-y-2">
+      // group：让下方操作条（复制/重新生成）在悬停整条消息时显形。
+      // ⚠️ 必须用**匿名** group——子元素里的 group/details 是命名组，只响应 group-hover/details:
+      <div key={m.id} className="space-y-2 group">
         <div className={`world-msg text-sm max-w-[90%] p-2 rounded-lg ${m.error ? 'bg-rose-500/10 border border-rose-500/30 text-rose-400' : m.role === 'user' ? 'bg-primary-500/20 ml-auto' : 'bg-elevated/80'}`}>
           <div className="text-[10px] text-textMuted mb-0.5">{m.error ? '错误' : m.role === 'user' ? (m.pending ? '我（排队中，发送后生效）' : '我') : (prevIsReasoning ? '' : (creatorName || '世界 AI'))}</div>
           {!m.error && (m.role === 'ai' || m.role === 'note') && !!m.reasoning && (
@@ -322,7 +324,8 @@ const WorldChatPanel = memo(forwardRef<WorldChatHandle, WorldChatPanelProps>(({ 
 
         {/* 消息操作条（DSH 式 MessageIconActions，2026-08-16）：复制 + 重新生成 */}
         {(m.role === 'ai' || m.role === 'note') && m.content && !m.pending && (
-          <div className="flex items-center gap-0.5 pl-1 opacity-0 group-hover:opacity-100 transition-opacity">
+          // 键盘可达 + 无悬停设备（触屏）常显：光靠 group-hover 在触屏上永远点不到
+          <div className="flex items-center gap-0.5 pl-1 opacity-0 group-hover:opacity-100 focus-within:opacity-100 [@media(hover:none)]:opacity-100 transition-opacity">
             <button
               onClick={() => {
                 try { navigator.clipboard.writeText(m.content || ''); } catch {}

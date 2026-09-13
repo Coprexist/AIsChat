@@ -65,6 +65,14 @@
 - 同类排查：`-(++msgSeqRef.current)` 同样写在 updater 内（亦不纯），但只影响占位 id 递增，
   不会造成正确性问题，故保持原样
 
+#### 复制 / 重新生成 按钮永久不可见（悬空 group-hover）
+- 操作条用了 `opacity-0 group-hover:opacity-100`，但整个 `WorldChatPanel.tsx` 里
+  **没有任何元素定义匿名 `group` 类**（子元素里的 `group/details` 是**命名组**，
+  只响应 `group-hover/details:`）→ 该变体永远匹配不上，按钮永久停在 `opacity-0`
+- 修复：给消息行容器加匿名 `group`；并补 `focus-within:opacity-100`（键盘 Tab 可达）
+  与 `[@media(hover:none)]:opacity-100`（触屏无悬停，否则永远点不到）
+- 教训：Tailwind 的 `group-hover` 是**悬空引用**——类名拼错/祖先缺失时不会报错，只会静默失效
+
 ### 🏗️ 架构重构：stream_world_chat 分阶段拆分
 
 按"小步 + 每步验证"推进（383 行 → 分三段），已完成阶段 1-3：
