@@ -7,6 +7,7 @@ var { useEffect, useState, useRef, useCallback, useMemo } = React;
 var { MarkdownText, IconNewChatOutline16 } = require("@deepseek-ai/dsh-client-ui-primitives");
 var API = "/aischat-api";
 var WS_BASE = "/aischat-ws";
+var PLUGIN_API = "/aischat-plugin";
 var K_TOKEN = "aisc.token";
 var K_USER = "aisc.user";
 var store = {
@@ -69,6 +70,32 @@ async function api(path, options = {}) {
     throw err;
   }
   return data;
+}
+async function pluginApi(path, options = {}) {
+  const res = await fetch(PLUGIN_API + path, { method: options.method || "GET", cache: "no-store" });
+  let data = null;
+  try {
+    data = await res.json();
+  } catch {
+  }
+  if (!res.ok || data && data.ok === false) {
+    throw new Error(data && (data.error || data.detail) || `request failed (${res.status})`);
+  }
+  return data;
+}
+function shortId(id) {
+  return id ? String(id).slice(0, 7) : "\u2014";
+}
+function pluginStateText(status) {
+  if (!status) return "\u8BFB\u53D6\u4E2D\u2026";
+  if (status.state === "update-available") return `\u53EF\u66F4\u65B0\u5230 ${shortId(status.available && status.available.id)}`;
+  if (status.state === "up-to-date") return "\u5DF2\u662F\u6700\u65B0";
+  if (status.state === "source-unavailable") return `\u672A\u627E\u5230\u66F4\u65B0\u6E90\uFF08${status.source && status.source.how || "unknown"}\uFF09`;
+  if (status.state === "not-installed") return "\u5B89\u88C5\u76EE\u5F55\u7F3A\u5C11\u6784\u5EFA\u6E05\u5355";
+  return String(status.state);
+}
+function pluginNeedsAttention(status) {
+  return Boolean(status) && (status.state === "update-available" || status.backend && status.backend.mismatch);
 }
 async function loadContacts(force = false) {
   if (!store.token) return;
@@ -940,10 +967,39 @@ function SettingsPage() {
   const [, force] = useState(0);
   const refresh = useCallback(() => force((n) => n + 1), []);
   const user = store.user;
+  const [plugin, setPlugin] = useState(null);
+  const [pluginMsg, setPluginMsg] = useState("");
+  const [pluginBusy, setPluginBusy] = useState(false);
   useEffect(() => {
     window.addEventListener("aischat:auth", refresh);
-    return () => window.removeEventListener("aischat:auth", refresh);
+    let alive = true;
+    pluginApi("/status").then((s) => {
+      if (alive) setPlugin(s);
+    }).catch(() => {
+    });
+    return () => {
+      alive = false;
+      window.removeEventListener("aischat:auth", refresh);
+    };
   }, [refresh]);
+  const applyPluginUpdate = async () => {
+    setPluginBusy(true);
+    setPluginMsg("");
+    try {
+      const result = await pluginApi("/apply", { method: "POST" });
+      if (result.applyMode === "restart") {
+        setPluginMsg(`\u5DF2\u6362\u5165 ${result.changed.length} \u4E2A\u6587\u4EF6\u3002host \u534A\u5DF2\u53D8\u66F4\uFF0C\u9700\u91CD\u542F dsh-web \u540E\u751F\u6548\u3002`);
+        setPlugin(await pluginApi("/status").catch(() => plugin));
+      } else {
+        setPluginMsg("\u5DF2\u66F4\u65B0\uFF0C\u6B63\u5728\u5237\u65B0\u9875\u9762\u2026");
+        setTimeout(() => window.location.reload(), 600);
+      }
+    } catch (e) {
+      setPluginMsg(`\u66F4\u65B0\u5931\u8D25\uFF1A${e.message}`);
+    } finally {
+      setPluginBusy(false);
+    }
+  };
   if (!user || !store.token) {
     return h(
       "div",
@@ -978,12 +1034,49 @@ function SettingsPage() {
         onClick: () => openImmersive(`/aischat-ui${f.path}?embed=1`, f.label)
       }, f.label))
     ),
+    h("div", { style: { fontSize: 13, fontWeight: 600, margin: "18px 0 8px", color: "var(--dsw-alias-label-primary)" } }, "\u63D2\u4EF6"),
+    h(
+      "div",
+      { style: { ...style.row, padding: "6px 0" } },
+      h(
+        "div",
+        { style: style.rowText },
+        h(
+          "div",
+          { style: style.rowTitle },
+          plugin ? `dsh-aischat ${plugin.installed && plugin.installed.version || "\u672A\u77E5"} \xB7 ${shortId(plugin.installed && plugin.installed.id)}` : "dsh-aischat \u7248\u672C\u68C0\u6D4B\u4E2D\u2026"
+        ),
+        h("div", { style: style.rowSub }, pluginStateText(plugin))
+      ),
+      pluginNeedsAttention(plugin) ? h("button", {
+        style: style.smallBtn,
+        disabled: pluginBusy,
+        onClick: applyPluginUpdate
+      }, pluginBusy ? "\u66F4\u65B0\u4E2D\u2026" : "\u66F4\u65B0") : null
+    ),
+    plugin && plugin.backend && plugin.backend.mismatch ? h(
+      "div",
+      { style: { ...style.hint, marginTop: 2 } },
+      `\u63D2\u4EF6\u6784\u5EFA\u65F6\u540E\u7AEF\u4E3A ${plugin.backend.builtAgainst}\uFF0C\u5F53\u524D\u4E3A ${plugin.backend.running}\uFF1B\u5185\u7F6E\u754C\u9762\u53EF\u80FD\u5DF2\u4E0E\u540E\u7AEF API \u4E0D\u4E00\u81F4\uFF0C\u5EFA\u8BAE\u66F4\u65B0\u63D2\u4EF6\u3002`
+    ) : null,
+    pluginMsg ? h("div", { style: { ...style.hint, marginTop: 2 } }, pluginMsg) : null,
     h("button", { style: { ...style.btn, background: "var(--dsw-alias-state-danger-primary, #e5484d)", marginTop: 20 }, onClick: doLogout }, "\u9000\u51FA\u767B\u5F55"),
     h("div", { style: style.hint }, "\u670D\u52A1\u901A\u8FC7\u672C\u673A\u540C\u6E90\u4EE3\u7406\u8BBF\u95EE\uFF0C\u65E0\u516C\u7F51\u5730\u5740\u53C2\u4E0E\u3002")
   );
 }
 function FooterButton({ wide }) {
   const [open, setOpen] = useState(false);
+  const [needsUpdate, setNeedsUpdate] = useState(false);
+  useEffect(() => {
+    let alive = true;
+    pluginApi("/status").then((s) => {
+      if (alive) setNeedsUpdate(pluginNeedsAttention(s));
+    }).catch(() => {
+    });
+    return () => {
+      alive = false;
+    };
+  }, []);
   useEffect(() => {
     const onRefresh = () => setOpen(boardOpenRef.current);
     window.addEventListener("aischat:board-refresh", onRefresh);
@@ -1004,7 +1097,11 @@ function FooterButton({ wide }) {
       "aria-label": rail ? "AIsChat" : void 0
     },
     h(IconNewChatOutline16, { size: rail ? 18 : 16 }),
-    rail ? null : h("span", { style: { fontWeight: 500 } }, "AIsChat")
+    rail ? null : h("span", { style: { fontWeight: 500 } }, "AIsChat"),
+    needsUpdate ? h("span", {
+      title: "AIsChat \u63D2\u4EF6\u6709\u66F4\u65B0",
+      style: { flex: "none", width: 7, height: 7, borderRadius: "50%", background: "var(--dsw-alias-state-danger-primary, #e5484d)" }
+    }) : null
   );
 }
 var boardOpenRef = { current: false };

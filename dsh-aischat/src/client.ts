@@ -35,6 +35,8 @@ const PLUGIN_ID = 'dsh-aischat'
 const API = '/aischat-api'
 /** WebSocket endpoint answered by the host half (upgrade proxy). */
 const WS_BASE = '/aischat-ws'
+/** Plugin self-update endpoints answered by the host half (outside the AIsChat proxy prefix). */
+const PLUGIN_API = '/aischat-plugin'
 
 /** Browser-local storage keys (guarded read/write). */
 const K_TOKEN = 'aisc.token'
@@ -112,6 +114,40 @@ async function api(path, options = {}) {
     throw err
   }
   return data
+}
+
+/**
+ * Call a host-half plugin endpoint. These live outside the AIsChat proxy prefix,
+ * so they bypass api() and are not authenticated.
+ */
+async function pluginApi(path, options = {}) {
+  const res = await fetch(PLUGIN_API + path, { method: options.method || 'GET', cache: 'no-store' })
+  let data = null
+  try { data = await res.json() } catch { /* non-JSON body */ }
+  if (!res.ok || (data && data.ok === false)) {
+    throw new Error((data && (data.error || data.detail)) || `request failed (${res.status})`)
+  }
+  return data
+}
+
+/** 构建身份是内容摘要，展示前 7 位即可（同镜像 digest 的短标识用法）。 */
+function shortId(id) {
+  return id ? String(id).slice(0, 7) : '—'
+}
+
+/** 把插件状态翻译成一句人话；失败原因如实展示，不笼统报“不可用”。 */
+function pluginStateText(status) {
+  if (!status) return '读取中…'
+  if (status.state === 'update-available') return `可更新到 ${shortId(status.available && status.available.id)}`
+  if (status.state === 'up-to-date') return '已是最新'
+  if (status.state === 'source-unavailable') return `未找到更新源（${(status.source && status.source.how) || 'unknown'}）`
+  if (status.state === 'not-installed') return '安装目录缺少构建清单'
+  return String(status.state)
+}
+
+/** 需要提示更新的两种情形：插件有新版，或内置界面与后端 API 已漂移。 */
+function pluginNeedsAttention(status) {
+  return Boolean(status) && (status.state === 'update-available' || (status.backend && status.backend.mismatch))
 }
 
 /** Load contacts once per page (cached; refresh() re-fetches). */
@@ -1018,11 +1054,38 @@ function SettingsPage() {
   const [, force] = useState(0)
   const refresh = useCallback(() => force((n) => n + 1), [])
   const user = store.user
+  const [plugin, setPlugin] = useState(null)
+  const [pluginMsg, setPluginMsg] = useState('')
+  const [pluginBusy, setPluginBusy] = useState(false)
 
   useEffect(() => {
     window.addEventListener('aischat:auth', refresh)
-    return () => window.removeEventListener('aischat:auth', refresh)
+    let alive = true
+    pluginApi('/status').then((s) => { if (alive) setPlugin(s) }).catch(() => {})
+    return () => {
+      alive = false
+      window.removeEventListener('aischat:auth', refresh)
+    }
   }, [refresh])
+
+  const applyPluginUpdate = async () => {
+    setPluginBusy(true)
+    setPluginMsg('')
+    try {
+      const result = await pluginApi('/apply', { method: 'POST' })
+      if (result.applyMode === 'restart') {
+        setPluginMsg(`已换入 ${result.changed.length} 个文件。host 半已变更，需重启 dsh-web 后生效。`)
+        setPlugin(await pluginApi('/status').catch(() => plugin))
+      } else {
+        setPluginMsg('已更新，正在刷新页面…')
+        setTimeout(() => window.location.reload(), 600)
+      }
+    } catch (e) {
+      setPluginMsg(`更新失败：${e.message}`)
+    } finally {
+      setPluginBusy(false)
+    }
+  }
 
   if (!user || !store.token) {
     return h('div', { style: { padding: 20, maxWidth: 420 } },
@@ -1049,6 +1112,29 @@ function SettingsPage() {
         onClick: () => openImmersive(`/aischat-ui${f.path}?embed=1`, f.label),
       }, f.label)),
     ),
+    h('div', { style: { fontSize: 13, fontWeight: 600, margin: '18px 0 8px', color: 'var(--dsw-alias-label-primary)' } }, '插件'),
+    h('div', { style: { ...style.row, padding: '6px 0' } },
+      h('div', { style: style.rowText },
+        h('div', { style: style.rowTitle },
+          plugin
+            ? `dsh-aischat ${(plugin.installed && plugin.installed.version) || '未知'} · ${shortId(plugin.installed && plugin.installed.id)}`
+            : 'dsh-aischat 版本检测中…'),
+        h('div', { style: style.rowSub }, pluginStateText(plugin)),
+      ),
+      pluginNeedsAttention(plugin)
+        ? h('button', {
+            style: style.smallBtn,
+            disabled: pluginBusy,
+            onClick: applyPluginUpdate,
+          }, pluginBusy ? '更新中…' : '更新')
+        : null,
+    ),
+    plugin && plugin.backend && plugin.backend.mismatch
+      ? h('div', { style: { ...style.hint, marginTop: 2 } },
+          `插件构建时后端为 ${plugin.backend.builtAgainst}，当前为 ${plugin.backend.running}；` +
+          '内置界面可能已与后端 API 不一致，建议更新插件。')
+      : null,
+    pluginMsg ? h('div', { style: { ...style.hint, marginTop: 2 } }, pluginMsg) : null,
     h('button', { style: { ...style.btn, background: 'var(--dsw-alias-state-danger-primary, #e5484d)', marginTop: 20 }, onClick: doLogout }, '退出登录'),
     h('div', { style: style.hint }, '服务通过本机同源代理访问，无公网地址参与。'),
   )
@@ -1056,6 +1142,14 @@ function SettingsPage() {
 
 function FooterButton({ wide }) {
   const [open, setOpen] = useState(false)
+  const [needsUpdate, setNeedsUpdate] = useState(false)
+  useEffect(() => {
+    let alive = true
+    pluginApi('/status')
+      .then((s) => { if (alive) setNeedsUpdate(pluginNeedsAttention(s)) })
+      .catch(() => { /* 宿主半不可达时不打扰用户 */ })
+    return () => { alive = false }
+  }, [])
   useEffect(() => {
     const onRefresh = () => setOpen(boardOpenRef.current)
     window.addEventListener('aischat:board-refresh', onRefresh)
@@ -1076,6 +1170,12 @@ function FooterButton({ wide }) {
   },
     h(IconNewChatOutline16, { size: rail ? 18 : 16 }),
     rail ? null : h('span', { style: { fontWeight: 500 } }, 'AIsChat'),
+    needsUpdate
+      ? h('span', {
+          title: 'AIsChat 插件有更新',
+          style: { flex: 'none', width: 7, height: 7, borderRadius: '50%', background: 'var(--dsw-alias-state-danger-primary, #e5484d)' },
+        })
+      : null,
   )
 }
 

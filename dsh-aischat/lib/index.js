@@ -1,19 +1,245 @@
 // src/index.ts
 import http from "node:http";
 import z from "@deepseek-ai/schemastery";
-import { createReadStream, existsSync, statSync, mkdirSync, readFileSync, writeFileSync, realpathSync, readdirSync, unlinkSync } from "node:fs";
-import { join, normalize, extname, sep } from "node:path";
-import { fileURLToPath } from "node:url";
+import { createReadStream, existsSync as existsSync2, statSync, mkdirSync as mkdirSync2, readFileSync as readFileSync2, writeFileSync as writeFileSync2, realpathSync, readdirSync, unlinkSync } from "node:fs";
+import { join as join2, normalize, extname, sep } from "node:path";
 import os from "node:os";
+
+// src/plugin-update.ts
+import { createHash } from "node:crypto";
+import {
+  copyFileSync,
+  existsSync,
+  mkdirSync,
+  readFileSync,
+  renameSync,
+  rmSync,
+  writeFileSync
+} from "node:fs";
+import { dirname, isAbsolute, join, resolve } from "node:path";
+import { fileURLToPath } from "node:url";
+var PLUGIN_NAME = "dsh-aischat";
+var MANIFEST_REL = "lib/manifest.json";
+var PLUGIN_PREFIX = "/aischat-plugin";
+var HOST_ENTRY = "lib/index.js";
+var STAGING_DIR = ".aischat-plugin-staging";
+var BACKUP_DIR = ".aischat-plugin-previous";
+var PACKAGE_ROOT = join(fileURLToPath(new URL(".", import.meta.url)), "..");
+function sha256File(path) {
+  return createHash("sha256").update(readFileSync(path)).digest("hex");
+}
+function manifestId(manifest) {
+  const canonical = JSON.stringify(
+    Object.keys(manifest.files).sort().map((rel) => [rel, manifest.files[rel]])
+  );
+  return createHash("sha256").update(canonical).digest("hex");
+}
+function readManifest(root) {
+  const path = join(root, MANIFEST_REL);
+  if (!existsSync(path)) return null;
+  try {
+    const parsed = JSON.parse(readFileSync(path, "utf8"));
+    if (!parsed || typeof parsed !== "object" || !parsed.files || typeof parsed.files !== "object") return null;
+    return parsed;
+  } catch {
+    return null;
+  }
+}
+function packageNameOf(root) {
+  try {
+    const pkg = JSON.parse(readFileSync(join(root, "package.json"), "utf8"));
+    return typeof pkg.name === "string" ? pkg.name : null;
+  } catch {
+    return null;
+  }
+}
+function resolveSourceRoot(installRoot, explicit) {
+  if (explicit && explicit.trim()) {
+    const root = resolve(explicit.trim());
+    return packageNameOf(root) === PLUGIN_NAME ? { root, how: "config" } : { root: null, how: "config-invalid" };
+  }
+  const profileRoot = dirname(dirname(installRoot));
+  if (packageNameOf(profileRoot) === null && !existsSync(join(profileRoot, "package.json"))) {
+    return { root: null, how: "no-profile-package" };
+  }
+  try {
+    const pkg = JSON.parse(readFileSync(join(profileRoot, "package.json"), "utf8"));
+    const spec = pkg.dependencies?.[PLUGIN_NAME];
+    if (!spec || !spec.startsWith("file:")) return { root: null, how: "no-file-spec" };
+    const raw = spec.slice("file:".length);
+    const root = isAbsolute(raw) ? raw : resolve(profileRoot, raw);
+    return packageNameOf(root) === PLUGIN_NAME ? { root, how: "profile-file-spec" } : { root: null, how: "source-missing" };
+  } catch {
+    return { root: null, how: "no-profile-package" };
+  }
+}
+async function fetchBackendVersion(backendUrl) {
+  try {
+    const res = await fetch(new URL("/health", backendUrl.endsWith("/") ? backendUrl : backendUrl + "/"), {
+      signal: AbortSignal.timeout(1500)
+    });
+    if (!res.ok) return null;
+    const body = await res.json();
+    return typeof body.version === "string" ? body.version : null;
+  } catch {
+    return null;
+  }
+}
+function summarize(manifest) {
+  return manifest ? { version: manifest.version, id: manifestId(manifest), buildStamp: manifest.buildStamp } : null;
+}
+async function computeStatus(installRoot, backendUrl, explicitSource) {
+  const installedManifest = readManifest(installRoot);
+  const source = resolveSourceRoot(installRoot, explicitSource);
+  const availableManifest = source.root ? readManifest(source.root) : null;
+  const running = await fetchBackendVersion(backendUrl);
+  const installed = summarize(installedManifest);
+  const available = summarize(availableManifest);
+  let state;
+  if (!installed) state = "not-installed";
+  else if (!available) state = "source-unavailable";
+  else if (installed.id !== available.id) state = "update-available";
+  else state = "up-to-date";
+  const applyMode = installedManifest && availableManifest && installedManifest.files[HOST_ENTRY] !== availableManifest.files[HOST_ENTRY] ? "restart" : "hot";
+  const builtAgainst = installedManifest?.backendVersion ?? null;
+  return {
+    installed,
+    available,
+    source,
+    state,
+    applyMode,
+    backend: {
+      builtAgainst,
+      running,
+      mismatch: Boolean(builtAgainst && running && builtAgainst !== running)
+    }
+  };
+}
+var applying = false;
+function applyUpdate(installRoot, sourceRoot) {
+  if (applying) return { ok: false, changed: [], applyMode: "hot", error: "\u5DF2\u6709\u66F4\u65B0\u6B63\u5728\u8FDB\u884C" };
+  applying = true;
+  const staging = join(installRoot, STAGING_DIR);
+  try {
+    const manifest = readManifest(sourceRoot);
+    if (!manifest) {
+      return { ok: false, changed: [], applyMode: "hot", error: "\u66F4\u65B0\u6E90\u6CA1\u6709\u6784\u5EFA\u6E05\u5355\uFF0C\u8BF7\u5148\u5728\u6E90\u7801\u76EE\u5F55\u6267\u884C node scripts/build.mjs" };
+    }
+    const previous = readManifest(installRoot);
+    const rels = Object.keys(manifest.files).sort();
+    rmSync(staging, { recursive: true, force: true });
+    for (const rel of rels) {
+      const src = join(sourceRoot, rel);
+      if (!existsSync(src)) {
+        return { ok: false, changed: [], applyMode: "hot", error: `\u66F4\u65B0\u6E90\u7F3A\u5C11\u6E05\u5355\u5217\u51FA\u7684\u6587\u4EF6\uFF1A${rel}` };
+      }
+      const actual = sha256File(src);
+      if (actual !== manifest.files[rel]) {
+        return { ok: false, changed: [], applyMode: "hot", error: `\u66F4\u65B0\u6E90\u6587\u4EF6\u4E0E\u6E05\u5355\u4E0D\u7B26\uFF1A${rel}\uFF08\u6E90\u7801\u53EF\u80FD\u5DF2\u6539\u52A8\u4F46\u672A\u91CD\u65B0\u6784\u5EFA\uFF09` };
+      }
+      const staged = join(staging, rel);
+      mkdirSync(dirname(staged), { recursive: true });
+      copyFileSync(src, staged);
+    }
+    const hostChanged = previous?.files[HOST_ENTRY] !== manifest.files[HOST_ENTRY];
+    const backup = join(installRoot, BACKUP_DIR);
+    const changed = [];
+    for (const rel of [...rels, MANIFEST_REL]) {
+      const target = join(installRoot, rel);
+      if (existsSync(target)) {
+        const saved = join(backup, rel);
+        mkdirSync(dirname(saved), { recursive: true });
+        copyFileSync(target, saved);
+      }
+      if (rel === MANIFEST_REL) continue;
+      if (previous?.files[rel] !== manifest.files[rel]) changed.push(rel);
+      mkdirSync(dirname(target), { recursive: true });
+      renameSync(join(staging, rel), target);
+    }
+    writeFileSync(join(installRoot, MANIFEST_REL), JSON.stringify(manifest, null, 2), "utf8");
+    return {
+      ok: true,
+      changed,
+      applyMode: hostChanged ? "restart" : "hot",
+      installed: { version: manifest.version, id: manifestId(manifest) }
+    };
+  } catch (e) {
+    return { ok: false, changed: [], applyMode: "hot", error: String(e.message ?? e) };
+  } finally {
+    rmSync(staging, { recursive: true, force: true });
+    applying = false;
+  }
+}
+function rollback(installRoot) {
+  const backup = join(installRoot, BACKUP_DIR);
+  const manifest = readManifest(backup);
+  if (!manifest) return { ok: false, changed: [], applyMode: "hot", error: "\u6CA1\u6709\u53EF\u56DE\u6EDA\u7684\u5907\u4EFD" };
+  try {
+    const restored = [];
+    for (const rel of [...Object.keys(manifest.files), MANIFEST_REL]) {
+      const src = join(backup, rel);
+      if (!existsSync(src)) continue;
+      const target = join(installRoot, rel);
+      mkdirSync(dirname(target), { recursive: true });
+      copyFileSync(src, target);
+      restored.push(rel);
+    }
+    return {
+      ok: true,
+      changed: restored,
+      applyMode: "restart",
+      installed: { version: manifest.version, id: manifestId(manifest) }
+    };
+  } catch (e) {
+    return { ok: false, changed: [], applyMode: "hot", error: String(e.message ?? e) };
+  }
+}
+function registerPluginRoutes(register, opts) {
+  register({
+    kind: "prefix",
+    path: PLUGIN_PREFIX,
+    handler: (req, res) => {
+      const route = (req.url ?? "/").split("?")[0];
+      const send = (status, payload) => {
+        res.writeHead(status, { "content-type": "application/json; charset=utf-8" });
+        res.end(JSON.stringify(payload));
+      };
+      if (req.method === "GET" && route === `${PLUGIN_PREFIX}/status`) {
+        computeStatus(opts.installRoot, opts.backendUrl, opts.sourceDir).then((status) => send(200, status)).catch((e) => send(500, { error: String(e?.message ?? e) }));
+        return;
+      }
+      if (req.method === "POST" && route === `${PLUGIN_PREFIX}/apply`) {
+        const resolved = resolveSourceRoot(opts.installRoot, opts.sourceDir);
+        if (!resolved.root) {
+          send(409, { ok: false, error: `\u65E0\u6CD5\u5B9A\u4F4D\u66F4\u65B0\u6E90\uFF08${resolved.how}\uFF09`, source: resolved });
+          return;
+        }
+        const result = applyUpdate(opts.installRoot, resolved.root);
+        opts.log?.(result.ok ? `updated ${result.changed.length} file(s), applyMode=${result.applyMode}` : `update failed: ${result.error}`);
+        send(result.ok ? 200 : 409, { ...result, source: resolved });
+        return;
+      }
+      if (req.method === "POST" && route === `${PLUGIN_PREFIX}/rollback`) {
+        const result = rollback(opts.installRoot);
+        send(result.ok ? 200 : 409, result);
+        return;
+      }
+      send(404, { error: "not found" });
+    }
+  });
+}
+
+// src/index.ts
 var name = "dsh-aischat";
 var inject = ["webServer", "tools", "systemPrompt"];
 var Config = z.object({
-  backendUrl: z.string().default("http://127.0.0.1:5228")
+  backendUrl: z.string().default("http://127.0.0.1:5228"),
+  pluginSourceDir: z.string().default("")
 });
 var HTTP_PREFIX = "/aischat-api";
 var WS_PATH = "/aischat-ws";
 var UI_PREFIX = "/aischat-ui";
-var UI_ROOT = join(fileURLToPath(new URL(".", import.meta.url)), "..", "dist");
+var UI_ROOT = join2(PACKAGE_ROOT, "dist");
 var MIME = {
   ".html": "text/html; charset=utf-8",
   ".js": "text/javascript; charset=utf-8",
@@ -37,17 +263,17 @@ var MIME = {
 function serveStatic(req, res) {
   const raw = (req.url ?? "/").split("?")[0];
   const rel = raw === UI_PREFIX || raw === `${UI_PREFIX}/` ? "/index.html" : raw.slice(UI_PREFIX.length);
-  const candidate = normalize(join(UI_ROOT, rel));
+  const candidate = normalize(join2(UI_ROOT, rel));
   if (!candidate.startsWith(UI_ROOT)) {
     res.writeHead(403);
     res.end("forbidden");
     return;
   }
   let file = candidate;
-  if (!existsSync(file) || statSync(file).isDirectory()) {
-    file = join(UI_ROOT, "index.html");
+  if (!existsSync2(file) || statSync(file).isDirectory()) {
+    file = join2(UI_ROOT, "index.html");
   }
-  if (!existsSync(file)) {
+  if (!existsSync2(file)) {
     res.writeHead(404);
     res.end("not found");
     return;
@@ -179,7 +405,7 @@ function proxyWs(backendUrl, req, socket, head) {
   if (head.length > 0) upstream.write(head);
   upstream.end();
 }
-var WORLD_DIR_BASE = join(process.env.DSH_HOME ?? join(os.homedir(), ".dsh"), "aischat-worlds");
+var WORLD_DIR_BASE = join2(process.env.DSH_HOME ?? join2(os.homedir(), ".dsh"), "aischat-worlds");
 var WORLDS_PREFIX = "/aischat-worlds";
 var worldTokenMap = /* @__PURE__ */ new Map();
 var sessionTokenMap = /* @__PURE__ */ new Map();
@@ -187,7 +413,7 @@ function sanitizeDirName(name2) {
   return String(name2 || "").replace(/[\\/:*?"<>|\u0000-\u001f]/g, "_").trim() || "\u672A\u547D\u540D\u4E16\u754C";
 }
 function readJsonBody(req) {
-  return new Promise((resolve, reject) => {
+  return new Promise((resolve2, reject) => {
     let size = 0;
     const chunks = [];
     req.on("data", (c) => {
@@ -201,7 +427,7 @@ function readJsonBody(req) {
     });
     req.on("end", () => {
       try {
-        resolve(JSON.parse(Buffer.concat(chunks).toString("utf8") || "{}"));
+        resolve2(JSON.parse(Buffer.concat(chunks).toString("utf8") || "{}"));
       } catch {
         reject(new Error("invalid json"));
       }
@@ -210,7 +436,7 @@ function readJsonBody(req) {
   });
 }
 function backendRequest(backendUrl, method, path, opts = {}) {
-  return new Promise((resolve, reject) => {
+  return new Promise((resolve2, reject) => {
     let target;
     try {
       target = new URL(path, backendUrl.endsWith("/") ? backendUrl : `${backendUrl}/`);
@@ -236,7 +462,7 @@ function backendRequest(backendUrl, method, path, opts = {}) {
       res.on("data", (c) => {
         chunks.push(Buffer.isBuffer(c) ? c : Buffer.from(c));
       });
-      res.on("end", () => resolve({ status: res.statusCode ?? 502, text: Buffer.concat(chunks).toString("utf8") }));
+      res.on("end", () => resolve2({ status: res.statusCode ?? 502, text: Buffer.concat(chunks).toString("utf8") }));
     });
     req.on("error", reject);
     if (data) req.write(data);
@@ -261,9 +487,9 @@ function resolveWorldFromCwd(cwd) {
     const real = realpathSync(cwd);
     const base = realpathSync(WORLD_DIR_BASE);
     if (real !== base && !real.startsWith(base + sep)) return null;
-    const metaPath = join(real, ".aischat-world.json");
-    if (!existsSync(metaPath)) return null;
-    const meta = JSON.parse(readFileSync(metaPath, "utf8"));
+    const metaPath = join2(real, ".aischat-world.json");
+    if (!existsSync2(metaPath)) return null;
+    const meta = JSON.parse(readFileSync2(metaPath, "utf8"));
     const worldId = Number(meta.worldId);
     if (!Number.isInteger(worldId) || worldId <= 0) return null;
     return { worldId, name: String(meta.name ?? `\u4E16\u754C${worldId}`) };
@@ -278,14 +504,14 @@ function textOutput(value) {
 function listWorldDirs() {
   const out = [];
   try {
-    if (!existsSync(WORLD_DIR_BASE)) return out;
+    if (!existsSync2(WORLD_DIR_BASE)) return out;
     for (const entry of readdirSync(WORLD_DIR_BASE, { withFileTypes: true })) {
       if (!entry.isDirectory()) continue;
-      const metaPath = join(WORLD_DIR_BASE, entry.name, ".aischat-world.json");
+      const metaPath = join2(WORLD_DIR_BASE, entry.name, ".aischat-world.json");
       let worldId = null;
       let name2 = "";
       try {
-        const meta = JSON.parse(readFileSync(metaPath, "utf8"));
+        const meta = JSON.parse(readFileSync2(metaPath, "utf8"));
         worldId = Number(meta.worldId) || null;
         name2 = String(meta.name ?? "");
       } catch {
@@ -307,13 +533,13 @@ function isMirrorExcluded(relPath) {
 }
 function worldDirFor(worldId) {
   try {
-    if (!existsSync(WORLD_DIR_BASE)) return null;
+    if (!existsSync2(WORLD_DIR_BASE)) return null;
     for (const entry of readdirSync(WORLD_DIR_BASE, { withFileTypes: true })) {
       if (!entry.isDirectory()) continue;
-      const metaPath = join(WORLD_DIR_BASE, entry.name, ".aischat-world.json");
+      const metaPath = join2(WORLD_DIR_BASE, entry.name, ".aischat-world.json");
       try {
-        const meta = JSON.parse(readFileSync(metaPath, "utf8"));
-        if (Number(meta.worldId) === worldId) return join(WORLD_DIR_BASE, entry.name);
+        const meta = JSON.parse(readFileSync2(metaPath, "utf8"));
+        if (Number(meta.worldId) === worldId) return join2(WORLD_DIR_BASE, entry.name);
       } catch {
       }
     }
@@ -324,7 +550,7 @@ function worldDirFor(worldId) {
 var SNAPSHOT_FILE = ".aischat-sync.json";
 function readSnapshot(dir) {
   try {
-    const parsed = JSON.parse(readFileSync(join(dir, SNAPSHOT_FILE), "utf8"));
+    const parsed = JSON.parse(readFileSync2(join2(dir, SNAPSHOT_FILE), "utf8"));
     if (parsed && parsed.v === 1 && parsed.files && typeof parsed.files === "object") return parsed;
   } catch {
   }
@@ -332,7 +558,7 @@ function readSnapshot(dir) {
 }
 function writeSnapshot(dir, snap) {
   try {
-    writeFileSync(join(dir, SNAPSHOT_FILE), JSON.stringify(snap, null, 2), "utf8");
+    writeFileSync2(join2(dir, SNAPSHOT_FILE), JSON.stringify(snap, null, 2), "utf8");
   } catch {
   }
 }
@@ -348,7 +574,7 @@ function compareMirror(remoteTree, dir, snap) {
   for (const f of remoteTree) if (f.path && !isMirrorExcluded(f.path)) remote.set(f.path, f.mtime);
   const localFiles = walkDir(dir).filter((p) => !isMirrorExcluded(p));
   const local = /* @__PURE__ */ new Map();
-  for (const p of localFiles) local.set(p, statMtime(join(dir, p)));
+  for (const p of localFiles) local.set(p, statMtime(join2(dir, p)));
   const out = { added: [], removed: [], changedRemote: [], changedLocal: [], conflict: [] };
   const seen = /* @__PURE__ */ new Set();
   for (const [p, rm] of remote) {
@@ -437,9 +663,9 @@ async function pullWithSnapshot(backendUrl, worldId, dir, token, force = false) 
         skipped++;
         continue;
       }
-      const target = join(dir, rel);
-      mkdirSync(join(target, ".."), { recursive: true });
-      writeFileSync(target, content, "utf8");
+      const target = join2(dir, rel);
+      mkdirSync2(join2(target, ".."), { recursive: true });
+      writeFileSync2(target, content, "utf8");
       pulled++;
       pulledOk.push(rel);
     } catch {
@@ -450,7 +676,7 @@ async function pullWithSnapshot(backendUrl, worldId, dir, token, force = false) 
   for (const rel of cmp.removed) {
     if (force || !cmp.changedLocal.includes(rel)) {
       try {
-        unlinkSync(join(dir, rel));
+        unlinkSync(join2(dir, rel));
         pulled++;
         removedOk.push(rel);
       } catch {
@@ -461,7 +687,7 @@ async function pullWithSnapshot(backendUrl, worldId, dir, token, force = false) 
   const nextSnap = { v: 1, files: { ...snap.files } };
   for (const rel of pulledOk) {
     const rm = tree.find((t) => t.path === rel)?.mtime ?? snap.files[rel]?.rm ?? 0;
-    nextSnap.files[rel] = { lm: statMtime(join(dir, rel)), rm };
+    nextSnap.files[rel] = { lm: statMtime(join2(dir, rel)), rm };
   }
   for (const rel of removedOk) delete nextSnap.files[rel];
   writeSnapshot(dir, nextSnap);
@@ -498,7 +724,7 @@ async function pushWithSnapshot(backendUrl, worldId, dir, token, force = false) 
       continue;
     }
     try {
-      const content = readFileSync(join(dir, rel), "utf8");
+      const content = readFileSync2(join2(dir, rel), "utf8");
       const res = await backendRequest(backendUrl, "PUT", `/worlds/${worldId}/files`, { token, json: { path: rel, content } });
       if (res.status === 200) {
         pushed++;
@@ -522,7 +748,7 @@ async function pushWithSnapshot(backendUrl, worldId, dir, token, force = false) 
   const nextSnap = { v: 1, files: { ...snap.files } };
   for (const rel of pushedOk) {
     const rm = freshTree.find((t) => t.path === rel)?.mtime ?? snap.files[rel]?.rm ?? 0;
-    nextSnap.files[rel] = { lm: statMtime(join(dir, rel)), rm };
+    nextSnap.files[rel] = { lm: statMtime(join2(dir, rel)), rm };
   }
   for (const rel of removedOk) delete nextSnap.files[rel];
   writeSnapshot(dir, nextSnap);
@@ -544,7 +770,7 @@ function walkDir(root) {
       return;
     }
     for (const e of entries) {
-      const full = join(dir, e.name);
+      const full = join2(dir, e.name);
       const rel = full.slice(root.length).replace(/^[/\\]/, "");
       if (e.isDirectory()) {
         if (e.name === "__pycache__") continue;
@@ -578,6 +804,12 @@ function apply(ctx, config) {
       proxyWs(backendUrl, req, socket, head);
     }
   });
+  registerPluginRoutes((route) => ctx.webServer.register(route), {
+    installRoot: PACKAGE_ROOT,
+    backendUrl,
+    sourceDir: config.pluginSourceDir,
+    log: (message) => ctx.logger?.info?.(message)
+  });
   ctx.webServer.register({
     kind: "prefix",
     path: WORLDS_PREFIX,
@@ -596,14 +828,14 @@ function apply(ctx, config) {
             return;
           }
           const dirName = sanitizeDirName(`AIC\u7FA4\u89C6\u754C-${name2 || `\u4E16\u754C${worldId}`}`);
-          const dir = join(WORLD_DIR_BASE, dirName);
+          const dir = join2(WORLD_DIR_BASE, dirName);
           try {
-            mkdirSync(dir, { recursive: true });
-            const metaPath = join(dir, ".aischat-world.json");
-            if (!existsSync(metaPath)) {
-              writeFileSync(metaPath, JSON.stringify({ worldId, name: name2 }, null, 2), "utf8");
+            mkdirSync2(dir, { recursive: true });
+            const metaPath = join2(dir, ".aischat-world.json");
+            if (!existsSync2(metaPath)) {
+              writeFileSync2(metaPath, JSON.stringify({ worldId, name: name2 }, null, 2), "utf8");
             } else {
-              const prev = JSON.parse(readFileSync(metaPath, "utf8"));
+              const prev = JSON.parse(readFileSync2(metaPath, "utf8"));
               if (Number(prev.worldId) !== worldId) {
                 send(409, { error: `\u76EE\u5F55\u5DF2\u5C5E\u4E8E\u4E16\u754C ${prev.worldId}` });
                 return;
@@ -940,7 +1172,13 @@ function apply(ctx, config) {
 export {
   Config,
   apply,
+  applyUpdate,
+  computeStatus,
   inject,
-  name
+  manifestId,
+  name,
+  readManifest,
+  resolveSourceRoot,
+  rollback
 };
 //# sourceMappingURL=index.js.map

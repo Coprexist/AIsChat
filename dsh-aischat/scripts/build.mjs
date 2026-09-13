@@ -9,8 +9,9 @@
  *   `react` stays external (the shell's own instance resolves at load time).
  */
 import { build } from 'esbuild'
-import { mkdirSync, readFileSync } from 'node:fs'
-import { dirname, join } from 'node:path'
+import { createHash } from 'node:crypto'
+import { existsSync, mkdirSync, readFileSync, readdirSync, writeFileSync } from 'node:fs'
+import { dirname, join, relative } from 'node:path'
 import { fileURLToPath } from 'node:url'
 
 const __dirname = dirname(fileURLToPath(import.meta.url))
@@ -75,4 +76,47 @@ for (const match of clientBundle.matchAll(/@deepseek-ai\/[a-z0-9-]+/g)) {
   }
 }
 
-console.log('built lib/index.js and lib/client.js')
+// ── 构建清单：自更新的内容寻址身份 ──────────────────────────────────
+// 记录每个运行时产物的 sha256；对清单取摘要即为本次构建的身份，因此不需要
+// 人工维护版本号。sourcemap 属调试辅助，不进清单，避免注释改动也改变身份。
+const BUNDLES = ['lib/index.js', 'lib/client.js']
+
+function listDist(dir) {
+  const out = []
+  for (const entry of readdirSync(dir, { withFileTypes: true })) {
+    const abs = join(dir, entry.name)
+    if (entry.isDirectory()) out.push(...listDist(abs))
+    else if (!entry.name.endsWith('.map')) out.push(abs)
+  }
+  return out
+}
+
+const distRoot = join(root, 'dist')
+const artifacts = [
+  ...BUNDLES.map((rel) => join(root, rel)),
+  ...(existsSync(distRoot) ? listDist(distRoot) : []),
+]
+
+const files = {}
+for (const abs of artifacts.sort()) {
+  files[relative(root, abs).split('\\').join('/')] = createHash('sha256').update(readFileSync(abs)).digest('hex')
+}
+
+// 记录构建时后端版本，供运行时检测“插件内置 UI 与后端 API 是否已漂移”
+const backendUrl = process.env.AISCHAT_BACKEND_URL ?? 'http://127.0.0.1:5228'
+let backendVersion = null
+try {
+  const res = await fetch(new URL('/health', backendUrl), { signal: AbortSignal.timeout(1500) })
+  if (res.ok) backendVersion = (await res.json()).version ?? null
+} catch { /* 后端未运行时不阻塞构建，清单里留 null */ }
+
+const manifest = {
+  name: 'dsh-aischat',
+  version: JSON.parse(readFileSync(join(root, 'package.json'), 'utf8')).version,
+  buildStamp: new Date().toISOString(),
+  backendVersion,
+  files,
+}
+writeFileSync(join(root, 'lib/manifest.json'), JSON.stringify(manifest, null, 2) + '\n', 'utf8')
+
+console.log(`built lib/index.js and lib/client.js (${Object.keys(files).length} artifacts, backend=${backendVersion ?? 'n/a'})`)

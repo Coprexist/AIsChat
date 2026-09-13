@@ -27,8 +27,8 @@ import type { Duplex } from 'node:stream'
 import z from '@deepseek-ai/schemastery'
 import { createReadStream, existsSync, statSync, mkdirSync, readFileSync, writeFileSync, realpathSync, readdirSync, unlinkSync } from 'node:fs'
 import { join, normalize, extname, sep } from 'node:path'
-import { fileURLToPath } from 'node:url'
 import os from 'node:os'
+import { PACKAGE_ROOT, registerPluginRoutes } from './plugin-update.js'
 
 /** Stable Cordis plugin name. */
 export const name = 'dsh-aischat'
@@ -36,15 +36,25 @@ export const name = 'dsh-aischat'
 /** 代理、世界工作区同步与世界操作工具都需要这些服务。 */
 export const inject = ['webServer', 'tools', 'systemPrompt']
 
-/** Plugin config: only the local backend base URL. */
+/** Plugin config: backend base URL and an optional plugin update source. */
 export type Config = {
   /** AIsChat backend base URL, e.g. http://127.0.0.1:5228 (loopback only). */
   backendUrl: string
+  /**
+   * 插件自更新的源目录（内含 lib/manifest.json 的构建产物）。
+   * 留空则回溯安装来源：profile 的 package.json 里 dependencies['dsh-aischat']
+   * 的 file: 规格，通常无需配置。
+   */
+  pluginSourceDir: string
 }
 
 export const Config: z<Config> = z.object({
   backendUrl: z.string().default('http://127.0.0.1:5228'),
+  pluginSourceDir: z.string().default(''),
 })
+
+// 自更新原语对外导出：scripts/update-test.mjs 离线验证用，也可供运维脚本按需调用。
+export { applyUpdate, computeStatus, manifestId, readManifest, resolveSourceRoot, rollback } from './plugin-update.js'
 
 /** Routes owned by this plugin. */
 const HTTP_PREFIX = '/aischat-api'
@@ -53,7 +63,7 @@ const WS_PATH = '/aischat-ws'
 const UI_PREFIX = '/aischat-ui'
 
 /** 静态资源根目录：插件包内 dist/（前端 BASE_URL=/aischat-ui/ 构建产物）。 */
-const UI_ROOT = join(fileURLToPath(new URL('.', import.meta.url)), '..', 'dist')
+const UI_ROOT = join(PACKAGE_ROOT, 'dist')
 
 /** 静态文件 content-type 表（前端产物常用子集；缺省 application/octet-stream）。 */
 const MIME: Record<string, string> = {
@@ -711,6 +721,14 @@ export function apply(ctx: Context, config: Config): void {
     handler: (req, socket, head) => {
       proxyWs(backendUrl, req, socket, head)
     },
+  })
+
+  // ── 插件自更新端点（状态 / 换入 / 回滚） ────────────────────────────
+  registerPluginRoutes((route) => ctx.webServer.register(route), {
+    installRoot: PACKAGE_ROOT,
+    backendUrl,
+    sourceDir: config.pluginSourceDir,
+    log: (message) => ctx.logger?.info?.(message),
   })
 
   // ── 世界工作区同步端点 ──────────────────────────────────────────────

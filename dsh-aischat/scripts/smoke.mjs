@@ -11,7 +11,7 @@ const GATEWAY_PORT = 59229
 const backend = createServer((req, res) => {
   if (req.url.startsWith('/health')) {
     res.writeHead(200, { 'content-type': 'application/json' })
-    res.end(JSON.stringify({ status: 'ok' }))
+    res.end(JSON.stringify({ status: 'ok', version: '0.0.0-smoke' }))
     return
   }
   res.writeHead(404)
@@ -35,13 +35,19 @@ backend.on('upgrade', (req, socket) => {
 })
 await new Promise((r) => backend.listen(BACKEND_PORT, '127.0.0.1', r))
 
-// Mock webServer service: prefix + upgrade registries.
-const registrations = { prefix: null, upgrade: null }
+// Mock webServer service: keep every prefix registration and dispatch by
+// longest match, mirroring the real carrier so multi-route plugins are covered.
+const registrations = { prefixes: [], upgrade: null }
 const webServer = {
   register(route) {
-    if (route.kind === 'prefix') registrations.prefix = route
+    if (route.kind === 'prefix') registrations.prefixes.push(route)
   },
   registerUpgrade(route) { registrations.upgrade = route },
+}
+function matchPrefix(url) {
+  return registrations.prefixes
+    .filter((r) => url.startsWith(r.path))
+    .sort((a, b) => b.path.length - a.path.length)[0]
 }
 
 // Import built host half and apply it.
@@ -49,16 +55,18 @@ const mod = await import('../lib/index.js')
 mod.apply(
   {
     webServer,
+    tools: { register: () => {} },
+    systemPrompt: { section: () => {} },
     logger: { info: () => {} },
     effect: () => () => {},
   },
-  { backendUrl: `http://127.0.0.1:${BACKEND_PORT}` },
+  { backendUrl: `http://127.0.0.1:${BACKEND_PORT}`, pluginSourceDir: '' },
 )
 
 // Gateway server: dispatch to registered handlers.
 const gateway = createServer((req, res) => {
-  const r = registrations.prefix
-  if (r && req.url.startsWith(r.path)) {
+  const r = matchPrefix(req.url ?? '/')
+  if (r) {
     r.handler(req, res)
     return
   }
@@ -78,7 +86,13 @@ const body = await res.json()
 console.log('HTTP proxy /aischat-api/health ->', res.status, JSON.stringify(body))
 if (res.status !== 200 || body.status !== 'ok') throw new Error('HTTP proxy failed')
 
-// 2. WS upgrade proxy
+// 2. Plugin self-update status endpoint
+const pluginStatus = await fetch(`http://127.0.0.1:${GATEWAY_PORT}/aischat-plugin/status`)
+const pluginBody = await pluginStatus.json()
+console.log('plugin /status ->', pluginStatus.status, JSON.stringify(pluginBody))
+if (pluginStatus.status !== 200 || !pluginBody.state) throw new Error('plugin status failed')
+
+// 3. WS upgrade proxy
 const ws = new WebSocket(`ws://127.0.0.1:${GATEWAY_PORT}/aischat-ws?token=test`)
 await new Promise((resolve, reject) => {
   ws.onopen = () => resolve()

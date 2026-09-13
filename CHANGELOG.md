@@ -9,6 +9,30 @@
 
 ### ✨ 新增功能
 
+#### dsh-aischat 插件支持一键自更新与版本漂移提示
+- 设置页的 AIsChat 分区底部新增插件版本行：显示构建身份（摘要前 7 位）与状态，
+  检测到不一致时出现 **更新** 按钮；侧边栏底部的 AIsChat 入口在有更新时显示角标
+- **身份用内容摘要，不用版本号**：`node scripts/build.mjs` 产出 `lib/manifest.json`，
+  清单里每个产物带 sha256，对清单取摘要即该次构建的身份（同镜像 digest 的用法）。
+  因此不存在"忘了 bump 版本号导致检测不到"的情形
+- **更新源零配置**：插件回溯安装来源——profile 的 `package.json` 里
+  `dependencies["dsh-aischat"]` 的 `file:` 规格（pnpm/npm 记录的就是它）。
+  真机实测解析成功；需要指向别处时用新的 `pluginSourceDir` 配置覆盖
+- **换入不留半新半旧**：先暂存并逐文件校验 sha256（源码改过但没重新构建会被拒绝，
+  实测确认拒绝后安装副本未被改动），通过后备份旧文件、逐文件原子改名，
+  构建清单最后落盘作为提交点；上一次状态留在 `.aischat-plugin-previous/` 可回滚
+- **如实区分两种生效方式**：只动 client/UI 为 `hot`（自动刷新页面），
+  动了 host 半为 `restart`（必须重启 dsh-web——它正被进程加载，覆盖文件不会热替换）。
+  插件不自行重启宿主进程，那会掐断当前会话
+- **后端版本漂移检测**：构建时把后端 `/health` 的 `version` 写进清单，运行时再比一次。
+  "插件内置 UI 调用了已不存在的后端接口"这类事故——本次 `/groups/{id}/messages` 改成
+  `/gm/{id}/messages` 正是一例——现在会在设置页直接提示
+- 新增 `/aischat-plugin/status|apply|rollback` 三个同源端点；新增
+  `scripts/update-test.mjs`（15 条断言，覆盖换入/幂等/篡改拒绝/restart 判定/回滚）
+- 顺带修好 `scripts/smoke.mjs`：它只留得住最后一个 prefix 路由，且 `ctx.tools` 未 mock
+  导致 `apply()` 直接抛错——世界工具加进来之后它就没再跑通过。现在按最长前缀匹配派发，
+  并把插件端点纳入冒烟范围
+
 #### 管理页「添加供应商」可以一键获取模型列表
 - 供应商表单的「模型选项列表 (JSON)」旁边多了一个 **获取模型** 按钮：填好 API Base URL 后点它，
   自动拉 `/v1/models` 并把模型清单填进 JSON（拿不到就把人话原因写在下面，而不是静默失败）

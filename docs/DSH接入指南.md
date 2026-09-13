@@ -83,6 +83,60 @@ systemctl restart dsh-web   # 或重启 dsh web 进程
 > 开发态改动同步：改 `src/*.ts` 后重跑 build，把 `lib/` 与 `dist/` 复制到
 > profile 的 `node_modules/dsh-aischat/`，Host 改动需重启 dsh-web，Client 改动刷新页面即可。
 
+### 3.5 插件自更新
+
+DSH 设置页的 **AIsChat** 分区底部新增一行插件版本信息，检测到不一致时出现 **更新** 按钮；
+侧边栏底部的 AIsChat 入口在有更新时显示角标。
+
+**身份用内容摘要，不用版本号。** `node scripts/build.mjs` 会产出 `lib/manifest.json`：
+清单里每个产物带 sha256，对清单取摘要即该次构建的身份（同镜像 digest 的用法）。
+因此不存在"忘了 bump 版本号导致检测不到"的情形——内容变了身份就变。
+
+**更新源零配置。** 插件回溯安装来源：profile 的 `package.json` 里
+`dependencies["dsh-aischat"]` 的 `file:` 规格（pnpm/npm 记录的就是它）。
+需要指向别处时再配 `pluginSourceDir`：
+
+```yaml
+- insert:
+    - id: dsh-aischat
+      name: dsh-aischat
+      config:
+        pluginSourceDir: /path/to/dsh-aischat
+```
+
+**换入过程不会留半新半旧的状态**：先暂存并逐文件校验 sha256（源码改过但没重新构建会被
+拒绝），通过后备份旧文件、逐文件原子改名，构建清单最后落盘作为提交点。上一次的状态保留在
+`.aischat-plugin-previous/`，可回滚。
+
+**两种生效方式，界面会如实告知**：
+
+| 变更范围 | applyMode | 生效方式 |
+|---|---|---|
+| 只动了 `lib/client.js` / `dist/` | `hot` | 自动刷新页面即生效 |
+| 动了 `lib/index.js`（Host 半） | `restart` | 必须重启 dsh-web——它正被进程加载，覆盖文件不会热替换 |
+
+插件不会自行重启宿主进程（那会掐断当前会话）。
+
+**接口**（同为同源，无需认证）：
+
+| 方法 | 路径 | 说明 |
+|------|------|------|
+| GET | `/aischat-plugin/status` | 已装/可用的身份、更新源解析依据、applyMode、后端版本漂移 |
+| POST | `/aischat-plugin/apply` | 执行换入 |
+| POST | `/aischat-plugin/rollback` | 回滚到上一次换入前 |
+
+**后端版本漂移检测**：构建时把后端 `/health` 的 `version` 写进清单，运行时再比一次。
+后端 API 变了而插件内置的 `dist/` 还是旧的，会在设置页直接提示——这正是"插件 UI 调用了
+已不存在的接口"这类事故的成因。
+
+离线验证（全程临时目录，不碰 profile 安装副本）：
+
+```bash
+cd dsh-aischat
+node scripts/update-test.mjs   # 换入 / 幂等 / 篡改拒绝 / restart 判定 / 回滚
+node scripts/smoke.mjs         # Host 半挂到 mock webServer，验代理与插件端点
+```
+
 ---
 
 ## 4. 世界工作区（核心特性）
