@@ -314,6 +314,32 @@ async def migrated_db():
 
 需要 `TEST_DATABASE_URL` 指向测试库。在容器里用 1.1 的运行器（它会替你推导 URL 并加闸）。
 
+### 5.5 发图链路的脚手架：怎么加第 6 条用例
+
+`test_world_chat_images.py` 里的几个私有辅助函数就是全部脚手架，新用例直接复用：
+
+| 辅助函数 | 作用 | 注意 |
+|---------|------|------|
+| `_seed_world(db, with_image=)` | 清库 → 建临时用户 + 世界 → 可选地落一张真实 1×1 PNG | 开头 `TRUNCATE worlds, users CASCADE`；返回 `(world_id, attachment)` |
+| `_prepare(db, world_id, items)` | 走真实链路调 `_prepare_world_chat`（`stream_world_chat` 的准备阶段）| 它会**落库**用户消息，所以多轮用例天然带历史 |
+| `_last_user(messages)` | 取最后一条 user 消息 | 尾部还挂着时间/访客等 system 段，**不能取 `messages[-1]`** |
+| `_notes(messages)` | 取尾部「本轮附图」便签 | 用 `IMAGE_NOTE_PREFIX` 前缀识别 |
+| `_drop_image_file(attachment)` | 删掉用例造的图片 | 放 `finally`，别让 `/app/data/test-smoke/` 越堆越大 |
+
+五条用例各自守住的不变式（加新用例时别测重了）：
+
+| 用例 | 守住的不变式 |
+|------|-------------|
+| `test_plain_text_turn_survives_the_image_path` | 有历史的普通文字消息不能抛（P0 本体）|
+| `test_image_turn_injects_multimodal_parts_and_note` | 最后一条 user 是多模态 parts、真带 `data:` URL、便签数 = 实际注入数 |
+| `test_image_turn_persists_attachments` | 附件跟着消息落库（刷新后前端渲染缩略图靠它）|
+| `test_history_image_degrades_to_placeholder` | 历史图降级成 `[图片]`、只有最新一条带字节、本轮没图就不许发便签 |
+| `test_vision_degrade_strips_images_and_note_together` | `strip_image_parts` 之后图片与便签同时消失 |
+
+**写新用例时最容易踩的坑**：让用例只跑「第一轮」。历史为空时很多分支根本不会进入
+（`attachments=None` 只可能来自已落库的旧消息），于是就得到一条永远为绿的**假用例**。
+写完记得做第 1.2 节的变异验证。
+
 ---
 
 ## 六、端到端测试
