@@ -1,11 +1,12 @@
-"""LLM 端点拼接（app/utils/pure/llm_endpoint.py）—— 纯函数，零 IO。
+"""LLM 端点拼接（app/utils/pure/llm_endpoint.py）。纯函数。
 
-守 2026-09-13 的两起真实事故：
-1. 小米 MiMo 的 /models 是 404（漏了 /v1）→ 绑定 API Key **必失败**；
-2. 通义千问的 preset base_url 自带 /v1，再被补一次 → /v1/v1/chat/completions 404。
+对应两起线上事故：
+- 小米 MiMo 的 /models 返回 404（缺少 /v1），绑定 API Key 必然失败；
+- 通义千问预设的 base_url 已含 /v1，再补一次得到 /v1/v1/chat/completions，404。
 
-规则本身只有一句话：**base_url 末尾已有版本段（/vN）就不再补，否则补 /v1**。
-本文件既钉死这条规则，也用真实 PRESETS 做一次全覆盖（新增预设写错 base_url 会当场红）。
+规则：base_url 末尾已含版本段（/vN）则不再补，否则补 /v1。
+
+除固定该规则外，本文件遍历真实 PRESETS 校验全部预设：新增预设若写错 base_url，会立即失败。
 """
 from app.services.agent.provider_presets import PRESETS
 from app.utils.pure.llm_endpoint import (
@@ -17,20 +18,20 @@ from app.utils.pure.llm_endpoint import (
 
 
 def test_appends_v1_when_missing():
-    """MiMo 事故：不补 /v1 会让 /models 变成 404（openresty 直接 404）"""
+    """缺少 /v1 时 /models 返回 404（MiMo 事故）。"""
     assert api_root("https://api.xiaomimimo.com") == "https://api.xiaomimimo.com/v1"
     assert models_url("https://api.xiaomimimo.com") == "https://api.xiaomimimo.com/v1/models"
 
 
 def test_does_not_append_when_version_present():
-    """通义千问事故：base_url 自带 /v1，再补就成 /v1/v1 → 404（此前聊天一直是坏的）"""
+    """base_url 已含 /v1 时不得再补（通义千问事故：此前聊天一直是 404）。"""
     dashscope = "https://dashscope.aliyuncs.com/compatible-mode/v1"
     assert api_root(dashscope) == dashscope, "自带 /v1 的 base_url 不能再补一次"
     assert chat_completions_url(dashscope) == dashscope + "/chat/completions"
 
 
 def test_keeps_non_v1_version_segment():
-    """智谱的版本段是 v4，不是 v1 —— 不能假设版本号一定是 1"""
+    """版本段可以是 v4，不能假定为 v1。"""
     zhipu = "https://open.bigmodel.cn/api/paas/v4"
     assert chat_completions_url(zhipu) == zhipu + "/chat/completions"
 
@@ -47,7 +48,7 @@ def test_empty_or_none_base_url_does_not_crash():
 
 
 def test_embeddings_accepts_a_full_path():
-    """embedding 的 base_url 允许直接给到 /embeddings，不能再给它拼一层"""
+    """embedding 的 base_url 允许直接给到 /embeddings，此时不再拼接。"""
     full = "http://localhost:11434/v1/embeddings"
     assert embeddings_url(full) == full
     assert embeddings_url("http://localhost:11434/v1") == full
@@ -55,8 +56,8 @@ def test_embeddings_accepts_a_full_path():
 
 
 def test_every_preset_produces_a_wellformed_endpoint():
-    """真实预设全覆盖：chat / models 端点都不能出现重复版本段"""
-    assert PRESETS, "预设列表不该为空"
+    """遍历真实预设，校验 chat / models 端点不含重复版本段。"""
+    assert PRESETS, "预设列表为空"
     for key, preset in PRESETS.items():
         base = preset["base_url"]
         assert base.startswith(("http://", "https://")), key

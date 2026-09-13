@@ -71,6 +71,16 @@ docker exec -w /app \
 运行器只实现了 `pytest.fixture` 与 `pytest.mark`。需要参数化、插件、覆盖率就去装 pytest，
 不要往运行器里加功能。
 
+运行器接受**选择器**（子串匹配 `文件名::用例名`），用于只跑改动涉及的部分：
+
+```bash
+# 只跑发图链路（5 条）
+docker exec -w /app -e TEST_DATABASE_URL="$TEST" -e TEST_DATABASE_URL_SYNC="${TEST/+asyncpg/}" \
+  ai_group_backend python tests/run_without_pytest.py test_world_chat_images
+```
+
+实测差距：只跑发图链路 **5.8s**，全量 47 条 **49.8s**。改哪个文件就跑哪个，只在推送前跑全量。
+
 **启动闸**：库名不以 `_test` 结尾直接拒绝启动。运行器会 `drop_all` + `TRUNCATE`，
 而生产库与测试库在同一个 PostgreSQL 实例里、只差库名——这个闸不是形式主义。
 
@@ -112,21 +122,15 @@ echo "rc=$?"        # 这才是 cmd 的退出码
 tail -3 /tmp/out.txt
 ```
 
-#### ② 需要装依赖的验证，用一次性容器，别污染正在跑的生产容器
+#### ② 不在容器内安装依赖
 
-```bash
-docker run -i --rm --network <compose 网络> --entrypoint sh \
-  -v "$PWD/backend:/app" -w /app <镜像名> <<'INNER'
-pip install -q -i <镜像> coverage
-coverage run --source=app tests/run_without_pytest.py
-INNER
-```
+容器内安装的包不进 git、不进 `requirements.txt`，容器重建即丢失；在生产容器里还会直接改变
+正在运行服务的环境。需要某个工具时，走 CI（workflow 里显式声明），或在宿主机/开发机环境做。
 
-`--rm` 让装进去的东西随容器消失，生产容器一个字节都不变。
-**但注意**：容器挂载了 `./backend`，覆盖率运行会在**仓库里**写出 `.coverage`，跑完记得删
-（已加进 `.gitignore`）。
+若在容器外运行工具，注意工作目录是挂载进来的仓库：工具产物（`.coverage`、`coverage.xml`）
+会直接落到仓库里，用完删除（已在 `.gitignore` 中忽略）。
 
-#### ③ 断言前先问一句：这条用例会不会永远为绿
+#### ③ 永远为绿的用例是假覆盖
 
 见 1.2。只跑首轮的用例看着在测发图，实际上 `None` 那条分支根本没进去。
 **永远绿 + 断言齐全 + 覆盖率好看**，是假覆盖的三个特征。
@@ -145,6 +149,14 @@ assert doc_yaml_block.rstrip() == open(".github/workflows/test.yml").read().rstr
 ```
 
 手抄一份 workflow 进文档，等于给自己留一张迟早过期的假地图——而看文档的人不会去核对。
+
+#### ⑥ 本地能过不等于 CI 能过
+
+测试把图片写进 `settings.data_dir`（硬编码为 `/app/data`）：本地 `/app` 可写、全绿；
+CI runner 上 `/app` 属另一用户不可写，4 条用例直接 `PermissionError`。
+
+只要测试依赖**环境可写性**或**绝对路径**，就必须在 CI 上验证过才算数。
+修法是不要让测试碰真实数据目录：`data_dir` 是只读 property，测试临时替换类描述符，退出还原。
 
 ---
 
@@ -336,18 +348,17 @@ cd /tmp/zfsv3/sata11/15228874271/data/aischat && \
 ```python
 # backend/tests/test_world_chat_images.py
 async def test_image_turn_injects_multimodal_parts_and_note(migrated_db):
-    """带图消息：最后一条 user 是多模态 parts，便签数与**实际注入数**一致。"""
-    async with async_session() as db:
-        world_id, attachment = await _seed_world(db, with_image=True)
-        try:
-            ctx = await _prepare(db, world_id, [
-                ChatItem(text="这是什么？", attachments=(attachment,)),
-            ])
-        finally:
-            _drop_image_file(attachment)
+    """带图消息生成多模态 parts，便签数量等于实际注入数。"""
+    with _temp_data_dir():
+        async with async_session() as db:
+            world_id, attachment = await _seed_world(db, with_image=True)
+            ctx = await _prepare(
+                db, world_id,
+                [ChatItem(text="这是什么？", attachments=(attachment,))],
+            )
 
     body = _last_user(ctx["messages"])
-    assert isinstance(body["content"], list), "图片被静默丢弃了：content 本应是 parts 列表"
+    assert isinstance(body["content"], list), "图片被丢弃，content 应为 parts 列表"
     urls = [p["image_url"]["url"] for p in body["content"] if p.get("type") == "image_url"]
     assert urls[0].startswith("data:image/png;base64,")
 ```
@@ -388,11 +399,14 @@ async def migrated_db():
 
 | 辅助函数 | 作用 | 注意 |
 |---------|------|------|
+| `_temp_data_dir()` | 上下文管理器，把 `settings.data_dir` 指向临时目录 | `data_dir` 是只读 property，实现上替换类描述符并在退出时还原；不做这一步会污染生产数据目录，且在 CI 上不可写 |
 | `_seed_world(db, with_image=)` | 清库 → 建临时用户 + 世界 → 可选地落一张真实 1×1 PNG | 开头 `TRUNCATE worlds, users CASCADE`；返回 `(world_id, attachment)` |
 | `_prepare(db, world_id, items)` | 走真实链路调 `_prepare_world_chat`（`stream_world_chat` 的准备阶段）| 它会**落库**用户消息，所以多轮用例天然带历史 |
 | `_last_user(messages)` | 取最后一条 user 消息 | 尾部还挂着时间/访客等 system 段，**不能取 `messages[-1]`** |
 | `_notes(messages)` | 取尾部「本轮附图」便签 | 用 `IMAGE_NOTE_PREFIX` 前缀识别 |
-| `_drop_image_file(attachment)` | 删掉用例造的图片 | 放 `finally`，别让 `/app/data/test-smoke/` 越堆越大 |
+
+
+每个用例都必须在 `_temp_data_dir()` 内执行 `_seed_world` 与 `_prepare`。
 
 五条用例各自守住的不变式（加新用例时别测重了）：
 
@@ -516,8 +530,7 @@ flowchart LR
 
 ### 9.2 基线（2026-09-13 实测）
 
-怎么跑出这个数字见 **9.5** —— 那里给了「官方源」与「国内镜像」两套**各自完整**的命令，
-按自己所在网络整段复制即可，不需要手动改任何一行。
+该数字由 CI 的覆盖率报表产出（见 9.5 与第十节），本节只记录结果。
 
 | 指标 | 值 |
 |------|-----|
@@ -572,50 +585,41 @@ repo 里的 admin 最大但风险最低（管理员专用、输入可信），**
 
 增量门禁只能拦住**新增**的坏味道，拦不住已经烂在那儿的部分——所以 4.2 的缺口仍要单独补。
 
-### 9.5 怎么跑出覆盖率：两套完整命令，按网络选一套
+### 9.5 覆盖率数字从哪来
 
-**规则一句话**：能直连官方源就用 **A**；所在网络访问不到官方源（如中国大陆）就用 **B**。
-两版除 `pip install` 那一行外完全相同，**都可以整段复制执行，不用手动改任何一行**。
+**常规来源：CI 报表。** workflow 里跑 `pytest --cov=app --cov-report=term-missing`，
+日志中直接给出 `TOTAL` 与逐文件明细（见第十节）。CI 在 GitHub 上执行，用官方源，不加镜像。
 
-#### A. 官方源 / Official source（国际网络 · international）
+**本地复现**需要一个已装好依赖的 Python 环境（如开发机上的 venv）。
+本项目禁止在容器内安装依赖（见 1.3 ②），因此不在容器里做这件事。
+按所在网络选一套安装命令：
+
+#### A. 官方源 / Official source（国际网络）
 
 ```bash
-# 在仓库根目录执行。一次性容器：装进去的东西随容器消失，不污染正在跑的生产容器
-docker run -i --rm --network aischat_default --entrypoint sh \
-  -v "$PWD/backend:/app" -w /app aischat-backend <<'INNER'
-pip install -q coverage
-coverage run --source=app tests/run_without_pytest.py
-coverage report
-INNER
+pip install coverage
 ```
 
 #### B. 国内镜像 / China mainland mirror
 
 ```bash
-# 与 A 完全相同，只是 pip 多指定了一个国内镜像
-docker run -i --rm --network aischat_default --entrypoint sh \
-  -v "$PWD/backend:/app" -w /app aischat-backend <<'INNER'
-pip install -q -i https://pypi.tuna.tsinghua.edu.cn/simple coverage
-coverage run --source=app tests/run_without_pytest.py
-coverage report
-INNER
+pip install -i https://pypi.tuna.tsinghua.edu.cn/simple coverage
 ```
 
-**只在本机装（不跑容器）时**同样是两套：
+装好后在仓库根目录执行：
 
-| 网络环境 | 命令 |
-|---------|------|
-| 国际 / Official | `pip install coverage` |
-| 中国大陆 / China mainland | `pip install -i https://pypi.tuna.tsinghua.edu.cn/simple coverage` |
+```bash
+cd backend
+coverage run --source=app tests/run_without_pytest.py
+coverage report
+```
 
-可用的国内镜像（实测 200 / 亚秒级）：清华 `https://pypi.tuna.tsinghua.edu.cn/simple`、
+可用的国内镜像：清华 `https://pypi.tuna.tsinghua.edu.cn/simple`、
 阿里 `https://mirrors.aliyun.com/pypi/simple/`。
 
-> **为什么会有 B 这一版**（本项目部署环境的实测记录，与通用用法无关）：这台 NAS 上 `pypi.org`
-> **DNS 解析超时**（`curl: (28) Resolving timed out after 15000 ms`），`pip download` 30 秒被杀（rc=124）。
-> 注意这**不是"没有外网"**——`api.deepseek.com` 100 ms 可达；容器 DNS 同样解析不了 pypi.org。
-
-**CI 用官方源**（GitHub Actions 在海外），不要加镜像。
+> **为什么需要 B 这一版**（本项目部署环境的实测记录）：该 NAS 上 `pypi.org` DNS 解析超时
+> （`curl: (28) Resolving timed out after 15000 ms`），`pip download` 30 秒被杀（rc=124）。
+> 这不是"没有外网"：`api.deepseek.com` 100 ms 可达。
 
 ---
 

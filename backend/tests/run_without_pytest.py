@@ -1,17 +1,19 @@
-"""无 pytest 环境下的最小运行器（后端容器里没装 pytest）。
+"""无 pytest 环境下的最小运行器。
 
-pytest 能做的事很多，这里只补我们真正用到的那一小撮：`pytest.mark.anyio`、
-`pytest.fixture`，以及 conftest 里的 `migrated_db`。需要参数化/插件就该去装 pytest，
-别往这里加功能——它只是"没有 pytest 时也能跑既有用例"的兜底。
+后端容器不含 pytest。本脚本只实现现有用例实际用到的两件事 —— pytest.fixture 与
+pytest.mark —— 外加 conftest 中的 migrated_db。需要参数化、插件或覆盖率统计时请安装
+pytest，不要扩展本脚本。
 
-用法（在后端容器内跑，指向测试库）：
+用法（在后端容器内，指向测试库）：
 
-    T=postgresql+asyncpg://ai_chat:<pwd>@postgres:5432/ai_group_chat_test
-    docker exec -e TEST_DATABASE_URL=$T \
-                -e TEST_DATABASE_URL_SYNC=${T/+asyncpg/} \
-                ai_group_backend python tests/run_without_pytest.py
+    docker exec -w /app \
+      -e TEST_DATABASE_URL=<测试库> -e TEST_DATABASE_URL_SYNC=<测试库(sync)> \
+      ai_group_backend python tests/run_without_pytest.py [选择器]
 
-安全阀：库名不以 `_test` 结尾直接拒绝启动——本运行器会 drop_all + TRUNCATE。
+选择器按子串匹配 文件名::用例名，省略则运行全部。
+
+启动闸：目标库名必须以 _test 结尾。运行过程包含 drop_all 与 TRUNCATE，而生产库与
+测试库位于同一 PostgreSQL 实例，仅库名不同。
 """
 from __future__ import annotations
 
@@ -30,7 +32,7 @@ sys.path.insert(0, str(BACKEND_DIR))
 
 
 class _Marker:
-    """pytest.mark.xxx —— 既当值用（pytestmark = pytest.mark.anyio）也当装饰器用。"""
+    """pytest.mark.<name>：既作值使用（pytestmark = pytest.mark.anyio），也作装饰器。"""
 
     def __init__(self, name: str):
         self.name = name
@@ -42,14 +44,12 @@ class _Marker:
 
 
 class _MarkRegistry:
-    """pytest.mark 本体：点任意名字都得到一个 _Marker。"""
-
     def __getattr__(self, name: str) -> _Marker:
         return _Marker(name)
 
 
 def _install_pytest_stub() -> None:
-    """必须在 import conftest 之前调用（conftest 顶部就 import pytest）。"""
+    """必须在导入 conftest 之前调用（conftest 顶部即 import pytest）。"""
     pytest = types.ModuleType("pytest")
 
     def fixture(*args, **kwargs):
@@ -65,7 +65,7 @@ def _install_pytest_stub() -> None:
 def _guard_test_db() -> None:
     url = os.environ.get("TEST_DATABASE_URL", "")
     if not url:
-        sys.exit("缺少 TEST_DATABASE_URL —— 本运行器只允许跑测试库（会 drop_all + TRUNCATE）")
+        sys.exit("缺少 TEST_DATABASE_URL：本运行器只允许指向测试库（会 drop_all + TRUNCATE）")
     dbname = url.rsplit("/", 1)[-1].split("?")[0]
     if not dbname.endswith("_test"):
         sys.exit(f"拒绝启动：库名必须以 _test 结尾（会 drop_all + TRUNCATE），当前 = {dbname}")
@@ -80,7 +80,7 @@ def _load(module_name: str, path: Path):
 
 
 class _FixtureResolver:
-    """按名字解析 conftest 里的 fixture，只支持我们实际用的三种形态。"""
+    """按名解析 conftest 中的 fixture，仅支持现有用例用到的形态。"""
 
     def __init__(self, conftest):
         self._conftest = conftest
@@ -114,17 +114,24 @@ class _FixtureResolver:
                 traceback.print_exc()
 
 
-async def _run() -> int:
+async def _run(selector: str) -> int:
     conftest = _load("conftest", TESTS_DIR / "conftest.py")
     resolver = _FixtureResolver(conftest)
 
-    passed, failures = 0, []
+    passed, failures, matched = 0, [], 0
     for path in sorted(TESTS_DIR.glob("test_*.py")):
+        # 选择器不含 :: 时按文件名过滤，避免白导入无关模块
+        if selector and "::" not in selector and selector not in path.stem:
+            continue
         module = _load(path.stem, path)
         for name in sorted(n for n in dir(module) if n.startswith("test_")):
             fn = getattr(module, name)
             if not callable(fn):
                 continue
+            node = f"{path.stem}::{name}"
+            if selector and selector not in node:
+                continue
+            matched += 1
             try:
                 kwargs = {
                     p: await resolver.resolve(p)
@@ -134,12 +141,16 @@ async def _run() -> int:
                 if inspect.isawaitable(result):
                     await result
                 passed += 1
-                print(f"  PASS  {path.name}::{name}")
+                print(f"  PASS  {node}")
             except Exception:
-                failures.append(f"{path.name}::{name}")
-                print(f"  FAIL  {path.name}::{name}")
+                failures.append(node)
+                print(f"  FAIL  {node}")
                 traceback.print_exc()
     await resolver.teardown()
+
+    if matched == 0:
+        print(f"没有匹配的用例：选择器 = {selector!r}")
+        return 1
 
     print()
     print(f"RESULT passed={passed} failed={len(failures)}")
@@ -149,6 +160,7 @@ async def _run() -> int:
 
 
 if __name__ == "__main__":
+    selector = sys.argv[1] if len(sys.argv) > 1 else ""
     _guard_test_db()
     _install_pytest_stub()
-    sys.exit(asyncio.run(_run()))
+    sys.exit(asyncio.run(_run(selector)))

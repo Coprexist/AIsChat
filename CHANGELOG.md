@@ -316,6 +316,21 @@
 
 ### 🧪 测试
 
+#### 修 CI 失败：测试不得写生产数据目录（本地绿、CI 红）
+- 首次推送后 CI 立刻红了：`4 failed, 43 passed`，
+  `PermissionError: [Errno 13] Permission denied: /app`
+- 根因：发图链路用例把测试图片写进 `settings.data_dir`（硬编码 property，恒为 `/app/data`）。
+  本地 `/app` 可写所以一直绿；CI runner 上 `/app` 属另一用户，不可写
+- 修：用例改用临时目录，并临时替换 `data_dir` 的类描述符（它是只读 property），退出还原；
+  生产数据目录不再被写入
+- 顺带：
+  - `run_without_pytest.py` 支持**选择器**（按 `文件名::用例名` 子串匹配）。
+    实测只跑发图链路 **5.8s**、全量 47 条 **49.8s** —— 改哪个文件就跑哪个，推送前才跑全量
+  - 测试注释统一为专业写法：去掉语气词、自我叙述、说教式加粗与 emoji
+  - `docs/guides/test_strategy.md` 同步：§1.3 新增第 ⑥ 条「本地能过不等于 CI 能过」，
+    第 ② 条改为「不在容器内安装依赖」，§5.5 脚手架表与 §5.2 示例改用临时 data_dir，
+    §9.5 改为「覆盖率数字从哪来」（常规来源是 CI 报表）
+
 #### 补上 P0 源头与端点拼接的纯函数用例（23 条）
 - 新增 `backend/tests/test_multimodal.py`（16 条）：第一条就钉死 P0 的契约 ——
   `image_attachments()` 必须兜住 `normalize_attachments()` 的 `list | None`，
