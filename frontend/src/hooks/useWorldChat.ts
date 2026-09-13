@@ -9,6 +9,9 @@ import { api } from '../api/client'
 // 消息走插入队列，避免与仍在运行的 turn 冲突。
 const CHAT_PROCESSING_INITIAL = true
 
+// 会让内容上移（用户往回看）的按键——用于同步断开滚动跟随
+const SCROLL_UP_KEYS = new Set(['PageUp', 'ArrowUp', 'Home'])
+
 // 世界 AI 对话消息（世界级会话，非 DM；reasoning = 思考过程；tool = 工具执行结果；note = 中间叙述）
 export interface ChatMsg {
   id: number
@@ -195,6 +198,11 @@ export function useWorldChat({ wid, onRefresh, onMsg }: UseWorldChatOptions) {
         // 在底部（跟随模式）才滚到消息末尾；用户往上翻时不打扰
         // ⚠️ 2026-08-13 修复：实时读位置（isAtBottomRef 由 rAF 节流更新可能延迟——
         // 用户刚往上翻时 ref 还是 true，工具 done 后 loadChat 误滚到底部）
+        //
+        // 注意：这里**可以**直接量位置，而上面那个跟随 effect **不可以**——
+        // 区别在时机：本处运行在 setChatMsgs 之后、React 提交之前，量到的还是
+        // 更新前的 DOM（= 用户此刻的真实位置）；跟随 effect 跑在提交之后，
+        // 内容已撑高而 scrollTop 未跟上，量出来必然是"不在底部"。别把两者"统一"了。
         const el = listElsRef.current.find((x) => x.isConnected)
         const atBottomNow = el ? el.scrollHeight - el.scrollTop - el.clientHeight < 80 : false
         if (atBottomNow) {
@@ -306,33 +314,54 @@ export function useWorldChat({ wid, onRefresh, onMsg }: UseWorldChatOptions) {
   }, [eachList])
   forceScrollToBottomRef.current = forceScrollToBottom
 
-  // 新消息到达：跟随模式（在底部）自动滚到最新——首次瞬时（等布局稳定），后续新消息平滑，流式内容更新瞬时
-  const prevLenRef = useRef(0)
+  // 新消息 / 流式内容到达：在底部就跟随（首次瞬时等布局稳定；流式中用瞬时滚，避免 smooth 动画堆积打架）
+  //
+  // ⚠️ 判定跟随与否一律用 isAtBottomRef —— 与「回到底部」按钮**同一个真相源**：在底部就跟随，不在就不跟随。
+  // 绝不在这里重新测量 scrollHeight - scrollTop - clientHeight：本 effect 跑在 DOM 更新之后，
+  // 内容已经撑高而 scrollTop 还没跟上，会把"正在跟随"误判成"用户翻走了"，此后越差越多、跟随永久断掉
+  //（2026-09-13 修复：思考气泡一次性撑高超过 80px 即触发，表现为跟随在中途被打断）。
+  // 用户主动离开底部改由下方 wheel/touch/keydown **同步**判定，不依赖位置测量。
   const loadedOnceRef = useRef(false)
   useEffect(() => {
-    if (chatMsgs.length === 0) return
-    // ⚠️ 2026-08-13 修复：滚动前实时读取位置（不依赖可能延迟的 isAtBottomRef）——
-    // 用户往上翻后 rAF 节流未及更新 ref，AI 新消息到达会误滚到底部。
-    const el = listElsRef.current.find((x) => x.isConnected)
-    if (!el) return
-    // ⚠️ 2026-08-13 修复2：只看列表元素本身的滚动位置（不用 window.scrollY）——
-    // 列表占满视口时 window.scrollY 恒 0，误判"在底部"导致每次新消息都跳底。
-    const atBottomNow = el.scrollHeight - el.scrollTop - el.clientHeight < 80
-    if (!atBottomNow) {
-      // 用户不在底部：不滚动，未读由 countUnreadIfAway 计数
+    if (chatMsgs.length === 0 || !isAtBottomRef.current) return
+    if (!loadedOnceRef.current) {
+      loadedOnceRef.current = true
+      forceScrollToBottom()
       return
     }
-    const first = !loadedOnceRef.current
-    loadedOnceRef.current = true
-    const lenChanged = chatMsgs.length !== prevLenRef.current
-    prevLenRef.current = chatMsgs.length
-    if (first) {
-      forceScrollToBottom()
-    } else if (lenChanged) {
-      // 流式输出中（chatSending）用瞬时滚动：smooth 动画在快速连续输出时会堆积打架导致卡顿
-      eachList((el) => { el.scrollTo({ top: el.scrollHeight, behavior: chatSending ? 'auto' : 'smooth' }) })
+    // 条数与内容都跟随：流式是在同一条气泡里增长，条数不变但高度一直在涨
+    eachList((el) => { el.scrollTo({ top: el.scrollHeight, behavior: chatSending ? 'auto' : 'smooth' }) })
+  }, [chatMsgs, chatSending, eachList, forceScrollToBottom])
+
+  // 用户主动往上滚 → 立刻断开跟随（同步、不读布局）
+  // 必须同步：若等 rAF 节流的位置判断，中间这一帧若恰好来了流式分片，跟随会把视图拽回底部；
+  // 而这次回弹又触发 scroll 事件把 ref 置回 true，用户将再也滚不上去。
+  useEffect(() => {
+    const breakFollow = () => {
+      if (!isAtBottomRef.current) return
+      isAtBottomRef.current = false
+      setIsAtBottom(false)
     }
-  }, [chatMsgs, chatSending])
+    const onWheel = (e: WheelEvent) => { if (e.deltaY < 0) breakFollow() }
+    const onKey = (e: KeyboardEvent) => { if (SCROLL_UP_KEYS.has(e.key)) breakFollow() }
+    let lastTouchY = 0
+    const onTouchStart = (e: TouchEvent) => { lastTouchY = e.touches[0]?.clientY ?? 0 }
+    const onTouchMove = (e: TouchEvent) => {
+      const y = e.touches[0]?.clientY ?? 0
+      if (y > lastTouchY) breakFollow()  // 手指下滑 = 内容上移 = 往回看
+      lastTouchY = y
+    }
+    window.addEventListener('wheel', onWheel, { capture: true, passive: true })
+    window.addEventListener('keydown', onKey, true)
+    window.addEventListener('touchstart', onTouchStart, { capture: true, passive: true })
+    window.addEventListener('touchmove', onTouchMove, { capture: true, passive: true })
+    return () => {
+      window.removeEventListener('wheel', onWheel, true)
+      window.removeEventListener('keydown', onKey, true)
+      window.removeEventListener('touchstart', onTouchStart, true)
+      window.removeEventListener('touchmove', onTouchMove, true)
+    }
+  }, [])
 
   const scrollToBottom = useCallback((smooth = true) => {
     isAtBottomRef.current = true

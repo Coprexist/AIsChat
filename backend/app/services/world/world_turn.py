@@ -194,6 +194,7 @@ class WorldTurnWorker:
                 sid = session_id_for_db(world_row) if world_row else None
                 pending = self._inserts
                 self._inserts = []
+                flushed = 0
                 for _it in pending:
                     if len(_it.get("msg_ids") or []) == len([m for m in _it["messages"] if str(m).strip()]):
                         continue  # 已由 _inject_pending_user_messages 落库
@@ -209,8 +210,12 @@ class WorldTurnWorker:
                         )
                         _db.add(wm)
                         await _db.flush()
+                        flushed += 1
                         await tb.broadcast(f"data: [INSERT]{json.dumps({'msg_id': wm.id, 'content': _t}, ensure_ascii=False)}\n\n")
                 await _db.commit()
+                if flushed:
+                    # 只在「消息发得太晚、本轮已无注入点」时触发，不是每轮都打，不会刷屏
+                    logger.info(f"🌐 世界 #{self.world_id} 轮次收尾补发插入消息 {flushed} 条")
         except Exception as e:
             logger.warning(f"🌐 世界 #{self.world_id} 残留插入消息补发失败（非致命）: {e}")
 
