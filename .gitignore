@@ -92,3 +92,11 @@ coverage.xml
 htmlcov/
 .pytest_cache/
 
+# 本地私有资料：审计/渗透报告、口令与密钥备忘、内网地址清单、运维记录……
+# 一律放 .local/（本目录永不入库），命名与约定见 docs/SUMMARY.md「文档规范 · 本地私有资料」
+.local/
+
+# 兜底：审计类报告即使被随手放在别处，也不进仓库
+SECURITY-AUDIT-*.md
+PENTEST-*.md
+
