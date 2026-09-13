@@ -499,6 +499,11 @@ def _tool_result_summary(name: str, result: dict) -> str:
             return f"在 {result.get('path')} 找到 {result.get('total_hits')} 处「{result.get('pattern')}」：{first}…"
         return f"搜索失败：{result.get('error', '未知错误')}"
     if name == "compact_context":
+        if ok and result.get("skipped"):
+            return (
+                f"无需压缩：当前会话只有 {result.get('real_messages', 0)} 条对话，"
+                f"都还在保留窗口（最近 {result.get('keep_last', 0)} 条）内"
+            )
         if ok:
             return (
                 f"上下文已压缩（{result.get('before_tokens')}→{result.get('after_tokens')} tokens，"
@@ -1218,20 +1223,31 @@ async def _do_execute(world_repo: WorldRepository, world, name: str, arguments: 
         # 复用主对话的压缩服务：总结中间消息 → 存 worlds.config.chat_summaries[会话] → 下次只发摘要+最近 N 条
         try:
             from app.services.memory.context_compression_service import compress_messages
-            from app.services.world.world_chat_service import _resolve_world_credentials, resolve_world_chat_model, get_chat_history, session_key, session_id_for_db, WORLD_CHAT_KEEP_LAST, WORLD_CONTEXT_MIN_MESSAGES
+            from app.services.world.world_chat_service import _resolve_world_credentials, resolve_world_chat_model, get_chat_history, session_key, session_id_for_db, WORLD_CHAT_KEEP_LAST
             api_key, api_base = await _resolve_world_credentials(world_repo, world)
             from app.models.world import WorldAI
             wai = (await world_repo.execute(select(WorldAI).where(WorldAI.world_id == world.id))).scalar_one_or_none()
             model = await resolve_world_chat_model(world_repo, world, api_base, wai)
             sid_db = session_id_for_db(world)
             history = await get_chat_history(world_repo, world.id, 200, session_id=sid_db)
-            if len(history) < WORLD_CONTEXT_MIN_MESSAGES:
-                return {"success": False, "error": f"对话太短（{len(history)} 条），无需压缩"}
             msgs = [{"role": "system", "content": "世界 AI 对话"}]  # keep_system 保留
             msgs += [
                 {"role": "assistant" if m["role"] == "ai" else m["role"], "content": m["content"]}
                 for m in history if m["role"] not in ("tool", "note")
             ]
+            # 只按**真实对话条数**判断：tool/note 不进 LLM 上下文，也不算"可压缩内容"。
+            # 这里必须用过滤后的条数——用原始行数会把满屏工具调用误判成"有的可压"
+            real_count = len(msgs) - 1
+            if real_count <= WORLD_CHAT_KEEP_LAST:
+                logger.info(
+                    f"🌐 世界 #{world.id} 无需压缩：真实对话 {real_count} 条 ≤ 保留窗口 {WORLD_CHAT_KEEP_LAST}"
+                )
+                return {
+                    "success": True,          # 空操作不是失败：AI 该如实转述，不该报"执行失败"
+                    "skipped": True,
+                    "real_messages": real_count,
+                    "keep_last": WORLD_CHAT_KEEP_LAST,
+                }
             new_messages, stats = await compress_messages(
                 messages=msgs,
                 api_base_url=api_base,

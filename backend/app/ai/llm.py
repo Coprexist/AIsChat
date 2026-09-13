@@ -4,10 +4,8 @@ LLM 调用抽象层
 提供通用的聊天补全（支持工具调用）、模型解析、消息构建
 """
 import json
-import base64
 import logging
 import httpx
-import os as _os
 from datetime import datetime
 from zoneinfo import ZoneInfo
 from sqlalchemy import select
@@ -20,6 +18,10 @@ from app.services.memory.memory_service import recall_relevant_memories, format_
 from app.utils.pure.prompting import (
     resolve_model, build_personality_segment, format_time_shanghai,
     format_message, format_context_for_ai, assemble_system_prompt,
+)
+from app.utils.multimodal import (
+    build_content, image_attachments, image_note, injected_image_count,
+    messages_have_images, strip_image_parts, is_vision_unsupported_error,
 )
 
 logger = logging.getLogger(__name__)
@@ -129,40 +131,53 @@ async def chat_completion(
     import time as _time
     from app.services.infrastructure.metrics_collector import metrics
     t0 = _time.monotonic()
-    try:
+
+    async def _dispatch(msgs: list[dict]):
+        """一次实际请求（流式/非流式由调用方决定）。"""
         if stream:
-            result = await _chat_completion_streaming(
-                messages, model, api_base_url, api_key, tools,
+            return await _chat_completion_streaming(
+                msgs, model, api_base_url, api_key, tools,
                 temperature, top_p, presence_penalty, frequency_penalty,
                 max_tokens, response_format, thinking_enabled, user_id,
                 pool_key_id, provider_supports_thinking, on_tool_call,
             )
-        else:
-            result = await _chat_completion_non_streaming(
-                messages, model, api_base_url, api_key, tools,
-                temperature, top_p, presence_penalty, frequency_penalty,
-                max_tokens, response_format, thinking_enabled, user_id,
-                pool_key_id, provider_supports_thinking,
-            )
-        elapsed = _time.monotonic() - t0
-        await metrics.record_llm_call(elapsed, success=True)
-        # AI 调用计数（分状态帧）：情感/记忆衰减的时间尺度
-        if agent_id and db is not None:
-            try:
-                from app.services.agent.state_stack_service import bump_frame_call_count
-                await bump_frame_call_count(db, agent_id)
-            except Exception:
-                pass
-        return result
+        return await _chat_completion_non_streaming(
+            msgs, model, api_base_url, api_key, tools,
+            temperature, top_p, presence_penalty, frequency_penalty,
+            max_tokens, response_format, thinking_enabled, user_id,
+            pool_key_id, provider_supports_thinking,
+        )
+
+    try:
+        try:
+            result = await _dispatch(messages)
+        except Exception as e:
+            # 模型不吃图片（纯文本模型收到 image_url 多半 400）→ 剥掉图片重试一次，
+            # 并在消息里明确告诉 AI"你看不到图"，避免它编造图片内容。
+            if not (messages_have_images(messages) and is_vision_unsupported_error(str(e))):
+                raise
+            degraded, removed = strip_image_parts(messages)
+            logger.warning(f"🖼️ 当前模型似乎不支持图片，降级为纯文本重试（剥掉 {removed} 张）: {e}")
+            result = await _dispatch(degraded)
+            result["vision_unsupported"] = True
     except Exception:
-        elapsed = _time.monotonic() - t0
-        await metrics.record_llm_call(elapsed, success=False)
+        await metrics.record_llm_call(_time.monotonic() - t0, success=False)
         raise
+    await metrics.record_llm_call(_time.monotonic() - t0, success=True)
+    # AI 调用计数（分状态帧）：情感/记忆衰减的时间尺度
+    if agent_id and db is not None:
+        try:
+            from app.services.agent.state_stack_service import bump_frame_call_count
+            await bump_frame_call_count(db, agent_id)
+        except Exception:
+            pass
+    return result
 
 
 def _build_request_url_and_headers(api_base_url: str, api_key: str | None) -> tuple[str, dict]:
     """构建 LLM API 请求 URL 和 headers（流式/非流式共用）。"""
-    url = f"{api_base_url}/v1/chat/completions"
+    from app.utils.pure.llm_endpoint import chat_completions_url
+    url = chat_completions_url(api_base_url)
     headers = {"Content-Type": "application/json"}
     if api_key:
         headers["Authorization"] = f"Bearer {api_key}"
@@ -668,92 +683,32 @@ async def _build_injected_skills(
     return "\n\n".join(parts) if parts else ""
 
 
-async def _inject_image_data(
+def _attach_image_to_message(
     messages: list[dict],
-    recent_orm_messages: list,
+    index: int | None,
+    orm_message,
     data_dir: str,
-) -> list[dict]:
+) -> int:
+    """把 messages[index] 升级成多模态内容（仅当该条消息带图片附件时）。
+
+    只让"最新一条用户消息"携带真实图片字节，历史消息保持纯文本——既护住
+    prompt cache，也避免 token 爆炸。返回是否真的注入了图片。
+
+    返回实际注入的图片数（0 = 没注入）。
+
+    之前这里靠"格式化后的 content 里包含 ORM 原文"来反查是哪条消息，
+    内容雷同时会匹配错；现在由调用方直接给出下标与 ORM 对象。
     """
-    为最后一条含图片附件的人类消息注入 image_data（base64）。
-    只处理最近一条用户消息中的第一张图片，避免 token 爆炸。
-
-    返回修改后的 messages（原地修改 + 返回）。
-    """
-    if not messages or not recent_orm_messages:
-        return messages
-
-    # 构建 orm 消息的索引：content → orm 对象
-    orm_by_content: dict[str, any] = {}
-    for orm_m in recent_orm_messages:
-        if orm_m.content and getattr(orm_m, 'sender_type', 'human') == "human":
-            orm_by_content[orm_m.content] = orm_m
-
-    # 从 messages 末尾向前找最后一条 user 消息
-    for i in range(len(messages) - 1, -1, -1):
-        msg = messages[i]
-        if msg.get("role") != "user":
-            continue
-        content = msg.get("content", "")
-        # 从 content 中提取纯文本（消息格式为 "名字(ID:x): 内容" 或 "名字: 内容"）
-        # 尝试匹配 orm 消息
-        attached_orm = None
-        for orm_content, orm_obj in orm_by_content.items():
-            if content.endswith(orm_content) or orm_content in content:
-                attached_orm = orm_obj
-                break
-        if attached_orm is None:
-            continue
-
-        # 检查附件
-        attachments = getattr(attached_orm, "attachments", None)
-        if not attachments:
-            continue
-
-        # 解析 JSON（DM 消息可能是字符串）
-        if isinstance(attachments, str):
-            try:
-                attachments = json.loads(attachments)
-            except (json.JSONDecodeError, TypeError):
-                continue
-        if not isinstance(attachments, list) or len(attachments) == 0:
-            continue
-
-        # 找第一张图片
-        image_att = None
-        for att in attachments:
-            mime = att.get("mime_type", "")
-            if mime.startswith("image/"):
-                image_att = att
-                break
-        if image_att is None:
-            continue
-
-        # 读取并编码
-        file_path = image_att.get("path", "")
-        physical_path = _os.path.join(data_dir, file_path)
-        if not _os.path.isfile(physical_path):
-            logger.warning(f"图片文件不存在: {physical_path}")
-            continue
-
-        try:
-            file_size = _os.path.getsize(physical_path)
-            if file_size > 4 * 1024 * 1024:
-                logger.warning(f"图片过大 ({file_size} bytes)，跳过: {physical_path}")
-                continue
-            with open(physical_path, "rb") as f:
-                image_base64 = base64.b64encode(f.read()).decode("utf-8")
-            msg["image_data"] = image_base64
-            logger.info(
-                f"🖼️ 已注入图片: {_os.path.basename(file_path)} "
-                f"({file_size // 1024}KB) → 消息 {i}"
-            )
-            break  # 只处理一条消息
-        except Exception as e:
-            logger.warning(f"读取图片失败: {physical_path}: {e}")
-            continue
-
-    return messages
-
+    if index is None or orm_message is None:
+        return 0
+    attachments = getattr(orm_message, "attachments", None)
+    if not image_attachments(attachments):
+        return 0
+    content = build_content(messages[index].get("content"), attachments, data_dir)
+    if not isinstance(content, list):
+        return 0  # 图片一张都没读出来 → 保持纯文本
+    messages[index]["content"] = content
+    return injected_image_count(content)
 
 
 # _format_time ——已迁移到 utils/pure/prompting.py，导入为 format_time_shanghai
@@ -1028,9 +983,9 @@ async def build_messages(
         recent_messages = list(reversed(trimmed))
         
         max_len = getattr(group_obj, 'max_msg_display_len', 256) if group_obj else 256
-        
-        max_len = getattr(group_obj, 'max_msg_display_len', 256) if group_obj else 256
 
+        last_user_idx = None
+        last_user_orm = None
         for m in reversed(recent_messages):
             md = await chat_api.message_to_dict(m)
             content = m.content or ""
@@ -1047,9 +1002,14 @@ async def build_messages(
 
             role = "assistant" if m.sender_type == "ai" else "user"
             messages.append({"role": role, "content": format_message(msg_struct, getattr(agent, 'name', ''), max_content_len=5000),})
+            if role == "user":
+                last_user_idx = len(messages) - 1
+                last_user_orm = m
         
         if context_config_parser.should_inject_image(context_config):
-            await _inject_image_data(messages, recent_messages, settings.data_dir)
+            _n_img = _attach_image_to_message(messages, last_user_idx, last_user_orm, settings.data_dir)
+            if _n_img:
+                messages.append({"role": "system", "content": image_note(_n_img)})
 
     # 更新 AI 的最后阅读时间
     if last_read_at is not None:
@@ -1379,6 +1339,8 @@ async def build_dm_messages(
         trimmed.append(m)
     dm_messages = list(reversed(trimmed))
 
+    last_user_idx = None
+    last_user_orm = None
     for m in reversed(dm_messages):
         role = "assistant" if m.sender_id == agent.user_id else "user"
         name_result = await db.execute(
@@ -1408,9 +1370,14 @@ async def build_dm_messages(
             "role": role,
             "content": format_message(msg_struct, agent.name, max_content_len=-1),
         })
+        if role == "user":
+            last_user_idx = len(messages) - 1
+            last_user_orm = m
 
     # 🖼️ 为最后一条用户消息注入图片附件
-    await _inject_image_data(messages, dm_messages, settings.data_dir)
+    _n_img = _attach_image_to_message(messages, last_user_idx, last_user_orm, settings.data_dir)
+    if _n_img:
+        messages.append({"role": "system", "content": image_note(_n_img)})
 
     # ── 注入上一轮工具调用中的错误记录 ──
     # AI 的工具调用结果存在 ConversationLog 表中，DMMessage 只存了通过 send_dm 发出去的内容。

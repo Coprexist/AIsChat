@@ -18,6 +18,7 @@ from sqlalchemy import select
 
 from app.database import async_session
 from app.models.world import World, WorldChatMessage
+from app.services.world.world_chat_items import ChatItem
 
 logger = logging.getLogger(__name__)
 
@@ -147,7 +148,7 @@ class WorldTurnWorker:
                 from app.services.world.world_chat_service import stream_world_chat
                 async with async_session() as db:
                     async for event in stream_world_chat(
-                        SQLAlchemyWorldRepository(db), self.world_id, item["user_id"], item["message"], item["turn_id"]
+                        SQLAlchemyWorldRepository(db), self.world_id, item["user_id"], item["items"], item["turn_id"]
                     ):
                         if tb:
                             await tb.broadcast(event)
@@ -196,22 +197,26 @@ class WorldTurnWorker:
                 self._inserts = []
                 flushed = 0
                 for _it in pending:
-                    if len(_it.get("msg_ids") or []) == len([m for m in _it["messages"] if str(m).strip()]):
+                    items = _it.get("items") or []
+                    if len(_it.get("msg_ids") or []) == len(items):
                         continue  # 已由 _inject_pending_user_messages 落库
-                    total = len(_it["messages"])
-                    await tb.broadcast(f"data: [INSERTED]{json.dumps({'count': total})}\n\n")
-                    for _m in _it["messages"]:
-                        _t = str(_m).strip()
-                        if not _t:
+                    await tb.broadcast(f"data: [INSERTED]{json.dumps({'count': len(items)}, ensure_ascii=False)}\n\n")
+                    for it in items:
+                        if it.is_empty:
                             continue
                         wm = WorldChatMessage(
                             world_id=self.world_id, user_id=_it["user_id"],
-                            role="user", content=_t, session_id=sid,
+                            role="user", content=it.text, session_id=sid,
+                            attachments=list(it.attachments) or None,
                         )
                         _db.add(wm)
                         await _db.flush()
                         flushed += 1
-                        await tb.broadcast(f"data: [INSERT]{json.dumps({'msg_id': wm.id, 'content': _t}, ensure_ascii=False)}\n\n")
+                        payload = {
+                            "msg_id": wm.id, "content": it.text,
+                            "attachments": [dict(a) for a in it.attachments],
+                        }
+                        await tb.broadcast(f"data: [INSERT]{json.dumps(payload, ensure_ascii=False)}\n\n")
                 await _db.commit()
                 if flushed:
                     # 只在「消息发得太晚、本轮已无注入点」时触发，不是每轮都打，不会刷屏
@@ -219,7 +224,7 @@ class WorldTurnWorker:
         except Exception as e:
             logger.warning(f"🌐 世界 #{self.world_id} 残留插入消息补发失败（非致命）: {e}")
 
-    def enqueue(self, user_id: int, message: str | list[str]) -> str:
+    def enqueue(self, user_id: int, items: list[ChatItem]) -> str:
         """消息入队（支持批量：排队消息一起发给 AI），返回 turn_id（订阅直播用）。
 
         产品定（2026-08-16 改）：非命令消息在 AI 工具轮进行中时**进插入队列**（
@@ -228,14 +233,13 @@ class WorldTurnWorker:
         哪些消息必须等本轮结束，由命令声明决定（world_chat_commands.COMMAND_SPECS.mid_turn）；
         默认为 False 即等待，需要中途插入的命令单独标 True。
         """
-        messages = message if isinstance(message, list) else [message]
         turn_id = uuid.uuid4().hex[:12]
         # 判定是否插入：基于已有 turns（不含本次新建的），排除代理 turn（插入消息的广播，无独立生命周期）
         busy = any(not tb.ended and tb.proxy is None for tb in self.turns.values())
         # "能否中途插入"由命令声明决定（world_chat_commands.COMMAND_SPECS.mid_turn），
         # 不再硬编码 startswith('/')——后续新增"可中途发给 AI"的命令只需改声明
         from app.services.world.world_chat_commands import may_insert_mid_turn
-        insertable = all(may_insert_mid_turn(m) for m in messages)
+        insertable = all(may_insert_mid_turn(it.text) for it in items)
         if insertable and busy:
             # 有正在执行的轮次 + 含普通消息 → 走插入通道（工具轮下一轮 LLM 调用前注入）
             # 插入消息的广播代理到当前活跃 turn（前端订阅插入 turn = 收到当前轮流事件含 [INSERT] 回执）
@@ -245,12 +249,12 @@ class WorldTurnWorker:
             self.turns[turn_id] = tb
             # 2026-08-16 产品定（改）：不再立即落库+广播——消息先进插入队列，
             # 等 _inject_pending_user_messages 真正注入 AI 上下文时再落库 + 广播绘制气泡。
-            self._inserts.append({"user_id": user_id, "messages": messages, "msg_ids": [], "tb": tb})
+            self._inserts.append({"user_id": user_id, "items": items, "msg_ids": [], "tb": tb})
             return turn_id
         self.turns[turn_id] = TurnBroadcast(turn_id)
         self.msg_queue.put_nowait({
             "turn_id": turn_id, "user_id": user_id,
-            "message": messages,
+            "items": items,
         })
         return turn_id
 

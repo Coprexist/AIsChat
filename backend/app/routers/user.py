@@ -1,7 +1,6 @@
 """
 用户设置路由
 """
-import httpx
 from fastapi import APIRouter, Depends, HTTPException, status, File, UploadFile
 from sqlalchemy.ext.asyncio import AsyncSession
 from pydantic import BaseModel, Field, field_validator
@@ -176,44 +175,31 @@ async def test_api_connection(
     current_user: dict = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
-    """测试 API 连接（服务端代理，避免浏览器 CORS 限制）"""
-    import logging
-    logger = logging.getLogger(__name__)
+    """测试 API 连接（服务端代理，避免浏览器 CORS 限制）。
+
+    探测策略 / 文案 / 脱敏全部收敛在 app/services/agent/api_probe.py，
+    这里只负责取 key（用户输入 > 库里已存）与转成前端契约。
+    """
+    from app.services.agent.api_probe import probe_provider
 
     base_url = req.api_base_url or "https://api.deepseek.com"
     key = req.api_key
 
-    # 如果没传 key，尝试从数据库读取
+    # 没传 key（输入框空着就点测试）→ 用库里已保存的那把
     if not key:
-        from sqlalchemy import select
-        from app.models.user import User
-        result = await db.execute(select(User).where(User.id == current_user["user_id"]))
-        user = result.scalar_one_or_none()
-        if user and user.api_key_encrypted:
-            from app.utils.crypto import decrypt_api_key
-            key = decrypt_api_key(user.api_key_encrypted)
+        from app.services.infrastructure.user_credentials import user_api_key
+        key = await user_api_key(db, current_user["user_id"])
 
     if not key:
         raise HTTPException(status_code=400, detail="请先配置 API Key")
 
-    try:
-        async with httpx.AsyncClient(timeout=10.0) as client:
-            resp = await client.get(
-                f"{base_url.rstrip('/')}/models",
-                headers={"Authorization": f"Bearer {key}"},
-            )
-            if resp.status_code == 200:
-                data = resp.json()
-                model_count = len(data.get("data", []))
-                return {"ok": True, "message": f"连接成功，{model_count} 个模型可用"}
-            else:
-                return {"ok": False, "message": f"API 返回 {resp.status_code}: {resp.text[:200]}"}
-    except httpx.ConnectError:
-        return {"ok": False, "message": "无法连接到 API 服务器，请检查 Base URL"}
-    except httpx.TimeoutException:
-        return {"ok": False, "message": "连接超时，请检查网络或 API 地址"}
-    except Exception as e:
-        return {"ok": False, "message": f"连接失败: {str(e)}"}
+    # 私网地址必须"已登记"（用户/平台保存过）才允许请求——否则这就是个内网端口扫描器
+    from app.services.agent.base_url_registry import saved_private_hosts
+    probe = await probe_provider(
+        base_url, key,
+        allow_private_hosts=await saved_private_hosts(db, current_user["user_id"]),
+    )
+    return {"ok": probe.ok, "message": probe.message, "kind": probe.kind}
 
 
 @router.post("/avatar")

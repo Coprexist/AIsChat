@@ -14,6 +14,11 @@ from pathlib import Path
 
 from sqlalchemy import select
 from app.repositories.world_repo import WorldRepository
+from app.services.world.world_chat_items import ChatItem
+from app.utils.multimodal import (
+    build_content, image_placeholder, image_note, injected_image_count,
+)
+from app.utils.pure.llm_endpoint import chat_completions_url
 
 logger = logging.getLogger(__name__)
 
@@ -287,7 +292,9 @@ def world_context_block(world) -> str:
 
 # 世界 AI 对话上下文（与主对话压缩机制一致：128K 窗口 60% 触发提示，AI 调 compact 压缩）
 WORLD_CHAT_KEEP_LAST = 10          # 压缩后保留的最近消息数
-WORLD_CONTEXT_MIN_MESSAGES = 6     # 少于 N 条不触发压缩提示
+# 少于 N 条不提示压缩。必须比保留窗口多 1：真实消息数 ≤ 保留窗口时压缩是**空操作**，
+# 否则会出现"提示 AI 去压缩、压了却无可压缩"（旧值 6 < 10，正好落在这个空区间里）
+WORLD_CONTEXT_MIN_MESSAGES = WORLD_CHAT_KEEP_LAST + 1
 DEFAULT_MAX_TOOL_ROUNDS = 50       # 工具循环默认上限（可在设计页配置 max_tool_rounds 覆盖）
 
 
@@ -324,6 +331,26 @@ def new_session_id(world) -> str:
         sid = f"w{world.id}:{typ}:{_uuid.uuid4().hex[:12]}"
         if sid not in sessions:
             return sid
+
+
+async def create_new_session(world_repo, world) -> str:
+    """开一个新会话并切过去，返回新会话 id。
+
+    只动 world.config（current_session + sessions 登记），一条历史都不碰——
+    "/new 文本命令"与前端"新对话"按钮共用这一个入口，避免两处各写一遍。
+    """
+    from datetime import datetime as _dt, timezone as _tz
+
+    cfg = dict(world.config or {})
+    sid = new_session_id(world)
+    now = _dt.now(_tz.utc).replace(tzinfo=None).isoformat()
+    sessions = dict(cfg.get("sessions") or {})
+    sessions[sid] = {"created_at": now, "last_active_at": now}
+    cfg["current_session"] = sid
+    cfg["sessions"] = sessions
+    world.config = cfg
+    await world_repo.commit()
+    return sid
 
 
 def touch_session(world) -> None:
@@ -444,6 +471,7 @@ async def get_chat_history(world_repo: WorldRepository, world_id: int, limit: in
             "content": m.content,
             "reasoning": m.reasoning if m.role in ("ai", "note") else None,
             "is_error": bool(m.is_error) if m.role == "tool" else None,
+            "attachments": m.attachments,
             "created_at": m.created_at.isoformat() if m.created_at else None,
         }
         for m in reversed(result.scalars().all())
@@ -610,7 +638,7 @@ async def _stream_llm_once(
     index_to_id: dict[int, str] = {}  # index → id 桥（arguments 无 id 分片定位用）
     try:
         async with httpx.AsyncClient(timeout=300.0) as client:
-            async with client.stream("POST", f"{api_base}/v1/chat/completions", json=payload, headers=headers) as resp:
+            async with client.stream("POST", chat_completions_url(api_base), json=payload, headers=headers) as resp:
                 if resp.status_code != 200:
                     err = (await resp.aread()).decode(errors="replace")[:300]
                     yield f"data: [ERROR]{_friendly_llm_error(f'{resp.status_code}: {err}')}\n\n"
@@ -716,20 +744,21 @@ async def _inject_pending_user_messages(
         return
     # 落库 + 广播（先 [INSERTED] 清前端排队弹窗，再逐条落库 + [INSERT] 画气泡）
     from app.models.world import World, WorldChatMessage
+    from app.config import settings
+    from app.models.world import World, WorldChatMessage
     for _it in insert_items:
         tb = _it.get("tb")
         user_id = _it.get("user_id")
-        msgs = _it.get("messages") or []
+        items = _it.get("items") or []
         if tb:
             try:
-                await tb.broadcast(f"data: [INSERTED]{json.dumps({'count': len(msgs)}, ensure_ascii=False)}\n\n")
+                await tb.broadcast(f"data: [INSERTED]{json.dumps({'count': len(items)}, ensure_ascii=False)}\n\n")
             except Exception as e:
                 # 回执发不出去 = 前端排队弹窗永远清不掉（用户可见），必须留痕
                 logger.warning(f"🌐 世界 #{world_id} [INSERTED] 回执广播失败: {e}")
         ids: list[int] = []
-        for _m in msgs:
-            _m_text = str(_m).strip()
-            if not _m_text:
+        for it in items:
+            if it.is_empty:
                 continue
             # 落库（真实 msg_id → 前端 [INSERT] 画的气泡与历史一致，刷新不重复）
             if sid_db is None:
@@ -737,19 +766,24 @@ async def _inject_pending_user_messages(
                 sid_db = session_id_for_db(_w) if _w else None
             wm = WorldChatMessage(
                 world_id=world_id, user_id=user_id, role="user",
-                content=_m_text, session_id=sid_db,
+                content=it.text, session_id=sid_db,
+                attachments=list(it.attachments) or None,
             )
             world_repo.add(wm)
             await world_repo.flush()
             ids.append(wm.id)
             if tb:
                 try:
-                    await tb.broadcast(f"data: [INSERT]{json.dumps({'msg_id': wm.id, 'content': _m_text}, ensure_ascii=False)}\n\n")
+                    payload = {
+                        "msg_id": wm.id, "content": it.text,
+                        "attachments": [dict(a) for a in it.attachments],
+                    }
+                    await tb.broadcast(f"data: [INSERT]{json.dumps(payload, ensure_ascii=False)}\n\n")
                 except Exception as e:
                     # 同上：气泡画不出来（用户可见）。消息已落库，下次 loadChat 会补上
                     logger.warning(f"🌐 世界 #{world_id} [INSERT] 回执广播失败（msg_id={wm.id}）: {e}")
-            # 注入 AI 上下文（真正"发送"给 AI）
-            messages.append({"role": "user", "content": _m_text})
+            # 注入 AI 上下文（真正"发送"给 AI）：带图则实时转多模态
+            messages.append({"role": "user", "content": build_content(it.text, it.attachments, settings.data_dir)})
         _it["msg_ids"] = ids
     await world_repo.commit()
 
@@ -885,8 +919,16 @@ def _args_summary(arguments: str) -> str:
     return ""
 
 
+def _history_text(text: str, attachments) -> str:
+    """历史消息里的图片降级成 [图片] 标记：让模型知道当时有图，但不给字节。"""
+    placeholder = image_placeholder(attachments)
+    if not placeholder:
+        return text or ""
+    return f"{placeholder} {text}".strip() if text else placeholder
+
+
 async def _prepare_world_chat(
-    world_repo: WorldRepository, world_id: int, user_id: int, message: str | list[str],
+    world_repo: WorldRepository, world_id: int, user_id: int, items: list[ChatItem],
 ) -> dict | None:
     """世界 AI 对话的准备阶段：世界加载/凭证/前缀/历史/消息列表/命令识别。
 
@@ -978,16 +1020,17 @@ async def _prepare_world_chat(
         )
     history = await get_chat_history(world_repo, world_id, WORLD_CHAT_KEEP_LAST if summary else CHAT_HISTORY_LIMIT, session_id=sid_db)
     hist_llm = [
-        {"role": "assistant" if m["role"] == "ai" else m["role"], "content": m["content"]}
+        {
+            "role": "assistant" if m["role"] == "ai" else m["role"],
+            "content": _history_text(m["content"], m.get("attachments")),
+        }
         for m in history if m["role"] not in ("tool", "note")
     ]
-    # 用户消息列表（单条/批量统一；批量 = 排队消息一起发，逐条气泡）
-    msg_list = message if isinstance(message, list) else [message]
-    msg_list = [str(m).strip() for m in msg_list if str(m).strip()]
+    # 用户消息（单条/批量统一；批量 = 排队消息一起发，逐条气泡）
     from app.services.memory.context_compression_service import should_compress
     needs_compress = should_compress(
         [{"role": "system", "content": system_prompt}, *hist_llm,
-         *[{"role": "user", "content": m} for m in msg_list]],
+         *[{"role": "user", "content": it.text} for it in items]],
         min_messages=WORLD_CONTEXT_MIN_MESSAGES,
     )
 
@@ -996,8 +1039,22 @@ async def _prepare_world_chat(
     if summary:
         messages.append({"role": "system", "content": summary})
     messages += hist_llm
-    for m in msg_list:
-        messages.append({"role": "user", "content": m})
+    # 只有最后一条带真实图片字节（同批靠前的降级成 [图片]）——既护住 prompt cache，
+    # 也避免一次塞进多张图把 token 顶爆
+    _last_idx = len(items) - 1
+    for _idx, it in enumerate(items):
+        content = (
+            build_content(it.text, it.attachments, settings.data_dir)
+            if _idx == _last_idx
+            else _history_text(it.text, it.attachments)
+        )
+        messages.append({"role": "user", "content": content})
+    # 附图便签（真 system role，放在用户消息之后）：只给 image_url 不给这句话，
+    # 模型会自称"我是文本 AI"却又能描述图里的内容（实测 mimo-v2.5）。
+    # 数量用**实际注入数**，与"另有 N 张未提供"配套，避免模型去找不存在的图
+    _n_img = injected_image_count(messages[-1]["content"]) if items else 0
+    if _n_img:
+        messages.append({"role": "system", "content": image_note(_n_img)})
 
     # 动态信息全部放末尾（每次变化，不影响前缀 cache）——与主对话同规则
     if notice_lines:
@@ -1056,8 +1113,12 @@ async def _prepare_world_chat(
 
     # 落库用户消息（批量 = 排队消息一起发，逐条气泡；先提交，即使流失败也不丢）
     from app.models.world import WorldChatMessage
-    for m in msg_list:
-        world_repo.add(WorldChatMessage(world_id=world_id, user_id=user_id, role="user", content=m, session_id=sid_db))
+    for it in items:
+        world_repo.add(WorldChatMessage(
+            world_id=world_id, user_id=user_id, role="user",
+            content=it.text, session_id=sid_db,
+            attachments=list(it.attachments) or None,
+        ))
     try:
         await world_repo.commit()
     except Exception as e:
@@ -1079,11 +1140,12 @@ async def _prepare_world_chat(
     model = await resolve_world_chat_model(world_repo, world, api_base, wai)
     thinking = bool(cfg.get("thinking", False))
 
-    cmd_text = msg_list[0] if len(msg_list) == 1 else ""
+    # 命令只在单条纯文本时识别：带附件的消息一律当普通消息走 LLM
+    cmd_text = items[0].text if len(items) == 1 and not items[0].attachments else ""
     return {
         "world": world, "wai": wai, "cfg": cfg,
         "api_key": api_key, "api_base": api_base, "model": model, "thinking": thinking,
-        "tools_for_world": tools_for_world, "messages": messages, "msg_list": msg_list,
+        "tools_for_world": tools_for_world, "messages": messages,
         "sid_db": sid_db, "cmd_text": cmd_text,
     }
 
@@ -1173,7 +1235,7 @@ async def _stream_first_round(
     try:
         _log_llm_request(world_id, turn_id, 0, model, thinking, messages)
         async with httpx.AsyncClient(timeout=300.0) as client:
-            async with client.stream("POST", f"{api_base}/v1/chat/completions", json=payload, headers=headers) as resp:
+            async with client.stream("POST", chat_completions_url(api_base), json=payload, headers=headers) as resp:
                 if resp.status_code != 200:
                     err = (await resp.aread()).decode(errors="replace")[:300]
                     yield f"data: [ERROR]{_friendly_llm_error(f'{resp.status_code}: {err}')}\n\n"
@@ -1396,7 +1458,7 @@ async def stream_world_chat(
     world_repo: WorldRepository,
     world_id: int,
     user_id: int,
-    message: str | list[str],
+    items: list[ChatItem],
     turn_id: str = "",
 ):
     """世界 AI 对话（SSE 流式，参考大同差异分析流式实现）。
@@ -1413,7 +1475,7 @@ async def stream_world_chat(
     """
     from app.models.world import WorldChatMessage
 
-    ctx = await _prepare_world_chat(world_repo, world_id, user_id, message)
+    ctx = await _prepare_world_chat(world_repo, world_id, user_id, items)
     if ctx is None:
         yield "data: [ERROR]世界不存在\n\n"
         yield "data: [DONE]\n\n"
@@ -1424,7 +1486,6 @@ async def stream_world_chat(
     model, thinking = ctx["model"], ctx["thinking"]
     tools_for_world = ctx["tools_for_world"]
     messages = ctx["messages"]
-    msg_list = ctx["msg_list"]
     sid_db = ctx["sid_db"]
     cmd_text = ctx["cmd_text"]  # 单条消息时即命令文本；_prepare_world_chat 已算好
 

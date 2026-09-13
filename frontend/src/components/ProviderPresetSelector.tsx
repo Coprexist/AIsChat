@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react'
 import { api } from '../api/client'
 import { useT } from '../i18n/I18nContext'
-import { Plus, Trash2, Check, Loader2, Settings, Server, Star, Globe } from 'lucide-react'
+import { Plus, Trash2, Check, Loader2, Settings, Server, Star, Globe, Download } from 'lucide-react'
 
 interface ModelOption { value: string; label: string }
 
@@ -360,6 +360,34 @@ function ProviderEditForm({
   t: (key: string) => string
   isNew?: boolean
 }) {
+  // 「获取模型」是表单自己的事：它只需要 base_url 和 write-only 的 editModels，
+  // 所以状态放这里，父组件一个 prop 都不用加
+  const [fetchKey, setFetchKey] = useState('')
+  const [fetching, setFetching] = useState(false)
+  const [fetchMsg, setFetchMsg] = useState<{ ok: boolean; text: string } | null>(null)
+
+  const handleFetchModels = async () => {
+    if (!editBaseUrl.trim()) return
+    setFetching(true)
+    setFetchMsg(null)
+    try {
+      const r = await api.post<{ ok: boolean; message: string; models: ModelOption[] }>(
+        '/admin/provider-presets/fetch-models',
+        { base_url: editBaseUrl.trim(), api_key: fetchKey.trim() || undefined },
+      )
+      if (r.models && r.models.length > 0) {
+        setEditModels(JSON.stringify(r.models, null, 2))
+        const okText = t('admin.fetchModelsOk') || '已获取 {n} 个模型'
+        setFetchMsg({ ok: true, text: okText.replace('{n}', String(r.models.length)) })
+      } else {
+        setFetchMsg({ ok: r.ok, text: r.message || t('admin.fetchModelsEmpty') || '该供应商没有返回模型列表' })
+      }
+    } catch (e: any) {
+      setFetchMsg({ ok: false, text: e?.detail || e?.message || '获取失败' })
+    }
+    setFetching(false)
+  }
+
   return (
     <div className="space-y-3 mt-3">
       {isNew && (
@@ -449,13 +477,35 @@ function ProviderEditForm({
         </label>
       </div>
       <div>
-        <label className="block text-xs text-textSecondary mb-1">{t('admin.modelOptionsJson') || '模型选项列表 (JSON)'}</label>
+        <div className="flex items-center justify-between gap-2 mb-1 flex-wrap">
+          <label className="block text-xs text-textSecondary">{t('admin.modelOptionsJson') || '模型选项列表 (JSON)'}</label>
+          <div className="flex items-center gap-2">
+            <input
+              type="text" value={fetchKey}
+              onChange={e => setFetchKey(e.target.value)}
+              placeholder={t('admin.fetchModelsHint') || 'API Key（仅用于获取，不会保存）'}
+              className="w-56 px-2 py-1 rounded-lg border border-border bg-canvas text-textPrimary text-[11px] font-mono focus:outline-none focus:ring-2 focus:ring-primary-500/60"
+            />
+            <button
+              onClick={handleFetchModels}
+              disabled={fetching || !editBaseUrl.trim()}
+              title={!editBaseUrl.trim() ? '请先填 API Base URL' : undefined}
+              className="inline-flex items-center gap-1 px-2.5 py-1 text-xs rounded-lg border border-border bg-canvas text-textSecondary hover:text-primary-500 hover:border-primary-500/40 disabled:opacity-40 disabled:hover:text-textSecondary transition-colors shrink-0"
+            >
+              {fetching ? <Loader2 size={12} className="animate-spin" /> : <Download size={12} />}
+              {t('admin.fetchModels') || '获取模型'}
+            </button>
+          </div>
+        </div>
         <textarea
           rows={3}
           value={editModels}
           onChange={e => setEditModels(e.target.value)}
           className="w-full px-3 py-2 rounded-lg border border-border bg-canvas text-textPrimary text-xs font-mono focus:outline-none focus:ring-2 focus:ring-primary-500/60 resize-y"
         />
+        {fetchMsg && (
+          <p className={'text-[11px] mt-1 break-all ' + (fetchMsg.ok ? 'text-mint-400' : 'text-rose-400')}>{fetchMsg.text}</p>
+        )}
       </div>
       <div className="flex items-center gap-3">
         <button

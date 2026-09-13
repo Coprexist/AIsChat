@@ -78,19 +78,10 @@ async def _cmd_compact(ctx: CmdContext) -> str:
 
 
 async def _cmd_new(ctx: CmdContext) -> str:
-    """开新会话（旧会话保存，可用 /use 切回）"""
-    from app.services.world.world_chat_service import new_session_id
+    """开新会话（旧会话保存，可用 /use 切回）。与前端"新对话"按钮共用 create_new_session。"""
+    from app.services.world.world_chat_service import create_new_session
 
-    world = ctx.world
-    cfg = dict(world.config or {})
-    sid = new_session_id(world)
-    now = datetime.now(timezone.utc).replace(tzinfo=None).isoformat()
-    sessions = dict(cfg.get("sessions") or {})
-    sessions[sid] = {"created_at": now, "last_active_at": now}
-    cfg["current_session"] = sid
-    cfg["sessions"] = sessions
-    world.config = cfg
-    await ctx.world_repo.commit()
+    sid = await create_new_session(ctx.world_repo, ctx.world)
     return f"已开新对话（会话 {sid}）。旧对话已保存：/sessions 查看列表，/use <id> 切回继续。"
 
 

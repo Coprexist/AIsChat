@@ -136,6 +136,26 @@ def build_compression_prompt(
     )
 
 
+def _not_compressed(messages: list[dict], reason: str) -> dict:
+    """未压缩（无需压缩 / 摘要失败）时的统一统计形状。
+
+    成功路径的字段这里全给齐（compressed_count=0、ratio=0），
+    调用方只需看 compressed，不必再对缺失字段做 `get(k, 0)` 兜底。
+    """
+    tokens = estimate_tokens(messages)
+    n = len(messages)
+    return {
+        "compressed": False,
+        "reason": reason,
+        "before_count": n,
+        "after_count": n,
+        "compressed_count": 0,
+        "before_tokens": tokens,
+        "after_tokens": tokens,
+        "compression_ratio_pct": 0,
+    }
+
+
 async def compress_messages(
     messages: list[dict],
     api_base_url: str,
@@ -172,12 +192,7 @@ async def compress_messages(
     if end_idx <= start_idx:
         # 没有可压缩的内容
         logger.info(f"上下文压缩跳过：无可压缩消息（total={original_count}, keep_last={keep_last_n}）")
-        return messages, {
-            "compressed": False,
-            "reason": "无可压缩消息",
-            "before_tokens": original_tokens,
-            "after_tokens": original_tokens,
-        }
+        return messages, _not_compressed(messages, "无可压缩消息")
 
     # 中间部分需要压缩
     messages_to_compress = messages[start_idx:end_idx]
@@ -210,12 +225,7 @@ async def compress_messages(
             raise ValueError("LLM 返回空摘要")
     except Exception as e:
         logger.error(f"上下文压缩失败（LLM 摘要调用出错）: {e}")
-        return messages, {
-            "compressed": False,
-            "reason": f"摘要生成失败: {e}",
-            "before_tokens": original_tokens,
-            "after_tokens": original_tokens,
-        }
+        return messages, _not_compressed(messages, f"摘要生成失败: {e}")
 
     # 组装新消息列表
     new_messages = []

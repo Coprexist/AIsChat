@@ -1,7 +1,9 @@
 import { memo, useState, useRef, useCallback, useMemo, forwardRef, useImperativeHandle, useEffect } from 'react'
-import { Send, Plus, X, ChevronRight, Brain, ArrowDown, FileText, Search, Globe, Terminal, Package, Clock, Wrench, Eraser, Pin, ChevronDown, Copy, RefreshCw } from 'lucide-react'
+import { Send, Plus, X, ChevronRight, Brain, ArrowDown, FileText, Search, Globe, Terminal, Package, Clock, Wrench, Eraser, Pin, ChevronDown, Copy, RefreshCw, Paperclip } from 'lucide-react'
 import MarkdownContent from './shared/MarkdownContent'
 import { useWorldChat, type ChatMsg } from '../hooks/useWorldChat'
+import { useAttachmentUpload, isImageAttachment } from '../hooks/useAttachmentUpload'
+import { AttachmentChips, DropMask } from './AttachmentChips'
 import { api } from '../api/client'
 import { useT } from '../i18n/I18nContext'
 
@@ -186,6 +188,15 @@ const WorldChatPanel = memo(forwardRef<WorldChatHandle, WorldChatPanelProps>(({ 
   const [localInput, setLocalInput] = useState('')
   const localInputRef = useRef('')
 
+  // ── 附件（图片可发给 AI；上传走与主站聊天共用的 hook） ──
+  // imagesOnly：非图片进不了多模态，让用户当场看见"仅支持图片"而不是发出去白费一轮
+  const attachments = useAttachmentUpload({ imagesOnly: true })
+  const fileInputRef = useRef<HTMLInputElement>(null)
+  const handlePickFiles = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
+    if (e.target.files?.length) attachments.pick(e.target.files)
+    e.target.value = ''  // 清空，便于重复选同一文件
+  }, [attachments.pick])
+
   // ── 本地命令检测状态 ──
   const [localCmdActive, setLocalCmdActive] = useState(false)
   const [localCmdQuery, setLocalCmdQuery] = useState('')
@@ -202,10 +213,12 @@ const WorldChatPanel = memo(forwardRef<WorldChatHandle, WorldChatPanelProps>(({ 
 
   const handleSubmit = useCallback((text: string) => {
     const t = text.trim()
-    if (!t) return
-    chat.submitText(t)
+    const atts = attachments.ready
+    if (!t && atts.length === 0) return
+    chat.submitText(t, atts.length ? atts : undefined)
+    attachments.clear()
     clearLocalInput()
-  }, [chat, clearLocalInput])
+  }, [chat, attachments, clearLocalInput])
 
   const handleCmdSelect = useCallback((cmd: string) => {
     chat.submitText(cmd)
@@ -228,7 +241,7 @@ const WorldChatPanel = memo(forwardRef<WorldChatHandle, WorldChatPanelProps>(({ 
         chat.forceScrollToBottom?.()
       }
       // 2) 重发最后一条用户消息 → 生成新回复（取代旧回复）
-      chat.submitText(lastUser.content)
+      chat.submitText(lastUser.content, lastUser.attachments)
     } catch (err: any) {
       if (onMsg) onMsg(`重新生成失败：${err?.message || '未知错误'}`)
     }
@@ -306,6 +319,20 @@ const WorldChatPanel = memo(forwardRef<WorldChatHandle, WorldChatPanelProps>(({ 
               </summary>
               <div className="text-xs text-textMuted mt-1 whitespace-pre-wrap bg-elevated/70 rounded p-2">{m.reasoning}</div>
             </details>
+          )}
+          {m.role === 'user' && !!m.attachments?.length && (
+            <div className="flex flex-wrap gap-1.5 mb-1">
+              {m.attachments.map((att, ai) => {
+                const url = `/api/fs/download/${att.file_id}?token=${localStorage.getItem('access_token') || ''}`
+                return isImageAttachment(att) ? (
+                  <a key={ai} href={url} target="_blank" rel="noreferrer" title={att.name}>
+                    <img src={url} alt={att.name} className="max-h-40 max-w-full rounded border border-border/60" />
+                  </a>
+                ) : (
+                  <span key={ai} className="text-[10px] text-textMuted">{att.name}</span>
+                )
+              })}
+            </div>
           )}
           {m.content ? <MarkdownContent content={m.content} /> : m.role === 'ai' ? (
             m.reasoning ? (
@@ -442,39 +469,45 @@ const WorldChatPanel = memo(forwardRef<WorldChatHandle, WorldChatPanelProps>(({ 
 
   return (
     <>
-      {/* 消息列表 */}
-      <div ref={chat.chatListRef} className="flex-1 overflow-y-auto p-3 space-y-2 relative">
-        {chat.chatLoadingOlder && <div className="text-[10px] text-textMuted text-center py-1">加载更早消息…</div>}
-        {chat.chatMsgs.length === 0 ? renderEmptySuggestions() : chat.chatMsgs.map((m, i) => renderMessage(m, i))}
+      {/* 消息列表：外层不滚动，专门用来挂拖拽提示层（放进滚动容器会随内容滚走）；
+          内层才是滚动容器——chatListRef 必须挂在滚动元素上（它读 scrollHeight/scrollTop） */}
+      <div className="flex-1 min-h-0 relative" {...attachments.zoneProps('list')}>
+        <DropMask {...attachments.dropState('list')} label="拖动到此处上传图片" />
+        <div ref={chat.chatListRef} className="absolute inset-0 overflow-y-auto p-3 space-y-2">
+          {chat.chatLoadingOlder && <div className="text-[10px] text-textMuted text-center py-1">加载更早消息…</div>}
+          {chat.chatMsgs.length === 0 ? renderEmptySuggestions() : chat.chatMsgs.map((m, i) => renderMessage(m, i))}
 
-        {/* 回到底部 / 新消息按钮：不在底部（或未读>0，或列表不可滚动时给入口）才显示；可滚动且在底部隐藏
-            sticky 固定在聊天列表视口右下角（输入区正上方）：列表滚动时不动，不随消息内容滚 */}
-        {(!chat.isAtBottom || !chat.chatCanScroll || chat.unreadCount > 0) && (
-          <div className="sticky bottom-3 flex justify-end pointer-events-none z-40">
-            <button
-              onClick={() => chat.scrollToBottom(true)}
-              className={`pointer-events-auto flex items-center justify-center gap-1 px-3 h-8 rounded-full shadow-lg transition-all ${
-                chat.unreadCount > 0
-                  ? 'bg-rose-500 hover:bg-rose-600 text-white border border-rose-400 animate-bounce'
-                  : 'bg-elevated border border-border text-textSecondary hover:text-textPrimary hover:bg-surface'
-              }`}
-              title="回到底部"
-            >
-              {chat.unreadCount > 0 ? (
-                <>
+          {/* 回到底部 / 新消息按钮：不在底部（或未读>0，或列表不可滚动时给入口）才显示；可滚动且在底部隐藏
+              sticky 固定在聊天列表视口右下角（输入区正上方）：列表滚动时不动，不随消息内容滚 */}
+          {(!chat.isAtBottom || !chat.chatCanScroll || chat.unreadCount > 0) && (
+            <div className="sticky bottom-3 flex justify-end pointer-events-none z-40">
+              <button
+                onClick={() => chat.scrollToBottom(true)}
+                className={`pointer-events-auto flex items-center justify-center gap-1 px-3 h-8 rounded-full shadow-lg transition-all ${
+                  chat.unreadCount > 0
+                    ? 'bg-rose-500 hover:bg-rose-600 text-white border border-rose-400 animate-bounce'
+                    : 'bg-elevated border border-border text-textSecondary hover:text-textPrimary hover:bg-surface'
+                }`}
+                title="回到底部"
+              >
+                {chat.unreadCount > 0 ? (
+                  <>
+                    <ArrowDown size={14} />
+                    <span className="text-xs font-semibold">{chat.unreadCount} 条新消息</span>
+                  </>
+                ) : (
                   <ArrowDown size={14} />
-                  <span className="text-xs font-semibold">{chat.unreadCount} 条新消息</span>
-                </>
-              ) : (
-                <ArrowDown size={14} />
-              )}
-            </button>
-          </div>
-        )}
+                )}
+              </button>
+            </div>
+          )}
+        </div>
       </div>
 
       {/* 会话工具条：当前会话 + 收藏 + 新对话 + 会话列表（/new 后对话保存可切回） */}
-      <div className="flex items-center gap-1.5 px-3 py-1.5 border-t border-border bg-surface/60 text-[10px] text-textMuted relative">
+      <div className="flex items-center gap-1.5 px-3 py-1.5 border-t border-border bg-surface/60 text-[10px] text-textMuted relative" {...attachments.zoneProps('toolbar')}>
+        {/* 这条只有 20 来像素高，不放文字——蒙版加深就够，但必须接住拖放（否则浏览器会直接打开图片） */}
+        <DropMask {...attachments.dropState('toolbar')} />
         <span className="truncate font-mono max-w-[180px] shrink-0" title={chat.currentSession}>{chat.currentSession === 'default' ? '默认会话' : chat.currentSession}</span>
         <button
           onClick={async () => { const p = await chat.togglePin(); if (!p && onMsg) onMsg('已取消收藏（收藏的会话不会被自动清理）') }}
@@ -484,7 +517,7 @@ const WorldChatPanel = memo(forwardRef<WorldChatHandle, WorldChatPanelProps>(({ 
           <Pin size={11} className={chat.sessionList.find((s) => s.id === chat.currentSession)?.pinned ? 'fill-current' : ''} />
         </button>
         <button
-          onClick={() => chat.submitText('/new')}
+          onClick={() => chat.newSession()}
           className="shrink-0 inline-flex items-center gap-1 px-1.5 py-0.5 rounded hover:bg-elevated hover:text-textSecondary transition-colors"
           title="开新对话（旧对话保存）"
         ><Plus size={11} /> 新对话</button>
@@ -510,8 +543,9 @@ const WorldChatPanel = memo(forwardRef<WorldChatHandle, WorldChatPanelProps>(({ 
         )}
       </div>
 
-      {/* 输入区 */}
-      <div className="p-3 border-t border-border relative">
+      {/* 输入区（图片可直接拖进来放下，与点回形针等价） */}
+      <div className="p-3 border-t border-border relative" {...attachments.zoneProps('input')} {...attachments.pasteProps}>
+        <DropMask {...attachments.dropState('input')} label="拖动到此处上传图片" />
         {/* 排队消息（AI 处理中，输入框上方弹窗展示） */}
         {chat.pendingItems.length > 0 && (
           <div className="absolute bottom-full left-3 right-3 mb-1 max-h-32 overflow-y-auto rounded-xl bg-elevated border border-border shadow-xl z-50">
@@ -520,7 +554,10 @@ const WorldChatPanel = memo(forwardRef<WorldChatHandle, WorldChatPanelProps>(({ 
             </div>
             {chat.pendingItems.map((it, i) => (
               <div key={i} className="flex items-center gap-2 px-3 py-1.5 text-xs border-b border-border/40 last:border-b-0">
-                <span className={`truncate flex-1 ${it.kind === 'cmd' ? 'font-mono text-primary-400' : 'text-textPrimary'}`}>{it.text}</span>
+                <span className={`truncate flex-1 ${it.kind === 'cmd' ? 'font-mono text-primary-400' : 'text-textPrimary'}`}>
+                  {it.text || (it.attachments?.length ? '（图片）' : '')}
+                  {!!it.attachments?.length && <span className="ml-1 text-[10px] text-textMuted">+{it.attachments.length}图</span>}
+                </span>
                 <span className="shrink-0 text-[10px] text-textMuted">{it.kind === 'cmd' ? '命令' : '消息'}</span>
                 <button
                   onClick={() => chat.setPendingItems((items) => items.filter((_, j) => j !== i))}
@@ -532,6 +569,7 @@ const WorldChatPanel = memo(forwardRef<WorldChatHandle, WorldChatPanelProps>(({ 
           </div>
         )}
         {localCmdActive && localCmdFiltered.length > 0 && renderCmdMenu()}
+        <AttachmentChips items={attachments.items} onRemove={attachments.remove} />
         <textarea
           ref={chat.chatInputRef}
           value={localInput}
@@ -554,21 +592,29 @@ const WorldChatPanel = memo(forwardRef<WorldChatHandle, WorldChatPanelProps>(({ 
             if (e.key === 'Enter' && !e.shiftKey) {
               e.preventDefault()
               const text = localInputRef.current
-              if (!text.trim()) return
+              if (!text.trim() && attachments.ready.length === 0) return
               handleSubmit(text)
             }
           }}
           rows={2}
-          placeholder={(chat.chatSending || chat.chatProcessing) ? 'AI 处理中，消息将排队…' : '和世界 AI 对话…（输入 / 查看命令）'}
+          placeholder={(chat.chatSending || chat.chatProcessing) ? 'AI 处理中，消息将排队…' : '和世界 AI 对话…（输入 / 查看命令；可直接拖图或粘贴截图）'}
           className="w-full bg-elevated text-sm p-2 rounded border border-border outline-none resize-none focus:border-primary-500/50"
         />
-        <button
-          onClick={() => { const t = localInputRef.current.trim(); if (t) handleSubmit(t) }}
-          disabled={!localInput.trim()}
-          className="w-full mt-2 py-1.5 text-sm bg-primary-500 hover:bg-primary-600 text-white rounded transition-colors disabled:opacity-40"
-        >
-          {(chat.chatSending || chat.chatProcessing) ? '排队发送' : (chat.chatSending ? '思考中...' : '发送')}
-        </button>
+        <div className="flex items-center gap-2 mt-2">
+          <input ref={fileInputRef} type="file" multiple accept="image/*" className="hidden" onChange={handlePickFiles} />
+          <button
+            onClick={() => fileInputRef.current?.click()}
+            className="shrink-0 p-1.5 rounded border border-border text-textMuted hover:text-primary-400 hover:border-primary-500/40 transition-colors"
+            title="添加图片（拖到对话面板任意处 / 截图后 Ctrl+V 也行）"
+          ><Paperclip size={14} /></button>
+          <button
+            onClick={() => handleSubmit(localInputRef.current)}
+            disabled={!localInput.trim() && attachments.ready.length === 0}
+            className="flex-1 py-1.5 text-sm bg-primary-500 hover:bg-primary-600 text-white rounded transition-colors disabled:opacity-40"
+          >
+            {(chat.chatSending || chat.chatProcessing) ? '排队发送' : (chat.chatSending ? '思考中...' : '发送')}
+          </button>
+        </div>
         {chat.chatProcessing && (
           <div className="text-[10px] text-textMuted mt-2 text-center">
             上一轮还在执行（刷新不影响），完成后自动显示

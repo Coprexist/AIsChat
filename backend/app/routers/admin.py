@@ -2944,6 +2944,39 @@ async def get_provider_presets(
     }
 
 
+class FetchModelsBody(BaseModel):
+    base_url: str
+    api_key: str | None = None
+
+
+@router.post("/provider-presets/fetch-models")
+async def fetch_provider_models(
+    body: FetchModelsBody,
+    admin: dict = Depends(require_admin),
+    db: AsyncSession = Depends(get_db),
+):
+    """拉取某供应商的模型清单（管理页「获取模型」按钮）。
+
+    key 优先用请求里带的一次性 key（表单里填、不保存）；没带就回退到**当前管理员
+    自己保存的**那把 —— 供应商配置本身不存 key，key 是用户级的。
+    探测策略/文案/脱敏全部复用 api_probe，这里只做"取 key + 转格式"。
+    """
+    from app.services.agent.api_probe import probe_provider
+
+    key = body.api_key
+    if not key:
+        from app.services.infrastructure.user_credentials import user_api_key
+        key = await user_api_key(db, admin["user_id"])
+
+    # 管理员是这台机器的信任根：新加的私网供应商必须能先测再存，所以这里不设限
+    probe = await probe_provider(body.base_url, key, allow_private=True)
+    return {
+        "ok": probe.ok,
+        "message": probe.message,
+        "models": [{"value": m, "label": m} for m in probe.models],
+    }
+
+
 class SaveProviderBody(BaseModel):
     name: str
     provider: str  # preset key 或 "manual"

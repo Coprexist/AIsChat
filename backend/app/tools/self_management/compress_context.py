@@ -94,9 +94,20 @@ class CompressContext(ToolPlugin):
             logger.error(f"compress_context 工具执行失败: {e}", exc_info=True)
             return {"error": True, "message": f"压缩失败: {e}"}
 
+        # 未压缩（无可压缩内容 / 摘要生成失败）不是"压缩完成"——不能对 AI 撒谎说压过了
+        if not stats.get("compressed"):
+            reason = stats.get("reason") or "无可压缩内容"
+            return {
+                "success": False,
+                "compressed": False,
+                "reason": reason,
+                "before_tokens": stats.get("before_tokens", 0),
+                "message": f"上下文未压缩：{reason}。如确需压缩可调小 keep_last_n 或换更长的对话",
+            }
+
         return {
             "success": True,
-            "compressed": stats.get("compressed", False),
+            "compressed": True,
             "before_tokens": stats.get("before_tokens", 0),
             "after_tokens": stats.get("after_tokens", 0),
             "compression_ratio_pct": stats.get("compression_ratio_pct", 0),

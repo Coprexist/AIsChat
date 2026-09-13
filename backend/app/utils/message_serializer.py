@@ -13,7 +13,7 @@ from app.models.sender import Sender
 import re
 
 
-def _normalize_attachments(attachments: list | str | None) -> list | None:
+def normalize_attachments(attachments: list | str | None) -> list | None:
     """统一归一化 attachments：Text 列（JSON 字符串）转 list。"""
     if isinstance(attachments, str):
         try:
@@ -40,7 +40,7 @@ def make_preview(content: str | None, attachments: list | str | None = None, max
             preview += "..."
         return preview
 
-    atts = _normalize_attachments(attachments)
+    atts = normalize_attachments(attachments)
     if not atts:
         return ""
 
@@ -90,7 +90,7 @@ def serialize_message(message, *,
     effective_avatar = getattr(message, 'sender_avatar_url', None) or sender_avatar_url or None
 
     # attachments: JSONB 自动反序列化,Text 列需手动 json.loads
-    attachments = _normalize_attachments(getattr(message, 'attachments', None))
+    attachments = normalize_attachments(getattr(message, 'attachments', None))
 
     conversation_value = getattr(message, conversation_key, None)
 
@@ -134,7 +134,7 @@ def serialize_message_with_sender(message, sender: Sender, *,
         conversation_key: 会话 ID 键名,群聊用 'group_id',私信用 'session_id'
         include_read_at: 是否包含 read_at 字段
     """
-    attachments = _normalize_attachments(getattr(message, 'attachments', None))
+    attachments = normalize_attachments(getattr(message, 'attachments', None))
 
     conversation_value = getattr(message, conversation_key, None)
 

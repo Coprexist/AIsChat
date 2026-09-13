@@ -938,7 +938,8 @@ async def generate_agent_personality(
 }"""
 
     async with httpx.AsyncClient(timeout=60.0) as client:
-        url = f"{api_base_url}/v1/chat/completions"
+        from app.utils.pure.llm_endpoint import chat_completions_url
+        url = chat_completions_url(api_base_url)
         headers = {"Content-Type": "application/json"}
         if api_key:
             headers["Authorization"] = f"Bearer {api_key}"

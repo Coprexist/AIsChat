@@ -7,7 +7,138 @@
 
 ## [Unreleased]
 
+### ✨ 新增功能
+
+#### 管理页「添加供应商」可以一键获取模型列表
+- 供应商表单的「模型选项列表 (JSON)」旁边多了一个 **获取模型** 按钮：填好 API Base URL 后点它，
+  自动拉 `/v1/models` 并把模型清单填进 JSON（拿不到就把人话原因写在下面，而不是静默失败）
+- **key 用一次性的**：旁边那个输入框「仅用于获取，不会保存」——供应商配置本来就不存 key（key 是用户级的）；
+  留空则回退到**当前管理员自己已保存的**那把（`user_credentials.user_api_key()` 单一入口，
+  顺带把「解密失败」从「整个接口 500」改成「记日志 + 当作没配」）
+- 后端新端点 `POST /admin/provider-presets/fetch-models`（管理员），直接复用 `probe_provider`——
+  探测策略 / 文案 / 脱敏一处定义、两处使用；供应商不实现 /models 时文案已说明，不假报成功
+- 前端状态放在 `ProviderEditForm` 内部（它只需要 base_url 和 write-only 的模型列表），
+  父组件一个 prop 都没加
+
+#### 群视界支持发图给 AI（并修好主站的图片链路）
+- **主站图片此前是坏的**：`_inject_image_data` 把 base64 塞进 `msg["image_data"]`，而
+  `_build_chat_payload` 把 messages **原样透传** —— 这是 OpenAI 协议里的未知字段，
+  被服务端直接忽略。DB 实证：10 条对话日志带 `image_data`，**0 条**带 `image_url`。
+  图能上传 / 能显示 / 能存库，但模型从来没看见
+- 新增 `app/utils/multimodal.py` 作为**唯一入口**（附件 → OpenAI 多模态 content）。三条约定：
+  只有 `image/*` 进多模态；无图时返回纯字符串（payload 与历史一致，prompt cache 友好）；
+  历史消息用 `[图片]` 占位、只有"最新一条"带真实字节——既护 cache 也防 token 爆炸
+- 主站 `_inject_image_data` → `_attach_image_to_message`：不再靠"格式化后的 content 包含
+  ORM 原文"反查是哪条消息（内容雷同时会匹配错），改由调用方直接给出下标与 ORM 对象
+- **视觉不支持的降级**：纯文本模型收到 `image_url` 多半 400。`chat_completion` 捕获后
+  自动剥掉图片重试一次，并注入提示告诉 AI"你看不到图、不要编造"，
+  结果带 `vision_unsupported=True` 供上层提示用户
+- **群视界打通**：`world_chat_messages.attachments`（迁移 `e8f9a0b1c2d3`）；
+  `POST /worlds/{id}/chat` 新增 `items: [{text, attachments}]` 契约（旧 `message`/`messages`
+  保留，三种入参在路由层归一化成 `ChatItem` 单一入口）；排队/插入队列全链路改带附件
+- **能力声明必须跟着图一起到场**：实测 mimo-v2.5 拿到了 `image_url`（请求日志可证），
+  也**描述出了图里的刷新图标**，却仍自称"我是文本 AI，看不到图片"——只给图不给话，模型会拒绝承认
+- 因此在用户消息**之后追加一条真 system 便签**（不塞进用户正文——那等于替用户说话，权威性也低）：
+  `【本轮附图】用户最新一条消息含 N 张图片，你可以直接查看。`
+  放在尾部 system 段，与"当前时间/能力变更通知"同一套 cache 友好写法
+- 便签与图片**同进同出**：一旦模型 400，`strip_image_parts` 会把便签一并改写成"你看不到图"，
+  所以不会出现"对纯文本模型撒谎"的情形；数量取**实际注入数**（单条默认 1 张，其余走"另有 N 张未提供"）
+- 前端抽出 `useAttachmentUpload` + `AttachmentChips`，主站聊天与群视界**共用同一实现**；
+  顺带清掉主站 `uploadingCount` 死状态与超出大小时的 `alert` 打断
+- **拖拽 / 粘贴即发**：钩子新增 `zoneProps(id)` / `dropState(id)` / `pasteProps`，
+  **整个对话面板都是落点**（消息列表 / 会话工具条 / 输入区各摊一份 `zoneProps`，
+  共用同一个深度计数，所以在区块之间移动鼠标时蒙版不会闪）、截图 Ctrl+V、
+  拖到回形针上（子元素，事件冒泡）都与点回形针等价。
+  三个坑都收在 hook 里：`dragenter/dragleave` 随子元素冒泡反复触发 → 用深度计数才知道"真的离开了"；
+  `dataTransfer.types` 不含 `Files` 的一律忽略 → 拖选文字不会误触；
+  粘贴只认 `clipboardData.items` 里 `kind==='file'` 的项，**纯文本粘贴原样放行**给浏览器（不抢默认行为）。
+  群视界取 `imagesOnly`——非图片进不了多模态，当场以错误态入列"仅支持图片"，不让用户白发一轮
+- **拖拽反馈是一层半透明蒙版**（不是描边）：所有落点 `bg-primary-500/[0.07]`，
+  鼠标当前所在那块 `bg-primary-500/20`——三块上下相邻，视觉上整个面板蒙一层、只有当前区块加深；
+  「拖动到此处上传图片」只在当前区块居中显示，**纯文字**（不做成按钮/药丸）
+- **蒙版必须挂在不滚动的容器上**：群视界与主站的消息列表都套了一层 `flex-1 min-h-0 relative`，
+  内层才是 `overflow-y-auto` 滚动容器（`chatListRef` / `containerRef` 仍挂内层——
+  它们要读 `scrollHeight` / `scrollTop`）。直接把 `absolute inset-0` 的蒙版放进滚动容器，它会随内容滚走
+- 拖拽 / 粘贴 / 点回形针三种入附件方式**共用同一个 `pick`**，之后流程完全一致
+- **主站聊天区域同样接入**：消息列表与输入区都有蒙版与落点（原先只有群视界有）
+
+#### 「新对话」不再走对话链路
+- 前端「新对话」按钮原来是发一条 `/new` 聊天消息，有四个副作用：被当成用户消息
+  **写进旧会话**（`_prepare_world_chat` 在处理命令**之前**就落库了，就是那"闪一下的 /new"）、
+  **占用一个轮次**（AI 忙时要排队 → 点了没反应）、在排队弹窗里显示成"命令"、
+  以及出异常时直接卡死（前端一直以为 AI 在处理中）
+- 新增 `POST /worlds/{id}/chat/session/new`（**不占轮次**）：建会话 + 切换 + 返回 messages/sessions。
+  按钮改调它；`/new` 文本命令保留，两处共用 `create_new_session` 单一入口
+- 顺带把"切会话"与"新建会话"的返回载荷收敛成 `_session_payload`，去掉一份重复拼装
+
 ### 🐛 修复的 Bug
+
+#### 小米 MiMo 绑定 API Key 必失败（连接测试少了个 /v1）
+- 现象：绑定 Xiaomi MiMo（按量付费 / Token Plan 两个 preset）时"连接失败"，其他供应商却正常
+- **实测取证**（用无效 key 探测：401/400=路径存在，404=路径不存在）：
+
+  | 端点 | 状态 |
+  |---|---|
+  | `api.xiaomimimo.com/models` | **404** |
+  | `api.xiaomimimo.com/v1/models` | 401 |
+  | `token-plan-cn.xiaomimimo.com/models` | **404** |
+  | `token-plan-cn.xiaomimimo.com/v1/models` | 401 |
+  | `api.deepseek.com/models` | 401（DeepSeek 的 /v1 可有可无，所以一直没人发现）|
+
+- 根因：`POST /user/test-api-connection` 探的是 `f"{base_url}/models"`，**漏了 `/v1`**；
+  而真正的聊天走的是 `f"{base}/v1/chat/completions"`——两处各写各的，语义不一致
+- 同一个 bug 还埋着第二颗雷：preset 里 `qwen` 的 base_url 自带 `/v1`（`.../compatible-mode/v1`）、
+  `zhipu` 自带 `/v4`，再被手拼一个 `/v1` → `.../v1/v1/chat/completions` **404**（实测）。
+  也就是说**通义千问兼容模式的聊天此前也是坏的**
+- 修：新增 `app/utils/pure/llm_endpoint.py` 作为**端点唯一入口**——
+  `api_root` / `chat_completions_url` / `models_url` / `embeddings_url`，
+  规则一句话：**base_url 末尾已有版本段（`/vN`）就不再补，否则补 `/v1`**。
+  `llm.py` / `agent_service` / `world_chat_service`（2 处）/ `routers/user` / 两处 embedding 全部改走它
+- 验证：9 个 preset 的 URL 全部正确（qwen → `.../v1/chat/completions`、zhipu → `.../v4/chat/completions`）；
+  重启后实测 `/user/test-api-connection` 对 MiMo 返回 `API 返回 401: Invalid API Key`
+  （修复前是 404 openresty），换成有效 key 即通。排查手法见 `docs/dev/llm_endpoint.md`
+- **顺带把连接测试重做成"两段式探针"**（`app/services/agent/api_probe.py`，业界 one-api / new-api 做法）：
+  ① `GET {root}/models` —— 免费、不需要模型名，多数供应商这条就够；
+  ② 仅当它 **404/405**（供应商没实现 `/models`）才退化成一次 `max_tokens=1` 的极小 chat 请求。
+  `401/403` **不退化**——路径是通的，退化只会掩盖真因。这才彻底解决"某家没实现 /models 就永远测不通"的一整类问题，
+  不再只治 MiMo 一家
+- **错误文案改成"用户接下来该改什么"**：`kind` 分 `auth / not_found / quota / rate_limited / network / timeout …`，
+  不再把供应商的原始 404 HTML 丢给用户（"路径不对"和"key 不对"以前长得一模一样，是这次事故里最误导人的地方）；
+  HTML 错误页只留一句说明
+- **响应脱敏**：供应商若把 API Key 原样回显在错误体里（不是每家都像 DeepSeek 那样打码成 `****robe`），
+  现在会被 `redact_secret()` 抹成 `***` 并截断——否则它会直接显示在用户界面上
+- **补了回归测试**：`tests/test_api_probe.py` 用 `httpx.MockTransport` **零网络**覆盖全部分支
+  （含"MiMo 的 /models 404 但聊天通"这条真实事故路径、"401 不许被兜底掩盖"、"key 回显必须脱敏"），全绿
+
+#### 连接测试可被当成内网端口扫描器（已修）
+- **能干什么**（实测）：拿无效 key 探 `200 / 401 / 404 / 302 / 连接拒绝 / 超时` 的差异，
+  就能画出内网 HTTP 服务地图；非 200 响应体的前 200 字符会回显（JSON 错误里常有内部 IP / 主机名）
+- **干不了什么**（也是实测，别把它想得太强）：路径后缀固定（`/v1/models`、`/chat/completions`），
+  **读不到内网任意页面**；302 不跟（httpx 默认 `follow_redirects=False`）；
+  200 分支不回显 body（连内网面板的标题都拿不到）；请求头里只有调用者自己的 key，不附带我们的任何凭据
+- 修：**私网目标只有"已登记"才允许请求**——已登记 = 平台预设 / 平台 `provider_config` /
+  该用户自己的 `user`·`agent`·`world` 配置里保存过的 `host:port`
+  （`base_url_registry.saved_private_hosts()`，**无新表、无新 UI**）。
+  于是"探内网"退化成"每个地址先保存一次再测一次"——手点，不是扫描；而公网地址一个字节都没变
+- 管理员路径不设限（信任根；否则新加的私网供应商"先测再存"就没法做了）
+- `url_guard.is_private_target()` **解析域名后再判**，所以 `127.0.0.1.nip.io` 这类 DNS 绕过的写法也拦得住
+- 测试补两条：私网**未登记**时必须一个请求都不发出去（`blocked_private`，零请求），
+  以及已登记/公网目标行为不变
+
+#### 「无需压缩」被当成执行失败（AI 主动 compact 时）
+- 现象：AI 自己调 `compact_context`，工具回「上下文压缩失败：无可压缩消息」，AI 于是告诉用户"执行失败"
+- **不是"必须等本轮结束才能压"**：压缩读的是**已落库**的历史（上一轮的消息、本轮的用户消息都在库里），
+  本轮进行中并不影响。日志实证：`上下文压缩跳过：无可压缩消息（total=8, keep_last=10）`
+- 真因是**两个阈值的量纲不一致**：`WORLD_CONTEXT_MIN_MESSAGES = 6` 数的是**全部行**（含 tool/note），
+  而 `WORLD_CHAT_KEEP_LAST = 10` 数的是**过滤后的真实对话**（tool/note 不进 LLM 上下文，也不算可压内容）。
+  门槛(6) 比保留窗口(10) 还低 → 真实消息 6~11 条这一段必然撞上"无可压缩"这个**空操作**
+- 修：① 世界工具改按**过滤后的真实条数**判断，空操作直接回 `success: True` +
+  「无需压缩：当前会话只有 N 条对话，都还在保留窗口内」（空操作不是失败，AI 应如实转述）；
+  ② `WORLD_CONTEXT_MIN_MESSAGES` 提到 `WORLD_CHAT_KEEP_LAST + 1`——
+  提示压缩的门槛必须高于保留窗口，否则就是让 AI 去压一个压不动的东西
+- 顺带：`compress_messages` 的"未压缩"统计补齐成**与成功同一形状**（`_not_compressed()`，
+  `compression_ratio_pct=0` / `compressed_count=0`），主站 `compress_context` 也不再在没压缩时
+  回「上下文压缩完成：X → X tokens」——那是对 AI 撒谎
 
 #### 世界 AI 默认模型解析崩溃（b68c8b9 引入的回归）
 - `world_chat_service` 把 `get_provider_config()`（返回**单个**默认供应商 dict）喂给

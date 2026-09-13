@@ -77,10 +77,17 @@ class CreatorConfigRequest(BaseModel):
     tools: list[str] | None = None
 
 
+class ChatItemRequest(BaseModel):
+    """一条带附件的消息（附件 = /fs/upload-attachment 返回的 {file_id, path, name, size, mime_type}）"""
+    text: str | None = None
+    attachments: list[dict] | None = None
+
+
 class ChatRequest(BaseModel):
-    """世界 AI 对话：message 单条；messages 批量（排队消息一起发给 AI，多条气泡）"""
+    """世界 AI 对话：message 单条；messages 批量；items 批量带附件（新前端用这个）"""
     message: str | None = Field(None, min_length=1)
     messages: list[str] | None = None
+    items: list[ChatItemRequest] | None = None
 
 
 class ChatSessionRequest(BaseModel):
@@ -772,7 +779,15 @@ async def post_chat(
         await db.commit()
     from app.services.world.world_turn import get_world_worker
     worker = get_world_worker(world_id)
-    payload = req.messages if req.messages else ([req.message] if req.message else [])
+    # 三种入参（items / messages / message）在这里归一化成 ChatItem —— 唯一入口
+    from app.services.world.world_chat_items import ChatItem
+    raw = (
+        [i.model_dump() for i in req.items] if req.items
+        else (req.messages or ([req.message] if req.message else []))
+    )
+    payload = ChatItem.coerce_many(raw)
+    if not payload:
+        raise HTTPException(status_code=400, detail="消息不能为空")
     turn_id = worker.enqueue(current_user["user_id"], payload)
     return {
         "turn_id": turn_id,
@@ -828,32 +843,17 @@ async def regenerate_chat(
     return {"messages": await get_chat_history(world_repo, world_id, limit=100, session_id=sid)}
 
 
-@router.post("/{world_id}/chat/session")
-async def switch_chat_session(
-    world_id: int,
-    req: ChatSessionRequest,
-    current_user: dict = Depends(get_current_user),
-    db: AsyncSession = Depends(get_db),
-    world_repo: WorldRepository = Depends(get_world_repo),
-):
-    """切换当前会话（id 一致：切回旧会话继续对话，上下文按会话隔离）"""
-    await _require_owner(db, world_id, current_user["user_id"])
-    from app.models.world import World
-    from app.services.world.world_chat_service import get_chat_history, session_id_for_db
-    world = await db.get(World, world_id)
-    if world is None:
-        raise HTTPException(status_code=404, detail="世界不存在")
-    cfg = dict(world.config or {})
-    sessions = cfg.get("sessions") or {}
-    # default 会话始终可切（旧数据）；其他会话须存在于列表
-    if req.session_id != "default" and req.session_id not in sessions:
-        raise HTTPException(status_code=404, detail="会话不存在")
-    cfg["current_session"] = None if req.session_id == "default" else req.session_id
-    world.config = cfg
-    await db.commit()
-    msgs = await get_chat_history(world_repo, world_id, 30, session_id=session_id_for_db(world))
+async def _session_payload(db, world_repo, world_id: int, world, current_session: str) -> dict:
+    """切换/新建会话后返回给前端的统一载荷。
+
+    "切会话"与"新建会话"两个端点共用，避免会话列表拼装逻辑写两遍。
+    """
     from sqlalchemy import func as _f
     from app.models.world import WorldChatMessage as _WCM
+    from app.services.world.world_chat_service import get_chat_history, session_id_for_db
+
+    sessions = (world.config or {}).get("sessions") or {}
+    msgs = await get_chat_history(world_repo, world_id, 30, session_id=session_id_for_db(world))
     has_default = (await db.execute(
         select(_f.count()).select_from(_WCM).where(
             _WCM.world_id == world_id, _WCM.session_id.is_(None),
@@ -866,11 +866,57 @@ async def switch_chat_session(
     ]
     if has_default:
         out.insert(0, {"id": "default", "last_active_at": None, "pinned": bool(sessions.get("default", {}).get("pinned_by"))})
-    return {
-        "current_session": req.session_id,
-        "messages": msgs,
-        "sessions": out,
-    }
+    return {"current_session": current_session, "messages": msgs, "sessions": out}
+
+
+@router.post("/{world_id}/chat/session")
+async def switch_chat_session(
+    world_id: int,
+    req: ChatSessionRequest,
+    current_user: dict = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+    world_repo: WorldRepository = Depends(get_world_repo),
+):
+    """切换当前会话（id 一致：切回旧会话继续对话，上下文按会话隔离）"""
+    await _require_owner(db, world_id, current_user["user_id"])
+    from app.models.world import World
+    world = await db.get(World, world_id)
+    if world is None:
+        raise HTTPException(status_code=404, detail="世界不存在")
+    cfg = dict(world.config or {})
+    sessions = cfg.get("sessions") or {}
+    # default 会话始终可切（旧数据）；其他会话须存在于列表
+    if req.session_id != "default" and req.session_id not in sessions:
+        raise HTTPException(status_code=404, detail="会话不存在")
+    cfg["current_session"] = None if req.session_id == "default" else req.session_id
+    world.config = cfg
+    await db.commit()
+    return await _session_payload(db, world_repo, world_id, world, req.session_id)
+
+
+@router.post("/{world_id}/chat/session/new")
+async def new_chat_session(
+    world_id: int,
+    current_user: dict = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+    world_repo: WorldRepository = Depends(get_world_repo),
+):
+    """开新会话并切过去（不占对话轮次）。
+
+    前端"新对话"按钮走这里，而不是发一条 /new 聊天消息——后者会被当成用户消息
+    写进旧会话、占用一个轮次，AI 忙时还得排队（2026-09-13 修）。
+    /new 文本命令保留，内部调用同一个 create_new_session。
+    """
+    await _require_owner(db, world_id, current_user["user_id"])
+    from app.models.world import World
+    from app.services.world.world_chat_service import create_new_session
+    world = await db.get(World, world_id)
+    if world is None:
+        raise HTTPException(status_code=404, detail="世界不存在")
+    sid = await create_new_session(world_repo, world)
+    return await _session_payload(db, world_repo, world_id, world, sid)
+
+
 
 
 @router.post("/{world_id}/chat/session/pin")

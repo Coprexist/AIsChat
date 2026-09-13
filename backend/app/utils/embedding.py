@@ -114,8 +114,8 @@ async def _embed_via_endpoint(
     model: str,
 ) -> list[float]:
     """直连 OpenAI 兼容 /v1/embeddings 端点（旧逻辑，保留给显式自定义服务）。"""
-    base = (api_base_url or "").rstrip("/")
-    url = base if base.endswith("/embeddings") else f"{base}/v1/embeddings"
+    from app.utils.pure.llm_endpoint import embeddings_url
+    url = embeddings_url(api_base_url)
     headers = {"Content-Type": "application/json"}
     if api_key:
         headers["Authorization"] = f"Bearer {api_key}"

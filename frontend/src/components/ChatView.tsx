@@ -13,6 +13,8 @@ import { useT } from '../i18n/I18nContext'
 import { tryOpenWorldWindow } from '../utils/worldView'
 import { isTauri, onKeyboardChange } from '../utils/tauri'
 import { scrollToInContainer } from '../utils/scroll'
+import { useAttachmentUpload } from '../hooks/useAttachmentUpload'
+import { AttachmentChips, DropMask } from './AttachmentChips'
 
 // ── 虚拟列表：消息高度估算（纯函数，窗口化渲染用）──
 // 估算偏保守（偏大），配合 overscan 消化误差，避免滚动时窗口露出空白
@@ -141,21 +143,10 @@ export default function ChatView({ conversationType, conversationId }: ChatViewP
   const [mentionQuery, setMentionQuery] = useState('')
   const [mentionIdx, setMentionIdx] = useState(0)
 
-  // 文件附件
-  interface PendingAttachment {
-    id: string        // 临时前端 ID（用于删除/去重）
-    file: File | null // null=上传完成，有值=上传中
-    file_id?: number  // 服务端返回的 ID
-    path?: string     // 服务端返回的存储路径
-    name: string
-    size: number
-    mime_type: string
-    uploading: boolean
-    error?: string
-  }
-  const [pendingAttachments, setPendingAttachments] = useState<PendingAttachment[]>([])
+  // 文件附件：上传逻辑与群视界世界对话共用 useAttachmentUpload
+  //（图片如何进 LLM 多模态由后端 app/utils/multimodal.py 统一处理）
+  const attachments = useAttachmentUpload()
   const fileInputRef = useRef<HTMLInputElement>(null)
-  const [uploadingCount, setUploadingCount] = useState(0)
 
   // Refs
   const textareaRef = useRef<HTMLTextAreaElement>(null)
@@ -852,92 +843,23 @@ export default function ChatView({ conversationType, conversationId }: ChatViewP
     })
   }
 
-  // 文件上传处理
-  const handleFileSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const files = e.target.files
-    if (!files || files.length === 0) return
-
-    // 从后端获取上传大小限制（缓存 5 分钟）
-    let MAX_FILE_MB = 32
-    try {
-      const cached = sessionStorage.getItem('upload_limits')
-      if (cached) {
-        const parsed = JSON.parse(cached)
-        if (Date.now() - parsed.ts < 300000) {
-          MAX_FILE_MB = parsed.upload_max_size_mb || 32
-        }
-      }
-    } catch {}
-
-    for (let i = 0; i < files.length; i++) {
-      const file = files[i]
-      if (file.size > MAX_FILE_MB * 1024 * 1024) {
-        alert(`文件「${file.name}」超出 ${MAX_FILE_MB}MB 上传限制`)
-        continue
-      }
-      const tempId = `att_${Date.now()}_${i}`
-      const newAtt: PendingAttachment = {
-        id: tempId,
-        file,
-        name: file.name,
-        size: file.size,
-        mime_type: file.type || 'application/octet-stream',
-        uploading: true,
-      }
-      setPendingAttachments(prev => [...prev, newAtt])
-      setUploadingCount(c => c + 1)
-
-      try {
-        const result = await api.upload('/fs/upload-attachment', file)
-        setPendingAttachments(prev =>
-          prev.map(a => a.id === tempId
-            ? { ...a, file: null, file_id: result.file_id, path: result.path, uploading: false }
-            : a
-          )
-        )
-        setUploadingCount(c => c - 1)
-      } catch (err: any) {
-        setPendingAttachments(prev =>
-          prev.map(a => a.id === tempId
-            ? { ...a, uploading: false, error: err.message || t('chat.uploadFailed') }
-            : a
-          )
-        )
-        setUploadingCount(c => c - 1)
-      }
-    }
+  // 文件上传处理（超限/失败记成错误态附件，不再 alert 打断流程）
+  const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (e.target.files?.length) attachments.pick(e.target.files)
     // 清空 input 以便重复选择同一文件
-    if (fileInputRef.current) fileInputRef.current.value = ''
+    e.target.value = ''
   }
 
-  const removeAttachment = (tempId: string) => {
-    setPendingAttachments(prev => prev.filter(a => a.id !== tempId))
-  }
 
   const handleSend = (text: string) => {
-    if (!text.trim() && pendingAttachments.length === 0) return
+    if (!text.trim() && attachments.items.length === 0) return
     if (!conversationId) return
     if (!connected) return
 
-    // 检查是否有未上传完的文件
-    const stillUploading = pendingAttachments.some(a => a.uploading)
-    if (stillUploading) return
+    // 还有上传中 / 上传失败的文件 → 不发（hook 已把状态标在附件条上）
+    if (attachments.uploading || attachments.hasError) return
 
-    // 检查是否有上传失败的文件
-    const hasErrors = pendingAttachments.some(a => a.error)
-    if (hasErrors) return
-
-    // 收集已上传完成的附件
-    const readyAttachments = pendingAttachments
-      .filter(a => a.file_id)
-      .map(a => ({
-        file_id: a.file_id!,
-        path: a.path || '',
-        name: a.name,
-        size: a.size,
-        mime_type: a.mime_type,
-      }))
-
+    const readyAttachments = attachments.ready
     sendMessage(text.trim(), replyTo?.id, readyAttachments.length > 0 ? readyAttachments : undefined)
     setInput('')
     setReplyTo(null)
@@ -947,7 +869,7 @@ export default function ChatView({ conversationType, conversationId }: ChatViewP
       sendTyping(false)
     }
     localStorage.removeItem(`draft_${conversationType}_${conversationId}`)
-    setPendingAttachments([])
+    attachments.clear()
     setMentionActive(false)
     window.dispatchEvent(new CustomEvent(CHAT_REFRESH_EVENT, { detail: { type: 'message_sent' } }))
   }
@@ -1044,53 +966,57 @@ export default function ChatView({ conversationType, conversationId }: ChatViewP
         </div>
       )}
 
-      {/* 消息列表 */}
-      <div
-        ref={containerRef}
-        className="flex-1 overflow-y-auto px-4 py-4 bg-canvas relative"
-      >
-        {/* 顶部哨兵（加载更旧消息的触发器） */}
-        <div ref={topSentinelRef} className="h-1" />
+      {/* 消息列表：外层不滚动，专门用来挂拖拽蒙版（放进滚动容器会随内容滚走）；
+          containerRef 必须留在内层——虚拟列表靠它读 scrollTop */}
+      <div className="flex-1 min-h-0 relative" {...attachments.zoneProps('list')}>
+        <DropMask {...attachments.dropState('list')} label={t('chat.dropToAdd')} />
+        <div
+          ref={containerRef}
+          className="absolute inset-0 overflow-y-auto px-4 py-4 bg-canvas"
+        >
+          {/* 顶部哨兵（加载更旧消息的触发器） */}
+          <div ref={topSentinelRef} className="h-1" />
 
-        {/* 顶部加载指示器 */}
-        {loadingState === 'older' && (
-          <div className="flex items-center justify-center py-3">
-            <Loader2 className="animate-spin text-textMuted" size={16} />
-          </div>
-        )}
+          {/* 顶部加载指示器 */}
+          {loadingState === 'older' && (
+            <div className="flex items-center justify-center py-3">
+              <Loader2 className="animate-spin text-textMuted" size={16} />
+            </div>
+          )}
 
-        {/* 无更多旧消息提示 */}
-        {!hasMoreBefore && messages.length > 0 && (
-          <div className="text-center text-[10px] text-textMuted py-2 select-none">
-            {t('chat.beginningOfChat')}
-          </div>
-        )}
+          {/* 无更多旧消息提示 */}
+          {!hasMoreBefore && messages.length > 0 && (
+            <div className="text-center text-[10px] text-textMuted py-2 select-none">
+              {t('chat.beginningOfChat')}
+            </div>
+          )}
 
-        {/* 初始加载 */}
-        {loadingState === 'initial' ? (
-          <div className="flex items-center justify-center h-full">
-            <Loader2 className="animate-spin text-textMuted" size={24} />
-          </div>
-        ) : messages.length === 0 ? (
-          <EmptyState icon={MessageSquare} title={conversationType === 'dm' ? '开始私信' : '开始群聊'} description={conversationType === 'dm' ? '给对方发送第一条消息吧' : '在群里发送第一条消息吧'} />
-        ) : (
-          <div style={{ paddingTop: messageElements.beforeH, paddingBottom: messageElements.afterH }}>
-            {messageElements.items}
-          </div>
-        )}
+          {/* 初始加载 */}
+          {loadingState === 'initial' ? (
+            <div className="flex items-center justify-center h-full">
+              <Loader2 className="animate-spin text-textMuted" size={24} />
+            </div>
+          ) : messages.length === 0 ? (
+            <EmptyState icon={MessageSquare} title={conversationType === 'dm' ? '开始私信' : '开始群聊'} description={conversationType === 'dm' ? '给对方发送第一条消息吧' : '在群里发送第一条消息吧'} />
+          ) : (
+            <div style={{ paddingTop: messageElements.beforeH, paddingBottom: messageElements.afterH }}>
+              {messageElements.items}
+            </div>
+          )}
 
-        {/* 底部活动状态栏：合并 AI 思考/输入 + 人类打字 */}
-        <ActivityBar users={activityUsers} />
+          {/* 底部活动状态栏：合并 AI 思考/输入 + 人类打字 */}
+          <ActivityBar users={activityUsers} />
 
-        {/* 底部加载指示器 */}
-        {loadingState === 'newer' && (
-          <div className="flex items-center justify-center py-3">
-            <Loader2 className="animate-spin text-textMuted" size={16} />
-          </div>
-        )}
+          {/* 底部加载指示器 */}
+          {loadingState === 'newer' && (
+            <div className="flex items-center justify-center py-3">
+              <Loader2 className="animate-spin text-textMuted" size={16} />
+            </div>
+          )}
 
-        {/* 底部哨兵（加载更新消息的触发器） */}
-        <div ref={bottomSentinelRef} className="h-1" />
+          {/* 底部哨兵（加载更新消息的触发器） */}
+          <div ref={bottomSentinelRef} className="h-1" />
+        </div>
       </div>
 
       {/* ↓ 回到底部浮动按钮 */}
@@ -1133,45 +1059,11 @@ export default function ChatView({ conversationType, conversationId }: ChatViewP
         }}
       />
 
-      {/* 输入框 */}
-      <div className="p-3 bg-surface border-t border-border relative">
-        {/* 附件预览列表 */}
-        {pendingAttachments.length > 0 && (
-          <div className="mb-2 flex flex-wrap gap-2">
-            {pendingAttachments.map((att) => (
-              <div
-                key={att.id}
-                className={`relative group flex items-center gap-2 pl-3 pr-1 py-1.5 rounded-xl text-xs border transition-colors ${
-                  att.error
-                    ? 'bg-rose-500/10 border-rose-500/30'
-                    : att.uploading
-                    ? 'bg-canvas border-border animate-pulse'
-                    : 'bg-canvas border-border hover:bg-elevated'
-                }`}
-              >
-                <FileIcon size={14} className={att.error ? 'text-rose-400' : att.uploading ? 'text-textMuted' : 'text-primary-400'} />
-                <span className={`max-w-[120px] truncate ${att.error ? 'text-rose-400' : 'text-textSecondary'}`}>
-                  {att.name}
-                </span>
-                {att.uploading && (
-                  <Loader2 size={12} className="animate-spin text-textMuted shrink-0" />
-                )}
-                {att.error && (
-                  <span className="text-rose-400 text-[10px] shrink-0" title={att.error || t('chat.uploadFailed')}>{t('chat.uploadFailed')}</span>
-                )}
-                <span className="text-textMuted text-[10px] shrink-0">
-                  {(att.size / 1024).toFixed(0)}KB
-                </span>
-                <button
-                  onClick={() => removeAttachment(att.id)}
-                  className="p-0.5 rounded-lg hover:bg-rose-500/10 text-textMuted hover:text-rose-400 transition-colors"
-                >
-                  <X size={12} />
-                </button>
-              </div>
-            ))}
-          </div>
-        )}
+      {/* 输入框（文件可直接拖进来放下，与点回形针等价） */}
+      <div className="p-3 bg-surface border-t border-border relative" {...attachments.zoneProps('input')} {...attachments.pasteProps}>
+        <DropMask {...attachments.dropState('input')} label={t('chat.dropToAdd')} />
+        {/* 附件预览列表（与群视界世界对话共用同一组件） */}
+        <AttachmentChips items={attachments.items} onRemove={attachments.remove} errorText={t('chat.uploadFailed')} />
 
         {/* @提及 自动补全下拉 */}
         {mentionActive && mentionFiltered.length > 0 && (
@@ -1216,7 +1108,7 @@ export default function ChatView({ conversationType, conversationId }: ChatViewP
           onSend={handleSend}
           connected={connected}
           onSendFile={() => fileInputRef.current?.click()}
-          hasAttachments={pendingAttachments.length > 0}
+          hasAttachments={attachments.items.length > 0}
           groupMembers={groupMembers}
           inputHeight={inputHeight}
           onAutoHeight={(ah) => {

@@ -4,6 +4,7 @@
  */
 import { useCallback, useEffect, useMemo, useRef, useState, type RefObject, type Dispatch, type SetStateAction, type UIEvent } from 'react'
 import { api } from '../api/client'
+import type { ReadyAttachment } from './useAttachmentUpload'
 
 // AI 处理中状态的初始值：状态检查（/chat/status）返回前一律按"处理中"对待，
 // 消息走插入队列，避免与仍在运行的 turn 冲突。
@@ -29,6 +30,21 @@ export interface ChatMsg {
   tool_args?: string
   /** 工具执行失败（落库后刷新保持红色；2026-08-13） */
   is_error?: boolean
+  /** 消息附件（图片在气泡里渲染成图；2026-09-13 新增） */
+  attachments?: ReadyAttachment[]
+}
+
+/** 排队弹窗条目（AI 处理中暂存，之后按序发送） */
+export interface PendingItem {
+  kind: 'msg' | 'cmd'
+  text: string
+  attachments?: ReadyAttachment[]
+}
+
+/** 发往 /worlds/{id}/chat 的一条消息（items 契约，对应后端 ChatItem） */
+export interface OutgoingItem {
+  text: string
+  attachments?: ReadyAttachment[]
 }
 
 // SSE 事件前缀（与后端 world_chat_service 的 yield 格式一一对应；解析用常量避免魔法数字）
@@ -81,7 +97,7 @@ export interface UseWorldChatReturn {
   chatLoadingOlder: boolean
   chatListRef: (el: HTMLDivElement | null) => void
   chatInputRef: RefObject<HTMLTextAreaElement | null>
-  pendingItems: { kind: 'msg' | 'cmd'; text: string }[]
+  pendingItems: PendingItem[]
   setPendingItems: Dispatch<SetStateAction<{ kind: 'msg' | 'cmd'; text: string }[]>>
   suggestions: string[]
   cmdActive: boolean
@@ -100,6 +116,7 @@ export interface UseWorldChatReturn {
   currentSession: string
   sessionList: { id: string; last_active_at?: string; pinned?: boolean }[]
   switchSession: (sid: string) => Promise<boolean>
+  newSession: () => Promise<string | null>
   togglePin: () => Promise<boolean>
   scrollToBottom: (force?: boolean) => void
   forceScrollToBottom: () => void
@@ -111,7 +128,7 @@ export function useWorldChat({ wid, onRefresh, onMsg }: UseWorldChatOptions) {
   const [chatInput, setChatInput] = useState('')
   const [chatSending, setChatSending] = useState(false)
   const [chatProcessing, setChatProcessing] = useState(CHAT_PROCESSING_INITIAL)
-  const [pendingItems, setPendingItems] = useState<{ kind: 'msg' | 'cmd'; text: string }[]>([])  // AI 处理中排队消息（msg 一起发；cmd 串行执行）
+  const [pendingItems, setPendingItems] = useState<PendingItem[]>([])  // AI 处理中排队消息（msg 一起发；cmd 串行执行）
   const [suggestions, setSuggestions] = useState<string[]>([])  // "你可以"建议（AI 生成 / 兜底 / 预设）
   // 会话（/new 开新对话、可切回；展示当前会话 id + 列表）
   const [currentSession, setCurrentSession] = useState<string>('default')
@@ -476,7 +493,7 @@ export function useWorldChat({ wid, onRefresh, onMsg }: UseWorldChatOptions) {
           if (payload.startsWith(EV.INSERT)) {
             // 排队消息已插入工具轮并落库（记入历史）：画用户气泡（用真实 msg_id，
             // 与历史一致，loadChat 后不会重复/错位）
-            const ins = parseEvent<{ msg_id: number; content: string }>(payload, EV.INSERT)
+            const ins = parseEvent<{ msg_id: number; content: string; attachments?: ReadyAttachment[] }>(payload, EV.INSERT)
             if (ins) {
               setChatMsgs((msgs) => {
                 // 正常路径：中途发送只挂排队弹窗、不画气泡，这里直接追加真实气泡。
@@ -484,9 +501,9 @@ export function useWorldChat({ wid, onRefresh, onMsg }: UseWorldChatOptions) {
                 // 后端其实仍忙 → 该 POST 被插进队列 → 此处若不替换就会重复显示，故按内容
                 // 匹配最早一条临时气泡原地换 id（后端 drain_inserts 是 FIFO，顺序一致）
                 const i = msgs.findIndex((m) => m.id < 0 && m.role === 'user' && m.content === ins.content)
-                if (i === -1) return [...msgs, { id: ins.msg_id, role: 'user', content: ins.content }]
+                if (i === -1) return [...msgs, { id: ins.msg_id, role: 'user', content: ins.content, attachments: ins.attachments }]
                 const next = [...msgs]
-                next[i] = { id: ins.msg_id, role: 'user', content: ins.content }
+                next[i] = { id: ins.msg_id, role: 'user', content: ins.content, attachments: ins.attachments }
                 return next
               })
               requestAnimationFrame(() => forceScrollToBottomRef.current?.())
@@ -624,6 +641,24 @@ export function useWorldChat({ wid, onRefresh, onMsg }: UseWorldChatOptions) {
     } catch { return false }
   }, [wid, forceScrollToBottom])
 
+  /** 新建会话并切过去（走 API，不占对话轮次）。
+   *  与"切会话"共用同一返回载荷，AI 正在跑时也能立刻切；
+   *  不再像过去那样发一条 /new 聊天消息（那会把 /new 写进旧会话并占一个轮次）。 */
+  const newSession = useCallback(async (): Promise<string | null> => {
+    try {
+      const r = await api.post<{ messages: ChatMsg[]; current_session: string; sessions: { id: string; created_at?: string; last_active_at?: string; pinned?: boolean }[] }>(
+        `/worlds/${wid}/chat/session/new`, {},
+      )
+      setCurrentSession(r.current_session)
+      if (Array.isArray(r.sessions)) setSessionList(r.sessions)
+      setChatMsgs(Array.isArray(r.messages) ? r.messages : [])
+      setChatHasMore(false)
+      setSuggestions([])
+      forceScrollToBottom()
+      return r.current_session
+    } catch { return null }
+  }, [wid, forceScrollToBottom])
+
   const togglePin = useCallback(async (): Promise<boolean> => {
     try {
       const cur = currentSessionRef.current
@@ -640,9 +675,11 @@ export function useWorldChat({ wid, onRefresh, onMsg }: UseWorldChatOptions) {
   //   → 回 [INSERTED]{count} 清排队弹窗 + [INSERT] 画真实气泡
   // 这里**不预先画占位气泡**：气泡必须等 AI 真正收到才出现
   //（"用户看到已发送" == "AI 已看到"），否则等于"还没被 AI 收到就已经显示成发出去了"
-  const sendInsertMessage = async (text: string) => {
+  const sendInsertMessage = async (text: string, attachments?: ReadyAttachment[]) => {
     try {
-      await api.post<{ turn_id: string; queued: boolean }>(`/worlds/${wid}/chat`, { messages: [text] })
+      await api.post<{ turn_id: string; queued: boolean }>(`/worlds/${wid}/chat`, {
+        items: [{ text, attachments: attachments?.length ? attachments : undefined }],
+      })
       // 不 await subscribeTurnStream——回执走活跃 turn 的 SSE（[INSERTED]/[INSERT]）
     } catch (e: any) {
       // 发送失败：从排队弹窗摘掉这条，否则 drain 会把它当普通排队消息再发一次
@@ -655,14 +692,16 @@ export function useWorldChat({ wid, onRefresh, onMsg }: UseWorldChatOptions) {
   }
 
   // ── 发送 ──
-  const sendMessages = async (texts: string[]) => {
-    const list = texts.map((t) => t.trim()).filter(Boolean)
+  const sendMessages = async (outgoing: OutgoingItem[]) => {
+    const list = outgoing
+      .map((i) => ({ text: i.text.trim(), attachments: i.attachments || [] }))
+      .filter((i) => i.text || i.attachments.length)
     if (!list.length) return
     setChatSending(true)
     setChatInput('')
     setCmdActive(false)
     // 斜杠命令：立即给执行中反馈（后端压缩/清空需要时间，等 [TOOL] 正式结果到达后 loadChat 会清掉这个临时气泡）
-    const singleCmd = list.length === 1 ? list[0] : ''
+    const singleCmd = list.length === 1 ? list[0].text : ''
     if (singleCmd.startsWith('/compact') || singleCmd.startsWith('/clear')) {
       setChatMsgs((msgs) => [...msgs, {
         id: -(++msgSeqRef.current), role: 'tool',
@@ -673,7 +712,12 @@ export function useWorldChat({ wid, onRefresh, onMsg }: UseWorldChatOptions) {
     // 服务器端轮次（不依赖本页面）：入队 → 订阅直播（断开自动重连，逻辑见 subscribeTurnStream）
     try {
       // 1. 入队（返回 turn_id；若前面有消息在跑会排队）
-      const r = await api.post<{ turn_id: string; queued: boolean; position: number }>(`/worlds/${wid}/chat`, { messages: list })
+      const r = await api.post<{ turn_id: string; queued: boolean; position: number }>(`/worlds/${wid}/chat`, {
+        items: list.map((i) => ({
+          text: i.text,
+          attachments: i.attachments.length ? i.attachments : undefined,
+        })),
+      })
       if (r.queued) {
         setChatMsgs((msgs) => [...msgs, { id: -(++msgSeqRef.current), role: 'tool', content: `⏳ 已排队（前面还有 ${r.position} 条在跑）` }])
       }
@@ -693,26 +737,26 @@ export function useWorldChat({ wid, onRefresh, onMsg }: UseWorldChatOptions) {
     }
   }
 
-  const submitText = (text: string) => {
+  const submitText = (text: string, attachments?: ReadyAttachment[]) => {
     const t = text.trim()
-    if (!t) return
+    if (!t && !attachments?.length) return
     const isCmd = t.startsWith('/')
     // AI 忙（本条发送中 / 后台轮次执行中）：一律进排队弹窗——不画占位气泡
     //（位置不对，且会被 loadChat 冲掉），真正插入后（[INSERT] 回执）才进对话流
     if (chatSending || chatProcessing) {
-      setPendingItems((items) => [...items, { kind: isCmd ? 'cmd' : 'msg', text: t }])
+      setPendingItems((items) => [...items, { kind: isCmd ? 'cmd' : 'msg', text: t, attachments }])
       setChatInput('')
       setCmdActive(false)
       setSuggestions([])  // 开始新工作流 → 旧建议隐藏，等新回复生成新的
       // 可中途插入的（普通消息 + 后端声明 mid_turn 的命令）立即发后端进插入队列；
       // 其余命令不能提前发——必须等本轮结束，由 drain effect 一次发一条，剩下的继续排队
-      if (mayInsertMidTurn(t)) sendInsertMessage(t)
+      if (mayInsertMidTurn(t)) sendInsertMessage(t, attachments)
       return
     }
     // 空闲状态：直接发送 + 画用户气泡
-    setChatMsgs((msgs) => [...msgs, { id: -(++msgSeqRef.current), role: 'user', content: t }])
+    setChatMsgs((msgs) => [...msgs, { id: -(++msgSeqRef.current), role: 'user', content: t, attachments }])
     setSuggestions([])
-    sendMessages([t])
+    sendMessages([{ text: t, attachments }])
   }
 
   // 插入建议到输入框（追加不覆盖）；输入框 ref 在聊天面板 textarea 上
@@ -735,11 +779,11 @@ export function useWorldChat({ wid, onRefresh, onMsg }: UseWorldChatOptions) {
     const firstCmd = items.findIndex((i) => i.kind === 'cmd')
     if (firstCmd === 0) {
       setPendingItems(items.slice(1))
-      sendMessages([items[0].text])
+      sendMessages([{ text: items[0].text, attachments: items[0].attachments }])
     } else {
       const n = firstCmd === -1 ? items.length : firstCmd
       setPendingItems(items.slice(n))
-      sendMessages(items.slice(0, n).map((i) => i.text))
+      sendMessages(items.slice(0, n).map((i) => ({ text: i.text, attachments: i.attachments })))
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [chatSending, chatProcessing, pendingItems])
@@ -751,7 +795,7 @@ export function useWorldChat({ wid, onRefresh, onMsg }: UseWorldChatOptions) {
     chatListRef, chatInputRef, pendingItems, setPendingItems, suggestions,
     cmdActive, setCmdActive, cmdQuery, setCmdQuery, cmdIdx, setCmdIdx, cmdFiltered, worldCommands,
     submitText, insertSuggestion, isAtBottom, chatCanScroll, scrollToBottom, forceScrollToBottom,
-    currentSession, sessionList, switchSession, togglePin, unreadCount,
+    currentSession, sessionList, switchSession, newSession, togglePin, unreadCount,
   }
 }
 

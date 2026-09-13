@@ -364,6 +364,82 @@ active   → sleeping（休眠：无人在线 + 空闲超时）
 
 ---
 
+### 6.12 消息附件与多模态（2026-09-13 补充）
+
+世界对话的消息单元是 `ChatItem{text, attachments}`（`app/services/world/world_chat_items.py`）。
+HTTP 三种入参（`items` / `messages` / `message`）只在**路由层归一化一次**，进去之后全链路都是 `ChatItem`。
+
+**附件 → LLM 多模态只有一个入口**：`app/utils/multimodal.py`（主站聊天与群视界共用）
+
+| 函数 | 用途 |
+|---|---|
+| `build_content(text, attachments, data_dir)` | 当前消息：有图 → `[{type:text},{type:image_url}]`；无图 → 原样字符串 |
+| `image_placeholder(attachments)` | 历史消息：降级成 `[图片]`，只让模型知道"当时有图" |
+| `strip_image_parts(messages)` | 视觉不支持时剥掉图片，换成"你看不到图"的提示 |
+| `is_vision_unsupported_error(text)` | 从 API 错误文本判断是否"模型不吃图片" |
+
+**三条硬约定**：
+1. 只有 `image/*` 进多模态，其余附件走文本标记；
+2. 无可用图片时 `content` 必须是**纯字符串**——payload 与不带图的历史完全一致，prompt cache 才命中；
+3. 历史一律用占位符，**只有最新一条**携带真实字节（单图上限 4MB，单条最多 1 张）。
+
+**视觉不支持的降级**：纯文本模型收到 `image_url` 多半返回 400。`chat_completion` 捕获后
+剥图重试一次，并注入提示让 AI 如实说自己看不到图（不编造）；结果带 `vision_unsupported=True`
+供上层提示用户。
+
+**前端附件的唯一入口是 `useAttachmentUpload`**（`frontend/src/hooks/useAttachmentUpload.ts`），
+点选、拖拽、上传、待发列表全在里面，`AttachmentChips` 只做展示：
+
+| 返回 | 用途 |
+|---|---|
+| `items / remove / clear` | 待发附件条（`AttachmentChips` 渲染） |
+| `ready` | 已上传完成、可随消息发出的元数据 |
+| `zoneProps(id)` | 拖拽：**每个落点摊一份**（消息列表 / 会话工具条 / 输入区 / 主站同款），`id` 用来判断鼠标此刻在哪块 |
+| `dropState(id)` | 蒙版状态：`{active, strong}`——`active`=正在拖，`strong`=鼠标就在这块（更深 + 显示文字） |
+| `pasteProps` | 粘贴：摊到**输入区容器**上，事件从 textarea 冒泡上来（截图 Ctrl+V 即可） |
+| 选项 `imagesOnly` | 群视界传 `true`：非图片以错误态入列"仅支持图片"（进不了多模态，别让用户白发一轮） |
+
+**三种入附件方式共用同一个 `pick`**：点回形针 / 拖进面板 / Ctrl+V，之后完全一致。
+三个坑都收在 hook 内：
+
+- `dragenter/dragleave` 随子元素冒泡反复触发 → 用深度计数判断"真的离开了"；
+- `dataTransfer.types` 不含 `Files` 的一律忽略 → 拖选文字不会误触蒙版；
+- 粘贴只取 `clipboardData.items` 里 `kind==='file'` 的项，**纯文本粘贴不拦截**（`preventDefault` 只在真有文件时调），
+  否则会把正常输入文字也吃掉。
+
+**落点是整个对话面板**：多处落点共用**同一个** `dragDepth` 计数（同一个 hook 实例），
+在区块之间移动鼠标时计数不会归零，蒙版不会闪；真的移出面板才归零隐藏。
+
+**拖拽反馈是一层半透明蒙版**（`DropMask`，不是描边）：所有落点 `bg-primary-500/[0.07]`，
+`strong` 的那块 `bg-primary-500/20`——落点上下相邻，视觉上整个面板蒙一层、只有当前区块加深。
+文字「拖动到此处上传图片」**只在 strong 的那块**居中显示、**纯文字**（不做按钮样式），
+否则几块会同时冒字。会话工具条只有 20 来像素高，只加深不显示文字，但**必须也接住拖放**——
+漏了它，拖到那条缝上浏览器会直接打开图片。
+
+**蒙版必须挂在"不滚动的容器"上**：群视界与主站的消息列表外面都套了一层 `flex-1 min-h-0 relative`，
+内层才是 `overflow-y-auto` 的滚动容器（`chatListRef` / `containerRef` 仍挂内层——它们要读
+`scrollHeight` / `scrollTop`，挂外层量不到）。若直接把 `absolute inset-0` 的蒙版塞进滚动容器，
+它会跟着内容一起滚走。
+
+回形针不需要单独处理：它是容器的子元素，拖放事件冒泡到容器即命中（`DropHint` 是
+`pointer-events-none`，正好不会因为自己浮出来而打断拖拽）。
+
+### 6.13 会话管理与轮次（2026-09-13 补充）
+
+**会话的增 / 切 / 收藏一律走 API，不占对话轮次**：`POST /chat/session`（切）、
+`POST /chat/session/new`（新建）、`POST /chat/session/pin`（收藏）。
+三者共用 `_session_payload`，返回同一形状（`messages` + `sessions` + `current_session`）。
+
+**`/new` 文本命令保留**，与"新建会话"端点共用 `create_new_session`——只动 `world.config`
+（`current_session` + `sessions` 登记），**一条历史都不碰**。
+
+⚠️ 反例（已修）：让「新对话」按钮发一条 `/new` 聊天消息，会被落库成旧会话里的用户消息、
+并占用一个轮次——AI 忙时按钮等于失效。UI 动作别借道对话链路。
+
+**轮次模型（故意串行）**：每个世界一个 `WorldTurnWorker` + 一个 `asyncio.Queue`，
+**同世界的所有会话共用一个队列、串行执行**；不同世界之间并行。
+理由：一个世界只有一份世界文件与状态，两个会话同时跑会各自调工具改同一份数据 → 竞态。
+
 ## 七、世界标识规范
 
 ### 7.1 规则（原话）

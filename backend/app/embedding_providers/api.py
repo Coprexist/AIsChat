@@ -51,10 +51,9 @@ class OpenAICompatProvider(EmbeddingProvider):
         return self._api_key if self._api_key is not None else (_s.embedding_api_key or "")
 
     def _embeddings_url(self) -> str:
-        # 接受 "https://host/v1" 或完整 "/v1/embeddings" 路径
-        if self.base_url.rstrip("/").endswith("/embeddings"):
-            return self.base_url
-        return f"{self.base_url}/v1/embeddings"
+        # 接受 "https://host"、"https://host/v1" 或完整 "/v1/embeddings" 路径
+        from app.utils.pure.llm_endpoint import embeddings_url
+        return embeddings_url(self.base_url)
 
     def dimension(self) -> int | None:
         return self._dimension
