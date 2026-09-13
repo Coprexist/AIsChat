@@ -516,17 +516,8 @@ flowchart LR
 
 ### 9.2 基线（2026-09-13 实测）
 
-容器里没装 `coverage`，且 **`pypi.org` 在本机 DNS 解析超时**（见 9.5），所以用一次性容器 + 国内镜像：
-
-```bash
-MIRROR=https://pypi.tuna.tsinghua.edu.cn/simple
-docker run -i --rm --network aischat_default --entrypoint sh \
-  -v "$PWD/backend:/app" -w /app aischat-backend <<'INNER'
-pip install -q -i $MIRROR coverage
-coverage run --source=app tests/run_without_pytest.py
-coverage report
-INNER
-```
+怎么跑出这个数字见 **9.5** —— 那里给了「官方源」与「国内镜像」两套**各自完整**的命令，
+按自己所在网络整段复制即可，不需要手动改任何一行。
 
 | 指标 | 值 |
 |------|-----|
@@ -581,27 +572,50 @@ repo 里的 admin 最大但风险最低（管理员专用、输入可信），**
 
 增量门禁只能拦住**新增**的坏味道，拦不住已经烂在那儿的部分——所以 4.2 的缺口仍要单独补。
 
-### 9.5 装工具：官方写法 + 国内镜像（两套都给）
+### 9.5 怎么跑出覆盖率：两套完整命令，按网络选一套
 
-**官方默认写法（国际网络直接用这个）**：
+**规则一句话**：能直连官方源就用 **A**；所在网络访问不到官方源（如中国大陆）就用 **B**。
+两版除 `pip install` 那一行外完全相同，**都可以整段复制执行，不用手动改任何一行**。
 
-```bash
-pip install coverage
-```
-
-**国内网络（本机必须加，否则会卡死）**：这台 NAS 上 `pypi.org` **DNS 解析超时**
-（`curl: (28) Resolving timed out after 15000 ms`），`pip download` 30 秒被杀（rc=124）。
-注意这**不是"没有外网"**——`api.deepseek.com` 100 ms 可达。容器 DNS 同样解析不了 pypi.org。
+#### A. 官方源 / Official source（国际网络 · international）
 
 ```bash
-pip install -i https://pypi.tuna.tsinghua.edu.cn/simple coverage
+# 在仓库根目录执行。一次性容器：装进去的东西随容器消失，不污染正在跑的生产容器
+docker run -i --rm --network aischat_default --entrypoint sh \
+  -v "$PWD/backend:/app" -w /app aischat-backend <<'INNER'
+pip install -q coverage
+coverage run --source=app tests/run_without_pytest.py
+coverage report
+INNER
 ```
+
+#### B. 国内镜像 / China mainland mirror
+
+```bash
+# 与 A 完全相同，只是 pip 多指定了一个国内镜像
+docker run -i --rm --network aischat_default --entrypoint sh \
+  -v "$PWD/backend:/app" -w /app aischat-backend <<'INNER'
+pip install -q -i https://pypi.tuna.tsinghua.edu.cn/simple coverage
+coverage run --source=app tests/run_without_pytest.py
+coverage report
+INNER
+```
+
+**只在本机装（不跑容器）时**同样是两套：
+
+| 网络环境 | 命令 |
+|---------|------|
+| 国际 / Official | `pip install coverage` |
+| 中国大陆 / China mainland | `pip install -i https://pypi.tuna.tsinghua.edu.cn/simple coverage` |
 
 可用的国内镜像（实测 200 / 亚秒级）：清华 `https://pypi.tuna.tsinghua.edu.cn/simple`、
 阿里 `https://mirrors.aliyun.com/pypi/simple/`。
 
-**不要把镜像写成唯一写法**：国际用户照抄会失败。官方源才是默认，国内镜像只是中国网络下的变体，
-所以要并排给、并标明适用条件。CI 跑在 GitHub 上，用官方源，**不要**加镜像。
+> **为什么会有 B 这一版**（本项目部署环境的实测记录，与通用用法无关）：这台 NAS 上 `pypi.org`
+> **DNS 解析超时**（`curl: (28) Resolving timed out after 15000 ms`），`pip download` 30 秒被杀（rc=124）。
+> 注意这**不是"没有外网"**——`api.deepseek.com` 100 ms 可达；容器 DNS 同样解析不了 pypi.org。
+
+**CI 用官方源**（GitHub Actions 在海外），不要加镜像。
 
 ---
 
