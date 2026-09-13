@@ -48,7 +48,9 @@ assert(base && Object.keys(base.files).length > 0, `源码构建清单存在（$
 
 const work = mkdtempSync(join(tmpdir(), 'aischat-plugin-update-'))
 try {
-  const install = join(work, 'install')
+  // 按 pnpm 的真实布局摆放，让来源分类读到 <profile>/package.json
+  const profile = join(work, 'profile')
+  const install = join(profile, 'node_modules', 'dsh-aischat')
   const source = join(work, 'source')
   copyArtifacts(REPO, install, base)
   copyArtifacts(REPO, source, base)
@@ -105,6 +107,41 @@ try {
   )
   const repaired = applyUpdate(install, source)
   assert(repaired.ok && repaired.changed.includes('dist/index.html'), '换入把缺失产物补回')
+
+  // 9. 安装来源决定更新通道：分发出去的副本不该被本地版本语义接管。
+  const setSpec = (spec) => writeFileSync(
+    join(profile, 'package.json'),
+    JSON.stringify({ dependencies: spec }, null, 2),
+    'utf8',
+  )
+
+  setSpec({ 'dsh-aischat': '^1.2.3' })
+  status = await computeStatus(install, BACKEND)
+  assert(
+    status.installKind === 'npm' && status.updateChannel === 'package-manager',
+    `npm 来源且无市场 -> package-manager（kind=${status.installKind} channel=${status.updateChannel}）`,
+  )
+
+  setSpec({ 'dsh-aischat': '^1.2.3', dshmarket: '^1.0.0' })
+  status = await computeStatus(install, BACKEND)
+  assert(
+    status.marketInstalled && status.updateChannel === 'market',
+    `npm 来源且有市场 -> market（channel=${status.updateChannel}）`,
+  )
+
+  setSpec({ 'dsh-aischat': 'github:owner/repo#path:/dsh-aischat' })
+  status = await computeStatus(install, BACKEND)
+  assert(
+    status.installKind === 'git' && status.updateChannel === 'package-manager',
+    `git 来源 -> package-manager（kind=${status.installKind} channel=${status.updateChannel}）`,
+  )
+
+  setSpec({ 'dsh-aischat': 'file:/tmp/x/dsh-aischat' })
+  status = await computeStatus(install, BACKEND)
+  assert(
+    status.installKind === 'local-file' && status.updateChannel === 'self',
+    `本地 file: 来源优先走自己的换入（channel=${status.updateChannel}）`,
+  )
 } finally {
   rmSync(work, { recursive: true, force: true })
 }

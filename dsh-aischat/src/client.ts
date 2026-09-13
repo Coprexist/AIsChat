@@ -138,19 +138,32 @@ function shortId(id) {
 /** 把插件状态翻译成一句人话；失败原因如实展示，不笼统报“不可用”。 */
 function pluginStateText(status) {
   if (!status) return '读取中…'
+  // 分发出去的副本不归本地的版本语义管：装了市场就推荐走市场，
+  // 没装市场则由这里代劳，用包管理器从原来源更新。
+  if (status.updateChannel === 'market') return '推荐在「设置 → 插件市场」更新'
+  if (status.updateChannel === 'package-manager') {
+    return `从原来源更新（${status.installKind === 'git' ? 'git' : 'npm'}）`
+  }
   if (status.state === 'update-available' && status.reason === 'incomplete') {
     return `安装不完整，缺 ${status.missing} 个文件`
   }
   if (status.state === 'update-available') return `可更新到 ${shortId(status.available && status.available.id)}`
   if (status.state === 'up-to-date') return '已是最新'
-  if (status.state === 'source-unavailable') return `未找到更新源（${(status.source && status.source.how) || 'unknown'}）`
+  if (status.state === 'source-unavailable') return '未找到更新源'
   if (status.state === 'not-installed') return '安装目录缺少构建清单'
   return String(status.state)
 }
 
-/** 需要提示更新的两种情形：插件有新版，或内置界面与后端 API 已漂移。 */
+/** 该不该出按钮：本地来源可换入；没有市场时由我们代劳；有市场则不出手。 */
+function pluginCanAct(status) {
+  return Boolean(status) && (status.updateChannel === 'self' || status.updateChannel === 'package-manager')
+}
+
+/** 需要提示更新的两种情形：本地来源确有新版，或内置界面与后端 API 已漂移。 */
 function pluginNeedsAttention(status) {
-  return Boolean(status) && (status.state === 'update-available' || (status.backend && status.backend.mismatch))
+  if (!status) return false
+  const localOutdated = status.updateChannel === 'self' && status.state === 'update-available'
+  return localOutdated || Boolean(status.backend && status.backend.mismatch)
 }
 
 /** Load contacts once per page (cached; refresh() re-fetches). */
@@ -1074,10 +1087,17 @@ function SettingsPage() {
   const applyPluginUpdate = async () => {
     setPluginBusy(true)
     setPluginMsg('')
+    // 本地来源走自己的原子换入；没有市场时由包管理器从原来源更新。
+    const viaPackageManager = Boolean(plugin) && plugin.updateChannel === 'package-manager'
     try {
-      const result = await pluginApi('/apply', { method: 'POST' })
+      const result = await pluginApi(viaPackageManager ? '/update' : '/apply', { method: 'POST' })
       if (result.applyMode === 'restart') {
-        setPluginMsg(`已换入 ${result.changed.length} 个文件。host 半已变更，需重启 dsh-web 后生效。`)
+        setPluginMsg(viaPackageManager
+          ? '已完成。host 半有变化，需重启 dsh-web 后生效。'
+          : `已换入 ${result.changed.length} 个文件。host 半已变更，需重启 dsh-web 后生效。`)
+        setPlugin(await pluginApi('/status').catch(() => plugin))
+      } else if (viaPackageManager) {
+        setPluginMsg('已是最新，或已更新到最新。')
         setPlugin(await pluginApi('/status').catch(() => plugin))
       } else {
         setPluginMsg('已更新，正在刷新页面…')
@@ -1124,12 +1144,14 @@ function SettingsPage() {
             : 'dsh-aischat 版本检测中…'),
         h('div', { style: style.rowSub }, pluginStateText(plugin)),
       ),
-      pluginNeedsAttention(plugin)
+      pluginCanAct(plugin)
         ? h('button', {
             style: style.smallBtn,
             disabled: pluginBusy,
             onClick: applyPluginUpdate,
-          }, pluginBusy ? '更新中…' : '更新')
+          }, pluginBusy
+            ? '处理中…'
+            : (plugin.updateChannel === 'package-manager' ? '检查更新' : '更新'))
         : null,
     ),
     plugin && plugin.backend && plugin.backend.mismatch

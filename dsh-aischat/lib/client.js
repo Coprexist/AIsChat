@@ -88,17 +88,26 @@ function shortId(id) {
 }
 function pluginStateText(status) {
   if (!status) return "\u8BFB\u53D6\u4E2D\u2026";
+  if (status.updateChannel === "market") return "\u63A8\u8350\u5728\u300C\u8BBE\u7F6E \u2192 \u63D2\u4EF6\u5E02\u573A\u300D\u66F4\u65B0";
+  if (status.updateChannel === "package-manager") {
+    return `\u4ECE\u539F\u6765\u6E90\u66F4\u65B0\uFF08${status.installKind === "git" ? "git" : "npm"}\uFF09`;
+  }
   if (status.state === "update-available" && status.reason === "incomplete") {
     return `\u5B89\u88C5\u4E0D\u5B8C\u6574\uFF0C\u7F3A ${status.missing} \u4E2A\u6587\u4EF6`;
   }
   if (status.state === "update-available") return `\u53EF\u66F4\u65B0\u5230 ${shortId(status.available && status.available.id)}`;
   if (status.state === "up-to-date") return "\u5DF2\u662F\u6700\u65B0";
-  if (status.state === "source-unavailable") return `\u672A\u627E\u5230\u66F4\u65B0\u6E90\uFF08${status.source && status.source.how || "unknown"}\uFF09`;
+  if (status.state === "source-unavailable") return "\u672A\u627E\u5230\u66F4\u65B0\u6E90";
   if (status.state === "not-installed") return "\u5B89\u88C5\u76EE\u5F55\u7F3A\u5C11\u6784\u5EFA\u6E05\u5355";
   return String(status.state);
 }
+function pluginCanAct(status) {
+  return Boolean(status) && (status.updateChannel === "self" || status.updateChannel === "package-manager");
+}
 function pluginNeedsAttention(status) {
-  return Boolean(status) && (status.state === "update-available" || status.backend && status.backend.mismatch);
+  if (!status) return false;
+  const localOutdated = status.updateChannel === "self" && status.state === "update-available";
+  return localOutdated || Boolean(status.backend && status.backend.mismatch);
 }
 async function loadContacts(force = false) {
   if (!store.token) return;
@@ -988,10 +997,14 @@ function SettingsPage() {
   const applyPluginUpdate = async () => {
     setPluginBusy(true);
     setPluginMsg("");
+    const viaPackageManager = Boolean(plugin) && plugin.updateChannel === "package-manager";
     try {
-      const result = await pluginApi("/apply", { method: "POST" });
+      const result = await pluginApi(viaPackageManager ? "/update" : "/apply", { method: "POST" });
       if (result.applyMode === "restart") {
-        setPluginMsg(`\u5DF2\u6362\u5165 ${result.changed.length} \u4E2A\u6587\u4EF6\u3002host \u534A\u5DF2\u53D8\u66F4\uFF0C\u9700\u91CD\u542F dsh-web \u540E\u751F\u6548\u3002`);
+        setPluginMsg(viaPackageManager ? "\u5DF2\u5B8C\u6210\u3002host \u534A\u6709\u53D8\u5316\uFF0C\u9700\u91CD\u542F dsh-web \u540E\u751F\u6548\u3002" : `\u5DF2\u6362\u5165 ${result.changed.length} \u4E2A\u6587\u4EF6\u3002host \u534A\u5DF2\u53D8\u66F4\uFF0C\u9700\u91CD\u542F dsh-web \u540E\u751F\u6548\u3002`);
+        setPlugin(await pluginApi("/status").catch(() => plugin));
+      } else if (viaPackageManager) {
+        setPluginMsg("\u5DF2\u662F\u6700\u65B0\uFF0C\u6216\u5DF2\u66F4\u65B0\u5230\u6700\u65B0\u3002");
         setPlugin(await pluginApi("/status").catch(() => plugin));
       } else {
         setPluginMsg("\u5DF2\u66F4\u65B0\uFF0C\u6B63\u5728\u5237\u65B0\u9875\u9762\u2026");
@@ -1051,11 +1064,11 @@ function SettingsPage() {
         ),
         h("div", { style: style.rowSub }, pluginStateText(plugin))
       ),
-      pluginNeedsAttention(plugin) ? h("button", {
+      pluginCanAct(plugin) ? h("button", {
         style: style.smallBtn,
         disabled: pluginBusy,
         onClick: applyPluginUpdate
-      }, pluginBusy ? "\u66F4\u65B0\u4E2D\u2026" : "\u66F4\u65B0") : null
+      }, pluginBusy ? "\u5904\u7406\u4E2D\u2026" : plugin.updateChannel === "package-manager" ? "\u68C0\u67E5\u66F4\u65B0" : "\u66F4\u65B0") : null
     ),
     plugin && plugin.backend && plugin.backend.mismatch ? h(
       "div",

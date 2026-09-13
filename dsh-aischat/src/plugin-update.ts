@@ -12,11 +12,12 @@
  * 因此换入后返回 applyMode：只动了 client/dist 即为 hot（刷新页面即可），
  * 动了 host 半则为 restart（必须重启 dsh-web）。本模块不自行重启宿主进程。
  */
+import { spawn } from 'node:child_process'
 import { createHash } from 'node:crypto'
 import {
   copyFileSync, existsSync, mkdirSync, readFileSync, renameSync, rmSync, writeFileSync,
 } from 'node:fs'
-import { dirname, isAbsolute, join, resolve } from 'node:path'
+import { basename, dirname, isAbsolute, join, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 
 export interface PluginManifest {
@@ -122,10 +123,26 @@ async function fetchBackendVersion(backendUrl: string): Promise<string | null> {
   }
 }
 
+/** 本插件的安装来源；决定该由谁负责更新。 */
+export type InstallKind = 'local-file' | 'npm' | 'git' | 'unknown'
+
+/**
+ * 更新通道。分发出去的副本不该由本插件用本地构建的版本语义去覆盖：
+ * 装在 npm / git 上的副本交给包管理器（有市场就让市场做，它本来就是 GUI）。
+ */
+export type UpdateChannel = 'self' | 'market' | 'package-manager' | 'unavailable'
+
+/** 插件市场的包名；装了它就把更新让给它。 */
+const MARKET_PLUGIN = 'dshmarket'
+
 export interface PluginStatus {
   installed: { version: string; id: string; buildStamp: string } | null
   available: { version: string; id: string; buildStamp: string } | null
   source: SourceResolution
+  /** 安装来源与更新通道 */
+  installKind: InstallKind
+  updateChannel: UpdateChannel
+  marketInstalled: boolean
   state: 'up-to-date' | 'update-available' | 'source-unavailable' | 'not-installed'
   /** update-available 的原因：构建落后，或安装副本缺文件 */
   reason: 'behind' | 'incomplete' | null
@@ -144,6 +161,30 @@ function missingArtifacts(root: string, manifest: PluginManifest): string[] {
   return Object.keys(manifest.files).filter((rel) => !existsSync(join(root, rel)))
 }
 
+/** profile 根目录：安装目录形如 <profile>/node_modules/<name>。 */
+function profileRootOf(installRoot: string): string {
+  return dirname(dirname(installRoot))
+}
+
+function readProfileDependencies(installRoot: string): Record<string, string> | null {
+  try {
+    const pkg = JSON.parse(readFileSync(join(profileRootOf(installRoot), 'package.json'), 'utf8')) as {
+      dependencies?: Record<string, string>
+    }
+    return pkg.dependencies ?? {}
+  } catch {
+    return null
+  }
+}
+
+function classifySpec(spec: string | undefined): InstallKind {
+  if (!spec) return 'unknown'
+  if (spec.startsWith('file:') || spec.startsWith('link:')) return 'local-file'
+  if (spec.startsWith('github:') || spec.startsWith('git+') || spec.startsWith('git:')) return 'git'
+  if (/^https?:\/\/(github\.com|codeload\.github\.com)\//.test(spec)) return 'git'
+  return 'npm'
+}
+
 function summarize(manifest: PluginManifest | null) {
   return manifest
     ? { version: manifest.version, id: manifestId(manifest), buildStamp: manifest.buildStamp }
@@ -156,6 +197,9 @@ export async function computeStatus(
   explicitSource?: string,
 ): Promise<PluginStatus> {
   const installedManifest = readManifest(installRoot)
+  const dependencies = readProfileDependencies(installRoot)
+  const installKind = classifySpec(dependencies?.[PLUGIN_NAME])
+  const marketInstalled = Boolean(dependencies?.[MARKET_PLUGIN])
   const source = resolveSourceRoot(installRoot, explicitSource)
   const availableManifest = source.root ? readManifest(source.root) : null
   const running = await fetchBackendVersion(backendUrl)
@@ -165,6 +209,17 @@ export async function computeStatus(
 
   const missing = installedManifest ? missingArtifacts(installRoot, installedManifest) : []
 
+  // 装在 npm / git 上的副本不归本地构建的版本语义管：有市场就推荐走市场，
+  // 没有就用包管理器从原来源更新。只有本地 file: 安装才走自己的内容寻址换入。
+  const updateChannel: UpdateChannel =
+    installKind === 'local-file'
+      ? 'self'
+      : installKind === 'unknown'
+        ? 'unavailable'
+        : marketInstalled
+          ? 'market'
+          : 'package-manager'
+
   let state: PluginStatus['state']
   let reason: PluginStatus['reason'] = null
   if (!installed) {
@@ -172,6 +227,9 @@ export async function computeStatus(
   } else if (missing.length) {
     state = 'update-available'
     reason = 'incomplete'
+  } else if (updateChannel === 'market' || updateChannel === 'package-manager') {
+    // 远端来源的版本高低由包管理器判定，这里不猜
+    state = 'up-to-date'
   } else if (!available) {
     state = 'source-unavailable'
   } else if (installed.id !== available.id) {
@@ -191,6 +249,9 @@ export async function computeStatus(
     installed,
     available,
     source,
+    installKind,
+    updateChannel,
+    marketInstalled,
     state,
     reason,
     missing: missing.length,
@@ -277,6 +338,56 @@ export function applyUpdate(installRoot: string, sourceRoot: string): ApplyResul
   }
 }
 
+export interface PackageManagerUpdateResult {
+  ok: boolean
+  profile: string
+  output: string
+  applyMode: ApplyMode
+  error?: string
+}
+
+/**
+ * 兜底更新通道：没有插件市场时，用 DSH 自带的包管理器从原来源更新。
+ * 不重复实现版本比对——npm 的 semver 与 git 的 ref 解析都归 pnpm，本函数只负责
+ * 调用并如实回传输出。装完比较 host 半的摘要，决定是刷新页面还是必须重启。
+ */
+export function updateViaPackageManager(installRoot: string): Promise<PackageManagerUpdateResult> {
+  const profileRoot = profileRootOf(installRoot)
+  const profile = basename(profileRoot)
+  const hostEntry = join(installRoot, HOST_ENTRY)
+  const before = existsSync(hostEntry) ? sha256File(hostEntry) : null
+
+  return new Promise((resolve) => {
+    let child: ReturnType<typeof spawn>
+    try {
+      child = spawn('dsh', ['plugin', '--profile', profile, 'update', PLUGIN_NAME], {
+        cwd: profileRoot,
+        env: process.env,
+      })
+    } catch (e) {
+      resolve({ ok: false, profile, output: '', applyMode: 'hot', error: String((e as Error).message ?? e) })
+      return
+    }
+    let output = ''
+    const collect = (buf: Buffer) => { output += buf.toString('utf8') }
+    child.stdout?.on('data', collect)
+    child.stderr?.on('data', collect)
+    child.on('error', (e) => {
+      resolve({ ok: false, profile, output, applyMode: 'hot', error: String(e.message ?? e) })
+    })
+    child.on('close', (code) => {
+      const after = existsSync(hostEntry) ? sha256File(hostEntry) : null
+      resolve({
+        ok: code === 0,
+        profile,
+        output: output.slice(-4000),
+        applyMode: before !== after ? 'restart' : 'hot',
+        error: code === 0 ? undefined : `dsh plugin update 退出码 ${code}`,
+      })
+    })
+  })
+}
+
 /** 回滚到上一次换入前的状态（applyUpdate 会保留一份备份）。 */
 export function rollback(installRoot: string): ApplyResult {
   const backup = join(installRoot, BACKUP_DIR)
@@ -336,6 +447,17 @@ export function registerPluginRoutes(
           ? `updated ${result.changed.length} file(s), applyMode=${result.applyMode}`
           : `update failed: ${result.error}`)
         send(result.ok ? 200 : 409, { ...result, source: resolved })
+        return
+      }
+      if (req.method === 'POST' && route === `${PLUGIN_PREFIX}/update`) {
+        updateViaPackageManager(opts.installRoot)
+          .then((result) => {
+            opts.log?.(result.ok
+              ? `updated via package manager, applyMode=${result.applyMode}`
+              : `package-manager update failed: ${result.error}`)
+            send(result.ok ? 200 : 409, result)
+          })
+          .catch((e) => send(500, { error: String(e?.message ?? e) }))
         return
       }
       if (req.method === 'POST' && route === `${PLUGIN_PREFIX}/rollback`) {

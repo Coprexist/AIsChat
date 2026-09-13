@@ -6,6 +6,7 @@ import { join as join2, normalize, extname, sep } from "node:path";
 import os from "node:os";
 
 // src/plugin-update.ts
+import { spawn } from "node:child_process";
 import { createHash } from "node:crypto";
 import {
   copyFileSync,
@@ -16,7 +17,7 @@ import {
   rmSync,
   writeFileSync
 } from "node:fs";
-import { dirname, isAbsolute, join, resolve } from "node:path";
+import { basename, dirname, isAbsolute, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 var PLUGIN_NAME = "dsh-aischat";
 var MANIFEST_REL = "lib/manifest.json";
@@ -85,20 +86,43 @@ async function fetchBackendVersion(backendUrl) {
     return null;
   }
 }
+var MARKET_PLUGIN = "dshmarket";
 function missingArtifacts(root, manifest) {
   return Object.keys(manifest.files).filter((rel) => !existsSync(join(root, rel)));
+}
+function profileRootOf(installRoot) {
+  return dirname(dirname(installRoot));
+}
+function readProfileDependencies(installRoot) {
+  try {
+    const pkg = JSON.parse(readFileSync(join(profileRootOf(installRoot), "package.json"), "utf8"));
+    return pkg.dependencies ?? {};
+  } catch {
+    return null;
+  }
+}
+function classifySpec(spec) {
+  if (!spec) return "unknown";
+  if (spec.startsWith("file:") || spec.startsWith("link:")) return "local-file";
+  if (spec.startsWith("github:") || spec.startsWith("git+") || spec.startsWith("git:")) return "git";
+  if (/^https?:\/\/(github\.com|codeload\.github\.com)\//.test(spec)) return "git";
+  return "npm";
 }
 function summarize(manifest) {
   return manifest ? { version: manifest.version, id: manifestId(manifest), buildStamp: manifest.buildStamp } : null;
 }
 async function computeStatus(installRoot, backendUrl, explicitSource) {
   const installedManifest = readManifest(installRoot);
+  const dependencies = readProfileDependencies(installRoot);
+  const installKind = classifySpec(dependencies?.[PLUGIN_NAME]);
+  const marketInstalled = Boolean(dependencies?.[MARKET_PLUGIN]);
   const source = resolveSourceRoot(installRoot, explicitSource);
   const availableManifest = source.root ? readManifest(source.root) : null;
   const running = await fetchBackendVersion(backendUrl);
   const installed = summarize(installedManifest);
   const available = summarize(availableManifest);
   const missing = installedManifest ? missingArtifacts(installRoot, installedManifest) : [];
+  const updateChannel = installKind === "local-file" ? "self" : installKind === "unknown" ? "unavailable" : marketInstalled ? "market" : "package-manager";
   let state;
   let reason = null;
   if (!installed) {
@@ -106,6 +130,8 @@ async function computeStatus(installRoot, backendUrl, explicitSource) {
   } else if (missing.length) {
     state = "update-available";
     reason = "incomplete";
+  } else if (updateChannel === "market" || updateChannel === "package-manager") {
+    state = "up-to-date";
   } else if (!available) {
     state = "source-unavailable";
   } else if (installed.id !== available.id) {
@@ -120,6 +146,9 @@ async function computeStatus(installRoot, backendUrl, explicitSource) {
     installed,
     available,
     source,
+    installKind,
+    updateChannel,
+    marketInstalled,
     state,
     reason,
     missing: missing.length,
@@ -186,6 +215,43 @@ function applyUpdate(installRoot, sourceRoot) {
     applying = false;
   }
 }
+function updateViaPackageManager(installRoot) {
+  const profileRoot = profileRootOf(installRoot);
+  const profile = basename(profileRoot);
+  const hostEntry = join(installRoot, HOST_ENTRY);
+  const before = existsSync(hostEntry) ? sha256File(hostEntry) : null;
+  return new Promise((resolve2) => {
+    let child;
+    try {
+      child = spawn("dsh", ["plugin", "--profile", profile, "update", PLUGIN_NAME], {
+        cwd: profileRoot,
+        env: process.env
+      });
+    } catch (e) {
+      resolve2({ ok: false, profile, output: "", applyMode: "hot", error: String(e.message ?? e) });
+      return;
+    }
+    let output = "";
+    const collect = (buf) => {
+      output += buf.toString("utf8");
+    };
+    child.stdout?.on("data", collect);
+    child.stderr?.on("data", collect);
+    child.on("error", (e) => {
+      resolve2({ ok: false, profile, output, applyMode: "hot", error: String(e.message ?? e) });
+    });
+    child.on("close", (code) => {
+      const after = existsSync(hostEntry) ? sha256File(hostEntry) : null;
+      resolve2({
+        ok: code === 0,
+        profile,
+        output: output.slice(-4e3),
+        applyMode: before !== after ? "restart" : "hot",
+        error: code === 0 ? void 0 : `dsh plugin update \u9000\u51FA\u7801 ${code}`
+      });
+    });
+  });
+}
 function rollback(installRoot) {
   const backup = join(installRoot, BACKUP_DIR);
   const manifest = readManifest(backup);
@@ -233,6 +299,13 @@ function registerPluginRoutes(register, opts) {
         const result = applyUpdate(opts.installRoot, resolved.root);
         opts.log?.(result.ok ? `updated ${result.changed.length} file(s), applyMode=${result.applyMode}` : `update failed: ${result.error}`);
         send(result.ok ? 200 : 409, { ...result, source: resolved });
+        return;
+      }
+      if (req.method === "POST" && route === `${PLUGIN_PREFIX}/update`) {
+        updateViaPackageManager(opts.installRoot).then((result) => {
+          opts.log?.(result.ok ? `updated via package manager, applyMode=${result.applyMode}` : `package-manager update failed: ${result.error}`);
+          send(result.ok ? 200 : 409, result);
+        }).catch((e) => send(500, { error: String(e?.message ?? e) }));
         return;
       }
       if (req.method === "POST" && route === `${PLUGIN_PREFIX}/rollback`) {

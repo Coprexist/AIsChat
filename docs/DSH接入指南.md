@@ -117,6 +117,25 @@ DSH 设置页的 **AIsChat** 分区底部新增一行插件版本信息，检测
 `reason: incomplete`，而不是拿两份清单比对说"已是最新"。内容哈希留给换入阶段，那条路径
 本来就要读全量文件。
 
+**谁负责更新：按安装来源分三条通道**
+
+本地构建与分发出去的副本不是一回事，硬用一套版本语义去管会互相覆盖。插件读
+profile 的 `package.json` 判断自己是怎么装的，据此决定该由谁更新：
+
+| 安装来源 | `installKind` | 通道 | 界面行为 |
+|---|---|---|---|
+| 本地目录（`file:` / `link:`） | `local-file` | `self` | 走本文这套内容寻址换入，出「更新」按钮 |
+| npm 包，**且装了插件市场** | `npm` | `market` | 显示「推荐在设置 → 插件市场更新」，**不出手** |
+| git 源，**且装了插件市场** | `git` | `market` | 同上 |
+| npm / git 源，**没装市场** | `npm` / `git` | `package-manager` | 出「检查更新」，由 `dsh plugin update` 从原来源更新 |
+
+第三、四行的判据是「市场（`dshmarket`）是否在 profile 的 dependencies 里」。本地安装
+**永远优先走 `self`**——开发机上装了市场，也不该让市场去接管本地源码。
+
+`package-manager` 通道**不重复实现版本比对**：npm 的 semver、git 的 ref 解析都归 pnpm，
+插件只负责调用并如实回传输出。这和插件市场自己遵循的同一条原则一致——它也曾专门修过
+「用 npm 包名去比对私有 git 源，结果把 git 安装覆盖掉」的问题。
+
 **两种生效方式，界面会如实告知**：
 
 | 变更范围 | applyMode | 生效方式 |
@@ -131,7 +150,8 @@ DSH 设置页的 **AIsChat** 分区底部新增一行插件版本信息，检测
 | 方法 | 路径 | 说明 |
 |------|------|------|
 | GET | `/aischat-plugin/status` | 已装/可用的身份、更新源解析依据、applyMode、后端版本漂移 |
-| POST | `/aischat-plugin/apply` | 执行换入 |
+| POST | `/aischat-plugin/apply` | 用本地构建执行换入（`self` 通道） |
+| POST | `/aischat-plugin/update` | 调 `dsh plugin update` 从原来源更新（`package-manager` 通道） |
 | POST | `/aischat-plugin/rollback` | 回滚到上一次换入前 |
 
 **后端版本漂移检测**：构建时把后端 `/health` 的 `version` 写进清单，运行时再比一次。
