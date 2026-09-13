@@ -311,7 +311,7 @@ async def execute_do(db, world, do: dict, ctx: dict) -> dict:
     """执行决策技能的动作。返回 {success, reply?, result?, error?}。
 
     - reply_template：返回 reply 文本（调用方决定发送渠道）
-    - call_tool：调平台工具（world_tools._do_execute，世界身份）
+    - call_tool：调平台工具（run_world_tool，世界身份）
     - run_script：沙箱执行 Python（复用 skill_sandbox，世界配额）
     """
     action = str(do.get("action") or "")
@@ -320,11 +320,11 @@ async def execute_do(db, world, do: dict, ctx: dict) -> dict:
             return {"success": True, "reply": str(do.get("reply") or "").strip()}
         if action == "call_tool":
             from app.repositories.world_repo import SQLAlchemyWorldRepository
-            from app.services.world.world_tools import _do_execute
+            from app.tools.world import run_world_tool
             import json as _json
             name = str(do.get("name") or "")
             arguments = do.get("arguments") or {}
-            result = await _do_execute(
+            result = await run_world_tool(
                 SQLAlchemyWorldRepository(db), world, name,
                 _json.dumps(arguments, ensure_ascii=False) if isinstance(arguments, dict) else str(arguments),
             )

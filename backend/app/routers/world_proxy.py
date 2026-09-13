@@ -273,8 +273,8 @@ async def world_api_recall_memory(
 ):
     """受控 API：记忆检索（复用世界 AI 的 recall_memory 同一份逻辑）"""
     world = await _authorize_world_api(db, world_id, request)
-    from app.services.world.world_tools import _do_execute
-    result = await _do_execute(world_repo, world, "recall_memory", json.dumps({"query": query, "top_k": top_k}))
+    from app.tools.world import run_world_tool
+    result = await run_world_tool(world_repo, world, "recall_memory", json.dumps({"query": query, "top_k": top_k}))
     if not result.get("success"):
         raise HTTPException(status_code=400, detail=result.get("error", "记忆检索失败"))
     return {"memories": result.get("memories", [])}
@@ -294,8 +294,8 @@ async def world_api_store_memory(
     content = str(body.get("content", "")).strip()
     if not title or not content:
         raise HTTPException(status_code=422, detail="title 和 content 不能为空")
-    from app.services.world.world_tools import _do_execute
-    result = await _do_execute(world_repo, world, "store_memory", json.dumps({"title": title, "content": content}))
+    from app.tools.world import run_world_tool
+    result = await run_world_tool(world_repo, world, "store_memory", json.dumps({"title": title, "content": content}))
     if not result.get("success"):
         raise HTTPException(status_code=400, detail=result.get("error", "记忆存储失败"))
     await db.commit()
@@ -537,7 +537,7 @@ async def _check_bound_group(db: AsyncSession, world, group_id: int | None) -> i
 
 
 def _tool_ok(result: dict, what: str) -> None:
-    """工具结果统一错误提升（复用 world_tools 同一份实现）"""
+    """工具结果统一错误提升（复用 app.tools.world 同一份实现）"""
     if not result.get("success"):
         raise HTTPException(status_code=400, detail=result.get("error", what))
 
@@ -551,8 +551,8 @@ async def world_api_groups(
 ):
     """受控 API：绑定群列表（复用 get_bound_groups 同一份逻辑）"""
     world = await _authorize_world_api(db, world_id, request)
-    from app.services.world.world_tools import _do_execute
-    result = await _do_execute(world_repo, world, "get_bound_groups", "{}")
+    from app.tools.world import run_world_tool
+    result = await run_world_tool(world_repo, world, "get_bound_groups", "{}")
     _tool_ok(result, "查绑定群失败")
     return {"groups": result.get("groups", [])}
 
@@ -569,8 +569,8 @@ async def world_api_group_messages(
     """受控 API：读群消息（仅绑定群；复用 get_group_messages 同一份逻辑）"""
     world = await _authorize_world_api(db, world_id, request)
     gid = await _check_bound_group(db, world, group_id)
-    from app.services.world.world_tools import _do_execute
-    result = await _do_execute(world_repo, world, "get_group_messages", json.dumps({"group_id": gid, "limit": limit}))
+    from app.tools.world import run_world_tool
+    result = await run_world_tool(world_repo, world, "get_group_messages", json.dumps({"group_id": gid, "limit": limit}))
     _tool_ok(result, "读群消息失败")
     return {"group_id": gid, "messages": result.get("messages", [])}
 
@@ -586,8 +586,8 @@ async def world_api_group_members(
     """受控 API：群成员列表（仅绑定群；复用 list_group_members 同一份逻辑）"""
     world = await _authorize_world_api(db, world_id, request)
     gid = await _check_bound_group(db, world, group_id)
-    from app.services.world.world_tools import _do_execute
-    result = await _do_execute(world_repo, world, "list_group_members", json.dumps({"group_id": gid}))
+    from app.tools.world import run_world_tool
+    result = await run_world_tool(world_repo, world, "list_group_members", json.dumps({"group_id": gid}))
     _tool_ok(result, "查成员失败")
     return {"group_id": gid, "members": result.get("members", [])}
 
@@ -612,8 +612,8 @@ async def world_api_group_send(
         raise HTTPException(status_code=422, detail="消息内容不能为空")
     if len(content) > 2000:
         raise HTTPException(status_code=422, detail="消息内容过长（上限 2000 字）")
-    from app.services.world.world_tools import _do_execute
-    result = await _do_execute(world_repo, world, "send_group_message", json.dumps({"group_id": gid, "content": content}))
+    from app.tools.world import run_world_tool
+    result = await run_world_tool(world_repo, world, "send_group_message", json.dumps({"group_id": gid, "content": content}))
     _tool_ok(result, "发送失败")
     await db.commit()
     return {"ok": True, "group_id": gid, "message_id": result.get("message_id")}
@@ -639,8 +639,8 @@ async def world_api_group_role(
     if mtype not in ("human", "ai") or not mid or role not in ("owner", "admin", "member"):
         raise HTTPException(status_code=422, detail="参数不合法：member_type(human|ai) / member_id / role(owner|admin|member)")
     _rate_limit_write(world)
-    from app.services.world.world_tools import _do_execute
-    result = await _do_execute(world_repo, world, "set_group_member_role",
+    from app.tools.world import run_world_tool
+    result = await run_world_tool(world_repo, world, "set_group_member_role",
                                json.dumps({"group_id": gid, "member_type": mtype, "member_id": mid, "role": role}))
     _tool_ok(result, "改角色失败")
     await db.commit()
@@ -666,8 +666,8 @@ async def world_api_group_kick(
     if mtype not in ("human", "ai") or not mid:
         raise HTTPException(status_code=422, detail="参数不合法：member_type(human|ai) / member_id")
     _rate_limit_write(world)
-    from app.services.world.world_tools import _do_execute
-    result = await _do_execute(world_repo, world, "kick_group_member",
+    from app.tools.world import run_world_tool
+    result = await run_world_tool(world_repo, world, "kick_group_member",
                                json.dumps({"group_id": gid, "member_type": mtype, "member_id": mid}))
     _tool_ok(result, "移出失败")
     await db.commit()

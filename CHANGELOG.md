@@ -149,16 +149,27 @@
 
 ### 🐛 修复的 Bug
 
-#### 世界工具卡片不再只有「工具执行成功」
-- `_tool_result_summary` 是一长串 `name == "..."` 分派，兜底分支直接返回零信息量的
-  「工具执行成功」。`manage_records` / `suggest_questions` / `update_trigger_mode` 三个内置工具
-  没有分支，世界自定义 skill **全部**没有分支——用户只看到一张「已完成 / 工具执行成功」的卡片
-- 补上三个内置工具的文案（结构化记忆按动作分别描述：写入 / 命中条数 / 子目录数 / 重命名 / 移动），
-  兜底分支改为「工具名 + 一句结果摘要」（依次从 result/message/output/summary/note/data/stdout 抠，
-  都没有就退化成其余字段的截断 JSON），失败时带上 error
-- 新增 `tests/test_world_tool_summaries.py`：用 AST 抠出分派里实际出现过的工具名，与 `WORLD_TOOLS`
-  清单对齐——以后新增工具漏写文案 CI 直接红，不用等用户发现
-- 存量数据：全站 5171 条工具消息里 300+ 条是「工具执行成功」（world 45: 119、44: 72、39: 30）
+#### 世界工具全面插件化：一个工具一个文件，展示文案随工具走
+- 病根：29 个世界工具全塞在 `world_tools.py`（1606 行）——schema 清单、执行 if 链、展示 if 链三张
+  并列的表，靠"人工保持三处一致"。漏写的工具卡片上就只剩一句**零信息量的「工具执行成功」**
+  （全站 5171 条工具消息里 300+ 条是它：world 45 有 119、44 有 72、39 有 30），世界自定义 skill 更是
+  全部落到兜底
+- 现在一个工具一个文件（`app/tools/world/<name>.py`），schema / execute / summary 写在同一个类里，
+  子类被**定义时自注册**：`app/tools/__init__.py` 扫描 `app/tools/` 自动导入，没有清单可漏
+- **契约强制**：缺 `summary`（卡片那一行）/`label`/`segment` 的类在导入时直接抛 `TypeError`，
+  不再有"默默兜底"的可能；`tests/test_world_tool_summaries.py` 再断言
+  「发给 LLM 的工具集合 == 已实现插件集合」且每个工具成功/失败两条路径都有话可说
+- 展示与执行分开但同处一地：`summary()` 是折叠那一行，`detail()` 是点开后的详细说明
+  （默认渲染「参数 + 结果」，想更好读就覆盖）
+- **效率没有被牺牲**：执行分发从顺序比对 if 链改成字典查表；`WORLD_TOOLS` 首次访问构建一次并缓存；
+  参数在入口只解析一次（工具里直接用 `ctx.args`）；模块发现只在 `app.tools` 首次导入时做一次
+- 社区插件不必 fork 主仓库：`WORLD_TOOLS_DIR` 指向一个目录即可被发现（空 = 关闭；同权限运行，
+  只放可信代码）
+- 契约与写法见 `docs/group_world/development/world_tools_plugin.md`（中英双语）、脚手架
+  `app/tools/world/_template.py`
+- 兼容性：工具定义与原来**逐字一致**，唯一差异是 `required` 为空时显式给出 `[]`（与群 AI 侧
+  `ToolPlugin.to_definition()` 对齐）；旧入口 `app.services.world.world_tools._do_execute` 等
+  已删除，13 处调用点切到 `run_world_tool` / `execute_world_tool` / `tool_result_summary`
 
 #### 群视界设计页的对话栏被挤成一条缝（保底值 + 上限算错 + 压缩值被写回存储）
 - 现象：设计页对话栏常年 200px 上下，输入提示与建议卡换行成一列

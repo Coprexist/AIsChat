@@ -549,7 +549,7 @@ async def resolve_world_chat_model(
 ) -> str:
     """世界 AI 未显式指定模型时的默认模型解析——**唯一入口**。
 
-    world_chat_service / world_tools / world_suggestions 三处共用，
+    world_chat_service / app.tools.world / world_suggestions 三处共用，
     避免同一段优先级链被手抄多份后各自漂移。
 
     优先级（高 → 低）：
@@ -801,7 +801,7 @@ async def _execute_tool_round(
     - 落库：同 tool_id 更新最后一条（历史只留最终态）
     """
     from app.models.world import WorldChatMessage
-    from app.services.world.world_tools import _execute_world_tool, _tool_result_summary
+    from app.tools.world import execute_world_tool, tool_result_summary
     for idx, acc in sorted(tool_call_acc.items()):
         tool_id = f"t_{uuid.uuid4().hex[:8]}"
         args_summary = _args_summary(acc.get("arguments") or "")
@@ -813,21 +813,21 @@ async def _execute_tool_round(
             progress_events.append(note)
         result = None
         try:
-            result = await _execute_world_tool(
+            result = await execute_world_tool(
                 world_repo, world, acc["name"], acc["arguments"], turn_state,
                 on_progress=_on_progress,
             )
         except TypeError:
             # 兼容：工具签名未支持 on_progress
             try:
-                result = await _execute_world_tool(world_repo, world, acc["name"], acc["arguments"], turn_state)
+                result = await execute_world_tool(world_repo, world, acc["name"], acc["arguments"], turn_state)
             except Exception as e2:
                 logger.warning(f"🌐 世界 #{world_id} 工具 {acc['name']} 执行失败: {e2}")
                 result = {"success": False, "error": str(e2)[:500]}
         except Exception as e:
             logger.warning(f"🌐 世界 #{world_id} 工具 {acc['name']} 执行失败: {e}")
             result = {"success": False, "error": str(e)[:500]}
-        summary = _tool_result_summary(acc["name"], result)
+        summary = tool_result_summary(acc["name"], result)
         turn_state["tools_done"].append(summary)
         messages.append({
             "role": "tool",
@@ -961,8 +961,8 @@ async def _prepare_world_chat(
                 _la_dt = _dt.fromisoformat(_la)
                 _now = _dt.now(_tz.utc)
                 if _now - _ensure_aware(_la_dt) > _td(hours=hours):
-                    from app.services.world.world_tools import _do_execute
-                    await _do_execute(world_repo, world, "compact_context", "{}")
+                    from app.tools.world import run_world_tool
+                    await run_world_tool(world_repo, world, "compact_context", "{}")
                     touch_session(world)
                     await world_repo.commit()
                     logger.info(f"🌐 世界 #{world_id} 会话 {_key} 空闲 {hours}h 已自动压缩")
@@ -1125,7 +1125,7 @@ async def _prepare_world_chat(
         logger.warning(f"🌐 世界 #{world_id} 用户消息落库失败: {e}")
 
     # 世界 AI（造物主）工具 = 平台内置 + 设计侧 skills（world_ai_skills/ 全局库；世界侧居民能力不注入）
-    from app.services.world.world_tools import WORLD_TOOLS
+    from app.tools.world import WORLD_TOOLS
     from app.services.world.world_skill_runtime import build_ai_tools
     from app.repositories.capability_repo import SQLAlchemyCapabilityRepository
     from app.services.capability_versioning import ensure_source_version, get_effective_definitions
@@ -1337,7 +1337,7 @@ async def _run_tool_loop(
     full_content = first_content
     full_reasoning = first_reasoning
     try:
-        from app.services.world.world_tools import _execute_world_tool, _tool_result_summary
+        from app.tools.world import execute_world_tool, tool_result_summary
         # 第一轮过渡叙述 + 对应思考过程：给用户看（role=note，不进 AI 上下文）
         # 2026-08-13：正文/思考拆两条独立 note（刷新后思考独立气泡，折叠生效）
         if full_content or full_reasoning:

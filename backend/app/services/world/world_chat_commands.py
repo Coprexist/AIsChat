@@ -67,9 +67,9 @@ async def _cmd_clear(ctx: CmdContext) -> str:
 
 async def _cmd_compact(ctx: CmdContext) -> str:
     """压缩当前会话上下文为摘要（复用主对话的压缩服务）"""
-    from app.services.world.world_tools import _do_execute
+    from app.tools.world import run_world_tool
 
-    result = await _do_execute(ctx.world_repo, ctx.world, "compact_context", "{}")
+    result = await run_world_tool(ctx.world_repo, ctx.world, "compact_context", "{}")
     if result.get("success"):
         return (f"上下文已压缩：{result.get('before_tokens')} → "
                 f"{result.get('after_tokens')} tokens"
