@@ -2,7 +2,6 @@
 
 删除世界文件。
 """
-import json
 
 from app.tools.world.base import WorldToolPlugin, WorldToolContext
 from app.services.world.world_file_service import delete_file
@@ -27,7 +26,7 @@ class FileDeleteTool(WorldToolPlugin):
                 return {"success": False, "error": "缺少 path 参数"}
             delete_file(ctx.world.id, path)
             return {"success": True, "path": path}
-        except (ValueError, json.JSONDecodeError) as e:
+        except (ValueError) as e:
             return {"success": False, "error": str(e)}
 
     def summary(self, result: dict) -> str:

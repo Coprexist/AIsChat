@@ -2,7 +2,6 @@
 
 设置本世界的群类型配置（有多少种类型的群、每种的上限和规则、群助手模板）。传完整的 types 数组（先 get_group_types 看现状再改，只改要改的字段）。
 """
-import json
 
 from app.tools.world.base import WorldToolPlugin, WorldToolContext
 
@@ -23,10 +22,7 @@ class UpdateGroupTypesTool(WorldToolPlugin):
     required = ['types']
 
     async def execute(self, ctx: WorldToolContext) -> dict:
-        try:
-            args = ctx.args
-        except json.JSONDecodeError:
-            return {"success": False, "error": "参数解析失败"}
+        args = ctx.args
         try:
             from app.services.world.group_type_service import save_group_types_config
             types = await save_group_types_config(

@@ -2,7 +2,6 @@
 
 创建或写入世界文件（HTML/CSS/JS/图片等，自动建目录，类型白名单限制）。创建网页/改代码用它。
 """
-import json
 
 from app.tools.world.base import WorldToolPlugin, WorldToolContext
 
@@ -36,7 +35,7 @@ class FileWriteTool(WorldToolPlugin):
                 pass  # 文件不存在 → 正常创建
             write_file(ctx.world.id, path, content)
             return {"success": True, "path": path}
-        except (ValueError, FileNotFoundError, json.JSONDecodeError) as e:
+        except (ValueError, FileNotFoundError) as e:
             return {"success": False, "error": str(e)}
 
     def summary(self, result: dict) -> str:

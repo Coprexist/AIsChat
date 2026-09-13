@@ -2,7 +2,6 @@
 
 更新这个世界（你自己所在的世界）的名称或简介。用户要求改名/改设定时调用。
 """
-import json
 
 from app.tools.world.base import WorldToolPlugin, WorldToolContext
 
@@ -20,10 +19,7 @@ class UpdateWorldInfoTool(WorldToolPlugin):
     required = []
 
     async def execute(self, ctx: WorldToolContext) -> dict:
-        try:
-            args = ctx.args
-        except json.JSONDecodeError:
-            return {"success": False, "error": "参数解析失败"}
+        args = ctx.args
         patch = {
             k: v.strip() for k, v in args.items()
             if k in ("name", "description") and isinstance(v, str) and v.strip()

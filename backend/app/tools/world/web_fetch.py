@@ -2,7 +2,6 @@
 
 上网查资料：获取指定 URL 的网页内容（纯文本）。比 browser 命令更轻量快速，适合获取网页正文、API 响应、文档等。不支持需要 JavaScript 渲染的页面（如 SPA 应用）。页面加载慢/内容延迟出现时
 """
-import json
 
 from app.tools.world.base import WorldToolPlugin, WorldToolContext
 
@@ -32,7 +31,7 @@ class WebFetchTool(WorldToolPlugin):
             args = ctx.args
             from app.tools.file_operations.web_fetch import WebFetch
             return await WebFetch().execute(ctx.world_repo.session, 0, None, args, {})
-        except (ValueError, TypeError, json.JSONDecodeError) as e:
+        except (ValueError, TypeError) as e:
             return {"success": False, "error": str(e)}
 
     def summary(self, result: dict) -> str:

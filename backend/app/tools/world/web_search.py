@@ -2,7 +2,6 @@
 
 搜索引擎：通过 Bing 搜索网络上的最新信息，返回标题、链接和摘要。使用场景：搜索新闻、查找资料、获取实时信息、验证事实。与 web_fetch 配合使用：先用 web_search 找链接，再用 web_fetch 
 """
-import json
 
 from app.tools.world.base import WorldToolPlugin, WorldToolContext
 
@@ -28,7 +27,7 @@ class WebSearchTool(WorldToolPlugin):
             args = ctx.args
             from app.tools.file_operations.web_search import WebSearch
             return await WebSearch().execute(ctx.world_repo.session, 0, None, args, {})
-        except (ValueError, TypeError, json.JSONDecodeError) as e:
+        except (ValueError, TypeError) as e:
             return {"success": False, "error": str(e)}
 
     def summary(self, result: dict) -> str:

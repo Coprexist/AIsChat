@@ -2,7 +2,6 @@
 
 目录级结构记忆（对齐主站 manage_records）。把你的结构化数据按「目录/子目录/字段」三级存到数据库（世界维度），支持精确读写、列子目录、生成摘要。与 store_memory 的区别：store_memor
 """
-import json
 
 from app.tools.world.base import WorldToolPlugin, WorldToolContext
 
@@ -217,7 +216,7 @@ class ManageRecordsTool(WorldToolPlugin):
                 return {"success": True, "action": "move", "to_category": to_category, "moved": moved}
 
             return {"success": False, "error": f"未知 action: {action}"}
-        except (ValueError, TypeError, json.JSONDecodeError) as e:
+        except (ValueError, TypeError) as e:
             return {"success": False, "error": str(e)}
 
     def summary(self, result: dict) -> str:

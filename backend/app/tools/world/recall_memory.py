@@ -2,7 +2,6 @@
 
 检索本世界的长期记忆（语义搜索）。用户提到以前的事、或需要历史上下文时调用。
 """
-import json
 import logging
 
 from app.tools.world.base import WorldToolPlugin, WorldToolContext
@@ -70,7 +69,7 @@ class RecallMemoryTool(WorldToolPlugin):
                     if any(k in (m.title or "").lower() or k in (m.content or "").lower() for k in keywords)
                 ][:top_k]
             return {"success": True, "query": query, "memories": memories}
-        except (ValueError, TypeError, json.JSONDecodeError) as e:
+        except (ValueError, TypeError) as e:
             return {"success": False, "error": str(e)}
 
     def summary(self, result: dict) -> str:

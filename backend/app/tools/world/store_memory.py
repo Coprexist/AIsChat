@@ -2,7 +2,6 @@
 
 存储一条长期记忆（这个世界的重要信息，以后可以检索回忆）。世界的重要设定、用户偏好、关键事件值得存。
 """
-import json
 import logging
 
 from app.tools.world.base import WorldToolPlugin, WorldToolContext
@@ -53,7 +52,7 @@ class StoreMemoryTool(WorldToolPlugin):
                 ctx.world_repo.add(WorldAIMemory(world_id=ctx.world.id, title=title, content=content, embedding=embedding))
             await ctx.world_repo.flush()
             return {"success": True, "title": title, "embedded": embedding is not None, "updated": existing is not None}
-        except (ValueError, TypeError, json.JSONDecodeError) as e:
+        except (ValueError, TypeError) as e:
             return {"success": False, "error": str(e)}
 
     def summary(self, result: dict) -> str:

@@ -2,7 +2,6 @@
 
 增量编辑世界文件（查找替换/行后插入/删除行），比全量重写省 token。编辑前建议先 file_read 确认内容。多次插入时从最大行号开始往小插。
 """
-import json
 
 from app.tools.world.base import WorldToolPlugin, WorldToolContext
 
@@ -44,7 +43,7 @@ class FileEditTool(WorldToolPlugin):
                 return {"success": False, "error": err}
             write_file(ctx.world.id, path, new_content)
             return {"success": True, "path": path, "operation": operation}
-        except (ValueError, FileNotFoundError, json.JSONDecodeError) as e:
+        except (ValueError, FileNotFoundError) as e:
             return {"success": False, "error": str(e)}
 
     def summary(self, result: dict) -> str:

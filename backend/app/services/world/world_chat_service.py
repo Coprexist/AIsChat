@@ -793,75 +793,80 @@ async def _inject_pending_user_messages(
     await world_repo.commit()
 
 
+async def _run_one_tool_call(
+    world_repo: WorldRepository, world, world_id: int, sid_db: str | None,
+    acc: dict, turn_state: dict, messages: list,
+):
+    """执行单个工具调用：执行 → 摘要/详情 → 注入 AI 上下文 → 落库 → 状态事件。
+
+    以异步生成器把 SSE 行交给调用方；落库在这里自己 commit（每个工具一次，和原来一致：
+    前一个工具的记录不会因为后一个失败而丢）。
+    """
+    from app.models.world import WorldChatMessage
+    from app.tools.world import execute_world_tool, tool_label, tool_result_detail, tool_result_summary
+
+    tool_id = f"t_{uuid.uuid4().hex[:8]}"
+    args_summary = _args_summary(acc.get("arguments") or "")
+    # ① 执行前：running 状态（前端创建/更新气泡：正在执行 XX）
+    yield f"data: [TOOL_UPDATE]{json.dumps({'tool_id': tool_id, 'status': 'running', 'name': acc['name'], 'args_summary': args_summary}, ensure_ascii=False)}\n\n"
+    # ② 工具内部进度事件（耗时工具如 run_world_code 分阶段 yield update）
+    progress_events: list[str] = []
+    async def _on_progress(note: str) -> None:
+        progress_events.append(note)
+    result = None
+    try:
+        result = await execute_world_tool(
+            world_repo, world, acc["name"], acc["arguments"], turn_state,
+            on_progress=_on_progress,
+        )
+    except Exception as e:
+        # 工具/技能自己抛异常：如实回传错误，交给 AI 决定下一步（别重试——副作用可能已发生）
+        logger.warning(f"🌐 世界 #{world_id} 工具 {acc['name']} 执行失败: {e}")
+        result = {"success": False, "error": str(e)[:500]}
+    summary = tool_result_summary(acc["name"], result)
+    # 卡片详情（UI 专用）：和 summary 一起算好，随事件下发 + 落库；不进 LLM 上下文
+    detail = tool_result_detail(acc["name"], acc["arguments"], result)
+    turn_state["tools_done"].append(summary)
+    messages.append({
+        "role": "tool",
+        "tool_call_id": acc["id"] or f"call_{idx}",
+        "content": json.dumps(result, ensure_ascii=False),
+    })
+    # ③ 进度事件转发（同 tool_id，status=update）
+    for note in progress_events:
+        yield f"data: [TOOL_UPDATE]{json.dumps({'tool_id': tool_id, 'status': 'update', 'name': acc['name'], 'summary': note}, ensure_ascii=False)}\n\n"
+    # ④ 执行后：done（同 tool_id，前端原地更新）
+    yield f"data: [TOOL_UPDATE]{json.dumps({'tool_id': tool_id, 'status': 'done', 'name': acc['name'], 'label': tool_label(acc['name']), 'success': bool(result.get('success')), 'summary': summary, 'detail': detail}, ensure_ascii=False)}\n\n"
+    # ⑤ 落库：同 tool_id 更新最后一条（历史只留最终态）；无 tool_id 旧字段则新增
+    existing = (await world_repo.execute(
+        select(WorldChatMessage).where(
+            WorldChatMessage.world_id == world_id,
+            WorldChatMessage.tool_id == tool_id,
+        ).order_by(WorldChatMessage.id.desc()).limit(1)
+    )).scalar_one_or_none()
+    if existing is not None:
+        existing.content = summary
+        existing.is_error = not bool(result.get("success"))
+        existing.tool_name = acc["name"]
+        existing.tool_detail = detail
+    else:
+        world_repo.add(WorldChatMessage(
+            world_id=world_id, user_id=None, role="tool",
+            content=summary, session_id=sid_db, tool_id=tool_id,
+            is_error=not bool(result.get("success")),
+            tool_name=acc["name"], tool_detail=detail,
+        ))
+    await world_repo.commit()
+
+
 async def _execute_tool_round(
     world_repo: WorldRepository, world, world_id: int, tool_call_acc: dict,
     messages: list, turn_state: dict, sid_db: str | None,
 ):
-    """执行本轮所有工具调用：执行 → 摘要 → 注入上下文 → 落库 → 状态事件。
-
-    工具轮循环内的单轮执行单元（2026-08-13 拆分；同日升级为多状态事件）：
-    - 执行前 yield [TOOL_UPDATE]{tool_id, status:running}（前端显示"正在执行 XX"）
-    - 工具内部可 yield 进度（on_progress → status:update，如 运行代码/编译/执行中）
-    - 执行后 yield 同 id [TOOL_UPDATE]{status:done}（前端按 id 原地更新气泡）
-    - 落库：同 tool_id 更新最后一条（历史只留最终态）
-    """
-    from app.models.world import WorldChatMessage
-    from app.tools.world import execute_world_tool, tool_label, tool_result_detail, tool_result_summary
+    """执行本轮所有工具调用：逐个交给 _run_one_tool_call，事件按序透传。"""
     for idx, acc in sorted(tool_call_acc.items()):
-        tool_id = f"t_{uuid.uuid4().hex[:8]}"
-        args_summary = _args_summary(acc.get("arguments") or "")
-        # ① 执行前：running 状态（前端创建/更新气泡：正在执行 XX）
-        yield f"data: [TOOL_UPDATE]{json.dumps({'tool_id': tool_id, 'status': 'running', 'name': acc['name'], 'args_summary': args_summary}, ensure_ascii=False)}\n\n"
-        # ② 工具内部进度事件（耗时工具如 run_world_code 分阶段 yield update）
-        progress_events: list[str] = []
-        async def _on_progress(note: str) -> None:
-            progress_events.append(note)
-        result = None
-        try:
-            result = await execute_world_tool(
-                world_repo, world, acc["name"], acc["arguments"], turn_state,
-                on_progress=_on_progress,
-            )
-        except Exception as e:
-            # 工具/技能自己抛异常：如实回传错误，交给 AI 决定下一步（别重试——副作用可能已发生）
-            logger.warning(f"🌐 世界 #{world_id} 工具 {acc['name']} 执行失败: {e}")
-            result = {"success": False, "error": str(e)[:500]}
-        summary = tool_result_summary(acc["name"], result)
-        # 卡片详情（UI 专用）：和 summary 一起算好，随事件下发 + 落库；不进 LLM 上下文
-        detail = tool_result_detail(acc["name"], acc["arguments"], result)
-        turn_state["tools_done"].append(summary)
-        messages.append({
-            "role": "tool",
-            "tool_call_id": acc["id"] or f"call_{idx}",
-            "content": json.dumps(result, ensure_ascii=False),
-        })
-        # ③ 进度事件转发（同 tool_id，status=update）
-        for note in progress_events:
-            yield f"data: [TOOL_UPDATE]{json.dumps({'tool_id': tool_id, 'status': 'update', 'name': acc['name'], 'summary': note}, ensure_ascii=False)}\n\n"
-        # ④ 执行后：done（同 tool_id，前端原地更新）
-        yield f"data: [TOOL_UPDATE]{json.dumps({'tool_id': tool_id, 'status': 'done', 'name': acc['name'], 'label': tool_label(acc['name']), 'success': bool(result.get('success')), 'summary': summary, 'detail': detail}, ensure_ascii=False)}\n\n"
-        # ⑤ 落库：同 tool_id 更新最后一条（历史只留最终态）；无 tool_id 旧字段则新增
-        existing = (await world_repo.execute(
-            select(WorldChatMessage).where(
-                WorldChatMessage.world_id == world_id,
-                WorldChatMessage.tool_id == tool_id,
-            ).order_by(WorldChatMessage.id.desc()).limit(1)
-        )).scalar_one_or_none()
-        if existing is not None:
-            existing.content = summary
-            existing.is_error = not bool(result.get("success"))
-            existing.tool_name = acc["name"]
-            existing.tool_detail = detail
-        else:
-            world_repo.add(WorldChatMessage(
-                world_id=world_id, user_id=None, role="tool",
-                content=summary, session_id=sid_db, tool_id=tool_id,
-                is_error=not bool(result.get("success")),
-                tool_name=acc["name"], tool_detail=detail,
-            ))
-        await world_repo.commit()
-
-
+        async for line in _run_one_tool_call(world_repo, world, world_id, sid_db, acc, turn_state, messages):
+            yield line
 
 
 def _parse_dsml_tool_calls(text: str) -> list[dict] | None:

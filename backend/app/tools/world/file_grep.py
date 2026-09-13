@@ -2,7 +2,6 @@
 
 按关键词/正则搜索世界文件内容，返回命中行+行号（轻量定位，不用整文件全读）。找到位置后配合 file_read(offset,limit) 读对应段落。
 """
-import json
 
 from app.tools.world.base import WorldToolPlugin, WorldToolContext
 
@@ -40,7 +39,7 @@ class FileGrepTool(WorldToolPlugin):
             if not hits:
                 return {"success": True, "path": path, "pattern": pattern, "hits": [], "total_hits": 0, "note": f"未找到匹配「{pattern}」"}
             return {"success": True, "path": path, "pattern": pattern, "hits": hits, "total_hits": len(hits)}
-        except (ValueError, FileNotFoundError, json.JSONDecodeError) as e:
+        except (ValueError, FileNotFoundError) as e:
             return {"success": False, "error": str(e)}
 
     def summary(self, result: dict) -> str:

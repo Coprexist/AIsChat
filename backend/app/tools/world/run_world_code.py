@@ -2,7 +2,6 @@
 
 在沙箱中运行本世界的 Python 代码（测试用）：可直接跑一段脚本（code），或触发入口 main.py 的 handle(event)（给 event 即触发模式）。世界代码运行在隔离沙箱（内存/CPU/超时受限，
 """
-import json
 
 from app.tools.world.base import WorldToolPlugin, WorldToolContext
 
@@ -42,7 +41,7 @@ class RunWorldCodeTool(WorldToolPlugin):
             entry = str(args.get("entry") or "").strip() or None
             await ctx.progress("脚本运行中…")
             return await _run_code(ctx.world, code=code if isinstance(code, str) else None, entry=entry)
-        except (ValueError, TypeError, json.JSONDecodeError) as e:
+        except (ValueError, TypeError) as e:
             return {"success": False, "error": str(e)}
 
     def summary(self, result: dict) -> str:

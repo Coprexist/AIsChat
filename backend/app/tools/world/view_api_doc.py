@@ -2,7 +2,6 @@
 
 查看「群视界 API 文档」指定分区的详细接口内容（文档按区分区，此处只列区名与区介绍，需要细节时按需打开对应分区）：
 """
-import json
 
 from app.tools.world.base import WorldToolPlugin, WorldToolContext
 
@@ -38,7 +37,7 @@ class ViewApiDocTool(WorldToolPlugin):
                 return {"success": False, "error": f"缺少 section 参数（可选：{ids}）"}
             from app.services.world.world_api_docs import view_section
             return {"success": True, **view_section(section)}
-        except (ValueError, FileNotFoundError, json.JSONDecodeError) as e:
+        except (ValueError, FileNotFoundError) as e:
             return {"success": False, "error": str(e)}
 
     def summary(self, result: dict) -> str:

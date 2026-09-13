@@ -2,7 +2,6 @@
 
 设置本世界在绑定群里的 AI 触发模式（world_decision_skill.md §3）：mention_only=只有 @ 本世界 AI（或 @all/群公告）才唤醒 AI 本体，其余群消息不触发（默认，安静且省
 """
-import json
 
 from app.tools.world.base import WorldToolPlugin, WorldToolContext
 
@@ -24,10 +23,7 @@ class UpdateTriggerModeTool(WorldToolPlugin):
     required = ['mode']
 
     async def execute(self, ctx: WorldToolContext) -> dict:
-        try:
-            args = ctx.args
-        except json.JSONDecodeError:
-            return {"success": False, "error": "参数解析失败"}
+        args = ctx.args
         mode = str(args.get("mode") or "").strip()
         if mode not in ("mention_only", "all"):
             return {"success": False, "error": "mode 必须是 mention_only 或 all"}

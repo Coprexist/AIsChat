@@ -31,9 +31,9 @@ function ToolBubble({ name, label, detail, error, icon, running }: {
   const state = error ? 'error' : running ? 'running' : 'ok'
   // 运行中显示 "进行中…" 摘要；完成显示结果摘要（截断）
   const summary = label.length > 60 ? label.slice(0, 60) + '…' : label
-  // 展开看详情（详情比那一行更全）；没有详情时退化成展开完整摘要
-  const body = detail || label
-  const expandable = !!detail || label.includes('\n')
+  // 展开内容只有一个来源：优先详情；没有详情时，只有多行摘要才值得展开
+  const body = detail || (label.includes('\n') ? label : '')
+  const expandable = !!body
   return (
     <div
       className={`world-msg max-w-[90%] mx-auto text-[11px] rounded-lg overflow-hidden border ${

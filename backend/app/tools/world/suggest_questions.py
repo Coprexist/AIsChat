@@ -2,7 +2,6 @@
 
 向用户展示接下来的建议（3-4 个，每个 ≤20 字）：可以是问题（如「卡牌对战怎么玩？」）、陈述性要求（如「把背景改成星空」）或下一步选项（如「查看世界文件」）——具体、好玩、引导探索。完成回复觉得用户需要引导时调用—
 """
-import json
 
 from app.tools.world.base import WorldToolPlugin, WorldToolContext
 
@@ -34,7 +33,7 @@ class SuggestQuestionsTool(WorldToolPlugin):
             if ctx.turn_state is not None:
                 ctx.turn_state["suggestions"] = questions[:5]
             return {"success": True, "count": len(questions), "note": "已生成建议问题，回复末尾会展示给用户"}
-        except (ValueError, TypeError, json.JSONDecodeError) as e:
+        except (ValueError, TypeError) as e:
             return {"success": False, "error": str(e)}
 
     def summary(self, result: dict) -> str:
