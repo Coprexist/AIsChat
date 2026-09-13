@@ -9,6 +9,27 @@
 
 ### ✨ 新增功能
 
+#### 插件按安装来源分流更新通道（本地 / 插件市场 / 包管理器）
+- 原先的自更新只服务本地 `file:` 安装：分发出去的用户规格不是 `file:`，
+  `resolveSourceRoot` 返回 `no-file-spec`，界面**把内部枚举名直接显示给用户看**，
+  按钮还是死的。这既不诚实也没用
+- 现在插件读 profile 的 `package.json` 判断自己是**怎么装的**，据此决定谁负责更新：
+
+  | 安装来源 | 通道 | 界面行为 |
+  |---|---|---|
+  | 本地 `file:` / `link:` | `self` | 走原有的内容寻址原子换入，出「更新」按钮 |
+  | npm / git **且装了市场** | `market` | 「推荐在设置 → 插件市场更新」，不出手 |
+  | npm / git **且没有市场** | `package-manager` | 出「检查更新」，由 `dsh plugin update` 从原来源更新 |
+
+- 本地安装**永远优先走 `self`**：开发机上就算装了市场，也不该让市场接管本地源码
+- `package-manager` 通道**不重复实现版本比对**——semver 与 git ref 解析都归 pnpm，
+  插件只负责调用并如实回传输出。这与插件市场自身的同一条原则一致：它在
+  `updates.js` 里专门防过「用 npm 包名去比对私有 git 源、把 git 安装覆盖掉」
+- 新增 `POST /aischat-plugin/update`；`update-test.mjs` 补 4 条来源分类断言（共 20 条）
+- 对分发用户的实际意义：装在 npm 上的用户由市场按版本号提示更新；用
+  `github:owner/repo#path:/dsh-aischat` 装的用户由市场按 **HEAD commit** 比对提示
+  ——主仓库一变就能提示，天然适配「源码在仓库、产物随仓库走」的分发方式
+
 #### 新增 lockfile 本地依赖路径修复工具，并记录 DSH_HOME 符号链接的两个坑
 - `dsh-aischat/scripts/fix-profile-links.mjs`：DSH_HOME 为符号链接时，pnpm 写 lockfile
   按符号链接路径算相对路径、解析却按真实路径算，`file:` 依赖会指向不存在的
