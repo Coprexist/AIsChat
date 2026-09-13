@@ -77,7 +77,7 @@ jobs:
   # 前端此前在 PR 阶段零检查：deploy-demo.yml 只在 push 到 main 时跑，
   # 且跑的是 vite build（不含 tsc），类型错误一路裸奔到部署。
   frontend:
-    name: Frontend (typecheck)
+    name: Frontend (typecheck + i18n)
     runs-on: ubuntu-latest
     defaults:
       run:
@@ -97,3 +97,8 @@ jobs:
       # 必须走 node_modules 里的 tsc：npx 在缺包时会去装一个同名的假 tsc@2.0.3
       - name: Typecheck
         run: ./node_modules/.bin/tsc --noEmit
+
+      # i18n key 完整性：getTranslation 找不到 key 时会把 key 原样显示到界面上
+      #（用户看到 admin.addProvider 这种源码串），这里用静态检查兜住
+      - name: i18n keys
+        run: npm run i18n:check

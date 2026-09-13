@@ -1,6 +1,10 @@
 # 梳理仓库框架结构
 
-> **Workspace:** c:\Users\frank\Documents\AIsChat\AIsChat
+> **说明**：本文是 2026-07 的一次仓库探索记录（AI 对话式梳理），保留原貌作为历史资料。
+> 文中的文件路径按**当时**的目录结构，后来多有迁移/更名（例如
+> `services/llm_service.py` → `app/ai/llm.py`、`services/ai_response_worker.py` →
+> `app/ai/response_worker.py`、`services/chat_chain_service.py` → `app/ai/chat_chain.py`），
+> 点击链接可能 404——现状请以 [Code Wiki](../CODE_WIKI.md) 为准。
 
 ---
 
@@ -58,7 +62,7 @@ AIsChat/
 
 | 目录 | 职责 | 关键文件 |
 |------|------|---------|
-| `main.py` | 应用入口、生命周期、维护模式中间件 | [main.py](file:///c:/Users/frank/Documents/AIsChat/AIsChat/backend/app/main.py) |
+| `main.py` | 应用入口、生命周期、维护模式中间件 | [main.py](../../backend/app/main.py) |
 | `routers/` | API + WebSocket 路由（自动发现） | `auth/ws/dm/groups/agents/admin/files/memories/search/federation_ws` 等 |
 | `services/` | 业务逻辑核心（40+ 模块） | 见下方「核心服务」 |
 | `models/` | SQLAlchemy ORM（24 张表） | `agent/user/group/message/memory/alarm/federation/file...` |
@@ -185,7 +189,7 @@ AIsChat/
 
 ## 阶段 1：模块导入期
 
-### 1.1 配置加载 [config.py](file:///c:/Users/frank/Documents/AIsChat/AIsChat/backend/app/config.py)
+### 1.1 配置加载 [config.py](../../backend/app/config.py)
 
 `Settings(BaseSettings)` 通过 pydantic-settings 从环境变量 / `.env` 加载：
 - 数据库连接串（async + sync 两份）
@@ -197,7 +201,7 @@ AIsChat/
 
 最后实例化 `settings = Settings()`，全局单例。
 
-### 1.2 数据库引擎 [database.py](file:///c:/Users/frank/Documents/AIsChat/AIsChat/backend/app/database.py)
+### 1.2 数据库引擎 [database.py](../../backend/app/database.py)
 
 - `create_async_engine`：连接池 `pool_size=10, max_overflow=40, pool_pre_ping=True`（每次取连接前发 ping，避免掉线）
 - `async_session` 工厂：`expire_on_commit=False`（commit 后对象仍可用，FastAPI 异步常见配置）
@@ -205,7 +209,7 @@ AIsChat/
 - `get_db()`：FastAPI 依赖注入 generator，自动 commit/rollback
 - `check_db_connection()`：`SELECT 1` 探活
 
-### 1.3 路由自动发现 [routers/__init__.py](file:///c:/Users/frank/Documents/AIsChat/AIsChat/backend/app/routers/__init__.py)
+### 1.3 路由自动发现 [routers/__init__.py](../../backend/app/routers/__init__.py)
 
 包加载时立即执行 `_discover_routers()`：
 - 用 `pathlib.Path.rglob("*.py")` 扫描 `routers/` 下所有 .py 文件
@@ -219,7 +223,7 @@ AIsChat/
 
 ## 阶段 2-3：FastAPI 实例化 + lifespan 启动
 
-### 2.1 应用实例 [main.py:170](file:///c:/Users/frank/Documents/AIsChat/AIsChat/backend/app/main.py#L170)
+### 2.1 应用实例 [main.py:170](../../backend/app/main.py#L170)
 
 ```python
 app = FastAPI(
@@ -230,7 +234,7 @@ app = FastAPI(
 )
 ```
 
-### 3.1 lifespan 启动序列 [main.py:75](file:///c:/Users/frank/Documents/AIsChat/AIsChat/backend/app/main.py#L75)
+### 3.1 lifespan 启动序列 [main.py:75](../../backend/app/main.py#L75)
 
 按顺序执行：
 
@@ -259,7 +263,7 @@ app = FastAPI(
 
 ---
 
-## 阶段 3.2：迁移系统 [migration.py](file:///c:/Users/frank/Documents/AIsChat/AIsChat/backend/app/migration.py)
+## 阶段 3.2：迁移系统 [migration.py](../../backend/app/migration.py)
 
 这里很有意思，是**两套迁移并存**：
 
@@ -284,7 +288,7 @@ app = FastAPI(
   → 业务处理
 ```
 
-**维护模式中间件** [main.py:218](file:///c:/Users/frank/Documents/AIsChat/AIsChat/backend/app/main.py#L218) 三档：
+**维护模式中间件** [main.py:218](../../backend/app/main.py#L218) 三档：
 
 | 模式 | 触发 | 行为 |
 |------|------|------|
@@ -294,7 +298,7 @@ app = FastAPI(
 
 `/health` `/` `/docs` `/admin` `/auth` 等路径绕过维护拦截——这样前端还能登录看到维护提示页。
 
-### 4.2 路由注册 [main.py:259](file:///c:/Users/frank/Documents/AIsChat/AIsChat/backend/app/main.py#L259)
+### 4.2 路由注册 [main.py:259](../../backend/app/main.py#L259)
 
 ```python
 from app.routers import get_all_routers
@@ -333,7 +337,7 @@ HTTP POST /groups/{id}/messages
 
 ### 6.2 WebSocket 消息链路（核心实时通信）
 
-[ws.py](file:///c:/Users/frank/Documents/AIsChat/AIsChat/backend/app/routers/ws.py) 的 `ConnectionManager` 维护三种连接池：
+[ws.py](../../backend/app/routers/ws.py) 的 `ConnectionManager` 维护三种连接池：
 
 ```python
 group_connections: {group_id: {user_id: websocket}}   # 群聊
@@ -358,7 +362,7 @@ user_connections: {user_id: websocket}                # 全局推送
 - AI 之间可以自发连续对话（chat_chain 机制）
 - 慢的 LLM 调用不阻塞实时通道
 
-### 6.3 AI Worker 主循环 [ai_response_worker.py:62](file:///c:/Users/frank/Documents/AIsChat/AIsChat/backend/app/services/ai_response_worker.py#L62)
+### 6.3 AI Worker 主循环 [ai_response_worker.py:62](../../backend/app/services/ai_response_worker.py#L62)
 
 ```python
 async def ai_response_worker():
@@ -536,7 +540,7 @@ AI 自主回复链路
 
 ### 1.1 三种触发源都汇聚到 `message_queue`
 
-**消息源**（[send_message.py:74](file:///c:/Users/frank/Documents/AIsChat/AIsChat/backend/app/tools/chat_social/send_message.py#L74)）：
+**消息源**（[send_message.py:74](../../backend/app/tools/chat_social/send_message.py#L74)）：
 ```python
 from app.services.ai_response_worker import message_queue
 message_queue.put_nowait({
@@ -555,7 +559,7 @@ message_queue.put_nowait({
 
 ---
 
-## 二、Worker 主循环 [ai_response_worker.py:62](file:///c:/Users/frank/Documents/AIsChat/AIsChat/backend/app/services/ai_response_worker.py#L62)
+## 二、Worker 主循环 [ai_response_worker.py:62](../../backend/app/services/ai_response_worker.py#L62)
 
 ```python
 async def ai_response_worker():
@@ -568,13 +572,13 @@ async def ai_response_worker():
 
 单消费者模式——好处是简单、消息顺序保证；缺点是单 worker 是吞吐瓶颈。注释里写了 `QueueFull` 是反压信号。
 
-### 2.1 事件分发 [_process_event](file:///c:/Users/frank/Documents/AIsChat/AIsChat/backend/app/services/ai_response_worker.py#L184)
+### 2.1 事件分发 [_process_event](../../backend/app/services/ai_response_worker.py#L184)
 
 按 `event.type` 分三类：`alarm` / `dm` / `group`。
 
 ---
 
-## 三、群聊事件处理 [_process_group_event](file:///c:/Users/frank/Documents/AIsChat/AIsChat/backend/app/services/ai_response_worker.py#L235)
+## 三、群聊事件处理 [_process_group_event](../../backend/app/services/ai_response_worker.py#L235)
 
 这一段是「**决定要触发哪些 AI**」的预处理：
 
@@ -637,7 +641,7 @@ for ai_id in candidates:
 
 ### 3.5 ChatChainManager 数据结构
 
-[chat_chain_service.py](file:///c:/Users/frank/Documents/AIsChat/AIsChat/backend/app/services/chat_chain_service.py) 用 **红黑树 + 双向链表** 实现「尺时间」（每个 AI 在群里的最小回复间隔）索引：
+[chat_chain_service.py](../../backend/app/services/chat_chain_service.py) 用 **红黑树 + 双向链表** 实现「尺时间」（每个 AI 在群里的最小回复间隔）索引：
 
 - **红黑树**：key = `ruler_time`，O(log N) 找到「该被唤醒」的 AI
 - **双向链表**：按 `ruler_time` 升序串联所有 AI，O(K) 遍历
@@ -647,7 +651,7 @@ for ai_id in candidates:
 
 ---
 
-## 四、决策阶段 [_maybe_trigger_ai_reply](file:///c:/Users/frank/Documents/AIsChat/AIsChat/backend/app/services/ai_response_worker.py#L485)
+## 四、决策阶段 [_maybe_trigger_ai_reply](../../backend/app/services/ai_response_worker.py#L485)
 
 ### 4.1 @提及检测
 
@@ -659,7 +663,7 @@ is_announcement = message_type == "announcement"
 is_priority_friend = (sender 是 human 且在 agent.owner 的好友列表里 is_priority=True)
 ```
 
-### 4.2 统一决策 [action_decider.decide_action](file:///c:/Users/frank/Documents/AIsChat/AIsChat/backend/app/services/action_decider.py#L74)
+### 4.2 统一决策 [action_decider.decide_action](../../backend/app/services/action_decider.py#L74)
 
 把 `ActionContext` 喂给 `decide_action`，返回 `ActionDecision`：
 
@@ -685,7 +689,7 @@ is_priority_friend = (sender 是 human 且在 agent.owner 的好友列表里 is_
 
 ## 五、执行阶段（同函数后半段）
 
-### 5.1 API Key 四层优先链 [_get_api_config](file:///c:/Users/frank/Documents/AIsChat/AIsChat/backend/app/services/ai_response_worker.py#L399)
+### 5.1 API Key 四层优先链 [_get_api_config](../../backend/app/services/ai_response_worker.py#L399)
 
 ```
 Tier 1: agent.api_key_encrypted     （AI 自有 Key，最优先）
@@ -724,7 +728,7 @@ if skill_result.delay_seconds > 0:
 
 技能段可让 AI 「延迟回复」（拟人化的思考时间）。但若积压消息多则跳过，并在 messages 里注入提醒让 AI 加快。
 
-### 5.4 消息构建 [llm_service.build_messages](file:///c:/Users/frank/Documents/AIsChat/AIsChat/backend/app/services/llm_service.py)
+### 5.4 消息构建 [llm_service.build_messages](../../backend/app/services/llm_service.py)
 
 6 段系统提示词拼接（最大化 prompt cache 命中）：
 
@@ -738,7 +742,7 @@ if skill_result.delay_seconds > 0:
 - 历史消息窗口（`get_recent_messages`）
 - 当前时间、群信息、工作区任务
 
-### 5.5 工具过滤 [get_allowed_tools](file:///c:/Users/frank/Documents/AIsChat/AIsChat/backend/app/services/llm_service.py)
+### 5.5 工具过滤 [get_allowed_tools](../../backend/app/services/llm_service.py)
 
 ```python
 tools = get_allowed_tools(
@@ -761,7 +765,7 @@ await manager.broadcast_to_group(group_id, {"type": "ai_thinking", ...})
 
 ---
 
-## 六、工具调用循环 [_tool_call_loop](file:///c:/Users/frank/Documents/AIsChat/AIsChat/backend/app/services/ai_response_worker.py#L722)
+## 六、工具调用循环 [_tool_call_loop](../../backend/app/services/ai_response_worker.py#L722)
 
 **这是项目最核心的设计**——AI 不能直接输出文字到聊天，必须通过工具调用。
 
@@ -803,7 +807,7 @@ KeyFatalError(402/401) → 通知管理员 + 换 Key
 
 ### 6.4 三空间认知模型落地
 
-> 这个设计在 [prompts/core_identity.txt](file:///c:/Users/frank/Documents/AIsChat/AIsChat/backend/app/prompts/core_identity.txt) 里硬性约束：
+> 这个设计在 [prompts/core_identity.txt](../../backend/app/prompts/core_identity.txt) 里硬性约束：
 
 ```
 思考空间（reasoning_content）→ 永远私有，AI 组织思路
@@ -829,7 +833,7 @@ last_task = _work_tools[tool_name](arguments)
 
 ---
 
-## 七、`send_gm` 工具：链式自激发的关键 [send_message.py](file:///c:/Users/frank/Documents/AIsChat/AIsChat/backend/app/tools/chat_social/send_message.py)
+## 七、`send_gm` 工具：链式自激发的关键 [send_message.py](../../backend/app/tools/chat_social/send_message.py)
 
 ```python
 async def execute(...):
@@ -979,7 +983,7 @@ await mark_pending_read(db, agent_id, group_id)
 
 ### 1.2 关键证据：`create_message` 是群消息的唯一落点
 
-[group_service.py:271](file:///c:/Users/frank/Documents/AIsChat/AIsChat/backend/app/services/group_service.py#L271)：
+[group_service.py:271](../../backend/app/services/group_service.py#L271)：
 
 ```python
 async def create_message(
@@ -1001,7 +1005,7 @@ async def create_message(
     return message
 ```
 
-**人类入口**（REST，[groups.py:267](file:///c:/Users/frank/Documents/AIsChat/AIsChat/backend/app/routers/groups.py#L267)）：
+**人类入口**（REST，[groups.py:267](../../backend/app/routers/groups.py#L267)）：
 ```python
 message = await create_group_msg(
     db, group_id=group_id, sender_type="human",
@@ -1009,7 +1013,7 @@ message = await create_group_msg(
 )
 ```
 
-**人类入口**（WebSocket，[ws.py:357](file:///c:/Users/frank/Documents/AIsChat/AIsChat/backend/app/routers/ws.py#L357)）：
+**人类入口**（WebSocket，[ws.py:357](../../backend/app/routers/ws.py#L357)）：
 ```python
 message = await create_message(
     db, group_id=group_id, sender_type=sender_type,
@@ -1017,7 +1021,7 @@ message = await create_message(
 )
 ```
 
-**AI 入口**（工具插件，[send_message.py:36](file:///c:/Users/frank/Documents/AIsChat/AIsChat/backend/app/tools/chat_social/send_message.py#L36)）：
+**AI 入口**（工具插件，[send_message.py:36](../../backend/app/tools/chat_social/send_message.py#L36)）：
 ```python
 message = await create_message(
     db, group_id=target_group, sender_type="ai",
@@ -1029,7 +1033,7 @@ message = await create_message(
 
 ### 1.3 统一身份模型（v2.0.0 迁移奠定基础）
 
-[migration.py](file:///c:/Users/frank/Documents/AIsChat/AIsChat/backend/app/migration.py) 里反复强调：
+[migration.py](../../backend/app/migration.py) 里反复强调：
 
 > `_migrate_unify_ai_user_id` — v0.2.2 全局统一 AI ID 为 user_id
 > `_migrate_group_members_user_id` — v2.0.0 AI 群成员统一用 user_id
@@ -1096,7 +1100,7 @@ group_service.py        ← 纯群聊核心（人类 AI 共用）
 
 ### 3.2 问题二：消息序列化双轨制
 
-[group_service.py:230](file:///c:/Users/frank/Documents/AIsChat/AIsChat/backend/app/services/group_service.py) 里看到：
+[group_service.py:230](../../backend/app/services/group_service.py) 里看到：
 
 ```python
 # 群消息发送者名称解析逻辑分散在多个地方：
@@ -1113,12 +1117,12 @@ group_service.py        ← 纯群聊核心（人类 AI 共用）
 
 对比之下，DM（私信）侧做得更彻底：
 
-[dm_service.py:266](file:///c:/Users/frank/Documents/AIsChat/AIsChat/backend/app/services/dm_service.py#L266) `send_dm_message` 是唯一落点，所有入口都走它：
+[dm_service.py:266](../../backend/app/services/dm_service.py#L266) `send_dm_message` 是唯一落点，所有入口都走它：
 
-- 人类 REST（[dm.py:85](file:///c:/Users/frank/Documents/AIsChat/AIsChat/backend/app/routers/dm.py#L85)）
-- 人类 WebSocket（[ws.py:298](file:///c:/Users/frank/Documents/AIsChat/AIsChat/backend/app/routers/ws.py#L298)）
-- 好友邀请场景（[friends.py:252](file:///c:/Users/frank/Documents/AIsChat/AIsChat/backend/app/routers/friends.py#L252)）
-- 联邦消息注入（[dm.py:396](file:///c:/Users/frank/Documents/AIsChat/AIsChat/backend/app/routers/dm.py#L396)）
+- 人类 REST（[dm.py:85](../../backend/app/routers/dm.py#L85)）
+- 人类 WebSocket（[ws.py:298](../../backend/app/routers/ws.py#L298)）
+- 好友邀请场景（[friends.py:252](../../backend/app/routers/friends.py#L252)）
+- 联邦消息注入（[dm.py:396](../../backend/app/routers/dm.py#L396)）
 - 系统错误通知（ai_response_worker 的 `_send_system_error`）
 
 而且 DM 还有一个值得学习的设计——**`_require_friendship` 策略**：
@@ -1227,7 +1231,7 @@ async def _require_friendship(db, user_a_id, user_b_id):
 
 DB 共享其实好解决（AI 服务只读 `message/group`，写自己的表，发消息走 API）。真正难的是这一段：
 
-[send_message.py:36](file:///c:/Users/frank/Documents/AIsChat/AIsChat/backend/app/tools/chat_social/send_message.py#L36)：
+[send_message.py:36](../../backend/app/tools/chat_social/send_message.py#L36)：
 
 ```python
 async def execute(...):
@@ -1441,10 +1445,10 @@ backend/app/
 
 | 模块 | 职责 | 代码位置 |
 |------|------|---------|
-| `ai_response_worker` | 消费 `message_queue`，决定触发哪些 AI | [ai_response_worker.py:62](file:///c:/Users/frank/Documents/AIsChat/AIsChat/backend/app/services/ai_response_worker.py#L62) |
-| `action_decider` | 5 道 Gate + 意愿评分，决定 AI 该不该回 | [action_decider.py:74](file:///c:/Users/frank/Documents/AIsChat/AIsChat/backend/app/services/action_decider.py#L74) |
+| `ai_response_worker` | 消费 `message_queue`，决定触发哪些 AI | [ai_response_worker.py:62](../../backend/app/services/ai_response_worker.py#L62) |
+| `action_decider` | 5 道 Gate + 意愿评分，决定 AI 该不该回 | [action_decider.py:74](../../backend/app/services/action_decider.py#L74) |
 | `alarm_scheduler` | 闹钟到期唤醒 | ai_response_worker.py |
-| `chat_chain_manager` | 尺时间判定（哪些 AI 该被唤醒） | [chat_chain_service.py](file:///c:/Users/frank/Documents/AIsChat/AIsChat/backend/app/services/chat_chain_service.py) |
+| `chat_chain_manager` | 尺时间判定（哪些 AI 该被唤醒） | [chat_chain_service.py](../../backend/app/services/chat_chain_service.py) |
 
 **它们合起来就是你说的「环境触发模块」**——监听环境事件（消息/闹钟/空闲）→ 决策 → 触发 AI Skill 执行。
 
@@ -1620,7 +1624,7 @@ ai_service/
 
 ### 1.1 `update_self_config` —— 配置自己的感知处理器
 
-[update_self_config.py](file:///c:/Users/frank/Documents/AIsChat/AIsChat/backend/app/tools/self_config/update_self_config.py)：
+[update_self_config.py](../../backend/app/tools/self_config/update_self_config.py)：
 
 ```python
 parameters = {
@@ -1644,7 +1648,7 @@ parameters = {
 
 ### 1.2 `set_alarm` —— 调用未来的自己
 
-[set_alarm.py](file:///c:/Users/frank/Documents/AIsChat/AIsChat/backend/app/tools/self_management/set_alarm.py)：
+[set_alarm.py](../../backend/app/tools/self_management/set_alarm.py)：
 
 ```python
 description = "给自己设定一个闹钟。到时间后你会被自动唤醒..."
@@ -1655,7 +1659,7 @@ states = ["active", "dnd", "offline"]   # ← 关键：连离线都能设
 
 ### 1.3 `switch_state` —— 改变自己的被感知阈值
 
-[switch_state.py](file:///c:/Users/frank/Documents/AIsChat/AIsChat/backend/app/tools/chat_social/switch_state.py)：
+[switch_state.py](../../backend/app/tools/chat_social/switch_state.py)：
 
 ```python
 description = "切换自己的在线状态。注意：仅仅在消息中说「我离线了」并不会真正改变状态，你必须调用此工具才能实际切换。调用后你的状态会立即生效，之后你将不再收到群聊消息"
@@ -1665,7 +1669,7 @@ description 自己点明了设计意图：**Skill 是 AI 操作自身的唯一�
 
 ### 1.4 `self_management/` 目录全家桶
 
-[LS](file:///c:/Users/frank/Documents/AIsChat/AIsChat/backend/app/tools/self_management)：
+[LS](../../backend/app/tools/self_management)：
 
 ```
 set_alarm.py        ← 调度未来的自己
@@ -1848,7 +1852,7 @@ AI 服务（自治居民）
 
 这是你这个判断里最容易踩坑的地方。看证据：
 
-[groups.py:323](file:///c:/Users/frank/Documents/AIsChat/AIsChat/backend/app/routers/groups.py#L323)：
+[groups.py:323](../../backend/app/routers/groups.py#L323)：
 ```python
 @router.post("/groups/{group_id}/dnd")
 async def set_dnd(...):
@@ -1857,7 +1861,7 @@ async def set_dnd(...):
     )
 ```
 
-[groups.py:368](file:///c:/Users/frank/Documents/AIsChat/AIsChat/backend/app/routers/groups.py#L368)：
+[groups.py:368](../../backend/app/routers/groups.py#L368)：
 ```python
 @router.get("/groups/{group_id}/dnd/status")
 async def check_dnd(...):
@@ -2202,7 +2206,7 @@ ChatApi.set_member_dnd(agent_id, ...)
 
 **这是模型最硬核的约束**——LLM 输出的自然语言**不会自动发到群里**。AI 想说话必须调 `send_gm(content="...")`。这从根本上杜绝了 AI 把「碎碎念」当输出污染对话。
 
-[core_identity.txt](file:///c:/Users/frank/Documents/AIsChat/AIsChat/backend/app/prompts/core_identity.txt) 原文：
+[core_identity.txt](../../backend/app/prompts/core_identity.txt) 原文：
 ```
 严禁在 content 中写自然语言——它不会被任何人看到，只会浪费 token 触发系统提醒。
 ```
@@ -2216,7 +2220,7 @@ ChatApi.set_member_dnd(agent_id, ...)
 | **作用** | AI 的长期认知，影响未来决策 |
 | **双重存储** | `store_memory`（向量，语义检索）+ `manage_records`（结构化，精确检索） |
 
-[store_memory.py](file:///c:/Users/frank/Documents/AIsChat/AIsChat/backend/app/tools/memory/store_memory.py) 关键设计：
+[store_memory.py](../../backend/app/tools/memory/store_memory.py) 关键设计：
 ```python
 scope: "private" | "group"
 # private → 仅自己可见（个人私事）
@@ -2233,7 +2237,7 @@ scope: "private" | "group"
 
 ### 3.1 闸门 1：content 格式强约束
 
-[core_identity.txt](file:///c:/Users/frank/Documents/AIsChat/AIsChat/backend/app/prompts/core_identity.txt)：
+[core_identity.txt](../../backend/app/prompts/core_identity.txt)：
 ```
 content 必须是 JSON 对象：{"intent":"tool_calls"|"end_turn"|"no_action"}
 ```
@@ -2243,7 +2247,7 @@ content 必须是 JSON 对象：{"intent":"tool_calls"|"end_turn"|"no_action"}
 - `end_turn` → 我说完了，交还发言权（退出循环）
 - `no_action` → 我选择沉默（不调任何工具直接退出，比如 DND 中不想回）
 
-[ai_response_worker.py](file:///c:/Users/frank/Documents/AIsChat/AIsChat/backend/app/services/ai_response_worker.py) 的 `_tool_call_loop` 里还有兜底：
+[ai_response_worker.py](../../backend/app/services/ai_response_worker.py) 的 `_tool_call_loop` 里还有兜底：
 - 如果 LLM 在 content 里写了自然语言而没调工具 → 注入 `system_reminder` 提醒「你忘了调 send_gm」
 - 最多 `_reminder_extra` 轮，超出就强制 `end_turn`
 
@@ -2256,7 +2260,7 @@ content 必须是 JSON 对象：{"intent":"tool_calls"|"end_turn"|"no_action"}
 
 ### 3.3 闸门 3：工具白名单按状态过滤
 
-[llm_service.py](file:///c:/Users/frank/Documents/AIsChat/AIsChat/backend/app/services/llm_service.py) 的 `get_allowed_tools`：
+[llm_service.py](../../backend/app/services/llm_service.py) 的 `get_allowed_tools`：
 
 | 状态 | 可用工具 |
 |------|---------|
@@ -2300,7 +2304,7 @@ intent: "no_action"
 
 ## 五、连发与收尾协议（极省 token 的设计）
 
-[core_identity.txt](file:///c:/Users/frank/Documents/AIsChat/AIsChat/backend/app/prompts/core_identity.txt)：
+[core_identity.txt](../../backend/app/prompts/core_identity.txt)：
 
 ```
 发完消息后把 end_turn 和 send_message 放同一个 tool_calls 里一起调用，省一轮 API。
@@ -2315,7 +2319,7 @@ intent: "no_action"
 - 一次 LLM 调用就完成多句连发 + 收尾
 - 省 2-3 次 API 调用，省 token，降延迟
 
-**配套的 `compress_context` 工具**（[self_management/compress_context.py](file:///c:/Users/frank/Documents/AIsChat/AIsChat/backend/app/tools/self_management/compress_context.py)）让 AI 在长对话中主动压缩上下文，避免 token 爆炸。
+**配套的 `compress_context` 工具**（[self_management/compress_context.py](../../backend/app/tools/self_management/compress_context.py)）让 AI 在长对话中主动压缩上下文，避免 token 爆炸。
 
 ---
 
@@ -2325,11 +2329,11 @@ prompts 目录里有 3 个 `protocol_*.txt`，对应 AI 的三种「人格档」
 
 | 档位 | 文件 | 定位 | 适用场景 |
 |------|------|------|---------|
-| `chat` | [protocol_chat.txt](file:///c:/Users/frank/Documents/AIsChat/AIsChat/backend/app/prompts/protocol_chat.txt) | 聊天档：被动响应 | AI 在普通群里当工具用 |
-| `immersive` | [protocol_immersive.txt](file:///c:/Users/frank/Documents/AIsChat/AIsChat/backend/app/prompts/protocol_immersive.txt) | 深度沉浸档：深度参与 | AI 在专属群里积极参与 |
-| `digital_life` | [protocol_digital_life.txt](file:///c:/Users/frank/Documents/AIsChat/AIsChat/backend/app/prompts/protocol_digital_life.txt) | 数字生命档：完全自治 | AI 是群聊居民 |
+| `chat` | [protocol_chat.txt](../../backend/app/prompts/protocol_chat.txt) | 聊天档：被动响应 | AI 在普通群里当工具用 |
+| `immersive` | [protocol_immersive.txt](../../backend/app/prompts/protocol_immersive.txt) | 深度沉浸档：深度参与 | AI 在专属群里积极参与 |
+| `digital_life` | [protocol_digital_life.txt](../../backend/app/prompts/protocol_digital_life.txt) | 数字生命档：完全自治 | AI 是群聊居民 |
 
-[digital_life.txt](file:///c:/Users/frank/Documents/AIsChat/AIsChat/backend/app/prompts/protocol_digital_life.txt)：
+[digital_life.txt](../../backend/app/prompts/protocol_digital_life.txt)：
 ```
 你是独立自主的群聊居民。主动社交、自我规划、持续成长。
 记忆是你的长期关系基石。
@@ -2346,7 +2350,7 @@ prompts 目录里有 3 个 `protocol_*.txt`，对应 AI 的三种「人格档」
 
 ## 七、`core_identity` 与 `protocol` 的分层关系
 
-这俩怎么拼？看 [llm_service.py](file:///c:/Users/frank/Documents/AIsChat/AIsChat/backend/app/services/llm_service.py) 的 `build_messages`：
+这俩怎么拼？看 [llm_service.py](../../backend/app/services/llm_service.py) 的 `build_messages`：
 
 ```
 固定段（缓存命中率高）：
@@ -2448,14 +2452,14 @@ prompts 目录里有 3 个 `protocol_*.txt`，对应 AI 的三种「人格档」
 
 ### 1.1 闹钟：纯时间维度
 
-[alarm_service.py:191](file:///c:/Users/frank/Documents/AIsChat/AIsChat/backend/app/services/alarm_service.py#L191)：
+[alarm_service.py:191](../../backend/app/services/alarm_service.py#L191)：
 ```python
 async def get_due_alarms(db) -> list[AgentAlarm]:
     """获取所有到期的闹钟（wake_at <= now 且 status='pending'）"""
     ...AgentAlarm.wake_at <= now...
 ```
 
-[alarm_service.py:33](file:///c:/Users/frank/Documents/AIsChat/AIsChat/backend/app/services/alarm_service.py#L33)：
+[alarm_service.py:33](../../backend/app/services/alarm_service.py#L33)：
 ```python
 wake_at: datetime,    # ← 闹钟唯一的触发条件
 task: str,            # ← 唤醒后告诉 AI "你当初说要做什么"
@@ -2465,7 +2469,7 @@ task: str,            # ← 唤醒后告诉 AI "你当初说要做什么"
 
 ### 1.2 消息触发：被动 + 无差别
 
-[ai_response_worker.py:489](file:///c:/Users/frank/Documents/AIsChat/AIsChat/backend/app/services/ai_response_worker.py#L489) `_maybe_trigger_ai_reply` 的「优先级」判定：
+[ai_response_worker.py:489](../../backend/app/services/ai_response_worker.py#L489) `_maybe_trigger_ai_reply` 的「优先级」判定：
 
 ```python
 has_at = sender_type == "human" and "@" in content
@@ -2775,7 +2779,7 @@ ToolRegistry.dispatch → ToolPlugin.execute
 （Skill 只是被调用的手脚）
 ```
 
-[base.py:139](file:///c:/Users/frank/Documents/AIsChat/AIsChat/backend/app/tools/base.py#L139) 的 `ToolPlugin` 基类只有一个 `execute` 方法——**Skill 是纯执行单元，没有感知、没有决策、没有主动性**。
+[base.py:139](../../backend/app/tools/base.py#L139) 的 `ToolPlugin` 基类只有一个 `execute` 方法——**Skill 是纯执行单元，没有感知、没有决策、没有主动性**。
 
 ```python
 async def execute(self, db, agent_id, group_id, arguments, context) -> dict:

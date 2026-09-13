@@ -1,7 +1,11 @@
 # AIsChat Code Wiki
 
-> 版本：v1.0.0 | 更新：2026-08-10
+> 版本：v1.1.0 | 更新：2026-09-13 | 对应应用版本：v0.4.0
 > 本文档是 AIsChat 项目的结构化 Code Wiki，涵盖项目架构、模块职责、关键类与函数说明、依赖关系以及项目运行方式。
+>
+> **本次刷新（v1.1.0）**：路由表补全到 29 个模块；前端补 i18n 体系与构建产物两节；
+> 开发指南里的工具注册方式与测试命令改为与现状一致；清理了 16 处指向作者本机
+> Windows 路径的失效链接（`file:///f:/...` → 仓库内相对路径）。
 
 ---
 
@@ -31,6 +35,8 @@
   - [6.3 Hooks 体系](#63-hooks-体系)
   - [6.4 上下文管理](#64-上下文管理)
   - [6.5 页面模块](#65-页面模块)
+  - [6.6 i18n 体系（三语 + 命名空间）](#66-i18n-体系三语--命名空间)
+  - [6.7 构建产物与插件包](#67-构建产物与插件包)
 - [7. 关键类与函数索引](#7-关键类与函数索引)
 - [8. API 端点概览](#8-api-端点概览)
 - [9. 数据模型关系](#9-数据模型关系)
@@ -259,12 +265,17 @@ AIsChat/
 │   │   │   ├── memory.py             # 记忆
 │   │   │   ├── agent_skill.py        # AI 技能
 │   │   │   └── ...                   # 其他模型
-│   │   ├── tools/                    # 工具插件（自动发现注册）
+│   │   ├── tools/                    # 工具插件（定义即自注册，无清单）
 │   │   │   ├── base.py               # ToolPlugin 基类 + ToolRegistry
+│   │   │   ├── decision.py           # 决策类工具
 │   │   │   ├── chat_social/          # 社交工具（send_gm, send_dm 等）
+│   │   │   ├── group_management/     # 群管理工具
 │   │   │   ├── file_operations/      # 文件操作工具
 │   │   │   ├── memory/               # 记忆工具
+│   │   │   ├── network/              # 联网工具（web_search / web_fetch）
+│   │   │   ├── self_config/          # 自我配置工具
 │   │   │   ├── self_management/      # 自我管理工具（闹钟/状态栈）
+│   │   │   ├── world/                # 群视界工具（一个工具一个文件）
 │   │   │   └── ...                   # 其他工具
 │   │   ├── skills/                   # 思维 Skill 定义
 │   │   ├── schemas/                  # Pydantic 请求/响应模型
@@ -306,13 +317,22 @@ AIsChat/
 │   │   ├── api/                      # API 客户端
 │   │   ├── i18n/                     # 国际化
 │   │   └── utils/                    # 前端工具
+│   ├── scripts/
+│   │   └── check-i18n.mjs            # i18n 静态检查（npm run i18n:check）
 │   ├── package.json
 │   ├── vite.config.ts
 │   └── Dockerfile
+├── dsh-aischat/                      # DeepSeek Harness 插件包（宿主侧 + 客户端侧）
+│   ├── lib/                          # 构建产物（index.js 宿主 / client.js 客户端 / manifest.json）
+│   ├── dist/                         # 与 frontend/dist 镜像的前端产物（排除 docs/assets）
+│   ├── scripts/                      # sync-dist / build / smoke / update-test
+│   └── src/                          # 插件源码
 ├── data/                             # 运行时数据
 │   └── world_blocks/                 # 群视界积木（前端页面+后端逻辑）
 ├── docs/                             # 文档
-├── scripts/                          # SQL 脚本
+├── scripts/                          # SQL 脚本 + 截图管线
+│   └── screenshot/                   # README/文档配图一键生成（CDP 驱动，演示数据在浏览器侧替换）
+├── gitignore-本地docs/               # 不入库的本地资料（审计报告/口令/地址清单），见 docs/SUMMARY.md
 ├── docker-compose.yml                # Docker 编排
 └── .env.example                      # 环境变量模板
 ```
@@ -323,7 +343,7 @@ AIsChat/
 
 ### 5.1 应用入口 (app/main.py)
 
-**文件**: [app/main.py](file:///f:/Zhang/AIsChat/backend/app/main.py)
+**文件**: [app/main.py](../backend/app/main.py)
 
 FastAPI 应用的核心入口，负责：
 
@@ -368,7 +388,7 @@ async def lifespan(app: FastAPI):
 
 ### 5.2 配置管理 (app/config.py)
 
-**文件**: [app/config.py](file:///f:/Zhang/AIsChat/backend/app/config.py)
+**文件**: [app/config.py](../backend/app/config.py)
 
 基于 `pydantic_settings.BaseSettings` 的全局配置管理，支持 `.env` 文件加载。
 
@@ -395,7 +415,7 @@ async def lifespan(app: FastAPI):
 
 ### 5.3 数据库层 (app/database.py)
 
-**文件**: [app/database.py](file:///f:/Zhang/AIsChat/backend/app/database.py)
+**文件**: [app/database.py](../backend/app/database.py)
 
 基于 SQLAlchemy 2.0 的异步数据库管理。
 
@@ -413,7 +433,7 @@ async def lifespan(app: FastAPI):
 
 #### 5.4.1 response_worker.py — AI 响应 Worker
 
-**文件**: [app/ai/response_worker.py](file:///f:/Zhang/AIsChat/backend/app/ai/response_worker.py)
+**文件**: [app/ai/response_worker.py](../backend/app/ai/response_worker.py)
 
 AI 响应的调度中心，维护全局状态并编排回复触发。
 
@@ -453,7 +473,7 @@ while True:
 
 #### 5.4.2 decider.py — 统一行动决策
 
-**文件**: [app/ai/decider.py](file:///f:/Zhang/AIsChat/backend/app/ai/decider.py)
+**文件**: [app/ai/decider.py](../backend/app/ai/decider.py)
 
 将原有的被动回复 Gate 链 + 闹钟主动唤醒合并为统一的决策系统。
 
@@ -505,7 +525,7 @@ class ActionContext:
 
 #### 5.4.3 executor.py — 工具执行引擎
 
-**文件**: [app/ai/executor.py](file:///f:/Zhang/AIsChat/backend/app/ai/executor.py)
+**文件**: [app/ai/executor.py](../backend/app/ai/executor.py)
 
 AI 的核心执行引擎，实现工具调用循环和 API 配置管理。
 
@@ -544,7 +564,7 @@ Tier 3: 账单人自有 Key
 
 #### 5.4.4 llm.py — LLM 调用抽象层
 
-**文件**: [app/ai/llm.py](file:///f:/Zhang/AIsChat/backend/app/ai/llm.py)
+**文件**: [app/ai/llm.py](../backend/app/ai/llm.py)
 
 提供通用的聊天补全、系统提示词构建、消息组装。
 
@@ -581,7 +601,7 @@ class KeyFatalError(Exception):     # 402/401 → 跳过此 Key
 
 #### 5.4.5 chat_chain.py — 聊天链尺时间
 
-**文件**: [app/ai/chat_chain.py](file:///f:/Zhang/AIsChat/backend/app/ai/chat_chain.py)
+**文件**: [app/ai/chat_chain.py](../backend/app/ai/chat_chain.py)
 
 基于红黑树 + 双向链表的 AI 发言节奏管理。
 
@@ -607,7 +627,7 @@ class ChatChainManager:  # 聊天链管理器（全局单例 chat_chain_manager�
 
 #### 5.4.6 group_logic.py — AI 群聊策略
 
-**文件**: [app/ai/group_logic.py](file:///f:/Zhang/AIsChat/backend/app/ai/group_logic.py)
+**文件**: [app/ai/group_logic.py](../backend/app/ai/group_logic.py)
 
 AI 特有的群聊策略函数：
 
@@ -623,7 +643,7 @@ AI 特有的群聊策略函数：
 
 #### 5.5.1 ChatApi — 聊天统一接口
 
-**文件**: [app/chat/__init__.py](file:///f:/Zhang/AIsChat/backend/app/chat/__init__.py)
+**文件**: [app/chat/__init__.py](../backend/app/chat/__init__.py)
 
 ```python
 class ChatApi(BaseChatApi):
@@ -645,7 +665,7 @@ class ChatApi(BaseChatApi):
 
 #### 5.5.2 ConnectionManager — WebSocket 连接管理
 
-**文件**: [app/services/connection_manager.py](file:///f:/Zhang/AIsChat/backend/app/services/connection_manager.py)
+**文件**: [app/services/connection_manager.py](../backend/app/services/connection_manager.py)
 
 ```python
 class ConnectionManager:
@@ -669,40 +689,48 @@ class ConnectionManager:
 
 ### 5.6 路由层 (app/routers/)
 
-**路由自动发现**: [app/routers/__init__.py](file:///f:/Zhang/AIsChat/backend/app/routers/__init__.py)
+**路由自动发现**: [app/routers/__init__.py](../backend/app/routers/__init__.py)
 
 通过扫描 `routers/` 目录自动发现所有路由模块，无需手动注册。每个路由模块定义 `router = APIRouter(...)` 变量。
 
 | 路由文件 | 前缀 | 说明 |
 |---------|------|------|
-| `ws.py` | `/ws` | WebSocket 端点（连接、心跳、消息收发） |
-| `chat.py` | `/chat` | 聊天 REST API（消息创建/查询、群管理） |
+| `ws.py` | — | WebSocket 端点（连接、心跳、消息收发），**群 subscribe 校验群成员** |
+| `chat.py` | `/chat` | 聊天 REST API（消息创建/查询、好友） |
 | `auth.py` | `/auth` | 认证（登录、注册、Token 验证） |
+| `user.py` | `/user` | 用户设置 |
 | `agents.py` | `/agents` | AI 代理 CRUD + 配置 |
-| `dm.py` | `/dm` | 私信会话与消息 |
-| `groups.py` | `/groups` | 群聊管理 |
-| `friends.py` | `/friends` | 好友关系 |
-| `search.py` | `/search` | 用户搜索 |
-| `admin.py` | `/admin` | 管理后台 |
+| `ai.py` | `/ai` | AI 底层服务 |
+| `dm.py` | — | 私信会话与消息 |
+| `gm.py` | — | 群聊消息（读接口需群成员） |
+| `groups.py` | — | 群聊管理（详情/成员需群成员） |
+| `friends.py` | — | 好友关系 |
+| `invitations.py` | — | 群邀请 |
+| `search.py` | — | 用户搜索 |
+| `admin.py` | `/admin` | 管理后台（全部需 `require_admin`） |
 | `market.py` | `/market` | 世界商城 |
 | `skills.py` | `/skills` | 技能管理 |
 | `worlds.py` | `/worlds` | 群视界 CRUD |
-| `world_proxy.py` | `/world-proxy` | 世界反向代理 |
+| `world_proxy.py` | `/world` | 群视界入口（页面/文件/API 代理） |
+| `world_realtime.py` | — | 世界实时通道（独立 WebSocket） |
 | `brain.py` | `/brain` | 薄大脑 API |
 | `memories.py` | `/memories` | 记忆管理 |
-| `files.py` | `/files` | 文件管理 |
-| `invitations.py` | `/invitations` | 邀请管理 |
-| `federation_ws.py` | 联邦 WebSocket |
-| `conversation_log.py` | 对话日志 |
-| `system.py` | 系统设置 |
+| `files.py` | `/fs` | 文件上传/下载，`/fs/public/{id}` 走维护图片白名单 |
+| `federation_ws.py` | — | 联邦 WebSocket + 联邦管理 |
+| `conversation_log.py` | — | 对话日志 |
+| `study.py` | `/study` | 自习室 |
+| `system.py` | — | 系统设置 / 健康检查 |
 | `plugins.py` | `/plugins` | 统一插件（列表 / 管理员全局开关 / 用户偏好 / 重扫目录） |
-| `theme_vote.py` | 主题选色投票 |
+| `theme_vote.py` / `theme_vote_r2.py` | — | 主题选色投票（一轮/二轮） |
+| `api_docs.py` | `/kb` | 群视界接口文档服务 |
+| `swagger_docs.py` | — | 自带 Swagger 文档页（生产环境 404） |
+| `deps.py` | — | 共享依赖（`require_admin` / `require_group_member` / `require_agent_access`），不注册路由 |
 
 ### 5.7 服务层 (app/services/)
 
 #### 5.7.1 薄大脑控制系统 (services/brain/)
 
-**核心文件**: [app/services/brain/brain_controller.py](file:///f:/Zhang/AIsChat/backend/app/services/brain/brain_controller.py)
+**核心文件**: [app/services/brain/brain_controller.py](../backend/app/services/brain/brain_controller.py)
 
 薄大脑只做 4 件事：
 
@@ -834,7 +862,7 @@ async def _handle_typing_indicator(...): ...
 
 #### 5.8.1 ToolPlugin 基类
 
-**文件**: [app/tools/base.py](file:///f:/Zhang/AIsChat/backend/app/tools/base.py)
+**文件**: [app/tools/base.py](../backend/app/tools/base.py)
 
 ```python
 class ToolPlugin:
@@ -865,7 +893,7 @@ class ToolPlugin:
 
 #### 5.8.3 工具注册中心
 
-**文件**: [app/services/tool_registry.py](file:///f:/Zhang/AIsChat/backend/app/services/tool_registry.py)
+**文件**: [app/services/tool_registry.py](../backend/app/services/tool_registry.py)
 
 ```python
 class ToolRegistry:
@@ -935,7 +963,7 @@ validate_tool_call(tool_name, arguments)
 
 ### 6.1 应用入口与路由
 
-**入口文件**: [frontend/src/App.tsx](file:///f:/Zhang/AIsChat/frontend/src/App.tsx)
+**入口文件**: [frontend/src/App.tsx](../frontend/src/App.tsx)
 
 ```
 路由结构:
@@ -1004,7 +1032,7 @@ validate_tool_call(tool_name, arguments)
 |---------|------|------|
 | `AuthContext` | `context/AuthContext.tsx` | 认证状态（用户信息、登录/登出） |
 | `ThemeContext` | `context/ThemeContext.tsx` | 主题（深色/浅色） |
-| `I18nContext` | `i18n/I18nContext.tsx` | 国际化（中/英） |
+| `I18nContext` | `i18n/I18nContext.tsx` | 国际化（中 / 英 / 日），见 6.6 |
 
 ### 6.5 页面模块
 
@@ -1027,6 +1055,59 @@ validate_tool_call(tool_name, arguments)
 | `SetupPage` | `pages/SetupPage.tsx` | 设置向导 |
 | `InstanceSetupPage` | `pages/InstanceSetupPage.tsx` | 桌面端实例配置 |
 | `DemoChat` | `pages/DemoChat.tsx` | Demo 模式 |
+
+> 组件/页面表为节选（当前 54 个组件、23 个页面）；新增文件请顺手补进本表。
+
+### 6.6 i18n 体系（三语 + 命名空间）
+
+**查找入口只有一个**：`i18n/translations.ts` 的 `getTranslation(lang, path, vars)`。
+`path` 形如 `nav.chat`（默认落 `common` 分区）或 `tool:toolName.file_read`（带分区前缀）。
+
+| 文件 | 分区 | 内容 |
+|------|------|------|
+| `i18n/translations.ts` | `common` | 主字典，zh / en / ja 各一份（1700+ key） |
+| `i18n/tool.ts` | `tool` | 工具名 `toolName.*`、状态模板 `tool.*`、`world.reasoning` |
+| `i18n/admin_config.ts` | `adminConfig` | 配置组卡片文案，key 为**裸名**（`save` / `embeddingLabel`） |
+
+约定与坑：
+
+- **查不到 key 时 `getTranslation` 原样返回 key**——界面就会把 `admin.addProvider`、
+  `adminConfig:sourceDb` 这样的源码串显示给用户。它不报错、不崩溃，所以必须靠
+  `npm run i18n:check` 兜住（2026-09 已按此修掉 48 个三语全缺 + 62 处单语缺的 key）
+- **分区内不重复写前缀**：`adminConfig` 的 key 就是 `save`，不是 `configGroup.save`；
+  后端 `CONFIG_GROUPS` 的 `label_key`/`hint_key` 同样是裸名，
+  `ConfigGroupCard` 的 `tr()` 统一补 `adminConfig:` 前缀——三处必须同一个口径
+- 语言解析优先级：设置向导临时覆盖 → 用户 `language` 字段 → localStorage 缓存 → 默认语言
+- 静态检查：`frontend/scripts/check-i18n.mjs`（零依赖，纯 Node 标准库）扫源码里的
+  `t()` / `tr()` 调用与模板串，并读后端 `app_config_service.py` 核对下发的 key；
+  缺 key 即非 0 退出，`--json` 供其它工具消费
+
+### 6.7 构建产物与插件包
+
+| 产物 | 生成方式 | 说明 |
+|------|---------|------|
+| `frontend/dist` | 容器内 `vite build` | Web 前端产物，Docker 部署直接用它 |
+| `dsh-aischat/dist` | `node dsh-aischat/scripts/sync-dist.mjs` | 与 `frontend/dist` 逐字节镜像，**排除** `docs/assets`（README 配图不进包） |
+| `dsh-aischat/lib/*.js`、`lib/manifest.json` | `node dsh-aischat/scripts/build.mjs` | 插件宿主/客户端产物 + 内容寻址清单，自更新按清单校验完整性 |
+
+```bash
+# 改了前端源码、要让 DSH 插件面板同步生效
+docker exec -w /app ai_group_frontend sh -c "BASE_URL=/aischat-ui/ node_modules/.bin/vite build"
+node dsh-aischat/scripts/sync-dist.mjs
+node dsh-aischat/scripts/build.mjs
+```
+
+> **改了后端 Python 记得重启容器**：`docker restart ai_group_backend`。
+> 后端是挂载源码但不带 reload，改完不重启＝线上还是旧代码（i18n 前缀改名踩过一次）。
+
+**English summary.** All UI copy goes through a single lookup,
+`getTranslation(lang, path, vars)`, with three locales (zh / en / ja) and three namespaces
+(`common`, `tool`, `adminConfig`). A missing key is returned **verbatim**, so the raw key
+shows up in the UI instead of an error — `npm run i18n:check` is the guard for that.
+Keys inside a namespace are bare (`save`, not `configGroup.save`); the backend
+`CONFIG_GROUPS` schema uses the same bare names. Build artifacts:
+`frontend/dist` (web) → `dsh-aischat/dist` (plugin mirror, excluding `docs/assets`) →
+`dsh-aischat/lib` + `lib/manifest.json` (content-addressed, powers plugin self-update).
 
 ---
 
@@ -1151,6 +1232,23 @@ validate_tool_call(tool_name, arguments)
 | | GET | `/system/health` | 健康检查 |
 | **Brain** | GET | `/brain/state` | 薄大脑状态 |
 | | POST | `/brain/arbitrate` | 冲突仲裁 |
+| **Plugins** | GET | `/plugins` | 插件列表（全局开关 + 用户偏好） |
+| | POST | `/plugins/rescan` | 重扫目录（管理员） |
+| | POST | `/plugins/{id}/toggle` | 全局开关（管理员） |
+| | POST | `/plugins/{id}/pref` | 用户偏好 |
+| **User** | PUT | `/user/settings` | 用户设置 |
+| | POST | `/user/redeem` | 兑换额度 |
+| | GET | `/user/credit-status` | 额度状态 |
+| **Study** | POST | `/study/heartbeat` | 自习室心跳 |
+| | GET | `/study/summary` | 自习统计 |
+| **World** | GET | `/world/{id}/api/world` | 世界信息 |
+| | GET/POST | `/world/{id}/api/chat`、`/memories`、`/data/{key}` | 世界页面调用的受控 API |
+| | GET | `/world/{id}/files/*` | 世界静态文件（**匿名可读**，世界页面即可分享链接） |
+| **ThemeVote** | POST | `/theme-vote` | 主题选色投票 |
+| **Federation** | — | `/admin/federation/peers...` | 联邦对端管理（管理员，见 `federation_ws.py`） |
+
+> 上表是常读接口的概览，不是全集（29 个路由模块）。完整清单看运行实例的 `/docs`
+> ——生产环境（`ENVIRONMENT=production`）该页与 `/openapi.json` 会自动 404。
 
 ### WebSocket
 
@@ -1369,7 +1467,9 @@ class MyTool(ToolPlugin):
         return {"result": "success"}
 ```
 
-3. 在 `app/tools/__init__.py` 中导入子模块（自动注册）
+3. **不需要登记清单**：`app/tools/__init__.py` 扫描目录自动导入，子类在**定义时自注册**。
+   缺少 `label`（卡片一行文案）/ `segment`（技能段）等契约字段会在导入时直接抛
+   `TypeError`——这是故意的：不允许"默默兜底成一句工具执行成功"
 
 ### 新增 API 路由
 
@@ -1396,11 +1496,37 @@ class MyTool(ToolPlugin):
 
 ### 测试
 
+后端用例自带连接串推导，**跑之前给一个测试库即可**（不要指向主库）：
+
 ```bash
-cd backend
-# 运行测试
-pytest tests/
+# 后端：整套 / 单个文件（容器内运行，无需装依赖）
+PROD=$(docker exec ai_group_backend printenv DATABASE_URL)
+TEST=$(printf "%s" "$PROD" | sed "s|/ai_group_chat|/ai_group_chat_test|")
+docker exec -w /app -e TEST_DATABASE_URL="$TEST" \
+  -e TEST_DATABASE_URL_SYNC="$(printf "%s" "$TEST" | sed "s|+asyncpg||")" \
+  ai_group_backend python tests/run_without_pytest.py            # 或 tests/test_security_guards.py
 ```
+
+```bash
+# 前端：类型检查 + i18n key 完整性（都在容器里跑，不装依赖）
+docker exec -w /app ai_group_frontend node_modules/.bin/tsc --noEmit
+node frontend/scripts/check-i18n.mjs
+```
+
+| 守卫 | 拦住什么 |
+|------|---------|
+| `backend/tests/test_security_guards.py` | 路由漏挂权限依赖（`require_admin` / `require_group_member`）、角色信 JWT、白名单失守 |
+| `backend/tests/test_world_tool_summaries.py` | 世界工具缺 `label` / `summary` 契约 |
+| `frontend/scripts/check-i18n.mjs` | 界面会显示裸 i18n key（三语缺 key / 后缀口径不一致） |
+
+### 文档约定
+
+| 约定 | 说明 |
+|------|------|
+| 同步 CHANGELOG | 任何用户可见改动都写进 `CHANGELOG.md` 的 Unreleased |
+| 中英双语 | 指南类文档保留中英标题/副标题，关键操作段落给英文摘要 |
+| 命令双份 | 依赖网络的安装命令给「A. 官方源」与「B. 国内镜像」两个**各自整段可复制**的块 |
+| 私有资料不入库 | 审计报告、口令、公网域名/入口 IP 一律放 `gitignore-本地docs/`（见 `docs/SUMMARY.md`） |
 
 ### 常用 Git 分支策略
 
