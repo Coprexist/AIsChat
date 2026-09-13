@@ -252,6 +252,22 @@
 
 ### 🔧 开发工具
 
+#### 接入覆盖率：增量当门禁、整体只当报表
+- 首次实测基线：**行覆盖率 8%**（27,726 语句 / 25,534 未执行；267 个文件里 **180 个**是 0%）
+- CI 每次跑 `pytest --cov=app --cov-report=term-missing --cov-report=xml` 出报表，
+  外加 `coverage report --sort=cover`；**整体覆盖率故意不设阈值** ——
+  一旦当门禁就会奖励写"调用了但没断言"的假用例，比没有覆盖率更糟
+- 增量覆盖率用 `diff-cover --compare-branch=origin/<目标分支>`，**仅 pull_request 阻断**，
+  阈值放在 workflow 顶部的 `env.DIFF_COVER_MIN`（初始 80，太吵就只调这一个数字）。
+  checkout 相应加 `fetch-depth: 0`，否则浅克隆拿不到目标分支
+- ⚠️ 报告里 `app/models` 显示 **92.2%，是假象**：模型层只是被 import 过（类定义在导入时执行），
+  不是被测过。这是"覆盖率衡量被执行、不衡量被验证"最干净的标本，已写进文档，
+  免得有人拿这个数字判断模型层质量
+- 顺带记档一个会反复咬人的坑：这台 NAS 上 **`pypi.org` 解析超时**
+  （`curl: (28) Resolving timed out`，`pip download` 30 秒超时），清华/阿里镜像正常（200 / 0.5s）。
+  容器里同样解析不了 pypi.org，所以任何 `pip install` 都要显式带 `-i` 国内镜像；
+  CI 在 GitHub 上跑，不受此限
+
 #### CI 补上前端类型检查门禁（此前 PR 阶段前端零检查）
 - 前端改动此前在 PR 阶段**不跑任何检查**：`test.yml` 只监听 `backend/**`；
   唯一管前端的 `deploy-demo.yml` 只在 push 到 main 时跑，且跑的是 `npm run build:demo`
@@ -269,6 +285,21 @@
   （文档写错 CI 内容，等于给人一张假地图）
 
 ### 🧪 测试
+
+#### 补上 P0 源头与端点拼接的纯函数用例（23 条）
+- 新增 `backend/tests/test_multimodal.py`（16 条）：第一条就钉死 P0 的契约 ——
+  `image_attachments()` 必须兜住 `normalize_attachments()` 的 `list | None`，
+  用 `None` / `"坏了"` / `"null"` / `0` / `()` 五种退化输入各打一遍
+- 另覆盖 `build_content` 的三条产品不变式：无图必须返回**纯字符串**（payload 与历史完全一致）、
+  图丢了或超限要退回纯文本而不是变成"残缺多模态"、单条默认只注入 1 张并明说"另有 N 张未提供"；
+  以及 `strip_image_parts` 必须把图片与「你能看图」便签**一起**抹掉
+- 新增 `backend/tests/test_llm_endpoint.py`（7 条）：钉死端点拼接的 `/vN` 规则
+  （MiMo 缺 /v1、通义自带 /v1 再被补成 /v1/v1，两起真实事故），
+  并**遍历全部 9 个真实预设**做全覆盖 —— 将来新增预设时 base_url 写错会当场红
+- 两批都做了变异验证：去掉 `or []` / `build_content` 忽略图片 / `strip_image_parts` 不改写便签 /
+  `api_root` 无脑补 /v1 —— 四个 bug 全部被抓住
+- 用例总数 24 → **47**；文档 `docs/guides/test_strategy.md` 的用例表、缺口表、覆盖率一节同步更新，
+  且第十节的 workflow 改成**逐字节引用真实文件**（并用脚本校验过一致）
 
 #### 群视界发图链路补上端到端冒烟（零 LLM 消耗）
 - 新增 `backend/tests/test_world_chat_images.py`：**真调** `_prepare_world_chat`，

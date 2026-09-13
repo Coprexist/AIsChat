@@ -85,3 +85,10 @@ data/
 __pycache__/
 frontend/dist/
 
+# 测试产物（覆盖率报告 / pytest 缓存）
+.coverage
+.coverage.*
+coverage.xml
+htmlcov/
+.pytest_cache/
+

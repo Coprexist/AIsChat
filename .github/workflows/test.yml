@@ -11,6 +11,12 @@ on:
       - 'backend/**'
       - 'frontend/**'
 
+env:
+  # 增量覆盖率门槛（只作用于 pull_request）。基线是 8%，所以这里盯**本次改动的行**，
+  # 不盯整体——整体覆盖率当门禁只会奖励写"调用了但没断言"的用例。
+  # 太吵就调低这一个数字；先跑一段时间再决定要不要收紧。
+  DIFF_COVER_MIN: 80
+
 jobs:
   # 作业 id 与名称保持原样：改名会让 GitHub 上的 required status check 失效
   pytest:
@@ -31,6 +37,8 @@ jobs:
           --health-retries 10
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0        # diff-cover 要与目标分支比对，浅克隆拿不到
 
       - uses: actions/setup-python@v5
         with:
@@ -41,7 +49,7 @@ jobs:
       - name: Install dependencies
         run: |
           pip install -r backend/requirements.txt
-          pip install pytest pytest-asyncio pytest-timeout
+          pip install pytest pytest-asyncio pytest-timeout pytest-cov diff-cover
 
       - name: Run backend tests
         env:
@@ -49,10 +57,25 @@ jobs:
           TEST_DATABASE_URL_SYNC: postgresql://ai_chat:test-pass@localhost:5432/ai_group_chat_test
         run: |
           cd backend
-          python -m pytest tests/ -q
+          python -m pytest tests/ -q --cov=app --cov-report=term-missing --cov-report=xml
+
+      # 只报表不设阈值：整体覆盖率当前约 8%，它的用处是看缺口的**分布与趋势**，
+      # 不是当门禁。注意 app/models 那 92% 是假象——只是被 import 过，不是被测过。
+      - name: 整体覆盖率报表
+        run: |
+          cd backend
+          python -m coverage report --sort=cover | tail -50
+
+      - name: 增量覆盖率门禁（仅 PR）
+        if: github.event_name == 'pull_request'
+        run: |
+          cd backend
+          diff-cover coverage.xml \
+            --compare-branch=origin/${{ github.base_ref }} \
+            --fail-under=${{ env.DIFF_COVER_MIN }}
 
   # 前端此前在 PR 阶段零检查：deploy-demo.yml 只在 push 到 main 时跑，
-  # 且跑的是 `vite build`（不含 tsc），类型错误一路裸奔到部署。
+  # 且跑的是 vite build（不含 tsc），类型错误一路裸奔到部署。
   frontend:
     name: Frontend (typecheck)
     runs-on: ubuntu-latest

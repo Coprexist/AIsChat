@@ -30,6 +30,8 @@
 | 文件 | 类型 | 用例数 | 覆盖 |
 |------|------|--------|------|
 | `backend/tests/test_api_probe.py` | 单元（零网络） | 17 | 供应商探针判定、错误文案、响应脱敏、内网地址围栏 |
+| `backend/tests/test_multimodal.py` | 单元（零网络 + 临时真文件） | 16 | 附件 → 多模态 content、便签、视觉降级（**P0 源头**）|
+| `backend/tests/test_llm_endpoint.py` | 单元（零网络） | 7 | 端点拼接 `/vN` 规则 + 全部 9 个预设全覆盖 |
 | `backend/tests/test_world_chat_images.py` | 集成（真库 + 真文件） | 5 | 群视界发图链路：真调 `_prepare_world_chat`，零 LLM 消耗 |
 | `backend/tests/test_agent_resolution.py` | 集成（真库） | 2 | 群成员 `member_id` 解析优先级 |
 
@@ -66,14 +68,16 @@ docker exec -w /app \
 ### 1.2 写完用例要证明「它会红」
 
 只跑到绿不算完成。把 bug 放回去（用 monkeypatch，别改源码，更别改正在被生产容器挂载的目录）
-确认用例转红，否则它只是摆设。`test_world_chat_images.py` 的 5 条就是这么定稿的：
+确认用例转红，否则它只是摆设。两批用例都是这么定稿的：
 
 | 放回去的 bug | 结果 |
 |---|---|
 | `image_attachments` 去掉 `or []`（P0 本体） | ✅ 被抓住：`TypeError: 'NoneType' object is not iterable` |
 | `build_content` 忽略图片（静默丢弃） | ✅ 被抓住 |
+| `strip_image_parts` 只剥图片、不改写便签 | ✅ 被抓住 |
 | 不发「本轮附图」便签 | ✅ 被抓住 |
 | 历史图片不降级成 `[图片]` | ✅ 被抓住 |
+| `api_root` 退化成无脑补 /v1 | ✅ 被抓住 |
 
 **第一版是假覆盖**：只跑了首轮，而首轮历史是空的、`None` 根本不会出现——
 P0 只在「上一轮存过不带附件的消息」时才触发。是变异测试把这个漏洞逼出来的。
@@ -127,8 +131,8 @@ flowchart TD
     style Unit fill:#059669,color:#fff
 ```
 
-> 上表是**目标**比例。截至 2026-09-13 的实际构成是 24 条用例（单元 17 / 集成 7），
-> 清单见第一节。
+> 上表是**目标**比例。截至 2026-09-13 的实际构成是 **47 条用例**（单元 40 / 集成 7），
+> 清单见第一节；整体**行**覆盖率 8%，见第九节。
 
 ### 2.2 测试目标
 
@@ -194,6 +198,8 @@ graph TD
 | `app/services/agent/api_probe.py` | 探针判定、错误文案、响应脱敏 | `backend/tests/test_api_probe.py` |
 | `app/utils/pure/url_guard.py` | 内网/公网地址判定（含 DNS 解析绕过） | `backend/tests/test_api_probe.py` |
 | `app/services/agent/base_url_registry.py` | 「已登记私网地址」的允许清单 | `backend/tests/test_api_probe.py` |
+| `app/utils/multimodal.py` | 附件 → 多模态 content、便签与视觉降级 | `backend/tests/test_multimodal.py` |
+| `app/utils/pure/llm_endpoint.py` | 端点拼接（`/vN` 规则）+ 全部预设 | `backend/tests/test_llm_endpoint.py` |
 
 ### 4.2 尚未覆盖（把缺口写出来，别让它不可见）
 
@@ -202,8 +208,6 @@ graph TD
 | `app/ai/decider.py` | 决策逻辑、意愿分计算 | 无用例 |
 | `app/ai/executor.py` | 工具调用循环、上下文压缩 | 无用例 |
 | `app/ai/llm.py` | API Key 解析、消息构建、视觉降级重试 | 无用例 |
-| `app/utils/multimodal.py` | 附件 → 多模态 content（纯函数部分） | 只能由 `test_world_chat_images.py` 间接覆盖 |
-| `app/utils/pure/llm_endpoint.py` | 端点拼接（`/vN` 规则） | 无用例（曾在 9 个 preset 上人工核验） |
 | `app/tools/` | 工具参数校验、执行 | 无用例 |
 | `app/services/memory/` | 记忆检索、遗忘机制、压缩阈值 | 无用例 |
 | `app/services/brain/` | 状态机转换、心跳 | 无用例 |
@@ -446,20 +450,81 @@ flowchart LR
 | 集成测试 | 70% | 50% | API 端点: 100% |
 | 端到端测试 | 核心链路 100% | 核心链路 100% | 所有业务链路 |
 
-### 9.2 现状：未接入
+### 9.2 基线（2026-09-13 实测）
 
-CI 只装 `pytest pytest-asyncio pytest-timeout`，**没有** `pytest-cov`；
-`backend/requirements.txt` 里也没有覆盖率依赖。前端没有测试框架，因此也没有前端覆盖率。
-所以上面那张表是**目标**，不是当前达标情况。
-
-### 9.3 接入方式（目标）
+容器里没装 `coverage`，且 **`pypi.org` 在本机 DNS 解析超时**（见 9.5），所以用一次性容器 + 国内镜像：
 
 ```bash
-pip install pytest-cov
-cd backend && python -m pytest tests/ --cov=app --cov-report=term-missing
+MIRROR=https://pypi.tuna.tsinghua.edu.cn/simple
+docker run -i --rm --network aischat_default --entrypoint sh \
+  -v "$PWD/backend:/app" -w /app aischat-backend <<'INNER'
+pip install -q -i $MIRROR coverage
+coverage run --source=app tests/run_without_pytest.py
+coverage report
+INNER
 ```
 
-接入前请先补 4.2 的缺口——覆盖率数字本身不解决「关键路径没有用例」。
+| 指标 | 值 |
+|------|-----|
+| 总语句 | 27,726 |
+| 未执行 | 25,534 |
+| **行覆盖率** | **8%** |
+| 覆盖率为 0% 的文件 | 267 个里的 **180 个** |
+
+按目录（语句数 = 分母权重，所以"缺测试的总量"看这一列）：
+
+| 目录 | 语句 | 覆盖 |
+|------|------|------|
+| `app/services` | 13,059 | 5.3% |
+| `app/routers` | 6,334 | **0.0%** |
+| `app/ai` | 2,618 | **0.0%** |
+| `app/utils` | 1,250 | 13.4% |
+| `app/chat` | 788 | **0.0%** |
+| `app/schemas` | 669 | **0.0%** |
+| `app/models` | 1,122 | **92.2%** ← 见 9.3 |
+
+### 9.3 `app/models` 的 92% 是假象
+
+模型层"覆盖率"高，只是因为它被 **import 过** —— 类定义与字段声明在导入时就执行了，
+跟"有没有被测"毫无关系。这是「覆盖率衡量**被执行**、不衡量**被验证**」最干净的标本。
+
+同理：**覆盖率量不出代码优不优秀**。低覆盖 ≠ 代码烂（只说明没人守），
+高覆盖也可能是烂代码配一堆没断言的用例。要找"哪里值得改"，得把三个维度交叉看：
+
+| 信号 | 含义 | 动作 |
+|------|------|------|
+| 高复杂度 × 低覆盖 | 最容易出 bug、又完全没人守 | 最优先：补用例或直接重构 |
+| 高改动频率 × 低覆盖 | 一直在改、每次都可能改坏 | 优先补用例 |
+| 低复杂度 × 低覆盖 | 简单代码没测试 | 优先级低，可以一直不管 |
+
+按这个口径，当前最该盯的是（语句数 / 圈复杂度 / 覆盖率）：`app/routers/admin.py`（1614 / 533 / 0%）、
+`app/ai/llm.py`（747 / 304 / 0%）、`app/ai/executor.py`（589 / 186 / 0%）——
+repo 里的 admin 最大但风险最低（管理员专用、输入可信），**最大 ≠ 最急**。
+
+### 9.4 怎么用（已接入 CI）
+
+| 用途 | 形式 | 是否阻断 |
+|------|------|---------|
+| 整体覆盖率 | CI 跑 `--cov-report=term-missing` + `--sort=cover` 出报表 | ❌ **不设阈值** |
+| 增量覆盖率 | `diff-cover coverage.xml --compare-branch=origin/<目标分支>` | ✅ **仅 PR** |
+
+增量当门禁、整体只当报表，是业界通行做法（Codecov/Coveralls 的 patch coverage 同理）：
+增量数字只跟本次改动有关，老代码既拖不了后腿，也不会替它虚高。
+整体覆盖率一旦设阈值，就会奖励写"调用了但没断言"的假用例——比没有覆盖率更糟。
+
+阈值放在 workflow 顶部的 `env.DIFF_COVER_MIN`（初始 80），**太吵就只调这一个数字**。
+注意别因为"整体才 8%"就把增量门槛也降掉：那两件事没关系。
+
+增量门禁只能拦住**新增**的坏味道，拦不住已经烂在那儿的部分——所以 4.2 的缺口仍要单独补。
+
+### 9.5 本机装工具必须用国内镜像
+
+这台 NAS 上 `pypi.org` **解析超时**（`curl: (28) Resolving timed out`），
+`pip download` 直接 30 秒超时。清华/阿里镜像正常（200，0.5 秒级）。
+所以任何 `pip install` 都要显式带 `-i https://pypi.tuna.tsinghua.edu.cn/simple`，
+容器内也一样（容器 DNS 同样解析不了 pypi.org）。
+
+CI 在 GitHub 上跑，不受此限制，不需要镜像。
 
 ---
 
@@ -468,7 +533,9 @@ cd backend && python -m pytest tests/ --cov=app --cov-report=term-missing
 ### 10.1 真实的 workflow
 
 `.github/workflows/test.yml` 就是全部检查（另有 `deploy-demo.yml` 负责 push 到 main 时构建并发布 Pages）。
-为节省篇幅，下面省掉了 `--health-cmd` 等编排细节，但**作业、触发路径、命令都是原样**：
+
+下面是该文件的**逐字节原文**——不是节选、不是示意。文档里的 CI 内容一旦与真实文件不一致，
+就是一张假地图，所以这里宁可直接贴全文：
 
 ```yaml
 name: Tests
@@ -484,6 +551,12 @@ on:
       - 'backend/**'
       - 'frontend/**'
 
+env:
+  # 增量覆盖率门槛（只作用于 pull_request）。基线是 8%，所以这里盯**本次改动的行**，
+  # 不盯整体——整体覆盖率当门禁只会奖励写"调用了但没断言"的用例。
+  # 太吵就调低这一个数字；先跑一段时间再决定要不要收紧。
+  DIFF_COVER_MIN: 80
+
 jobs:
   # 作业 id 与名称保持原样：改名会让 GitHub 上的 required status check 失效
   pytest:
@@ -497,24 +570,49 @@ jobs:
           POSTGRES_DB: ai_group_chat_test
         ports:
           - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U ai_chat"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0        # diff-cover 要与目标分支比对，浅克隆拿不到
+
       - uses: actions/setup-python@v5
         with:
           python-version: '3.11'
           cache: 'pip'
           cache-dependency-path: backend/requirements.txt
+
       - name: Install dependencies
         run: |
           pip install -r backend/requirements.txt
-          pip install pytest pytest-asyncio pytest-timeout
+          pip install pytest pytest-asyncio pytest-timeout pytest-cov diff-cover
+
       - name: Run backend tests
         env:
           TEST_DATABASE_URL: postgresql+asyncpg://ai_chat:test-pass@localhost:5432/ai_group_chat_test
           TEST_DATABASE_URL_SYNC: postgresql://ai_chat:test-pass@localhost:5432/ai_group_chat_test
         run: |
           cd backend
-          python -m pytest tests/ -q
+          python -m pytest tests/ -q --cov=app --cov-report=term-missing --cov-report=xml
+
+      # 只报表不设阈值：整体覆盖率当前约 8%，它的用处是看缺口的**分布与趋势**，
+      # 不是当门禁。注意 app/models 那 92% 是假象——只是被 import 过，不是被测过。
+      - name: 整体覆盖率报表
+        run: |
+          cd backend
+          python -m coverage report --sort=cover | tail -50
+
+      - name: 增量覆盖率门禁（仅 PR）
+        if: github.event_name == 'pull_request'
+        run: |
+          cd backend
+          diff-cover coverage.xml \
+            --compare-branch=origin/${{ github.base_ref }} \
+            --fail-under=${{ env.DIFF_COVER_MIN }}
 
   # 前端此前在 PR 阶段零检查：deploy-demo.yml 只在 push 到 main 时跑，
   # 且跑的是 vite build（不含 tsc），类型错误一路裸奔到部署。
@@ -526,13 +624,16 @@ jobs:
         working-directory: frontend
     steps:
       - uses: actions/checkout@v4
+
       - uses: actions/setup-node@v4
         with:
           node-version: 22
           cache: 'npm'
           cache-dependency-path: frontend/package-lock.json
+
       - name: Install dependencies
         run: npm ci
+
       # 必须走 node_modules 里的 tsc：npx 在缺包时会去装一个同名的假 tsc@2.0.3
       - name: Typecheck
         run: ./node_modules/.bin/tsc --noEmit
@@ -552,6 +653,9 @@ jobs:
 | 前端改动（push main） | 另有 `deploy-demo.yml` 跑 `vite build --mode demo`（**不含 tsc**）并发布 Pages |
 | 文档改动 | 不触发（合理）|
 | 依赖安装 | 均已开缓存：后端 `cache: pip`、前端 `cache: npm` |
+| 克隆深度 | `fetch-depth: 0` —— diff-cover 要与目标分支比对，浅克隆拿不到 |
+| 整体覆盖率报表 | 每次跑（`--sort=cover`），**不阻断** |
+| 增量覆盖率门禁 | 仅 PR 阻断，阈值 = workflow 顶部 `env.DIFF_COVER_MIN` |
 
 ### 10.3 质量门禁现状
 
@@ -559,8 +663,9 @@ jobs:
 |------|------|
 | 后端测试全绿 | ✅ CI 阻断（`pytest tests/ -q` 非零即红）|
 | 前端类型检查 | ✅ CI 阻断（`tsc --noEmit`）——2026-09-13 新增 |
+| 增量覆盖率 | ✅ CI 阻断（仅 PR）——2026-09-13 新增 |
+| 整体覆盖率阈值 | ❌ **故意不设**：当门禁只会奖励写"调用了但没断言"的假用例 |
 | 代码风格（Ruff / ESLint）| ❌ 未接入 CI |
-| 覆盖率阈值 | ❌ 未接入 |
 | 前端测试 / E2E | ❌ 未接入 |
 | 安全扫描 | ❌ 未接入 |
 
