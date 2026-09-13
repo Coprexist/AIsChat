@@ -250,6 +250,32 @@
   "值为空或值本身来自某个预设"；模型下拉候选与当前预设提到组件顶部，
   移除两处 JSX 立即执行函数
 
+### 🧪 测试
+
+#### 群视界发图链路补上端到端冒烟（零 LLM 消耗）
+- 新增 `backend/tests/test_world_chat_images.py`：**真调** `_prepare_world_chat`，
+  走"入参 → ChatItem → 落库 → LLM payload"整条线，守住四件事：无附件消息不能抛（P0 本体）、
+  带图消息最后一条必须是多模态 parts 且真带 `data:` URL、便签数与实际注入数一致、
+  历史图降级成 `[图片]` 且与「你能看图」便签同进同出
+- 为什么需要：2026-09-13 那次 P0 是"纯函数测试全绿、探针测试全绿"的情况下炸的——
+  `image_attachments()` 迭代了契约是 `list | None` 的返回值，
+  于是**只要上一轮存过不带附件的消息**，这一轮必抛 `TypeError`。各部件单测永远看不到这条线
+- **并证明了它会红**：把四个原始 bug 分别 monkeypatch 放回去（不改源码），四条用例全部转红。
+  第一版其实是**假覆盖**——只跑了首轮，而首轮历史为空、`None` 根本不会出现；
+  是变异测试把这个漏洞逼出来的，所以第一轮之后又补了第二轮
+- 新增 `backend/tests/run_without_pytest.py`：后端容器里没有 pytest，
+  此前只能临时糊 heredoc 桩。现在收敛成一个正经入口（只实现 `pytest.fixture` /
+  `pytest.mark`，其余功能请去装 pytest），并带**启动闸**：库名不以 `_test` 结尾直接拒绝启动，
+  因为它会 `drop_all` + `TRUNCATE`——生产库与测试库在同一实例里，只差库名
+- 全套 24 条通过（探针 17 + 发图 5 + 既有 2）
+- 文档：`docs/guides/test_strategy.md` 重写为「只写事实」。原文里的
+  `tests/unit/`、`tests/integration/`、`tests/performance/`、`frontend/e2e/`、
+  `python -m tests.setup_test_data`、`npm run test:e2e`、`npm run test:coverage`
+  以及 Staging/PreProd 环境链**全都不存在**（CI 实际跑的是 `cd backend && python -m pytest tests/`，
+  用例平铺在 `backend/tests/`）。现在目录、命令、依赖、workflow 内容都可原样粘贴执行；
+  尚未落地的能力（前端 E2E、性能压测、覆盖率、风格门禁）逐条标注「目标 / 未落地」，
+  并列出**没有用例的核心模块**缺口表——缺口不可见比缺口本身更危险
+
 ## [v0.4.0] - 2026-08-24
 
 ### 🚀 新功能

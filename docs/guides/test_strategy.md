@@ -2,26 +2,87 @@
 
 > **面向开发者和质量保证人员。** 多层次测试策略、测试规范和质量标准。
 > **For developers and QA.** Multi-level testing strategy, test standards, and quality criteria.
+>
+> 本文档只描述**仓库里真实存在**的东西。尚未落地的能力一律显式标注「目标」/「未落地」，
+> 不写成既有事实——目录结构与命令必须能原样粘贴执行。
 
 ---
 
 ## 目录
 
-1. [测试策略概述](#一测试策略概述)
-2. [测试金字塔](#二测试金字塔)
-3. [单元测试](#三单元测试)
-4. [集成测试](#四集成测试)
-5. [端到端测试](#五端到端测试)
-6. [性能测试](#六性能测试)
-7. [测试环境](#七测试环境)
-8. [测试覆盖率要求](#八测试覆盖率要求)
-9. [CI/CD 集成](#九cicd-集成)
+1. [当前套件与运行方式](#一当前套件与运行方式)
+2. [测试策略概述](#二测试策略概述)
+3. [测试金字塔现状](#三测试金字塔现状)
+4. [单元测试](#四单元测试)
+5. [集成测试](#五集成测试)
+6. [端到端测试](#六端到端测试)
+7. [性能测试](#七性能测试)
+8. [测试环境](#八测试环境)
+9. [测试覆盖率](#九测试覆盖率)
+10. [CI/CD 集成](#十cicd-集成)
 
 ---
 
-## 一、测试策略概述
+## 一、当前套件与运行方式
 
-### 1.1 测试分层模型
+后端用例全部平铺在 `backend/tests/`，**没有子目录**。
+
+| 文件 | 类型 | 用例数 | 覆盖 |
+|------|------|--------|------|
+| `backend/tests/test_api_probe.py` | 单元（零网络） | 17 | 供应商探针判定、错误文案、响应脱敏、内网地址围栏 |
+| `backend/tests/test_world_chat_images.py` | 集成（真库 + 真文件） | 5 | 群视界发图链路：真调 `_prepare_world_chat`，零 LLM 消耗 |
+| `backend/tests/test_agent_resolution.py` | 集成（真库） | 2 | 群成员 `member_id` 解析优先级 |
+
+辅助文件：
+
+- `backend/tests/conftest.py` —— 测试库环境变量与 `migrated_db` fixture
+- `backend/tests/run_without_pytest.py` —— 后端容器里**没装 pytest**，这是最小运行器
+
+### 1.1 两种跑法
+
+CI 与装了 pytest 的机器：
+
+```bash
+cd backend && python -m pytest tests/ -q
+```
+
+后端容器 / 没装 pytest 的机器（走自带运行器）：
+
+```bash
+PROD=$(docker exec ai_group_backend printenv DATABASE_URL)
+TEST=${PROD/\/ai_group_chat/\/ai_group_chat_test}
+docker exec -w /app \
+  -e TEST_DATABASE_URL="$TEST" \
+  -e TEST_DATABASE_URL_SYNC="${TEST/+asyncpg/}" \
+  ai_group_backend python tests/run_without_pytest.py
+```
+
+运行器只实现了 `pytest.fixture` 与 `pytest.mark`。需要参数化、插件、覆盖率就去装 pytest，
+不要往运行器里加功能。
+
+**启动闸**：库名不以 `_test` 结尾直接拒绝启动。运行器会 `drop_all` + `TRUNCATE`，
+而生产库与测试库在同一个 PostgreSQL 实例里、只差库名——这个闸不是形式主义。
+
+### 1.2 写完用例要证明「它会红」
+
+只跑到绿不算完成。把 bug 放回去（用 monkeypatch，别改源码，更别改正在被生产容器挂载的目录）
+确认用例转红，否则它只是摆设。`test_world_chat_images.py` 的 5 条就是这么定稿的：
+
+| 放回去的 bug | 结果 |
+|---|---|
+| `image_attachments` 去掉 `or []`（P0 本体） | ✅ 被抓住：`TypeError: 'NoneType' object is not iterable` |
+| `build_content` 忽略图片（静默丢弃） | ✅ 被抓住 |
+| 不发「本轮附图」便签 | ✅ 被抓住 |
+| 历史图片不降级成 `[图片]` | ✅ 被抓住 |
+
+**第一版是假覆盖**：只跑了首轮，而首轮历史是空的、`None` 根本不会出现——
+P0 只在「上一轮存过不带附件的消息」时才触发。是变异测试把这个漏洞逼出来的。
+
+---
+
+## 二、测试策略概述
+
+### 2.1 测试分层模型
 
 ```mermaid
 flowchart TD
@@ -30,43 +91,46 @@ flowchart TD
         Integration[集成测试<br/>Integration Tests]
         Unit[单元测试<br/>Unit Tests]
     end
-    
+
     subgraph "数量比例"
         E2ERatio[~5%]
         IntegrationRatio[~20%]
         UnitRatio[~75%]
     end
-    
+
     subgraph "执行速度"
         E2ESpeed[慢 (分钟级)]
         IntegrationSpeed[中等 (秒级)]
         UnitSpeed[快 (毫秒级)]
     end
-    
+
     subgraph "维护成本"
         E2ECost[高]
         IntegrationCost[中]
         UnitCost[低]
     end
-    
+
     E2E --> E2ERatio
     Integration --> IntegrationRatio
     Unit --> UnitRatio
-    
+
     E2E --> E2ESpeed
     Integration --> IntegrationSpeed
     Unit --> UnitSpeed
-    
+
     E2E --> E2ECost
     Integration --> IntegrationCost
     Unit --> UnitCost
-    
+
     style E2E fill:#7c3aed,color:#fff
     style Integration fill:#2563eb,color:#fff
     style Unit fill:#059669,color:#fff
 ```
 
-### 1.2 测试目标
+> 上表是**目标**比例。截至 2026-09-13 的实际构成是 24 条用例（单元 17 / 集成 7），
+> 清单见第一节。
+
+### 2.2 测试目标
 
 | 维度 | 目标 | 衡量指标 |
 |------|------|---------|
@@ -77,38 +141,30 @@ flowchart TD
 
 ---
 
-## 二、测试金字塔
+## 三、测试金字塔现状
 
 ```mermaid
 graph TD
-    subgraph "E2E 测试"
-        E2E1[用户注册登录]
-        E2E2[群聊创建与消息]
-        E2E3[AI 对话完整流程]
-        E2E4[文件上传下载]
-        E2E5[支付与额度]
+    subgraph "手工回归（部署后人工执行）"
+        E2E1[注册登录]
+        E2E2[群聊与消息]
+        E2E3[AI 对话与工具调用]
+        E2E4[文件上传与发图]
+        E2E5[群视界世界]
     end
-    
-    subgraph "集成测试"
-        INT1[API 端点测试]
-        INT2[数据库 CRUD]
-        INT3[WebSocket 连接]
-        INT4[AI 决策引擎]
-        INT5[工具执行]
-        INT6[记忆系统]
+
+    subgraph "集成测试（真库 · backend/tests/）"
+        INT1[test_agent_resolution.py]
+        INT2[test_world_chat_images.py]
     end
-    
-    subgraph "单元测试"
-        UNIT1[业务逻辑函数]
-        UNIT2[数据模型验证]
-        UNIT3[工具插件]
-        UNIT4[配置管理]
-        UNIT5[工具函数]
+
+    subgraph "单元测试（零网络 · backend/tests/）"
+        UNIT1[test_api_probe.py]
     end
-    
+
     E2E --> INT
     INT --> UNIT
-    
+
     style E2E1 fill:#7c3aed,color:#fff
     style E2E2 fill:#7c3aed,color:#fff
     style E2E3 fill:#7c3aed,color:#fff
@@ -116,562 +172,358 @@ graph TD
     style E2E5 fill:#7c3aed,color:#fff
     style INT1 fill:#2563eb,color:#fff
     style INT2 fill:#2563eb,color:#fff
-    style INT3 fill:#2563eb,color:#fff
-    style INT4 fill:#2563eb,color:#fff
-    style INT5 fill:#2563eb,color:#fff
-    style INT6 fill:#2563eb,color:#fff
     style UNIT1 fill:#059669,color:#fff
-    style UNIT2 fill:#059669,color:#fff
-    style UNIT3 fill:#059669,color:#fff
-    style UNIT4 fill:#059669,color:#fff
-    style UNIT5 fill:#059669,color:#fff
 ```
+
+三层的分界在本仓库里的具体含义：
+
+| 层 | 判据 | 例 |
+|----|------|----|
+| 单元 | 不连数据库、不出网 | `test_api_probe.py` 用 `httpx.MockTransport` 顶掉真实出网 |
+| 集成 | 连真库，但**不花 LLM 额度** | `test_world_chat_images.py` 真调业务函数，只断言 LLM payload |
+| 端到端 | 真环境、真模型、真浏览器 | 目前**没有自动化**，见第六节 |
 
 ---
 
-## 三、单元测试
+## 四、单元测试
 
-### 3.1 测试范围
+### 4.1 已有覆盖
 
-| 模块 | 测试重点 | 示例文件 |
+| 模块 | 测试重点 | 用例文件 |
 |------|---------|---------|
-| `app/ai/decider.py` | 决策逻辑、意愿分计算 | `tests/ai/test_decider.py` |
-| `app/ai/executor.py` | 工具调用循环、上下文压缩 | `tests/ai/test_executor.py` |
-| `app/ai/llm.py` | API Key 解析、消息构建 | `tests/ai/test_llm.py` |
-| `app/tools/` | 工具参数校验、执行 | `tests/tools/test_weather.py` |
-| `app/services/memory/` | 记忆检索、遗忘机制 | `tests/memory/test_memory.py` |
-| `app/services/brain/` | 状态机转换、心跳 | `tests/brain/test_brain.py` |
-| `app/chat/` | 消息管道、可达性 | `tests/chat/test_chat_api.py` |
+| `app/services/agent/api_probe.py` | 探针判定、错误文案、响应脱敏 | `backend/tests/test_api_probe.py` |
+| `app/utils/pure/url_guard.py` | 内网/公网地址判定（含 DNS 解析绕过） | `backend/tests/test_api_probe.py` |
+| `app/services/agent/base_url_registry.py` | 「已登记私网地址」的允许清单 | `backend/tests/test_api_probe.py` |
 
-### 3.2 单元测试示例
+### 4.2 尚未覆盖（把缺口写出来，别让它不可见）
+
+| 模块 | 应覆盖 | 现状 |
+|------|--------|------|
+| `app/ai/decider.py` | 决策逻辑、意愿分计算 | 无用例 |
+| `app/ai/executor.py` | 工具调用循环、上下文压缩 | 无用例 |
+| `app/ai/llm.py` | API Key 解析、消息构建、视觉降级重试 | 无用例 |
+| `app/utils/multimodal.py` | 附件 → 多模态 content（纯函数部分） | 只能由 `test_world_chat_images.py` 间接覆盖 |
+| `app/utils/pure/llm_endpoint.py` | 端点拼接（`/vN` 规则） | 无用例（曾在 9 个 preset 上人工核验） |
+| `app/tools/` | 工具参数校验、执行 | 无用例 |
+| `app/services/memory/` | 记忆检索、遗忘机制、压缩阈值 | 无用例 |
+| `app/services/brain/` | 状态机转换、心跳 | 无用例 |
+| `app/chat/` | 消息管道、可达性 | 无用例 |
+
+### 4.3 示例：零网络单测
+
+单元用例**不许出网**。需要 HTTP 的地方一律用 `httpx.MockTransport` 顶掉传输层，
+这样「供应商返回 404 但聊天其实是通的」这类真实事故路径才能便宜地复现：
 
 ```python
-# tests/ai/test_decider.py
-import pytest
-from app.ai.decider import decide_action, ActionType
+# backend/tests/test_api_probe.py
+def _client(handler) -> httpx.AsyncClient:
+    return httpx.AsyncClient(transport=httpx.MockTransport(handler))
 
-class TestDecideAction:
-    """测试 AI 决策逻辑"""
-    
-    @pytest.fixture
-    def base_context(self):
-        return {
-            "event_type": "group_message",
-            "agent_id": 1,
-            "group_id": 7,
-            "is_mentioned": False,
-            "is_at_all": False,
-            "idle_seconds": 30,
-        }
-    
-    def test_agent_blocked_should_not_act(self, base_context):
-        """AI 被封禁时不应回复"""
-        context = {**base_context, "agent_state": "blocked"}
-        result = decide_action(context)
-        assert result.should_act is False
-        assert result.reason == "agent blocked"
-    
-    def test_agent_dnd_with_mention_should_act(self, base_context):
-        """DND 状态下被 @应该回复"""
-        context = {**base_context, "agent_state": "dnd", "is_mentioned": True}
-        result = decide_action(context)
-        assert result.should_act is True
-        assert result.action_type == ActionType.REPLY
-    
-    def test_low_willingness_should_skip(self, base_context):
-        """意愿分低时应跳过"""
-        context = {**base_context, "willingness_score": 5}
-        result = decide_action(context)
-        assert result.should_act is False
-    
-    def test_high_willingness_should_reply(self, base_context):
-        """意愿分高时应回复"""
-        context = {**base_context, "willingness_score": 80}
-        result = decide_action(context)
-        assert result.should_act is True
+
+async def test_models_404_falls_back_to_tiny_chat():
+    """/models 不存在 → 真发一次极小 chat；MiMo 这条路径必须判成功"""
+    calls: list[str] = []
+
+    def handler(request):
+        calls.append(request.url.path)
+        if request.url.path.endswith("/models"):
+            return httpx.Response(404, text="<html>404 Not Found</html>")
+        return httpx.Response(200, json={"choices": [{"message": {"content": "hi"}}]})
+
+    async with _client(handler) as c:
+        r = await probe_provider(MIMO, "sk-test", client=c)
+
+    assert r.ok and r.kind == "ok"
+    assert calls == ["/v1/models", "/v1/chat/completions"]
+    assert "mimo-v2.5" in r.message          # 模型名取自预设
 ```
 
-### 3.3 运行单元测试
+### 4.4 运行
 
 ```bash
-# 运行所有单元测试
-cd backend && python -m pytest tests/unit/ -v
+# 装了 pytest
+cd backend && python -m pytest tests/test_api_probe.py -v
 
-# 运行特定模块测试
-python -m pytest tests/unit/ai/test_decider.py -v
-
-# 运行并显示覆盖率
-python -m pytest tests/unit/ --cov=app --cov-report=term-missing
-
-# 生成 HTML 覆盖率报告
-python -m pytest tests/unit/ --cov=app --cov-report=html
+# 容器里没装 pytest（完整命令见 1.1）
+cd /tmp/zfsv3/sata11/15228874271/data/aischat && \
+  docker exec -w /app ai_group_backend python tests/run_without_pytest.py
 ```
 
 ---
 
-## 四、集成测试
+## 五、集成测试
 
-### 4.1 测试范围
+### 5.1 现有用例
 
-| 集成场景 | 涉及模块 | 测试文件 |
-|---------|---------|---------|
-| REST API → 数据库 | 路由层 + ORM | `tests/integration/test_api/` |
-| WebSocket → 消息广播 | WS + ConnectionManager | `tests/integration/test_ws/` |
-| AI 决策 → LLM 调用 | Decider + LLM | `tests/integration/test_ai_flow/` |
-| 工具执行 → 记忆存储 | Executor + Memory | `tests/integration/test_tool_flow/` |
-| 联邦通信 | Federation 模块 | `tests/integration/test_federation/` |
+| 场景 | 涉及模块 | 用例文件 |
+|------|---------|---------|
+| 群成员 ID → Agent 解析 | 群成员表 + Agent 模型 | `backend/tests/test_agent_resolution.py` |
+| 世界对话准备 → LLM payload | 路由入参 + ChatItem + 落库 + `multimodal` | `backend/tests/test_world_chat_images.py` |
 
-### 4.2 API 集成测试示例
+集成用例连**测试库** `ai_group_chat_test`，但**不花 LLM 额度**：跑的是业务函数，不是真的对话。
+`test_world_chat_images.py` 走完 `_prepare_world_chat` 后只断言「送给模型的 messages 长什么样」。
 
-```python
-# tests/integration/test_api/test_auth.py
-import pytest
-from fastapi.testclient import TestClient
-
-class TestAuthAPI:
-    """认证相关 API 集成测试"""
-    
-    def test_register_user_success(self, client: TestClient):
-        """用户注册成功"""
-        response = client.post("/auth/register", json={
-            "username": "testuser",
-            "password": "testpass123",
-            "email": "test@example.com"
-        })
-        assert response.status_code == 201
-        data = response.json()
-        assert "access_token" in data
-        assert data["user"]["username"] == "testuser"
-    
-    def test_register_duplicate_username(self, client: TestClient):
-        """重复用户名注册失败"""
-        # 先注册一个用户
-        client.post("/auth/register", json={
-            "username": "duplicate",
-            "password": "testpass123",
-            "email": "first@example.com"
-        })
-        # 尝试注册相同用户名
-        response = client.post("/auth/register", json={
-            "username": "duplicate",
-            "password": "testpass123",
-            "email": "second@example.com"
-        })
-        assert response.status_code == 400
-    
-    def test_login_success(self, client: TestClient):
-        """登录成功"""
-        response = client.post("/auth/login", json={
-            "username": "testuser",
-            "password": "testpass123"
-        })
-        assert response.status_code == 200
-        assert "access_token" in data
-    
-    def test_login_wrong_password(self, client: TestClient):
-        """错误密码登录失败"""
-        response = client.post("/auth/login", json={
-            "username": "testuser",
-            "password": "wrongpass"
-        })
-        assert response.status_code == 401
-```
-
-### 4.3 集成测试配置
+### 5.2 示例：真调业务函数，只断言 payload
 
 ```python
-# tests/conftest.py
-import pytest
-from httpx import AsyncClient
-from app.main import app
-from app.database import async_session, init_db
+# backend/tests/test_world_chat_images.py
+async def test_image_turn_injects_multimodal_parts_and_note(migrated_db):
+    """带图消息：最后一条 user 是多模态 parts，便签数与**实际注入数**一致。"""
+    async with async_session() as db:
+        world_id, attachment = await _seed_world(db, with_image=True)
+        try:
+            ctx = await _prepare(db, world_id, [
+                ChatItem(text="这是什么？", attachments=(attachment,)),
+            ])
+        finally:
+            _drop_image_file(attachment)
 
-@pytest.fixture
-async def client():
-    """创建测试客户端"""
-    async with AsyncClient(app=app, base_url="http://test") as ac:
-        yield ac
-
-@pytest.fixture
-async def db_session():
-    """创建测试数据库会话"""
-    async with async_session() as session:
-        yield session
-        await session.rollback()
-
-@pytest.fixture
-def auth_headers(client, test_user):
-    """创建认证请求头"""
-    response = client.post("/auth/login", json={
-        "username": test_user.username,
-        "password": "testpass123"
-    })
-    token = response.json()["access_token"]
-    return {"Authorization": f"Bearer {token}"}
+    body = _last_user(ctx["messages"])
+    assert isinstance(body["content"], list), "图片被静默丢弃了：content 本应是 parts 列表"
+    urls = [p["image_url"]["url"] for p in body["content"] if p.get("type") == "image_url"]
+    assert urls[0].startswith("data:image/png;base64,")
 ```
 
-### 4.4 运行集成测试
+### 5.3 conftest.py
 
-```bash
-# 运行所有集成测试
-cd backend && python -m pytest tests/integration/ -v
+集成用例共享 `backend/tests/conftest.py`。它做三件事：把 `DATABASE_URL` 指向测试库、
+提供 `migrated_db` fixture、注册 anyio backend：
 
-# 运行特定 API 测试
-python -m pytest tests/integration/test_api/ -v
+```python
+# backend/tests/conftest.py（节选）
+TEST_DATABASE_URL = os.environ.get(
+    "TEST_DATABASE_URL",
+    "postgresql+asyncpg://ai_chat:<pwd>@localhost:5432/ai_group_chat_test",
+)
+os.environ["DATABASE_URL"] = TEST_DATABASE_URL
+os.environ["DATABASE_URL_SYNC"] = TEST_DATABASE_URL_SYNC
 
-# 指定测试环境
-ENV=test python -m pytest tests/integration/ -v
+
+@pytest.fixture(scope="session")
+async def migrated_db():
+    """用模型 metadata 建全量表（不跑 alembic：历史迁移链无法从空库重建，模型即 schema）"""
+    ...
+    await conn.run_sync(Base.metadata.drop_all)
+    await conn.run_sync(Base.metadata.create_all)
 ```
+
+注意 `migrated_db` 是 **session 级**且会 `drop_all`：用例自己负责播种
+（现有集成用例的做法是开头 `TRUNCATE ... CASCADE`，再插入自己需要的最小数据）。
+
+### 5.4 运行
+
+需要 `TEST_DATABASE_URL` 指向测试库。在容器里用 1.1 的运行器（它会替你推导 URL 并加闸）。
 
 ---
 
-## 五、端到端测试
+## 六、端到端测试
 
-### 5.1 关键业务链路
+### 6.1 现状：没有自动化 E2E
 
-```mermaid
-flowchart LR
-    subgraph "E2E 测试场景"
-        E2E1[用户旅程]
-        E2E2[AI 对话]
-        E2E3[群聊协作]
-        E2E4[文件流程]
-        E2E5[支付流程]
-    end
-    
-    subgraph "用户旅程详情"
-        T1[注册]
-        T2[登录]
-        T3[创建群聊]
-        T4[添加 AI]
-        T5[发送消息]
-        T6[接收回复]
-    end
-    
-    subgraph "AI 对话详情"
-        A1[AI 被 @]
-        A2[AI 思考]
-        A3[AI 回复]
-        A4[AI 使用工具]
-        A5[AI 记忆]
-    end
-    
-    E2E1 --> T1 & T2 & T3 & T4 & T5 & T6
-    E2E2 --> A1 & A2 & A3 & A4 & A5
-```
+仓库里**没有**前端 E2E 套件：没有 Playwright 依赖、没有 `frontend/e2e/` 目录，
+`frontend/package.json` 的 scripts 只有 `dev` / `build` / `build:demo` / `preview`，CI 也没有前端 job。
 
-### 5.2 E2E 测试示例（Playwright）
+因此「端到端」目前 = **部署后人工回归**，按附录清单走一遍。
 
-```typescript
-// frontend/e2e/chat.spec.ts
-import { test, expect } from '@playwright/test';
+`test_world_chat_images.py` 是其中能自动化部分的替代品：它咬得住「接线级」回归
+（payload 形状、便签、降级路径），咬不住 UI 与真实模型行为。
 
-test.describe('聊天功能', () => {
-  test('用户可以发送消息', async ({ page }) => {
-    // 1. 登录
-    await page.goto('/login');
-    await page.fill('input[name="username"]', 'testuser');
-    await page.fill('input[name="password"]', 'testpass');
-    await page.click('button[type="submit"]');
-    
-    // 2. 进入群聊
-    await page.goto('/chat/7');
-    
-    // 3. 发送消息
-    await page.fill('.message-input', '你好，AI！');
-    await page.click('.send-button');
-    
-    // 4. 验证消息显示
-    await expect(page.locator('.message:last-child')).toBeVisible();
-    await expect(page.locator('.message:last-child .content')).toHaveText('你好，AI！');
-  });
-  
-  test('AI 可以回复消息', async ({ page }) => {
-    // ...
-    // 验证 AI 回复
-    await expect(page.locator('.message.ai-message:last-child')).toBeVisible({
-      timeout: 10000
-    });
-  });
-});
-```
+### 6.2 手工回归清单
 
-### 5.3 运行 E2E 测试
+见附录。改动核心链路（聊天管道 / 世界 / 模型解析 / 附件）后按清单走。
 
-```bash
-# 安装 Playwright
-cd frontend && npx playwright install
+### 6.3 若要引入自动化（目标，尚未落地）
 
-# 运行 E2E 测试
-npm run test:e2e
-
-# 带浏览器界面运行
-npx playwright test --headed
-
-# 生成测试报告
-npx playwright show-report
-```
+1. 先补**后端**：真起服务 + 真调一次模型。成本可控，且能验证只有真模型才会暴露的行为
+   （例如模型不承认自己能看图）；
+2. 再补**前端**：登录 → 发消息 → 发图 → 断言气泡与缩略图。
 
 ---
 
-## 六、性能测试
+## 七、性能测试
 
-### 6.1 性能测试矩阵
+### 7.1 现状：未落地
 
-| 测试场景 | 工具 | 指标 | 通过标准 |
-|---------|------|------|---------|
+没有性能测试目录，`backend/requirements.txt` 里没有 locust / k6 之类依赖，也没有压测脚本；
+CI 不跑性能。
+
+### 7.2 目标矩阵
+
+| 测试场景 | 工具（目标） | 指标 | 通过标准 |
+|---------|-------------|------|---------|
 | API 响应时间 | Locust / wrk | P95 响应时间 | < 500ms |
 | WebSocket 并发 | k6 | 同时在线用户 | > 1000 |
-| AI 回复延迟 | 自定义脚本 | 端到端延迟 | < 5s |
+| AI 回复延迟 | 自定义脚本 | 端到端延迟 | < 5s（受模型侧影响，只作趋势观测）|
 | 数据库查询 | pgbench | QPS | > 1000 |
 | 文件上传 | curl / wrk | 上传速度 | > 10MB/s |
 
-### 6.2 API 性能测试示例
+### 7.3 目前怎么测
 
-```python
-# tests/performance/test_api_performance.py
-from locust import HttpUser, task, between
+手工观测，够用为止：
 
-class AIsChatUser(HttpUser):
-    wait_time = between(1, 3)
-    
-    @task(3)
-    def send_message(self):
-        self.client.post("/chat/messages", json={
-            "group_id": 7,
-            "content": "性能测试消息"
-        })
-    
-    @task(1)
-    def get_messages(self):
-        self.client.get("/chat/messages", params={
-            "group_id": 7,
-            "limit": 50
-        })
-
-class AIsChatLoadTest:
-    """加载测试场景"""
-    
-    def test_100_concurrent_users(self):
-        """100 并发用户测试"""
-        # locust -f test_api_performance.py --users 100 --spawn-rate 10
-    
-    def test_1000_concurrent_users(self):
-        """1000 并发用户测试"""
-        # locust -f test_api_performance.py --users 1000 --spawn-rate 50
+```bash
+curl -s -o /dev/null -w "%{http_code} %{time_total}s\n" http://127.0.0.1:5228/health
+docker logs --since 10m ai_group_backend 2>&1 | grep -E "🌐"
 ```
 
-### 6.3 性能基准
-
-```mermaid
-bar-chart
-    title API 响应时间基准 (P95)
-    x-axis [消息发送, 消息查询, AI 回复, 用户登录]
-    y-axis "响应时间 (ms)" 0 --> 1000
-    bar [当前实现] 120, 80, 3500, 200
-    bar [目标] 50, 30, 5000, 100
-```
-
-| 端点 | 当前 P95 | 目标 P95 | 状态 |
-|------|---------|---------|------|
-| POST /chat/messages | 120ms | 50ms | 可接受 |
-| GET /chat/messages | 80ms | 30ms | 可接受 |
-| AI 回复 (端到端) | 3500ms | 5000ms | ✅ 优于目标 |
-| POST /auth/login | 200ms | 100ms | 可接受 |
+**不要**把手工观测到的单次数字当成基准写进文档 —— 没有固定负载的「基准」是误导。
 
 ---
 
-## 七、测试环境
+## 八、测试环境
 
-### 7.1 环境分层
+### 8.1 真实环境链
+
+只有三段，没有 staging / pre-production：
 
 ```mermaid
-flowchart TD
-    subgraph "开发环境"
-        Dev[Developer's Machine]
-    end
-    
-    subgraph "测试环境"
-        Staging[Staging Server]
-    end
-    
-    subgraph "预发布环境"
-        PreProd[Pre-production]
-    end
-    
-    subgraph "生产环境"
-        Prod[Production]
-    end
-    
-    Dev -->|push code| CI[CI Pipeline]
-    CI -->|deploy| Staging
-    Staging -->|E2E 测试通过| PreProd
-    PreProd -->|回归测试通过| Prod
-    
+flowchart LR
+    Dev[开发容器 / 本机] -->|push backend/**| CI[GitHub Actions]
+    CI -->|测试通过| Merge[合并]
+    Merge -->|/usr/local/bin/dsh-web-restart| Prod[生产：NAS 容器]
+
     style Dev fill:#6366f1,color:#fff
-    style Staging fill:#059669,color:#fff
-    style PreProd fill:#f59e0b,color:#fff
+    style CI fill:#f59e0b,color:#fff
     style Prod fill:#dc2626,color:#fff
 ```
 
-### 7.2 环境配置
+### 8.2 数据库
 
-| 环境 | 数据库 | LLM Key | 用途 |
-|------|--------|---------|------|
-| 本地开发 | SQLite / PG Test | Mock | 单元测试 |
-| Staging | 独立 PG | 测试 Key | 集成/E2E 测试 |
-| Pre-production | 独立 PG | 生产 Key (限额) | 回归测试 |
-| Production | 主 PG | 生产 Key | 正式服务 |
+生产库与测试库在**同一个 PostgreSQL 实例**里，只差库名：
 
-### 7.3 测试数据管理
+| 用途 | 库名 | 谁在用 |
+|------|------|--------|
+| 生产 | `ai_group_chat` | `ai_group_backend` 容器（挂载 `./backend:/app`）|
+| 测试 | `ai_group_chat_test` | `conftest.py` 的 `migrated_db` + 集成用例 |
 
-```bash
-# 创建测试数据
-cd backend && python -m tests.setup_test_data
+正因为同实例、只差库名，`run_without_pytest.py` 才必须有那个「库名以 `_test` 结尾」的启动闸。
 
-# 清理测试数据
-python -m tests.cleanup_test_data
+### 8.3 测试数据管理
 
-# 从生产数据脱敏复制
-python -m tests.sync_production_data --sanitize
-```
+没有 `setup_test_data` / 脱敏复制之类的脚本，也不需要：
+
+- schema 由 `migrated_db` 从**模型 metadata** 建全量（`drop_all` + `create_all`）。
+  历史迁移链无法从空库重建，所以**模型即 schema**，测试库不跑 alembic；
+- 数据由每个用例自己播种，开头 `TRUNCATE ... CASCADE` 保证从干净状态开始；
+- 用例造的临时文件（如 `test_world_chat_images.py` 的 1×1 PNG）自己删干净。
 
 ---
 
-## 八、测试覆盖率要求
+## 九、测试覆盖率
 
-### 8.1 覆盖率标准
+### 9.1 目标
 
 | 测试类型 | 目标覆盖率 | 最低覆盖率 | 关键模块 |
 |---------|-----------|-----------|---------|
 | 单元测试 | 80% | 60% | AI 核心: 90%+ |
 | 集成测试 | 70% | 50% | API 端点: 100% |
-| E2E 测试 | 核心链路 100% | 核心链路 100% | 所有业务链路 |
+| 端到端测试 | 核心链路 100% | 核心链路 100% | 所有业务链路 |
 
-### 8.2 关键模块覆盖率
+### 9.2 现状：未接入
 
-```mermaid
-pie title 关键模块覆盖率
-    "AI 决策引擎" : 95
-    "AI 执行引擎" : 90
-    "LLM 调用层" : 85
-    "聊天核心" : 90
-    "记忆系统" : 80
-    "工具系统" : 85
-    "认证系统" : 95
-    "支付系统" : 90
-```
+CI 只装 `pytest pytest-asyncio pytest-timeout`，**没有** `pytest-cov`；
+`backend/requirements.txt` 里也没有覆盖率依赖。前端没有测试框架，因此也没有前端覆盖率。
+所以上面那张表是**目标**，不是当前达标情况。
 
-### 8.3 覆盖率工具
+### 9.3 接入方式（目标）
 
 ```bash
-# 后端覆盖率
-cd backend && pytest --cov=app --cov-report=term-missing
-
-# 前端覆盖率
-cd frontend && npm run test:coverage
-
-# 生成对比报告
-npm run coverage:compare
+pip install pytest-cov
+cd backend && python -m pytest tests/ --cov=app --cov-report=term-missing
 ```
+
+接入前请先补 4.2 的缺口——覆盖率数字本身不解决「关键路径没有用例」。
 
 ---
 
-## 九、CI/CD 集成
+## 十、CI/CD 集成
 
-### 9.1 CI 流水线
+### 10.1 真实的 workflow
 
-```mermaid
-flowchart TD
-    subgraph "CI Pipeline"
-        A[代码提交] --> B[Lint 检查]
-        B --> C[单元测试]
-        C --> D{覆盖率达标?}
-        D -->|是| E[构建镜像]
-        D -->|否| F[❌ 流水线失败]
-        E --> G[推送镜像]
-        G --> H[部署到 Staging]
-        H --> I[集成测试]
-        I --> J{E2E 通过?}
-        J -->|是| K[✅ 合并到主分支]
-        J -->|否| L[❌ 部署回滚]
-    end
-    
-    style A fill:#2563eb,color:#fff
-    style F fill:#dc2626,color:#fff
-    style L fill:#dc2626,color:#fff
-    style K fill:#059669,color:#fff
-```
-
-### 9.2 GitHub Actions 配置
+`.github/workflows/test.yml` 就是全部内容（没有前端 job、没有 E2E job、没有部署 job——
+部署走 `.github/workflows/deploy-demo.yml`）：
 
 ```yaml
-# .github/workflows/test.yml
-name: Test Suite
+name: Backend Tests
 
-on: [push, pull_request]
+on:
+  push:
+    paths:
+      - 'backend/**'
+      - '.github/workflows/test.yml'
+  pull_request:
+    paths:
+      - 'backend/**'
 
 jobs:
-  unit-test:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
-        with:
-          python-version: '3.12'
-      - run: pip install -r backend/requirements.txt
-      - run: cd backend && pytest tests/unit/ --cov=app --cov-fail-under=60
-  
-  integration-test:
-    needs: unit-test
+  pytest:
     runs-on: ubuntu-latest
     services:
       postgres:
-        image: postgres:17
+        image: pgvector/pgvector:pg17
         env:
-          POSTGRES_PASSWORD: test
+          POSTGRES_USER: ai_chat
+          POSTGRES_PASSWORD: test-pass
+          POSTGRES_DB: ai_group_chat_test
         ports:
           - 5432:5432
     steps:
       - uses: actions/checkout@v4
-      - run: cd backend && pytest tests/integration/
-  
-  e2e-test:
-    needs: integration-test
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-python@v5
         with:
-          node-version: '20'
-      - run: cd frontend && npm install
-      - run: npx playwright test
+          python-version: '3.11'
+      - name: Install dependencies
+        run: |
+          pip install -r backend/requirements.txt
+          pip install pytest pytest-asyncio pytest-timeout
+      - name: Run backend tests
+        env:
+          TEST_DATABASE_URL: postgresql+asyncpg://ai_chat:test-pass@localhost:5432/ai_group_chat_test
+          TEST_DATABASE_URL_SYNC: postgresql://ai_chat:test-pass@localhost:5432/ai_group_chat_test
+        run: |
+          cd backend
+          python -m pytest tests/ -q
 ```
 
-### 9.3 质量门禁
+注意 CI 里的库名是 `ai_group_chat_test`、跑的是 `pytest tests/`（**平铺**，不是 `tests/unit/`）。
 
-| 门禁 | 检查项 | 失败处理 |
-|------|--------|---------|
-| 代码风格 | ESLint / Ruff | ❌ 阻止合并 |
-| 单元测试 | 60% 覆盖率 | ❌ 阻止合并 |
-| 集成测试 | 全部通过 | ❌ 阻止合并 |
-| E2E 测试 | 核心链路通过 | ❌ 阻止合并 |
-| 性能基准 | 满足 P95 标准 | ⚠️ 警告通知 |
-| 安全扫描 | 无高危漏洞 | ❌ 阻止合并 |
+### 10.2 触发条件与缺口
+
+| 项 | 现状 |
+|----|------|
+| 触发路径 | 仅 `backend/**` 与 workflow 自身 |
+| 前端改动 | **不触发任何 CI**（前端没有测试）|
+| 文档改动 | 不触发（合理）|
+| 依赖安装 | 每次 `pip install -r`，无缓存 |
+
+### 10.3 质量门禁现状
+
+| 门禁 | 现状 |
+|------|------|
+| 后端测试全绿 | ✅ CI 阻断（`pytest tests/ -q` 非零即红）|
+| 代码风格（Ruff / ESLint）| ❌ 未接入 CI |
+| 覆盖率阈值 | ❌ 未接入 |
+| 前端测试 / E2E | ❌ 未接入 |
+| 安全扫描 | ❌ 未接入 |
 
 ---
 
-## 附录：测试清单模板
+## 附录：手工回归清单
 
 ### 功能测试清单
 
 | # | 功能点 | 测试用例 | 状态 | 备注 |
 |---|--------|---------|------|------|
-| 1 | 用户注册 | 正常注册/重复用户名/密码强度 | ✅/❌ | |
-| 2 | 用户登录 | 正常登录/错误密码/Token 过期 | ✅/❌ | |
-| 3 | 消息发送 | 文本/图片/文件/表情 | ✅/❌ | |
-| 4 | AI 回复 | @AI/主动唤醒/工具调用 | ✅/❌ | |
-| ... | ... | ... | ... | |
+| 1 | 用户注册登录 | 正常注册 / 重复用户名 / 错误密码 | ✅ | 注册当前开放（`registration_enabled`）|
+| 2 | 消息发送 | 文本 / 图片 / 文件 | ✅ | 图片必须**真被模型看见**，不能只看气泡 |
+| 3 | AI 回复 | @AI / 主动唤醒 / 工具调用 | ✅ | |
+| 4 | 群视界发图 | 点选 / 拖拽 / Ctrl+V 三种入法 | ✅ | 蒙版高亮 + 当前区块加深 |
+| 5 | 群视界发图（模型侧）| 换纯文本模型时应如实说「看不到图」，不编造 | ✅ | 降级靠 `strip_image_parts` |
+| 6 | 「新对话」 | 不占轮次、不写旧会话 | ✅ | 走 `POST /worlds/{id}/chat/session/new` |
+| 7 | 供应商连接测试 | 公网 / 已登记私网 / 未登记私网 | ✅ | 未登记私网必须零请求 |
+| 8 | 管理页获取模型 | 填 base_url → 点「获取模型」| ✅ | key 一次性，不保存 |
+| 9 | AI 主动 compact | 消息不足时应回「无需压缩」而非「失败」| ✅ | 空操作不是失败 |
+| 10 | 记忆管理 | 增删改查 | ✅ | |
 
 ### 回归测试清单
 
@@ -682,5 +534,8 @@ jobs:
 | 3 | AI 对话 | v0.1.5 | 2026-08-05 | ✅ |
 | 4 | 记忆管理 | v0.2.0 | 2026-08-08 | ✅ |
 | 5 | 群视界 | v0.3.0 | 2026-08-10 | ✅ |
+| 6 | 群视界发图 + 附件交互 | Unreleased | 2026-09-13 | ✅ |
+| 7 | 内网地址围栏 | Unreleased | 2026-09-13 | ✅ |
 
-> **文档版本**: v1.0.0 | **更新日期**: 2026-08-10
+> **文档版本**: v2.0.0 | **更新日期**: 2026-09-13
+> v2.0.0 起本文档只写事实：目录、命令、依赖均可原样执行。
