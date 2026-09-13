@@ -107,7 +107,7 @@ def _ensure_repo(db_or_repo):
 1. `F:\Zhang\AIsChat\.venv\Scripts\python.exe -m py_compile <改动文件>`（无依赖，纯语法）
 2. grep 确认：`db = _ensure_repo(db)` 数、残留 `db: AsyncSession` 签名、残留 `db.execute`（Mode A 文件应为 0）
 3. 检查调用方：grep 服务名，确认所有调用点兼容（Mode A 必须全改；Mode B 不动）
-4. **勿执行 `pip install`**（用户明确反对）；**勿动 ~/.dsh**
+4. **勿在容器内安装依赖**（2026-09-13 修订：禁止的是容器内 `pip`/`npm` 安装，宿主机与 CI 不受限。原表述为"勿执行 `pip install`"，字面过宽）；**勿动 ~/.dsh**
 
 
 ---

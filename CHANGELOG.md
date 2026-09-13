@@ -252,6 +252,18 @@
 
 ### 📚 文档更新
 
+#### 补齐文档索引，GitHub Actions 升级到当前大版本
+- `docs/SUMMARY.md` 此前有 **17 个文档未被索引**：`docs/dev/` 全部 8 篇、群视界 3 篇设计文档、
+  宣传文章 2 篇、DSH 接入指南、插件协议 v2、魔视界、部署合规建议书。
+  新增「八、开发参考（docs/dev）」与「九、宣传与文章」两节，其余归入既有分类，归档顺延为第十节
+- 两个 workflow 的 action 全部升级：`checkout` v4→v7、`setup-python` v5→v7、`setup-node` v4→v7、
+  `configure-pages` v5→v6、`upload-pages-artifact` v3→v5、`deploy-pages` v4→v5。
+  CI 长期警告这些 action 目标 Node 20、被强制运行在 Node 24 上，属弃用预警
+- `docs/guides/test_strategy.md` 第十节的 workflow 块改为**程序化同步**（脚本从真实文件生成），
+  并校验逐字节一致：手抄一份 workflow 进文档，等于给自己留一张迟早过期的假地图
+- `docs/dev/repository_refactor_progress.md` 第 4 条禁令改为「勿在容器内安装依赖」：
+  原文「勿执行 `pip install`」字面过宽，已注明修订时间与原表述
+
 #### 文档面向国内/国际读者：命令给两套，各能整段复制
 - 上一版只给了「一行官方 + 一行注释掉的国内镜像」，**没兼顾国际读者**：
   国内读者要手动取消注释、容易漏；国际读者容易被镜像干扰。两边都不好整段复制

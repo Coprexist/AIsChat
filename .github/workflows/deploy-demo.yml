@@ -25,13 +25,13 @@ jobs:
         working-directory: frontend
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       - name: Setup Pages
-        uses: actions/configure-pages@v5
+        uses: actions/configure-pages@v6
 
       - name: Setup Node
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v7
         with:
           node-version: 22
           cache: 'npm'
@@ -47,9 +47,9 @@ jobs:
           # __IS_DEMO__ 常量由 vite.config.ts 的 define 注入（基于 BASE_URL 是否存在）
 
       - name: Upload Pages artifact
-        uses: actions/upload-pages-artifact@v3
+        uses: actions/upload-pages-artifact@v5
         with:
           path: frontend/dist
 
       - name: Deploy to Pages
-        uses: actions/deploy-pages@v4
+        uses: actions/deploy-pages@v5
