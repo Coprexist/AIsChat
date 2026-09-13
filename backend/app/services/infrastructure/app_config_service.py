@@ -60,35 +60,35 @@ CONFIG_GROUPS: dict[str, dict] = {
     # ── Embedding 提供方配置（已上线）──
     "embedding": {
         "column": "embedding_config",
-        "label_key": "configGroup.embeddingLabel",
-        "hint_key": "configGroup.embeddingHint",
+        "label_key": "embeddingLabel",
+        "hint_key": "embeddingHint",
         "fields": {
             "embedding_backend": {
                 "type": "select",
-                "label_key": "configGroup.embeddingBackend",
-                "hint_key": "configGroup.embeddingBackendHint",
+                "label_key": "embeddingBackend",
+                "hint_key": "embeddingBackendHint",
                 "options": [
-                    {"value": "disabled", "label_key": "configGroup.backendDisabled"},
-                    {"value": "ollama", "label_key": "configGroup.backendOllama"},
-                    {"value": "api", "label_key": "configGroup.backendApi"},
-                    {"value": "local", "label_key": "configGroup.backendLocal"},
+                    {"value": "disabled", "label_key": "backendDisabled"},
+                    {"value": "ollama", "label_key": "backendOllama"},
+                    {"value": "api", "label_key": "backendApi"},
+                    {"value": "local", "label_key": "backendLocal"},
                 ],
             },
             "embedding_base_url": {
-                "type": "text", "label_key": "configGroup.embeddingBaseUrl",
-                "hint_key": "configGroup.embeddingBaseUrlHint",
+                "type": "text", "label_key": "embeddingBaseUrl",
+                "hint_key": "embeddingBaseUrlHint",
             },
             "embedding_api_key": {
-                "type": "secret", "label_key": "configGroup.embeddingApiKey",
-                "hint_key": "configGroup.embeddingApiKeyHint",
+                "type": "secret", "label_key": "embeddingApiKey",
+                "hint_key": "embeddingApiKeyHint",
             },
             "embedding_model": {
-                "type": "text", "label_key": "configGroup.embeddingModel",
-                "hint_key": "configGroup.embeddingModelHint",
+                "type": "text", "label_key": "embeddingModel",
+                "hint_key": "embeddingModelHint",
             },
             "embedding_dimension": {
-                "type": "number", "label_key": "configGroup.embeddingDimension",
-                "hint_key": "configGroup.embeddingDimensionHint",
+                "type": "number", "label_key": "embeddingDimension",
+                "hint_key": "embeddingDimensionHint",
             },
         },
         "encrypted": ["embedding_api_key"],  # 加密存储的字段（缓存里放明文）
@@ -96,35 +96,35 @@ CONFIG_GROUPS: dict[str, dict] = {
     # ── 运行时参数（第二批：检索调参 + 时区 + 摘要 TTL）──
     "runtime": {
         "column": "runtime_config",
-        "label_key": "configGroup.runtimeLabel",
-        "hint_key": "configGroup.runtimeHint",
+        "label_key": "runtimeLabel",
+        "hint_key": "runtimeHint",
         "fields": {
             "default_top_k": {
-                "type": "number", "label_key": "configGroup.topK",
-                "hint_key": "configGroup.topKHint",
+                "type": "number", "label_key": "topK",
+                "hint_key": "topKHint",
             },
             "vector_weight": {
-                "type": "float", "label_key": "configGroup.vectorWeight",
+                "type": "float", "label_key": "vectorWeight",
                 "step": 0.05, "min": 0, "max": 1,
-                "hint_key": "configGroup.vectorWeightHint",
+                "hint_key": "vectorWeightHint",
             },
             "bm25_weight": {
-                "type": "float", "label_key": "configGroup.bm25Weight",
+                "type": "float", "label_key": "bm25Weight",
                 "step": 0.05, "min": 0, "max": 1,
-                "hint_key": "configGroup.bm25WeightHint",
+                "hint_key": "bm25WeightHint",
             },
             "time_decay_weight": {
-                "type": "float", "label_key": "configGroup.timeDecayWeight",
+                "type": "float", "label_key": "timeDecayWeight",
                 "step": 0.05, "min": 0, "max": 1,
-                "hint_key": "configGroup.timeDecayWeightHint",
+                "hint_key": "timeDecayWeightHint",
             },
             "display_timezone": {
-                "type": "text", "label_key": "configGroup.displayTimezone",
-                "hint_key": "configGroup.displayTimezoneHint",
+                "type": "text", "label_key": "displayTimezone",
+                "hint_key": "displayTimezoneHint",
             },
             "summary_cache_ttl": {
-                "type": "number", "label_key": "configGroup.summaryCacheTtl",
-                "hint_key": "configGroup.summaryCacheTtlHint",
+                "type": "number", "label_key": "summaryCacheTtl",
+                "hint_key": "summaryCacheTtlHint",
             },
         },
         "encrypted": [],

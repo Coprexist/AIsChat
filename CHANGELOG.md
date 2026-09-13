@@ -9,6 +9,18 @@
 
 ### ✨ 新增功能
 
+#### 前端 i18n 静态检查：源码用到的 key，三语必须齐全
+- 新增 `frontend/scripts/check-i18n.mjs`（`npm run i18n:check`，零依赖，纯 Node 标准库）：
+  解析三个字典文件得到 zh/en/ja 的 key 集合，再扫 `src/` 里所有 `t()` / `tr()` 调用
+  ——静态串、模板串（`preset.${key}Name` 这类按正则反查）、以及带命名空间前缀的写法
+  （`tool:tool.running`、`adminConfig:save`）都能核
+- **后端下发的 key 也一起核**：`CONFIG_GROUPS` 的 `label_key`/`hint_key` 是前端
+  静态扫不到的（`t(\`adminConfig:${key}\`)`），脚本直接读 `app_config_service.py`
+  逐个比对，缺一个就红
+- 退出码非 0 即有问题，输出按「三语都缺 / 部分语言缺」分组并给到 文件:行号；
+  `--json` 供其它工具消费
+- 反向验证过：把后端某个 `label_key` 改回带前缀的旧写法，脚本立刻报缺；改回即绿
+
 #### 插件按安装来源分流更新通道（本地 / 插件市场 / 包管理器）
 - 原先的自更新只服务本地 `file:` 安装：分发出去的用户规格不是 `file:`，
   `resolveSourceRoot` 返回 `no-file-spec`，界面**把内部枚举名直接显示给用户看**，
@@ -160,6 +172,23 @@
 - 老数据没有这两列 → 自动退化成原来的样子，不受影响
 
 ### 🐛 修复的 Bug
+
+#### 界面直接显示 i18n 源码串（admin.addProvider / adminConfig:sourceDb …）
+- 现象：设置页、管理页若干位置把 key 原样当文案渲染——用户看到的字面量就是
+  `admin.addProvider`、`adminConfig:sourceDb`。`getTranslation()` 找不到 key 时
+  **原样返回 key**，所以这类问题不报错、不崩溃，只能靠肉眼看界面发现
+- 全量核对（新增的静态检查脚本，见「新增功能」）扫出 **48 个 key 三语都缺**、
+  **62 处只在部分语言缺**（en 缺 41、ja 缺 21）——后者的后果是英文/日文用户看到中文回退
+- 另有一类命名空间错位：`admin_config.ts` 的 key 带 `configGroup.` 前缀，而卡片里
+  写的是 `tr('sourceDb')`（补的是 `adminConfig:`）、后端 `CONFIG_GROUPS` 下发的又是
+  `configGroup.sourceDb`，**同一个 key 三种写法**，16 处裸 key 由此而来。现在统一成
+  「`adminConfig` 分区内裸名」，字典、后端 schema、组件三处一致，删掉重复前缀
+- 补齐 139 行译文（zh 27 / en 66 / ja 46）；`adminConfig` 前缀改名同步落到
+  后端 `app_config_service.py`（**改后需 `docker restart ai_group_backend` 才生效**，
+  后端容器不带 reload）
+- 验证：headless Chrome 真实登录管理员，9 个高发路由 × zh/en/ja 共 27 次页面加载，
+  正文零裸 key、零 JS 异常；配置组卡片三语正例断言（`Embedding 向量配置` /
+  `Embedding Config` / `Embedding ベクトル設定` 及 `界面已修改/Edited in UI/UI で変更済み`）全部命中
 
 #### dsh-aischat：点开含代码块的会话，整个 AIsChat 面板消失
 - 现象：在 DSH 侧 AIsChat 面板点开某个会话，面板整块消失，控制台报

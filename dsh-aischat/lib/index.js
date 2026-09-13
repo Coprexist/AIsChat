@@ -1,11 +1,11 @@
-// src/index.ts
+// dsh-aischat/src/index.ts
 import http from "node:http";
 import z from "@deepseek-ai/schemastery";
 import { createReadStream, existsSync as existsSync2, statSync, mkdirSync as mkdirSync2, readFileSync as readFileSync2, writeFileSync as writeFileSync2, realpathSync, readdirSync, unlinkSync } from "node:fs";
 import { join as join2, normalize, extname, sep } from "node:path";
 import os from "node:os";
 
-// src/plugin-update.ts
+// dsh-aischat/src/plugin-update.ts
 import { spawn } from "node:child_process";
 import { createHash } from "node:crypto";
 import {
@@ -318,7 +318,7 @@ function registerPluginRoutes(register, opts) {
   });
 }
 
-// src/index.ts
+// dsh-aischat/src/index.ts
 var name = "dsh-aischat";
 var inject = ["webServer", "tools", "systemPrompt"];
 var Config = z.object({
