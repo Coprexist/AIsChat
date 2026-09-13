@@ -9,6 +9,22 @@
 
 ### ✨ 新增功能
 
+#### 修 dsh-aischat 打包遗漏 dist，并给自更新加装完整性检测
+- **打包 bug**：`package.json` 的 `files` 只有 `["lib","cordis.patch.yml","README.md"]`，
+  漏了 `dist`。文档教的"手动拷 lib 与 dist 到 profile"一直掩盖着它；这次走正规
+  `dsh plugin add`（pnpm 严格按 `files` 装包），安装副本的 `dist` 被裁掉，
+  `/aischat-ui/` 直接 **404**，DSH 面板里的沉浸式界面全废
+- 由此暴露自更新的一个真实缺陷：**`status` 只比对清单，不看文件是否真的在**——
+  `dist` 已经没了，它仍报 `up-to-date`。现在 `status` 会逐个确认产物存在
+  （只做存在性检查，开销可忽略），缺失即报 `reason: incomplete` 并给出缺失数；
+  内容哈希留给换入阶段（那条路径本来就要读全量文件）
+- 换入时的 `changed` 也改为按磁盘实况判断，而不是比对两份清单——文件被删掉时，
+  清单对比会说"没变化"，从而漏报
+- `build.mjs` 的清单把 `package.json` 一并纳管：它的 `files`/`exports`/`dsh` 字段
+  同样决定插件能否加载
+- `update-test.mjs` 增加第 8 步：删掉安装副本里的 `dist/index.html`，断言必须报
+  `incomplete` 且换入能补回（共 16 条断言）
+
 #### dsh-aischat 插件支持一键自更新与版本漂移提示
 - 设置页的 AIsChat 分区底部新增插件版本行：显示构建身份（摘要前 7 位）与状态，
   检测到不一致时出现 **更新** 按钮；侧边栏底部的 AIsChat 入口在有更新时显示角标

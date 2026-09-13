@@ -85,6 +85,9 @@ async function fetchBackendVersion(backendUrl) {
     return null;
   }
 }
+function missingArtifacts(root, manifest) {
+  return Object.keys(manifest.files).filter((rel) => !existsSync(join(root, rel)));
+}
 function summarize(manifest) {
   return manifest ? { version: manifest.version, id: manifestId(manifest), buildStamp: manifest.buildStamp } : null;
 }
@@ -95,11 +98,22 @@ async function computeStatus(installRoot, backendUrl, explicitSource) {
   const running = await fetchBackendVersion(backendUrl);
   const installed = summarize(installedManifest);
   const available = summarize(availableManifest);
+  const missing = installedManifest ? missingArtifacts(installRoot, installedManifest) : [];
   let state;
-  if (!installed) state = "not-installed";
-  else if (!available) state = "source-unavailable";
-  else if (installed.id !== available.id) state = "update-available";
-  else state = "up-to-date";
+  let reason = null;
+  if (!installed) {
+    state = "not-installed";
+  } else if (missing.length) {
+    state = "update-available";
+    reason = "incomplete";
+  } else if (!available) {
+    state = "source-unavailable";
+  } else if (installed.id !== available.id) {
+    state = "update-available";
+    reason = "behind";
+  } else {
+    state = "up-to-date";
+  }
   const applyMode = installedManifest && availableManifest && installedManifest.files[HOST_ENTRY] !== availableManifest.files[HOST_ENTRY] ? "restart" : "hot";
   const builtAgainst = installedManifest?.backendVersion ?? null;
   return {
@@ -107,6 +121,8 @@ async function computeStatus(installRoot, backendUrl, explicitSource) {
     available,
     source,
     state,
+    reason,
+    missing: missing.length,
     applyMode,
     backend: {
       builtAgainst,
@@ -152,7 +168,7 @@ function applyUpdate(installRoot, sourceRoot) {
         copyFileSync(target, saved);
       }
       if (rel === MANIFEST_REL) continue;
-      if (previous?.files[rel] !== manifest.files[rel]) changed.push(rel);
+      if (!existsSync(target) || sha256File(target) !== manifest.files[rel]) changed.push(rel);
       mkdirSync(dirname(target), { recursive: true });
       renameSync(join(staging, rel), target);
     }

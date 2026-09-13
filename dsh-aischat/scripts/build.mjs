@@ -79,7 +79,8 @@ for (const match of clientBundle.matchAll(/@deepseek-ai\/[a-z0-9-]+/g)) {
 // ── 构建清单：自更新的内容寻址身份 ──────────────────────────────────
 // 记录每个运行时产物的 sha256；对清单取摘要即为本次构建的身份，因此不需要
 // 人工维护版本号。sourcemap 属调试辅助，不进清单，避免注释改动也改变身份。
-const BUNDLES = ['lib/index.js', 'lib/client.js']
+// package.json 一并纳管：它的 files/exports/dsh 字段同样决定插件能否加载。
+const TRACKED = ['package.json', 'lib/index.js', 'lib/client.js']
 
 function listDist(dir) {
   const out = []
@@ -93,7 +94,7 @@ function listDist(dir) {
 
 const distRoot = join(root, 'dist')
 const artifacts = [
-  ...BUNDLES.map((rel) => join(root, rel)),
+  ...TRACKED.map((rel) => join(root, rel)),
   ...(existsSync(distRoot) ? listDist(distRoot) : []),
 ]
 

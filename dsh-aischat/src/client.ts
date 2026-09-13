@@ -138,6 +138,9 @@ function shortId(id) {
 /** 把插件状态翻译成一句人话；失败原因如实展示，不笼统报“不可用”。 */
 function pluginStateText(status) {
   if (!status) return '读取中…'
+  if (status.state === 'update-available' && status.reason === 'incomplete') {
+    return `安装不完整，缺 ${status.missing} 个文件`
+  }
   if (status.state === 'update-available') return `可更新到 ${shortId(status.available && status.available.id)}`
   if (status.state === 'up-to-date') return '已是最新'
   if (status.state === 'source-unavailable') return `未找到更新源（${(status.source && status.source.how) || 'unknown'}）`

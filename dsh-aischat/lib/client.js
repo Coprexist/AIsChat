@@ -88,6 +88,9 @@ function shortId(id) {
 }
 function pluginStateText(status) {
   if (!status) return "\u8BFB\u53D6\u4E2D\u2026";
+  if (status.state === "update-available" && status.reason === "incomplete") {
+    return `\u5B89\u88C5\u4E0D\u5B8C\u6574\uFF0C\u7F3A ${status.missing} \u4E2A\u6587\u4EF6`;
+  }
   if (status.state === "update-available") return `\u53EF\u66F4\u65B0\u5230 ${shortId(status.available && status.available.id)}`;
   if (status.state === "up-to-date") return "\u5DF2\u662F\u6700\u65B0";
   if (status.state === "source-unavailable") return `\u672A\u627E\u5230\u66F4\u65B0\u6E90\uFF08${status.source && status.source.how || "unknown"}\uFF09`;

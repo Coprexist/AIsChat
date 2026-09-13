@@ -127,8 +127,21 @@ export interface PluginStatus {
   available: { version: string; id: string; buildStamp: string } | null
   source: SourceResolution
   state: 'up-to-date' | 'update-available' | 'source-unavailable' | 'not-installed'
+  /** update-available 的原因：构建落后，或安装副本缺文件 */
+  reason: 'behind' | 'incomplete' | null
+  /** 安装清单里缺失的产物数量 */
+  missing: number
   applyMode: ApplyMode
   backend: { builtAgainst: string | null; running: string | null; mismatch: boolean }
+}
+
+/**
+ * 安装完整性：只做存在性检查。清单只记录装了什么，一旦产物被包管理器按
+ * files 字段裁掉，清单仍会声称一切正常——只有真去看文件在不在才发现得了。
+ * 内容哈希开销大，留给 apply 阶段。
+ */
+function missingArtifacts(root: string, manifest: PluginManifest): string[] {
+  return Object.keys(manifest.files).filter((rel) => !existsSync(join(root, rel)))
 }
 
 function summarize(manifest: PluginManifest | null) {
@@ -150,11 +163,23 @@ export async function computeStatus(
   const installed = summarize(installedManifest)
   const available = summarize(availableManifest)
 
+  const missing = installedManifest ? missingArtifacts(installRoot, installedManifest) : []
+
   let state: PluginStatus['state']
-  if (!installed) state = 'not-installed'
-  else if (!available) state = 'source-unavailable'
-  else if (installed.id !== available.id) state = 'update-available'
-  else state = 'up-to-date'
+  let reason: PluginStatus['reason'] = null
+  if (!installed) {
+    state = 'not-installed'
+  } else if (missing.length) {
+    state = 'update-available'
+    reason = 'incomplete'
+  } else if (!available) {
+    state = 'source-unavailable'
+  } else if (installed.id !== available.id) {
+    state = 'update-available'
+    reason = 'behind'
+  } else {
+    state = 'up-to-date'
+  }
 
   const applyMode: ApplyMode =
     installedManifest && availableManifest && installedManifest.files[HOST_ENTRY] !== availableManifest.files[HOST_ENTRY]
@@ -167,6 +192,8 @@ export async function computeStatus(
     available,
     source,
     state,
+    reason,
+    missing: missing.length,
     applyMode,
     backend: {
       builtAgainst,
@@ -229,7 +256,8 @@ export function applyUpdate(installRoot: string, sourceRoot: string): ApplyResul
         copyFileSync(target, saved)
       }
       if (rel === MANIFEST_REL) continue
-      if (previous?.files[rel] !== manifest.files[rel]) changed.push(rel)
+      // 按磁盘实况判断，而不是比两份清单：产物被删掉时清单对比会说“没变化”
+      if (!existsSync(target) || sha256File(target) !== manifest.files[rel]) changed.push(rel)
       mkdirSync(dirname(target), { recursive: true })
       renameSync(join(staging, rel), target)
     }

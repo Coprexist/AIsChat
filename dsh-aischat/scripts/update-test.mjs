@@ -93,6 +93,18 @@ try {
   const rolled = rollback(install)
   assert(rolled.ok, `回滚成功（${rolled.error ?? ''}）`)
   assert(sha(join(install, 'lib/index.js')) === base.files['lib/index.js'], '回滚后 host 产物恢复为上一版')
+
+  // 8. 安装副本缺产物 -> 必须报不完整，而不是拿清单比对说“已是最新”。
+  //    真实事故：pnpm 按 package.json 的 files 字段装包，dist 不在其中被裁掉，
+  //    而 /aischat-plugin/status 当时仍报 up-to-date，界面 404 无人知晓。
+  rmSync(join(install, 'dist/index.html'), { force: true })
+  status = await computeStatus(install, BACKEND, source)
+  assert(
+    status.state === 'update-available' && status.reason === 'incomplete' && status.missing > 0,
+    `缺产物时判为不完整（state=${status.state} reason=${status.reason} missing=${status.missing}）`,
+  )
+  const repaired = applyUpdate(install, source)
+  assert(repaired.ok && repaired.changed.includes('dist/index.html'), '换入把缺失产物补回')
 } finally {
   rmSync(work, { recursive: true, force: true })
 }
