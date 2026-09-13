@@ -26,7 +26,7 @@ class SendGm(ToolPlugin):
 
     async def execute(self, db: AsyncSession, agent_id: int, group_id: int | None,
                       arguments: dict, context: dict) -> dict:
-        from app.chat.message import create_message, message_to_dict
+        from app.chat.gm import send_gm_message, gm_message_to_dict
         from app.models.agent import Agent as AgentModel
 
         # 统一用 user_id 作为 sender_id（v2.0.0 迁移后所有消息 sender_id 均为 users.id）
@@ -37,7 +37,7 @@ class SendGm(ToolPlugin):
         content = arguments["content"]
         reply_to = arguments.get("reply_to")
 
-        message = await create_message(
+        message = await send_gm_message(
             db, group_id=target_group, sender_type="ai",
             sender_id=user_id, content=content, reply_to=reply_to,
         )
@@ -46,7 +46,7 @@ class SendGm(ToolPlugin):
         # WebSocket 广播
         agent_name = context.get("agent_name", f"AI:{agent_id}")
         sender_avatar = getattr(a_obj, 'avatar_url', None) if a_obj else None
-        msg_data = message_to_dict(message, sender_name=agent_name, sender_avatar_url=sender_avatar)
+        msg_data = gm_message_to_dict(message, sender_name=agent_name, sender_avatar_url=sender_avatar)
         manager = context.get("manager")
         if manager:
             await manager.broadcast_to_group(

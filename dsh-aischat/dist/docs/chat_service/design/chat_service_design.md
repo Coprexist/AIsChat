@@ -338,7 +338,9 @@ class ChatEvent:
 | `backend/app/services/federation_service.py` | 联邦协议核心 |
 | `backend/app/services/federation_manager.py` | 联邦状态机 |
 | `backend/app/routers/ws.py` | WebSocket 端点 |
-| `backend/app/routers/chat.py` | ChatApi REST 端点 |
+| `backend/app/routers/gm.py` | 群聊消息 REST 端点（GM） |
+| `backend/app/routers/dm.py` | 私信 REST 端点（DM） |
+| `backend/app/routers/chat.py` | 用户信息 / 好友 REST 端点 |
 | `backend/app/routers/federation_ws.py` | 联邦 WebSocket 端点 |
 | `backend/app/models/group.py` | 群相关 ORM |
 | `backend/app/models/dm.py` | 私信相关 ORM |
@@ -350,14 +352,18 @@ class ChatEvent:
 
 ### 10.1 REST 端点
 
+群聊消息（GM）与私信（DM）接口同形，均带认证、游标分页：
+
 | 方法 | 路径 | 说明 |
 |------|------|------|
-| POST | `/chat/message` | 创建消息 |
-| GET | `/chat/messages` | 获取消息列表 |
-| POST | `/chat/group/dnd` | 设置群 DND |
-| POST | `/chat/group/join` | 加入群 |
-| POST | `/chat/group/leave` | 离开群 |
+| GET | `/gm/{group_id}/messages` | 群聊消息历史（游标分页） |
+| POST | `/gm/{group_id}/messages` | 发送群聊消息 |
+| GET | `/dm/{session_id}/messages` | 私信消息历史（游标分页） |
+| POST | `/dm/{session_id}/messages` | 发送私信 |
+| GET | `/chat/user/{user_id}` | 获取用户信息 |
 | POST | `/chat/friend/request` | 发送好友请求 |
+
+群管理（成员/公告/头像/邀请/离开/DND 等）在 `/groups/*`。
 
 ### 10.2 WebSocket 事件
 

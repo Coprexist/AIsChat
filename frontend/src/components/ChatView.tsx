@@ -462,7 +462,7 @@ export default function ChatView({ conversationType, conversationId }: ChatViewP
       let fetched: Message[]
       if (conversationType === 'group') {
         fetched = await api.get<Message[]>(
-          `/groups/${conversationId}/messages?${queryParams.toString()}`
+          `/gm/${conversationId}/messages?${queryParams.toString()}`
         )
       } else {
         fetched = await api.get<Message[]>(

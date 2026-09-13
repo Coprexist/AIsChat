@@ -16,7 +16,7 @@ from app.utils.auth import decode_access_token
 from app.utils.error_handler import build_ws_error, log_error
 from app.chat.connection import ConnectionManager
 from app.chat import chat_api
-from app.chat.message import create_message, message_to_dict
+from app.chat.gm import send_gm_message, gm_message_to_dict
 from app.chat.delivery import store_pending_message
 
 logger = logging.getLogger(__name__)
@@ -240,7 +240,7 @@ async def websocket_endpoint(ws: WebSocket, token: str = Query(...)):
 
                     async with async_session() as db:
                         try:
-                            message = await create_message(
+                            message = await send_gm_message(
                                 db, group_id=group_id, sender_type=sender_type,
                                 sender_id=user_id, content=content, reply_to=reply_to,
                                 attachments=attachments,
@@ -268,7 +268,7 @@ async def websocket_endpoint(ws: WebSocket, token: str = Query(...)):
                         except Exception as e:
                             logger.error(f"获取头像失败: {e}", exc_info=True)
 
-                        msg_data = message_to_dict(message, sender_name=username, sender_avatar_url=sender_avatar, sender_state=sender_state)
+                        msg_data = gm_message_to_dict(message, sender_name=username, sender_avatar_url=sender_avatar, sender_state=sender_state)
 
                         # 审计日志：用户发送消息（fire-and-forget）
                         asyncio.create_task(_log_message_audit(user_id, "group", group_id, message.id))

@@ -1,6 +1,6 @@
 # AIsChat 文档目录
 
-> **版本**: v3.3.0 | **更新**: 2026-08-17
+> **版本**: v3.4.0 | **更新**: 2026-09-13
 
 ---
 
@@ -24,7 +24,8 @@
 | [故障排查手册.md](./guides/troubleshooting.md) | 管理员/开发者 | 常见问题诊断流程图、错误码速查、一键诊断脚本 |
 | [备份与恢复指南.md](./guides/backup_and_recovery.md) | 管理员 | 3-2-1 备份策略、时点恢复、灾难恢复方案 |
 | [WebSocket 事件文档.md](./guides/ws_events.md) | 前端/集成开发者 | 所有 WS 事件的 payload 格式、时序图、重连策略 |
-| [测试策略文档.md](./guides/test_strategy.md) | 开发者/QA | 测试金字塔、单/集成/E2E 测试规范、CI/CD 集成 |
+| [测试策略文档.md](./guides/test_strategy.md) | 开发者/QA | 当前套件与两种跑法、单/集成测试规范、覆盖率口径与基线、CI/CD；含「写完用例必须证明它会红」与排查踩坑 |
+| [部署合规建议书.md](./deployment-compliance.md) | 管理员/部署者 | 中国境内内容标识 / 拟人化互动服务法规对照与操作建议 |
 
 ### 三、服务模块设计
 
@@ -67,6 +68,7 @@
 | 文档 | 适用人群 | 说明 |
 |------|---------|------|
 | [plugin_system_design.md](./plugin_system/design/plugin_system_design.md) | 开发者 / 管理员 | 目录即插件协议、两级开关（管理员全局 + 用户个人）、皮肤插件、技能插件桥接 |
+| [plugin-protocol-v2.md](./plugin-protocol-v2.md) | 开发者 / 管理员 | 阶段二设计：语言中立的行为插件协议 |
 
 ### 四、子系统专题
 
@@ -74,6 +76,7 @@
 |------|---------|------|
 | [兑换码系统.md](./兑换码系统.md) | 开发者 | 兑换码系统设计与实现 |
 | [文件存储与协作系统.md](./文件存储与协作系统.md) | 开发者 | 文件上传、协作模式、引用追踪、配额管理 |
+| [魔视界.md](./magic-vision.md) | 开发者 | 魔视界 —— CSS 滤镜系统 |
 
 ### 四·五、群视界（Group World）专题
 
@@ -83,7 +86,10 @@
 | [群视界实现文档](./group_world/implementation.md) | 开发者 | 实现现状 + 阶段 2 架构决策与踩坑（ADR 风格） |
 | [群视界阶段 2 规划](./group_world/plan_phase2.md) | 开发者 | 阶段 2 清单（2.1-2.5 已完成）与估算 |
 | [接口文档服务](./group_world/design/api_docs_service.md) | 开发者 / 管理员 | /kb 接口 + docx 导出 + pandoc 安装、路径规则、422 local_kw 坑 |
-| [群视界 API 文档](./group_world/api/world_api_docs.md) | 开发者 / 世界 AI | 9 大分区接口手册（变量/文件/积木/群聊/受控 API…） |
+| [群视界 API 文档](./group_world/api/world_api_docs.md) | 开发者 / 世界 AI | 10 大分区接口手册（变量/文件/积木/群聊/同步限流/受控 API…） |
+| [世界 Skill 机制](./group_world/design/world_skill_design.md) | 开发者 | 文件式 skill/tool 机制（world skill runtime） |
+| [世界决策技能](./group_world/design/world_decision_skill.md) | 开发者 | Decision Skill 与触发模式 |
+| [世界能力注入](./group_world/design/world_agent_capabilities.md) | 开发者 | 群 AI / 世界 AI 的能力边界与路径 |
 
 ### 五、探索与讨论
 
@@ -98,6 +104,7 @@
 |------|---------|------|
 | [CODE_WIKI.md](./CODE_WIKI.md) | 开发者/维护者 | **代码 Wiki**：项目架构、模块职责、关键类与函数、依赖关系、API 端点、数据模型、配置部署 |
 | [LEARNING_ROADMAP.md](./LEARNING_ROADMAP.md) | 新开发者 | **学习路线图**：5 阶段阶梯式学习，每阶段有目标、必读文件、Mermaid 图表、动手实践任务 |
+| [DSH 接入指南.md](./DSH接入指南.md) | 开发者 | 将 AIsChat 接入 DeepSeek Harness（DSH） |
 
 ### 七、项目参考
 
@@ -106,7 +113,27 @@
 | [项目全景报告.md](./reference/项目全景报告.md) | AI 智能体/用户/企业 | 产品白皮书：核心亮点、能力矩阵、架构全景、用户画像 |
 | [项目参考.md](./reference/项目参考.md) | 开发者 | 参考项目架构思路和设计亮点 |
 
-### 八、归档文档
+### 八、开发参考（docs/dev）
+
+| 文档 | 适用人群 | 说明 |
+|------|---------|------|
+| [LLM 端点入口](./dev/llm_endpoint.md) | 开发者 | base_url 版本段拼接规则、供应商连接探针、内网地址策略 |
+| [能力懒加载](./dev/capability_lazy_loading.md) | 开发者 | skills/tools 版本化与增量变更注入 |
+| [Repository 化重构进度](./dev/repository_refactor_progress.md) | 开发者 | 重构进度的唯一权威存档，接续工作前先读 |
+| [重构实施开发文档](./dev/重构实施开发文档.md) | 开发者 | 后端重构实施细节 |
+| [AI↔AI 私信规则与限额](./dev/ai_ai_dm_quota.md) | 开发者 | 私信规则、配额与限额 |
+| [技术规格书](./dev/cpec.md) | 开发者 | AI 群聊社交网络系统技术规格 |
+| [自习室插件开发文档](./dev/STUDY_ROOM_DEVLOG.md) | 开发者 | study-room 插件开发记录 |
+| [开发待办](./dev/TODO.md) | 开发者 | 待办清单 |
+
+### 九、宣传与文章
+
+| 文档 | 适用人群 | 说明 |
+|------|---------|------|
+| [v0.3.1 开源介绍](./promotion/aischat-v0.3.1-article.md) | 所有人 | 项目介绍文章 |
+| [v0.3.6 前端展示要点](./promo/v0.3.6_frontend_showcase.md) | 所有人 | 前端焕新展示要点 |
+
+### 十、归档文档
 
 | 文档 | 归档位置 | 说明 |
 |------|---------|------|
@@ -159,8 +186,16 @@
 - **设计/实现类文档**：使用蛇形命名（snake_case），如 `chat_service_design.md`
 - **其他文档**：使用中文标题，如 `用户手册.md`
 
-### 语言规范
-- 使用中文撰写
+### 语言与面向读者规范
+
+- **同时面向国内与国际读者**：正文以中文为主，但**操作步骤必须让两种读者都能照做**
+- **命令给两套、各自整段可复制**：凡涉及镜像/加速源的地方，给「A. 官方源（国际）」与
+  「B. 国内镜像（中国大陆）」两块**完整**命令。读者按自己网络选一块整段复制；
+  **不要**写成"一行官方 + 一行注释掉的镜像"——那要求读者手动改，国内读者容易漏、国际读者容易误用
+- **镜像只写面向国内的**（清华 `pypi.tuna.tsinghua.edu.cn`、阿里 `mirrors.aliyun.com`、
+  npm `registry.npmmirror.com` 等），不罗列国外镜像
+- **官方写法是默认**：官方 URL / 官方命令原样给出，不转述成二次包装的说法
+- 指南类文档保留中英双语标题与副标题；关键操作段落给英文摘要
 - 术语统一，避免歧义
 - 代码块使用正确的语言标记
 - 图表使用 Mermaid 语法
@@ -180,4 +215,4 @@
 
 ---
 
-*文档版本: v3.2.1 | 最后更新: 2026-08-11*
+*文档版本: v3.4.0 | 最后更新: 2026-09-13*

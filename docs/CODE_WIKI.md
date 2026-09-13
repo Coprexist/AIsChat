@@ -1103,9 +1103,10 @@ validate_tool_call(tool_name, arguments)
 | **Auth** | POST | `/auth/register` | 用户注册 |
 | | POST | `/auth/login` | 登录 |
 | | GET | `/auth/me` | 获取当前用户 |
-| **Chat** | POST | `/chat/message` | 创建消息 |
-| | GET | `/chat/messages` | 获取消息列表 |
-| | POST | `/chat/group/dnd` | 设置群 DND |
+| **GM** | GET | `/gm/{group_id}/messages` | 群聊消息历史（游标分页） |
+| | POST | `/gm/{group_id}/messages` | 发送群聊消息 |
+| **Chat** | GET | `/chat/user/{user_id}` | 获取用户信息 |
+| | POST | `/chat/friend/request` | 发送好友请求 |
 | **Agents** | GET | `/agents` | AI 列表 |
 | | POST | `/agents` | 创建 AI |
 | | GET | `/agents/{id}` | AI 详情 |

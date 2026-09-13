@@ -98,7 +98,7 @@ export default function ForwardFileModal({ file, onClose }: ForwardFileModalProp
         .map((t) => {
           const body = { content: '', attachments: [attachment] }
           return t.type === 'group'
-            ? api.post(`/groups/${t.id}/messages`, body)
+            ? api.post(`/gm/${t.id}/messages`, body)
             : api.post(`/dm/${t.id}/messages`, body)
         }),
     )

@@ -318,10 +318,10 @@ async def _handle_forwarded_message(from_public_id: str, data: dict) -> None:
                 message = await handle_remote_message(db, group_id, msg, source_public_id)
                 await db.commit()
 
-                from app.chat.message import message_to_dict
+                from app.chat.gm import gm_message_to_dict
                 # 先用原始头像 URL 立即广播，头像下载放到后台不阻塞消息
                 original_avatar = msg.get("sender_avatar_url")
-                msg_data = message_to_dict(message, sender_name=msg.get("sender_name", "远程用户"), sender_avatar_url=original_avatar)
+                msg_data = gm_message_to_dict(message, sender_name=msg.get("sender_name", "远程用户"), sender_avatar_url=original_avatar)
                 # 后台异步下载头像（不影响消息即时送达）
                 asyncio.create_task(_download_remote_avatar(
                     msg.get("sender_avatar_url"), msg.get("sender_type", "human"),

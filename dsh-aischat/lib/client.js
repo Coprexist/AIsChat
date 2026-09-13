@@ -84,18 +84,9 @@ async function loadContacts(force = false) {
 async function loadMessages(active) {
   if (!active) return [];
   let list = [];
-  if (active.kind === "group") {
-    const data = await api(`/chat/messages?group_id=${encodeURIComponent(active.id)}&limit=50&offset=0`);
-    list = data && data.messages || [];
-    const members = await api(`/groups/${encodeURIComponent(active.id)}/members`).catch(() => []);
-    if (Array.isArray(members)) {
-      for (const mb of members) {
-        if (mb && mb.id != null && mb.name) store.nameCache[`${mb.type}:${mb.id}`] = mb.name;
-      }
-    }
-  } else {
-    list = await api(`/dm/${encodeURIComponent(active.id)}/messages?limit=50`);
-  }
+  const path = active.kind === "group" ? `/gm/${encodeURIComponent(active.id)}/messages?limit=50` : `/dm/${encodeURIComponent(active.id)}/messages?limit=50`;
+  const fetched = await api(path);
+  list = Array.isArray(fetched) ? fetched : [];
   store.messages = list;
   warmNameCache(list);
   return list;
@@ -274,20 +265,10 @@ async function sendMessage(content) {
     store.ws.send(JSON.stringify(payload));
     return;
   }
-  const query = active.kind === "group" ? `group_id=${encodeURIComponent(active.id)}` : null;
-  const params = new URLSearchParams({
-    sender_type: "user",
-    sender_id: String(store.user ? store.user.id : ""),
-    content
-  });
-  if (query) {
-    await api(`/chat/message?${query}&${params.toString()}`, { method: "POST" });
-  } else {
-    await api(`/dm/${encodeURIComponent(active.id)}/messages`, {
-      method: "POST",
-      json: { content }
-    });
-  }
+  await api(
+    active.kind === "group" ? `/gm/${encodeURIComponent(active.id)}/messages` : `/dm/${encodeURIComponent(active.id)}/messages`,
+    { method: "POST", json: { content } }
+  );
 }
 async function doLogin(loginId, password) {
   const data = await api("/auth/login", {

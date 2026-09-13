@@ -801,7 +801,7 @@ async def build_messages(
         pass
 
     # 2. 获取最近消息（用于记忆检索 + 历史消息）
-    recent_for_query = await chat_api.get_recent_messages(db, group_id, limit=5)
+    recent_for_query = await chat_api.get_gm_messages(db, group_id, limit=5)
     query_parts: list[str] = []
     sender_names: dict[tuple[str, int], str] = {}
     for m in recent_for_query:
@@ -952,7 +952,7 @@ async def build_messages(
     if vector_accelerated:
         try:
             from app.services.memory.vector_pipeline import hybrid_search
-            recent = await chat_api.get_recent_messages(db, group_id, limit=5, after_time=last_read_at)
+            recent = await chat_api.get_gm_messages(db, group_id, limit=5, after_time=last_read_at)
             query_text_v = " ".join([m.content[:100] for m in recent])
             relevant = await hybrid_search(db, group_id, query_text_v, top_k=limit)
             for r in reversed(relevant):
@@ -969,7 +969,7 @@ async def build_messages(
         max_unread = msg_window["max_unread_messages"]
         min_unread = msg_window["min_unread_messages"]
         
-        recent_messages = await chat_api.get_recent_messages(db, group_id, limit=max_unread)
+        recent_messages = await chat_api.get_gm_messages(db, group_id, limit=max_unread)
         
         # 字符数上限：最多加载 40000 字，与条数上限取小
         MAX_CHARS = 40000
@@ -987,7 +987,7 @@ async def build_messages(
         last_user_idx = None
         last_user_orm = None
         for m in reversed(recent_messages):
-            md = await chat_api.message_to_dict(m)
+            md = await chat_api.gm_message_to_dict(m)
             content = m.content or ""
             if max_len > 0 and len(content) > max_len:
                 content = content[:max_len] + '...[展开 id=' + str(m.id) + ']'

@@ -10,7 +10,7 @@
 - [x] **DSH 插件 v1**（`dsh-aischat`）：同源网关（`/aischat-api` HTTP + `/aischat-ws` WS 代理）+ 侧边栏 board + 设置页；已 commit `1f81c12`
 - [x] **消息渲染照搬 DSH 风格**：官方 `MarkdownText`（GFM+KaTeX）、我方气泡 `--dsw-specific-bubble` 右对齐 + 名称靠右、图片附件 blob→objectURL、群聊邀请卡片
 - [x] **401 自动登出**（不再静默"暂无联系人"）
-- [x] **私信读取/发送修复**：改用带认证的 `/dm/{id}/messages`（后端 `/chat/messages` dm 分支硬编码 user_id=0、`/chat/message` 签名缺 dm_session_id——两个后端 bug，前端已绕开）
+- [x] **私信读取/发送修复**：改用带认证的 `/dm/{id}/messages`（后端 `/chat/messages` dm 分支硬编码 user_id=0、`/chat/message` 签名缺 dm_session_id——两个后端 bug，前端已绕开，后端已修复见文末备注）
 - [x] **需求1：对话默认到底**（消息变化自动滚底）
 - [x] **需求2：群视界沉浸式界面**——长线优雅方案：`/aischat-ui` 静态托管（`BASE_URL=/aischat-ui/` 构建 + SPA 回退 + 防穿越）+ iframe 沉浸式覆盖层；群聊头部自动查 `/worlds/by-entity` 显示"沉浸式"按钮；嵌入模式增强（API 基址走 `/aischat-api`、401 通知宿主、`?token=` 注入、router basename 修复 404）
 - [x] **需求3：私信/群聊设置页**（⚙：置顶/免打扰/公告/成员列表）
@@ -96,4 +96,4 @@
 
 ## 📌 备注
 
-- 后端遗留 bug（前端已绕开，供后端修复）：`/chat/messages` 的 dm 分支 `get_dm_messages(db, dm_session_id, 0, ...)` 硬编码 user_id=0 永远无权访问；`/chat/message` 的 ChatApi.create_message 签名缺 `dm_session_id` 参数会 500。
+- 后端遗留 bug 已修复（2026-09-13）：`/chat/messages` 的 dm 分支硬编码 `user_id=0`、`/chat/message` 签名缺 `dm_session_id` —— 两项都随**删除重复入口**一并消失。群消息现在只有一个入口 `GET/POST /gm/{group_id}/messages`，与 `/dm/{session_id}/messages` 同形（带认证、游标分页、返回列表）。插件已改用它，不再需要绕开。

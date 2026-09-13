@@ -34,7 +34,7 @@ class EnterGroup(ToolPlugin):
         reason = arguments.get("reason", "主动查看")
 
         # 验证成员资格（用 _get_member 兼容 agent.id/user_id 两种格式）
-        from app.chat.message import _get_member
+        from app.chat.gm import _get_member
         member = await _get_member(db, target_group, "ai", agent_id)
         if not member:
             return {"error": True, "message": f"你不在群聊 {target_group} 中"}
@@ -73,7 +73,7 @@ class EnterGroup(ToolPlugin):
             "group_name": group_name,
             "unread_count": unread_count,
             "last_message_preview": preview[:100] if preview else "",
-            "message": f"已进入群「{group_name}」，有 {unread_count} 条未读消息。如需查看消息请使用 get_recent_messages(group_id={target_group})",
+            "message": f"已进入群「{group_name}」，有 {unread_count} 条未读消息。如需查看消息请使用 get_gm_messages(group_id={target_group})",
             "stack_depth": len(stack),
         }
 

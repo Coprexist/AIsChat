@@ -34,7 +34,7 @@ class SendFile(ToolPlugin):
     async def execute(self, db: AsyncSession, agent_id: int, group_id: int | None,
                       arguments: dict, context: dict) -> dict:
         from app.models.file import FileMetadata
-        from app.chat.message import create_message as create_group_message, message_to_dict
+        from app.chat.gm import send_gm_message, gm_message_to_dict
         from app.chat.dm import send_dm_message, get_or_create_dm_session
         from app.models.agent import Agent as AgentModel
 
@@ -152,7 +152,7 @@ class SendFile(ToolPlugin):
         else:
             # ── 群聊 ──
             try:
-                message = await create_group_message(
+                message = await send_gm_message(
                     db, group_id=target_group,
                     sender_type="ai", sender_id=agent_user_id,
                     content=caption if caption else "",
@@ -165,7 +165,7 @@ class SendFile(ToolPlugin):
                 return {"error": True, "message": f"发送失败: {str(e)}"}
 
             # 广播
-            msg_data = message_to_dict(message, sender_name=agent_name, sender_avatar_url=sender_avatar)
+            msg_data = gm_message_to_dict(message, sender_name=agent_name, sender_avatar_url=sender_avatar)
             if manager:
                 await manager.broadcast_to_group(target_group, {"type": "message", "data": msg_data})
 

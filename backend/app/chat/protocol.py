@@ -7,27 +7,16 @@ class BaseChatApi(ABC):
     """ChatApi 协议抽象基类 — 聊天世界的统一接口契约"""
 
     @abstractmethod
-    async def create_message(
+    async def send_gm_message(
         self,
         db,
+        group_id: int,
         sender_type: str,
         sender_id: int,
-        group_id: Optional[int] = None,
-        dm_session_id: Optional[str] = None,
-        content: str = "",
+        content: str,
         reply_to: Optional[int] = None,
         attachments: Optional[List[str]] = None,
-    ) -> dict: ...
-
-    @abstractmethod
-    async def list_messages(
-        self,
-        db,
-        group_id: Optional[int] = None,
-        dm_session_id: Optional[str] = None,
-        limit: int = 50,
-        offset: int = 0,
-    ) -> List[dict]: ...
+    ) -> Any: ...
 
     @abstractmethod
     async def set_member_dnd(

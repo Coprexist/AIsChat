@@ -53,8 +53,8 @@ class WorldCommand(ToolPlugin):
         world_id = rows[0].world_id
 
         # 以 AI 身份发群消息 → 群消息钩子（source="user"）→ 世界程序 handle 解析执行
-        from app.chat.message import create_message
-        await create_message(db, group_id, "ai", agent_id, command, source="user")
+        from app.chat.gm import send_gm_message
+        await send_gm_message(db, group_id, "ai", agent_id, command, source="user")
 
         return {
             "success": True,

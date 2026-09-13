@@ -364,6 +364,82 @@ active   → sleeping（休眠：无人在线 + 空闲超时）
 
 ---
 
+### 6.12 消息附件与多模态（2026-09-13 补充）
+
+世界对话的消息单元是 `ChatItem{text, attachments}`（`app/services/world/world_chat_items.py`）。
+HTTP 三种入参（`items` / `messages` / `message`）只在**路由层归一化一次**，进去之后全链路都是 `ChatItem`。
+
+**附件 → LLM 多模态只有一个入口**：`app/utils/multimodal.py`（主站聊天与群视界共用）
+
+| 函数 | 用途 |
+|---|---|
+| `build_content(text, attachments, data_dir)` | 当前消息：有图 → `[{type:text},{type:image_url}]`；无图 → 原样字符串 |
+| `image_placeholder(attachments)` | 历史消息：降级成 `[图片]`，只让模型知道"当时有图" |
+| `strip_image_parts(messages)` | 视觉不支持时剥掉图片，换成"你看不到图"的提示 |
+| `is_vision_unsupported_error(text)` | 从 API 错误文本判断是否"模型不吃图片" |
+
+**三条硬约定**：
+1. 只有 `image/*` 进多模态，其余附件走文本标记；
+2. 无可用图片时 `content` 必须是**纯字符串**——payload 与不带图的历史完全一致，prompt cache 才命中；
+3. 历史一律用占位符，**只有最新一条**携带真实字节（单图上限 4MB，单条最多 1 张）。
+
+**视觉不支持的降级**：纯文本模型收到 `image_url` 多半返回 400。`chat_completion` 捕获后
+剥图重试一次，并注入提示让 AI 如实说自己看不到图（不编造）；结果带 `vision_unsupported=True`
+供上层提示用户。
+
+**前端附件的唯一入口是 `useAttachmentUpload`**（`frontend/src/hooks/useAttachmentUpload.ts`），
+点选、拖拽、上传、待发列表全在里面，`AttachmentChips` 只做展示：
+
+| 返回 | 用途 |
+|---|---|
+| `items / remove / clear` | 待发附件条（`AttachmentChips` 渲染） |
+| `ready` | 已上传完成、可随消息发出的元数据 |
+| `zoneProps(id)` | 拖拽：**每个落点摊一份**（消息列表 / 会话工具条 / 输入区 / 主站同款），`id` 用来判断鼠标此刻在哪块 |
+| `dropState(id)` | 蒙版状态：`{active, strong}`——`active`=正在拖，`strong`=鼠标就在这块（更深 + 显示文字） |
+| `pasteProps` | 粘贴：摊到**输入区容器**上，事件从 textarea 冒泡上来（截图 Ctrl+V 即可） |
+| 选项 `imagesOnly` | 群视界传 `true`：非图片以错误态入列"仅支持图片"（进不了多模态，别让用户白发一轮） |
+
+**三种入附件方式共用同一个 `pick`**：点回形针 / 拖进面板 / Ctrl+V，之后完全一致。
+三个坑都收在 hook 内：
+
+- `dragenter/dragleave` 随子元素冒泡反复触发 → 用深度计数判断"真的离开了"；
+- `dataTransfer.types` 不含 `Files` 的一律忽略 → 拖选文字不会误触蒙版；
+- 粘贴只取 `clipboardData.items` 里 `kind==='file'` 的项，**纯文本粘贴不拦截**（`preventDefault` 只在真有文件时调），
+  否则会把正常输入文字也吃掉。
+
+**落点是整个对话面板**：多处落点共用**同一个** `dragDepth` 计数（同一个 hook 实例），
+在区块之间移动鼠标时计数不会归零，蒙版不会闪；真的移出面板才归零隐藏。
+
+**拖拽反馈是一层半透明蒙版**（`DropMask`，不是描边）：所有落点 `bg-primary-500/[0.07]`，
+`strong` 的那块 `bg-primary-500/20`——落点上下相邻，视觉上整个面板蒙一层、只有当前区块加深。
+文字「拖动到此处上传图片」**只在 strong 的那块**居中显示、**纯文字**（不做按钮样式），
+否则几块会同时冒字。会话工具条只有 20 来像素高，只加深不显示文字，但**必须也接住拖放**——
+漏了它，拖到那条缝上浏览器会直接打开图片。
+
+**蒙版必须挂在"不滚动的容器"上**：群视界与主站的消息列表外面都套了一层 `flex-1 min-h-0 relative`，
+内层才是 `overflow-y-auto` 的滚动容器（`chatListRef` / `containerRef` 仍挂内层——它们要读
+`scrollHeight` / `scrollTop`，挂外层量不到）。若直接把 `absolute inset-0` 的蒙版塞进滚动容器，
+它会跟着内容一起滚走。
+
+回形针不需要单独处理：它是容器的子元素，拖放事件冒泡到容器即命中（`DropHint` 是
+`pointer-events-none`，正好不会因为自己浮出来而打断拖拽）。
+
+### 6.13 会话管理与轮次（2026-09-13 补充）
+
+**会话的增 / 切 / 收藏一律走 API，不占对话轮次**：`POST /chat/session`（切）、
+`POST /chat/session/new`（新建）、`POST /chat/session/pin`（收藏）。
+三者共用 `_session_payload`，返回同一形状（`messages` + `sessions` + `current_session`）。
+
+**`/new` 文本命令保留**，与"新建会话"端点共用 `create_new_session`——只动 `world.config`
+（`current_session` + `sessions` 登记），**一条历史都不碰**。
+
+⚠️ 反例（已修）：让「新对话」按钮发一条 `/new` 聊天消息，会被落库成旧会话里的用户消息、
+并占用一个轮次——AI 忙时按钮等于失效。UI 动作别借道对话链路。
+
+**轮次模型（故意串行）**：每个世界一个 `WorldTurnWorker` + 一个 `asyncio.Queue`，
+**同世界的所有会话共用一个队列、串行执行**；不同世界之间并行。
+理由：一个世界只有一份世界文件与状态，两个会话同时跑会各自调工具改同一份数据 → 竞态。
+
 ## 七、世界标识规范
 
 ### 7.1 规则（原话）
@@ -431,12 +507,28 @@ active   → sleeping（休眠：无人在线 + 空闲超时）
 
 ### 7.7 消息插入 + 工具状态事件 + 流式协议（2026-08-13 产品定）
 
-**普通消息插入工具轮**：AI 工具轮进行中用户发普通消息→不打断循环，在下一轮 LLM 调用前自然注入（drain → 落库 → 拼上下文）；只有命令（/ 开头）等当前轮次结束再执行。前端两段式协议：
+**普通消息插入工具轮**：AI 工具轮进行中用户发普通消息→不打断循环，在下一轮 LLM 调用前自然注入（drain → 落库 → 拼上下文）。前端两段式协议：
 
 ```
-[INSERTED]{"count": N}   ← 信号（不计入历史）：前端按 FIFO 清排队弹窗
+[INSERTED]{"count": N}   ← 信号（不计入历史）：前端清排队弹窗中"走了插入通道"的 N 条
 [INSERT]{"msg_id", "content"}  ← 消息（已落库、记入历史）：前端画用户气泡（真实 id）
 ```
+
+**哪些消息必须等本轮结束，由命令声明决定**（`world_chat_commands._COMMANDS` 是唯一来源，
+经 `GET /worlds/{id}/chat` 的 `commands` 字段下发前端）：
+- `mid_turn=False`（默认）= 等本轮结束再执行；`mid_turn=True` = 允许工具轮进行中直接插入
+- 未注册的斜杠命令保守按"必须等待"处理
+- 新增命令 = 表里加一行 + 写个 handler，执行分发/前端补全/排队分流三处自动一致
+- ⚠️ 清弹窗的依据是「这条当初是否走了插入通道」（同一判定），**不是**弹窗项的显示标签；
+  否则将来把某命令标为 `mid_turn=True` 时，`[INSERTED]` 会清不掉它，被 drain 重复发送
+
+**回执投递的两处保证（2026-09-13 修复）**：
+1. **插入消息的广播代理会重指到当前活跃 turn**（`drain_inserts` 时）。
+   消息可能在 T1 进行中入队（proxy=T1），却在 T1 结束、T2 开始后才被 T2 的首轮前注入取走；
+   若仍转发给已结束的 T1，`TurnBroadcast.broadcast` 会因 `T1.ended` 直接丢弃事件
+   → 前端收不到 `[INSERTED]`/`[INSERT]`，弹窗永远清不掉（只能等轮次结束 `loadChat` 才补上）
+2. **轮次收尾的残留消息补发必须在 `tb.end()` 之前**（`_flush_leftover_inserts`）。
+   `end()` 会置 `ended=True`，之后 broadcast 同样被丢弃——该兜底曾因此长期形同虚设
 
 **工具状态事件**（同 tool_id 多状态，气泡原地更新）：
 
@@ -489,6 +581,51 @@ POST /world/{id}/api/event     # 用户登录鉴权 + 群绑定/成员校验 + �
 - **不产生群消息**：世界程序回复用 publish(SSE) 回页面；只有真正需要别人在群里看到的才用群消息 API
 - 接口文档 06 分区 4.1（世界 AI/页面代码可直接读）；世界 39 改造补丁：main.py handle 支持 page_command（payload.command 复用群命令语法走同一套 dispatch）+ game.js sendCommand 改走事件通道
 - 配套【消息同步纪律】强注入段：非必要消息不同步到群，前端能展示的一律不发群
+
+### 7.12 滚动跟随与输入意图（2026-09-13 修复）
+
+**产品语义（用户原话）**：用户在底部就自动跟随；一旦不在底部就不自动跟随——**即「回到底部」按钮显示的时候**。
+
+#### 跟随与否 = 与按钮同一个真相源
+
+`isAtBottomRef` 同时驱动两件事：**是否自动跟随**、**「回到底部」按钮是否显示**。
+两者必须是同一个判断，不能各算各的。
+
+#### ⚠️ 不能在内容更新后测量位置来判断
+
+跟随 effect 跑在 DOM 提交**之后**，此时内容已撑高、`scrollTop` 还没跟上，
+`scrollHeight - scrollTop - clientHeight` 必然变大 → 把「正在跟随」误判成「用户翻走了」。
+**越差越多，跟随从此永久断掉。** 曾表现为：思考气泡一次性撑高 > 80px 时跟随被中途打断。
+
+同理，原实现只在**消息条数**变化时滚动；而流式内容是**同一条气泡内增长**（条数不变），
+所以流式期间根本不滚——注释写着「流式内容更新瞬时」，代码并未实现。
+
+#### 用户离开底部：用输入意图，不用位置测量
+
+位置是**结果**，输入才是**意图**。用结果反推意图必然出错；输入事件同步触发且零 reflow。
+
+| 输入 | 判定 | 覆盖 |
+|------|------|------|
+| `wheel` | `deltaY < 0` | 鼠标滚轮上翻 / 触控板双指上滑 |
+| `keydown` | `PageUp` / `ArrowUp` / `Home` | 键盘往回翻 |
+| `touchstart`+`touchmove` | 当前 Y > 上次 Y（手指下滑 = 内容上移） | 移动端拖列表 |
+
+命中即把 `isAtBottomRef` 与 `isAtBottom` 一并置 false——**若等 rAF 节流的位置判断，
+中间那一帧若有流式分片到达，跟随会把视图拽回底部；这次回弹又触发 scroll 事件把 ref 置回 true，
+用户将再也滚不上去。**
+
+**刻意不覆盖**：
+- **拖滚动条**：只产生 scroll 事件（无 wheel/touch/keydown），由 `updateScrollState` 的 rAF 兜底，
+  有 1 帧延迟。补它需要比较 `clientWidth`/`offsetWidth` 判断是否点在滚动条上——**又变成测量猜意图**，得不偿失
+- **`End` 键**：语义是「回到最新」，应当**恢复**跟随，由 rAF 里 `atBottom → ref=true` 完成
+- **`Space` / `Shift+Space`**：Space 在聊天页是发送键，纳入会造成误判
+- **我方程序化滚动**：必须不触发断开（否则自杀循环）
+
+#### 一处"看起来一样但正确"的测量
+
+`loadChat` 里同样有 `scrollHeight - scrollTop - clientHeight < 80` 的测量，**那处是对的**：
+它运行在 `setChatMsgs` 之后、React 提交**之前**，量到的是更新前的 DOM（= 用户此刻真实位置）。
+**区别在时机，不要为了"消除不一致"把两者统一。**
 
 ---
 

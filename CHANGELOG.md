@@ -73,6 +73,30 @@
 
 ### 🐛 修复的 Bug
 
+#### 群消息接口统一为 `/gm`，与 `/dm` 对称（顺带修掉两个必然 500 的 bug）
+- 两个 bug 都当场复现过，且比记录里更严重：
+  - `POST /chat/message` **任何请求都 500** —— 路由无条件传 `dm_session_id=`，而 `ChatApi.create_message` 的签名根本没有这个参数。
+    不是"只有私信会 500"，是整个接口全死。插件（dsh-aischat）在 WS 断开时的 HTTP 兜底正是打这个接口
+  - `GET /chat/messages?dm_session_id=1_72` → 500「无权访问此会话」：`list_messages` 把 `user_id` 硬编码为 0，
+    而该会话双方是 {1, 72}，永远无权访问
+- **根因是契约与实现漂移**：`protocol.py` 声明 `create_message(group_id=None, dm_session_id=None)`，实现却把 `group_id`
+  变成必填位置参数、丢掉 `dm_session_id`；路由是照契约写的，于是必然 500
+- 群消息此前有**三个入口**（`/chat/message`、`/chat/messages`、`/groups/{id}/messages`）。前两个无认证、返回 `{messages: []}`、
+  也不解析发送者名字；现在**只剩一个**：`GET/POST /gm/{group_id}/messages`
+- 新端点与 `GET/POST /dm/{session_id}/messages` 同形：带认证、游标分页、返回列表、`ValueError`→400、服务端补齐 `sender_name`。
+  命名沿用 `docs/guides/用户手册.md` 已定的「GM = Group Message / DM = Direct Message」约定——前端页面路由
+  `/chat/gm/:id` ↔ `/chat/dm/:id` 早就对称，这次补齐的是后端 API
+- **代码侧一并改名对齐**：`app/chat/message.py` → `app/chat/gm.py`；`create_message` → `send_gm_message`、
+  `get_recent_messages` → `get_gm_messages`、`message_to_dict` → `gm_message_to_dict`，对齐
+  `send_dm_message` / `get_dm_messages` / `_dm_message_to_dict`；`ChatApi` 与 `protocol.py` 同步收敛（删掉 `list_messages`）
+- `app/chat/` 包与 `chat_api` **不改名**——它们同时涵盖 GM 与 DM，不属群聊专属语义
+- 顺带删掉 `/chat/group/*` 五个群聊路由（`dnd` / `{id}` / `members` / `join` / `leave`）：与 `/groups/*` 完全重复，
+  其中 `join` / `leave` / `dnd` **完全没有鉴权**（任何人都能把任意成员塞进任意群），`dnd` 还硬编码 `member_id=0`
+- 插件与前端改调新端点；插件不再自报 `sender_type` / `sender_id`（改由服务端从 token 解出）——
+  群聊发送的 HTTP 兜底路径这才第一次真正可用
+- 新增 `backend/tests/test_gm_dm_symmetry.py` 锁住对称约定：断言两端点同时提供 GET/POST，且已删入口不得回归
+  （用两条变异分别验证过会红，不是摆设）
+
 #### 小米 MiMo 绑定 API Key 必失败（连接测试少了个 /v1）
 - 现象：绑定 Xiaomi MiMo（按量付费 / Token Plan 两个 preset）时"连接失败"，其他供应商却正常
 - **实测取证**（用无效 key 探测：401/400=路径存在，404=路径不存在）：

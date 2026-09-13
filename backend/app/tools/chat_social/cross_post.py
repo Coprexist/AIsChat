@@ -78,17 +78,17 @@ class CrossPost(ToolPlugin):
 
         try:
             if target_type == "group":
-                from app.chat.message import create_message, message_to_dict, is_member_of_group
+                from app.chat.gm import send_gm_message, gm_message_to_dict, is_member_of_group
                 if not await is_member_of_group(db, agent_id, "ai", target_id):
                     return {"error": True, "message": f"你不是群 {target_id} 的成员，无法发消息"}
-                message = await create_message(
+                message = await send_gm_message(
                     db, group_id=target_id, sender_type="ai",
                     sender_id=agent.user_id, content=full_content,
                 )
                 await db.flush()
                 manager = context.get("manager")
                 if manager:
-                    msg_data = message_to_dict(message, sender_name=agent.name, sender_avatar_url=agent.avatar_url)
+                    msg_data = gm_message_to_dict(message, sender_name=agent.name, sender_avatar_url=agent.avatar_url)
                     await manager.broadcast_to_group(
                         target_id, {"type": "message", "data": msg_data},
                     )

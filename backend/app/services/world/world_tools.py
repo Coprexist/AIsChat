@@ -767,11 +767,11 @@ async def _do_execute(world_repo: WorldRepository, world, name: str, arguments: 
     from app.services.world.world_file_service import delete_file, list_files, write_file
 
     # ── 群聊 API 工具（以世界创建者身份执行，权限按群聊角色体系：owner/admin/member）──
-    from app.chat.message import (
+    from app.chat.gm import (
         get_group as _get_group,
         get_group_members as _get_group_members,
-        get_recent_messages as _get_recent_messages,
-        create_message as _create_message,
+        get_gm_messages as _get_gm_messages,
+        send_gm_message as _send_gm_message,
         change_member_role as _change_member_role,
         remove_member as _remove_member,
     )
@@ -834,7 +834,7 @@ async def _do_execute(world_repo: WorldRepository, world, name: str, arguments: 
                 return {"success": False, "error": "本世界未绑定任何群聊"}
             gid = gids[0]
             limit = max(1, min(int(args.get("limit") or 20), 50))
-            msgs = await _get_recent_messages(world_repo.session, gid, limit)
+            msgs = await get_gm_messages(world_repo.session, gid, limit)
             from app.models.user import User
             from app.models.agent import Agent
             all_ids = {m.sender_id for m in msgs}
@@ -898,7 +898,7 @@ async def _do_execute(world_repo: WorldRepository, world, name: str, arguments: 
             content = str(args.get("content") or "").strip()
             if not content:
                 return {"success": False, "error": "消息内容不能为空"}
-            msg = await _create_message(world_repo.session, gid, "human", world.owner_id, content, source="world", allow_non_member=True)
+            msg = await send_gm_message(world_repo.session, gid, "human", world.owner_id, content, source="world", allow_non_member=True)
             try:
                 from app.routers.ws import manager
                 await manager.broadcast_to_group(gid, {"type": "message", "data": {"id": msg.id, "content": content}})

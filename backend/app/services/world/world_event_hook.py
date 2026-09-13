@@ -6,7 +6,7 @@
   处理不处理由世界程序自己决定（平台只喂，不干预）。
 - 节流合并：同世界一个窗口（默认 2 秒，worlds.config.group_trigger_interval 可配；
   0 = 每条触发）内的消息合并成一条 event.messages，避免群消息爆发把沙箱跑死。
-- 防死循环：世界程序自己发的消息（create_message source="world"）不触发。
+- 防死循环：世界程序自己发的消息（send_gm_message source="world"）不触发。
 - 触发不影响世界 status：沉睡世界也能感知；唤醒仍保持手动（AUTO_MANAGE=False）。
 
 event 结构（世界代码在 handle(event) 里收到）：
@@ -50,7 +50,7 @@ _pending: dict[int, _Pending] = {}
 
 
 async def notify_group_message(db, group_id: int, message, source: str) -> None:
-    """群消息钩子（create_message 落库后调用）。
+    """群消息钩子（send_gm_message 落库后调用）。
 
     - source="world"（世界程序自己发的消息）不触发，防死循环
     - 查绑定该群的世界 → 消息入队节流窗口（异步触发，不阻塞消息发送）

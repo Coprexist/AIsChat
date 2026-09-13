@@ -483,9 +483,9 @@ async def _trigger_group_assistant(
                 )
                 if dec.get("hit") and dec.get("handled"):
                     if dec.get("reply"):
-                        from app.chat.message import create_message as _cm
+                        from app.chat.gm import send_gm_message
                         from app.routers.ws import manager
-                        msg = await _cm(db, group_id, "ai", -ga.id, dec["reply"],
+                        msg = await send_gm_message(db, group_id, "ai", -ga.id, dec["reply"],
                                         source="world", allow_non_member=True)
                         await db.flush()
                         try:
@@ -502,8 +502,8 @@ async def _trigger_group_assistant(
                 return
 
             # 构建消息：system_prompt + 最近群消息
-            from app.chat.message import get_recent_messages
-            history = await get_recent_messages(db, group_id, limit=20)
+            from app.chat.gm import get_gm_messages
+            history = await get_gm_messages(db, group_id, limit=20)
             messages: list[dict] = [{"role": "system", "content": ga.system_prompt or f"你是群助手「{ga.name}」，服务本群。"}]
             for m in reversed(history):  # 正序
                 if not m.content:
@@ -564,9 +564,9 @@ async def _trigger_group_assistant(
                 return
 
             # 发群消息（sender_id 用负值避免与 user_id 冲突；source=world 防触发世界程序循环）
-            from app.chat.message import create_message as _cm
+            from app.chat.gm import send_gm_message
             from app.routers.ws import manager
-            msg = await _cm(db, group_id, "ai", -ga.id, reply, source="world", allow_non_member=True)
+            msg = await send_gm_message(db, group_id, "ai", -ga.id, reply, source="world", allow_non_member=True)
             await db.flush()
             try:
                 await manager.broadcast_to_group(group_id, {"type": "message", "data": {"id": msg.id, "content": reply}})
@@ -677,9 +677,9 @@ async def _maybe_trigger_ai_reply(
             if dec.get("hit") and dec.get("handled"):
                 if dec.get("reply"):
                     try:
-                        from app.chat.message import create_message as _cm
+                        from app.chat.gm import send_gm_message
                         from app.routers.ws import manager
-                        msg = await _cm(db, group_id, "ai", agent.user_id or 0, dec["reply"])
+                        msg = await send_gm_message(db, group_id, "ai", agent.user_id or 0, dec["reply"])
                         await db.flush()
                         await manager.broadcast_to_group(group_id, {"type": "message", "data": {"id": msg.id, "content": dec["reply"]}})
                     except Exception:

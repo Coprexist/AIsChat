@@ -752,9 +752,9 @@ class FederationManager:
                 message = await handle_remote_message(db, gid, msg, source_public_id)
                 await db.commit()
 
-                from app.chat.message import message_to_dict
+                from app.chat.gm import gm_message_to_dict
                 original_avatar = msg.get("sender_avatar_url")
-                msg_data = message_to_dict(message, sender_name=msg.get("sender_name", "Remote User"), sender_avatar_url=original_avatar)
+                msg_data = gm_message_to_dict(message, sender_name=msg.get("sender_name", "Remote User"), sender_avatar_url=original_avatar)
 
                 # 后台异步下载头像
                 if original_avatar and peer:

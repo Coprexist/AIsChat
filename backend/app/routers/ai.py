@@ -55,7 +55,7 @@ async def trigger_ai_chat(
 
     try:
         # 1. 创建消息（走统一消息管道）
-        message = await chat_api.create_message(
+        message = await chat_api.send_gm_message(
             db,
             sender_type=req.sender_type,
             sender_id=sender_id,

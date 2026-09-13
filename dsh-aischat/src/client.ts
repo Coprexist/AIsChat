@@ -131,22 +131,13 @@ async function loadContacts(force = false) {
 async function loadMessages(active) {
   if (!active) return []
   let list = []
-  if (active.kind === 'group') {
-    const data = await api(`/chat/messages?group_id=${encodeURIComponent(active.id)}&limit=50&offset=0`)
-    list = (data && data.messages) || []
-    // 群聊成员名字：成员接口返回 {type: 'ai'|'human', id, name}——AI 发送者
-    // 在 /chat/user/{id} 查不到，必须用成员表（按 "type:id" 缓存）。
-    const members = await api(`/groups/${encodeURIComponent(active.id)}/members`).catch(() => [])
-    if (Array.isArray(members)) {
-      for (const mb of members) {
-        if (mb && mb.id != null && mb.name) store.nameCache[`${mb.type}:${mb.id}`] = mb.name
-      }
-    }
-  } else {
-    // DM 专用接口：带认证的游标分页（/chat/messages 的 dm 分支会把
-    // user_id 硬编码为 0，永远无权访问，不能用于私信）
-    list = await api(`/dm/${encodeURIComponent(active.id)}/messages?limit=50`)
-  }
+  // 群聊与私信同形：GET /gm/{group_id}/messages ↔ GET /dm/{session_id}/messages。
+  // 两端都带认证、游标分页，且由服务端补齐 sender_name。
+  const path = active.kind === 'group'
+    ? `/gm/${encodeURIComponent(active.id)}/messages?limit=50`
+    : `/dm/${encodeURIComponent(active.id)}/messages?limit=50`
+  const fetched = await api(path)
+  list = Array.isArray(fetched) ? fetched : []
   store.messages = list
   warmNameCache(list)
   return list
@@ -368,23 +359,14 @@ async function sendMessage(content) {
     store.ws.send(JSON.stringify(payload))
     return
   }
-  const query = active.kind === 'group'
-    ? `group_id=${encodeURIComponent(active.id)}`
-    : null
-  const params = new URLSearchParams({
-    sender_type: 'user',
-    sender_id: String(store.user ? store.user.id : ''),
-    content,
-  })
-  if (query) {
-    await api(`/chat/message?${query}&${params.toString()}`, { method: 'POST' })
-  } else {
-    // DM 专用接口（/chat/message 的签名没有 dm_session_id 参数，会 500）
-    await api(`/dm/${encodeURIComponent(active.id)}/messages`, {
-      method: 'POST',
-      json: { content },
-    })
-  }
+  // 群聊与私信同形：POST /gm/{group_id}/messages ↔ POST /dm/{session_id}/messages。
+  // 发送者身份由服务端从 token 解出，客户端不再自报 sender_type/sender_id。
+  await api(
+    active.kind === 'group'
+      ? `/gm/${encodeURIComponent(active.id)}/messages`
+      : `/dm/${encodeURIComponent(active.id)}/messages`,
+    { method: 'POST', json: { content } },
+  )
 }
 
 async function doLogin(loginId, password) {

@@ -32,7 +32,7 @@ class MuteGroup(ToolPlugin):
 
     async def execute(self, db: AsyncSession, agent_id: int, group_id: int | None,
                       arguments: dict, context: dict) -> dict:
-        from app.chat.message import _get_member
+        from app.chat.gm import _get_member
         from app.models.agent import Agent as AgentModel
         from sqlalchemy import select
 

@@ -3,7 +3,7 @@
 
 对外接口：ChatApi（AI 模块通过此接口操作聊天世界）
 内部模块：
-  - message.py:    群消息创建/投递/广播
+  - gm.py:         群消息创建/投递/广播
   - dm.py:         私信创建/投递
   - connection.py:  WebSocket 连接管理（ConnectionManager）
   - delivery.py:   消息可达性管理（DND/mute/pending）
@@ -15,15 +15,15 @@ from datetime import datetime
 
 from app.services.connection_manager import ConnectionManager, connection_manager
 from app.chat.protocol import BaseChatApi
-from app.chat.message import (
+from app.chat.gm import (
     create_group,
     get_group,
     list_user_groups,
     add_member,
     get_group_members,
-    create_message,
-    get_recent_messages,
-    message_to_dict,
+    send_gm_message,
+    get_gm_messages,
+    gm_message_to_dict,
     is_member_of_group,
     remove_member,
     leave_group,
@@ -68,22 +68,22 @@ class ChatApi(BaseChatApi):
 
     # ── 群聊 ──
 
-    async def create_message(self, db, group_id, sender_type, sender_id, content,
+    async def send_gm_message(self, db, group_id, sender_type, sender_id, content,
                               reply_to=None, attachments=None):
-        return await create_message(db, group_id, sender_type, sender_id, content,
+        return await send_gm_message(db, group_id, sender_type, sender_id, content,
                                      reply_to=reply_to, attachments=attachments)
 
-    async def get_recent_messages(self, db, group_id, limit=20,
-                                   before_id=None, after_id=None, after_time=None):
-        return await get_recent_messages(db, group_id, limit=limit,
-                                          before_id=before_id, after_id=after_id,
-                                          after_time=after_time)
+    async def get_gm_messages(self, db, group_id, limit=20,
+                              before_id=None, after_id=None, after_time=None):
+        return await get_gm_messages(db, group_id, limit=limit,
+                                     before_id=before_id, after_id=after_id,
+                                     after_time=after_time)
 
-    async def message_to_dict(self, message, sender_name=None,
-                               sender_avatar_url=None, sender_state=None):
-        return message_to_dict(message, sender_name=sender_name,
-                                sender_avatar_url=sender_avatar_url,
-                                sender_state=sender_state)
+    async def gm_message_to_dict(self, message, sender_name=None,
+                                 sender_avatar_url=None, sender_state=None):
+        return gm_message_to_dict(message, sender_name=sender_name,
+                                  sender_avatar_url=sender_avatar_url,
+                                  sender_state=sender_state)
 
     async def is_member_of_group(self, db, member_id, member_type, group_id):
         return await is_member_of_group(db, member_id, member_type, group_id)
@@ -200,22 +200,6 @@ class ChatApi(BaseChatApi):
         return await update_last_read(db, group_id, member_type, member_id)
 
     # ── 缺失接口补充 ──
-
-    async def list_messages(
-        self,
-        db,
-        group_id: Optional[int] = None,
-        dm_session_id: Optional[str] = None,
-        limit: int = 50,
-        offset: int = 0,
-    ) -> List[dict]:
-        if group_id is not None:
-            messages = await get_recent_messages(db, group_id, limit=limit)
-            return [await self.message_to_dict(m) for m in messages]
-        elif dm_session_id is not None:
-            messages = await get_dm_messages(db, dm_session_id, 0, limit=limit)
-            return [await self.message_to_dict(m) for m in messages]
-        return []
 
     async def set_member_dnd(
         self,

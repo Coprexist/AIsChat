@@ -130,7 +130,7 @@ async def _handle_call(db, world, permissions: set[str], req: dict) -> dict:
         if op == "group.send":
             if "group:send" not in permissions:
                 raise PermissionError("未声明权限 group:send")
-            from app.chat.message import create_message, get_group
+            from app.chat.gm import send_gm_message, get_group
             from app.models.world import WorldBinding
             from sqlalchemy import select
             rows = (await db.execute(
@@ -142,7 +142,7 @@ async def _handle_call(db, world, permissions: set[str], req: dict) -> dict:
             group = await get_group(db.session, gid)
             if not group:
                 return {"ok": False, "error": "绑定群不存在"}
-            msg = await create_message(db.session, gid, world.owner_id, str(req.get("content", "")),
+            msg = await send_gm_message(db.session, gid, world.owner_id, str(req.get("content", "")),
                                        sender_type="user", sender_id=str(world.owner_id))
             return {"ok": True, "data": {"success": True, "message_id": getattr(msg, "id", None)}}
 

@@ -95,6 +95,12 @@ GET /worlds/{id}/chat/stream?turn_id= ──订阅直播（30s 心跳；断开�
 - **前缀稳定**：静态 system（档案+提示词+工具约定）→ 摘要 → 历史 → 用户消息；动态信息（懒通知/压缩提示/当前时间）全部放**末尾独立 system 消息**（与主对话同规则，不破坏 prefix cache）
 - **当前时间**：`## 当前时间` 尾部注入（display_timezone，v4 思考默认开是正常行为）
 - **compact**：接近上限（128K 的 60%）提示 AI 调 `compact_context` → 摘要存库 → 下次只发「摘要+最近 10 条」；一次压缩一次 miss，之后稳定命中
+  - 触发提示的门槛 `WORLD_CONTEXT_MIN_MESSAGES` 必须**高于**保留窗口 `WORLD_CHAT_KEEP_LAST`：
+    真实消息数 ≤ 保留窗口时压缩是空操作，门槛低于窗口就会"提示 AI 去压、压了却无可压缩"（旧值 6 < 10 踩过）
+  - 工具的"可压缩性"按**过滤后的真实条数**判断（tool/note 不进 LLM 上下文，也不是可压内容）；
+    空操作如实回「无需压缩」，**不算执行失败**——它读的是已落库的历史，与"本轮是否结束"无关
+  - 注意世界每次只带最近 `CHAT_HISTORY_LIMIT = 30` 条，token 提示阈值（128K 的 60%）几乎不会触发，
+    world AI 多半是**自己想起来**调 compact 的；此时上面的门槛检查就是唯一的护栏
 - **请求日志**：每次发往 DeepSeek 的完整请求落盘 `data/world_llm_requests/{world_id}.jsonl`（每世界最近 10 条，含 turn_id/round 标记），排查问题直接看模型收到了什么
 
 ---

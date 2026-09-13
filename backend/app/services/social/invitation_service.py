@@ -207,7 +207,7 @@ async def accept_invitation(
     Returns:
         dict with the updated invitation info
     """
-    from app.chat.message import add_member
+    from app.chat.gm import add_member
 
     invitation = await invitation_repo.get(GroupInvitation, invitation_id)
     if invitation is None:
