@@ -40,7 +40,10 @@ export function useResizableSidebar(
   const resolveMax = () => (typeof max === 'function' ? max() : max)
   const [preferredWidth, setPreferredWidth] = useState(() => {
     const saved = Number(localStorage.getItem(storageKey))
-    if (saved > 0) return saved
+    // 低于下限的存量值不当作意图：下限是布局硬约束，用户不可能在它之外表达过偏好
+    // （多半是旧版本下限更小、或曾被写小），这种情况回落默认值而不是夹到下限——
+    // 夹到下限会把"最小"当成"合适"。高于上限的不丢：上限随窗口/邻栏变化，收敛在渲染层做。
+    if (saved >= min) return saved
     return side === 'left' ? SIDEBAR_DEFAULT : RIGHT_DEFAULT
   })
   const resizing = useRef(false)
