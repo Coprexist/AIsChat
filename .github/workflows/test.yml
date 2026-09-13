@@ -1,15 +1,18 @@
-name: Backend Tests
+name: Tests
 
 on:
   push:
     paths:
       - 'backend/**'
+      - 'frontend/**'
       - '.github/workflows/test.yml'
   pull_request:
     paths:
       - 'backend/**'
+      - 'frontend/**'
 
 jobs:
+  # 作业 id 与名称保持原样：改名会让 GitHub 上的 required status check 失效
   pytest:
     runs-on: ubuntu-latest
     services:
@@ -32,6 +35,8 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: '3.11'
+          cache: 'pip'
+          cache-dependency-path: backend/requirements.txt
 
       - name: Install dependencies
         run: |
@@ -45,3 +50,27 @@ jobs:
         run: |
           cd backend
           python -m pytest tests/ -q
+
+  # 前端此前在 PR 阶段零检查：deploy-demo.yml 只在 push 到 main 时跑，
+  # 且跑的是 `vite build`（不含 tsc），类型错误一路裸奔到部署。
+  frontend:
+    name: Frontend (typecheck)
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: frontend
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: 'npm'
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Install dependencies
+        run: npm ci
+
+      # 必须走 node_modules 里的 tsc：npx 在缺包时会去装一个同名的假 tsc@2.0.3
+      - name: Typecheck
+        run: ./node_modules/.bin/tsc --noEmit

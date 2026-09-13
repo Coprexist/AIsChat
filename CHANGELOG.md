@@ -250,6 +250,24 @@
   "值为空或值本身来自某个预设"；模型下拉候选与当前预设提到组件顶部，
   移除两处 JSX 立即执行函数
 
+### 🔧 开发工具
+
+#### CI 补上前端类型检查门禁（此前 PR 阶段前端零检查）
+- 前端改动此前在 PR 阶段**不跑任何检查**：`test.yml` 只监听 `backend/**`；
+  唯一管前端的 `deploy-demo.yml` 只在 push 到 main 时跑，且跑的是 `npm run build:demo`
+  = `vite build --mode demo` —— **不含 tsc**（只有 `build` 才是 `tsc -b && vite build`）。
+  也就是说类型错误可以一路裸奔到部署
+- 新增 `frontend` job：`npm ci` + `./node_modules/.bin/tsc --noEmit`。
+  既有 `pytest` job 的 id 与名称**故意没动**——改名会让 GitHub 上的 required status check 失效
+- 触发路径补 `frontend/**`（push 与 pull_request 都补）
+- 后端补 `cache: 'pip'`：前端早就开了 `cache: 'npm'`，后端每次却要从 PyPI 重下全部依赖，
+  是个一直存在的不对称
+- 这个闸**验证过会红**：往 `src/` 注入一个类型错误 → `tsc` 退出码 2 并打印
+  `error TS2322: Type 'string' is not assignable to type 'number'`；删掉后退出码 0
+- 文档：`docs/guides/test_strategy.md` 第十节同步更新，并用脚本校验过
+  「文档里的 yaml 块」与「真实 workflow」在 **jobs / 触发路径 / 每条 run 命令** 上完全一致
+  （文档写错 CI 内容，等于给人一张假地图）
+
 ### 🧪 测试
 
 #### 群视界发图链路补上端到端冒烟（零 LLM 消耗）

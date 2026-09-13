@@ -321,7 +321,8 @@ async def migrated_db():
 ### 6.1 现状：没有自动化 E2E
 
 仓库里**没有**前端 E2E 套件：没有 Playwright 依赖、没有 `frontend/e2e/` 目录，
-`frontend/package.json` 的 scripts 只有 `dev` / `build` / `build:demo` / `preview`，CI 也没有前端 job。
+`frontend/package.json` 的 scripts 只有 `dev` / `build` / `build:demo` / `preview`。
+CI 里有一个前端 job，但它只做**类型检查**（`tsc --noEmit`），不跑任何测试（见第十节）。
 
 因此「端到端」目前 = **部署后人工回归**，按附录清单走一遍。
 
@@ -440,22 +441,25 @@ cd backend && python -m pytest tests/ --cov=app --cov-report=term-missing
 
 ### 10.1 真实的 workflow
 
-`.github/workflows/test.yml` 就是全部内容（没有前端 job、没有 E2E job、没有部署 job——
-部署走 `.github/workflows/deploy-demo.yml`）：
+`.github/workflows/test.yml` 就是全部检查（另有 `deploy-demo.yml` 负责 push 到 main 时构建并发布 Pages）。
+为节省篇幅，下面省掉了 `--health-cmd` 等编排细节，但**作业、触发路径、命令都是原样**：
 
 ```yaml
-name: Backend Tests
+name: Tests
 
 on:
   push:
     paths:
       - 'backend/**'
+      - 'frontend/**'
       - '.github/workflows/test.yml'
   pull_request:
     paths:
       - 'backend/**'
+      - 'frontend/**'
 
 jobs:
+  # 作业 id 与名称保持原样：改名会让 GitHub 上的 required status check 失效
   pytest:
     runs-on: ubuntu-latest
     services:
@@ -472,6 +476,8 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: '3.11'
+          cache: 'pip'
+          cache-dependency-path: backend/requirements.txt
       - name: Install dependencies
         run: |
           pip install -r backend/requirements.txt
@@ -483,7 +489,31 @@ jobs:
         run: |
           cd backend
           python -m pytest tests/ -q
+
+  # 前端此前在 PR 阶段零检查：deploy-demo.yml 只在 push 到 main 时跑，
+  # 且跑的是 vite build（不含 tsc），类型错误一路裸奔到部署。
+  frontend:
+    name: Frontend (typecheck)
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: frontend
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: 'npm'
+          cache-dependency-path: frontend/package-lock.json
+      - name: Install dependencies
+        run: npm ci
+      # 必须走 node_modules 里的 tsc：npx 在缺包时会去装一个同名的假 tsc@2.0.3
+      - name: Typecheck
+        run: ./node_modules/.bin/tsc --noEmit
 ```
+
+> `frontend` job 不跑任何测试，只做类型检查。它拦得住的东西已用「注入一个类型错误」验证过：
+> 有错时 `tsc` 退出码 2 并打印 `error TS2322`，删掉后退出码 0。
 
 注意 CI 里的库名是 `ai_group_chat_test`、跑的是 `pytest tests/`（**平铺**，不是 `tests/unit/`）。
 
@@ -491,16 +521,18 @@ jobs:
 
 | 项 | 现状 |
 |----|------|
-| 触发路径 | 仅 `backend/**` 与 workflow 自身 |
-| 前端改动 | **不触发任何 CI**（前端没有测试）|
+| 触发路径 | `backend/**`、`frontend/**` 与 workflow 自身 |
+| 前端改动（PR） | 类型检查 `tsc --noEmit`；**没有任何测试** |
+| 前端改动（push main） | 另有 `deploy-demo.yml` 跑 `vite build --mode demo`（**不含 tsc**）并发布 Pages |
 | 文档改动 | 不触发（合理）|
-| 依赖安装 | 每次 `pip install -r`，无缓存 |
+| 依赖安装 | 均已开缓存：后端 `cache: pip`、前端 `cache: npm` |
 
 ### 10.3 质量门禁现状
 
 | 门禁 | 现状 |
 |------|------|
 | 后端测试全绿 | ✅ CI 阻断（`pytest tests/ -q` 非零即红）|
+| 前端类型检查 | ✅ CI 阻断（`tsc --noEmit`）——2026-09-13 新增 |
 | 代码风格（Ruff / ESLint）| ❌ 未接入 CI |
 | 覆盖率阈值 | ❌ 未接入 |
 | 前端测试 / E2E | ❌ 未接入 |
