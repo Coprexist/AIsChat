@@ -456,13 +456,20 @@ export function useWorldChat({ wid, onRefresh, onMsg }: UseWorldChatOptions) {
             // 清除依据是"这条当初是否走了插入通道"（mayInsertMidTurn），而不是 kind——
             // kind 只是弹窗显示标签（'cmd' 显示成"命令"），与路由无关。
             // 未走插入通道的命令必须留着，否则 drain effect 会漏发。
+            //
+            // ⚠️ 计数必须定义在 updater **内部**：React StrictMode 会把 updater 调用两次
+            //（用来暴露不纯的 updater）。若在外部闭包变量上累减，第二次调用会看到"已经扣完"的
+            // 状态而原样返回未过滤的列表，而 React 恰好采用第二次的结果 → 弹窗条目永远清不掉。
             const sig = parseEvent<{ count?: number }>(payload, EV.INSERTED)
             if (sig) {
-              let left = sig.count || 0
-              setPendingItems((items) => items.filter((it) => {
-                if (left > 0 && mayInsertMidTurn(it.text)) { left -= 1; return false }
-                return true
-              }))
+              const quota = sig.count || 0
+              setPendingItems((items) => {
+                let left = quota
+                return items.filter((it) => {
+                  if (left > 0 && mayInsertMidTurn(it.text)) { left -= 1; return false }
+                  return true
+                })
+              })
             }
             continue
           }

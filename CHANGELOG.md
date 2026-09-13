@@ -53,6 +53,18 @@
   `Space`（在聊天页是发送键）
 - 设计详见 `docs/group_world/design/group_world_design.md` §7.12
 
+#### 排队弹窗条目清不掉（updater 不纯，StrictMode 下静默失效）
+- `[INSERTED]` 的清除逻辑把配额 `left` 定义在 `setPendingItems` 的 updater **外部**并在其中累减。
+  React 在 StrictMode（`main.tsx` 已开启）下会**调用 updater 两次**以暴露不纯的 updater：
+  第一次调用扣掉了 `left`，第二次调用看到 `left` 已为 0，便原样返回**未过滤**的列表，
+  而 React 恰好采用第二次的结果 → **弹窗条目永远清不掉**
+- 现象特征：**气泡正常出现**（`[INSERT]` 是独立事件），只有弹窗不消失；后端日志完全干净
+  （无补发、无广播失败），因此可判定问题在前端处理而非投递
+- 修复：把计数移入 updater 内部，使其成为纯函数
+- 该 bug 是本轮把原 `items.slice(count)`（纯函数，本就正确）改写为带谓词版本时引入的
+- 同类排查：`-(++msgSeqRef.current)` 同样写在 updater 内（亦不纯），但只影响占位 id 递增，
+  不会造成正确性问题，故保持原样
+
 ### 🏗️ 架构重构：stream_world_chat 分阶段拆分
 
 按"小步 + 每步验证"推进（383 行 → 分三段），已完成阶段 1-3：
