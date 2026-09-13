@@ -1,7 +1,7 @@
 window.__ModuleLoader__.load({ id: "dsh-aischat", factory: (require) => {
 var module = { exports: {} }; var exports = module.exports;
 
-// dsh-aischat/src/client.ts
+// src/client.ts
 var React = require("react");
 var { useEffect, useState, useRef, useCallback, useMemo } = React;
 var { MarkdownText, IconNewChatOutline16 } = require("@deepseek-ai/dsh-client-ui-primitives");

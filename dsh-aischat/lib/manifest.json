@@ -1,7 +1,7 @@
 {
   "name": "dsh-aischat",
   "version": "0.1.0",
-  "buildStamp": "2026-09-13T15:26:51.168Z",
+  "buildStamp": "2026-09-13T15:32:22.934Z",
   "backendVersion": "0.4.0",
   "files": {
     "dist/assets/AdminPage-DiY20Dq9.js": "2dfe2f1fc7c7978e26dcd7ae53f81d3f980a3fee4afb2df576f022c78bf79694",
@@ -254,8 +254,8 @@
     "dist/study-room/js/config.js": "85c20d58cefdc15ed9d01977a456c36c8cf681f7d7eab1ab71ba62dc00f5d735",
     "dist/study-room/js/sound.js": "7010da06e10cb2dbea5cc9f80edfaa657aa4779fe1526effafb33b0d5fd685e2",
     "dist/vite.svg": "615aaf0d999eaea59d2e828c1b6371b1a25f8db9e9026726cc2817a4c9e5b033",
-    "lib/client.js": "ab4abd65cd5b741a1efe86ce0e13dcdd5bf8559fb9282fd022daf9c1c52f6682",
-    "lib/index.js": "d7cd3e05849c5fb023e8a2726097b7dc0837817d7ad98ac6f6bf1b797ed75d1d",
+    "lib/client.js": "afcc6aaff0c71eea125beb3f0a4208383a8e83cdb318792b49ce875701fc6362",
+    "lib/index.js": "b6d7cf1b949ac171a3945ef22ff941c14ebd4f0ff50bb30dc2956a4dbf4d47af",
     "package.json": "7bcda3306662fa231e15c61d220d12235489b6efd4d14019b08169aa2d15f9fe"
   }
 }
