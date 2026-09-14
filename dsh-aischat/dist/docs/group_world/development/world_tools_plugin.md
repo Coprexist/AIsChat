@@ -28,7 +28,7 @@ backend/app/tools/world/
 |---|---|---|
 | `name` | ✅ | 工具名，也是 LLM 的 function name；文件名与它保持一致 |
 | `label` | ✅ | 卡片标题的中文名，如「读文件」 |
-| `segment` | ✅ | 分组：`file` / `group` / `memory` / `net` / `world` / `self` |
+| `segment` | ✅ | 分组：`file` / `group` / `memory` / `net` / `world` / `self` / `approval`（审批与协作） |
 | `description` | ✅ | 给 LLM 看的说明：做什么、什么时候用 |
 | `parameters` | ✅ | JSON Schema 的 properties；无参数写 `{}` |
 | `required` | ✅ | 必填参数名列表；无必填写 `[]` |
@@ -124,7 +124,7 @@ to register and raises `TypeError` immediately):
 |---|---|---|
 | `name` | ✅ | Tool name / LLM function name; keep the file name identical |
 | `label` | ✅ | Human-readable Chinese title shown on the card |
-| `segment` | ✅ | Grouping: `file` / `group` / `memory` / `net` / `world` / `self` |
+| `segment` | ✅ | Grouping: `file` / `group` / `memory` / `net` / `world` / `self` / `approval` |
 | `description` | ✅ | What the tool does and when to use it (written for the LLM) |
 | `parameters` / `required` | ✅ | JSON Schema properties and required names; use `{}` / `[]` when empty |
 | `execute(ctx)` | ✅ | Returns a dict; `success=True` on success, `error` on failure |
