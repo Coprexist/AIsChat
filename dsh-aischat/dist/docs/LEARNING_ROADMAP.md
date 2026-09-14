@@ -2,7 +2,7 @@
 
 > 版本：v1.0.0 | 更新：2026-08-10
 > 本文档提供 AIsChat 项目的阶梯式学习路线，每个阶段都有明确的目标、必读文件和实践任务。
-> 配合 [CODE_WIKI.md](file:///f:/Zhang/AIsChat/docs/CODE_WIKI.md) 效果最佳。
+> 配合 [CODE_WIKI.md](../docs/CODE_WIKI.md) 效果最佳。
 
 ---
 
@@ -76,9 +76,9 @@ flowchart LR
 
 | 文件 | 重点 | 行号 |
 |------|------|------|
-| [README.md](file:///f:/Zhang/AIsChat/README.md) | 项目介绍、快速开始 | 全文 |
-| [docker-compose.yml](file:///f:/Zhang/AIsChat/docker-compose.yml) | 服务编排结构 | 全文 |
-| [.env.example](file:///f:/Zhang/AIsChat/.env.example) | 环境变量说明 | 全文 |
+| [README.md](../README.md) | 项目介绍、快速开始 | 全文 |
+| [docker-compose.yml](../docker-compose.yml) | 服务编排结构 | 全文 |
+| [.env.example](../.env.example) | 环境变量说明 | 全文 |
 
 ### 动手实践
 
@@ -193,10 +193,10 @@ sequenceDiagram
 
 | 文件 | 重点 | 行号 |
 |------|------|------|
-| [app/routers/ws.py](file:///f:/Zhang/AIsChat/backend/app/routers/ws.py) | WebSocket 端点 | 全文 |
-| [app/chat/__init__.py](file:///f:/Zhang/AIsChat/backend/app/chat/__init__.py) | ChatApi 实现 | L58-L200 |
-| [app/services/connection_manager.py](file:///f:/Zhang/AIsChat/backend/app/services/connection_manager.py) | 连接管理 | L22-L100 |
-| [app/chat/message.py](file:///f:/Zhang/AIsChat/backend/app/chat/message.py) | 消息 CRUD | 全文 |
+| [app/routers/ws.py](../backend/app/routers/ws.py) | WebSocket 端点 | 全文 |
+| [app/chat/__init__.py](../backend/app/chat/__init__.py) | ChatApi 实现 | L58-L200 |
+| [app/services/connection_manager.py](../backend/app/services/connection_manager.py) | 连接管理 | L22-L100 |
+| [app/chat/gm.py](../backend/app/chat/gm.py) | 群消息 CRUD | 全文 |
 
 ### 模块依赖关系
 
@@ -343,10 +343,10 @@ flowchart TD
 
 | 文件 | 重点 | 行号 |
 |------|------|------|
-| [app/ai/decider.py](file:///f:/Zhang/AIsChat/backend/app/ai/decider.py) | 统一行动决策 | L1-L120 |
-| [app/ai/executor.py](file:///f:/Zhang/AIsChat/backend/app/ai/executor.py) | 工具执行引擎 | L1-L100 |
-| [app/ai/llm.py](file:///f:/Zhang/AIsChat/backend/app/ai/llm.py) | LLM 调用抽象层 | L1-L200 |
-| [app/ai/response_worker.py](file:///f:/Zhang/AIsChat/backend/app/ai/response_worker.py) | AI 响应 Worker | L1-L150 |
+| [app/ai/decider.py](../backend/app/ai/decider.py) | 统一行动决策 | L1-L120 |
+| [app/ai/executor.py](../backend/app/ai/executor.py) | 工具执行引擎 | L1-L100 |
+| [app/ai/llm.py](../backend/app/ai/llm.py) | LLM 调用抽象层 | L1-L200 |
+| [app/ai/response_worker.py](../backend/app/ai/response_worker.py) | AI 响应 Worker | L1-L150 |
 
 ### 关键数据结构
 
@@ -394,7 +394,7 @@ classDiagram
 
 #### 任务 1：阅读决策逻辑
 
-在 [decider.py](file:///f:/Zhang/AIsChat/backend/app/ai/decider.py) 中，追踪 `decide_action()` 的决策链：
+在 [decider.py](../backend/app/ai/decider.py) 中，追踪 `decide_action()` 的决策链：
 
 ```mermaid
 gantt
@@ -412,7 +412,7 @@ gantt
 
 #### 任务 2：追踪工具调用循环
 
-在 [executor.py](file:///f:/Zhang/AIsChat/backend/app/ai/executor.py) 的 `_tool_call_loop()` 中观察：
+在 [executor.py](../backend/app/ai/executor.py) 的 `_tool_call_loop()` 中观察：
 
 ```python
 # 关键代码位置
@@ -426,7 +426,7 @@ while loop_idx < max_loops:
 
 #### 任务 3：修改 AI 行为
 
-尝试修改 [app/prompts/](file:///f:/Zhang/AIsChat/backend/app/prompts/) 中的系统提示词模板，观察 AI 回复的变化。
+尝试修改 [app/prompts/](../backend/app/prompts/) 中的系统提示词模板，观察 AI 回复的变化。
 
 #### 任务 4：添加调试日志
 
@@ -524,30 +524,30 @@ graph TD
 
 | 文件 | 重点 | 行号 |
 |------|------|------|
-| [app/services/memory/memory_service.py](file:///f:/Zhang/AIsChat/backend/app/services/memory/memory_service.py) | 记忆检索主入口 | 全文 |
-| [app/services/memory/context_compression_service.py](file:///f:/Zhang/AIsChat/backend/app/services/memory/context_compression_service.py) | 上下文压缩 | 全文 |
-| [app/services/memory/forgetting_mechanism.py](file:///f:/Zhang/AIsChat/backend/app/services/memory/forgetting_mechanism.py) | 遗忘机制 | 全文 |
+| [app/services/memory/memory_service.py](../backend/app/services/memory/memory_service.py) | 记忆检索主入口 | 全文 |
+| [app/services/memory/context_compression_service.py](../backend/app/services/memory/context_compression_service.py) | 上下文压缩 | 全文 |
+| [app/services/memory/forgetting_mechanism.py](../backend/app/services/memory/forgetting_mechanism.py) | 遗忘机制 | 全文 |
 
 #### 技能引擎
 
 | 文件 | 重点 | 行号 |
 |------|------|------|
-| [app/services/skill/skill_engine.py](file:///f:/Zhang/AIsChat/backend/app/services/skill/skill_engine.py) | 思维 Skill 引擎 | 全文 |
-| [app/services/skill/skill_runtime.py](file:///f:/Zhang/AIsChat/backend/app/services/skill/skill_runtime.py) | 技能运行时 | 全文 |
+| [app/services/skill/skill_engine.py](../backend/app/services/skill/skill_engine.py) | 思维 Skill 引擎 | 全文 |
+| [app/services/skill/skill_runtime.py](../backend/app/services/skill/skill_runtime.py) | 技能运行时 | 全文 |
 
 #### 世界系统
 
 | 文件 | 重点 | 行号 |
 |------|------|------|
-| [app/services/world/world_service.py](file:///f:/Zhang/AIsChat/backend/app/services/world/world_service.py) | 世界 CRUD | L1-L150 |
-| [app/services/world/world_scheduler.py](file:///f:/Zhang/AIsChat/backend/app/services/world/world_scheduler.py) | 懒加载调度 | 全文 |
+| [app/services/world/world_service.py](../backend/app/services/world/world_service.py) | 世界 CRUD | L1-L150 |
+| [app/services/world/world_scheduler.py](../backend/app/services/world/world_scheduler.py) | 懒加载调度 | 全文 |
 
 #### 薄大脑
 
 | 文件 | 重点 | 行号 |
 |------|------|------|
-| [app/services/brain/brain_controller.py](file:///f:/Zhang/AIsChat/backend/app/services/brain/brain_controller.py) | 大脑控制器 | L1-L100 |
-| [app/services/brain/heartbeat_manager.py](file:///f:/Zhang/AIsChat/backend/app/services/brain/heartbeat_manager.py) | 心跳管理 | 全文 |
+| [app/services/brain/brain_controller.py](../backend/app/services/brain/brain_controller.py) | 大脑控制器 | L1-L100 |
+| [app/services/brain/heartbeat_manager.py](../backend/app/services/brain/heartbeat_manager.py) | 心跳管理 | 全文 |
 
 ### 记忆检索流程
 
@@ -676,9 +676,9 @@ mindmap
 
 | 文件 | 重点 |
 |------|------|
-| [app/tools/base.py](file:///f:/Zhang/AIsChat/backend/app/tools/base.py) | ToolPlugin 基类 |
-| [app/services/tool_registry.py](file:///f:/Zhang/AIsChat/backend/app/services/tool_registry.py) | 工具注册中心 |
-| [backend/app/main.py](file:///f:/Zhang/AIsChat/backend/app/main.py) | 应用入口 |
+| [app/tools/base.py](../backend/app/tools/base.py) | ToolPlugin 基类 |
+| [app/services/tool_registry.py](../backend/app/services/tool_registry.py) | 工具注册中心 |
+| [backend/app/main.py](../backend/app/main.py) | 应用入口 |
 
 ### 动手实践
 
@@ -843,7 +843,7 @@ WHERE created_at < NOW() - INTERVAL '90 days';
 
 ### Q4：如何添加新的 LLM 提供商？
 
-在 [app/config.py](file:///f:/Zhang/AIsChat/backend/app/config.py) 和 [app/ai/llm.py](file:///f:/Zhang/AIsChat/backend/app/ai/llm.py) 中扩展：
+在 [app/config.py](../backend/app/config.py) 和 [app/ai/llm.py](../backend/app/ai/llm.py) 中扩展：
 
 ```python
 # config.py
@@ -858,4 +858,4 @@ def get_model_options(self):
 ---
 
 > **文档版本**: v1.0.0 | **更新日期**: 2026-08-10
-> 本文档与 [CODE_WIKI.md](file:///f:/Zhang/AIsChat/docs/CODE_WIKI.md) 配合使用，Wiki 是参考手册，路线图是行动指南。
+> 本文档与 [CODE_WIKI.md](../docs/CODE_WIKI.md) 配合使用，Wiki 是参考手册，路线图是行动指南。

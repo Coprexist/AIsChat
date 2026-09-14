@@ -20,6 +20,6 @@
 
 ## 详细设计
 
-请参考完整的 [memory_system_design.md](file:///c:/Users/frank/Documents/AIsChat/AIsChat/docs/memory_system/design/memory_system_design.md) 设计文档。
+请参考完整的 [memory_system_design.md](../../../docs/memory_system/design/memory_system_design.md) 设计文档。
 
 结构化记忆图

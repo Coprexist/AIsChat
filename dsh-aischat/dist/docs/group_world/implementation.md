@@ -70,11 +70,14 @@ GET /worlds/{id}/chat/stream?turn_id= ──订阅直播（30s 心跳；断开�
 
 | 工具 | 说明 |
 |------|------|
-| `file_read` / `file_write` / `file_edit` / `file_list` / `file_delete` | 世界文件夹读写（隔离目录+扩展名白名单+防越界）；**file_edit 与主站共用同一份编辑核心** `app/utils/pure/file_edit.py`（str_replace 唯一性校验 / insert 行语义 / delete_lines 边界） |
+| `file_read` / `file_write` / `file_edit` / `file_list` / `file_delete` | 世界文件夹读写（隔离目录+类型策略+防越界）；**file_edit 与主站共用同一份编辑核心** `app/utils/pure/file_edit.py`（str_replace 唯一性校验 / insert 行语义 / delete_lines 边界） |
+| `file_move` / `file_copy` | **移动/重命名与复制（2026-09-15）**：走同一套越界与后缀校验；目录可整体搬移/复制 |
+| `web_download` | **下载文件（2026-09-15 收敛）**：固定落点 `downloads/`、GitHub blob → raw 直链、违规内容拦截（`world_moderation`）、大小 32MB；审阅模式下由平台弹窗征得同意 |
+| `ask_user` / `present_plan` | **审批与协作（2026-09-15）**：`ask_user` 事件类型关键词必填（download/delete/modify/other）弹窗问用户；`present_plan` 计划模式下先出计划、通过后本轮按自动模式执行——与平台门禁共用同一条审批通道 |
 | `update_world_info` | 改世界名/简介（以世界主人身份） |
 | `compact_context` | 压缩对话历史 → 存 `worlds.config.chat_summary`（复用主站 context_compression_service） |
 | `list_world_blocks` / `view_world_block` / `apply_world_block` | 积木体系（§七） |
-| `view_api_doc` | **接口文档分区查看（2026-08-05）**：工具描述只列区名+区介绍，AI 按需传区号（01~08）取详细 API（读 `data/world_api_docs/sections/`，注册表白名单防穿越） |
+| `view_api_doc` | **接口文档分区查看（2026-08-05）**：工具描述只列区名+区介绍，AI 按需传区号（01~10）取详细 API（读 `backend/app/services/world/api_docs/sections/`，注册表白名单防穿越） |
 | `store_memory` / `recall_memory` | **世界 AI 长期记忆（2.6）**：store 存 title+content（向量化失败降级无向量）；recall 语义检索（embedding <=> 余弦距离）→ 失败文本包含回退；世界按 world_id 隔离 |
 | `get_bound_groups` / `get_group_messages` / `list_group_members` / `send_group_message` / `set_group_member_role` / `kick_group_member` | **群聊 API（以世界创建者身份）**：默认作用本世界绑定群，无需传群号；管理操作仅群主/管理员（§十一） |
 | `web_search` / `web_fetch` | **上网（2026-08-05）**：**复用主系统同一份实现**（WebSearch/WebFetch 类，无 opencli 依赖）；web_fetch 支持 `delay_ms` 延迟抓取（AI 可设定等待后再取，应对慢速/动态加载页面） |
@@ -86,7 +89,9 @@ GET /worlds/{id}/chat/stream?turn_id= ──订阅直播（30s 心跳；断开�
 - 结果变化（如写完文件后 list 看到新文件=验证场景）→ 正常执行
 - 超过 5 分钟（用户可能改了文件）→ 允许重跑
 
-**安全**：文件走 `world_file_service`（`data/worlds/{id}/` 隔离、`..` 拒绝、白名单扩展名）；工具以世界主人身份执行写操作；所有设计页端点仅创建者可调（`_require_owner`）。
+**安全**：文件走 `world_file_service`（`data/worlds/{id}/` 隔离、`..` 拒绝、允许清单 + 禁用后缀三层防护）；工具以世界主人身份执行写操作；所有设计页端点仅创建者可调（`_require_owner`）。
+
+**运行模式门禁（2026-09-15）**：世界有 `auto`（自动）/ `review`（审阅，默认）/ `plan`（计划）三档，由用户在设计页切换、**AI 无工具可改**。审阅模式下下载/删除/改动机制三类操作由 `world_ai_mode.gate_tool_call` 弹窗征得用户同意后执行（同类本轮一次），计划模式下先 `present_plan` 通过再按自动模式执行。
 
 ---
 

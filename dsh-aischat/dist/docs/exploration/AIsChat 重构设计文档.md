@@ -176,11 +176,11 @@ graph TD
 
 | 服务 | 文档 | 核心内容 |
 |------|------|---------|
-| **聊天底层服务** | [chat_service_design.md](file:///c:/Users/frank/Documents/AIsChat/AIsChat/docs/chat_service/design/chat_service_design.md) | 消息管道、可达性管理、ConnectionManager、联邦协议、ChatApi |
-| **AI 底层服务** | [ai_service_design.md](file:///c:/Users/frank/Documents/AIsChat/AIsChat/docs/ai_service/design/ai_service_design.md) | LLM 调用、工具执行、流式响应、配置管理、额度消耗 |
-| **薄大脑控制系统** | [brain_controller_design.md](file:///c:/Users/frank/Documents/AIsChat/AIsChat/docs/brain_controller/design/brain_controller_design.md) | 心跳管理、状态机、冲突仲裁、人格锚点、资源调度 |
-| **记忆系统** | [memory_system_design.md](file:///c:/Users/frank/Documents/AIsChat/AIsChat/docs/memory_system/design/memory_system_design.md) | 双重记忆架构、结构化记忆、记忆分发、遗忘机制 |
-| **技能管理系统** | [skill_manager_design.md](file:///c:/Users/frank/Documents/AIsChat/AIsChat/docs/skill_manager/design/skill_manager_design.md) | Skill 分层、声明式依赖、模板引擎、多维触发器、注意力系统 |
+| **聊天底层服务** | [chat_service_design.md](../../docs/chat_service/design/chat_service_design.md) | 消息管道、可达性管理、ConnectionManager、联邦协议、ChatApi |
+| **AI 底层服务** | [ai_service_design.md](../../docs/ai_service/design/ai_service_design.md) | LLM 调用、工具执行、流式响应、配置管理、额度消耗 |
+| **薄大脑控制系统** | [brain_controller_design.md](../../docs/brain_controller/design/brain_controller_design.md) | 心跳管理、状态机、冲突仲裁、人格锚点、资源调度 |
+| **记忆系统** | [memory_system_design.md](../../docs/memory_system/design/memory_system_design.md) | 双重记忆架构、结构化记忆、记忆分发、遗忘机制 |
+| **技能管理系统** | [skill_manager_design.md](../../docs/skill_manager/design/skill_manager_design.md) | Skill 分层、声明式依赖、模板引擎、多维触发器、注意力系统 |
 
 ---
 

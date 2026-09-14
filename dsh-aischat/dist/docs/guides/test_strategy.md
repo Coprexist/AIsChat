@@ -11,7 +11,9 @@
 > the shipped container image has no pytest, so `python tests/run_without_pytest.py` is a
 > dependency-free runner for it (it refuses to start unless the target database name ends in `_test`).
 > Coverage is a report only; diff coverage gates pull requests. **Every new test must be proven to
-> fail first** — put the bug back and watch it go red (see §1.2).
+> fail first** — put the bug back and watch it go red (see §1.2). Frontend has no unit tests:
+> the PR gate is `tsc --noEmit` plus `npm run i18n:check`, which fails when a UI string would
+> otherwise render as a raw i18n key (see §1.4).
 > Commands are written in their official form; China-network mirror variants are marked separately
 > (see §9.5).
 
@@ -46,9 +48,10 @@
 | `backend/tests/test_world_tool_summaries.py` | 单元（零网络） | 4 | 世界工具插件契约：自报 `label/segment/summary`、文案可读、注册表覆盖 schema |
 | `backend/tests/test_gm_dm_symmetry.py` | 静态（路由表） | 3 | 群/私信接口命名对称，已删除的重复入口不得回归 |
 | `backend/tests/test_world_tool_plugins.py` | 静态（`symtable`） | 2 | 插件文件"引用了但没定义"的名字错误 |
+| `backend/tests/test_world_ai_guardrails.py` | 单元 + 集成（零网络） | 11 | 世界 AI 安全护栏：禁用后缀创建即拒 + 兜底强删、下载固定落点、违规内容拦截、模式门禁、**审阅弹窗完整闭环**（广播 → 用户点同意 → 工具放行） |
 | `backend/tests/test_agent_resolution.py` | 集成（真库） | 2 | 群成员 `member_id` 解析优先级 |
 
-合计 **66 条**（`run_without_pytest.py` 全量约 50s）。
+合计 **77 条**（`run_without_pytest.py` 全量约 55s）。
 
 辅助文件：
 
@@ -163,6 +166,20 @@ CI runner 上 `/app` 属另一用户不可写，4 条用例直接 `PermissionErr
 
 只要测试依赖**环境可写性**或**绝对路径**，就必须在 CI 上验证过才算数。
 修法是不要让测试碰真实数据目录：`data_dir` 是只读 property，测试临时替换类描述符，退出还原。
+
+### 1.4 前端检查（两条，都在容器里跑，不需要装依赖）
+
+```bash
+# 类型检查
+docker exec -w /app ai_group_frontend node_modules/.bin/tsc --noEmit
+
+# i18n key 完整性：源码里的 t()/tr() + 后端 CONFIG_GROUPS 下发的 key 一起核对
+node frontend/scripts/check-i18n.mjs     # 等价于 cd frontend && npm run i18n:check
+```
+
+为什么需要 i18n 这条：`getTranslation()` **找不到 key 时原样返回 key**，界面上就会把
+`admin.addProvider`、`adminConfig:sourceDb` 这样的源码串显示给用户——不报错、不崩溃，
+只靠肉眼发现。2026-09 就是这么攒出 48 个三语全缺 + 62 处单语缺的 key 的。
 
 ---
 
@@ -755,7 +772,7 @@ jobs:
 | 项 | 现状 |
 |----|------|
 | 触发路径 | `backend/**`、`frontend/**` 与 workflow 自身 |
-| 前端改动（PR） | 类型检查 `tsc --noEmit`；**没有任何测试** |
+| 前端改动（PR） | 类型检查 `tsc --noEmit` + i18n key 完整性 `npm run i18n:check`；**没有单元测试** |
 | 前端改动（push main） | 另有 `deploy-demo.yml` 跑 `vite build --mode demo`（**不含 tsc**）并发布 Pages |
 | 文档改动 | 不触发（合理）|
 | 依赖安装 | 均已开缓存：后端 `cache: pip`、前端 `cache: npm` |
@@ -769,6 +786,7 @@ jobs:
 |------|------|
 | 后端测试全绿 | ✅ CI 阻断（`pytest tests/ -q` 非零即红）|
 | 前端类型检查 | ✅ CI 阻断（`tsc --noEmit`）——2026-09-13 新增 |
+| 前端 i18n key 完整性 | ✅ CI 阻断（`npm run i18n:check`）——2026-09-13 新增 |
 | 增量覆盖率 | ✅ CI 阻断（仅 PR）——2026-09-13 新增 |
 | 整体覆盖率阈值 | ❌ **故意不设**：当门禁只会奖励写"调用了但没断言"的假用例 |
 | 代码风格（Ruff / ESLint）| ❌ 未接入 CI |
