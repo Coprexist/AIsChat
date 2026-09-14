@@ -20,6 +20,7 @@ from app.utils.multimodal import (
     build_content, image_placeholder, image_note, injected_image_count,
 )
 from app.utils.pure.llm_endpoint import chat_completions_url
+from app.utils.pure.tool_chain import heal_tool_chain
 
 logger = logging.getLogger(__name__)
 
@@ -27,6 +28,10 @@ logger = logging.getLogger(__name__)
 # 实际请求日志（排查问题用）：每世界最近 10 条，落盘 data/world_llm_requests/{world_id}.jsonl
 LLM_REQUEST_LOG_DIR = Path("data/world_llm_requests")
 LLM_REQUEST_KEEP = 10
+
+# 流式请求的输出预留：DeepSeek 把 max_tokens 计入上下文预算（prompt + max_tokens ≤ 窗口），
+# 长工具轮能涨到 18 万 token，预留太大就会顶到窗口上限。32000 够单次写大文件。
+STREAM_MAX_TOKENS = 32000
 
 
 # ═══════════════════════════════════════════════════════════════
@@ -634,7 +639,9 @@ async def _stream_llm_once(
         "messages": messages,
         "temperature": cfg.get("temperature", 0.8),
         "top_p": cfg.get("top_p", 0.9),
-        "max_tokens": 64000,
+        # 输出预留挡上下文预算（DeepSeek 算 prompt + max_tokens ≤ 窗口）：原先 64000 会让
+        # 200k 级的长工具轮直接顶到窗口；32000 足够单个文件写入，还给长上下文留了余量
+        "max_tokens": STREAM_MAX_TOKENS,
         "stream": True,
         "stream_options": {"include_usage": True},
     }
@@ -1243,7 +1250,7 @@ async def _stream_first_round(
         "messages": messages,
         "temperature": cfg.get("temperature", 0.8),
         "top_p": cfg.get("top_p", 0.9),
-        "max_tokens": 64000,
+        "max_tokens": STREAM_MAX_TOKENS,   # 与工具轮同值（见 _stream_llm_once 注释）
         "stream": True,
         "tools": tools_for_world,
         "stream_options": {"include_usage": True},
@@ -1392,12 +1399,13 @@ async def _run_tool_loop(
         # 工具循环上限：creator_config.max_tool_rounds（默认 50，设计页可改）
         max_rounds = int(cfg.get("max_tool_rounds") or DEFAULT_MAX_TOOL_ROUNDS)
         max_rounds = max(1, min(max_rounds, 200))
-        final = ""
-        for _r in range(max_rounds):
-            # ⚠️ 顺序不可颠倒：必须先执行工具、再注入插入消息。
-            # 反了会把 user 消息插进 assistant(tool_calls) 与其 tool_response 之间，
-            # 破坏 DeepSeek 消息链 → API 400。
-            # 执行本轮所有工具调用（执行→落库→[TOOL] 事件）
+        async def _exec_pending_tools():
+            """执行「当前待执行的那一批工具」+ 注入插入消息。
+
+            ⚠️ 顺序不可颠倒：必须先执行工具、再注入插入消息。
+            反了会把 user 消息插进 assistant(tool_calls) 与其 tool_response 之间，
+            破坏 DeepSeek 消息链 → API 400。读的是外层当前绑定（每轮换新的一批）。
+            """
             async for event in _execute_tool_round(world_repo, world, world_id, tool_call_acc, messages, turn_state, sid_db):
                 yield event
             # 此时 tool_response 已入 messages，user 追加在其后是合法链
@@ -1405,6 +1413,12 @@ async def _run_tool_loop(
                 await _inject_pending_user_messages(world_repo, world_id, messages, sid_db)
             except Exception as e:
                 logger.warning(f"🌐 世界 #{world_id} 插入消息注入失败（非致命）: {e}")
+
+        final = ""
+        for _r in range(max_rounds):
+            # 执行本轮所有工具调用（执行→落库→[TOOL] 事件）
+            async for event in _exec_pending_tools():
+                yield event
 
             # 下一轮：继续带 tools，直到模型不再调用（同时捕获思考内容）
             # 最后 3 轮：提醒尽快收尾总结
@@ -1452,10 +1466,16 @@ async def _run_tool_loop(
                 for i, tc in enumerate(tcs)
             }
         else:
-            final = ""  # 达到轮次上限：走强制收尾轮
+            # 达到轮次上限：最后请求的那批工具也得执行——否则工作丢了，而且
+            # assistant(tool_calls) 悬空会让收尾轮被 API 直接拒掉（2026-09-14 修的 400）
+            async for event in _exec_pending_tools():
+                yield event
+            final = ""
 
         # 强制收尾轮：不带 tools，保证必有最终回复（含思考捕获）
         if not final:
+            if heal_tool_chain(messages):   # 兜底：悬空 tool_calls 一并补齐，别让收尾轮 400
+                logger.warning(f"🔧 世界 #{world_id} 收尾前补齐悬空 tool_calls（避免 400）")
             _log_llm_request(world_id, turn_id, "final", model, thinking, messages)
             # 2026-08-13：收尾轮流式化（之前等整次结束一次性出）
             out_f: dict = {}
@@ -1609,6 +1629,7 @@ async def stream_world_chat(
                 if tool_call_acc and not full_content:
                     if not had_error:
                         try:
+                            heal_tool_chain(messages)   # 中断路径同样可能悬空：补齐再收尾
                             resp = await _llm(messages, None, "finalize")
                             full_content = (resp or {}).get("content") or "（工具执行完成）"
                             fr = (resp or {}).get("reasoning_content") or ""

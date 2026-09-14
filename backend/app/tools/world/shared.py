@@ -154,10 +154,12 @@ async def web_download(world, arguments: str, approved: bool = False) -> dict:
         return {"success": True, "path": path, "size": len(content), "url": url}
 
     # 旁路下载：没经过平台门禁 → 按产品要求，下载完成后再问用户是否保留
+    # 事后确认同样不默认保留：没人应答就删掉（on_timeout=False，安全默认）
     keep, note = await request_approval(
         wid, "", kind="download",
         title=f"是否保留刚下载的文件？{path}",
         detail=f"{url}\n{len(content) // 1024}KB → {path}",
+        on_timeout=False,
     )
     if keep:
         return {"success": True, "path": path, "size": len(content), "url": url}

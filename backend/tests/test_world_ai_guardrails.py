@@ -13,6 +13,7 @@ import json
 import shutil
 import tempfile
 
+from app.tools.world.base import WorldToolContext
 from app.services.world import world_file_service as fs
 from app.services.world.world_ai_mode import (
     DEFAULT_MODE,
@@ -176,6 +177,72 @@ async def test_gate_auto_allows_plan_blocks_review_needs_a_human():
     for mode in MODES:
         allowed, approved, _ = await gate_tool_call(_World(mode), WORLD_ID, "file_read", {"path": "a.js"}, {})
         assert allowed and not approved
+
+
+def test_unattended_policy_follows_mode():
+    """没人应答怎么办由模式决定：只有自动档才「问不到就自己继续」"""
+    from app.services.world import world_ai_mode as wam
+
+    assert wam.unattended_policy(_World("auto")) == (True, wam._ASK_TIMEOUT)
+    for mode in ("review", "plan"):
+        assert wam.unattended_policy(_World(mode)) == (False, wam._APPROVAL_TIMEOUT)
+
+
+async def test_no_viewer_follows_unattended_policy():
+    """连前端都没连着：审阅直接不放行；自动档立即放行（不空等）"""
+    from app.services.world import world_ai_mode as wam
+
+    old = wam._WAIT_FOR_VIEWER
+    wam._WAIT_FOR_VIEWER = 0
+    try:
+        approved, note = await wam.request_approval(987656, "", kind="other", title="t", on_timeout=False)
+        assert approved is False and "无人应答" in note
+        approved, note = await wam.request_approval(987656, "", kind="other", title="t", on_timeout=True)
+        assert approved is True and "自动档" in note
+    finally:
+        wam._WAIT_FOR_VIEWER = old
+
+
+async def test_user_silence_denies_review_but_continues_auto():
+    """前端连着、用户不吭声：审阅超时 = 不通过；自动档提问超时 = 放行继续"""
+    from app.services.world import world_ai_mode as wam
+
+    wid_turn = 987657
+    tb = TurnBroadcast("t_timeout")
+    tb.subscribe()                                   # 模拟前端连着
+    _workers[wid_turn] = _LiveWorker(tb)
+    try:
+        approved, note = await wam.request_approval(
+            wid_turn, "t_timeout", kind="download", title="t", timeout=1, on_timeout=False)
+        assert approved is False and "超时" in note
+        approved, note = await wam.request_approval(
+            wid_turn, "t_timeout", kind="other", title="t", timeout=1, on_timeout=True)
+        assert approved is True and "自动档" in note
+    finally:
+        _workers.pop(wid_turn, None)
+
+
+async def test_ask_user_tool_follows_mode_when_nobody_answers():
+    """ask_user 全链路：自动档没人应答 → 放行继续（对齐 DSH）；审阅/计划档 → 不通过"""
+    from app.services.world import world_ai_mode as wam
+    from app.tools.world.ask_user import AskUserTool
+
+    old = wam._WAIT_FOR_VIEWER
+    wam._WAIT_FOR_VIEWER = 0
+    try:
+        tool = AskUserTool()
+        for mode, expect in (("auto", True), ("review", False), ("plan", False)):
+            ctx = WorldToolContext(
+                world_repo=None, world=_World(mode), arguments="{}",
+                args={"kind": "other", "question": "继续吗？"},
+            )
+            r = await tool.execute(ctx)
+            assert r["success"] is True and r["approved"] is expect, f"{mode}: {r}"
+            assert r["answered"] is False and r["answer"] == "用户未回复"
+            if mode == "auto":
+                assert "自动档" in r["note"]
+    finally:
+        wam._WAIT_FOR_VIEWER = old
 
 
 def test_resolve_approval_rejects_unknown_id():

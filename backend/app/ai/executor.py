@@ -18,6 +18,7 @@ from sqlalchemy import select
 from app.config import settings
 from app.database import async_session
 from app.chat import chat_api
+from app.utils.pure.tool_chain import heal_tool_chain
 
 # ── 中断消息注入：AI 忙碌时，新消息不另起 executor，注入当前循环 ──
 # {agent_id: [{type: "user_message", content, sender_id, sender_name, session_id}]}
@@ -556,6 +557,13 @@ async def _tool_call_loop(
             async def _dispatch_one_tool(tc: dict):
                 nonlocal last_task, _end_turn
                 if _end_turn:
+                    # 同一批里前一个工具已 end_turn → 后面的不执行，但**必须**留一条 tool 响应：
+                    # assistant(tool_calls) 里每个 id 都要有回应，少一条整次请求 400
+                    # （2026-09-14 修的同类线上问题，兜底见 app/utils/pure/tool_chain.py）
+                    _pending_results.append({"tc_id": tc.get("id", ""), "result": {
+                        "success": False,
+                        "error": "本轮已结束（前一个工具调用了 end_turn），该工具未执行",
+                    }})
                     return
                 tc_id = tc.get("id", "")
                 func_info = tc.get("function", {})
@@ -697,6 +705,10 @@ async def _tool_call_loop(
                         old = _pending_interrupts.get(agent.id) or []
                         _pending_interrupts[agent.id] = pending_msgs + old
 
+            # 发请求前先补齐工具链（并行调用被跳过 / 任何中断路径都可能留悬空 tool_calls，
+            # 少一条响应整次请求就 400；纯函数校验，O(n)，代价可忽略）
+            if heal_tool_chain(messages):
+                logger.warning(f"🔧 AI {agent.name}({agent.id}) 补齐悬空 tool_calls（避免 400）")
             try:
                 # 内层：同 Key 重试（500/503）
                 for server_retry in range(MAX_SERVER_RETRIES + 1):

@@ -53,7 +53,8 @@ SAFE_TOOLS = frozenset({
     "ask_user", "present_plan",
 })
 
-_APPROVAL_TIMEOUT = 300                 # 等用户点按钮的上限（秒）；超时 = 不通过（安全默认）
+_APPROVAL_TIMEOUT = 300                 # 审阅/计划：等用户点按钮的上限（秒）；超时 = 不通过（安全默认）
+_ASK_TIMEOUT = 600                      # 自动档：AI 主动提问等用户的上限（10 分钟，超时自行继续，对齐 DSH）
 _WAIT_FOR_VIEWER = 20                   # 没人在看时先等一小会儿（页面最多 10s 一次空闲轮询会接上）
 
 
@@ -99,15 +100,32 @@ def _event(payload: dict) -> str:
     return "data: [APPROVAL]" + json.dumps(payload, ensure_ascii=False) + "\n\n"
 
 
+def unattended_policy(world) -> tuple[bool, int]:
+    """无人应答时的处置（模式决定，单一来源）：返回 (超时是否放行, 等多久)。
+
+    - **auto 自动**：无人应答就继续——AI 主动提问等 10 分钟（对齐 DSH 的「问不到就自己判断」），
+      没人在看时更不该干等；
+    - **review 审阅 / plan 计划**：无人应答一律**不放行**（这是这两种模式的全部意义，
+      绝不因为"等超时了"就默认批准敏感操作）。
+    """
+    if get_mode(world) == "auto":
+        return True, _ASK_TIMEOUT
+    return False, _APPROVAL_TIMEOUT
+
+
 async def request_approval(
     world_id: int, turn_id: str, *, kind: str, title: str,
-    detail: str = "", timeout: int = _APPROVAL_TIMEOUT,
+    detail: str = "", timeout: int = _APPROVAL_TIMEOUT, on_timeout: bool = False,
 ) -> tuple[bool, str]:
     """弹窗征询用户同意（唯一审批通道）。返回 (是否同意, 说明)。
 
-    没有可交互前端（轮次不在 / 没有订阅者 / 非轮次上下文）→ 立即按「不通过」返回，
-    不空等：审阅模式下没人在看时保守拒绝，是正确行为。
+    on_timeout = 没有人应答（没人看 / 等超时）时算不算放行——由调用方按模式声明，
+    不要在这里猜：审阅/计划必须 False，自动档的 AI 主动提问才是 True。
     """
+    def _unattended(reason: str) -> tuple[bool, str]:
+        if on_timeout:
+            return True, f"{reason}；自动档按你的判断继续（在回复里说明你的决定）"
+        return False, reason
     # 页面未必已经在看这个轮次（外部发起的轮次靠空闲轮询接上）——先等一小会儿再判定无人。
     tbs = _broadcasters(world_id, turn_id)
     deadline = time.monotonic() + _WAIT_FOR_VIEWER
@@ -115,7 +133,7 @@ async def request_approval(
         await asyncio.sleep(1)
         tbs = _broadcasters(world_id, turn_id)
     if not tbs:
-        return False, "当前没有可交互的前端（弹窗无人应答），已按「不通过」处理"
+        return _unattended("当前没有可交互的前端（弹窗无人应答）")
 
     approval_id = uuid.uuid4().hex[:12]
     entry = {
@@ -136,7 +154,7 @@ async def request_approval(
         approved = bool(await asyncio.wait_for(entry["future"], timeout=timeout))
         reason = entry.get("note") or ("用户已同意" if approved else "用户选择不同意")
     except asyncio.TimeoutError:
-        approved, reason = False, f"等待用户确认超时（{timeout}s），已按「不通过」处理"
+        approved, reason = _unattended(f"等待用户确认超时（{timeout // 60} 分钟）")
     except asyncio.CancelledError:
         approved, reason = False, "轮次被中断，审批未完成（按「不通过」处理）"
         raise
@@ -202,11 +220,13 @@ async def gate_tool_call(world, world_id: int, tool_name: str, args: dict, turn_
     if turn_state.get("plan_approved") or action in approved_classes:
         return True, True, ""
 
+    # 门禁永不「超时放行」：审阅/计划模式下没人应答就是不同意（on_timeout=False）
     ok, note = await request_approval(
         world_id, turn_state.get("turn_id", ""),
         kind=action,
         title=f"{MODE_LABELS[mode]}：AI 请求{ACTION_LABELS[action]}",
         detail=describe_action(tool_name, args),
+        on_timeout=False,
     )
     if not ok:
         return False, False, (

@@ -52,6 +52,13 @@ export const toolZh: TranslationDict = {
   'world.kind.modify': '改动世界机制',
   'world.kind.plan': '执行计划',
   'world.kind.other': '其他事项',
+  'world.mode.label': '运行模式',
+  'world.mode.auto': '自动',
+  'world.mode.review': '审阅',
+  'world.mode.plan': '计划',
+  'world.mode.hint.auto': '不打断：AI 自行下载文件、改动世界机制、删除文件',
+  'world.mode.hint.review': '下载 / 删除 / 改动世界机制会弹窗请你确认（同类操作本轮只问一次）',
+  'world.mode.hint.plan': 'AI 先探索并提交计划，你通过后才按自动模式执行',
 }
 
 export const toolEn: TranslationDict = {
@@ -94,6 +101,13 @@ export const toolEn: TranslationDict = {
   'world.kind.modify': 'Change world mechanics',
   'world.kind.plan': 'Run the plan',
   'world.kind.other': 'Other decision',
+  'world.mode.label': 'Mode',
+  'world.mode.auto': 'Auto',
+  'world.mode.review': 'Review',
+  'world.mode.plan': 'Plan',
+  'world.mode.hint.auto': 'No interruptions: the AI downloads, changes world mechanics and deletes on its own',
+  'world.mode.hint.review': 'Downloads / deletions / changes pop up for your approval (once per kind each turn)',
+  'world.mode.hint.plan': 'The AI explores and submits a plan first; on approval it runs in auto mode',
 }
 
 export const toolJa: TranslationDict = {
@@ -136,4 +150,11 @@ export const toolJa: TranslationDict = {
   'world.kind.modify': '世界の仕組み変更',
   'world.kind.plan': '計画の実行',
   'world.kind.other': 'その他の判断',
+  'world.mode.label': '実行モード',
+  'world.mode.auto': '自動',
+  'world.mode.review': '確認',
+  'world.mode.plan': '計画',
+  'world.mode.hint.auto': '中断なし：AI が取得・仕組み変更・削除を自ら実行します',
+  'world.mode.hint.review': '取得 / 削除 / 仕組み変更は確認ダイアログが出ます（同種はこのターン一度だけ）',
+  'world.mode.hint.plan': 'AI が先に計画を提出し、承認後に自動モードで実行します',
 }

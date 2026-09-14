@@ -39,14 +39,20 @@ class AskUserTool(WorldToolPlugin):
             return {"success": False, "error": f"kind 必填且必须是 {'/'.join(KINDS)} 之一"}
         if not question:
             return {"success": False, "error": "缺少 question 参数"}
-        from app.services.world.world_ai_mode import request_approval
+        from app.services.world.world_ai_mode import request_approval, unattended_policy
+        # 没人应答怎么办由模式决定：自动档等 10 分钟然后自行继续（对齐 DSH），
+        # 审阅/计划档一律不放行——不能因为"等超时了"就把敏感操作默认批了
+        on_timeout, timeout = unattended_policy(ctx.world)
         turn_id = (ctx.turn_state or {}).get("turn_id", "")
         approved, note = await request_approval(
             ctx.world.id, turn_id, kind=kind, title=question, detail=detail,
+            timeout=timeout, on_timeout=on_timeout,
         )
+        answered = "未回复" not in note and "无人应答" not in note
         return {
-            "success": True, "approved": approved,
-            "answer": "同意" if approved else "不同意", "note": note,
+            "success": True, "approved": approved, "answered": answered,
+            "answer": ("同意" if approved else "不同意") if answered else "用户未回复",
+            "note": note,
         }
 
     def summary(self, result: dict) -> str:

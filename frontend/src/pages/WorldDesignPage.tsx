@@ -489,6 +489,8 @@ export default function WorldDesignPage() {
         onMsg={setMsg}
         onUnreadCountChange={setChatUnreadCount}
         creatorName={world?.creator?.name}
+        aiMode={world?.ai_mode || 'review'}
+        onModeChange={(mode) => setWorld((w) => (w ? { ...w, ai_mode: mode } : w))}
       />
     </>
     )

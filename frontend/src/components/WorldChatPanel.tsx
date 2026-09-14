@@ -75,6 +75,38 @@ function ToolBubble({ name, label, detail, error, icon, running }: {
   )
 }
 
+// 运行模式三档（后端 world_ai_mode.MODES 是权威定义；这里只管展示与切换）
+const MODE_ITEMS = [
+  { key: 'auto', labelKey: 'tool:world.mode.auto', hintKey: 'tool:world.mode.hint.auto', active: 'bg-mint-400/15 text-mint-300' },
+  { key: 'review', labelKey: 'tool:world.mode.review', hintKey: 'tool:world.mode.hint.review', active: 'bg-amber-400/15 text-amber-300' },
+  { key: 'plan', labelKey: 'tool:world.mode.plan', hintKey: 'tool:world.mode.hint.plan', active: 'bg-primary-500/20 text-primary-300' },
+]
+
+/** 运行模式切换（对话栏内，随手可切）：自动 / 审阅 / 计划——
+ *  用户对 AI 自主度的约束，改即生效；当前档位带色，悬停显示该档说明。 */
+function ModeSwitch({ mode, busy, onChange }: { mode: string; busy: boolean; onChange: (m: string) => void }) {
+  const t = useT()
+  return (
+    <div className="flex items-center gap-2 px-3 py-1.5 border-t border-border bg-surface/60">
+      <ShieldAlert size={11} className="shrink-0 text-textMuted" />
+      <span className="shrink-0 text-[10px] text-textMuted">{t('tool:world.mode.label')}</span>
+      <div className="flex-1 min-w-0 flex items-center gap-0.5 p-0.5 rounded-lg bg-elevated border border-border">
+        {MODE_ITEMS.map((m) => (
+          <button
+            key={m.key}
+            onClick={() => { if (m.key !== mode && !busy) onChange(m.key) }}
+            disabled={busy}
+            title={t(m.hintKey)}
+            className={`flex-1 min-w-0 px-1.5 py-[3px] text-[10px] rounded-md transition-colors truncate disabled:opacity-60 ${
+              m.key === mode ? m.active : 'text-textMuted hover:text-textSecondary'
+            }`}
+          >{t(m.labelKey)}</button>
+        ))}
+      </div>
+    </div>
+  )
+}
+
 /** 审批弹窗（审阅/计划模式）：AI 请求下载/删除/改动机制，等用户点按钮，选完服务端自动继续。
  *  事件类型关键词由后端按下发的 kind 渲染，用户一眼看清在批什么。 */
 function ApprovalDialog({ approval, onDecide }: { approval: Approval; onDecide: (ok: boolean) => void }) {
@@ -181,6 +213,9 @@ interface WorldChatPanelProps {
   onUnreadCountChange?: (count: number) => void
   /** 群视界机器人昵称（气泡标签用；缺省回退「世界 AI」） */
   creatorName?: string
+  /** 世界当前运行模式（worlds.config.ai_mode；对话栏内可直接切） */
+  aiMode?: string
+  onModeChange?: (mode: string) => void
 }
 
 /**
@@ -191,8 +226,26 @@ interface WorldChatPanelProps {
  * - 通过 onUnreadCountChange 回调通知父组件未读变化
  * - 打字/消息更新仅重渲染此组件，不触发父组件
  */
-const WorldChatPanel = memo(forwardRef<WorldChatHandle, WorldChatPanelProps>(({ wid, onRefresh, onMsg, onUnreadCountChange, creatorName }, ref) => {
+const WorldChatPanel = memo(forwardRef<WorldChatHandle, WorldChatPanelProps>(({ wid, onRefresh, onMsg, onUnreadCountChange, creatorName, aiMode, onModeChange }, ref) => {
   const t = useT()
+  // 运行模式（对话栏内切换；与设计页配置弹窗是同一个后端字段，切换后回调父组件同步）
+  const [mode, setMode] = useState(aiMode || 'review')
+  const [modeBusy, setModeBusy] = useState(false)
+  useEffect(() => { if (aiMode) setMode(aiMode) }, [aiMode])
+  const switchMode = useCallback(async (next: string) => {
+    setModeBusy(true)
+    try {
+      await api.put<{ ai_mode: string }>(`/worlds/${wid}/ai-mode`, { mode: next })
+      setMode(next)
+      onModeChange?.(next)
+      const item = MODE_ITEMS.find((m) => m.key === next)
+      onMsg?.(item ? t(item.hintKey) : next)
+    } catch (e: any) {
+      onMsg?.(`切换运行模式失败: ${e?.message || e}`)
+    } finally {
+      setModeBusy(false)
+    }
+  }, [wid, onModeChange, onMsg, t])
   // ── 内部管理所有聊天状态 ──
   const chat = useWorldChat({ wid, onRefresh, onMsg })
 
@@ -552,6 +605,9 @@ const WorldChatPanel = memo(forwardRef<WorldChatHandle, WorldChatPanelProps>(({ 
           )}
         </div>
       </div>
+
+      {/* 运行模式：紧贴输入区上方一行，随时可切（AI 的自主度约束） */}
+      <ModeSwitch mode={mode} busy={modeBusy} onChange={switchMode} />
 
       {/* 会话工具条：当前会话 + 收藏 + 新对话 + 会话列表（/new 后对话保存可切回） */}
       <div className="flex items-center gap-1.5 px-3 py-1.5 border-t border-border bg-surface/60 text-[10px] text-textMuted relative" {...attachments.zoneProps('toolbar')}>
