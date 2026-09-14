@@ -14,6 +14,7 @@ from pathlib import Path
 
 from sqlalchemy import select
 from app.repositories.world_repo import WorldRepository
+from app.services.world.world_ai_mode import build_mode_prompt, gate_tool_call, get_mode
 from app.services.world.world_chat_items import ChatItem
 from app.utils.multimodal import (
     build_content, image_placeholder, image_note, injected_image_count,
@@ -75,6 +76,14 @@ FORCED_PROMPT_SEGMENTS = [
     "- **操作绝不借道群聊**：页面上的每个按钮/入口都要有直接的点击反馈（前端直接执行或调事件通道），**禁止写「从群聊进入/群内直接发指令：探索 战斗 商店…」这类引导文案**，禁止让用户离开页面去群里发指令才能操作；页面操作一律走事件通道（06 分区 4.1，POST /world/{id}/api/event），世界程序回复用 SSE 状态（publish）。只有真正关键、需要别人在群里看到的事件（如宣布重大结果、求助他人）才用群消息 API",
     # 消息同步纪律（产品 2026-08-13 定）
     "\n【消息同步纪律】（产品定）不要把内容无节制同步到群聊：\n- 群消息是稀缺资源，只在用户真正需要/期待在群里看到时才发布（回复提问、宣布重要事件、被 @ 时）\n- 前端/沉浸界面能展示或响应的内容（状态变化、进度、中间过程、提示信息）一律不同步到群——页面自会呈现，同步即噪音\n- 同一事件不要既发群消息又在界面重复展示；宁可少发，不可轰炸\n- 批量/例行通知（定时、状态刷新、系统噪音）默认不发群，除非用户明确要求",
+    # 文件与下载纪律（产品 2026-09-15 定：内容红线 + 程序文件红线 + 固定落点）
+    "\n【文件与下载纪律】\n"
+    "- 严禁下载色情、暴力、违法内容：平台按链接/文件名/正文关键词拦截并记录，命中即失败——不要换个链接再试；\n"
+    "- 严禁下载可执行文件、安装包与脚本（.exe/.msi/.dll/.bat/.cmd/.sh/.ps1/.vbs/.jar/.apk 等）："
+    "创建时直接拒绝，目录里遗留的会被强制删除。世界代码只有 .js 与 .py 两种（.py 在沙箱里执行），其余内容一律写成网页资源或纯文本；\n"
+    "- 下载一律落在固定目录 downloads/ 下，不要往别处塞下载来的文件；\n"
+    "- 移动/复制/删除世界文件用 file_move / file_copy / file_delete（都限定在世界目录内）；\n"
+    "- 沙箱已做隔离（文件系统 Landlock + 系统调用 seccomp，禁 execve/网络/挂载）：不要试图执行外部程序或绕过限制。",
     # 世界运行规范
     "\n【世界运行规范】\n- 沙箱环境：世界代码（main.py / 沙箱脚本）的工作目录 = 世界文件夹本体，可直接读写世界文件夹里的文件（含 JSON 数据文件）；环境变量注入 WORLD_ID / WORLD_API_TOKEN / WORLD_API_BASE / WORLD_DIR（token 只用于受控 API，绝不外泄/打印/写进页面）\n- 数据规范（代码/数据分离）：\n  1) 结构化/操作数据（状态、计数、记录）→ 用受控 API 的世界数据库：GET/PUT/DELETE /data/{key}（key 用命名空间如 player.lihua / poems / quest.1，value 任意 JSON）——世界代码与页面三方共用同一份数据\n  2) 静态文字类（设定、文档、素材文本）→ 放世界文件夹 content/ 子目录（可自由建层级；content/ 是世界产物区，发布世界不打包，下载数据可选包含）\n  3) 代码（网页/脚本）放世界文件夹根目录或自有目录\n- 页面读数据：经世界代码发布状态（POST /state → 页面 SSE）或世界代码生成页面时内嵌；页面不要直连数据库\n【内容提炼与动态加载】（产品 2026-08-12 定）剧情/按钮列表/大量设定等**内容不准写死在渲染中**：能提炼为文档/列表/数据文件的提炼掉，页面动态加载（fetch/import）；不固定数目；图片/音频等资源同理；同构多实例（NPC/卡牌/角色）**每个实例一个文件**（如 npcs/lihua.json）。改内容/新增实例都不碰渲染代码。\n【结构约定】注意维护和优化世界的项目结构：文件按职责组织（页面/样式/脚本/数据分开），定期清理无用文件，代码保持整洁可维护——世界会长期演进，结构混乱会让后续修改越来越难。⚠️ **适时拆分文件**：文件一旦变大（或你觉得对维护不利）就拆分——拆成职责单一的小文件/模块，别让单个文件越来越臃肿；拆分的判断标准：这个文件继续变大会不会让后续修改变难？会就拆。",
     # 常驻模式与实时通道
@@ -814,15 +823,24 @@ async def _run_one_tool_call(
     async def _on_progress(note: str) -> None:
         progress_events.append(note)
     result = None
-    try:
-        result = await execute_world_tool(
-            world_repo, world, acc["name"], acc["arguments"], turn_state,
-            on_progress=_on_progress,
-        )
-    except Exception as e:
-        # 工具/技能自己抛异常：如实回传错误，交给 AI 决定下一步（别重试——副作用可能已发生）
-        logger.warning(f"🌐 世界 #{world_id} 工具 {acc['name']} 执行失败: {e}")
-        result = {"success": False, "error": str(e)[:500]}
+    # ⓪ 运行模式门禁（唯一入口）：审阅/计划模式下敏感操作在这里弹窗等用户点头；
+    #    auto 直接放行并告知工具「平台已兜底」，工具不必自己再问一遍。
+    from app.tools.world.shared import parse_args
+    allowed, approved, block_reason = await gate_tool_call(
+        world, world_id, acc["name"], parse_args(acc.get("arguments") or ""), turn_state,
+    )
+    if not allowed:
+        result = {"success": False, "error": block_reason, "blocked_by": "ai_mode"}
+    else:
+        try:
+            result = await execute_world_tool(
+                world_repo, world, acc["name"], acc["arguments"], turn_state,
+                on_progress=_on_progress, approved=approved,
+            )
+        except Exception as e:
+            # 工具/技能自己抛异常：如实回传错误，交给 AI 决定下一步（别重试——副作用可能已发生）
+            logger.warning(f"🌐 世界 #{world_id} 工具 {acc['name']} 执行失败: {e}")
+            result = {"success": False, "error": str(e)[:500]}
     summary = tool_result_summary(acc["name"], result)
     # 卡片详情（UI 专用）：和 summary 一起算好，随事件下发 + 落库；不进 LLM 上下文
     detail = tool_result_detail(acc["name"], acc["arguments"], result)
@@ -1007,6 +1025,7 @@ async def _prepare_world_chat(
     # ── 组装消息：静态 system 前缀保持稳定（prompt cache 友好）──
     system_prompt = world_context_block(world) + "\n\n" + eff_user_prompt
     system_prompt += eff_forced_prompt  # 强注入段：平台强约束，用户不可改
+    system_prompt += build_mode_prompt(get_mode(world))  # 运行模式（自动/审阅/计划）
     system_prompt += f"\n【名字】你的名字是「{eff_name}」，对外标识 world-{world_id}。"
 
     notices = await take_pending_notices(world_repo, world_id)
@@ -1513,8 +1532,8 @@ async def stream_world_chat(
     except Exception as e:
         logger.warning(f"🌐 世界 #{world_id} 首轮插入消息注入失败（非致命）: {e}")
 
-    # 本轮对话状态（温和去重 + 工作流记忆收集）
-    turn_state: dict = {"executed": {}, "tools_done": []}
+    # 本轮对话状态（温和去重 + 工作流记忆收集 + 审批门禁的轮次上下文）
+    turn_state: dict = {"executed": {}, "tools_done": [], "turn_id": turn_id}
 
     # LLM 调用统一入口（工具轮/收尾共用）：与主系统一致走流式，规避非流式+tools+thinking 挂起
     async def _llm(messages: list, tools, round_no):

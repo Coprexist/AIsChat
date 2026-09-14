@@ -35,8 +35,12 @@ def __getattr__(name: str):
 
 
 async def run_world_tool(world_repo, world, name: str, arguments: str,
-                         turn_state: dict | None = None, on_progress=None) -> dict:
-    """执行一次工具调用（不去重）。命令、代理等确定性场景用这个。"""
+                         turn_state: dict | None = None, on_progress=None,
+                         approved: bool = False) -> dict:
+    """执行一次工具调用（不去重）。命令、代理等确定性场景用这个。
+
+    approved：已获用户同意（自动模式或门禁批准）——传给工具，免得它自己再问一遍。
+    """
     plugin = WorldToolRegistry.get(name)
     if plugin is not None:
         ctx = WorldToolContext(
@@ -46,6 +50,7 @@ async def run_world_tool(world_repo, world, name: str, arguments: str,
             args=_parse_args(arguments),
             turn_state=turn_state,
             on_progress=on_progress,
+            approved=approved,
         )
         return await plugin.execute(ctx)
 
@@ -58,7 +63,8 @@ async def run_world_tool(world_repo, world, name: str, arguments: str,
 
 
 async def execute_world_tool(world_repo, world, name: str, arguments: str,
-                             turn_state: dict | None = None, on_progress=None) -> dict:
+                             turn_state: dict | None = None, on_progress=None,
+                             approved: bool = False) -> dict:
     """AI 调用入口：run_world_tool + 温和去重。
 
     5 分钟内重复调用且结果与上次完全一致才提示跳过：list_world_files 这类可能是 AI 在
@@ -66,7 +72,8 @@ async def execute_world_tool(world_repo, world, name: str, arguments: str,
     """
     import time as _time
 
-    result = await run_world_tool(world_repo, world, name, arguments, turn_state, on_progress=on_progress)
+    result = await run_world_tool(world_repo, world, name, arguments, turn_state,
+                                  on_progress=on_progress, approved=approved)
     if turn_state is None:
         return result
     executed = turn_state.setdefault("executed", {})

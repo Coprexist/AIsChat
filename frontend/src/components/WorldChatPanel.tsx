@@ -1,7 +1,7 @@
 import { memo, useState, useRef, useCallback, useMemo, forwardRef, useImperativeHandle, useEffect } from 'react'
-import { Send, Plus, X, ChevronRight, Brain, ArrowDown, FileText, Search, Globe, Terminal, Package, Clock, Wrench, Eraser, Pin, ChevronDown, Copy, RefreshCw, Paperclip } from 'lucide-react'
+import { Send, Plus, X, ChevronRight, Brain, ArrowDown, FileText, Search, Globe, Terminal, Package, Clock, Wrench, Eraser, Pin, ChevronDown, Copy, RefreshCw, Paperclip, ShieldAlert } from 'lucide-react'
 import MarkdownContent from './shared/MarkdownContent'
-import { useWorldChat, type ChatMsg } from '../hooks/useWorldChat'
+import { useWorldChat, type Approval, type ChatMsg } from '../hooks/useWorldChat'
 import { useAttachmentUpload, isImageAttachment } from '../hooks/useAttachmentUpload'
 import { AttachmentChips, DropMask } from './AttachmentChips'
 import { api } from '../api/client'
@@ -71,6 +71,44 @@ function ToolBubble({ name, label, detail, error, icon, running }: {
           {body}
         </div>
       )}
+    </div>
+  )
+}
+
+/** 审批弹窗（审阅/计划模式）：AI 请求下载/删除/改动机制，等用户点按钮，选完服务端自动继续。
+ *  事件类型关键词由后端按下发的 kind 渲染，用户一眼看清在批什么。 */
+function ApprovalDialog({ approval, onDecide }: { approval: Approval; onDecide: (ok: boolean) => void }) {
+  const t = useT()
+  const kindKey = `tool:world.kind.${approval.kind}`
+  const localized = t(kindKey)
+  return (
+    <div className="world-msg fixed inset-0 z-50 bg-black/60 flex items-center justify-center p-4">
+      <div className="w-full max-w-md bg-surface border border-border rounded-2xl shadow-xl overflow-hidden">
+        <div className="flex items-center gap-2 px-4 py-2.5 border-b border-border">
+          <ShieldAlert size={14} className="text-amber-400" />
+          <span className="text-sm font-medium">{t('tool:world.approval.title')}</span>
+          <span className="text-[10px] px-1.5 py-0.5 rounded bg-elevated text-textMuted">
+            {localized && localized !== kindKey ? localized : approval.kind}
+          </span>
+        </div>
+        <div className="px-4 py-3 max-h-[50vh] overflow-y-auto">
+          <div className="text-sm font-medium mb-1">{approval.title}</div>
+          {approval.detail && (
+            <pre className="text-[11px] whitespace-pre-wrap break-all bg-elevated rounded-lg p-2 text-textSecondary">{approval.detail}</pre>
+          )}
+        </div>
+        <div className="flex items-center gap-2 px-4 py-3 border-t border-border">
+          <span className="flex-1 text-[10px] text-textMuted">{t('tool:world.approval.waiting')}</span>
+          <button
+            onClick={() => onDecide(false)}
+            className="px-3 py-1.5 text-xs rounded border border-border text-textSecondary hover:text-rose-400 hover:border-rose-500/40 transition-colors"
+          >{t('tool:world.approval.deny')}</button>
+          <button
+            onClick={() => onDecide(true)}
+            className="px-3 py-1.5 text-xs rounded bg-primary-500 hover:bg-primary-600 text-white transition-colors"
+          >{t('tool:world.approval.approve')}</button>
+        </div>
+      </div>
     </div>
   )
 }
@@ -635,6 +673,14 @@ const WorldChatPanel = memo(forwardRef<WorldChatHandle, WorldChatPanelProps>(({ 
           世界级会话（非 DM）：账单走世界主人，让它改界面、加功能
         </div>
       </div>
+
+      {/* 审批弹窗：一次只显示队首（后端同一时刻几乎只会挂一个待审批） */}
+      {chat.approvals.length > 0 && (
+        <ApprovalDialog
+          approval={chat.approvals[0]}
+          onDecide={(ok) => chat.resolveApproval(chat.approvals[0].approval_id, ok)}
+        />
+      )}
     </>
   )
 }))

@@ -1,93 +1,144 @@
 # 03 文件操作
-> `file_list / file_write / file_read / file_edit / file_delete` 全部参数与返回、类型白名单、越界防护、读取截断规则。**建/改世界网页代码前必读**。
+> \`file_list / file_write / file_read / file_edit / file_delete / file_move / file_copy\` 全部参数与返回、类型策略（允许清单 + 禁用后缀）、越界防护、读取截断规则，以及下载文件的固定落点。**建/改世界网页代码前必读**。
 
 ## 1. 概述
 
-世界文件存储在**隔离目录** `data/worlds/{world_id}/`，只能通过工具或 `/world/{id}/files/` 路由访问。**不允许越界访问**：`../`、绝对路径、符号链接逃逸一律拒绝。
+世界文件存储在**隔离目录** \`data/worlds/{world_id}/\`，只能通过工具或 \`/world/{id}/files/\` 路由访问。**不允许越界访问**：\`../\`、绝对路径、符号链接逃逸一律拒绝。
+
+### 1.1 类型策略（写文件前先看这一节）
+
+**允许**（不在清单内一律拒绝）：
+- 网页与世界代码：\`html htm css js mjs json map py\`
+- 纯文本源码/文档/配置/数据：\`md txt rst tex csv xml yaml yml toml ini cfg conf env log sql ts tsx jsx vue svelte java c h cpp hpp cs go rs kt swift\`
+- 媒体与字体：\`png jpg jpeg gif svg webp ico bmp woff woff2 ttf otf eot mp3 wav ogg mp4 webm\`
+- 文档/压缩包：\`pdf zip\`（zip 内的文件在导入时逐个过同一套检查）
+
+**禁止**（可执行文件、安装包、系统库、宿主脚本）：
+\`.exe .msi .msp .msu .com .scr .pif .cpl .dll .sys .drv .ocx .inf .lnk .reg .hta .msc .gadget .bat .cmd .sh .bash .zsh .ksh .csh .fish .vbs .vbe .jse .wsf .wsh .ps1 .psm1 .psd1 .jar .class .apk .app .deb .rpm .dmg .pkg .snap .iso .img .bin .so .o .a .dylib .elf\`
+
+三层防护，AI 与用户同一套：① 提示词明写不得下载脚本/程序文件；② **创建时直接拒绝**（\`⛔ 禁止 .xxx 类型文件\`，改后缀也无效，因为按后缀判定）；③ 目录里遗留的会被**兜底扫描强制删除**（世界唤醒、zip 导入、后端启动各扫一次）。
+
+需要运行逻辑就写成 \`.js\`（前端执行）或 \`.py\`（世界代码，沙箱执行）——**除这两种之外没有可执行的东西**。
+
+**单文件上限 32MB。**
 
 ## 2. 工具一览
 
 | 工具 | 用途 | 关键参数 |
 |------|------|----------|
-| `file_list` | 列出世界文件夹里的文件 | 无 |
-| `file_write` | 创建或写入文件（自动建目录） | `path`（相对路径，如 `css/style.css`）、`content` |
-| `file_read` | 读取文件内容（编辑前确认用） | `path` |
-| `file_edit` | 增量编辑（查找替换/插入/删行），省 token | `path`、`operation`、按需参数 |
-| `file_delete` | 删除文件 | `path` |
+| \`file_list\` | 列出世界文件夹里的文件 | 无 |
+| \`file_write\` | 创建或写入文件（自动建目录） | \`path\`（相对路径，如 \`css/style.css\`）、\`content\` |
+| \`file_read\` | 读取文件内容（编辑前确认用） | \`path\`、可选 \`offset\`/\`limit\` 按行分页 |
+| \`file_edit\` | 增量编辑（查找替换/插入/删行），省 token | \`path\`、\`operation\`、按需参数 |
+| \`file_delete\` | 删除文件或目录 | \`path\` |
+| \`file_move\` | 移动 / 重命名（目录可整体搬移） | \`from\`、\`to\`（都要写完整文件名） |
+| \`file_copy\` | 世界内复制文件 / 目录 | \`from\`、\`to\` |
 
 ## 3. 各工具详细
 
 ### 3.1 file_list
 
-```
+\`\`\`
 → { "success": true, "files": ["index.html", "css/style.css", "img/logo.png"] }
-```
+\`\`\`
 
 - 返回**相对路径列表**，可用于确认目录结构后再读写。
 
 ### 3.2 file_write
 
-```json
+\`\`\`json
 { "path": "css/style.css", "content": "body { color: red; }" }
-```
+\`\`\`
 
 - **自动创建缺失目录**；目标已存在则覆盖。
-- **类型白名单**（不在白名单内直接拒绝）：`html / htm / css / js / json / md / txt / png / jpg / jpeg / gif / svg / webp / ico / woff / woff2 / ttf / mp3 / wav / ogg / mp4 / webm / py`（`py` 仅存储，**阶段 2 才可执行**）。
-- **单文件上限 5MB**。
-- **温和去重**：若新内容与现有内容完全一致，返回 `unchanged: true` + 提示，不重复写入（不是错误，别重试）。
+- **类型策略见 1.1**（禁用后缀直接拒绝）。
+- **温和去重**：若新内容与现有内容完全一致，返回 \`unchanged: true\` + 提示，不重复写入（不是错误，别重试）。
 
 ### 3.3 file_read
 
-```
+\`\`\`
 → { "success": true, "path": "index.html", "content": "<html>…", "binary": false }
-```
+\`\`\`
 
-- 二进制文件：返回 `binary: true`，`content` 为 null（工具侧显示"二进制文件，内容不返回"）。
-- **长文件截断**：超过 6000 字符截断显示，末尾附提示——需要改内容时用 `file_edit` 定位，不要全文重写。
-- **建议**：编辑前先 `file_read` 确认当前内容，避免误覆盖。
+- 二进制文件：返回 \`binary: true\`，\`content\` 为 null（工具侧显示"二进制文件，内容不返回"）。
+- **按行分页**（推荐）：传 \`offset\`/\`limit\` 只读需要的段落，返回 \`total_lines / start_line / end_line / truncated\`——**先 file_grep 定位行号再读**，不要整文件全读浪费上下文。
+- **建议**：编辑前先 \`file_read\` 确认当前内容，避免误覆盖。
 
 ### 3.4 file_edit（增量编辑，推荐）
 
-```json
+\`\`\`json
 { "path": "index.html", "operation": "str_replace",
   "old_string": "<title>旧标题</title>", "new_string": "<title>新标题</title>" }
-```
+\`\`\`
 
-三种 `operation`：
+三种 \`operation\`：
 
 | operation | 必填参数 | 行为 |
 |-----------|----------|------|
-| `str_replace` | `old_string` + `new_string` | 精确替换；`old_string` 必须**唯一**，否则报错 |
-| `insert` | `line` + `new_string` | 在 `line` 行之后插入（1 开头，`0` = 文件开头） |
-| `delete_lines` | `start_line` + `end_line` | 删除 `start_line..end_line`（**含两端**） |
+| \`str_replace\` | \`old_string\` + \`new_string\` | 精确替换；\`old_string\` 必须**唯一**，否则报错 |
+| \`insert\` | \`line\` + \`new_string\` | 在 \`line\` 行之后插入（1 开头，\`0\` = 文件开头） |
+| \`delete_lines\` | \`start_line\` + \`end_line\` | 删除 \`start_line..end_line\`（**含两端**） |
 
 - **多次插入时从最大行号开始往小插**（行号会随插入变化，从大往小插不会错位）。
-- 编辑核心与主站共用同一份实现（`apply_file_edit`），语义一致。
+- 编辑核心与主站共用同一份实现（\`apply_file_edit\`），语义一致。
 - 二进制文件不可编辑。
 
 ### 3.5 file_delete
 
-```json
+\`\`\`json
 { "path": "old.html" }
-```
+\`\`\`
 
-- 删除文件；目录需先清空内容再删（或留空目录）。
+- 删除文件；路径是目录时**整个目录递归删除**（含里面的文件，谨慎）。
+- 审阅模式下删除会弹窗请用户确认（见 08 分区「运行模式门禁」）。
 
-## 4. 页面内访问静态资源（不是工具，是路由）
+### 3.6 file_move
+
+\`\`\`json
+{ "from": "css/old.css", "to": "assets/new.css" }
+\`\`\`
+
+- 同目录改名、跨目录搬移都行；源是目录时整体搬移（搬完会对目录做一次禁用后缀兜底扫描）。
+- \`to\` 要写**完整文件名**（不是目录）；源与目标都在世界目录内，\`../\` 一律拒绝。
+
+### 3.7 file_copy
+
+\`\`\`json
+{ "from": "index.html", "to": "backup/index.bak.html" }
+\`\`\`
+
+- 世界内复制文件/目录（原文件保留），**不能跨世界复制**。
+- 复制前校验总大小（≤32MB）与目标后缀。
+
+## 4. 下载文件（web_download）与下载纪律
+
+\`\`\`json
+{ "url": "https://raw.githubusercontent.com/vuejs/core/main/README.md", "path": "vue/README.md" }
+\`\`\`
+
+- **固定落点 \`downloads/\`**：\`path\` 只是 \`downloads/\` 下的子路径；不填则按 URL 文件名或 content-type 自动命名到 \`downloads/\`。**下载来的文件不要往别处塞**，需要移动/改用途用 \`file_move\` / \`file_copy\`。
+- **代码站直链**：GitHub 的 \`blob\` 页面链接会自动转成 \`raw\` 直链，直接贴浏览器地址也能下到源码。
+- **内容红线**：严禁下载色情、暴力、违法内容——平台按链接/目标文件名/文本正文关键词拦截并记录，**命中即失败且不写盘**。不要换个链接绕。
+- **程序文件红线**：严禁下载可执行文件、安装包与脚本（见 1.1 禁用清单），创建时直接拒绝；代码只允许 \`.js\`/\`.py\` 与纯文本源码。
+- **大小上限 32MB**；只能访问公网地址（内网/本机地址一律拒绝）。
+- **审批**：审阅模式下平台会自动弹窗请用户确认（你不用自己问、不用等）；旁路场景（世界程序/定时任务发起的下载）平台会在下载完成后弹窗问是否保留，没人应答会删掉文件。
+
+## 5. 页面内访问静态资源（不是工具，是路由）
 
 写死这段路径即可，编号用变量：
 
-```
-GET /world/${WORLD_ID}/files/<相对路径>     # 静态资源（css/js/图片/页面）
-```
+\`\`\`
+GET /world/\${WORLD_ID}/files/<相对路径>     # 静态资源（css/js/图片/页面）
+\`\`\`
 
-```html
-<link rel="stylesheet" href="/world/${WORLD_ID}/files/css/style.css">
-<img src="/world/${WORLD_ID}/files/img/logo.png">
-```
+\`\`\`html
+<link rel="stylesheet" href="/world/\${WORLD_ID}/files/css/style.css">
+<img src="/world/\${WORLD_ID}/files/img/logo.png">
+\`\`\`
 
-## 5. 约定与防呆
+## 6. 约定与防呆
 
-- 页面内资源一律**相对路径**引用（跨文件夹用 `../`），不要用 `/` 开头绝对路径（会 404）。
+- 页面内资源一律**相对路径**引用（跨文件夹用 \`../\`），不要用 \`/\` 开头绝对路径（会 404）。
 - 创建文件后**告知用户文件路径**；调用工具时不要把工具调用的原始内容写进回复文本，直接说做了什么。
-- 写文件前先 `file_list` / `file_read` 确认现状，避免重复写入或误覆盖用户改动。
+- 写文件前先 \`file_list\` / \`file_read\` 确认现状，避免重复写入或误覆盖用户改动。
+- 看文件不要整文件全读：\`file_grep\` 定位 → \`file_read\` 分页读 → \`file_edit\` 精确改。

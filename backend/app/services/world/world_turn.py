@@ -303,6 +303,25 @@ def get_world_worker(world_id: int) -> WorldTurnWorker:
     return w
 
 
+def active_broadcasts(world_id: int) -> list[TurnBroadcast]:
+    """该世界所有未结束的活跃轮次（只读，不新建 worker）：旁路事件（如下载后再确认）广播用。"""
+    w = _workers.get(world_id)
+    if w is None or w.task.done():
+        return []
+    return [tb for tb in w.turns.values() if not tb.ended and tb.proxy is None]
+
+
+def get_turn_broadcast(world_id: int, turn_id: str) -> TurnBroadcast | None:
+    """只读查询某轮次的直播通道（**不新建 worker**）：审批弹窗、旁路事件用。
+
+    没有 worker / 轮次已结束 / turn_id 为空 → None（调用方据此判断「没人在看」）。
+    """
+    w = _workers.get(world_id)
+    if w is None or w.task.done() or not turn_id:
+        return None
+    return w.subscribe(turn_id)
+
+
 async def subscribe_turn(world_id: int, turn_id: str):
     """SSE 直播生成器：订阅指定轮次，心跳保活；断开无影响（轮次在服务器继续）"""
     worker = get_world_worker(world_id)

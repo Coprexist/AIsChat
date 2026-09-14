@@ -48,9 +48,10 @@
 | `backend/tests/test_world_tool_summaries.py` | 单元（零网络） | 4 | 世界工具插件契约：自报 `label/segment/summary`、文案可读、注册表覆盖 schema |
 | `backend/tests/test_gm_dm_symmetry.py` | 静态（路由表） | 3 | 群/私信接口命名对称，已删除的重复入口不得回归 |
 | `backend/tests/test_world_tool_plugins.py` | 静态（`symtable`） | 2 | 插件文件"引用了但没定义"的名字错误 |
+| `backend/tests/test_world_ai_guardrails.py` | 单元 + 集成（零网络） | 11 | 世界 AI 安全护栏：禁用后缀创建即拒 + 兜底强删、下载固定落点、违规内容拦截、模式门禁、**审阅弹窗完整闭环**（广播 → 用户点同意 → 工具放行） |
 | `backend/tests/test_agent_resolution.py` | 集成（真库） | 2 | 群成员 `member_id` 解析优先级 |
 
-合计 **66 条**（`run_without_pytest.py` 全量约 50s）。
+合计 **77 条**（`run_without_pytest.py` 全量约 55s）。
 
 辅助文件：
 

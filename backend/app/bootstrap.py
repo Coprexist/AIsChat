@@ -275,6 +275,19 @@ async def _startup_world() -> None:
     except Exception as e:
         logger.warning(f"[WARN] 常驻世界恢复异常: {e}")
 
+    # 禁用后缀兜底扫描：手动拷进目录/历史遗留/解压夹带的可执行文件一律强删（2026-09-15 产品定）
+    try:
+        from sqlalchemy import select as sa_select
+        from app.services.world.world_file_service import sweep_banned_files
+        from app.models.world import World as _W
+        async with async_session() as _sdb:
+            _wids = list((await _sdb.execute(sa_select(_W.id))).scalars().all())
+        _removed = [f"#{wid}:{p}" for wid in _wids for p in sweep_banned_files(wid)]
+        if _removed:
+            logger.warning(f"[WARN] 启动扫描强制删除禁用后缀文件 {len(_removed)} 个: {_removed[:10]}")
+    except Exception as e:
+        logger.warning(f"[WARN] 禁用后缀扫描失败（不影响启动）: {e}")
+
     # 世界商城 GitHub 自动同步（配置开启时启动拉取一次最新索引）
     try:
         from app.services.world.market_github import refresh_from_github, get_market_config

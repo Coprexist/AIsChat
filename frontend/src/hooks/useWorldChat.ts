@@ -10,6 +10,10 @@ import type { ReadyAttachment } from './useAttachmentUpload'
 // 消息走插入队列，避免与仍在运行的 turn 冲突。
 const CHAT_PROCESSING_INITIAL = true
 
+// 空闲时的状态复查间隔：轮次未必由本页面发起（群里唤起常驻世界、别的标签页发消息），
+// 审阅模式的审批弹窗就是这么冒出来的——只在自己发消息后看状态会漏掉，所以空闲也要慢轮询。
+const IDLE_RECHECK_MS = 10000
+
 // 会让内容上移（用户往回看）的按键——用于同步断开滚动跟随
 const SCROLL_UP_KEYS = new Set(['PageUp', 'ArrowUp', 'Home'])
 
@@ -55,7 +59,17 @@ export interface OutgoingItem {
 const EV = {
   INSERTED: '[INSERTED]',  // 信号：排队消息已插入（不计历史）→ 清排队弹窗
   INSERT: '[INSERT]',      // 消息：已落库（记历史）→ 画用户气泡
+  APPROVAL: '[APPROVAL]',  // 审批弹窗：审阅/计划模式下 AI 的敏感操作等用户点按钮
 } as const
+
+/** 审批弹窗（后端 world_ai_mode.request_approval 下发；status=resolved 即关闭） */
+export interface Approval {
+  approval_id: string
+  /** 事件类型关键词：download | delete | modify | plan | other */
+  kind: string
+  title: string
+  detail?: string
+}
 
 /** 解析 `[PREFIX]{json}` 事件体；前缀不匹配/JSON 坏返回 null */
 function parseEvent<T>(payload: string, prefix: string): T | null {
@@ -125,6 +139,9 @@ export interface UseWorldChatReturn {
   scrollToBottom: (force?: boolean) => void
   forceScrollToBottom: () => void
   unreadCount: number
+  /** 待用户点按钮的审批项（队列，通常一次只有一条；刷新后由 /chat/status 恢复） */
+  approvals: Approval[]
+  resolveApproval: (approvalId: string, approved: boolean) => Promise<void>
 }
 
 export function useWorldChat({ wid, onRefresh, onMsg }: UseWorldChatOptions) {
@@ -134,6 +151,8 @@ export function useWorldChat({ wid, onRefresh, onMsg }: UseWorldChatOptions) {
   const [chatProcessing, setChatProcessing] = useState(CHAT_PROCESSING_INITIAL)
   const [pendingItems, setPendingItems] = useState<PendingItem[]>([])  // AI 处理中排队消息（msg 一起发；cmd 串行执行）
   const [suggestions, setSuggestions] = useState<string[]>([])  // "你可以"建议（AI 生成 / 兜底 / 预设）
+  // 待审批项（审阅/计划模式）：后端弹窗事件 pending 加入、resolved 移除；刷新后由状态轮询恢复
+  const [approvals, setApprovals] = useState<Approval[]>([])
   // 会话（/new 开新对话、可切回；展示当前会话 id + 列表）
   const [currentSession, setCurrentSession] = useState<string>('default')
   const [sessionList, setSessionList] = useState<{ id: string; last_active_at?: string; pinned?: boolean }[]>([])
@@ -514,6 +533,18 @@ export function useWorldChat({ wid, onRefresh, onMsg }: UseWorldChatOptions) {
             }
             continue
           }
+          if (payload.startsWith(EV.APPROVAL)) {
+            // 审批弹窗：pending 入队、resolved 关闭（同一 approval_id 幂等）
+            const ap = parseEvent<{ approval_id: string; status: string; kind: string; title: string; detail?: string }>(payload, EV.APPROVAL)
+            if (ap) {
+              setApprovals((list) => ap.status === 'resolved'
+                ? list.filter((a) => a.approval_id !== ap.approval_id)
+                : list.some((a) => a.approval_id === ap.approval_id)
+                  ? list
+                  : [...list, { approval_id: ap.approval_id, kind: ap.kind, title: ap.title, detail: ap.detail }])
+            }
+            continue
+          }
           if (payload.startsWith('[ERROR]')) throw new Error(payload.slice(7))
           if (payload.startsWith('[TOOL_UPDATE]')) {
             // 工具状态事件（2026-08-13：同 tool_id 多状态更新）——
@@ -591,6 +622,8 @@ export function useWorldChat({ wid, onRefresh, onMsg }: UseWorldChatOptions) {
           headers: { 'Authorization': `Bearer ${localStorage.getItem('access_token')}` },
         })
         const s = await r.json()
+        // 刷新页面后重画待审批弹窗（弹窗事件是一次性广播，错过就靠这里补）
+        if (Array.isArray(s?.approvals)) setApprovals(s.approvals)
         if (s && s.processing) {
           applyProcessing(true)
           // 有进行中的 turn → 订阅 SSE 直播，实时看到流式内容（不用等整轮跑完才一次性更新）
@@ -614,6 +647,7 @@ export function useWorldChat({ wid, onRefresh, onMsg }: UseWorldChatOptions) {
             loadChat()  // 处理完成：拉最新历史（含 AI 回复）
             onRefreshRef.current()  // 刷新用量（缓存命中率）——普通对话也要更新，不只工具场景
           }
+          timer = window.setTimeout(check, IDLE_RECHECK_MS)   // 空闲慢轮询：接住外部发起的轮次
         }
       } catch { /* 失败静默重试 */ if (!cancelled) timer = window.setTimeout(check, 8000) }
     }
@@ -672,6 +706,18 @@ export function useWorldChat({ wid, onRefresh, onMsg }: UseWorldChatOptions) {
       return r.pinned
     } catch { return false }
   }, [wid])
+
+  /** 审批弹窗回执：先乐观收起弹窗，再告诉后端（服务端据此恢复被挡住的工具调用） */
+  const resolveApproval = useCallback(async (approvalId: string, approved: boolean) => {
+    setApprovals((list) => list.filter((a) => a.approval_id !== approvalId))
+    try {
+      await api.post<{ success: boolean }>(`/worlds/${wid}/chat/approval`, {
+        approval_id: approvalId, approved,
+      })
+    } catch (e: any) {
+      onMsg(`审批提交失败: ${e?.message || e}`)
+    }
+  }, [wid, onMsg])
 
   // ── 插入消息（AI 运行中中途发送的普通消息，不阻塞等整轮结束）──
   // 设计见 docs/group_world/design/group_world_design.md §7.7：
@@ -800,6 +846,7 @@ export function useWorldChat({ wid, onRefresh, onMsg }: UseWorldChatOptions) {
     cmdActive, setCmdActive, cmdQuery, setCmdQuery, cmdIdx, setCmdIdx, cmdFiltered, worldCommands,
     submitText, insertSuggestion, isAtBottom, chatCanScroll, scrollToBottom, forceScrollToBottom,
     currentSession, sessionList, switchSession, newSession, togglePin, unreadCount,
+    approvals, resolveApproval,
   }
 }
 

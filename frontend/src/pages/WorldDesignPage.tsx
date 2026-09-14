@@ -31,6 +31,8 @@ interface World {
   agents: { agent_id: number; role: string }[]
   // 群视界机器人 = 世界配置（非 agent、无账号），身份 = world-{id}
   creator: WorldCreator | null
+  /** 运行模式：auto | review | plan（后端 world_ai_mode 权威，只由用户/API 改） */
+  ai_mode?: string
 }
 
 export default function WorldDesignPage() {
@@ -472,6 +474,8 @@ export default function WorldDesignPage() {
           wid={wid}
           creator={world.creator}
           usageStats={usageStats}
+          aiMode={world.ai_mode || 'review'}
+          onModeSaved={(mode) => setWorld((w) => (w ? { ...w, ai_mode: mode } : w))}
           onSaved={(updated) => setWorld((w) => (w ? { ...w, creator: updated } : w))}
           onClose={() => setShowCreatorForm(false)}
           onMsg={setMsg}

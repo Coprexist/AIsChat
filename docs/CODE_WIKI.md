@@ -1,9 +1,11 @@
 # AIsChat Code Wiki
 
-> 版本：v1.1.0 | 更新：2026-09-13 | 对应应用版本：v0.4.0
+> 版本：v1.1.1 | 更新：2026-09-15 | 对应应用版本：v0.4.0
 > 本文档是 AIsChat 项目的结构化 Code Wiki，涵盖项目架构、模块职责、关键类与函数说明、依赖关系以及项目运行方式。
 >
-> **本次刷新（v1.1.0）**：路由表补全到 29 个模块；前端补 i18n 体系与构建产物两节；
+> **本次刷新（v1.1.1）**：世界 AI 运行模式与文件安检落地（`world_ai_mode.py` / `world_moderation.py`，
+> 世界工具 29 → 33）；世界服务表补两个新文件。
+> **上一次刷新（v1.1.0）**：路由表补全到 29 个模块；前端补 i18n 体系与构建产物两节；
 > 开发指南里的工具注册方式与测试命令改为与现状一致；清理了 16 处指向作者本机
 > Windows 路径的失效链接（`file:///f:/...` → 仓库内相对路径）。
 
@@ -821,11 +823,17 @@ async def _handle_typing_indicator(...): ...
 | `world_file_service.py` | 世界文件服务 |
 | `world_suggestions.py` | 世界建议生成 |
 | `world_blocks.py` | 世界积木管理 |
-| `world_tools.py` | 世界工具定义 |
+| `world_ai_mode.py` | 运行模式（自动/审阅/计划）、动作类门禁、审批弹窗通道、按模式的提示词段 |
+| `world_moderation.py` | 下载内容审核（色情/暴力/违法词表 + 拦截留痕） |
 | `world_api_docs.py` | 世界 API 文档 |
 | `world_event_hook.py` | 世界事件钩子 |
 | `market_github.py` | 商城 GitHub 同步 |
-| `sandbox_isolate.py` | 沙箱隔离 |
+| `sandbox_isolate.py` | 沙箱隔离（Landlock + seccomp） |
+| `decision_skill.py` | 决策技能（事件 → AI 自写规则 → 程序化处理 or 唤醒本体） |
+| `skill_sandbox.py` / `skill_runner.py` | 世界 skill 沙箱执行 |
+| `world_turn.py` | 对话轮次 worker + `TurnBroadcast` 直播通道 |
+| `realtime_connection_manager.py` | 世界实时通道（WS 状态广播） |
+| `group_type_service.py` | 群类型模板与助手配置 |
 
 #### 5.7.5 基础设施 (services/infrastructure/)
 
@@ -1172,6 +1180,10 @@ Keys inside a namespace are bare (`save`, not `configGroup.save`); the backend
 | `create_world()` | `app/services/world/world_service.py` | L52 | 创建世界 |
 | `world_scheduler()` | `app/services/world/world_scheduler.py` | — | 世界懒加载调度 |
 | `skill_runtime` | `app/services/world/world_skill_runtime.py` | — | 世界 Skill 运行时 |
+| `gate_tool_call()` | `app/services/world/world_ai_mode.py` | — | 工具门禁：按运行模式放行/弹窗/拦截（工具循环唯一入口调用） |
+| `request_approval()` | `app/services/world/world_ai_mode.py` | — | 审批弹窗唯一通道（AI 的 ask_user/present_plan 与平台门禁共用） |
+| `sweep_banned_files()` | `app/services/world/world_file_service.py` | — | 禁用后缀兜底扫描强删（唤醒/导入/启动） |
+| `inspect()` | `app/services/world/world_moderation.py` | — | 下载内容审核唯一入口（链接/文件名/正文） |
 
 ---
 

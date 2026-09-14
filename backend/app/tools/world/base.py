@@ -22,6 +22,7 @@ SEGMENTS: dict[str, str] = {
     "net": "网络",
     "world": "世界",
     "self": "自我管理",
+    "approval": "审批与协作",
 }
 
 # 详情里的结果裁剪长度：详情是给人看的，不该把整篇文章塞进卡片
@@ -66,6 +67,7 @@ class WorldToolContext:
     args: dict                          # 已解析的参数
     turn_state: dict | None = None
     on_progress: Callable[[str], Awaitable[None]] | None = None
+    approved: bool = False              # 已获用户同意（自动模式或门禁批准）——工具不必再自己问
 
     async def progress(self, note: str) -> None:
         """耗时工具的分阶段进度回调（转发为 [TOOL_UPDATE] update 事件）"""

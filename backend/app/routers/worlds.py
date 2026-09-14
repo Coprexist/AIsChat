@@ -100,6 +100,18 @@ class ChatPinRequest(BaseModel):
     pin: bool = True
 
 
+class AiModeRequest(BaseModel):
+    """世界 AI 运行模式：auto（自动）/ review（审阅）/ plan（计划）— 只由用户/API 改"""
+    mode: str = Field(..., description="auto | review | plan")
+
+
+class ApprovalRequest(BaseModel):
+    """审批弹窗回执（审阅/计划模式下 AI 的敏感操作等用户点按钮）"""
+    approval_id: str = Field(..., description="弹窗事件里的 approval_id")
+    approved: bool = Field(..., description="用户是否同意")
+    note: str | None = Field(default=None, description="用户补充说明（可选）")
+
+
 class ChatSettingsUpdate(BaseModel):
     """会话生命周期设置（0 = 关闭对应项）"""
     auto_new_enabled: bool | None = None
@@ -485,6 +497,11 @@ async def wake_world(
     try:
         world = await wake_world(repo=world_repo, world_id=world_id)
         await db.commit()
+        # 禁用后缀兜底扫描（沉睡期间被拷进来的可执行文件，唤醒即清）
+        from app.services.world.world_file_service import sweep_banned_files
+        removed = sweep_banned_files(world_id)
+        if removed:
+            world["banned_removed"] = removed
         # 2.5：常驻世界随唤醒启动（config.resident=true 且 main.py 存在）
         from app.models.world import World as _World
         w = await db.get(_World, world_id)
@@ -1047,8 +1064,11 @@ async def chat_status(
 ):
     """世界 AI 对话状态：是否正在处理/排队（刷新页面后据此恢复「思考中」指示）"""
     await _require_owner(db, world_id, current_user["user_id"])
-    from app.models.world import WorldChatMessage
+    from app.models.world import World as _World
     from app.services.world.world_turn import get_world_worker
+    # 待审批项 + 运行模式：前端刷新页面后据此重画弹窗、显示当前模式（内存态，轮次中断即失效）
+    from app.services.world.world_ai_mode import get_mode, pending_approvals
+    world_row = await db.get(_World, world_id)
     worker = get_world_worker(world_id)
     queue_size = worker.queue_size
     # 正在处理 = 队列有消息，或有进行中的轮次（active_turn 标记；比"最后消息非 ai"准确，
@@ -1056,13 +1076,54 @@ async def chat_status(
     processing = queue_size > 0
     turn_id = None
     if not processing:
-        from app.models.world import World as _World
-        world_row = await db.get(_World, world_id)
         act = (world_row.config or {}).get("active_turn") if world_row else None
         if act:
             processing = True
             turn_id = act.get("turn_id")  # 刷新后前端据此订阅 SSE 直播，而不是干等到整轮结束
-    return {"processing": processing, "queue_size": queue_size, "turn_id": turn_id}
+    return {
+        "processing": processing, "queue_size": queue_size, "turn_id": turn_id,
+        "ai_mode": get_mode(world_row) if world_row else None,
+        "approvals": pending_approvals(world_id),
+    }
+
+
+@router.put("/{world_id}/ai-mode")
+async def set_ai_mode(
+    world_id: int,
+    req: AiModeRequest,
+    current_user: dict = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """切换世界 AI 运行模式（仅创建者）。
+
+    刻意不给 AI 任何改模式的工具：模式是用户对 AI 的约束，AI 能改就等于自己拆审阅。
+    """
+    await _require_owner(db, world_id, current_user["user_id"])
+    from app.models.world import World as _World
+    from app.services.world.world_ai_mode import MODES
+    if req.mode not in MODES:
+        raise HTTPException(status_code=400, detail=f"mode 必须是 {'/'.join(MODES)} 之一")
+    world_row = await db.get(_World, world_id)
+    if world_row is None:
+        raise HTTPException(status_code=404, detail="世界不存在")
+    world_row.config = {**(world_row.config or {}), "ai_mode": req.mode}
+    await db.commit()
+    return {"ai_mode": req.mode}
+
+
+@router.post("/{world_id}/chat/approval")
+async def resolve_chat_approval(
+    world_id: int,
+    req: ApprovalRequest,
+    current_user: dict = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """审批弹窗回执：用户点同意/不同意，等在服务端的工具调用随即继续（仅创建者）"""
+    await _require_owner(db, world_id, current_user["user_id"])
+    from app.services.world.world_ai_mode import resolve_approval
+    if not resolve_approval(req.approval_id, req.approved, req.note or ""):
+        raise HTTPException(status_code=404, detail="审批项不存在或已被处理")
+    return {"success": True}
 
 
 

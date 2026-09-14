@@ -13,13 +13,37 @@ logger = logging.getLogger(__name__)
 
 WORLDS_ROOT = Path("data/worlds")
 
-# 允许的文件扩展名（世界代码）
+# ── 扩展名策略（单一来源：所有写入路径都过 _check_ext）────────────────
+# 允许：世界代码 / 网页资源 / 纯文本源码 / 数据 / 媒体 / 字体。
+# 下载与上传共用这一份清单（别再各写各的，2026-09-15 收敛）。
 ALLOWED_EXTENSIONS = {
-    ".html", ".htm", ".css", ".js", ".json", ".md", ".txt",
-    ".png", ".jpg", ".jpeg", ".gif", ".svg", ".webp", ".ico",
-    ".woff", ".woff2", ".ttf", ".mp3", ".wav", ".ogg", ".mp4", ".webm",
-    # py 文件只允许写入（阶段 2 才执行，先允许存储）
-    ".py",
+    # 世界代码与网页
+    ".html", ".htm", ".css", ".js", ".mjs", ".json", ".map", ".py",
+    # 纯文本源码 / 文档 / 配置 / 数据（AI 从网上复制代码进来用）
+    ".md", ".txt", ".rst", ".tex", ".csv", ".xml", ".yaml", ".yml", ".toml",
+    ".ini", ".cfg", ".conf", ".env", ".log", ".sql",
+    ".ts", ".tsx", ".jsx", ".vue", ".svelte", ".java", ".c", ".h", ".cpp",
+    ".hpp", ".cs", ".go", ".rs", ".kt", ".swift",
+    # 媒体 / 字体
+    ".png", ".jpg", ".jpeg", ".gif", ".svg", ".webp", ".ico", ".bmp",
+    ".woff", ".woff2", ".ttf", ".otf", ".eot",
+    ".mp3", ".wav", ".ogg", ".mp4", ".webm",
+    # 文档 / 压缩包（zip 内容由 import_zip 逐个过 _check_ext）
+    ".pdf", ".zip",
+}
+
+# 禁止：可执行文件 / 安装包 / 系统库 / 宿主脚本（2026-09-15 产品定）
+# 三层防护：① 提示词明写不得下载 ② 创建时 _check_ext 直接拒 ③ sweep_banned_files 兜底强删
+BANNED_EXTENSIONS = {
+    # Windows 可执行 / 安装包
+    ".exe", ".msi", ".msp", ".msu", ".com", ".scr", ".pif", ".cpl",
+    ".dll", ".sys", ".drv", ".ocx", ".inf", ".lnk", ".reg", ".hta", ".msc", ".gadget",
+    # 控制台 / 宿主脚本（世界代码只有 .js/.py，其余脚本一律不要）
+    ".bat", ".cmd", ".sh", ".bash", ".zsh", ".ksh", ".csh", ".fish",
+    ".vbs", ".vbe", ".jse", ".wsf", ".wsh", ".ps1", ".psm1", ".psd1",
+    # 跨平台可执行 / 包管理 / 磁盘镜像
+    ".jar", ".class", ".apk", ".app", ".deb", ".rpm", ".dmg", ".pkg", ".snap",
+    ".iso", ".img", ".bin", ".so", ".o", ".a", ".dylib", ".elf",
 }
 MAX_FILE_SIZE = 32 * 1024 * 1024  # 单文件 32MB（网页资源/下载文件用）
 
@@ -45,9 +69,45 @@ def _safe_path(world_id: int, rel_path: str) -> Path:
     return target
 
 
+class BannedFileError(ValueError):
+    """禁用后缀（可执行/安装包/宿主脚本）——创建即拒，历史遗留由 sweep_banned_files 强删。
+
+    继承 ValueError：路由层/工具层原有的 except ValueError 全部照常生效（无需改调用方）。
+    """
+
+
 def _check_ext(path: Path) -> None:
-    if path.suffix.lower() not in ALLOWED_EXTENSIONS:
-        raise ValueError(f"不允许的文件类型: {path.suffix}，可选: {sorted(ALLOWED_EXTENSIONS)[:8]}...")
+    """扩展名守卫（唯一入口）：禁用清单优先给明确告警，其次才查允许清单。"""
+    ext = path.suffix.lower()
+    if ext in BANNED_EXTENSIONS:
+        raise BannedFileError(
+            f"⛔ 禁止 {ext} 类型文件（可执行/安装包/脚本）：世界只允许网页资源与世界代码。"
+            f"需要运行逻辑请写成 .py（沙箱执行）或前端 .js。"
+        )
+    if ext not in ALLOWED_EXTENSIONS:
+        raise ValueError(f"不允许的文件类型: {ext}，可选: {sorted(ALLOWED_EXTENSIONS)[:8]}...")
+
+
+def sweep_banned_files(world_id: int) -> list[str]:
+    """全目录扫描，发现禁用后缀文件立即强制删除（返回被删的相对路径）。
+
+    创建路径已逐个拦截，这里是兜底：手动拷进目录、历史遗留、解压夹带、改后缀绕过。
+    调用点：世界唤醒、zip 导入、后端启动。
+    """
+    base = _world_dir(world_id)
+    removed: list[str] = []
+    for p in sorted(base.rglob("*")):
+        if not p.is_file() or p.suffix.lower() not in BANNED_EXTENSIONS:
+            continue
+        rel = str(p.relative_to(base))
+        try:
+            p.unlink()
+            removed.append(rel)
+        except OSError as e:                       # 权限/占用：留痕不阻断
+            logger.warning(f"🛡️ 世界 #{world_id} 禁用文件删除失败: {rel}（{e}）")
+    if removed:
+        logger.warning(f"🛡️ 世界 #{world_id} 强制删除禁用后缀文件 {len(removed)} 个: {removed}")
+    return removed
 
 
 # ═══════════════════════════════════════════════════════════════
@@ -165,6 +225,55 @@ def delete_file(world_id: int, rel_path: str) -> None:
         raise FileNotFoundError(f"不存在: {rel_path}")
 
 
+def _tree_size(path: Path) -> int:
+    """文件/目录字节数（复制前的大小校验；只累加文件本体）"""
+    if path.is_file():
+        return path.stat().st_size
+    return sum(p.stat().st_size for p in path.rglob("*") if p.is_file())
+
+
+def _resolve_move(world_id: int, src: str, dst: str) -> tuple[Path, Path]:
+    """移动/复制的公共前半段：两边都过越界检查，目标再过滤用后缀。"""
+    source = _safe_path(world_id, src)
+    if not source.exists():
+        raise FileNotFoundError(f"不存在: {src}")
+    target = _safe_path(world_id, dst)
+    if source == target:
+        raise ValueError("源与目标相同，无需操作")
+    if source.is_file():
+        _check_ext(target)                          # 目标文件名必须合法（目录名不查后缀）
+    if target.is_dir():
+        raise ValueError(f"目标已被目录占用: {dst}（目标要写完整文件名，不是目录）")
+    return source, target
+
+
+def move_file(world_id: int, src: str, dst: str) -> dict:
+    """移动 / 重命名（跨目录搬移或同目录改名）；目录可整体搬移。"""
+    source, target = _resolve_move(world_id, src, dst)
+    target.parent.mkdir(parents=True, exist_ok=True)
+    shutil.move(str(source), str(target))
+    removed = sweep_banned_files(world_id) if target.is_dir() else []
+    logger.info(f"📦 世界 #{world_id} 移动文件: {src} → {dst}")
+    return {"path": dst, "from": src, "banned_removed": removed}
+
+
+def copy_file(world_id: int, src: str, dst: str) -> dict:
+    """复制文件 / 目录（世界内复制；跨世界复制不支持——各自目录隔离）。"""
+    source, target = _resolve_move(world_id, src, dst)
+    size = _tree_size(source)
+    if size > MAX_FILE_SIZE:
+        raise ValueError(f"超过 {MAX_FILE_SIZE // 1024 // 1024}MB 限制（{size // 1024}KB）")
+    target.parent.mkdir(parents=True, exist_ok=True)
+    if source.is_dir():
+        shutil.copytree(source, target)
+        removed = sweep_banned_files(world_id)
+    else:
+        shutil.copy2(source, target)
+        removed = []
+    logger.info(f"📄 世界 #{world_id} 复制文件: {src} → {dst}")
+    return {"path": dst, "from": src, "size": size, "banned_removed": removed}
+
+
 # ═══════════════════════════════════════════════════════════════
 # 文件夹导入（zip 或批量文件）
 # ═══════════════════════════════════════════════════════════════
@@ -179,6 +288,7 @@ def import_zip(world_id: int, zip_bytes: bytes, exclude_content: bool = True) ->
     base = _world_dir(world_id)
     count = 0
     skipped_content = 0
+    banned = 0
     meta: dict | None = None
     try:
         with zipfile.ZipFile(io.BytesIO(zip_bytes)) as zf:
@@ -204,6 +314,9 @@ def import_zip(world_id: int, zip_bytes: bytes, exclude_content: bool = True) ->
                     continue
                 try:
                     _check_ext(target)
+                except BannedFileError:
+                    banned += 1                      # 包里夹带可执行/脚本：跳过 + 计数告警
+                    continue
                 except ValueError:
                     continue
                 if info.file_size > MAX_FILE_SIZE:
@@ -213,8 +326,12 @@ def import_zip(world_id: int, zip_bytes: bytes, exclude_content: bool = True) ->
                 count += 1
     except zipfile.BadZipFile:
         raise ValueError("无效的 zip 文件")
-    logger.info(f"🌐 世界 #{world_id} zip 导入 {count} 个文件（跳过数据文件 {skipped_content}，meta={'y' if meta else 'n'}）")
-    return {"imported": count, "skipped_content": skipped_content, "meta": meta}
+    removed = sweep_banned_files(world_id)           # 兜底：目录里已有的遗留禁用文件一并清掉
+    logger.info(f"🌐 世界 #{world_id} zip 导入 {count} 个文件（跳过数据文件 {skipped_content}，禁用 {banned}，meta={'y' if meta else 'n'}）")
+    return {
+        "imported": count, "skipped_content": skipped_content,
+        "banned_skipped": banned, "banned_removed": removed, "meta": meta,
+    }
 
 
 def export_zip(world_id: int, include_content: bool = True, meta: dict | None = None) -> bytes:

@@ -9,6 +9,7 @@ from datetime import datetime, timedelta, timezone
 from sqlalchemy import select
 
 from app.repositories.world_repo import WorldRepository
+from app.services.world.world_ai_mode import get_mode
 
 logger = logging.getLogger(__name__)
 
@@ -459,6 +460,7 @@ def world_to_dict(w) -> dict:
         "world_time": w.world_time.isoformat() if w.world_time else None,
         "last_active_at": w.last_active_at.isoformat() if w.last_active_at else None,
         "config": w.config or {},
+        "ai_mode": get_mode(w),          # 运行模式（config.ai_mode 的权威取值，前端不用自己判默认）
         "creator_config": w.creator_config or {},
         "created_at": w.created_at.isoformat() if w.created_at else None,
     }

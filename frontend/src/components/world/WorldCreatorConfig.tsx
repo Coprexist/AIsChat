@@ -4,7 +4,14 @@
  * 2026-08-10：改为 Modal 弹窗（原内联展开），对齐 GroupManagerModal 风格
  */
 import { useEffect, useState } from 'react'
-import { Save, X, Settings, Brain, SlidersHorizontal, History, Pencil, ChevronDown, ChevronUp, Lock } from 'lucide-react'
+import { Save, X, Settings, Brain, SlidersHorizontal, History, Pencil, ChevronDown, ChevronUp, Lock, ShieldAlert } from 'lucide-react'
+
+// 运行模式（后端 world_ai_mode.MODES 是权威定义；这里只做展示与切换）
+const AI_MODES = [
+  { key: 'auto', label: '自动', hint: 'AI 自行下载文件、改动世界机制、删除文件，不打断你' },
+  { key: 'review', label: '审阅', hint: '下载 / 删除 / 改动世界机制会弹窗请你确认（同类操作本轮只问一次）' },
+  { key: 'plan', label: '计划', hint: 'AI 先探索并提交计划，你通过后才按自动模式执行' },
+]
 import { api } from '../../api/client'
 
 export interface WorldCreator {
@@ -32,12 +39,15 @@ interface WorldCreatorConfigProps {
   wid: number
   creator: WorldCreator
   usageStats: WorldUsageStats | null
+  /** 世界当前运行模式（worlds.config.ai_mode，后端保证有值） */
+  aiMode: string
+  onModeSaved: (mode: string) => void
   onSaved: (updated: WorldCreator) => void
   onClose: () => void
   onMsg: (msg: string) => void
 }
 
-export default function WorldCreatorConfig({ wid, creator, usageStats, onSaved, onClose, onMsg }: WorldCreatorConfigProps) {
+export default function WorldCreatorConfig({ wid, creator, usageStats, aiMode, onModeSaved, onSaved, onClose, onMsg }: WorldCreatorConfigProps) {
   const [form, setForm] = useState({
     name: creator.name ?? '',
     system_prompt: creator.system_prompt ?? '',
@@ -54,6 +64,7 @@ export default function WorldCreatorConfig({ wid, creator, usageStats, onSaved, 
   // 会话生命周期设置（/new 自动开、空闲压缩、保留天数）
   const [settings, setSettings] = useState<{ auto_new_enabled: boolean; auto_new_time: string; compact_idle_hours: number; retention_days: number } | null>(null)
   const [settingsSaving, setSettingsSaving] = useState(false)
+  const [modeSaving, setModeSaving] = useState(false)
 
   // 加载会话生命周期设置（失败静默，不阻塞表单）
   useEffect(() => {
@@ -107,6 +118,20 @@ export default function WorldCreatorConfig({ wid, creator, usageStats, onSaved, 
       onMsg(`保存失败: ${e?.message || e}`)
     } finally {
       setSettingsSaving(false)
+    }
+  }
+
+  /** 切运行模式：改即生效（与 AI 配置表单分开保存，避免"改了模式没点保存"的误解） */
+  const saveMode = async (mode: string) => {
+    setModeSaving(true)
+    try {
+      await api.put<{ ai_mode: string }>(`/worlds/${wid}/ai-mode`, { mode })
+      onModeSaved(mode)
+      onMsg(`运行模式已切换为${AI_MODES.find((m) => m.key === mode)?.label ?? mode}`)
+    } catch (e: any) {
+      onMsg(`切换运行模式失败: ${e?.message || e}`)
+    } finally {
+      setModeSaving(false)
     }
   }
 
@@ -171,6 +196,30 @@ export default function WorldCreatorConfig({ wid, creator, usageStats, onSaved, 
                   placeholder="如：星野镇的镇守者"
                 />
               )}
+            </div>
+          </div>
+
+          {/* 运行模式：AI 自主到什么程度（下载/删除/改动机制三类操作的门禁） */}
+          <div className="bg-elevated/40 rounded-xl p-3 space-y-2">
+            <div className="flex items-center gap-1.5 text-[10px] font-medium text-textSecondary uppercase tracking-wide">
+              <ShieldAlert size={11} className="text-primary-400" /> 运行模式
+            </div>
+            <div className="grid grid-cols-3 gap-1.5">
+              {AI_MODES.map((m) => (
+                <button
+                  key={m.key}
+                  onClick={() => saveMode(m.key)}
+                  disabled={modeSaving || aiMode === m.key}
+                  className={`px-2 py-1.5 text-xs rounded-lg border transition-colors disabled:opacity-100 ${
+                    aiMode === m.key
+                      ? 'bg-primary-500/15 border-primary-500/50 text-primary-300'
+                      : 'border-border text-textSecondary hover:text-textPrimary hover:border-primary-500/30'
+                  }`}
+                >{m.label}</button>
+              ))}
+            </div>
+            <div className="text-[10px] text-textMuted">
+              {(AI_MODES.find((m) => m.key === aiMode) || AI_MODES[1]).hint}
             </div>
           </div>
 
