@@ -1,9 +1,11 @@
 # AIsChat Code Wiki
 
-> 版本：v1.1.1 | 更新：2026-09-15 | 对应应用版本：v0.4.0
+> 版本：v1.1.2 | 更新：2026-09-15 | 对应应用版本：v0.4.0
 > 本文档是 AIsChat 项目的结构化 Code Wiki，涵盖项目架构、模块职责、关键类与函数说明、依赖关系以及项目运行方式。
 >
-> **本次刷新（v1.1.1）**：世界 AI 运行模式与文件安检落地（`world_ai_mode.py` / `world_moderation.py`），
+> **本次刷新（v1.1.2）**：前端界面收敛到单一来源（尺度令牌 + 语义类 + `components/ui` 组件库），
+> 新增 6.6 界面体系一节，详见 [前端界面统一规范](./dev/ui_system.md)。
+> **上一次刷新（v1.1.1）**：世界 AI 运行模式与文件安检落地（`world_ai_mode.py` / `world_moderation.py`），
 > 对话命名与会话列表（名字 + 最近聊天时间）；世界工具 29 → 34，世界服务表补两个新文件。
 > **上一次刷新（v1.1.0）**：路由表补全到 29 个模块；前端补 i18n 体系与构建产物两节；
 > 开发指南里的工具注册方式与测试命令改为与现状一致；清理了 16 处指向作者本机
@@ -37,8 +39,9 @@
   - [6.3 Hooks 体系](#63-hooks-体系)
   - [6.4 上下文管理](#64-上下文管理)
   - [6.5 页面模块](#65-页面模块)
-  - [6.6 i18n 体系（三语 + 命名空间）](#66-i18n-体系三语--命名空间)
-  - [6.7 构建产物与插件包](#67-构建产物与插件包)
+  - [6.6 界面体系（单一来源）](#66-界面体系单一来源)
+  - [6.7 i18n 体系（三语 + 命名空间）](#67-i18n-体系三语--命名空间)
+  - [6.8 构建产物与插件包](#68-构建产物与插件包)
 - [7. 关键类与函数索引](#7-关键类与函数索引)
 - [8. API 端点概览](#8-api-端点概览)
 - [9. 数据模型关系](#9-数据模型关系)
@@ -1040,7 +1043,7 @@ validate_tool_call(tool_name, arguments)
 |---------|------|------|
 | `AuthContext` | `context/AuthContext.tsx` | 认证状态（用户信息、登录/登出） |
 | `ThemeContext` | `context/ThemeContext.tsx` | 主题（深色/浅色） |
-| `I18nContext` | `i18n/I18nContext.tsx` | 国际化（中 / 英 / 日），见 6.6 |
+| `I18nContext` | `i18n/I18nContext.tsx` | 国际化（中 / 英 / 日），见 6.7 |
 
 ### 6.5 页面模块
 
@@ -1066,7 +1069,27 @@ validate_tool_call(tool_name, arguments)
 
 > 组件/页面表为节选（当前 54 个组件、23 个页面）；新增文件请顺手补进本表。
 
-### 6.6 i18n 体系（三语 + 命名空间）
+### 6.6 界面体系（单一来源）
+
+写任何界面前先读 [前端界面统一规范](./dev/ui_system.md)。三层结构，**改一处全站生效**：
+
+| 层 | 文件 | 唯一负责 |
+|----|------|---------|
+| 尺度令牌 | `tailwind.config.js` | 圆角 `control/card/dialog`、字号 `3xs/2xs`、层级 `overlay/drawer/modal/toast/max` |
+| 语义类 | `src/index.css` | `.btn .btn-*`、`.icon-btn`、`.field`、`.card`、`.chip` |
+| React 壳 | `src/components/ui/` | `PageShell PageHeader Button IconButton Input Select Card Badge Modal Dialog EmptyState` |
+
+约定：
+
+- 页面只写布局，不写颜色/圆角/阴影；出现 `bg-primary-500`、`rounded-2xl`、`px-3 py-1.5` 这类"自拼外观"就是漏网
+- 弹窗一律 `Modal`（标准卡片）或 `Dialog`（自定义卡片）：ESC 关闭、锁背景滚动、点遮罩关闭由 Dialog 统一实现——
+  手写 `fixed inset-0` 会丢掉这三样（2026-09 前 61 处手写遮罩里，多数没有 ESC 与滚动锁定）
+- 页面骨架一律 `PageShell`（标题栏 + 滚动 + 内容宽度四档 `narrow/content/wide/full`）
+- 新增变体只改 `index.css` 的 `@layer components`，再在 `Button.tsx` 的 `VARIANT_CLASS` 登记；
+  不在页面里就地拼一套新外观
+- 要整体调密度/观感就改令牌（2026-09 一次收敛：981 处圆角、398 处非标字号、78 处裸 z-index）
+
+### 6.7 i18n 体系（三语 + 命名空间）
 
 **查找入口只有一个**：`i18n/translations.ts` 的 `getTranslation(lang, path, vars)`。
 `path` 形如 `nav.chat`（默认落 `common` 分区）或 `tool:toolName.file_read`（带分区前缀）。
@@ -1090,7 +1113,7 @@ validate_tool_call(tool_name, arguments)
   `t()` / `tr()` 调用与模板串，并读后端 `app_config_service.py` 核对下发的 key；
   缺 key 即非 0 退出，`--json` 供其它工具消费
 
-### 6.7 构建产物与插件包
+### 6.8 构建产物与插件包
 
 | 产物 | 生成方式 | 说明 |
 |------|---------|------|
