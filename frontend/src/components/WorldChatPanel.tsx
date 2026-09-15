@@ -370,6 +370,19 @@ const WorldChatPanel = memo(forwardRef<WorldChatHandle, WorldChatPanelProps>(({ 
     })
   }, [chat])
 
+  // 同一段思考只显示一次：2026-09-15 之前的落库缺陷会把一段思考既落成 note、
+  // 又挂在最终回复上（历史数据里已经存在这种重复）。向前回溯到本轮起点（遇 user 停），
+  // 发现同一段思考就不再重复渲染——只吞掉重复的那一份，正常轮次不受影响。
+  const reasoningAlreadyShown = (msgIndex: number, reasoning?: string) => {
+    if (!reasoning) return false
+    for (let i = msgIndex - 1; i >= 0; i--) {
+      const prev = chat.chatMsgs[i]
+      if (prev.role === 'user') break
+      if (prev.reasoning === reasoning && (prev.role === 'note' || prev.role === 'ai')) return true
+    }
+    return false
+  }
+
   // ── 渲染消息列表 ──
   const renderMessage = (m: typeof chat.chatMsgs[number], msgIndex: number) => {
     const isLastAi = m.role === 'ai' && m.id === lastAiMsgId
@@ -378,6 +391,8 @@ const WorldChatPanel = memo(forwardRef<WorldChatHandle, WorldChatPanelProps>(({ 
       && chat.chatMsgs[msgIndex - 1].role === 'note'
       && !chat.chatMsgs[msgIndex - 1].content
       && !!chat.chatMsgs[msgIndex - 1].reasoning
+    // 老数据兼容：重复挂载的同一段思考只显示第一份（见 reasoningAlreadyShown）
+    const shownReasoning = reasoningAlreadyShown(msgIndex, m.reasoning) ? '' : m.reasoning
 
     if (m.role === 'tool') {
       // 工具状态气泡：running（正在执行 XX）→ update（进度）→ done（完成）
@@ -413,8 +428,9 @@ const WorldChatPanel = memo(forwardRef<WorldChatHandle, WorldChatPanelProps>(({ 
     // 思考单行条（DSH 式，2026-08-16）：只有思考没正文（note 且 content 空）——
     // 运行中显示最新一行+扫光，完成显示首行摘要，点击展开
     if (m.role === 'note' && !m.content && m.reasoning) {
+      if (!shownReasoning) return null   // 重复的同一段思考：上面已经有一条
       const reasoningRunning = (chat.chatSending || chat.chatProcessing) && m.id === lastAiMsgId
-      return <ReasoningBubble key={m.id} text={m.reasoning} running={reasoningRunning} />
+      return <ReasoningBubble key={m.id} text={shownReasoning} running={reasoningRunning} />
     }
 
     return (
@@ -423,14 +439,14 @@ const WorldChatPanel = memo(forwardRef<WorldChatHandle, WorldChatPanelProps>(({ 
       <div key={m.id} className="space-y-2 group">
         <div className={`world-msg text-sm max-w-[90%] p-2 rounded-control ${m.error ? 'bg-rose-500/10 border border-rose-500/30 text-rose-400' : m.role === 'user' ? 'bg-primary-500/20 ml-auto' : 'bg-elevated/80'}`}>
           <div className="text-3xs text-textMuted mb-0.5">{m.error ? '错误' : m.role === 'user' ? (m.pending ? '我（排队中，发送后生效）' : '我') : (prevIsReasoning ? '' : (creatorName || '世界 AI'))}</div>
-          {!m.error && (m.role === 'ai' || m.role === 'note') && !!m.reasoning && (
+          {!m.error && (m.role === 'ai' || m.role === 'note') && !!shownReasoning && (
             <details className="group/details mb-1.5">
               <summary className="flex items-center gap-1 text-3xs text-textMuted cursor-pointer select-none hover:text-textSecondary list-none [&::-webkit-details-marker]:hidden">
                 <ChevronRight size={11} className="transition-transform group-open/details:rotate-90" />
                 <Brain size={11} className="text-textMuted" />
                 思考过程
               </summary>
-              <div className="text-xs text-textMuted mt-1 whitespace-pre-wrap bg-elevated/70 rounded p-2">{m.reasoning}</div>
+              <div className="text-xs text-textMuted mt-1 whitespace-pre-wrap bg-elevated/70 rounded p-2">{shownReasoning}</div>
             </details>
           )}
           {m.role === 'user' && !!m.attachments?.length && (
@@ -448,11 +464,11 @@ const WorldChatPanel = memo(forwardRef<WorldChatHandle, WorldChatPanelProps>(({ 
             </div>
           )}
           {m.content ? <MarkdownContent content={m.content} /> : m.role === 'ai' ? (
-            m.reasoning ? (
+            shownReasoning ? (
               <span className="opacity-50 text-xs italic">
-                {(() => { const r = m.reasoning.trim(); return r.length > 60 ? r.slice(-60) + '…' : r || '思考中…' })()}
+                {(() => { const r = shownReasoning.trim(); return r.length > 60 ? r.slice(-60) + '…' : r || '思考中…' })()}
               </span>
-            ) : (
+            ) : m.reasoning ? null : (
               <span className="inline-flex gap-0.5">
                 <span className="w-1 h-1 bg-primary-400 rounded-full animate-bounce" style={{ animationDelay: '0ms' }} />
                 <span className="w-1 h-1 bg-primary-400 rounded-full animate-bounce" style={{ animationDelay: '150ms' }} />

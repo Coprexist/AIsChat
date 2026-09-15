@@ -1461,6 +1461,10 @@ async def _run_tool_loop(
     sid_db = ctx["sid_db"]
     full_content = first_content
     full_reasoning = first_reasoning
+    # 只有「产出最终正文那一轮」的思考才挂到最终回复上。
+    # 中间轮的思考已经作为独立 note 落库，若再挂一次，历史里会出现两个一模一样的「思考过程」
+    # （2026-09-15 修：world #45 实测同一段 2146 字的思考既在 note 又在 ai 回复上）
+    reply_reasoning = ""
     try:
         from app.tools.world import execute_world_tool, tool_result_summary
         # 第一轮过渡叙述 + 对应思考过程：给用户看（role=note，不进 AI 上下文）
@@ -1469,8 +1473,8 @@ async def _run_tool_loop(
             await _save_note_separated(world_repo, world_id, full_content, full_reasoning or "", sid_db)
         # 第一轮正文重置（最终以收尾轮为准）
         full_content = ""
-        # 首轮思考保留：后续轮有思考会覆盖；但工具轮 DeepSeek 常不输出 reasoning_content，
-        # 若清空则落库无思考（刷新后「思考过程」丢失）——保留首轮思考作兜底
+        # 首轮思考只用于 assistant 消息链（thinking 模式要求回传 reasoning_content）；
+        # 它已经作为独立 note 落库，因此不再挂到最终回复上（否则「思考过程」显示两遍）
         # 第一轮流式里收集到的 tool_calls（重构为 API 格式；content 用空串而非 None，避免部分接口/思考模式异常）
         # ⚠️ DeepSeek thinking 模式：首轮 assistant 也要回传 reasoning_content（2026-08-13 修复）
         messages.append({
@@ -1533,6 +1537,7 @@ async def _run_tool_loop(
             if not tcs:
                 # 收尾轮：正文作为最终回复（finally 落库 ai），不进 note
                 final = content
+                reply_reasoning = reasoning   # 本轮思考 = 最终回复的思考
                 break
             # 中间轮（还要继续调工具）：正文已由 _stream_llm_once 逐 chunk yield，
             # 此处只落库 note（历史可见、不进 AI 上下文）——不再重复 yield 正文，
@@ -1580,6 +1585,7 @@ async def _run_tool_loop(
             fr = (resp_final or {}).get("reasoning_content") or ""
             if fr:
                 full_reasoning = fr
+                reply_reasoning = fr
             full_content = final
         else:
             # ⚠️ 正常收尾轮（模型不再调工具 → final=content 已 break）：收尾总结也必须进 full_content，
@@ -1589,7 +1595,8 @@ async def _run_tool_loop(
     finally:
         # 异常路径也要把已生成内容交回：调用方 finally 里的落库依赖它
         result["full_content"] = full_content
-        result["full_reasoning"] = full_reasoning
+        # 思考只落一次：中间轮的思考已随 note 落库，最终回复不复用它
+        result["full_reasoning"] = reply_reasoning
 
 
 async def stream_world_chat(
