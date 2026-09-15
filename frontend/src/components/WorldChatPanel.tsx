@@ -77,10 +77,13 @@ function ToolBubble({ name, label, detail, error, icon, running }: {
 }
 
 // 运行模式三档（后端 world_ai_mode.MODES 是权威定义；这里只管展示与切换）
+// 选中态用**实色块**（不是淡色 tint）：一眼看出当前档在哪。文字色按各自底色的对比度单独选，
+// 不为了"统一"把对比度统一没了（primary-500 与按钮同色，mint-400 在浅色主题偏深用白字、
+// 深色主题变亮改用深灰，amber-400 两个主题都亮 → 深灰）
 const MODE_ITEMS = [
-  { key: 'auto', labelKey: 'tool:world.mode.auto', hintKey: 'tool:world.mode.hint.auto', active: 'bg-mint-400/15 text-mint-300' },
-  { key: 'review', labelKey: 'tool:world.mode.review', hintKey: 'tool:world.mode.hint.review', active: 'bg-amber-400/15 text-amber-300' },
-  { key: 'plan', labelKey: 'tool:world.mode.plan', hintKey: 'tool:world.mode.hint.plan', active: 'bg-primary-500/20 text-primary-300' },
+  { key: 'auto', labelKey: 'tool:world.mode.auto', hintKey: 'tool:world.mode.hint.auto', active: 'bg-mint-400 text-white dark:text-gray-900' },
+  { key: 'review', labelKey: 'tool:world.mode.review', hintKey: 'tool:world.mode.hint.review', active: 'bg-amber-400 text-gray-900' },
+  { key: 'plan', labelKey: 'tool:world.mode.plan', hintKey: 'tool:world.mode.hint.plan', active: 'bg-primary-500 text-white' },
 ]
 
 /** 运行模式切换（对话栏内，随手可切）：自动 / 审阅 / 计划——
@@ -98,8 +101,8 @@ function ModeSwitch({ mode, busy, onChange }: { mode: string; busy: boolean; onC
             onClick={() => { if (m.key !== mode && !busy) onChange(m.key) }}
             disabled={busy}
             title={t(m.hintKey)}
-            className={`flex-1 min-w-0 px-1.5 py-[3px] text-[10px] rounded-md transition-colors truncate disabled:opacity-60 ${
-              m.key === mode ? m.active : 'text-textMuted hover:text-textSecondary'
+            className={`flex-1 min-w-0 px-1.5 py-[3px] text-[11px] rounded-md transition-colors truncate disabled:opacity-60 ${
+              m.key === mode ? `font-semibold shadow-sm ${m.active}` : 'text-textMuted hover:text-textPrimary'
             }`}
           >{t(m.labelKey)}</button>
         ))}
@@ -661,7 +664,8 @@ ${s.id}` : s.id}
                 {s.last_active_at && (
                   <span className="shrink-0 text-[10px] text-textMuted">{formatRelativeTime(s.last_active_at, lang)}</span>
                 )}
-                <span className="shrink-0 flex items-center gap-1 text-textMuted">{s.pinned ? <Pin size={10} className="text-accent-400 fill-current" /> : ''}{s.id === chat.currentSession ? '当前' : ''}</span>
+                {/* 当前会话靠整行高亮标识，不再写"当前"两个字（用户 2026-09-15 反馈） */}
+                {s.pinned && <Pin size={10} className="shrink-0 text-accent-400 fill-current" />}
               </button>
             ))}
           </div>

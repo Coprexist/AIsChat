@@ -32,7 +32,7 @@ class PresentPlanTool(WorldToolPlugin):
         # 计划必须真有人点头：无人应答一律不通过（on_timeout=False），
         # 否则"计划模式"会退化成"等 5 分钟自动开工"
         approved, note = await request_approval(
-            ctx.world.id, turn_id, kind="plan", title="AI 计划待确认", detail=plan,
+            ctx.world.id, turn_id, kind="plan", title="AI 提交了一份计划", detail=plan,
             on_timeout=False,
         )
         if approved and ctx.turn_state is not None:

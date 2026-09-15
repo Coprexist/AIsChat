@@ -278,6 +278,8 @@ async def test_review_popup_round_trip():
         payload = json.loads(raw.removeprefix("data: [APPROVAL]").strip())
         assert payload["status"] == "pending" and payload["kind"] == "download"
         assert payload["approval_id"]
+        # 弹窗说人话：标题不能出现"机制/请求"这类内部术语（用户 2026-09-15 反馈）
+        assert payload["title"].startswith("AI 想") and "机制" not in payload["title"]
         assert [a["approval_id"] for a in pending_approvals(wid_turn)] == [payload["approval_id"]]
 
         # 等待期间工具没被放行（还没点按钮）

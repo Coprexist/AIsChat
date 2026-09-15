@@ -39,7 +39,14 @@ ACTION_TOOLS: dict[str, frozenset[str]] = {
         "set_group_member_role", "kick_group_member",
     }),
 }
+# 内部/日志用（含"机制"这类术语，只给开发看）
 ACTION_LABELS = {"download": "下载文件", "delete": "删除文件", "modify": "改动世界机制"}
+# 弹窗用：**用户听得懂的人话**（用户 2026-09-15 反馈：别让用户读内部术语）
+ACTION_ASKS = {
+    "download": "AI 想下载一个文件",
+    "delete": "AI 想删除文件",
+    "modify": "AI 想改动这个世界",
+}
 
 # 只读 / 无副作用工具：明列，其余未登记的一律按「改动机制」（保守默认，安全优先）
 SAFE_TOOLS = frozenset({
@@ -224,7 +231,8 @@ async def gate_tool_call(world, world_id: int, tool_name: str, args: dict, turn_
     ok, note = await request_approval(
         world_id, turn_state.get("turn_id", ""),
         kind=action,
-        title=f"{MODE_LABELS[mode]}：AI 请求{ACTION_LABELS[action]}",
+        # 弹窗写给用户看：一句人话的标题 + 具体内容（模式不写进标题，弹窗上方已有徽章）
+        title=ACTION_ASKS[action],
         detail=describe_action(tool_name, args),
         on_timeout=False,
     )
@@ -240,15 +248,15 @@ async def gate_tool_call(world, world_id: int, tool_name: str, args: dict, turn_
 def describe_action(tool_name: str, args: dict) -> str:
     """弹窗里给人看的操作说明（做了什么、动到哪个文件）"""
     if tool_name == "web_download":
-        return f"下载：{args.get('url', '')}\n保存到：{args.get('path') or 'downloads/（自动命名）'}"
+        return f"要下的东西：{args.get('url', '')}\n会存到：{args.get('path') or 'downloads/（自动命名）'}"
     if tool_name == "file_delete":
-        return f"删除：{args.get('path', '')}"
+        return f"要删掉：{args.get('path', '')}"
     if tool_name in ("file_move", "file_copy"):
-        return f"{'移动' if tool_name == 'file_move' else '复制'}：{args.get('from', '')} → {args.get('to', '')}"
+        return f"{'要搬去' if tool_name == 'file_move' else '要复制成'}：{args.get('from', '')} → {args.get('to', '')}"
     if tool_name in ("file_write", "file_edit"):
         path = args.get("path", "")
         body = str(args.get("content") or args.get("new_string") or "")
-        return f"{'改写' if tool_name == 'file_edit' else '写入'}：{path}\n\n{body[:1500]}"
+        return f"要动这个文件：{path}\n\n{body[:1500]}"
     return f"{tool_name}\n\n{json.dumps(args, ensure_ascii=False)[:1500]}"
 
 
