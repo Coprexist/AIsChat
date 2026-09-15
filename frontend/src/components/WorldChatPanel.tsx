@@ -1,6 +1,8 @@
 import { memo, useState, useRef, useCallback, useMemo, forwardRef, useImperativeHandle, useEffect } from 'react'
 import { Send, Plus, X, ChevronRight, Brain, ArrowDown, FileText, Search, Globe, Terminal, Package, Clock, Wrench, Eraser, Pin, ChevronDown, Copy, RefreshCw, Paperclip, ShieldAlert } from 'lucide-react'
 import MarkdownContent from './shared/MarkdownContent'
+import CodeRenderer from './shared/CodeRenderer'
+import { Button, Dialog } from './ui'
 import { useWorldChat, type Approval, type ChatMsg } from '../hooks/useWorldChat'
 import { useAttachmentUpload, isImageAttachment } from '../hooks/useAttachmentUpload'
 import { AttachmentChips, DropMask } from './AttachmentChips'
@@ -117,35 +119,48 @@ function ApprovalDialog({ approval, onDecide }: { approval: Approval; onDecide: 
   const t = useT()
   const kindKey = `tool:world.kind.${approval.kind}`
   const localized = t(kindKey)
+  const body = approval.body || ''
   return (
-    <div className="world-msg fixed inset-0 z-modal bg-black/60 flex items-center justify-center p-4">
-      <div className="w-full max-w-md bg-surface border border-border rounded-dialog shadow-xl overflow-hidden">
+    // 无 onClose：审批必须由用户明确点同意/不同意（ESC 与点遮罩都不放行），
+    // 但 Dialog 仍负责锁背景滚动 + 统一层级与遮罩
+    <Dialog className="world-msg flex items-center justify-center p-4">
+      <div className="w-full max-w-lg bg-surface border border-border rounded-dialog shadow-xl overflow-hidden">
         <div className="flex items-center gap-2 px-4 py-2.5 border-b border-border">
           <ShieldAlert size={14} className="text-amber-400" />
           <span className="text-sm font-medium">{t('tool:world.approval.title')}</span>
-          <span className="text-3xs px-1.5 py-0.5 rounded bg-elevated text-textMuted">
+          <span className="text-3xs px-2 py-0.5 rounded-full bg-elevated text-textMuted shrink-0">
             {localized && localized !== kindKey ? localized : approval.kind}
           </span>
         </div>
-        <div className="px-4 py-3 max-h-[50vh] overflow-y-auto">
-          <div className="text-sm font-medium mb-1">{approval.title}</div>
-          {approval.detail && (
-            <pre className="text-2xs whitespace-pre-wrap break-all bg-elevated rounded-control p-2 text-textSecondary">{approval.detail}</pre>
+        <div className="px-4 py-3 max-h-[55vh] overflow-y-auto space-y-2">
+          <div className="text-sm font-medium">{approval.title}</div>
+          {approval.detail && <div className="text-xs text-textSecondary">{approval.detail}</div>}
+          {/* 正文按 AI 实际写的东西渲染：散文/计划走 markdown，代码走代码块（同日聊天同款渲染器） */}
+          {!!body && (
+            approval.body_format === 'code' ? (
+              <div className="max-h-[45vh] overflow-auto">
+                <CodeRenderer className={`language-${approval.body_lang || 'plaintext'}`}>{body}</CodeRenderer>
+              </div>
+            ) : approval.body_format === 'markdown' ? (
+              <div className="text-sm text-textPrimary">
+                <MarkdownContent content={body} />
+              </div>
+            ) : (
+              <pre className="text-2xs whitespace-pre-wrap break-words bg-elevated rounded-control p-2 text-textSecondary">{body}</pre>
+            )
           )}
         </div>
         <div className="flex items-center gap-2 px-4 py-3 border-t border-border">
           <span className="flex-1 text-3xs text-textMuted">{t('tool:world.approval.waiting')}</span>
-          <button
-            onClick={() => onDecide(false)}
-            className="px-3 py-1.5 text-xs rounded border border-border text-textSecondary hover:text-rose-400 hover:border-rose-500/40 transition-colors"
-          >{t('tool:world.approval.deny')}</button>
-          <button
-            onClick={() => onDecide(true)}
-            className="px-3 py-1.5 text-xs rounded bg-primary-500 hover:bg-primary-600 text-white transition-colors"
-          >{t('tool:world.approval.approve')}</button>
+          <Button size="sm" variant="outline" onClick={() => onDecide(false)}>
+            {t('tool:world.approval.deny')}
+          </Button>
+          <Button size="sm" onClick={() => onDecide(true)}>
+            {t('tool:world.approval.approve')}
+          </Button>
         </div>
       </div>
-    </div>
+    </Dialog>
   )
 }
 

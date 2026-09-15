@@ -120,9 +120,14 @@ def unattended_policy(world) -> tuple[bool, int]:
     return False, _APPROVAL_TIMEOUT
 
 
+# 弹窗正文上限：够看清一个文件/一份计划，又不至于把 SSE 撑爆
+_BODY_MAX = 8000
+
+
 async def request_approval(
     world_id: int, turn_id: str, *, kind: str, title: str,
-    detail: str = "", timeout: int = _APPROVAL_TIMEOUT, on_timeout: bool = False,
+    detail: str = "", body: str = "", body_format: str = "text", body_lang: str = "",
+    timeout: int = _APPROVAL_TIMEOUT, on_timeout: bool = False,
 ) -> tuple[bool, str]:
     """弹窗征询用户同意（唯一审批通道）。返回 (是否同意, 说明)。
 
@@ -145,7 +150,10 @@ async def request_approval(
     approval_id = uuid.uuid4().hex[:12]
     entry = {
         "id": approval_id, "world_id": world_id, "kind": kind,
+        # detail = 一行摘要（动哪个文件）；body = 用户真正要看的内容，
+        # 由前端按 body_format 走聊天同款渲染器（markdown / code / text）
         "title": title, "detail": (detail or "")[:4000],
+        "body": (body or "")[:_BODY_MAX], "body_format": body_format, "body_lang": body_lang,
         "created_at": time.time(),
         "future": asyncio.get_running_loop().create_future(),
     }
@@ -153,6 +161,7 @@ async def request_approval(
     pending_event = _event({
         "approval_id": approval_id, "status": "pending", "kind": kind,
         "title": title, "detail": entry["detail"],
+        "body": entry["body"], "body_format": entry["body_format"], "body_lang": entry["body_lang"],
     })
     try:
         for tb in tbs:
@@ -194,7 +203,9 @@ def pending_approvals(world_id: int) -> list[dict]:
     """该世界待审批项（前端刷新后重画弹窗；不含 future）"""
     return [
         {"approval_id": e["id"], "kind": e["kind"], "title": e["title"],
-         "detail": e["detail"], "created_at": e["created_at"]}
+         "detail": e["detail"], "body": e["body"],
+         "body_format": e["body_format"], "body_lang": e["body_lang"],
+         "created_at": e["created_at"]}
         for e in _pending.values() if e["world_id"] == world_id
     ]
 
@@ -228,12 +239,17 @@ async def gate_tool_call(world, world_id: int, tool_name: str, args: dict, turn_
         return True, True, ""
 
     # 门禁永不「超时放行」：审阅/计划模式下没人应答就是不同意（on_timeout=False）
+    desc = describe_action(tool_name, args)
     ok, note = await request_approval(
         world_id, turn_state.get("turn_id", ""),
         kind=action,
-        # 弹窗写给用户看：一句人话的标题 + 具体内容（模式不写进标题，弹窗上方已有徽章）
+        # 弹窗写给用户看：一句人话的标题 + 一行摘要 + 可渲染的正文
+        # （模式不写进标题，弹窗上方已有徽章）
         title=ACTION_ASKS[action],
-        detail=describe_action(tool_name, args),
+        detail=desc["summary"],
+        body=desc.get("body") or "",
+        body_format=desc.get("format") or "text",
+        body_lang=desc.get("lang") or "",
         on_timeout=False,
     )
     if not ok:
@@ -245,19 +261,53 @@ async def gate_tool_call(world, world_id: int, tool_name: str, args: dict, turn_
     return True, True, ""
 
 
-def describe_action(tool_name: str, args: dict) -> str:
-    """弹窗里给人看的操作说明（做了什么、动到哪个文件）"""
+_LANG_BY_EXT = {
+    "html": "html", "htm": "html", "css": "css", "js": "javascript", "mjs": "javascript",
+    "jsx": "javascript", "ts": "typescript", "tsx": "typescript", "py": "python",
+    "json": "json", "md": "markdown", "yml": "yaml", "yaml": "yaml", "sh": "bash",
+    "sql": "sql", "xml": "xml", "txt": "plaintext",
+}
+
+
+def _lang_of(path: str) -> str:
+    return _LANG_BY_EXT.get(str(path).rsplit(".", 1)[-1].lower(), "plaintext") if "." in str(path) else "plaintext"
+
+
+def _fence(lang: str, text: str) -> str:
+    """四反引号围栏：正文里带三反引号也不会截断（markdown 渲染器支持）"""
+    return "````" + lang + "\n" + text + "\n````"
+
+
+def describe_action(tool_name: str, args: dict) -> dict:
+    """弹窗内容：summary 一行摘要 + body 用户真正要看的东西 + format 渲染方式。
+
+    前端按 format 走**聊天同一套渲染器**（markdown → MarkdownContent，code → CodeRenderer），
+    不再把内容当一坨纯文本塞进 <pre>——用户要能看懂 AI 到底要改什么（2026-09-15）。
+    """
     if tool_name == "web_download":
-        return f"要下的东西：{args.get('url', '')}\n会存到：{args.get('path') or 'downloads/（自动命名）'}"
+        url = str(args.get("url", ""))
+        target = args.get("path") or "downloads/（自动命名）"
+        return {"summary": f"要下载：{url}", "body": f"下载地址\n{url}\n\n存到\n{target}", "format": "text"}
     if tool_name == "file_delete":
-        return f"要删掉：{args.get('path', '')}"
+        return {"summary": f"要删掉：{args.get('path', '')}", "body": "", "format": "text"}
     if tool_name in ("file_move", "file_copy"):
-        return f"{'要搬去' if tool_name == 'file_move' else '要复制成'}：{args.get('from', '')} → {args.get('to', '')}"
-    if tool_name in ("file_write", "file_edit"):
-        path = args.get("path", "")
-        body = str(args.get("content") or args.get("new_string") or "")
-        return f"要动这个文件：{path}\n\n{body[:1500]}"
-    return f"{tool_name}\n\n{json.dumps(args, ensure_ascii=False)[:1500]}"
+        verb = "要搬去" if tool_name == "file_move" else "要复制成"
+        return {"summary": f"{verb}：{args.get('from', '')} → {args.get('to', '')}", "body": "", "format": "text"}
+    if tool_name == "file_write":
+        path = str(args.get("path", ""))
+        return {"summary": f"要写这个文件：{path}", "body": str(args.get("content") or ""),
+                "format": "code", "lang": _lang_of(path)}
+    if tool_name == "file_edit":
+        path = str(args.get("path", ""))
+        lang = _lang_of(path)
+        old, new = str(args.get("old_string") or ""), str(args.get("new_string") or "")
+        body = ""
+        if old:
+            body += "**替换掉这一段：**\n\n" + _fence(lang, old) + "\n\n"
+        body += "**换成：**\n\n" + _fence(lang, new)
+        return {"summary": f"要改这个文件：{path}", "body": body, "format": "markdown"}
+    return {"summary": f"要执行：{tool_name}", "body": json.dumps(args, ensure_ascii=False, indent=2),
+            "format": "code", "lang": "json"}
 
 
 # ═══════════════════════════════════════════════════════════════

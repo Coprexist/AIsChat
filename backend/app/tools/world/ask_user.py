@@ -46,7 +46,9 @@ class AskUserTool(WorldToolPlugin):
         on_timeout, timeout = unattended_policy(ctx.world)
         turn_id = (ctx.turn_state or {}).get("turn_id", "")
         approved, note = await request_approval(
-            ctx.world.id, turn_id, kind=kind, title=question, detail=detail,
+            # title = 要用户拍板的那句话；detail = AI 写的补充内容，按 markdown 渲染
+            ctx.world.id, turn_id, kind=kind, title=question,
+            body=detail, body_format="markdown",
             timeout=timeout, on_timeout=on_timeout,
         )
         answered = "未回复" not in note and "无人应答" not in note

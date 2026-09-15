@@ -68,7 +68,13 @@ export interface Approval {
   /** 事件类型关键词：download | delete | modify | plan | other */
   kind: string
   title: string
+  /** 一行摘要（动哪个文件/哪个地址） */
   detail?: string
+  /** 用户真正要看的内容：文件内容、计划正文、AI 的补充说明 */
+  body?: string
+  /** body 怎么渲染：markdown（散文/计划）| code（代码块）| text（纯文本） */
+  body_format?: 'markdown' | 'code' | 'text'
+  body_lang?: string
 }
 
 /** 解析 `[PREFIX]{json}` 事件体；前缀不匹配/JSON 坏返回 null */
@@ -535,13 +541,16 @@ export function useWorldChat({ wid, onRefresh, onMsg }: UseWorldChatOptions) {
           }
           if (payload.startsWith(EV.APPROVAL)) {
             // 审批弹窗：pending 入队、resolved 关闭（同一 approval_id 幂等）
-            const ap = parseEvent<{ approval_id: string; status: string; kind: string; title: string; detail?: string }>(payload, EV.APPROVAL)
+            const ap = parseEvent<Approval & { status: string }>(payload, EV.APPROVAL)
             if (ap) {
               setApprovals((list) => ap.status === 'resolved'
                 ? list.filter((a) => a.approval_id !== ap.approval_id)
                 : list.some((a) => a.approval_id === ap.approval_id)
                   ? list
-                  : [...list, { approval_id: ap.approval_id, kind: ap.kind, title: ap.title, detail: ap.detail }])
+                  : [...list, {
+                    approval_id: ap.approval_id, kind: ap.kind, title: ap.title, detail: ap.detail,
+                    body: ap.body, body_format: ap.body_format, body_lang: ap.body_lang,
+                  }])
             }
             continue
           }

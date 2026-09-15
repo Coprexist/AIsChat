@@ -264,6 +264,21 @@
 
 ### 🐛 修复的 Bug
 
+#### 审批弹窗不渲染 AI 发过来的内容（一坨 <pre> 纯文本）
+- 用户反馈"没有做他发过来的消息的渲染"：审阅/计划弹窗把 AI 的内容当纯文本塞进 `<pre>`（`break-all`，
+  代码换行乱、markdown 不生效），而聊天里同一份内容是正常渲染的
+- `describe_action()` 改成返回**摘要 + 正文 + 渲染格式**（内容与格式的唯一来源）：
+  `file_write` → code（按扩展名给语言，语法高亮）；`file_edit` → markdown（替换前/替换后两个代码块，
+  四反引号围栏防截断）；`ask_user` / `present_plan` → markdown；下载/删除/移动 → 一行摘要
+- `[APPROVAL]` 事件与 `/chat/status` 的 approvals 一并带上 `body / body_format / body_lang`（正文上限 8000 字），
+  前端 ApprovalDialog 走**聊天同款渲染器**（MarkdownContent / CodeRenderer），不再是纯文本
+- 顺手统一：审批弹窗改用 `Dialog`（打开即锁背景滚动；因为必须由用户明确点同意/不同意，
+  ESC 与点遮罩都不放行），按钮换成 `.btn` 语义类，宽度 max-w-md → max-w-lg（代码块放得下）
+- 验证：拦截 `/chat/status` 注入两种审批，浏览器实测——code 格式渲染出 1 个语法高亮代码块，
+  markdown 格式渲染出标题 + 表格 + 引用块，按钮为「不同意 / 同意」
+
+
+
 #### 世界 AI「思考过程」显示两遍：同一段思考既落了 note 又挂在最终回复上
 - **病根在落库**：工具轮里这一轮模型输出的思考被当成独立 `note` 落库（刷新后就是聊天里那条「思考」条），
   而收尾轮 DeepSeek 往往不再输出 `reasoning_content`，`full_reasoning` 便保留了**上一轮**的思考，

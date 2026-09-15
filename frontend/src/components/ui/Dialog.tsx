@@ -38,17 +38,19 @@ export default function Dialog({
   className = 'flex items-center justify-center p-4',
   children,
 }: DialogProps) {
-  // ESC 关闭 + 背景滚动锁定
+  // 打开期间锁背景滚动（与是否能关无关：强制审批弹窗也要锁）
+  useEffect(() => {
+    const prev = document.body.style.overflow
+    document.body.style.overflow = 'hidden'
+    return () => { document.body.style.overflow = prev }
+  }, [])
+
+  // ESC 关闭（只有给了 onClose 才生效：审批这类必须由用户明确选择的弹窗不给 onClose）
   useEffect(() => {
     if (!onClose) return
     const onKey = (e: KeyboardEvent) => e.key === 'Escape' && onClose()
     window.addEventListener('keydown', onKey)
-    const prev = document.body.style.overflow
-    document.body.style.overflow = 'hidden'
-    return () => {
-      window.removeEventListener('keydown', onKey)
-      document.body.style.overflow = prev
-    }
+    return () => window.removeEventListener('keydown', onKey)
   }, [onClose])
 
   return (
