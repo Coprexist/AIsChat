@@ -1,6 +1,7 @@
 import { useState, type ReactNode, type MouseEvent } from 'react'
 import { ExternalLink, ShieldAlert } from 'lucide-react'
 import { useT } from '../i18n/I18nContext'
+import { Dialog } from './ui'
 
 interface ExternalLinkSafeProps {
   href: string
@@ -52,9 +53,9 @@ export default function ExternalLinkSafe({ href, children, className, skipConfir
 
       {/* 确认弹窗 */}
       {showConfirm && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60" onClick={() => setShowConfirm(false)}>
+        <Dialog onClose={() =>  setShowConfirm(false)} className="flex items-center justify-center">
           <div
-            className="bg-surface rounded-2xl border border-border w-full max-w-sm mx-4 shadow-2xl"
+            className="bg-surface rounded-dialog border border-border w-full max-w-sm mx-4 shadow-2xl"
             onClick={e => e.stopPropagation()}
           >
             <div className="p-5">
@@ -68,7 +69,7 @@ export default function ExternalLinkSafe({ href, children, className, skipConfir
                 </div>
               </div>
 
-              <div className="bg-canvas border border-border rounded-xl px-3 py-2.5 mb-4">
+              <div className="bg-canvas border border-border rounded-card px-3 py-2.5 mb-4">
                 <p className="text-xs text-textPrimary font-mono break-all">{href}</p>
               </div>
 
@@ -92,7 +93,7 @@ export default function ExternalLinkSafe({ href, children, className, skipConfir
               </button>
             </div>
           </div>
-        </div>
+        </Dialog>
       )}
     </>
   )

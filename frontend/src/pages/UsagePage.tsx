@@ -9,7 +9,7 @@ import {
   ResponsiveContainer, ComposedChart, Line
 } from 'recharts'
 import { ArrowLeft, Loader2, BarChart3, Activity, FileText, Cpu } from 'lucide-react'
-import PageHeader from '../components/PageHeader'
+import { PageShell } from '../components/ui'
 
 interface DailyPoint {
   date: string
@@ -125,10 +125,7 @@ export default function UsagePage() {
   const selectedInfo = overview.find(a => a.agent_id === selectedAgent)
 
   return (
-    <div className="h-full flex flex-col bg-canvas">
-      <PageHeader title={t('usage.title')} onBack={() => history.back()} />
-      <div className="flex-1 overflow-y-auto">
-        <div className="max-w-4xl mx-auto p-4 md:p-6 space-y-5 pb-24 md:pb-6">
+    <PageShell title={t('usage.title')} onBack={() => history.back()} width="wide" contentClassName="space-y-5">
 
       {/* 日期选择 */}
       <div className="flex gap-2">
@@ -136,7 +133,7 @@ export default function UsagePage() {
           <button
             key={d}
             onClick={() => setDays(d)}
-            className={`px-4 py-2 rounded-xl text-xs font-medium transition-colors ${
+            className={`px-4 py-2 rounded-card text-xs font-medium transition-colors ${
               days === d
                 ? 'bg-primary-500/15 text-primary-600 dark:text-primary-300 border border-primary-400/30'
                 : 'bg-surface border border-border text-textSecondary hover:bg-elevated'
@@ -157,16 +154,16 @@ export default function UsagePage() {
         ].map(item => {
           const Icon = item.icon;
           return (
-          <div key={item.key} className="bg-surface rounded-xl border border-border p-4 text-center">
+          <div key={item.key} className="bg-surface rounded-card border border-border p-4 text-center">
             <div className="mb-1 flex justify-center"><Icon size={20} className="text-textSecondary" /></div>
             <div className="text-lg font-semibold text-textPrimary">{item.value}</div>
-            <div className="text-[10px] text-textMuted">{t(item.key)}</div>
+            <div className="text-3xs text-textMuted">{t(item.key)}</div>
           </div>
         )})}
       </div>
 
       {/* AI 选择 + 图表 */}
-      <div className="bg-surface rounded-2xl border border-border p-5">
+      <div className="bg-surface rounded-dialog border border-border p-5">
         {loading ? (
           <div className="flex justify-center py-12"><Loader2 className="animate-spin" size={24} /></div>
         ) : overview.length === 0 ? (
@@ -182,7 +179,7 @@ export default function UsagePage() {
               <select
                 value={selectedAgent || ''}
                 onChange={e => setSelectedAgent(e.target.value ? parseInt(e.target.value) : null)}
-                className="px-3 py-1.5 rounded-xl border border-border bg-canvas text-sm text-textPrimary focus:outline-none focus:ring-2 focus:ring-primary-500/50 max-w-[140px] truncate"
+                className="px-3 py-1.5 rounded-card border border-border bg-canvas text-sm text-textPrimary focus:outline-none focus:ring-2 focus:ring-primary-500/50 max-w-[140px] truncate"
               >
                 <option value="">{t('usage.allAi')}</option>
                 {overview.map(a => (
@@ -301,7 +298,7 @@ export default function UsagePage() {
 
       {/* AI 明细表 */}
       {overview.length > 0 && (
-        <div className="bg-surface rounded-2xl border border-border overflow-hidden">
+        <div className="bg-surface rounded-dialog border border-border overflow-hidden">
           <div className="px-5 py-3 border-b border-border">
             <h3 className="text-sm font-semibold text-textPrimary">{t('usage.agentDetailTableTitle')}</h3>
           </div>
@@ -339,8 +336,6 @@ export default function UsagePage() {
           </div>
         </div>
       )}
-    </div>
-      </div>
-    </div>
+    </PageShell>
   )
 }

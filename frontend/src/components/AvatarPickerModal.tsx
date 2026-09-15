@@ -159,11 +159,11 @@ export default function AvatarPickerModal({
     <>
       {/* 遮罩 */}
       <div
-        className="fixed inset-0 z-50 flex items-center justify-center bg-black/40"
+        className="fixed inset-0 z-modal flex items-center justify-center bg-black/40"
         onClick={onClose}
       >
         <div
-          className="relative bg-surface border border-border rounded-xl shadow-2xl w-80 max-w-[90vw] p-5"
+          className="relative bg-surface border border-border rounded-card shadow-2xl w-80 max-w-[90vw] p-5"
           onClick={(e) => e.stopPropagation()}
         >
           {/* 标题栏 */}
@@ -173,7 +173,7 @@ export default function AvatarPickerModal({
             </h3>
             <button
               onClick={onClose}
-              className="p-1 rounded-lg hover:bg-elevated text-textMuted transition-colors"
+              className="icon-btn-sm text-textMuted"
             >
               <X size={16} />
             </button>
@@ -181,7 +181,7 @@ export default function AvatarPickerModal({
 
           {/* 错误提示 */}
           {fileError && (
-            <div className="mb-3 text-xs text-rose-400 bg-rose-400/10 rounded-lg px-3 py-2">
+            <div className="mb-3 text-xs text-rose-400 bg-rose-400/10 rounded-control px-3 py-2">
               {fileError}
             </div>
           )}
@@ -192,15 +192,15 @@ export default function AvatarPickerModal({
               {/* 选项1：从个人空间选择 */}
               <button
                 onClick={() => setStep('select-file')}
-                className="flex flex-col items-center justify-center gap-2 p-4 rounded-xl border border-border bg-elevated hover:bg-canvas transition-colors"
+                className="flex flex-col items-center justify-center gap-2 p-4 rounded-card border border-border bg-elevated hover:bg-canvas transition-colors"
               >
-                <div className="w-12 h-12 rounded-xl bg-primary-500/10 dark:bg-primary-900/30 flex items-center justify-center">
+                <div className="w-12 h-12 rounded-card bg-primary-500/10 dark:bg-primary-900/30 flex items-center justify-center">
                   <Image size={22} className="text-primary-400" />
                 </div>
                 <span className="text-sm font-medium text-textPrimary">
                   {t('groupSettings.avatarPickerFromSpace')}
                 </span>
-                <span className="text-[10px] text-textMuted text-center leading-tight">
+                <span className="text-3xs text-textMuted text-center leading-tight">
                   {t('groupSettings.avatarPickerFromSpaceDesc')}
                 </span>
               </button>
@@ -208,15 +208,15 @@ export default function AvatarPickerModal({
               {/* 选项2：上传新图片 */}
               <button
                 onClick={() => fileInputRef.current?.click()}
-                className="flex flex-col items-center justify-center gap-2 p-4 rounded-xl border border-border bg-elevated hover:bg-canvas transition-colors"
+                className="flex flex-col items-center justify-center gap-2 p-4 rounded-card border border-border bg-elevated hover:bg-canvas transition-colors"
               >
-                <div className="w-12 h-12 rounded-xl bg-mint-400/10 dark:bg-mint-900/30 flex items-center justify-center">
+                <div className="w-12 h-12 rounded-card bg-mint-400/10 dark:bg-mint-900/30 flex items-center justify-center">
                   <Upload size={22} className="text-mint-400" />
                 </div>
                 <span className="text-sm font-medium text-textPrimary">
                   {t('groupSettings.avatarPickerUploadNew')}
                 </span>
-                <span className="text-[10px] text-textMuted text-center leading-tight">
+                <span className="text-3xs text-textMuted text-center leading-tight">
                   {t('groupSettings.avatarPickerUploadNewDesc')}
                 </span>
               </button>
@@ -249,7 +249,7 @@ export default function AvatarPickerModal({
                     <button
                       key={f.id}
                       onClick={() => handleSelectFromSpace(f)}
-                      className="relative aspect-square rounded-lg overflow-hidden border border-border bg-elevated hover:border-primary-400 transition-colors group"
+                      className="relative aspect-square rounded-control overflow-hidden border border-border bg-elevated hover:border-primary-400 transition-colors group"
                       title={f.path.split('/').pop() || f.path}
                     >
                       <img

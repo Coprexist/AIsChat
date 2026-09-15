@@ -104,19 +104,19 @@ export default function SkillBackpack({ agentId, className = '' }: Props) {
             <button
               key={seg.name}
               onClick={() => setExpandedSegment(isExpanded ? null : seg.name)}
-              className={`bg-surface rounded-xl border border-border text-left p-3.5 transition-all ${
+              className={`bg-surface rounded-card border border-border text-left p-3.5 transition-all ${
                 isExpanded
                   ? 'ring-2 ring-primary-500/30 shadow-lg border-primary-500/30'
                   : 'hover:border-primary-500/20 hover:shadow-sm'
               }`}
             >
               <div className="flex items-center gap-2.5 mb-2">
-                <div className="w-8 h-8 rounded-lg bg-primary-500/10 flex items-center justify-center shrink-0">
+                <div className="w-8 h-8 rounded-control bg-primary-500/10 flex items-center justify-center shrink-0">
                   <Icon size={16} className="text-primary-500" />
                 </div>
                 <div className="flex-1 min-w-0">
                   <h3 className="text-sm font-semibold text-textPrimary">{seg.name}</h3>
-                  <p className="text-[10px] text-textMuted">{seg.tool_count} {t('backpack.toolCount')}</p>
+                  <p className="text-3xs text-textMuted">{seg.tool_count} {t('backpack.toolCount')}</p>
                 </div>
                 <div className="shrink-0 text-textMuted">
                   {isExpanded ? <ChevronUp size={15} /> : <ChevronDown size={15} />}
@@ -124,18 +124,18 @@ export default function SkillBackpack({ agentId, className = '' }: Props) {
               </div>
 
               {seg.admin_description && (
-                <p className="text-[11px] text-textSecondary leading-relaxed line-clamp-2 mb-2">{seg.admin_description}</p>
+                <p className="text-2xs text-textSecondary leading-relaxed line-clamp-2 mb-2">{seg.admin_description}</p>
               )}
 
               {seg.trigger_conditions.length > 0 && (
                 <div className="flex flex-wrap gap-1">
                   {seg.trigger_conditions.slice(0, 2).map(tc => (
-                    <span key={tc} className="text-[10px] px-1.5 py-0.5 rounded bg-primary-500/8 text-primary-600 dark:text-primary-400" title={tc}>
+                    <span key={tc} className="text-3xs px-1.5 py-0.5 rounded bg-primary-500/8 text-primary-600 dark:text-primary-400" title={tc}>
                       {tc.length > 12 ? tc.slice(0, 12) + '…' : tc}
                     </span>
                   ))}
                   {seg.trigger_conditions.length > 2 && (
-                    <span className="text-[10px] px-1.5 py-0.5 rounded bg-canvas text-textMuted" title={seg.trigger_conditions.slice(2).join('、')}>
+                    <span className="text-3xs px-1.5 py-0.5 rounded bg-canvas text-textMuted" title={seg.trigger_conditions.slice(2).join('、')}>
                       +{seg.trigger_conditions.length - 2}
                     </span>
                   )}
@@ -148,19 +148,19 @@ export default function SkillBackpack({ agentId, className = '' }: Props) {
 
       {/* 展开区域 — 通栏显示被选中段落的工具 */}
       {expandedSeg && (
-        <div className="bg-surface rounded-xl border border-primary-500/20 p-4 space-y-2.5 shadow-lg">
+        <div className="bg-surface rounded-card border border-primary-500/20 p-4 space-y-2.5 shadow-lg">
           <div className="flex items-center justify-between">
             <p className="text-xs font-semibold text-textPrimary">{expandedSeg.name} — {t('backpack.toolsInSkill')} ({expandedSeg.tool_count})</p>
-            <button onClick={() => setExpandedSegment(null)} className="text-[11px] text-textMuted hover:text-textSecondary transition-colors">收起 <X size={12} /></button>
+            <button onClick={() => setExpandedSegment(null)} className="text-2xs text-textMuted hover:text-textSecondary transition-colors">收起 <X size={12} /></button>
           </div>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
             {expandedSeg.tools.map(tool => (
-              <div key={tool.name} className="rounded-lg border border-border/60 p-3 hover:border-primary-500/30 hover:bg-primary-500/[0.02] transition-colors">
+              <div key={tool.name} className="rounded-control border border-border/60 p-3 hover:border-primary-500/30 hover:bg-primary-500/[0.02] transition-colors">
                 <div className="flex items-center gap-2 flex-wrap min-w-0">
                   <span className="font-mono text-xs font-medium text-textPrimary">{tool.name}</span>
                   {/* 可用性 */}
                   {tool.available_in_current_state !== undefined && (
-                    <span className={`text-[10px] px-1.5 py-0.5 rounded ${
+                    <span className={`text-3xs px-1.5 py-0.5 rounded ${
                       tool.available_in_current_state
                         ? 'bg-mint-100 text-mint-700 dark:bg-mint-900/30 dark:text-mint-400'
                         : 'bg-slate-100 text-slate-500 dark:bg-slate-800 dark:text-slate-400'
@@ -170,16 +170,16 @@ export default function SkillBackpack({ agentId, className = '' }: Props) {
                   )}
                   {/* 状态标签 */}
                   {tool.states.map(s => (
-                    <span key={s} className={`text-[10px] px-1.5 py-0.5 rounded ${STATE_TAG_COLORS[s] || 'bg-canvas text-textMuted'}`}>
+                    <span key={s} className={`text-3xs px-1.5 py-0.5 rounded ${STATE_TAG_COLORS[s] || 'bg-canvas text-textMuted'}`}>
                       {STATE_LABELS[s] || s}
                     </span>
                   ))}
                 </div>
                 {tool.admin_description && (
-                  <p className="text-[11px] text-textSecondary leading-relaxed mt-1.5">{tool.admin_description}</p>
+                  <p className="text-2xs text-textSecondary leading-relaxed mt-1.5">{tool.admin_description}</p>
                 )}
                 {tool.trigger_condition && (
-                  <div className="mt-1 text-[10px] text-primary-500/70">{tool.trigger_condition}</div>
+                  <div className="mt-1 text-3xs text-primary-500/70">{tool.trigger_condition}</div>
                 )}
               </div>
             ))}

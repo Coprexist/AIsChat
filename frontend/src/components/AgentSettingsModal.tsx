@@ -107,7 +107,7 @@ function ApiKeyGetLink({ providers }: { providers?: ProviderItem[] }) {
       href={defaultProvider.api_key_url}
       target="_blank"
       rel="noopener noreferrer"
-      className="text-[10px] text-primary-400 hover:text-primary-500 dark:hover:text-primary-300 underline underline-offset-2 font-normal"
+      className="text-3xs text-primary-400 hover:text-primary-500 dark:hover:text-primary-300 underline underline-offset-2 font-normal"
     >
       获取 API Key →
     </a>
@@ -334,19 +334,19 @@ export default function AgentSettingsModal({
   if (!isOpen) return null
 
   return (
-    <div className="fixed inset-0 md:bg-black/70 flex items-start justify-center z-[60] md:pt-8 overflow-y-auto bg-surface" onClick={onClose}>
+    <div className="fixed inset-0 md:bg-black/70 flex items-start justify-center z-toast md:pt-8 overflow-y-auto bg-surface" onClick={onClose}>
       <div
-        className="bg-elevated border border-border rounded-none md:rounded-2xl p-6 w-full max-w-full md:max-w-2xl mx-0 md:mx-4 shadow-2xl shadow-black/30 my-0 md:my-4 h-full md:h-auto flex flex-col pb-0 md:pb-6"
+        className="bg-elevated border border-border rounded-none md:rounded-dialog p-6 w-full max-w-full md:max-w-2xl mx-0 md:mx-4 shadow-2xl shadow-black/30 my-0 md:my-4 h-full md:h-auto flex flex-col pb-0 md:pb-6"
         onClick={(e) => e.stopPropagation()}
       >
         {/* 移动端头部 */}
         <div className="flex items-center justify-between mb-5 md:hidden shrink-0">
           {view === 'detailed' ? (
-            <button onClick={() => setView('main')} className="p-1 -ml-1 rounded-lg hover:bg-elevated text-textSecondary transition-colors">
+            <button onClick={() => setView('main')} className="p-1 -ml-1 rounded-control hover:bg-elevated text-textSecondary transition-colors">
               <ArrowLeft size={20} />
             </button>
           ) : (
-            <button onClick={onClose} className="p-1 -ml-1 rounded-lg hover:bg-elevated text-textSecondary transition-colors">
+            <button onClick={onClose} className="icon-btn-sm -ml-1 text-textSecondary">
               <ArrowLeft size={20} />
             </button>
           )}
@@ -360,7 +360,7 @@ export default function AgentSettingsModal({
         <div className="hidden md:flex items-center justify-between mb-5">
           <div className="flex items-center gap-3">
             {view === 'detailed' && (
-              <button onClick={() => setView('main')} className="p-1 -ml-1 rounded-lg hover:bg-elevated text-textSecondary transition-colors">
+              <button onClick={() => setView('main')} className="p-1 -ml-1 rounded-control hover:bg-elevated text-textSecondary transition-colors">
                 <ArrowLeft size={18} />
               </button>
             )}
@@ -378,14 +378,14 @@ export default function AgentSettingsModal({
           {/* ═══════════════════════════════════════════ 主设置 ═══════════════════════════════════════════ */}
           {view === 'main' && (
             <>
-              <p className="text-[10px] text-textMuted -mb-3">{t('modal.mainSettingsDesc') || '核心配置，快速调整 AI 行为。更多参数请点击底部「详细设置」。'}</p>
+              <p className="text-3xs text-textMuted -mb-3">{t('modal.mainSettingsDesc') || '核心配置，快速调整 AI 行为。更多参数请点击底部「详细设置」。'}</p>
 
               {/* 基础信息 */}
               <Section title={t('modal.detailSettingsBasicInfo')} desc={t('modal.detailSettingsBasicInfoDesc')}>
                 <div>
                   <label className="block text-xs font-medium mb-1 text-textSecondary">{t('chat.groupName')}</label>
                   <input type="text" value={name} onChange={(e) => setName(e.target.value)}
-                    className="w-full px-3 py-2 rounded-lg border border-border bg-canvas text-sm text-textPrimary placeholder:text-textMuted focus:outline-none focus:ring-2 focus:ring-primary-500/50" />
+                    className="w-full px-3 py-2 rounded-control border border-border bg-canvas text-sm text-textPrimary placeholder:text-textMuted focus:outline-none focus:ring-2 focus:ring-primary-500/50" />
                 </div>
                 <div>
                   <label className="block text-xs font-medium mb-1 text-textSecondary">{t('modal.mainSettingsProfile') || '配置档位'}</label>
@@ -393,13 +393,13 @@ export default function AgentSettingsModal({
                     {PROFILE_OPTIONS.map((opt) => (
                       <button key={opt.value} type="button"
                         onClick={() => applyPreset(opt.value)}
-                        className={`flex flex-col items-center gap-1 p-2 rounded-xl border text-center transition-all ${
+                        className={`flex flex-col items-center gap-1 p-2 rounded-card border text-center transition-all ${
                           configProfile === opt.value
                             ? `border-primary-400 bg-primary-500/10 text-primary-600 dark:text-primary-300`
                             : 'border-border bg-canvas text-textSecondary hover:bg-elevated'
                         }`}
                       >
-                        <span className="text-[11px] font-semibold">{t(opt.label)}</span>
+                        <span className="text-2xs font-semibold">{t(opt.label)}</span>
                         <span className="text-[8px] leading-tight text-textMuted">{t(opt.desc)}</span>
                       </button>
                     ))}
@@ -408,7 +408,7 @@ export default function AgentSettingsModal({
                 <div>
                   <label className="block text-xs font-medium mb-1 text-textSecondary">{t('modal.createAgentSystemPrompt')}</label>
                   <textarea value={systemPrompt} onChange={(e) => setSystemPrompt(e.target.value)} rows={3}
-                    className="w-full px-3 py-2 rounded-lg border border-border bg-canvas text-sm text-textPrimary placeholder:text-textMuted focus:outline-none focus:ring-2 focus:ring-primary-500/50 resize-none" />
+                    className="w-full px-3 py-2 rounded-control border border-border bg-canvas text-sm text-textPrimary placeholder:text-textMuted focus:outline-none focus:ring-2 focus:ring-primary-500/50 resize-none" />
                 </div>
               </Section>
 
@@ -417,13 +417,13 @@ export default function AgentSettingsModal({
                 <div>
                   <label className="block text-xs font-medium mb-1 text-textSecondary">{t('agentDetail.bioLabel') || '简介'}</label>
                   <textarea value={bio} onChange={(e) => setBio(e.target.value)} rows={3} maxLength={500}
-                    className="w-full px-3 py-2 rounded-lg border border-border bg-canvas text-sm text-textPrimary placeholder:text-textMuted focus:outline-none focus:ring-2 focus:ring-primary-500/50 resize-none" />
-                  <p className="text-[10px] text-textMuted mt-0.5">{bio.length}/500</p>
+                    className="w-full px-3 py-2 rounded-control border border-border bg-canvas text-sm text-textPrimary placeholder:text-textMuted focus:outline-none focus:ring-2 focus:ring-primary-500/50 resize-none" />
+                  <p className="text-3xs text-textMuted mt-0.5">{bio.length}/500</p>
                 </div>
                 <div>
                   <label className="block text-xs font-medium mb-1 text-textSecondary">{t('agentDetail.statusTextLabel') || '个性状态'}</label>
                   <input type="text" value={statusText} onChange={(e) => setStatusText(e.target.value)} maxLength={100}
-                    className="w-full px-3 py-2 rounded-lg border border-border bg-canvas text-sm text-textPrimary placeholder:text-textMuted focus:outline-none focus:ring-2 focus:ring-primary-500/50" />
+                    className="w-full px-3 py-2 rounded-control border border-border bg-canvas text-sm text-textPrimary placeholder:text-textMuted focus:outline-none focus:ring-2 focus:ring-primary-500/50" />
                 </div>
                 <div>
                   <label className="block text-xs font-medium mb-1 text-textSecondary">{t('me.statusColorLabel') || '状态颜色'}</label>
@@ -459,7 +459,7 @@ export default function AgentSettingsModal({
                     { value: 'resonance', label: t('modal.detailSettingsAiTypeResonance'), desc: t('modal.detailSettingsAiTypeResonanceDesc') },
                   ] as const).map((type) => (
                     <button key={type.value} type="button" onClick={() => setAiType(type.value)}
-                      className={`flex flex-col items-center gap-1 p-2.5 rounded-xl border text-center transition-all ${
+                      className={`flex flex-col items-center gap-1 p-2.5 rounded-card border text-center transition-all ${
                         aiType === type.value
                           ? 'border-primary-400 bg-primary-500/10 text-primary-600 dark:text-primary-300'
                           : 'border-border bg-canvas text-textSecondary hover:bg-elevated'
@@ -480,7 +480,7 @@ export default function AgentSettingsModal({
                       {t('modal.detailSettingsChatModel')} <span className="text-textMuted">({t('modal.detailSettingsDefaultLabel')} {defaults.chat_model})</span>
                     </label>
                     <select value={chatModel} onChange={(e) => setChatModel(e.target.value)}
-                      className="w-full px-3 py-2 rounded-lg border border-border bg-canvas text-sm text-textPrimary focus:outline-none focus:ring-2 focus:ring-primary-500/50">
+                      className="w-full px-3 py-2 rounded-control border border-border bg-canvas text-sm text-textPrimary focus:outline-none focus:ring-2 focus:ring-primary-500/50">
                       <option value="">{t('modal.detailSettingsGlobalDefault')}</option>
                       {renderGroupedModels(modelOptions, providers)}
                     </select>
@@ -490,7 +490,7 @@ export default function AgentSettingsModal({
                       {t('modal.detailSettingsWorkModel')} <span className="text-textMuted">({t('modal.detailSettingsDefaultLabel')} {defaults.work_model})</span>
                     </label>
                     <select value={workModel} onChange={(e) => setWorkModel(e.target.value)}
-                      className="w-full px-3 py-2 rounded-lg border border-border bg-canvas text-sm text-textPrimary focus:outline-none focus:ring-2 focus:ring-primary-500/50">
+                      className="w-full px-3 py-2 rounded-control border border-border bg-canvas text-sm text-textPrimary focus:outline-none focus:ring-2 focus:ring-primary-500/50">
                       <option value="">{t('modal.detailSettingsGlobalDefault')}</option>
                       {renderGroupedModels(modelOptions, providers)}
                     </select>
@@ -506,7 +506,7 @@ export default function AgentSettingsModal({
                   <select
                     value={delayReplyEnabled === null ? 'inherit' : delayReplyEnabled ? 'on' : 'off'}
                     onChange={(e) => { const v = e.target.value; setDelayReplyEnabled(v === 'inherit' ? null : v === 'on') }}
-                    className="w-full px-3 py-2 rounded-lg border border-border bg-canvas text-sm text-textPrimary focus:outline-none focus:ring-2 focus:ring-primary-500/50"
+                    className="w-full px-3 py-2 rounded-control border border-border bg-canvas text-sm text-textPrimary focus:outline-none focus:ring-2 focus:ring-primary-500/50"
                   >
                     <option value="inherit">{t('modal.detailSettingsInheritGlobal')}</option>
                     <option value="on">{t('common.enabled')}</option>
@@ -531,7 +531,7 @@ export default function AgentSettingsModal({
           {/* ═══════════════════════════════════════════ 详细设置 ═══════════════════════════════════════════ */}
           {view === 'detailed' && (
             <>
-              <p className="text-[10px] text-textMuted -mb-3">{t('modal.detailSettingsDesc') || '高级参数调整。不确定的保持默认即可。'}</p>
+              <p className="text-3xs text-textMuted -mb-3">{t('modal.detailSettingsDesc') || '高级参数调整。不确定的保持默认即可。'}</p>
 
               {/* 高级模型参数 */}
               <Section title={t('modal.detailSettingsAdvancedModel') || '高级模型参数'} desc={t('modal.detailSettingsAdvancedModelDesc') || '精细控制采样策略'} defaultCollapsed>
@@ -564,7 +564,7 @@ export default function AgentSettingsModal({
                 <div>
                   <label className="block text-xs font-medium mb-1 text-textSecondary">{t('modal.detailSettingsMemoryLoadMode')}</label>
                   <select value={memoryLoadMode} onChange={(e) => setMemoryLoadMode(e.target.value)}
-                    className="w-full px-3 py-2 rounded-lg border border-border bg-canvas text-sm text-textPrimary focus:outline-none focus:ring-2 focus:ring-primary-500/50">
+                    className="w-full px-3 py-2 rounded-control border border-border bg-canvas text-sm text-textPrimary focus:outline-none focus:ring-2 focus:ring-primary-500/50">
                     <option value="index_only">{t('modal.detailSettingsMemoryLoadModeIndexOnly')}</option>
                     <option value="index_plus_recent">{t('modal.detailSettingsMemoryLoadModeIndexRecent')}</option>
                     <option value="index_plus_semantic">{t('modal.detailSettingsMemoryLoadModeIndexSemantic')}</option>
@@ -576,7 +576,7 @@ export default function AgentSettingsModal({
                 <div>
                   <label className="block text-xs font-medium mb-1 text-textSecondary">{t('modal.detailSettingsMemorySharedScope')}</label>
                   <select value={memorySharedScope} onChange={(e) => setMemorySharedScope(e.target.value)}
-                    className="w-full px-3 py-2 rounded-lg border border-border bg-canvas text-sm text-textPrimary focus:outline-none focus:ring-2 focus:ring-primary-500/50">
+                    className="w-full px-3 py-2 rounded-control border border-border bg-canvas text-sm text-textPrimary focus:outline-none focus:ring-2 focus:ring-primary-500/50">
                     <option value="private_only">{t('modal.detailSettingsMemorySharedScopePrivate')}</option>
                     <option value="private_plus_shared_by_user">{t('modal.detailSettingsMemorySharedScopeByUser')}</option>
                     <option value="private_plus_shared_all">{t('modal.detailSettingsMemorySharedScopeAll')}</option>
@@ -591,21 +591,21 @@ export default function AgentSettingsModal({
                   <input type="number" min={1} max={10000} value={conversationLogsLimit ?? ''}
                     onChange={(e) => setConversationLogsLimit(e.target.value ? parseInt(e.target.value) : null)}
                     placeholder={t('modal.detailSettingsConversationLogsLimitDesc') || '留空继承全局'}
-                    className="w-full px-3 py-2 rounded-lg border border-border bg-canvas text-sm text-textPrimary placeholder:text-textMuted focus:outline-none focus:ring-2 focus:ring-primary-500/50" />
-                  <p className="text-[10px] text-textMuted mt-0.5">{t('modal.detailSettingsConversationLogsLimitDesc') || '留空继承全局设置'}</p>
+                    className="w-full px-3 py-2 rounded-control border border-border bg-canvas text-sm text-textPrimary placeholder:text-textMuted focus:outline-none focus:ring-2 focus:ring-primary-500/50" />
+                  <p className="text-3xs text-textMuted mt-0.5">{t('modal.detailSettingsConversationLogsLimitDesc') || '留空继承全局设置'}</p>
                 </div>
                 <div>
                   <label className="block text-xs font-medium mb-1 text-textSecondary">{t('modal.detailSettingsUserCanViewLogs') || '允许用户查看日志'}</label>
                   <select
                     value={userCanViewLogs === null ? 'inherit' : userCanViewLogs ? 'on' : 'off'}
                     onChange={(e) => { const v = e.target.value; setUserCanViewLogs(v === 'inherit' ? null : v === 'on') }}
-                    className="w-full px-3 py-2 rounded-lg border border-border bg-canvas text-sm text-textPrimary focus:outline-none focus:ring-2 focus:ring-primary-500/50"
+                    className="w-full px-3 py-2 rounded-control border border-border bg-canvas text-sm text-textPrimary focus:outline-none focus:ring-2 focus:ring-primary-500/50"
                   >
                     <option value="inherit">{t('modal.detailSettingsInheritGlobal')}</option>
                     <option value="on">{t('common.enabled')}</option>
                     <option value="off">{t('common.disabled')}</option>
                   </select>
-                  <p className="text-[10px] text-textMuted mt-0.5">{t('modal.detailSettingsUserCanViewLogsDesc') || '留空继承全局默认设置'}</p>
+                  <p className="text-3xs text-textMuted mt-0.5">{t('modal.detailSettingsUserCanViewLogsDesc') || '留空继承全局默认设置'}</p>
                 </div>
               </Section>
 
@@ -616,7 +616,7 @@ export default function AgentSettingsModal({
                 <div>
                   <label className="block text-xs font-medium mb-1 text-textSecondary">{t('modal.detailSettingsReminderGrace')}</label>
                   <select value={reminderGrace} onChange={(e) => setReminderGrace(e.target.value)}
-                    className="w-full px-3 py-2 rounded-lg border border-border bg-canvas text-sm text-textPrimary focus:outline-none focus:ring-2 focus:ring-primary-500/50">
+                    className="w-full px-3 py-2 rounded-control border border-border bg-canvas text-sm text-textPrimary focus:outline-none focus:ring-2 focus:ring-primary-500/50">
                     <option value="every_time">{t('modal.detailSettingsReminderGraceEvery')}</option>
                     <option value="once">{t('modal.detailSettingsReminderGraceOnce')}</option>
                     <option value="off">{t('modal.detailSettingsReminderGraceOff')}</option>
@@ -654,13 +654,13 @@ export default function AgentSettingsModal({
                         <div className="flex items-center gap-3">
                           <NumberField label={t('agents.othersChatQuotaLabel')} value={othersChatQuota} setValue={setOthersChatQuota} min={1} max={9999} />
                           <div className="flex items-center gap-2 pt-5">
-                            <span className="text-[11px] text-textMuted">{t('agents.othersChatUsed')}: {othersChatUsed}</span>
+                            <span className="text-2xs text-textMuted">{t('agents.othersChatUsed')}: {othersChatUsed}</span>
                             <button type="button"
                               onClick={async () => { try { await api.post(`/agents/${agent.id}/reset-others-chat-used`); setOthersChatUsed(0) } catch { /* ignore */ } }}
-                              className="text-[10px] px-2 py-0.5 rounded border border-border text-textMuted hover:text-textSecondary transition-colors"
+                              className="text-3xs px-2 py-0.5 rounded border border-border text-textMuted hover:text-textSecondary transition-colors"
                             >{t('agents.othersChatUsedReset')}</button>
                           </div>
-                          <p className="text-[10px] text-textMuted leading-relaxed">{t('agents.othersChatQuotaDesc')}</p>
+                          <p className="text-3xs text-textMuted leading-relaxed">{t('agents.othersChatQuotaDesc')}</p>
                         </div>
                         <ToggleField label={t('agents.autoResetQuota') || '自动重置配额'} value={autoResetQuota} setValue={setAutoResetQuota} desc={t('agents.autoResetQuotaDesc') || '用户每次 DM 后自动重置配额计数至上限'} />
                       </>
@@ -670,7 +670,7 @@ export default function AgentSettingsModal({
                   </div>
                 ) : (
                   <div className="ml-4 pl-3 border-l-2 border-rose-400/30 space-y-2 mt-1">
-                    <label className="text-[11px] font-medium text-textMuted mb-2 block">{t('agents.disallowModeLabel')}</label>
+                    <label className="text-2xs font-medium text-textMuted mb-2 block">{t('agents.disallowModeLabel')}</label>
                     <div className="flex items-center gap-3">
                       <label className="flex items-center gap-1.5 cursor-pointer">
                         <input type="radio" name="disallowMode" value="strict" checked={disallowMode === 'strict'} onChange={() => setDisallowMode('strict')} className="text-primary-500" />
@@ -682,7 +682,7 @@ export default function AgentSettingsModal({
                       </label>
                     </div>
                     {disallowMode === 'own_key' && (
-                      <p className="text-[10px] text-textMuted leading-relaxed">{t('agents.disallowOwnKeyDesc')}</p>
+                      <p className="text-3xs text-textMuted leading-relaxed">{t('agents.disallowOwnKeyDesc')}</p>
                     )}
                   </div>
                 )}
@@ -690,16 +690,16 @@ export default function AgentSettingsModal({
                 {/* AI↔AI 私信限额（2026-08-09） */}
                 <div className="mt-4 pt-3 border-t border-border/40">
                   <label className="block text-xs font-medium mb-1 text-textSecondary">{t('agents.dmQuotaTitle') || 'AI↔AI 私信限额'}</label>
-                  <p className="text-[10px] text-textMuted leading-relaxed mb-2">{t('agents.dmQuotaDesc') || '控制与其他 AI 私信互通的条数（0 = 不启用该维度）。超出后消息照常送达，但不触发对方自动回复；创建者发消息后计数重置。'}</p>
+                  <p className="text-3xs text-textMuted leading-relaxed mb-2">{t('agents.dmQuotaDesc') || '控制与其他 AI 私信互通的条数（0 = 不启用该维度）。超出后消息照常送达，但不触发对方自动回复；创建者发消息后计数重置。'}</p>
                   <div className="grid grid-cols-2 gap-3">
                     <div className="space-y-2">
-                      <span className="text-[11px] font-medium text-textSecondary block">{t('agents.dmQuotaSend') || '发送'}</span>
+                      <span className="text-2xs font-medium text-textSecondary block">{t('agents.dmQuotaSend') || '发送'}</span>
                       <NumberField label={t('agents.dmQuotaDaily') || '每天'} value={dmSendDaily} setValue={setDmSendDaily} min={0} max={9999} />
                       <NumberField label={t('agents.dmQuotaWeekly') || '每周'} value={dmSendWeekly} setValue={setDmSendWeekly} min={0} max={9999} />
                       <NumberField label={t('agents.dmQuotaCreatorChat') || '距创建者对话'} value={dmSendCreatorChat} setValue={setDmSendCreatorChat} min={0} max={9999} />
                     </div>
                     <div className="space-y-2">
-                      <span className="text-[11px] font-medium text-textSecondary block">{t('agents.dmQuotaReceive') || '接收'}</span>
+                      <span className="text-2xs font-medium text-textSecondary block">{t('agents.dmQuotaReceive') || '接收'}</span>
                       <NumberField label={t('agents.dmQuotaDaily') || '每天'} value={dmRecvDaily} setValue={setDmRecvDaily} min={0} max={9999} />
                       <NumberField label={t('agents.dmQuotaWeekly') || '每周'} value={dmRecvWeekly} setValue={setDmRecvWeekly} min={0} max={9999} />
                       <NumberField label={t('agents.dmQuotaCreatorChat') || '距创建者对话'} value={dmRecvCreatorChat} setValue={setDmRecvCreatorChat} min={0} max={9999} />
@@ -718,7 +718,7 @@ export default function AgentSettingsModal({
                 <div>
                   <label className="block text-xs font-medium mb-1 text-textSecondary">API Base URL</label>
                   <input type="text" value={apiBaseUrl} onChange={(e) => setApiBaseUrl(e.target.value)}
-                    className="w-full px-3 py-2 rounded-lg border border-border bg-canvas text-sm text-textPrimary placeholder:text-textMuted focus:outline-none focus:ring-2 focus:ring-primary-500/50"
+                    className="w-full px-3 py-2 rounded-control border border-border bg-canvas text-sm text-textPrimary placeholder:text-textMuted focus:outline-none focus:ring-2 focus:ring-primary-500/50"
                     placeholder={t('modal.detailSettingsApiBaseUrlPlaceholder')} />
                 </div>
                 <div>
@@ -727,11 +727,11 @@ export default function AgentSettingsModal({
                     <ApiKeyGetLink providers={providers} />
                   </label>
                   <input type="password" value={apiKey} onChange={(e) => setApiKey(e.target.value)} autoComplete="off"
-                    className="w-full px-3 py-2 rounded-lg border border-border bg-canvas text-sm text-textPrimary placeholder:text-textMuted focus:outline-none focus:ring-2 focus:ring-primary-500/50"
+                    className="w-full px-3 py-2 rounded-control border border-border bg-canvas text-sm text-textPrimary placeholder:text-textMuted focus:outline-none focus:ring-2 focus:ring-primary-500/50"
                     placeholder={agent.has_api_key ? '•••••••• (unchanged if empty)' : t('modal.detailSettingsApiKeyPlaceholder')} />
                 </div>
                 <button onClick={handleTestApi} disabled={testingApi || (!apiBaseUrl.trim() && !apiKey.trim())}
-                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-border text-xs text-textSecondary hover:bg-elevated disabled:opacity-40 transition-colors"
+                  className="btn btn-xs btn-outline gap-1.5"
                 >
                   {testingApi ? <Loader2 size={12} className="animate-spin" /> : <RotateCw size={12} />}
                   {t('settings.testConnection')}
@@ -752,11 +752,11 @@ export default function AgentSettingsModal({
                   <div className="flex-1 relative">
                     <Ticket size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-textMuted" />
                     <input type="text" value={redeemCode} onChange={(e) => setRedeemCode(e.target.value)}
-                      className="w-full pl-9 pr-3 py-2 rounded-lg border border-border bg-canvas text-sm text-textPrimary placeholder:text-textMuted focus:outline-none focus:ring-2 focus:ring-primary-500/50"
+                      className="w-full pl-9 pr-3 py-2 rounded-control border border-border bg-canvas text-sm text-textPrimary placeholder:text-textMuted focus:outline-none focus:ring-2 focus:ring-primary-500/50"
                       placeholder={t('modal.detailSettingsRedeemPlaceholder')} />
                   </div>
                   <button onClick={handleRedeem} disabled={redeeming || !redeemCode.trim()}
-                    className="flex items-center gap-1 px-4 py-2 rounded-lg bg-primary-500 text-white text-sm font-medium hover:bg-primary-600 disabled:opacity-40 transition-colors shrink-0"
+                    className="btn btn-sm btn-primary gap-1 shrink-0"
                   >
                     {redeeming ? <Loader2 size={14} className="animate-spin" /> : <span>{t('me.redeem')}</span>}
                   </button>
@@ -777,24 +777,24 @@ export default function AgentSettingsModal({
         <div className="flex gap-3">
           {view === 'main' ? (
             <button onClick={() => setView('detailed')}
-              className="flex-1 py-2.5 text-sm border border-primary-400/30 text-primary-500 rounded-xl hover:bg-primary-500/10 font-medium transition-colors flex items-center justify-center gap-1"
+              className="flex-1 py-2.5 text-sm border border-primary-400/30 text-primary-500 rounded-card hover:bg-primary-500/10 font-medium transition-colors flex items-center justify-center gap-1"
             >
               {t('modal.goToDetailedSettings') || '详细设置'} <ChevronRight size={14} />
             </button>
           ) : (
             <button onClick={() => setView('main')}
-              className="flex-1 py-2.5 text-sm border border-border text-textSecondary rounded-xl hover:bg-elevated font-medium transition-colors"
+              className="flex-1 py-2.5 text-sm border border-border text-textSecondary rounded-card hover:bg-elevated font-medium transition-colors"
             >
               {t('modal.backToMainSettings') || '返回简洁设置'}
             </button>
           )}
           <button onClick={onClose}
-            className="flex-1 py-2.5 text-sm border border-border text-textSecondary rounded-xl hover:bg-elevated font-medium transition-colors"
+            className="btn btn-md btn-outline flex-1"
           >
             {t('common.cancel')}
           </button>
           <button onClick={handleSave} disabled={saving}
-            className="flex-1 py-2.5 text-sm bg-primary-500 text-white rounded-xl hover:bg-primary-600 font-medium transition-all shadow-lg shadow-primary-500/20 disabled:opacity-50"
+            className="btn btn-md btn-primary flex-1"
           >
             {saving ? <Loader2 size={16} className="animate-spin mx-auto" /> : t('common.save')}
           </button>
@@ -809,7 +809,7 @@ export default function AgentSettingsModal({
 function Section({ title, desc, children, defaultCollapsed }: { title: string; desc: string; children: React.ReactNode; defaultCollapsed?: boolean }) {
   const [open, setOpen] = useState(!defaultCollapsed)
   return (
-    <div className="bg-canvas/50 rounded-xl border border-border/50 overflow-hidden">
+    <div className="bg-canvas/50 rounded-card border border-border/50 overflow-hidden">
       <button
         onClick={() => setOpen(!open)}
         className="w-full flex items-center gap-2 px-4 py-3 text-left hover:bg-black/[0.02] dark:hover:bg-white/[0.02] transition-colors"
@@ -817,7 +817,7 @@ function Section({ title, desc, children, defaultCollapsed }: { title: string; d
         <span className={`shrink-0 text-textMuted transition-transform ${open ? 'rotate-90' : ''}`}>▶</span>
         <div className="flex-1 min-w-0">
           <h3 className="text-xs font-semibold text-textPrimary">{title}</h3>
-          <p className="text-[10px] text-textMuted leading-relaxed">{desc}</p>
+          <p className="text-3xs text-textMuted leading-relaxed">{desc}</p>
         </div>
       </button>
       {open && <div className="px-4 pb-4 space-y-2.5 border-t border-border/30 pt-3">{children}</div>}
@@ -839,7 +839,7 @@ function SliderField({ label, value, setValue, min, max, step, desc }: {
       <input type="range" min={min} max={max} step={step} value={value}
         onChange={(e) => setValue(parseFloat(e.target.value))}
         className="w-full" />
-      {desc && <p className="text-[10px] text-textMuted mt-0.5">{desc}</p>}
+      {desc && <p className="text-3xs text-textMuted mt-0.5">{desc}</p>}
     </div>
   )
 }
@@ -854,8 +854,8 @@ function NumberField({ label, value, setValue, min, max, desc }: {
       <label className="block text-xs text-textSecondary mb-1">{label}</label>
       <input type="number" min={min} max={max} value={value}
         onChange={(e) => setValue(parseInt(e.target.value) || min)}
-        className="w-full px-3 py-2 rounded-lg border border-border bg-canvas text-sm text-textPrimary focus:outline-none focus:ring-2 focus:ring-primary-500/50" />
-      {desc && <p className="text-[10px] text-textMuted mt-0.5">{desc}</p>}
+        className="w-full px-3 py-2 rounded-control border border-border bg-canvas text-sm text-textPrimary focus:outline-none focus:ring-2 focus:ring-primary-500/50" />
+      {desc && <p className="text-3xs text-textMuted mt-0.5">{desc}</p>}
     </div>
   )
 }
@@ -868,7 +868,7 @@ function ToggleField({ label, value, setValue, desc }: {
     <div className="flex items-center justify-between">
       <div className="flex-1 min-w-0">
         <span className="text-xs text-textSecondary">{label}</span>
-        {desc && <p className="text-[10px] text-textMuted">{desc}</p>}
+        {desc && <p className="text-3xs text-textMuted">{desc}</p>}
       </div>
       <Toggle checked={value} onChange={setValue} />
     </div>

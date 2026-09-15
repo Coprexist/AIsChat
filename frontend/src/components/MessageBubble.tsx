@@ -126,10 +126,10 @@ const MessageBubble = memo(function MessageBubble({
   // 背景层 absolute inset-0 铺满外层，尺寸由内容层撑起，圆角边框天然对齐
   // 自己的气泡：浅色主题 #8B5CF6 / 深色主题 #5a3a99（--tw-bubble 变量，日夜自动切换，不随按钮色漂移）
   const bubbleBg = isMine
-    ? 'bg-bubble rounded-2xl rounded-tr-md shadow-[0_2px_12px_rgba(139,92,246,0.18)]'
+    ? 'bg-bubble rounded-dialog rounded-tr-md shadow-[0_2px_12px_rgba(139,92,246,0.18)]'
     : senderType === 'system'
-      ? 'bg-rose-50 dark:bg-rose-900/20 rounded-2xl rounded-tl-md border border-rose-200 dark:border-rose-800'
-      : 'bg-surface rounded-2xl rounded-tl-md border border-border'
+      ? 'bg-rose-50 dark:bg-rose-900/20 rounded-dialog rounded-tl-md border border-rose-200 dark:border-rose-800'
+      : 'bg-surface rounded-dialog rounded-tl-md border border-border'
   const bubbleText = isMine
     ? 'text-bubbleInk'
     : senderType === 'system'
@@ -154,9 +154,9 @@ const MessageBubble = memo(function MessageBubble({
     '[&_pre]:-mx-1',
     '[&_pre]:px-1',
     '[&_img]:max-w-full',
-    '[&_img]:rounded-lg',
+    '[&_img]:rounded-control',
     // 表格圆角（overflow 由 index.css overflow-x-auto 控制）
-    '[&_.markdown-table-wrapper]:rounded-lg',
+    '[&_.markdown-table-wrapper]:rounded-control',
     '[&_.markdown-table-wrapper]:border',
     '[&_.markdown-table-wrapper]:border-border',
     // 移除 wrapper 额外间距
@@ -195,13 +195,13 @@ const MessageBubble = memo(function MessageBubble({
         <div className={`flex items-center gap-2 mb-1 flex-wrap ${isMine ? 'flex-row-reverse' : ''}`}>
           <span className={`text-xs font-medium ${senderType === 'system' ? 'text-rose-500' : 'text-textSecondary'}`}>{senderName}</span>
           {sourcePublicId && (
-            <span className="text-[10px] text-primary-400 bg-primary-500/10 px-1.5 py-0.5 rounded-full" title={t('chat.fromInstance').replace('{publicId}', sourcePublicId)}>
+            <span className="chip chip-primary shrink-0" title={t('chat.fromInstance').replace('{publicId}', sourcePublicId)}>
               <Globe size={10} className="inline" /> {sourcePublicId.length > 15 ? sourcePublicId.slice(0, 15) + '...' : sourcePublicId}
             </span>
           )}
-          <span className="text-[10px] text-textMuted">{formatMessageTime(createdAt, lang)}</span>
-          {thinking && <span className="text-[10px] text-primary-400 animate-pulse font-medium">{t('chat.thinking')}</span>}
-          {isTyping && <span className="text-[10px] text-mint-400 animate-pulse font-medium">{t('chat.typing')}</span>}
+          <span className="text-3xs text-textMuted">{formatMessageTime(createdAt, lang)}</span>
+          {thinking && <span className="text-3xs text-primary-400 animate-pulse font-medium">{t('chat.thinking')}</span>}
+          {isTyping && <span className="text-3xs text-mint-400 animate-pulse font-medium">{t('chat.typing')}</span>}
         </div>
         <div className={`relative ${thinking || isTyping ? 'opacity-70' : ''}`}>
           {/* 背景层：只上色/圆角/边框/阴影，不含图片 → 天然被魔视界选中旋转；尺寸由外层决定 */}
@@ -219,7 +219,7 @@ const MessageBubble = memo(function MessageBubble({
                 }
               }}>
               <div className={`w-0.5 h-full min-h-[1.5em] rounded-full shrink-0 ${isMine ? 'bg-white/40' : 'bg-primary-400'}`} />
-              <div className="text-[11px] leading-relaxed line-clamp-2">
+              <div className="text-2xs leading-relaxed line-clamp-2">
                 <span className={`font-medium ${isMine ? 'text-white/80' : 'text-primary-400'}`}>@{replyTo.sender}</span>
                 <span className={`${isMine ? 'text-white/50' : 'text-textMuted'}`}> {replyTo.content}</span>
               </div>
@@ -243,16 +243,16 @@ const MessageBubble = memo(function MessageBubble({
                 const fmime = att.mime_type!
                 if (fmime.startsWith('image/')) return (
                   <button key={fid} onClick={() => setPreviewFile({ file_id: fid, name: fname, size: fsize, mime_type: fmime })} className="block max-w-full">
-                    <img src={dlUrl} alt={fname} className="max-w-[280px] max-h-[200px] rounded-lg object-cover cursor-pointer hover:opacity-90 transition-opacity border border-white/10" title={fname} loading="lazy" />
+                    <img src={dlUrl} alt={fname} className="max-w-[280px] max-h-[200px] rounded-control object-cover cursor-pointer hover:opacity-90 transition-opacity border border-white/10" title={fname} loading="lazy" />
                   </button>
                 )
                 return (
                   <button key={fid} onClick={() => setPreviewFile({ file_id: fid, name: fname, size: fsize, mime_type: fmime })}
-                    className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs transition-colors ${isMine ? 'bg-white/10 hover:bg-white/20 text-white/90' : 'bg-canvas hover:bg-elevated text-textSecondary hover:text-textPrimary border border-border'}`}
+                    className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-control text-xs transition-colors ${isMine ? 'bg-white/10 hover:bg-white/20 text-white/90' : 'bg-canvas hover:bg-elevated text-textSecondary hover:text-textPrimary border border-border'}`}
                     title={`${fname} (${formatFileSize(fsize)})`}>
                     <FileIcon size={12} className={isMine ? 'text-white/80' : fileIconColor(fmime)} />
                     <span className="max-w-[100px] truncate">{fname}</span>
-                    <span className="text-[10px] opacity-60">{formatFileSize(fsize)}</span>
+                    <span className="text-3xs opacity-60">{formatFileSize(fsize)}</span>
                     <Download size={11} className="opacity-60" />
                   </button>
                 )
@@ -264,7 +264,7 @@ const MessageBubble = memo(function MessageBubble({
           {messageId != null && onReply && (
             <button
               onClick={() => onReply(messageId, senderName, content)}
-              className={`absolute ${isMine ? '-left-[9px]' : '-right-[9px]'} top-0 md:opacity-0 group-hover:opacity-100 transition-opacity p-1 rounded-lg bg-elevated border border-border shadow-lg hover:bg-surface text-textMuted hover:text-primary-400`}
+              className={`absolute ${isMine ? '-left-[9px]' : '-right-[9px]'} top-0 md:opacity-0 group-hover:opacity-100 transition-opacity p-1 rounded-control bg-elevated border border-border shadow-lg hover:bg-surface text-textMuted hover:text-primary-400`}
               title="回复"
             >
               <Reply size={12} />

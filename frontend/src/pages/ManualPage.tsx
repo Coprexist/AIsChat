@@ -73,7 +73,7 @@ function CodeRenderer({ className, children, inline, ...props }: any) {
   }
   // 用 block <code> 替代 <pre>，避免 react-markdown 误嵌套在 <p> 中产生 HTML 规范错误
   return (
-    <code className={`block overflow-x-auto whitespace-pre-wrap rounded-xl bg-elevated border border-border p-4 text-xs ${className || ''}`}>
+    <code className={`block overflow-x-auto whitespace-pre-wrap rounded-card bg-elevated border border-border p-4 text-xs ${className || ''}`}>
       {children}
     </code>
   )
@@ -114,7 +114,7 @@ export default function ManualPage() {
       <div className="flex items-center gap-3 mb-6">
         <button
           onClick={() => navigate(-1)}
-          className="p-1.5 rounded-lg hover:bg-elevated text-textSecondary hover:text-textPrimary transition-colors"
+          className="p-1.5 rounded-control hover:bg-elevated text-textSecondary hover:text-textPrimary transition-colors"
           title="返回"
         >
           <ArrowLeft size={20} />
@@ -125,7 +125,7 @@ export default function ManualPage() {
 
       {/* 内容区 */}
       {error ? (
-        <div className="bg-rose-400/10 border border-rose-400/20 rounded-xl p-6 text-center">
+        <div className="bg-rose-400/10 border border-rose-400/20 rounded-card p-6 text-center">
           <p className="text-rose-400 font-medium">加载失败</p>
           <p className="text-textMuted text-sm mt-1">{error}</p>
           <button
@@ -148,7 +148,7 @@ export default function ManualPage() {
           prose-p:text-textSecondary prose-p:leading-relaxed prose-p:my-3
           prose-a:text-primary-400 prose-a:no-underline hover:prose-a:text-primary-300
           prose-code:bg-elevated prose-code:text-accent-400 prose-code:px-1.5 prose-code:py-0.5 prose-code:rounded prose-code:text-xs
-          prose-pre:bg-elevated prose-pre:border prose-pre:border-border prose-pre:rounded-xl
+          prose-pre:bg-elevated prose-pre:border prose-pre:border-border prose-pre:rounded-card
           prose-table:border prose-table:border-border
           prose-th:bg-elevated prose-th:text-textPrimary prose-th:px-3 prose-th:py-2 prose-th:text-xs prose-th:font-medium
           prose-td:px-3 prose-td:py-2 prose-td:text-sm prose-td:text-textSecondary
@@ -160,7 +160,7 @@ export default function ManualPage() {
           [&_table]:w-full [&_table]:overflow-x-auto
           [&_table_th]:text-left
           [&_table_td]:text-left
-          [&_img]:rounded-xl [&_img]:max-w-full
+          [&_img]:rounded-card [&_img]:max-w-full
         ">
           <ReactMarkdown
             remarkPlugins={[remarkGfm]}

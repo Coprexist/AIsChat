@@ -48,14 +48,14 @@ export default function ActivityBar({ users }: ActivityBarProps) {
                 <img src={u.avatarUrl} alt={u.name} className="relative w-full h-full object-cover" loading="lazy" />
               </>
             ) : (
-              <span className="w-full h-full flex items-center justify-center text-[10px] font-bold bg-gradient-to-br from-primary-500 to-primary-700 text-white">
+              <span className="w-full h-full flex items-center justify-center text-3xs font-bold bg-gradient-to-br from-primary-500 to-primary-700 text-white">
                 {u.name.charAt(0).toUpperCase()}
               </span>
             )}
           </div>
         ))}
         {overflow && (
-          <div className="relative w-7 h-7 rounded-full ring-2 ring-canvas bg-surface flex items-center justify-center text-[10px] font-bold text-textMuted">
+          <div className="relative w-7 h-7 rounded-full ring-2 ring-canvas bg-surface flex items-center justify-center text-3xs font-bold text-textMuted">
             …
           </div>
         )}
@@ -71,7 +71,7 @@ export default function ActivityBar({ users }: ActivityBarProps) {
       </span>
 
       {/* 三点弹跳气泡 */}
-      <span className="shrink-0 px-2.5 py-1.5 bg-surface border border-border rounded-xl text-primary-400">
+      <span className="shrink-0 px-2.5 py-1.5 bg-surface border border-border rounded-card text-primary-400">
         <BouncingDots />
       </span>
     </div>

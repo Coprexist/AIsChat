@@ -132,7 +132,7 @@ const ChatInputFunc = ({ conversationType, conversationId, t, onSend, onSendFile
     <div className="flex items-end gap-2 px-4 py-3 shrink-0">
       {/* @mention 弹出列表 */}
       {mentionActive && mentionFiltered.length > 0 && (
-        <div className="absolute bottom-full left-4 mb-1 w-56 max-h-40 overflow-y-auto rounded-xl bg-elevated border border-border shadow-xl z-50">
+        <div className="absolute bottom-full left-4 mb-1 w-56 max-h-40 overflow-y-auto rounded-card bg-elevated border border-border shadow-xl z-modal">
           {mentionFiltered.map((m, i) => (
             <button
               key={`${m.type}:${m.id}`}
@@ -149,7 +149,7 @@ const ChatInputFunc = ({ conversationType, conversationId, t, onSend, onSendFile
 
       <button
         onClick={() => onSendFile?.()}
-        className="p-2.5 rounded-xl border border-border bg-canvas text-textMuted hover:text-textPrimary hover:border-primary-500/30 hover:bg-elevated transition-colors shrink-0"
+        className="p-2.5 rounded-card border border-border bg-canvas text-textMuted hover:text-textPrimary hover:border-primary-500/30 hover:bg-elevated transition-colors shrink-0"
         title={t('chat.addAttachment')}
       >
         <Paperclip size={18} />
@@ -162,12 +162,12 @@ const ChatInputFunc = ({ conversationType, conversationId, t, onSend, onSendFile
         onKeyDown={handleKeyDown}
         placeholder={conversationType === 'dm' ? t('chat.dmInputPlaceholder') : t('chat.groupInputPlaceholder')}
         rows={1}
-        className="flex-1 min-w-0 resize-none rounded-xl border border-border bg-canvas px-4 py-2.5 text-sm text-textPrimary placeholder:text-textMuted focus:outline-none focus:ring-2 focus:ring-primary-500/50 focus:border-primary-500/30 transition-shadow min-h-[40px]"
+        className="flex-1 min-w-0 resize-none rounded-card border border-border bg-canvas px-4 py-2.5 text-sm text-textPrimary placeholder:text-textMuted focus:outline-none focus:ring-2 focus:ring-primary-500/50 focus:border-primary-500/30 transition-shadow min-h-[40px]"
       />
       <button
         onClick={doSend}
         disabled={(!value.trim() && !hasAttachments) || !connected}
-        className="p-2.5 rounded-xl bg-primary-500 text-white hover:bg-primary-600 disabled:opacity-40 disabled:cursor-not-allowed transition-all shrink-0"
+        className="icon-btn-lg bg-primary-500 text-white hover:bg-primary-600 shrink-0"
         title={t('chat.send')}
       >
         <Send size={16} />

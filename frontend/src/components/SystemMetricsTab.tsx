@@ -53,7 +53,7 @@ export default function SystemMetricsTab() {
         <div className="flex gap-1.5">
           {[1, 6, 24, 72, 168].map(h => (
             <button key={h} onClick={() => setHours(h)}
-              className={`px-3.5 py-1.5 rounded-xl text-xs font-medium transition-colors ${
+              className={`px-3.5 py-1.5 rounded-card text-xs font-medium transition-colors ${
                 hours === h
                   ? 'bg-primary-500/15 text-primary-600 dark:text-primary-300 border border-primary-400/30'
                   : 'bg-surface border border-border text-textSecondary hover:bg-elevated'
@@ -62,7 +62,7 @@ export default function SystemMetricsTab() {
             </button>
           ))}
         </div>
-        <span className="text-[11px] text-textMuted">
+        <span className="text-2xs text-textMuted">
           {t('admin.metricsRetention').replace('{retentionDays}', String(retentionDays))}
         </span>
       </div>
@@ -77,7 +77,7 @@ export default function SystemMetricsTab() {
 
       {/* LLM 延迟趋势图 */}
       {timeline.length > 0 && (
-        <div className="bg-surface rounded-2xl border border-border p-5">
+        <div className="bg-surface rounded-dialog border border-border p-5">
           <h3 className="text-sm font-semibold text-textPrimary mb-4">{t('admin.metricsLatencyTrend')}</h3>
           <div className="h-72">
             <ResponsiveContainer width="100%" height="100%">
@@ -109,7 +109,7 @@ export default function SystemMetricsTab() {
       {/* 错误分布 + 工具延迟表 */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
         {errorPieData.length > 0 && (
-          <div className="bg-surface rounded-2xl border border-border p-5">
+          <div className="bg-surface rounded-dialog border border-border p-5">
             <h3 className="text-sm font-semibold text-textPrimary mb-3">{t('admin.metricsErrorDistribution')}</h3>
             <div className="h-56">
               <ResponsiveContainer width="100%" height="100%">
@@ -128,7 +128,7 @@ export default function SystemMetricsTab() {
         )}
 
         {live.tools && Object.keys(live.tools).length > 0 && (
-          <div className="bg-surface rounded-2xl border border-border p-5">
+          <div className="bg-surface rounded-dialog border border-border p-5">
             <h3 className="text-sm font-semibold text-textPrimary mb-3">{t('admin.metricsToolStats')}</h3>
             <div className="overflow-x-auto max-h-56 overflow-y-auto">
               <table className="w-full text-sm text-textPrimary">
@@ -166,12 +166,12 @@ export default function SystemMetricsTab() {
 
       {/* 意愿评分分布 */}
       {live.willingness && Object.keys(live.willingness).length > 0 && (
-        <div className="bg-surface rounded-2xl border border-border p-5">
+        <div className="bg-surface rounded-dialog border border-border p-5">
           <h3 className="text-sm font-semibold text-textPrimary mb-3">{t('admin.willingnessDistribution')}</h3>
           <div className="flex flex-wrap gap-2">
             {Object.entries(live.willingness).sort().map(([bucket, count]) => (
               <span key={bucket}
-                className="px-2.5 py-1 rounded-lg bg-primary-500/10 text-primary-600 dark:text-primary-300 text-xs font-mono">
+                className="px-2.5 py-1 rounded-control bg-primary-500/10 text-primary-600 dark:text-primary-300 text-xs font-mono">
                 {bucket}: {count as number}
               </span>
             ))}
@@ -192,10 +192,10 @@ function MetricCard({ icon: Icon, label, value, color }: {
     amber: 'bg-accent-400/10 text-accent-400',
   }
   return (
-    <div className="bg-surface rounded-xl border border-border p-4 text-center">
+    <div className="bg-surface rounded-card border border-border p-4 text-center">
       <Icon size={18} className={`mx-auto mb-1.5 ${colorMap[color]?.split(' ')[1] || 'text-textSecondary'}`} />
       <div className="text-xl font-bold text-textPrimary">{value}</div>
-      <div className="text-[10px] text-textMuted mt-0.5">{label}</div>
+      <div className="text-3xs text-textMuted mt-0.5">{label}</div>
     </div>
   )
 }

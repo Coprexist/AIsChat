@@ -30,7 +30,7 @@ export default function InvitationCard({
       : 'border-mint-400/40 bg-mint-50/30 dark:bg-mint-900/10'
 
   return (
-    <div className={`rounded-xl border-2 overflow-hidden transition-all ${cardBg}`}>
+    <div className={`rounded-card border-2 overflow-hidden transition-all ${cardBg}`}>
       {/* 头部 */}
       <div className="flex items-center gap-2 px-4 pt-3 pb-2">
         <div className={`
@@ -78,7 +78,7 @@ export default function InvitationCard({
             onClick={(e) => { e.stopPropagation(); onAccept(invitationId) }}
             className="flex-1 flex items-center justify-center gap-1.5 px-3 py-1.5
               bg-mint-500 hover:bg-mint-600 text-white text-sm font-medium
-              rounded-lg transition-colors"
+              rounded-control transition-colors"
           >
             <Check size={14} />
             {t('invitation.accept')}
@@ -87,7 +87,7 @@ export default function InvitationCard({
             onClick={(e) => { e.stopPropagation(); onReject(invitationId) }}
             className={`flex-1 flex items-center justify-center gap-1.5 px-3 py-1.5
               ${isMine ? 'bg-white/10 hover:bg-white/20 text-white/80' : 'bg-canvas hover:bg-hover text-textSecondary hover:text-textPrimary'}
-              text-sm rounded-lg border ${isMine ? 'border-white/20' : 'border-border'} transition-colors`}
+              text-sm rounded-control border ${isMine ? 'border-white/20' : 'border-border'} transition-colors`}
           >
             <X size={14} />
             {t('invitation.reject')}

@@ -218,7 +218,7 @@ function MermaidBlock({ code, compact = false }: MermaidBlockProps) {
       <div className={compact ? 'my-2' : 'my-4'}>
         <button
           onClick={() => setExpandLevel(1)}
-          className="flex items-center gap-1.5 px-3 py-2 rounded-lg border w-full text-xs border-border/50 bg-elevated/30 hover:bg-elevated text-textMuted hover:text-textSecondary"
+          className="flex items-center gap-1.5 px-3 py-2 rounded-control border w-full text-xs border-border/50 bg-elevated/30 hover:bg-elevated text-textMuted hover:text-textSecondary"
         >
           <Maximize2 size={13} />
           <span>展开 Mermaid 图表</span>
@@ -231,7 +231,7 @@ function MermaidBlock({ code, compact = false }: MermaidBlockProps) {
   if (isErrorCollapsed) {
     return (
       <div className={compact ? 'my-2' : 'my-4'}>
-        <div className="flex items-center gap-1.5 px-3 py-2 rounded-lg border w-full text-xs border-rose-400/20 bg-rose-400/5">
+        <div className="flex items-center gap-1.5 px-3 py-2 rounded-control border w-full text-xs border-rose-400/20 bg-rose-400/5">
           <button
             onClick={() => setErrorRevealed(true)}
             className="flex items-center gap-1 text-rose-400/70 hover:text-rose-400 transition-colors shrink-0"
@@ -256,7 +256,7 @@ function MermaidBlock({ code, compact = false }: MermaidBlockProps) {
     if (compact) {
       return (
         <div className={compact ? 'my-2' : 'my-4'}>
-          <div className="flex items-center gap-1.5 px-3 py-2 rounded-lg border w-full text-xs border-border/50 bg-elevated/30 text-textMuted">
+          <div className="flex items-center gap-1.5 px-3 py-2 rounded-control border w-full text-xs border-border/50 bg-elevated/30 text-textMuted">
             <Loader2 size={12} className="animate-spin" />
             <span>图表加载中...</span>
           </div>
@@ -264,7 +264,7 @@ function MermaidBlock({ code, compact = false }: MermaidBlockProps) {
       )
     }
     return (
-      <div ref={containerRef} className="my-3 rounded-xl border border-border bg-elevated p-4 flex items-center gap-2 text-textMuted text-sm">
+      <div ref={containerRef} className="my-3 rounded-card border border-border bg-elevated p-4 flex items-center gap-2 text-textMuted text-sm">
         <Loader2 size={14} className="animate-spin" />
         图表加载中...
       </div>
@@ -274,20 +274,20 @@ function MermaidBlock({ code, compact = false }: MermaidBlockProps) {
   // 错误态
   if (error) {
     return (
-      <div className="my-3 rounded-xl border border-rose-400/20 bg-rose-400/5 overflow-hidden">
+      <div className="my-3 rounded-card border border-rose-400/20 bg-rose-400/5 overflow-hidden">
         <div className="flex items-center justify-between gap-1.5 px-3 py-1.5 bg-rose-400/10 border-b border-rose-400/10">
-          <div className="flex items-center gap-1.5 text-[10px] text-rose-400 font-medium">
+          <div className="flex items-center gap-1.5 text-3xs text-rose-400 font-medium">
             <AlertTriangle size={12} /> Mermaid 图表渲染失败
           </div>
           <button
             onClick={() => dispatchErrorReport(error)}
-            className="text-[10px] px-2 py-0.5 rounded-md bg-rose-400/15 hover:bg-rose-400/25 text-rose-400 transition-colors"
+            className="text-3xs px-2 py-0.5 rounded-control bg-rose-400/15 hover:bg-rose-400/25 text-rose-400 transition-colors"
             title="将错误信息发送给AI，帮助其修正"
           >
             报告错误给AI
           </button>
         </div>
-        {error && <div className="px-3 py-1 text-[11px] text-rose-400/80 font-mono">{error}</div>}
+        {error && <div className="px-3 py-1 text-2xs text-rose-400/80 font-mono">{error}</div>}
         <div className="px-3 py-2 text-xs">
           <div className="text-textMuted mb-1">以下为原始代码：</div>
           <CodeRenderer className="" inline={false}>
@@ -310,11 +310,11 @@ function MermaidBlock({ code, compact = false }: MermaidBlockProps) {
     <>
       <div className={
         (compact ? 'my-2 max-w-full' : 'my-4')
-        + ' rounded-xl border border-border bg-white dark:bg-[#1e1e2e] [clip-path:inset(0_round_1rem)]' // clip-path 裁圆角但不去掉滚动能力
+        + ' rounded-card border border-border bg-white dark:bg-[#1e1e2e] [clip-path:inset(0_round_1rem)]' // clip-path 裁圆角但不去掉滚动能力
       }>
         {/* 标题栏 */}
         <div className="flex items-center justify-between px-3 py-1.5 bg-elevated/50 border-b border-border">
-          <span className="text-[10px] text-textMuted font-medium tracking-wide uppercase">
+          <span className="text-3xs text-textMuted font-medium tracking-wide uppercase">
             Mermaid
           </span>
           {compact && (
@@ -339,7 +339,7 @@ function MermaidBlock({ code, compact = false }: MermaidBlockProps) {
       {/* 全屏浮层：使用宽度修正后的 SVG + 缩放/拖拽 */}
       {expanded && (
         <div
-          className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm"
+          className="fixed inset-0 z-modal bg-black/80 backdrop-blur-sm"
           ref={overlayRef}
           onMouseDown={(e) => {
             dragRef.current = { startX: e.clientX, startY: e.clientY, panX: panRef.current.x, panY: panRef.current.y }
@@ -355,13 +355,13 @@ function MermaidBlock({ code, compact = false }: MermaidBlockProps) {
           <div className={isFullscreenClass}>
             {/* 工具栏 */}
             <div className="absolute top-4 right-4 flex items-center gap-2 z-10">
-              <button onClick={zoomIn} className="p-2 rounded-xl bg-black/30 hover:bg-black/50 text-white/80 hover:text-white transition-colors" title="放大">
+              <button onClick={zoomIn} className="icon-btn bg-black/30 hover:bg-black/50 text-white/80 hover:text-white" title="放大">
                 <ZoomIn size={18} />
               </button>
-              <button onClick={zoomOut} className="p-2 rounded-xl bg-black/30 hover:bg-black/50 text-white/80 hover:text-white transition-colors" title="缩小">
+              <button onClick={zoomOut} className="icon-btn bg-black/30 hover:bg-black/50 text-white/80 hover:text-white" title="缩小">
                 <ZoomOut size={18} />
               </button>
-              <button onClick={resetTransform} className="p-2 rounded-xl bg-black/30 hover:bg-black/50 text-white/80 hover:text-white transition-colors text-xs font-medium" title="重置">
+              <button onClick={resetTransform} className="icon-btn bg-black/30 hover:bg-black/50 text-white/80 hover:text-white text-xs font-medium" title="重置">
                 还原
               </button>
               <button onClick={() => {
@@ -373,10 +373,10 @@ function MermaidBlock({ code, compact = false }: MermaidBlockProps) {
                 a.href = 'data:image/svg+xml,' + encodeURIComponent(raw ?? '')
                 a.download = 'diagram.svg'
                 a.click()
-              }} className="p-2 rounded-xl bg-black/30 hover:bg-black/50 text-white/80 hover:text-white transition-colors" title="下载 SVG">
+              }} className="p-2 rounded-card bg-black/30 hover:bg-black/50 text-white/80 hover:text-white transition-colors" title="下载 SVG">
                 <Download size={18} />
               </button>
-              <button onClick={handleClose} className="p-2 rounded-xl bg-black/30 hover:bg-black/50 text-white/80 hover:text-white transition-colors" title="关闭">
+              <button onClick={handleClose} className="icon-btn bg-black/30 hover:bg-black/50 text-white/80 hover:text-white" title="关闭">
                 <Minimize2 size={18} />
               </button>
             </div>

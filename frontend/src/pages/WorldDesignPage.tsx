@@ -18,6 +18,7 @@ import { getCodeLang, isMarkdownFile } from '../utils/mime'
 import { tryOpenWorldWindow } from '../utils/worldView'
 import { useResizableSidebar } from '../hooks/useResizableSidebar'
 import { useElementWidth } from '../hooks/useElementWidth'
+import { Dialog } from '../components/ui'
 
 interface World {
   id: number
@@ -452,11 +453,11 @@ export default function WorldDesignPage() {
         <div className="flex items-center gap-2">
           <span className="text-sm font-semibold">{world.creator?.name || '群视界机器人'}</span>
           {chatUnreadCount > 0 && (
-            <span className="inline-flex items-center justify-center min-w-[18px] h-[18px] px-1 rounded-full bg-rose-500 text-white text-[10px] font-bold animate-pulse">
+            <span className="inline-flex items-center justify-center min-w-[18px] h-[18px] px-1 rounded-full bg-rose-500 text-white text-3xs font-bold animate-pulse">
               {chatUnreadCount > 99 ? '99+' : chatUnreadCount}
             </span>
           )}
-          <span className="text-[10px] px-1.5 py-0.5 rounded bg-elevated text-textMuted">{world.creator?.id}</span>
+          <span className="text-3xs px-1.5 py-0.5 rounded bg-elevated text-textMuted">{world.creator?.id}</span>
           <div className="flex-1" />
           <button
             onClick={() => setShowCreatorForm((v) => !v)}
@@ -536,7 +537,7 @@ export default function WorldDesignPage() {
                 上传
               </button>
               {uploadMenuOpen && (
-                <div className="absolute right-0 top-full mt-1 w-56 bg-surface border border-border rounded-lg shadow-lg p-1 z-50">
+                <div className="absolute right-0 top-full mt-1 w-56 bg-surface border border-border rounded-control shadow-lg p-1 z-modal">
                   <button onClick={mobileUploadHere} className="w-full inline-flex items-center gap-1.5 text-left text-xs px-3 py-2 rounded hover:bg-elevated text-textPrimary">
                     <Upload size={13} /> 上传到此位置（{mobileDir || '/'}）
                   </button>
@@ -651,7 +652,7 @@ export default function WorldDesignPage() {
                 <button
                   key={n.path}
                   onClick={() => setMobileDir(n.path)}
-                  className="w-full flex items-center gap-2 px-2 py-2.5 rounded-lg hover:bg-elevated text-textSecondary text-sm transition-colors"
+                  className="w-full flex items-center gap-2 px-2 py-2.5 rounded-control hover:bg-elevated text-textSecondary text-sm transition-colors"
                 >
                   <Folder size={16} className="text-primary-400 shrink-0" />
                   <span className="truncate flex-1 text-left">{n.name}</span>
@@ -661,7 +662,7 @@ export default function WorldDesignPage() {
                 <div key={n.path} className="flex items-center">
                   <button
                     onClick={() => { selectFile(n.path); setMobileView('file') }}
-                    className={`flex items-center gap-2 flex-1 min-w-0 text-left px-2 py-2.5 rounded-lg text-sm transition-colors ${currentFile === n.path ? 'bg-primary-500/20 text-primary-300' : 'hover:bg-elevated text-textSecondary'}`}
+                    className={`flex items-center gap-2 flex-1 min-w-0 text-left px-2 py-2.5 rounded-control text-sm transition-colors ${currentFile === n.path ? 'bg-primary-500/20 text-primary-300' : 'hover:bg-elevated text-textSecondary'}`}
                   >
                     <span className="shrink-0">{fileTypeIcon(n.name)}</span>
                     <span className="truncate flex-1">{n.name}</span>
@@ -681,7 +682,7 @@ export default function WorldDesignPage() {
 
         {/* 目录选择弹层（上传 → 选择其它位置） */}
         {uploadDirPickerOpen && (
-          <div className="absolute inset-0 z-50 bg-black/50 flex items-end">
+          <div className="absolute inset-0 z-modal bg-black/50 flex items-end">
             <div className="w-full bg-surface rounded-t-2xl border-t border-border flex flex-col max-h-[75%]">
               <div className="flex items-center gap-2 px-4 py-3 border-b border-border">
                 <span className="text-sm font-semibold flex-1">选择上传位置</span>
@@ -713,7 +714,7 @@ export default function WorldDesignPage() {
                   <button
                     key={n.path}
                     onClick={() => setUploadNavDir(n.path)}
-                    className="w-full flex items-center gap-2 px-3 py-2.5 rounded-lg hover:bg-elevated text-textSecondary text-sm transition-colors"
+                    className="w-full flex items-center gap-2 px-3 py-2.5 rounded-control hover:bg-elevated text-textSecondary text-sm transition-colors"
                   >
                     <Folder size={16} className="text-primary-400 shrink-0" />
                     <span className="truncate flex-1 text-left">{n.name}</span>
@@ -722,7 +723,7 @@ export default function WorldDesignPage() {
                 ))}
               </div>
               <div className="p-3 border-t border-border">
-                <button onClick={mobileUploadToNavDir} className="w-full py-2.5 text-sm bg-primary-500 hover:bg-primary-600 text-white rounded-lg transition-colors">
+                <button onClick={mobileUploadToNavDir} className="btn btn-md btn-primary w-full">
                   上传到此位置（{uploadNavDir || '/'}）
                 </button>
               </div>
@@ -807,7 +808,7 @@ export default function WorldDesignPage() {
         </div>
         )}
         {mode === 'files' && (
-        <div onMouseDown={fileResizeStart} className="w-1 shrink-0 cursor-col-resize hover:bg-primary-500/40 transition-colors relative z-[55]" />
+        <div onMouseDown={fileResizeStart} className="w-1 shrink-0 cursor-col-resize hover:bg-primary-500/40 transition-colors relative z-overlay" />
         )}
         {/* 中列：编辑 / 预览（预览模式撑满文件树+编辑区整块） */}
         <div className="flex-1 flex flex-col min-w-0" style={{ minWidth: MIN_EDITOR }}>
@@ -866,7 +867,7 @@ export default function WorldDesignPage() {
             )}
           </div>
         </div>
-        <div onMouseDown={chatResizeStart} className="w-1 shrink-0 cursor-col-resize hover:bg-primary-500/40 transition-colors relative z-[55]" />
+        <div onMouseDown={chatResizeStart} className="w-1 shrink-0 cursor-col-resize hover:bg-primary-500/40 transition-colors relative z-overlay" />
         {/* 右列：对话面板（标题已在顶部标题栏） */}
         <div ref={chatPanelRef} className="flex flex-col shrink-0 bg-surface" style={{ width: effectiveChatWidth, maxWidth: effectiveChatWidth }}>
           <div className="flex-1 min-h-0 flex flex-col">
@@ -878,13 +879,13 @@ export default function WorldDesignPage() {
 
       {/* 接口文档查看（程序员用）——手机全屏，桌面居中双栏 */}
       {docsOpen && (
-        <div className="fixed inset-0 z-[60] bg-black/60 flex md:items-center justify-center" onClick={() => setDocsOpen(false)}>
-          <div className="w-full md:max-w-4xl bg-surface md:border md:border-border md:rounded-2xl md:border-b-0 h-full md:h-auto md:max-h-[85vh] flex flex-col shadow-xl overflow-hidden" onClick={(e) => e.stopPropagation()}>
+        <Dialog onClose={() =>  setDocsOpen(false)} layer="toast" className="flex md:items-center justify-center">
+          <div className="w-full md:max-w-4xl bg-surface md:border md:border-border md:rounded-dialog md:border-b-0 h-full md:h-auto md:max-h-[85vh] flex flex-col shadow-xl overflow-hidden" onClick={(e) => e.stopPropagation()}>
             <div className="flex items-center justify-between px-4 py-3 border-b border-border shrink-0">
               <div className="flex items-center gap-2 min-w-0">
                 <BookOpen size={15} className="text-primary-400 shrink-0" />
                 <span className="text-sm font-semibold text-textPrimary truncate">世界 API 接口文档</span>
-                <span className="text-[10px] text-textMuted hidden sm:inline">发给世界 AI 的 md（view_api_doc 同源）</span>
+                <span className="text-3xs text-textMuted hidden sm:inline">发给世界 AI 的 md（view_api_doc 同源）</span>
               </div>
               <button onClick={() => setDocsOpen(false)} className="p-1 text-textMuted hover:text-textPrimary transition-colors shrink-0" title="关闭"><X size={16} /></button>
             </div>
@@ -895,10 +896,10 @@ export default function WorldDesignPage() {
                   <button
                     key={sec.id}
                     onClick={() => selectDoc(sec.id)}
-                    className={`md:w-full text-left px-2.5 py-2 rounded-lg transition-colors shrink-0 md:shrink md:flex-1 ${docsActive === sec.id ? 'bg-primary-500/15 text-primary-300' : 'hover:bg-elevated text-textSecondary'}`}
+                    className={`md:w-full text-left px-2.5 py-2 rounded-control transition-colors shrink-0 md:shrink md:flex-1 ${docsActive === sec.id ? 'bg-primary-500/15 text-primary-300' : 'hover:bg-elevated text-textSecondary'}`}
                   >
                     <div className="text-xs font-medium whitespace-nowrap md:whitespace-normal">{sec.id} {sec.title}</div>
-                    <div className="text-[10px] text-textMuted line-clamp-2 mt-0.5 hidden md:block">{sec.intro}</div>
+                    <div className="text-3xs text-textMuted line-clamp-2 mt-0.5 hidden md:block">{sec.intro}</div>
                   </button>
                 ))}
               </div>
@@ -934,15 +935,15 @@ export default function WorldDesignPage() {
               </div>
             </div>
           </div>
-        </div>
+        </Dialog>
       )}
 
       {/* 下载类型弹窗（md / docx）——手机底部抽屉，桌面居中 */}
       {downloadTarget && (
-        <div className="fixed inset-0 z-[70] bg-black/60 flex items-end md:items-center justify-center" onClick={() => setDownloadTarget(null)}>
-          <div className="w-full md:max-w-xs bg-surface border-t md:border border-border md:rounded-2xl rounded-none p-5 shadow-xl" onClick={(e) => e.stopPropagation()}>
+        <div className="fixed inset-0 z-toast bg-black/60 flex items-end md:items-center justify-center" onClick={() => setDownloadTarget(null)}>
+          <div className="w-full md:max-w-xs bg-surface border-t md:border border-border md:rounded-dialog rounded-none p-5 shadow-xl" onClick={(e) => e.stopPropagation()}>
             <div className="text-sm font-semibold text-textPrimary mb-1">{downloadTarget.title}</div>
-            <div className="text-[10px] text-textMuted mb-3">
+            <div className="text-3xs text-textMuted mb-3">
               {downloadTarget.scope === 'section' ? `当前分区：${docsSections.find((s) => s.id === docsActive)?.title || docsActive || '文档'}` : '全部分区合并'}
             </div>
             <div className="space-y-2">
@@ -962,7 +963,7 @@ export default function WorldDesignPage() {
               )}
             </div>
             {!docxAvailable && isAdminUser && (
-              <div className="mt-3 text-[10px] text-accent-400/90 leading-relaxed">
+              <div className="mt-3 text-3xs text-accent-400/90 leading-relaxed">
                 如需下载为 docx（Word），请前往管理页安装 pandoc 插件后重启后端。
               </div>
             )}
@@ -973,8 +974,8 @@ export default function WorldDesignPage() {
 
       {/* 世界包下载（含/不含数据文件） */}
       {worldZipOpen && (
-        <div className="fixed inset-0 z-[70] bg-black/60 flex items-center justify-center p-4" onClick={() => setWorldZipOpen(false)}>
-          <div className="w-full max-w-xs bg-surface border border-border rounded-2xl p-5 shadow-xl" onClick={(e) => e.stopPropagation()}>
+        <Dialog onClose={() =>  setWorldZipOpen(false)} layer="toast" className="flex items-center justify-center p-4">
+          <div className="w-full max-w-xs bg-surface border border-border rounded-dialog p-5 shadow-xl" onClick={(e) => e.stopPropagation()}>
             <div className="flex items-center gap-2 mb-1">
               <Download size={15} className="text-primary-400" />
               <span className="text-sm font-semibold text-textPrimary">下载世界包</span>
@@ -983,28 +984,28 @@ export default function WorldDesignPage() {
             <div className="space-y-2">
               <button
                 onClick={() => downloadWorldZip(true)}
-                className="w-full text-left px-3.5 py-3 rounded-xl border border-border bg-elevated/40 hover:bg-elevated transition-colors"
+                className="w-full text-left px-3.5 py-3 rounded-card border border-border bg-elevated/40 hover:bg-elevated transition-colors"
               >
                 <div className="flex items-center gap-2 text-sm text-textPrimary"><Download size={13} className="text-primary-400" /> 完整备份（含数据文件）</div>
-                <div className="text-[10px] text-textMuted mt-1 pl-5">代码 + 资源 + 运行数据（content/）</div>
+                <div className="text-3xs text-textMuted mt-1 pl-5">代码 + 资源 + 运行数据（content/）</div>
               </button>
               <button
                 onClick={() => downloadWorldZip(false)}
-                className="w-full text-left px-3.5 py-3 rounded-xl border border-border bg-elevated/40 hover:bg-elevated transition-colors"
+                className="w-full text-left px-3.5 py-3 rounded-card border border-border bg-elevated/40 hover:bg-elevated transition-colors"
               >
                 <div className="flex items-center gap-2 text-sm text-textPrimary"><Download size={13} className="text-primary-400" /> 仅代码与资源</div>
-                <div className="text-[10px] text-textMuted mt-1 pl-5">不含运行数据，适合分享给他人</div>
+                <div className="text-3xs text-textMuted mt-1 pl-5">不含运行数据，适合分享给他人</div>
               </button>
             </div>
             <button onClick={() => setWorldZipOpen(false)} className="w-full mt-3 py-1.5 text-xs text-textMuted hover:text-textPrimary transition-colors">取消</button>
           </div>
-        </div>
+        </Dialog>
       )}
 
       {/* 世界包导入（选择策略 → 选文件） */}
       {worldImportOpen && (
-        <div className="fixed inset-0 z-[70] bg-black/60 flex items-center justify-center p-4" onClick={() => setWorldImportOpen(false)}>
-          <div className="w-full max-w-xs bg-surface border border-border rounded-2xl p-5 shadow-xl" onClick={(e) => e.stopPropagation()}>
+        <Dialog onClose={() =>  setWorldImportOpen(false)} layer="toast" className="flex items-center justify-center p-4">
+          <div className="w-full max-w-xs bg-surface border border-border rounded-dialog p-5 shadow-xl" onClick={(e) => e.stopPropagation()}>
             <div className="flex items-center gap-2 mb-1">
               <FolderInput size={15} className="text-primary-400" />
               <span className="text-sm font-semibold text-textPrimary">导入世界包</span>
@@ -1013,22 +1014,22 @@ export default function WorldDesignPage() {
             <div className="space-y-2">
               <button
                 onClick={() => { setImportMode('safe'); importZipRef.current?.click() }}
-                className="w-full text-left px-3.5 py-3 rounded-xl border border-primary-500/40 bg-primary-500/10 hover:bg-primary-500/15 transition-colors"
+                className="w-full text-left px-3.5 py-3 rounded-card border border-primary-500/40 bg-primary-500/10 hover:bg-primary-500/15 transition-colors"
               >
                 <div className="flex items-center gap-2 text-sm text-textPrimary"><FolderInput size={13} className="text-primary-400" /> 保留数据文件</div>
-                <div className="text-[10px] text-textMuted mt-1 pl-5">只替换代码与资源，运行数据（content/）不动 · 推荐</div>
+                <div className="text-3xs text-textMuted mt-1 pl-5">只替换代码与资源，运行数据（content/）不动 · 推荐</div>
               </button>
               <button
                 onClick={() => { setImportMode('full'); importZipRef.current?.click() }}
-                className="w-full text-left px-3.5 py-3 rounded-xl border border-border bg-elevated/40 hover:bg-elevated transition-colors"
+                className="w-full text-left px-3.5 py-3 rounded-card border border-border bg-elevated/40 hover:bg-elevated transition-colors"
               >
                 <div className="flex items-center gap-2 text-sm text-textPrimary"><FolderInput size={13} className="text-primary-400" /> 连同数据文件替换</div>
-                <div className="text-[10px] text-textMuted mt-1 pl-5">代码、资源、运行数据全部按包内版本替换</div>
+                <div className="text-3xs text-textMuted mt-1 pl-5">代码、资源、运行数据全部按包内版本替换</div>
               </button>
             </div>
             <button onClick={() => setWorldImportOpen(false)} className="w-full mt-3 py-1.5 text-xs text-textMuted hover:text-textPrimary transition-colors">取消</button>
           </div>
-        </div>
+        </Dialog>
       )}
 
       {/* 群类型与群助手管理（… 菜单） */}

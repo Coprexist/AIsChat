@@ -61,7 +61,7 @@ export const adminNavItem: NavItem = {
  * 工具类：生成 nav-link 的 CSS class
  */
 export const navLinkClass = ({ isActive }: { isActive: boolean }) =>
-  `flex items-center gap-3 px-3 py-2.5 mx-2 rounded-xl text-sm font-medium transition-all duration-200 ${
+  `flex items-center gap-3 px-3 py-2.5 mx-2 rounded-card text-sm font-medium transition-all duration-200 ${
     isActive
       ? 'bg-primary-500/15 text-primary-600 dark:text-primary-300'
       : 'text-textSecondary hover:text-textPrimary hover:bg-elevated'
@@ -71,7 +71,7 @@ export const navLinkClass = ({ isActive }: { isActive: boolean }) =>
  * 工具类：生成 collapsed 模式下的图标 CSS class
  */
 export const navIconClass = ({ isActive }: { isActive: boolean }) =>
-  `flex items-center justify-center w-10 h-10 rounded-xl transition-all duration-200 ${
+  `flex items-center justify-center w-10 h-10 rounded-card transition-all duration-200 ${
     isActive
       ? 'bg-primary-500/15 text-primary-600 dark:text-primary-300'
       : 'text-textSecondary hover:text-textPrimary hover:bg-elevated'

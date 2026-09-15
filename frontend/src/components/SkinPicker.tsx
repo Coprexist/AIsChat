@@ -105,14 +105,14 @@ export default function SkinPicker() {
         key={opts.id}
         onClick={opts.onClick}
         disabled={busy || opts.disabled}
-        className={`relative w-full text-left rounded-xl border p-3 transition-all ${
+        className={`relative w-full text-left rounded-card border p-3 transition-all ${
           opts.selected
             ? 'border-mint-400/60 bg-mint-400/5 ring-1 ring-mint-400/30'
             : 'border-border bg-surface hover:border-primary-400/40 hover:bg-elevated'
         } ${busy ? 'opacity-60' : ''} ${opts.disabled ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'}`}
       >
         {opts.selected && (
-          <span className="absolute -top-2 left-3 px-2 py-0.5 rounded-full bg-mint-500 text-white text-[10px] font-medium flex items-center gap-0.5 shadow">
+          <span className="absolute -top-2 left-3 px-2 py-0.5 rounded-full bg-mint-500 text-white text-3xs font-medium flex items-center gap-0.5 shadow">
             <Check size={10} /> {t('settings.skinInUse')}
           </span>
         )}
@@ -129,9 +129,9 @@ export default function SkinPicker() {
           {opts.icon}
         </div>
         <p className="text-sm font-medium text-textPrimary leading-tight">{opts.name}</p>
-        <p className="text-[11px] text-textMuted mt-0.5 line-clamp-2 min-h-[2em]">{opts.desc}</p>
+        <p className="text-2xs text-textMuted mt-0.5 line-clamp-2 min-h-[2em]">{opts.desc}</p>
         {opts.disabled && opts.disabledLabel && (
-          <p className="text-[10px] text-rose-400 mt-1">{opts.disabledLabel}</p>
+          <p className="text-3xs text-rose-400 mt-1">{opts.disabledLabel}</p>
         )}
       </button>
     )
@@ -146,7 +146,7 @@ export default function SkinPicker() {
         </p>
       </div>
       <p className="text-xs text-textMuted mb-1">{t('settings.skinDesc')}</p>
-      <p className="text-[11px] text-accent-500 mb-3">{t('settings.skinMutualExclusive')}</p>
+      <p className="text-2xs text-accent-500 mb-3">{t('settings.skinMutualExclusive')}</p>
 
       {loading ? (
         <p className="text-xs text-textMuted">{t('settings.loadingPlugins')}</p>

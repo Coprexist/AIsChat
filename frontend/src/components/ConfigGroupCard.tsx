@@ -166,7 +166,7 @@ export default function ConfigGroupCard({ groupKey }: { groupKey: string }) {
               max={field.max}
               value={values[key] ?? ''}
               onChange={(e) => setValues({ ...values, [key]: e.target.value })}
-              className="w-full px-3.5 py-2.5 rounded-xl border border-border bg-canvas text-sm text-textPrimary"
+              className="w-full px-3.5 py-2.5 rounded-card border border-border bg-canvas text-sm text-textPrimary"
             />
           ) : (
             <input
@@ -174,7 +174,7 @@ export default function ConfigGroupCard({ groupKey }: { groupKey: string }) {
               value={values[key] ?? ''}
               onChange={(e) => setValues({ ...values, [key]: e.target.value })}
               placeholder={isSecret(key) && secretSet[key] ? secretPlaceholder : ''}
-              className="w-full px-3.5 py-2.5 rounded-xl border border-border bg-canvas text-sm text-textPrimary"
+              className="w-full px-3.5 py-2.5 rounded-card border border-border bg-canvas text-sm text-textPrimary"
             />
           )}
 

@@ -1,9 +1,9 @@
-import { ReactNode, SelectHTMLAttributes } from 'react'
+import { ReactNode, SelectHTMLAttributes, useId } from 'react'
 
 /**
  * 统一 Select 下拉组件
  *
- * 统一下拉框视觉（与 Input 一致的圆角/边框/焦点态）。
+ * 视觉来自 .field 语义类（index.css），与 Input 完全一致。
  * 支持 label 与 hint 说明（小白友好）。
  */
 interface SelectProps extends SelectHTMLAttributes<HTMLSelectElement> {
@@ -11,6 +11,7 @@ interface SelectProps extends SelectHTMLAttributes<HTMLSelectElement> {
   hint?: ReactNode
   options: { value: string; label: ReactNode }[]
   placeholder?: string
+  fieldSize?: 'sm' | 'md'
 }
 
 export default function Select({
@@ -18,11 +19,13 @@ export default function Select({
   hint,
   options,
   placeholder,
+  fieldSize = 'md',
   className = '',
   id,
   ...rest
 }: SelectProps) {
-  const selectId = id || (label ? `select-${Math.random().toString(36).slice(2, 8)}` : undefined)
+  const autoId = useId()
+  const selectId = id || (label ? `select-${autoId}` : undefined)
 
   return (
     <div className="space-y-1.5">
@@ -33,8 +36,7 @@ export default function Select({
       )}
       <select
         id={selectId}
-        className={`w-full px-3.5 py-2.5 rounded-xl border border-border bg-canvas text-sm text-textPrimary
-          focus:outline-none focus:ring-2 focus:ring-primary-500/50 transition-shadow ${className}`}
+        className={`field ${fieldSize === 'sm' ? 'field-sm' : ''} ${className}`}
         {...rest}
       >
         {placeholder && <option value="">{placeholder}</option>}

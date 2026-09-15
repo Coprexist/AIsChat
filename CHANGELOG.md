@@ -231,6 +231,37 @@
   （等宽、可滚动、可复制）
 - 老数据没有这两列 → 自动退化成原来的样子，不受影响
 
+### 🎨 界面统一（前端设计体系收敛）
+
+#### 全站视觉收敛到「一处定义」：尺度令牌 + 语义类 + 组件库
+- **病根**：设计系统其实早就存在（`components/ui/` 六个组件 + `index.css` 的 `.btn`），
+  但**几乎没人用**——只有 `ConfirmDialogHost` 被引入过一次，`.input` 0 处引用。
+  于是全站长出 167 种不同的按钮类名、61 处手写 `fixed inset-0` 遮罩、
+  8 处手写页头（其中一处还漏了 `bg-surface`）、2 套并存的 Modal、213 处硬编码色值、
+  14 档 z-index、10/11/13px 三种"非标"字号
+- **尺度令牌**（`tailwind.config.js`）：圆角 `control/card/dialog`、
+  字号 `3xs/2xs`、层级 `overlay/drawer/modal/toast/max`。
+  裸数值就地替换：`rounded-lg|xl|2xl|md` 981 处、`text-[10|11|13px]` 398 处、
+  `z-50|z-[55..100]` 78 处——**以后改观感只动这一处**
+- **语义类**（`index.css`）：补 `.icon-btn`（28/32/40）、`.field`（32/40）、
+  `.card`、`.chip`（5 色）、`.btn-outline`、`.btn-xs`，
+  和原有的 `.btn .btn-*` 一起构成唯一的外观来源
+- **组件库**：补 `PageShell`（根容器 + 标题栏 + 滚动 + 内容宽度四档）、
+  `Dialog`（无壳弹窗：ESC + 锁滚动 + 点遮罩关闭）、`IconButton`、`Badge`、
+  `EmptyState`；`Modal` 收敛成 `Dialog` + 标准卡片；`Input/Select/Card` 改用语义类
+- **批量采用**（脚本改造 + 逐处复核 + 截图比对）：
+  · 131 个按钮换成 `.btn/.icon-btn` 语义类（35 图标按钮 + 66 主按钮 + 30 描边按钮）
+  · 32 处手写遮罩换成 `<Dialog>`（顺带补上 ESC 与背景滚动锁定，此前大多数弹窗两者都没有）
+  · 17 个散装胶囊标签换成 `.chip`
+  · 7 个页面换成 `PageShell/PageHeader`（群视界、我的、用量、存储、发布、AI、本地模型）
+  · 删除旧版 `components/Modal.tsx`（仅 AdminPage 在用）与两个"没人引用的公共组件"位置
+- **新增开发文档 [docs/dev/ui_system.md](docs/dev/ui_system.md)**：三层结构图、
+  令牌表、可抄的模式表、"新增变体只改 index.css"的规则、提交前自检命令——目标是
+  **下一个人不用想样式，照抄即可**
+- 验证：`tsc --noEmit` 与 i18n 检查均 0 报错；8 张演示截图与改造前逐像素比对
+  （差异 0.1%~3.9%，均为按钮高度对齐带来的位移），三个真实弹窗在浏览器里实测
+  结构与滚动锁定（`role=dialog` + `body.overflow=hidden`）
+
 ### 🐛 修复的 Bug
 
 #### 世界 AI「执行到一半 400」——工具调用链悬空导致的 invalid_request_error

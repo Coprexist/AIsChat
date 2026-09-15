@@ -75,7 +75,7 @@ export default function InstanceSetupPage() {
   return (
     <div className="h-full flex items-center justify-center bg-canvas">
       <div className="max-w-md w-full px-4">
-        <div className="bg-surface border border-border rounded-2xl p-6 shadow-xl">
+        <div className="bg-surface border border-border rounded-dialog p-6 shadow-xl">
           {/* 标题 */}
           <div className="flex items-center gap-2 mb-2">
             <Globe size={20} className="text-primary-400" />
@@ -101,7 +101,7 @@ export default function InstanceSetupPage() {
                   setTestResult(null)
                   setError('')
                 }}
-                className="w-full px-3.5 py-2.5 rounded-xl border border-border bg-canvas text-sm text-textPrimary placeholder:text-textMuted focus:outline-none focus:ring-2 focus:ring-primary-500/50"
+                className="w-full px-3.5 py-2.5 rounded-card border border-border bg-canvas text-sm text-textPrimary placeholder:text-textMuted focus:outline-none focus:ring-2 focus:ring-primary-500/50"
                 placeholder={t('desktop.instanceUrlPlaceholder')}
                 onKeyDown={(e) => {
                   if (e.key === 'Enter') handleTest()
@@ -111,7 +111,7 @@ export default function InstanceSetupPage() {
 
             {/* 错误提示 */}
             {error && (
-              <div className="text-xs text-rose-400 bg-rose-500/10 border border-rose-500/20 rounded-xl px-3 py-2">
+              <div className="text-xs text-rose-400 bg-rose-500/10 border border-rose-500/20 rounded-card px-3 py-2">
                 {error}
               </div>
             )}
@@ -120,7 +120,7 @@ export default function InstanceSetupPage() {
             <button
               onClick={handleTest}
               disabled={testing || !url.trim()}
-              className="w-full flex items-center justify-center gap-2 py-2.5 rounded-xl border border-border hover:bg-elevated text-sm text-textSecondary disabled:opacity-40 transition-colors"
+              className="btn btn-md btn-outline w-full gap-2"
             >
               {testing ? (
                 <Loader2 size={16} className="animate-spin" />
@@ -141,14 +141,14 @@ export default function InstanceSetupPage() {
           <div className="flex gap-3 mt-6">
             <button
               onClick={handleSkip}
-              className="flex-1 py-2.5 rounded-xl border border-border text-sm text-textMuted hover:bg-elevated transition-colors"
+              className="btn btn-md btn-outline flex-1 text-textMuted"
             >
               {t('desktop.skip')}
             </button>
             <button
               onClick={handleSave}
               disabled={saving || testResult !== 'success'}
-              className="flex-1 flex items-center justify-center gap-2 py-2.5 rounded-xl bg-primary-500 hover:bg-primary-600 disabled:opacity-30 text-white text-sm font-medium transition-all"
+              className="btn btn-md btn-primary flex-1 gap-2"
             >
               {saving ? (
                 <Loader2 size={16} className="animate-spin" />

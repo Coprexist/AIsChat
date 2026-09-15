@@ -4,6 +4,7 @@ import { useT } from '../i18n/I18nContext'
 import { getApiKeyUrl } from '../utils/providers.tsx'
 import { Key, Plus, Trash2, ToggleLeft, ToggleRight, Loader2, BarChart3, X } from 'lucide-react'
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell, Legend } from 'recharts'
+import { Dialog } from './ui'
 
 interface PoolKey {
   id: number
@@ -89,7 +90,7 @@ export default function ApiKeyPoolTab() {
         </div>
         <button
           onClick={() => setShowAdd(true)}
-          className="flex items-center gap-1.5 px-3 py-1.5 bg-primary-500 text-white rounded-xl hover:bg-primary-600 text-xs font-medium transition-colors"
+          className="flex items-center gap-1.5 px-3 py-1.5 bg-primary-500 text-white rounded-card hover:bg-primary-600 text-xs font-medium transition-colors"
         >
           <Plus size={14} /> {t('admin.addKey')}
         </button>
@@ -97,19 +98,19 @@ export default function ApiKeyPoolTab() {
 
       {/* Key 列表 */}
       {keys.length === 0 ? (
-        <div className="bg-surface rounded-xl border border-border p-10 text-center">
+        <div className="bg-surface rounded-card border border-border p-10 text-center">
           <Key size={32} className="mx-auto mb-3 text-textMuted" />
           <p className="text-sm text-textSecondary">{t('admin.noApiKeys')}</p>
           <p className="text-xs text-textMuted mt-1">{t('admin.noKeysDesc')}</p>
           <button
             onClick={() => setShowAdd(true)}
-            className="mt-4 px-4 py-2 bg-primary-500 text-white rounded-xl hover:bg-primary-600 text-sm font-medium transition-colors"
+            className="mt-4 px-4 py-2 bg-primary-500 text-white rounded-card hover:bg-primary-600 text-sm font-medium transition-colors"
           >
             {t('admin.addFirstKey')}
           </button>
         </div>
       ) : (
-        <div className="bg-surface rounded-xl border border-border overflow-x-auto">
+        <div className="bg-surface rounded-card border border-border overflow-x-auto">
           <table className="w-full text-sm text-textPrimary">
             <thead>
               <tr className="border-b border-border bg-canvas">
@@ -138,7 +139,7 @@ export default function ApiKeyPoolTab() {
                   <td className="py-2.5 px-3 text-center">
                     <button
                       onClick={() => handleToggle(k.id, k.is_active)}
-                      className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-lg text-xs font-medium transition-colors ${
+                      className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-control text-xs font-medium transition-colors ${
                         k.is_active
                           ? 'bg-mint-400/10 text-mint-400'
                           : 'bg-rose-400/10 text-rose-400'
@@ -152,7 +153,7 @@ export default function ApiKeyPoolTab() {
                   <td className="py-2.5 px-3 text-center">
                     <button
                       onClick={() => setStatsKeyId(k.id)}
-                      className="p-1.5 rounded-lg hover:bg-primary-500/10 text-textMuted hover:text-primary-400 transition-colors"
+                      className="p-1.5 rounded-control hover:bg-primary-500/10 text-textMuted hover:text-primary-400 transition-colors"
                       title={t('admin.viewKeyStats')}
                     >
                       <BarChart3 size={14} />
@@ -161,7 +162,7 @@ export default function ApiKeyPoolTab() {
                   <td className="py-2.5 px-3 text-right">
                     <button
                       onClick={() => handleDelete(k.id, k.name)}
-                      className="p-1.5 rounded-lg hover:bg-rose-400/10 text-textMuted hover:text-rose-400 transition-colors"
+                      className="p-1.5 rounded-control hover:bg-rose-400/10 text-textMuted hover:text-rose-400 transition-colors"
                       title={t('common.delete')}
                     >
                       <Trash2 size={14} />
@@ -214,9 +215,9 @@ function AddPoolKeyModal({ onClose, onSaved }: { onClose: () => void; onSaved: (
   }
 
   return (
-    <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-50" onClick={onClose}>
+    <Dialog onClose={onClose} className="flex items-center justify-center">
       <div
-        className="bg-elevated border border-border rounded-2xl p-6 w-full max-w-md mx-4 shadow-2xl shadow-black/30"
+        className="bg-elevated border border-border rounded-dialog p-6 w-full max-w-md mx-4 shadow-2xl shadow-black/30"
         onClick={(e) => e.stopPropagation()}
       >
         <h3 className="text-lg font-semibold mb-1 text-textPrimary flex items-center gap-2">
@@ -232,7 +233,7 @@ function AddPoolKeyModal({ onClose, onSaved }: { onClose: () => void; onSaved: (
             <input
               type="text" value={name} onChange={(e) => setName(e.target.value)}
               placeholder={t('admin.keyNamePlaceholder')}
-              className="w-full px-3 py-2 rounded-xl border border-border bg-canvas text-sm text-textPrimary placeholder:text-textMuted focus:outline-none focus:ring-2 focus:ring-primary-500/50"
+              className="w-full px-3 py-2 rounded-card border border-border bg-canvas text-sm text-textPrimary placeholder:text-textMuted focus:outline-none focus:ring-2 focus:ring-primary-500/50"
               autoFocus
             />
           </div>
@@ -241,7 +242,7 @@ function AddPoolKeyModal({ onClose, onSaved }: { onClose: () => void; onSaved: (
             <input
               type="text" value={apiBaseUrl} onChange={(e) => setApiBaseUrl(e.target.value)}
               placeholder={t('admin.keyApiUrlPlaceholder')}
-              className="w-full px-3 py-2 rounded-xl border border-border bg-canvas text-sm text-textPrimary placeholder:text-textMuted focus:outline-none focus:ring-2 focus:ring-primary-500/50"
+              className="w-full px-3 py-2 rounded-card border border-border bg-canvas text-sm text-textPrimary placeholder:text-textMuted focus:outline-none focus:ring-2 focus:ring-primary-500/50"
             />
           </div>
           <div>
@@ -252,7 +253,7 @@ function AddPoolKeyModal({ onClose, onSaved }: { onClose: () => void; onSaved: (
                   href={getApiKeyUrl(apiBaseUrl)}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="text-[10px] text-primary-400 hover:text-primary-500 dark:hover:text-primary-300 underline underline-offset-2 font-normal"
+                  className="text-3xs text-primary-400 hover:text-primary-500 dark:hover:text-primary-300 underline underline-offset-2 font-normal"
                 >
                   获取 API Key →
                 </a>
@@ -261,7 +262,7 @@ function AddPoolKeyModal({ onClose, onSaved }: { onClose: () => void; onSaved: (
             <input
               type="password" value={apiKey} onChange={(e) => setApiKey(e.target.value)}
               placeholder="sk-..."
-              className="w-full px-3 py-2 rounded-xl border border-border bg-canvas text-sm text-textPrimary placeholder:text-textMuted focus:outline-none focus:ring-2 focus:ring-primary-500/50"
+              className="w-full px-3 py-2 rounded-card border border-border bg-canvas text-sm text-textPrimary placeholder:text-textMuted focus:outline-none focus:ring-2 focus:ring-primary-500/50"
             />
           </div>
           <div>
@@ -269,7 +270,7 @@ function AddPoolKeyModal({ onClose, onSaved }: { onClose: () => void; onSaved: (
             <input
               type="number" value={priority} onChange={(e) => setPriority(parseInt(e.target.value) || 0)}
               min={0} max={100}
-              className="w-24 px-3 py-2 rounded-xl border border-border bg-canvas text-sm text-textPrimary focus:outline-none focus:ring-2 focus:ring-primary-500/50"
+              className="w-24 px-3 py-2 rounded-card border border-border bg-canvas text-sm text-textPrimary focus:outline-none focus:ring-2 focus:ring-primary-500/50"
             />
           </div>
           <div>
@@ -277,7 +278,7 @@ function AddPoolKeyModal({ onClose, onSaved }: { onClose: () => void; onSaved: (
             <input
               type="number" value={concurrentLimit ?? ''} onChange={(e) => setConcurrentLimit(e.target.value ? parseInt(e.target.value) : null)}
               min={1} placeholder={t('admin.keyConcurrentLimitPlaceholder')}
-              className="w-28 px-3 py-2 rounded-xl border border-border bg-canvas text-sm text-textPrimary placeholder:text-textMuted focus:outline-none focus:ring-2 focus:ring-primary-500/50"
+              className="w-28 px-3 py-2 rounded-card border border-border bg-canvas text-sm text-textPrimary placeholder:text-textMuted focus:outline-none focus:ring-2 focus:ring-primary-500/50"
             />
           </div>
         </div>
@@ -286,16 +287,16 @@ function AddPoolKeyModal({ onClose, onSaved }: { onClose: () => void; onSaved: (
 
         <div className="flex gap-2 mt-4">
           <button onClick={onClose}
-            className="flex-1 py-2.5 text-sm border border-border rounded-xl hover:bg-elevated text-textSecondary transition-colors font-medium">
+            className="btn btn-md btn-outline flex-1">
             {t('common.cancel')}
           </button>
           <button onClick={handleSave} disabled={!name.trim() || !apiKey.trim() || loading}
-            className="flex-1 py-2.5 text-sm bg-primary-500 text-white rounded-xl hover:bg-primary-600 disabled:opacity-30 font-medium transition-all shadow-lg shadow-primary-500/20">
+            className="btn btn-md btn-primary flex-1">
             {loading ? t('admin.adding') : t('admin.add')}
           </button>
         </div>
       </div>
-    </div>
+    </Dialog>
   )
 }
 
@@ -322,9 +323,9 @@ function KeyStatsModal({ keyId, onClose }: { keyId: number; onClose: () => void 
   }
 
   return (
-    <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-50 overflow-y-auto" onClick={onClose}>
+    <Dialog onClose={onClose} className="flex items-center justify-center overflow-y-auto">
       <div
-        className="bg-elevated border border-border rounded-2xl p-6 w-full max-w-3xl mx-4 my-8 shadow-2xl shadow-black/30 max-h-[90vh] overflow-y-auto"
+        className="bg-elevated border border-border rounded-dialog p-6 w-full max-w-3xl mx-4 my-8 shadow-2xl shadow-black/30 max-h-[90vh] overflow-y-auto"
         onClick={(e) => e.stopPropagation()}
       >
         {/* 头部 */}
@@ -337,14 +338,14 @@ function KeyStatsModal({ keyId, onClose }: { keyId: number; onClose: () => void 
             <select
               value={days}
               onChange={(e) => handleDaysChange(parseInt(e.target.value))}
-              className="px-2 py-1 rounded-lg border border-border bg-canvas text-xs text-textPrimary"
+              className="px-2 py-1 rounded-control border border-border bg-canvas text-xs text-textPrimary"
             >
               <option value={7}>{t('admin.lastNDays').replace('{n}', '7')}</option>
               <option value={30}>{t('admin.lastNDays').replace('{n}', '30')}</option>
               <option value={90}>{t('admin.lastNDays').replace('{n}', '90')}</option>
             </select>
             <button onClick={onClose}
-              className="p-1.5 rounded-lg hover:bg-elevated text-textMuted hover:text-textPrimary transition-colors">
+              className="icon-btn-sm text-textMuted">
               <X size={18} />
             </button>
           </div>
@@ -360,19 +361,19 @@ function KeyStatsModal({ keyId, onClose }: { keyId: number; onClose: () => void 
           <div className="space-y-5">
             {/* 概览卡片 */}
             <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-              <div className="bg-canvas rounded-xl border border-border p-3 text-center">
+              <div className="bg-canvas rounded-card border border-border p-3 text-center">
                 <div className="text-2xl font-bold text-primary-400">{stats.overview.total_requests.toLocaleString()}</div>
                 <div className="text-xs text-textMuted mt-1">{t('admin.keyStatsTotalReqs')}</div>
               </div>
-              <div className="bg-canvas rounded-xl border border-border p-3 text-center">
+              <div className="bg-canvas rounded-card border border-border p-3 text-center">
                 <div className="text-2xl font-bold text-accent-400">{(stats.overview.total_tokens / 1000).toFixed(0)}K</div>
                 <div className="text-xs text-textMuted mt-1">{t('admin.keyStatsTotalTokens')}</div>
               </div>
-              <div className="bg-canvas rounded-xl border border-border p-3 text-center">
+              <div className="bg-canvas rounded-card border border-border p-3 text-center">
                 <div className="text-2xl font-bold text-mint-400">{stats.overview.total_credit.toFixed(1)}</div>
                 <div className="text-xs text-textMuted mt-1">{t('admin.keyStatsTotalCredit')}</div>
               </div>
-              <div className="bg-canvas rounded-xl border border-border p-3 text-center">
+              <div className="bg-canvas rounded-card border border-border p-3 text-center">
                 <div className="text-2xl font-bold text-textPrimary">{stats.overview.active_users}</div>
                 <div className="text-xs text-textMuted mt-1">{t('admin.keyStatsActiveUsers')}</div>
               </div>
@@ -382,7 +383,7 @@ function KeyStatsModal({ keyId, onClose }: { keyId: number; onClose: () => void 
             {stats.daily.length > 0 && (
               <div>
                 <h4 className="text-sm font-medium text-textPrimary mb-2">{t('admin.keyStatsTokenTrend')}</h4>
-                <div className="bg-canvas rounded-xl border border-border p-3">
+                <div className="bg-canvas rounded-card border border-border p-3">
                   <ResponsiveContainer width="100%" height={220}>
                     <LineChart data={stats.daily}>
                       <CartesianGrid strokeDasharray="3 3" stroke="var(--color-border)" />
@@ -408,7 +409,7 @@ function KeyStatsModal({ keyId, onClose }: { keyId: number; onClose: () => void 
             {stats.model_distribution.length > 0 && (
               <div>
                 <h4 className="text-sm font-medium text-textPrimary mb-2">{t('admin.keyStatsModelDist')}</h4>
-                <div className="bg-canvas rounded-xl border border-border p-3">
+                <div className="bg-canvas rounded-card border border-border p-3">
                   <ResponsiveContainer width="100%" height={220}>
                     <PieChart>
                       <Pie
@@ -443,6 +444,6 @@ function KeyStatsModal({ keyId, onClose }: { keyId: number; onClose: () => void 
           </div>
         )}
       </div>
-    </div>
+    </Dialog>
   )
 }

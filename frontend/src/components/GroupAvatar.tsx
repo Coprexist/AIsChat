@@ -24,7 +24,7 @@ export function GroupAvatarGroup({ g }: { g: GroupAvatarData }) {
 
   if (mode === 'custom' && g.avatar_url) {
     return (
-      <div className="w-9 h-9 rounded-lg overflow-hidden shrink-0 bg-elevated">
+      <div className="w-9 h-9 rounded-control overflow-hidden shrink-0 bg-elevated">
         <img key={g.avatar_url} src={thumbUrl(g.avatar_url) || g.avatar_url || undefined} alt="" className="w-full h-full object-cover" loading="lazy" />
       </div>
     )
@@ -32,7 +32,7 @@ export function GroupAvatarGroup({ g }: { g: GroupAvatarData }) {
 
   if (mode === 'default') {
     return (
-      <div className="w-9 h-9 rounded-lg bg-primary-500/10 flex items-center justify-center shrink-0">
+      <div className="w-9 h-9 rounded-control bg-primary-500/10 flex items-center justify-center shrink-0">
         <Users size={14} className="text-primary-400/70" />
       </div>
     )
@@ -41,13 +41,13 @@ export function GroupAvatarGroup({ g }: { g: GroupAvatarData }) {
   // members 模式：2×2 网格
   if (avatars.length === 0) {
     return (
-      <div className="w-9 h-9 rounded-lg bg-primary-500/10 flex items-center justify-center shrink-0">
+      <div className="w-9 h-9 rounded-control bg-primary-500/10 flex items-center justify-center shrink-0">
         <Users size={14} className="text-primary-400/70" />
       </div>
     )
   }
   return (
-    <div className="w-9 h-9 rounded-lg bg-elevated grid grid-cols-2 grid-rows-2 gap-px overflow-hidden shrink-0">
+    <div className="w-9 h-9 rounded-control bg-elevated grid grid-cols-2 grid-rows-2 gap-px overflow-hidden shrink-0">
       {avatars.slice(0, 4).map((url, i) => (
         <div key={i} className="bg-canvas flex items-center justify-center">
           <img src={thumbUrl(url) || url || undefined} alt="" className="w-full h-full object-cover" loading="lazy" />
@@ -72,12 +72,12 @@ export function GroupAvatarHeader({
 }) {
   const mode = g.avatar_mode || 'default'
   const img = (
-    <div className="w-8 h-8 rounded-lg overflow-hidden shrink-0 bg-elevated cursor-pointer hover:opacity-80 transition-opacity">
+    <div className="w-8 h-8 rounded-control overflow-hidden shrink-0 bg-elevated cursor-pointer hover:opacity-80 transition-opacity">
       <img key={g.avatar_url} src={thumbUrl(g.avatar_url) || g.avatar_url || undefined} alt="" className="w-full h-full object-cover" loading="lazy" />
     </div>
   )
   const icon = (
-    <div className="w-8 h-8 rounded-lg bg-primary-500/10 flex items-center justify-center shrink-0 cursor-pointer hover:opacity-80 transition-opacity">
+    <div className="w-8 h-8 rounded-control bg-primary-500/10 flex items-center justify-center shrink-0 cursor-pointer hover:opacity-80 transition-opacity">
       <Users size={14} className="text-primary-400/70" />
     </div>
   )

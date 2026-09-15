@@ -7,6 +7,7 @@ import { useDesktopNotification } from '../hooks/useDesktopNotification'
 import { Wrench, X } from 'lucide-react'
 import { loadFromStorage, apply } from '../utils/cssFilters'
 import { isEmbedded } from '../embed/bridge'
+import { Dialog } from './ui'
 
 /** 嵌入模式（?embed=1）：隐藏本应用侧边栏/移动导航，只渲染对话内容，由宿主提供导航与外壳 */
 const EMBED = isEmbedded()
@@ -179,9 +180,9 @@ export default function Layout() {
         sidebarOverlay ? (
           <>
             {/* 点击外部关闭 */}
-            <div className="fixed inset-0 z-30" onClick={() => setSidebarOverlay(false)} />
+            <div className="fixed inset-0 z-overlay" onClick={() => setSidebarOverlay(false)} />
             {/* 覆盖式侧边栏：flex 容器宽度跟随侧边栏（含其内部折叠），收起标签固定在右缘 */}
-            <div className="fixed inset-y-0 left-0 z-40 flex">
+            <div className="fixed inset-y-0 left-0 z-drawer flex">
               <div className="h-full shadow-2xl border-r border-border">
                 <Sidebar translucent onClose={() => setSidebarOverlay(false)} />
               </div>
@@ -197,7 +198,7 @@ export default function Layout() {
         ) : (
           <button
             onClick={() => setSidebarOverlay(true)}
-            className="fixed left-0 top-1/2 -translate-y-1/2 z-50 flex items-center px-1 py-6 rounded-r-xl bg-surface border border-l-0 border-border text-textMuted hover:text-textPrimary hover:bg-elevated shadow-lg transition-colors"
+            className="fixed left-0 top-1/2 -translate-y-1/2 z-modal flex items-center px-1 py-6 rounded-r-xl bg-surface border border-l-0 border-border text-textMuted hover:text-textPrimary hover:bg-elevated shadow-lg transition-colors"
             title="显示侧边栏"
           >
             »
@@ -208,7 +209,7 @@ export default function Layout() {
       {/* ── 移动端抽屉遮罩（嵌入模式不渲染） ── */}
       {!EMBED && drawerOpen && (
         <div
-          className="md:hidden fixed inset-0 z-40 bg-black/60 transition-opacity"
+          className="md:hidden fixed inset-0 z-drawer bg-black/60 transition-opacity"
           onClick={() => setDrawerOpen(false)}
         />
       )}
@@ -216,7 +217,7 @@ export default function Layout() {
       {/* ── 移动端抽屉（嵌入模式不渲染） ── */}
       {!EMBED && (
       <div
-        className={`md:hidden fixed inset-y-0 left-0 z-50 w-72 transform transition-transform duration-250 ${
+        className={`md:hidden fixed inset-y-0 left-0 z-modal w-72 transform transition-transform duration-250 ${
           drawerOpen ? 'translate-x-0' : '-translate-x-full'
         }`}
       >
@@ -245,43 +246,43 @@ export default function Layout() {
 
       {/* 软维护——顶栏 */}
       {softMaintenance && !(softOnce && sessionStorage.getItem('maint_soft_done')) && softStyle === 'banner' && (
-        <div className="fixed top-0 left-0 right-0 z-[65] text-xs text-center py-2 px-4 font-medium flex items-center justify-center gap-2" style={{ backgroundColor: softColor, color: softTextColor }}>
+        <div className="fixed top-0 left-0 right-0 z-toast text-xs text-center py-2 px-4 font-medium flex items-center justify-center gap-2" style={{ backgroundColor: softColor, color: softTextColor }}>
           <span>{softText}</span>
           <button onClick={() => { setSoftMaintenance(false); if (softOnce) sessionStorage.setItem('maint_soft_done', '1') }}
-            className="shrink-0 px-2 py-0.5 rounded text-[10px] opacity-80 hover:opacity-100 transition-opacity" style={{ backgroundColor: 'rgba(0,0,0,0.15)' }}><X size={12} /></button>
+            className="shrink-0 px-2 py-0.5 rounded text-3xs opacity-80 hover:opacity-100 transition-opacity" style={{ backgroundColor: 'rgba(0,0,0,0.15)' }}><X size={12} /></button>
         </div>
       )}
       {/* 软维护——弹窗（关闭后本会话不再弹，除非管理员重新开启） */}
       {softMaintenance && !(softOnce && sessionStorage.getItem('maint_soft_done')) && !sessionStorage.getItem('maint_soft_dismissed') && softStyle === 'popup' && (
-        <div className="fixed inset-0 z-[65] flex items-center justify-center bg-black/50 p-4" onClick={() => { setSoftMaintenance(false); sessionStorage.setItem('maint_soft_dismissed', '1') }}>
-          <div className="bg-surface rounded-xl p-5 max-w-xs w-full text-center shadow-xl border border-border/50" onClick={e => e.stopPropagation()}>
+        <Dialog onClose={() =>  { setSoftMaintenance(false); sessionStorage.setItem('maint_soft_dismissed', '1') } } layer="toast" className="flex items-center justify-center p-4">
+          <div className="bg-surface rounded-card p-5 max-w-xs w-full text-center shadow-xl border border-border/50" onClick={e => e.stopPropagation()}>
             <div className="text-sm mb-3">{softText}</div>
             <button onClick={() => { setSoftMaintenance(false); sessionStorage.setItem('maint_soft_dismissed', '1') }}
-              className="px-4 py-1.5 rounded-lg text-xs font-medium transition-opacity hover:opacity-90" style={{ backgroundColor: softColor, color: softTextColor }}>知道了</button>
+              className="px-4 py-1.5 rounded-control text-xs font-medium transition-opacity hover:opacity-90" style={{ backgroundColor: softColor, color: softTextColor }}>知道了</button>
           </div>
-        </div>
+        </Dialog>
       )}
 
       {/* 硬维护——顶栏 */}
       {maintenance && hardText.style === 'banner' && (
-        <div className="fixed top-0 left-0 right-0 z-[70] text-xs text-center py-2 px-4 font-medium flex items-center justify-center gap-2" style={{ backgroundColor: hardText.color, color: hardText.textColor }}>
+        <div className="fixed top-0 left-0 right-0 z-toast text-xs text-center py-2 px-4 font-medium flex items-center justify-center gap-2" style={{ backgroundColor: hardText.color, color: hardText.textColor }}>
           <span>{hardText.title} · {hardText.body}</span>
           <button onClick={() => { setMaintenance(false); sessionStorage.setItem('maint_hard_dismissed', '1') }}
-            className="shrink-0 px-2 py-0.5 rounded text-[10px] opacity-80 hover:opacity-100 transition-opacity" style={{ backgroundColor: 'rgba(0,0,0,0.15)' }}><X size={12} /></button>
+            className="shrink-0 px-2 py-0.5 rounded text-3xs opacity-80 hover:opacity-100 transition-opacity" style={{ backgroundColor: 'rgba(0,0,0,0.15)' }}><X size={12} /></button>
         </div>
       )}
       {/* 硬维护——弹窗 */}
       {maintenance && hardText.style !== 'banner' && (
-        <div className="fixed inset-0 z-[70] flex items-center justify-center bg-black/60 p-4">
-          <div className="bg-surface rounded-xl p-6 max-w-sm w-full text-center shadow-xl border border-border/50">
+        <div className="fixed inset-0 z-toast flex items-center justify-center bg-black/60 p-4">
+          <div className="bg-surface rounded-card p-6 max-w-sm w-full text-center shadow-xl border border-border/50">
             <Wrench size={36} className="mx-auto mb-3" style={{ color: hardText.color }} />
             <h2 className="text-base font-semibold mb-2" style={{ color: hardText.color }}>{hardText.title}</h2>
             <p className="text-sm text-textSecondary mb-4">{hardText.body}</p>
             {hardText.image && !imgError && (
-              <img src={hardText.image} alt="" className="w-24 h-24 object-contain mx-auto mb-4 rounded-lg" onError={() => setImgError(true)} />
+              <img src={hardText.image} alt="" className="w-24 h-24 object-contain mx-auto mb-4 rounded-control" onError={() => setImgError(true)} />
             )}
             <button onClick={() => { setMaintenance(false); sessionStorage.setItem('maint_hard_dismissed', '1') }}
-              className="px-5 py-2 text-sm rounded-lg font-medium transition-opacity hover:opacity-90" style={{ backgroundColor: hardText.color, color: hardText.textColor }}>知道了</button>
+              className="px-5 py-2 text-sm rounded-control font-medium transition-opacity hover:opacity-90" style={{ backgroundColor: hardText.color, color: hardText.textColor }}>知道了</button>
           </div>
         </div>
       )}

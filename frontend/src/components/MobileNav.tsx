@@ -25,7 +25,7 @@ export default function MobileNav({ closeDrawer }: MobileNavProps) {
 
   return (
     <nav
-      className="md:hidden fixed bottom-0 left-0 right-0 z-50 bg-surface/95 backdrop-blur-lg border-t border-border"
+      className="md:hidden fixed bottom-0 left-0 right-0 z-modal bg-surface/95 backdrop-blur-lg border-t border-border"
       style={{ paddingBottom: 'env(safe-area-inset-bottom, 0px)' }}
     >
       <div className="flex h-14">
@@ -51,7 +51,7 @@ export default function MobileNav({ closeDrawer }: MobileNavProps) {
                   <div className="absolute rounded-full ai-pulse-active opacity-50" style={{ inset: isCompact ? '-3px' : '-6px' }} />
                 )}
               </div>
-              <span className={`${isCompact ? 'text-[9px]' : 'text-[10px]'} font-medium truncate max-w-full px-0.5`}>{t(item.i18nKey)}</span>
+              <span className={`${isCompact ? 'text-[9px]' : 'text-3xs'} font-medium truncate max-w-full px-0.5`}>{t(item.i18nKey)}</span>
             </button>
           )
         })}

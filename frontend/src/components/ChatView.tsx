@@ -6,7 +6,7 @@ import MessageBubble from './MessageBubble'
 import ChatInput from './ChatInput'
 import ActivityBar, { type ActivityUser } from './ActivityBar'
 import ProfileCard from './ProfileCard'
-import EmptyState from './EmptyState'
+import { EmptyState } from './ui'
 import { Send, Loader2, AlertTriangle, X, ArrowDown, ArrowUp, Paperclip, FileIcon, Bot, User, MessageSquare, Inbox, Settings , Gamepad2 , Globe } from 'lucide-react'
 import { getStateDotColor, CHAT_REFRESH_EVENT } from '../constants'
 import { useT } from '../i18n/I18nContext'
@@ -404,7 +404,7 @@ export default function ChatView({ conversationType, conversationId }: ChatViewP
           {msg.id === firstUnreadId && hasMoreBefore && (
             <div className="flex items-center gap-2 my-3 select-none">
               <div className="flex-1 h-px bg-rose-500/30" />
-              <span className="text-[10px] font-medium text-rose-400 whitespace-nowrap">{t('chat.newMessages')}</span>
+              <span className="text-3xs font-medium text-rose-400 whitespace-nowrap">{t('chat.newMessages')}</span>
               <div className="flex-1 h-px bg-rose-500/30" />
             </div>
           )}
@@ -897,7 +897,7 @@ export default function ChatView({ conversationType, conversationId }: ChatViewP
     <div className="flex-1 flex flex-col min-w-0 overflow-hidden relative">
       {/* 重连提示条 */}
       {reconnecting && (
-        <div className="absolute top-0 left-0 right-0 z-50 flex items-center justify-center gap-2 bg-accent-500/15 border-b border-accent-500/20 text-accent-400 px-4 py-1.5 text-xs font-medium backdrop-blur-sm">
+        <div className="absolute top-0 left-0 right-0 z-modal flex items-center justify-center gap-2 bg-accent-500/15 border-b border-accent-500/20 text-accent-400 px-4 py-1.5 text-xs font-medium backdrop-blur-sm">
           <Loader2 size={12} className="animate-spin" />
           {t('chat.reconnecting')}
         </div>
@@ -914,11 +914,11 @@ export default function ChatView({ conversationType, conversationId }: ChatViewP
 
       {/* 错误 Toast */}
       {errors.length > 0 && (
-        <div className="absolute top-4 right-4 z-50 space-y-1 max-w-sm">
+        <div className="absolute top-4 right-4 z-modal space-y-1 max-w-sm">
           {errors.map((err) => (
             <div
               key={err.timestamp}
-              className="flex items-start gap-2 bg-rose-500/10 border border-rose-500/20 text-rose-400 rounded-xl px-3 py-2 text-sm shadow-lg shadow-black/20"
+              className="flex items-start gap-2 bg-rose-500/10 border border-rose-500/20 text-rose-400 rounded-card px-3 py-2 text-sm shadow-lg shadow-black/20"
             >
               <AlertTriangle size={14} className="shrink-0 mt-0.5" />
               <span className="flex-1">{err.message}</span>
@@ -934,7 +934,7 @@ export default function ChatView({ conversationType, conversationId }: ChatViewP
       {showJumpToUnread && firstUnreadId && (
         <button
           onClick={handleJumpToUnread}
-          className="absolute top-3 right-4 z-40 flex items-center gap-1.5 px-3 py-1.5 bg-primary-500/90 hover:bg-primary-500 text-white text-xs font-medium rounded-full shadow-lg shadow-primary-500/30 backdrop-blur-sm transition-all duration-200"
+          className="absolute top-3 right-4 z-drawer flex items-center gap-1.5 px-3 py-1.5 bg-primary-500/90 hover:bg-primary-500 text-white text-xs font-medium rounded-full shadow-lg shadow-primary-500/30 backdrop-blur-sm transition-all duration-200"
         >
           <ArrowUp size={14} />
           {t('chat.jumpToFirstUnread')}
@@ -943,21 +943,21 @@ export default function ChatView({ conversationType, conversationId }: ChatViewP
 
       {/* 群视界全屏入口：群聊绑定世界时先弹窗、不加载消息；选「标准界面」才关并加载 */}
       {worldModalOpen && boundWorldId && conversationType === 'group' && (
-        <div className="absolute inset-0 z-[60] flex items-center justify-center bg-black/70 backdrop-blur-sm">
-          <div className="w-full max-w-md mx-4 bg-surface rounded-2xl border border-primary-500/30 shadow-2xl p-8 text-center">
+        <div className="absolute inset-0 z-toast flex items-center justify-center bg-black/70 backdrop-blur-sm">
+          <div className="w-full max-w-md mx-4 bg-surface rounded-dialog border border-primary-500/30 shadow-2xl p-8 text-center">
             <div className="mb-4"><Globe size={48} className="mx-auto text-primary-400" /></div>
             <h2 className="text-lg font-semibold text-textPrimary">这个群聊绑定了群视界</h2>
             <p className="text-sm text-textMuted mt-2 mb-7">世界已就绪，选择一种方式进入</p>
             <div className="space-y-2.5">
               <button
                 onClick={openImmersive}
-                className="w-full inline-flex items-center justify-center gap-1.5 py-3 bg-primary-500 hover:bg-primary-600 text-white rounded-xl font-medium transition-colors"
+                className="btn btn-md btn-primary w-full gap-1.5"
               >
                 <Gamepad2 size={14} /> 在沉浸界面打开
               </button>
               <button
                 onClick={closeWorldModal}
-                className="w-full inline-flex items-center justify-center gap-1.5 py-3 bg-elevated hover:bg-border text-textPrimary rounded-xl font-medium transition-colors"
+                className="w-full inline-flex items-center justify-center gap-1.5 py-3 bg-elevated hover:bg-border text-textPrimary rounded-card font-medium transition-colors"
               >
                 <Settings size={12} /> 在此标准界面打开
               </button>
@@ -986,7 +986,7 @@ export default function ChatView({ conversationType, conversationId }: ChatViewP
 
           {/* 无更多旧消息提示 */}
           {!hasMoreBefore && messages.length > 0 && (
-            <div className="text-center text-[10px] text-textMuted py-2 select-none">
+            <div className="text-center text-3xs text-textMuted py-2 select-none">
               {t('chat.beginningOfChat')}
             </div>
           )}
@@ -1021,7 +1021,7 @@ export default function ChatView({ conversationType, conversationId }: ChatViewP
 
       {/* ↓ 回到底部浮动按钮 */}
       {!isAtBottom && messages.length > 0 && (
-        <div className="absolute bottom-20 right-6 z-40">
+        <div className="absolute bottom-20 right-6 z-drawer">
           <button
             onClick={() => scrollToBottom(true)}
             className="flex items-center justify-center w-9 h-9 bg-elevated border border-border rounded-full shadow-lg shadow-black/20 text-textSecondary hover:text-textPrimary hover:bg-surface transition-all duration-200"
@@ -1067,7 +1067,7 @@ export default function ChatView({ conversationType, conversationId }: ChatViewP
 
         {/* @提及 自动补全下拉 */}
         {mentionActive && mentionFiltered.length > 0 && (
-          <div className="absolute bottom-full left-3 right-3 mb-1 bg-elevated border border-border rounded-xl shadow-2xl shadow-black/20 z-50 max-h-48 overflow-y-auto">
+          <div className="absolute bottom-full left-3 right-3 mb-1 bg-elevated border border-border rounded-card shadow-2xl shadow-black/20 z-modal max-h-48 overflow-y-auto">
             {mentionFiltered.map((m, i) => (
               <button
                 key={`${m.type}:${m.id}`}
@@ -1095,7 +1095,7 @@ export default function ChatView({ conversationType, conversationId }: ChatViewP
               <div className="text-primary-400 font-medium truncate">回复 @{replyTo.sender_name}</div>
               <div className="text-textMuted truncate">{replyTo.content}</div>
             </div>
-            <button onClick={() => setReplyTo(null)} className="shrink-0 p-1 rounded-lg hover:bg-elevated text-textMuted hover:text-textPrimary transition-colors">
+            <button onClick={() => setReplyTo(null)} className="shrink-0 p-1 rounded-control hover:bg-elevated text-textMuted hover:text-textPrimary transition-colors">
               <X size={14} />
             </button>
           </div>

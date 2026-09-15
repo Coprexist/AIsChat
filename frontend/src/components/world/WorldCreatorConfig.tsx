@@ -13,6 +13,7 @@ const AI_MODES = [
   { key: 'plan', label: '计划', hint: 'AI 先探索并提交计划，你通过后才按自动模式执行' },
 ]
 import { api } from '../../api/client'
+import { Dialog } from '../ui'
 
 export interface WorldCreator {
   id: string
@@ -135,18 +136,18 @@ export default function WorldCreatorConfig({ wid, creator, usageStats, aiMode, o
     }
   }
 
-  const fieldLabel = 'text-[10px] text-textMuted mb-1'
-  const fieldInput = 'w-full bg-elevated text-sm p-2 rounded-lg border border-border outline-none focus:border-primary-500/50 transition-colors'
+  const fieldLabel = 'text-3xs text-textMuted mb-1'
+  const fieldInput = 'w-full bg-elevated text-sm p-2 rounded-control border border-border outline-none focus:border-primary-500/50 transition-colors'
 
   return (
-    <div className="fixed inset-0 z-50 bg-black/60 flex items-center justify-center p-4" onClick={onClose}>
-      <div className="w-full max-w-lg bg-surface border border-border rounded-2xl max-h-[85vh] flex flex-col shadow-xl" onClick={(e) => e.stopPropagation()}>
+    <Dialog onClose={onClose} className="flex items-center justify-center p-4">
+      <div className="w-full max-w-lg bg-surface border border-border rounded-dialog max-h-[85vh] flex flex-col shadow-xl" onClick={(e) => e.stopPropagation()}>
         {/* 头部 */}
         <div className="flex items-center justify-between p-4 pb-2 shrink-0">
           <div className="flex items-center gap-2 min-w-0">
             <Settings size={16} className="text-primary-400 shrink-0" />
             <span className="text-sm font-semibold text-textPrimary truncate">群视界机器人配置</span>
-            <span className="text-[10px] text-textMuted shrink-0">世界的 AI：让它改界面、加功能</span>
+            <span className="text-3xs text-textMuted shrink-0">世界的 AI：让它改界面、加功能</span>
           </div>
           <button onClick={onClose} className="p-1 text-textMuted hover:text-textPrimary transition-colors shrink-0" title="关闭">
             <X size={16} />
@@ -157,11 +158,11 @@ export default function WorldCreatorConfig({ wid, creator, usageStats, aiMode, o
         <div className="flex-1 overflow-y-auto px-4 py-3 space-y-3">
           {/* 用量（置顶：一眼看到成本/缓存） */}
           {usageStats && (
-            <div className="bg-elevated/40 rounded-xl p-3">
+            <div className="bg-elevated/40 rounded-card p-3">
               <div className="flex items-center justify-between">
                 <div>
-                  <div className="text-[10px] text-textSecondary uppercase tracking-wide font-medium">LLM 缓存命中率</div>
-                  <div className="text-[10px] text-textMuted mt-0.5">{usageStats.total_calls} 次调用 · prompt {usageStats.prompt_tokens} / 缓存 {usageStats.cached_tokens} tok</div>
+                  <div className="text-3xs text-textSecondary uppercase tracking-wide font-medium">LLM 缓存命中率</div>
+                  <div className="text-3xs text-textMuted mt-0.5">{usageStats.total_calls} 次调用 · prompt {usageStats.prompt_tokens} / 缓存 {usageStats.cached_tokens} tok</div>
                 </div>
                 <div className="text-lg font-bold text-mint-400">{usageStats.cache_hit_rate_pct}%</div>
               </div>
@@ -169,19 +170,19 @@ export default function WorldCreatorConfig({ wid, creator, usageStats, aiMode, o
           )}
 
           {/* 身份：名字默认收起，🖊 点击可改 */}
-          <div className="bg-elevated/40 rounded-xl p-3 space-y-2.5">
-            <div className="flex items-center gap-1.5 text-[10px] font-medium text-textSecondary uppercase tracking-wide">
+          <div className="bg-elevated/40 rounded-card p-3 space-y-2.5">
+            <div className="flex items-center gap-1.5 text-3xs font-medium text-textSecondary uppercase tracking-wide">
               <Settings size={11} className="text-primary-400" /> 身份
             </div>
             <div>
               <div className="flex items-center gap-2">
                 <div className="flex-1 min-w-0">
                   <div className="text-xs text-textSecondary truncate">{form.name.trim() || '（未命名）'}</div>
-                  <div className="text-[10px] text-textMuted mt-0.5">群视界机器人的名字</div>
+                  <div className="text-3xs text-textMuted mt-0.5">群视界机器人的名字</div>
                 </div>
                 <button
                   onClick={() => setEditingName((v) => !v)}
-                  className="p-1.5 text-textMuted hover:text-textPrimary hover:bg-border rounded-lg transition-colors shrink-0"
+                  className="p-1.5 text-textMuted hover:text-textPrimary hover:bg-border rounded-control transition-colors shrink-0"
                   title={editingName ? '收起' : '修改名字'}
                 >
                   {editingName ? <ChevronUp size={15} /> : <Pencil size={15} />}
@@ -200,8 +201,8 @@ export default function WorldCreatorConfig({ wid, creator, usageStats, aiMode, o
           </div>
 
           {/* 运行模式：AI 自主到什么程度（下载/删除/改动机制三类操作的门禁） */}
-          <div className="bg-elevated/40 rounded-xl p-3 space-y-2">
-            <div className="flex items-center gap-1.5 text-[10px] font-medium text-textSecondary uppercase tracking-wide">
+          <div className="bg-elevated/40 rounded-card p-3 space-y-2">
+            <div className="flex items-center gap-1.5 text-3xs font-medium text-textSecondary uppercase tracking-wide">
               <ShieldAlert size={11} className="text-primary-400" /> 运行模式
             </div>
             <div className="grid grid-cols-3 gap-1.5">
@@ -210,7 +211,7 @@ export default function WorldCreatorConfig({ wid, creator, usageStats, aiMode, o
                   key={m.key}
                   onClick={() => saveMode(m.key)}
                   disabled={modeSaving || aiMode === m.key}
-                  className={`px-2 py-1.5 text-xs rounded-lg border transition-colors disabled:opacity-100 ${
+                  className={`px-2 py-1.5 text-xs rounded-control border transition-colors disabled:opacity-100 ${
                     aiMode === m.key
                       ? 'bg-primary-500/15 border-primary-500/50 text-primary-300'
                       : 'border-border text-textSecondary hover:text-textPrimary hover:border-primary-500/30'
@@ -218,14 +219,14 @@ export default function WorldCreatorConfig({ wid, creator, usageStats, aiMode, o
                 >{m.label}</button>
               ))}
             </div>
-            <div className="text-[10px] text-textMuted">
+            <div className="text-3xs text-textMuted">
               {(AI_MODES.find((m) => m.key === aiMode) || AI_MODES[1]).hint}
             </div>
           </div>
 
           {/* 人设与行为：提示词默认收起；展开显示强注入（深灰只读）+ 可改输入（🖊 点击） */}
-          <div className="bg-elevated/40 rounded-xl p-3 space-y-2.5">
-            <div className="flex items-center gap-1.5 text-[10px] font-medium text-textSecondary uppercase tracking-wide">
+          <div className="bg-elevated/40 rounded-card p-3 space-y-2.5">
+            <div className="flex items-center gap-1.5 text-3xs font-medium text-textSecondary uppercase tracking-wide">
               <Brain size={11} className="text-primary-400" /> 人设与行为
             </div>
 
@@ -234,13 +235,13 @@ export default function WorldCreatorConfig({ wid, creator, usageStats, aiMode, o
               <div className="flex items-center gap-2">
                 <div className="flex-1 min-w-0">
                   <div className="text-xs text-textSecondary truncate">系统提示词（角色人设）</div>
-                  <div className="text-[10px] text-textMuted mt-0.5 truncate">
+                  <div className="text-3xs text-textMuted mt-0.5 truncate">
                     {form.system_prompt.trim() ? form.system_prompt.trim().slice(0, 60) + '…' : '（未设置，使用默认人设）'}
                   </div>
                 </div>
                 <button
                   onClick={() => setEditingPrompt((v) => !v)}
-                  className="p-1.5 text-textMuted hover:text-textPrimary hover:bg-border rounded-lg transition-colors shrink-0"
+                  className="p-1.5 text-textMuted hover:text-textPrimary hover:bg-border rounded-control transition-colors shrink-0"
                   title={editingPrompt ? '收起' : '编辑系统提示词'}
                 >
                   {editingPrompt ? <ChevronUp size={15} /> : <Pencil size={15} />}
@@ -266,18 +267,18 @@ export default function WorldCreatorConfig({ wid, creator, usageStats, aiMode, o
                     <Lock size={11} className="text-textMuted shrink-0" />
                     <span className="truncate">平台强注入提示词（不可修改）</span>
                   </div>
-                  <div className="text-[10px] text-textMuted mt-0.5">工具约定 / 能力边界 / 记忆约定 / 运行规范等，每次对话自动附带</div>
+                  <div className="text-3xs text-textMuted mt-0.5">工具约定 / 能力边界 / 记忆约定 / 运行规范等，每次对话自动附带</div>
                 </div>
                 <button
                   onClick={() => setShowForced((v) => !v)}
-                  className="p-1.5 text-textMuted hover:text-textPrimary hover:bg-border rounded-lg transition-colors shrink-0"
+                  className="p-1.5 text-textMuted hover:text-textPrimary hover:bg-border rounded-control transition-colors shrink-0"
                   title={showForced ? '收起' : '展开查看'}
                 >
                   {showForced ? <ChevronUp size={15} /> : <ChevronDown size={15} />}
                 </button>
               </div>
               {showForced && (
-                <pre className="mt-2 max-h-56 overflow-y-auto bg-elevated/60 border border-border rounded-lg p-2.5 text-[10px] leading-relaxed text-textMuted whitespace-pre-wrap font-mono select-text">
+                <pre className="mt-2 max-h-56 overflow-y-auto bg-elevated/60 border border-border rounded-control p-2.5 text-3xs leading-relaxed text-textMuted whitespace-pre-wrap font-mono select-text">
                   {creator.forced_prompt || '（无）'}
                 </pre>
               )}
@@ -286,21 +287,21 @@ export default function WorldCreatorConfig({ wid, creator, usageStats, aiMode, o
 
           {/* 对话生命周期（/new 自动开、空闲压缩、保留天数） */}
           {settings && (
-            <div className="bg-elevated/40 rounded-xl p-3 space-y-2.5">
-              <div className="flex items-center gap-1.5 text-[10px] font-medium text-textSecondary uppercase tracking-wide">
+            <div className="bg-elevated/40 rounded-card p-3 space-y-2.5">
+              <div className="flex items-center gap-1.5 text-3xs font-medium text-textSecondary uppercase tracking-wide">
                 <History size={11} className="text-primary-400" /> 对话生命周期
               </div>
-              <div className="flex items-center justify-between bg-elevated/60 rounded-lg p-2.5">
+              <div className="flex items-center justify-between bg-elevated/60 rounded-control p-2.5">
                 <div>
                   <div className="text-xs text-textSecondary">每日自动开新对话</div>
-                  <div className="text-[10px] text-textMuted mt-0.5">跨过设定时间自动 /new（旧对话保存可切回）</div>
+                  <div className="text-3xs text-textMuted mt-0.5">跨过设定时间自动 /new（旧对话保存可切回）</div>
                 </div>
                 <div className="flex items-center gap-2 shrink-0">
                   <input
                     type="time"
                     value={settings.auto_new_time}
                     onChange={(e) => setSettings((s) => (s ? { ...s, auto_new_time: e.target.value } : s))}
-                    className="bg-elevated text-xs p-1 rounded-lg border border-border outline-none focus:border-primary-500/50"
+                    className="bg-elevated text-xs p-1 rounded-control border border-border outline-none focus:border-primary-500/50"
                   />
                   <input
                     type="checkbox"
@@ -310,10 +311,10 @@ export default function WorldCreatorConfig({ wid, creator, usageStats, aiMode, o
                   />
                 </div>
               </div>
-              <div className="flex items-center justify-between bg-elevated/60 rounded-lg p-2.5">
+              <div className="flex items-center justify-between bg-elevated/60 rounded-control p-2.5">
                 <div>
                   <div className="text-xs text-textSecondary">空闲自动压缩</div>
-                  <div className="text-[10px] text-textMuted mt-0.5">超过 N 小时未对话，下次发消息前自动 compact（0 = 关闭）</div>
+                  <div className="text-3xs text-textMuted mt-0.5">超过 N 小时未对话，下次发消息前自动 compact（0 = 关闭）</div>
                 </div>
                 <input
                   type="number"
@@ -321,14 +322,14 @@ export default function WorldCreatorConfig({ wid, creator, usageStats, aiMode, o
                   max={720}
                   value={settings.compact_idle_hours}
                   onChange={(e) => setSettings((s) => (s ? { ...s, compact_idle_hours: Number(e.target.value) || 0 } : s))}
-                  className="w-20 bg-elevated text-sm p-1.5 rounded-lg border border-border outline-none text-right focus:border-primary-500/50"
+                  className="w-20 bg-elevated text-sm p-1.5 rounded-control border border-border outline-none text-right focus:border-primary-500/50"
                   title="小时"
                 />
               </div>
-              <div className="flex items-center justify-between bg-elevated/60 rounded-lg p-2.5">
+              <div className="flex items-center justify-between bg-elevated/60 rounded-control p-2.5">
                 <div>
                   <div className="text-xs text-textSecondary">会话保留天数</div>
-                  <div className="text-[10px] text-textMuted mt-0.5">未收藏的会话超过 N 天未活跃将被清理（0 = 不清理）</div>
+                  <div className="text-3xs text-textMuted mt-0.5">未收藏的会话超过 N 天未活跃将被清理（0 = 不清理）</div>
                 </div>
                 <input
                   type="number"
@@ -336,14 +337,14 @@ export default function WorldCreatorConfig({ wid, creator, usageStats, aiMode, o
                   max={3650}
                   value={settings.retention_days}
                   onChange={(e) => setSettings((s) => (s ? { ...s, retention_days: Number(e.target.value) || 0 } : s))}
-                  className="w-20 bg-elevated text-sm p-1.5 rounded-lg border border-border outline-none text-right focus:border-primary-500/50"
+                  className="w-20 bg-elevated text-sm p-1.5 rounded-control border border-border outline-none text-right focus:border-primary-500/50"
                   title="天"
                 />
               </div>
               <button
                 onClick={saveSettings}
                 disabled={settingsSaving}
-                className="w-full py-1.5 text-xs bg-elevated hover:bg-border text-textSecondary rounded-lg transition-colors disabled:opacity-40"
+                className="w-full py-1.5 text-xs bg-elevated hover:bg-border text-textSecondary rounded-control transition-colors disabled:opacity-40"
               >
                 {settingsSaving ? '保存中...' : '保存会话设置'}
               </button>
@@ -351,8 +352,8 @@ export default function WorldCreatorConfig({ wid, creator, usageStats, aiMode, o
           )}
 
           {/* 模型 */}
-          <div className="bg-elevated/40 rounded-xl p-3 space-y-2.5">
-            <div className="flex items-center gap-1.5 text-[10px] font-medium text-textSecondary uppercase tracking-wide">
+          <div className="bg-elevated/40 rounded-card p-3 space-y-2.5">
+            <div className="flex items-center gap-1.5 text-3xs font-medium text-textSecondary uppercase tracking-wide">
               <SlidersHorizontal size={11} className="text-primary-400" /> 模型与参数
             </div>
             <div className="flex gap-2">
@@ -378,10 +379,10 @@ export default function WorldCreatorConfig({ wid, creator, usageStats, aiMode, o
                 />
               </div>
             </div>
-            <div className="flex items-center justify-between bg-elevated/60 rounded-lg p-2.5">
+            <div className="flex items-center justify-between bg-elevated/60 rounded-control p-2.5">
               <div>
                 <div className="text-xs text-textSecondary">深度思考（推理模式）</div>
-                <div className="text-[10px] text-accent-400/90 mt-0.5">推理 token 单独计费，费用显著增加</div>
+                <div className="text-3xs text-accent-400/90 mt-0.5">推理 token 单独计费，费用显著增加</div>
               </div>
               <input
                 type="checkbox"
@@ -390,10 +391,10 @@ export default function WorldCreatorConfig({ wid, creator, usageStats, aiMode, o
                 className="w-4 h-4 accent-primary-500"
               />
             </div>
-            <div className="flex items-center justify-between bg-elevated/60 rounded-lg p-2.5">
+            <div className="flex items-center justify-between bg-elevated/60 rounded-control p-2.5">
               <div>
                 <div className="text-xs text-textSecondary">工具循环上限</div>
-                <div className="text-[10px] text-textMuted mt-0.5">单次对话最多连续调几轮工具（1-200，默认 50）</div>
+                <div className="text-3xs text-textMuted mt-0.5">单次对话最多连续调几轮工具（1-200，默认 50）</div>
               </div>
               <input
                 type="number"
@@ -401,7 +402,7 @@ export default function WorldCreatorConfig({ wid, creator, usageStats, aiMode, o
                 max={200}
                 value={form.max_tool_rounds}
                 onChange={(e) => setForm((f) => ({ ...f, max_tool_rounds: Number(e.target.value) || 50 }))}
-                className="w-20 bg-elevated text-sm p-1.5 rounded-lg border border-border outline-none text-right focus:border-primary-500/50"
+                className="w-20 bg-elevated text-sm p-1.5 rounded-control border border-border outline-none text-right focus:border-primary-500/50"
               />
             </div>
           </div>
@@ -412,12 +413,12 @@ export default function WorldCreatorConfig({ wid, creator, usageStats, aiMode, o
           <button
             onClick={save}
             disabled={saving}
-            className="w-full py-2 text-sm bg-primary-500 hover:bg-primary-600 text-white rounded-lg transition-colors disabled:opacity-40"
+            className="btn btn-sm btn-primary w-full"
           >
             {saving ? '保存中...' : (<span className="inline-flex items-center justify-center gap-1.5"><Save size={14} /> 保存配置</span>)}
           </button>
         </div>
       </div>
-    </div>
+    </Dialog>
   )
 }

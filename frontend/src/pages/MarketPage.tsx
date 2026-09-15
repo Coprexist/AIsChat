@@ -15,7 +15,7 @@ import {
 } from 'lucide-react'
 import { api } from '../api/client'
 import { useT } from '../i18n/I18nContext'
-import PageHeader from '../components/PageHeader'
+import { Dialog, PageHeader } from '../components/ui'
 import MarketGithubTab from '../components/MarketGithubTab'
 
 interface MarketItem {
@@ -288,10 +288,10 @@ export default function MarketPage() {
   // ── 同步状态徽标 ──
   const SyncBadge = ({ item }: { item: MarketItem }) => {
     if (item.sync_state === 'synced') {
-      return <span className="inline-flex items-center gap-1 text-[10px] px-1.5 py-0.5 rounded bg-mint-500/15 text-mint-400"><CheckCircle2 size={9} /> 已同步</span>
+      return <span className="inline-flex items-center gap-1 text-3xs px-1.5 py-0.5 rounded bg-mint-500/15 text-mint-400"><CheckCircle2 size={9} /> 已同步</span>
     }
     if (item.sync_state === 'stale') {
-      return <span className="inline-flex items-center gap-1 text-[10px] px-1.5 py-0.5 rounded bg-accent-500/15 text-accent-400"><RefreshCw size={9} /> 同步过（有改动）</span>
+      return <span className="inline-flex items-center gap-1 text-3xs px-1.5 py-0.5 rounded bg-accent-500/15 text-accent-400"><RefreshCw size={9} /> 同步过（有改动）</span>
     }
     return null
   }
@@ -303,24 +303,24 @@ export default function MarketPage() {
     const it = detail.item as any
     const isMine = isLocal && myId !== null && it.author_id === myId
     return (
-      <div className="fixed inset-0 z-50 bg-black/60 flex items-end md:items-center justify-center" onClick={() => setDetail(null)}>
+      <div className="fixed inset-0 z-modal bg-black/60 flex items-end md:items-center justify-center" onClick={() => setDetail(null)}>
         <div
-          className="w-full md:max-w-lg bg-surface border-t md:border border-border md:rounded-2xl rounded-t-2xl max-h-[85vh] flex flex-col"
+          className="w-full md:max-w-lg bg-surface border-t md:border border-border md:rounded-dialog rounded-t-2xl max-h-[85vh] flex flex-col"
           onClick={(e) => e.stopPropagation()}
         >
           {/* 头部 */}
           <div className="flex items-center gap-3 p-4 pb-2 shrink-0">
-            <div className={`w-10 h-10 rounded-xl flex items-center justify-center shrink-0 ${isLocal ? 'bg-primary-500/15 text-primary-400' : 'bg-[#24292F]/10 dark:bg-white/10 text-[#24292F] dark:text-white'}`}>
+            <div className={`w-10 h-10 rounded-card flex items-center justify-center shrink-0 ${isLocal ? 'bg-primary-500/15 text-primary-400' : 'bg-[#24292F]/10 dark:bg-white/10 text-[#24292F] dark:text-white'}`}>
               {isLocal ? <Globe size={18} /> : <Github size={18} />}
             </div>
             <div className="min-w-0 flex-1">
               <div className="flex items-center gap-2">
                 <span className="text-base font-semibold text-textPrimary truncate">{it.title}</span>
                 {isLocal ? <SyncBadge item={it} /> : it.is_local
-                  ? <span className="inline-flex items-center gap-1 text-[10px] px-1.5 py-0.5 rounded bg-primary-500/15 text-primary-400 shrink-0"><Store size={9} /> 本地</span>
-                  : <span className="inline-flex items-center gap-1 text-[10px] px-1.5 py-0.5 rounded bg-elevated text-textMuted shrink-0"><Github size={9} /> 远程</span>}
+                  ? <span className="inline-flex items-center gap-1 text-3xs px-1.5 py-0.5 rounded bg-primary-500/15 text-primary-400 shrink-0"><Store size={9} /> 本地</span>
+                  : <span className="inline-flex items-center gap-1 text-3xs px-1.5 py-0.5 rounded bg-elevated text-textMuted shrink-0"><Github size={9} /> 远程</span>}
               </div>
-              <div className="text-[10px] text-textMuted mt-0.5">
+              <div className="text-3xs text-textMuted mt-0.5">
                 <span className="inline-flex items-center gap-1"><User size={10} /> {it.author_name || (isLocal ? `#${it.author_id}` : 'GitHub')}</span>
                 {isLocal && it.github_path && <span className="ml-2">📦 {it.github_path}</span>}
                 {!isLocal && it.slug && <span className="ml-2">📦 worlds/{it.slug}</span>}
@@ -335,37 +335,37 @@ export default function MarketPage() {
             {it.tags?.length > 0 && (
               <div className="flex flex-wrap gap-1.5">
                 {it.tags.map((tg: string) => (
-                  <span key={tg} className="inline-flex items-center gap-0.5 text-[10px] px-1.5 py-0.5 rounded bg-elevated text-textMuted"><Tag size={9} /> {tg}</span>
+                  <span key={tg} className="inline-flex items-center gap-0.5 text-3xs px-1.5 py-0.5 rounded bg-elevated text-textMuted"><Tag size={9} /> {tg}</span>
                 ))}
               </div>
             )}
             {/* 信息网格 */}
-            <div className="grid grid-cols-2 gap-2 text-[11px]">
-              <div className="rounded-lg bg-elevated px-3 py-2">
+            <div className="grid grid-cols-2 gap-2 text-2xs">
+              <div className="rounded-control bg-elevated px-3 py-2">
                 <div className="text-textMuted">更新时间</div>
                 <div className="text-textPrimary mt-0.5">{isLocal ? fmtDate(it.updated_at) : fmtDate(it.updated_at)}</div>
               </div>
               {isLocal && (
-                <div className="rounded-lg bg-elevated px-3 py-2">
+                <div className="rounded-control bg-elevated px-3 py-2">
                   <div className="text-textMuted">云端更新</div>
                   <div className="text-textPrimary mt-0.5">{it.github_updated_at ? fmtDate(it.github_updated_at) : '—'}</div>
                 </div>
               )}
-              <div className="rounded-lg bg-elevated px-3 py-2">
+              <div className="rounded-control bg-elevated px-3 py-2">
                 <div className="text-textMuted">{isLocal ? '本地下载' : '云端下载'}</div>
                 <div className="text-textPrimary mt-0.5">{isLocal ? `${it.downloads} 次导入` : `${it.downloads ?? 0} 次`}</div>
               </div>
               {isLocal && (
-                <div className="rounded-lg bg-elevated px-3 py-2">
+                <div className="rounded-control bg-elevated px-3 py-2">
                   <div className="text-textMuted">云端下载</div>
                   <div className="text-textPrimary mt-0.5">{it.github_downloads != null ? `${it.github_downloads} 次` : '—'}</div>
                 </div>
               )}
-              <div className="rounded-lg bg-elevated px-3 py-2">
+              <div className="rounded-control bg-elevated px-3 py-2">
                 <div className="text-textMuted">包大小</div>
                 <div className="text-textPrimary mt-0.5">{fmtSize(it.package_size)}</div>
               </div>
-              <div className="rounded-lg bg-elevated px-3 py-2">
+              <div className="rounded-control bg-elevated px-3 py-2">
                 <div className="text-textMuted">来源</div>
                 <div className="text-textPrimary mt-0.5">{isLocal ? '本地发布' : 'GitHub 仓库'}</div>
               </div>
@@ -378,7 +378,7 @@ export default function MarketPage() {
               <button
                 onClick={() => { doSync(it); setDetail(null) }}
                 disabled={syncingId === it.id || it.sync_state === 'synced'}
-                className="flex-1 inline-flex items-center justify-center gap-1 text-xs px-3 py-2 rounded-lg bg-primary-500/15 text-primary-400 hover:bg-primary-500/25 transition-colors disabled:opacity-40"
+                className="flex-1 inline-flex items-center justify-center gap-1 text-xs px-3 py-2 rounded-control bg-primary-500/15 text-primary-400 hover:bg-primary-500/25 transition-colors disabled:opacity-40"
               >
                 <ArrowUpCircle size={12} /> {it.sync_state === 'synced' ? '已同步' : '同步到 GitHub'}
               </button>
@@ -386,20 +386,20 @@ export default function MarketPage() {
             {isLocal && isMine && (
               <button
                 onClick={() => { setEditItem(it); setDetail(null) }}
-                className="flex-1 inline-flex items-center justify-center gap-1 text-xs px-3 py-2 rounded-lg bg-elevated text-textSecondary hover:text-primary-400 transition-colors"
+                className="flex-1 inline-flex items-center justify-center gap-1 text-xs px-3 py-2 rounded-control bg-elevated text-textSecondary hover:text-primary-400 transition-colors"
               ><Edit3 size={12} /> 编辑介绍</button>
             )}
             {isLocal && isMine && (
               <button
                 onClick={() => { doUnpublish(it); setDetail(null) }}
-                className="inline-flex items-center gap-1 text-xs px-3 py-2 rounded-lg bg-elevated text-textMuted hover:text-rose-400 transition-colors"
+                className="inline-flex items-center gap-1 text-xs px-3 py-2 rounded-control bg-elevated text-textMuted hover:text-rose-400 transition-colors"
               ><Trash2 size={12} /> 下架</button>
             )}
             {(!isLocal && !it.is_local) && (
               <button
                 onClick={() => { doImport(it); setDetail(null) }}
                 disabled={importingId === it.id}
-                className="flex-1 inline-flex items-center justify-center gap-1 text-xs px-3 py-2 rounded-lg bg-primary-500 text-white hover:bg-primary-600 transition-colors disabled:opacity-40"
+                className="flex-1 inline-flex items-center justify-center gap-1 text-xs px-3 py-2 rounded-control bg-primary-500 text-white hover:bg-primary-600 transition-colors disabled:opacity-40"
               >
                 <Download size={12} /> {importingId === it.id ? '导入中…' : '导入到我的世界'}
               </button>
@@ -408,7 +408,7 @@ export default function MarketPage() {
               <button
                 onClick={() => { doImport(it); setDetail(null) }}
                 disabled={importingId === it.id}
-                className="flex-1 inline-flex items-center justify-center gap-1 text-xs px-3 py-2 rounded-lg bg-primary-500 text-white hover:bg-primary-600 transition-colors disabled:opacity-40"
+                className="flex-1 inline-flex items-center justify-center gap-1 text-xs px-3 py-2 rounded-control bg-primary-500 text-white hover:bg-primary-600 transition-colors disabled:opacity-40"
               >
                 <Download size={12} /> {importingId === it.id ? '导入中…' : '一键导入'}
               </button>
@@ -425,7 +425,7 @@ export default function MarketPage() {
       <PageHeader title="世界商城" subtitle="本地发布 / GitHub 资源共享" onBack={() => navigate(-1)}>
         <button
           onClick={openPublish}
-          className="inline-flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-lg bg-primary-500 hover:bg-primary-600 text-white transition-colors shrink-0"
+          className="btn btn-xs btn-primary gap-1.5 shrink-0"
         >
           <Upload size={13} /> 发布世界
         </button>
@@ -433,31 +433,31 @@ export default function MarketPage() {
 
       {/* 板块切换 */}
       <div className="px-4 pt-2 shrink-0">
-        <div className="flex items-center gap-1 bg-elevated rounded-lg p-0.5 w-fit">
+        <div className="flex items-center gap-1 bg-elevated rounded-control p-0.5 w-fit">
           <button
             onClick={() => setTab('local')}
-            className={`inline-flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-md transition-colors ${tab === 'local' ? 'bg-primary-500/15 text-primary-400' : 'text-textSecondary hover:text-textPrimary'}`}
+            className={`inline-flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-control transition-colors ${tab === 'local' ? 'bg-primary-500/15 text-primary-400' : 'text-textSecondary hover:text-textPrimary'}`}
           >
-            <Database size={12} /> 本地 <span className="text-[10px] opacity-70">({total})</span>
+            <Database size={12} /> 本地 <span className="text-3xs opacity-70">({total})</span>
           </button>
           <button
             onClick={() => setTab('github')}
-            className={`inline-flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-md transition-colors ${tab === 'github' ? 'bg-primary-500/15 text-primary-400' : 'text-textSecondary hover:text-textPrimary'}`}
+            className={`inline-flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-control transition-colors ${tab === 'github' ? 'bg-primary-500/15 text-primary-400' : 'text-textSecondary hover:text-textPrimary'}`}
           >
-            <Github size={12} /> GitHub <span className="text-[10px] opacity-70">({ghItems.length})</span>
+            <Github size={12} /> GitHub <span className="text-3xs opacity-70">({ghItems.length})</span>
           </button>
         </div>
       </div>
 
       {/* GitHub 绑定条（统一到「我的」页绑定，状态跨页同步） */}
       <div className="px-4 pt-2 shrink-0">
-        <div className="flex items-center gap-2 text-xs rounded-lg bg-surface border border-border px-3 py-2">
+        <div className="flex items-center gap-2 text-xs rounded-control bg-surface border border-border px-3 py-2">
           <Link2 size={12} className="text-textMuted shrink-0" />
           {bindState?.bound ? (
             <>
               <span className="text-textSecondary">GitHub：<span className="text-primary-400 font-semibold">@{bindState.username}</span>（同步以你的身份推送）</span>
-              <button onClick={() => navigate('/me?bind=github')} className="ml-auto text-[10px] text-primary-400 hover:text-primary-500 dark:hover:text-primary-300 transition-colors shrink-0">更换</button>
-              <button onClick={doUnbind} className="inline-flex items-center gap-1 text-[10px] px-2 py-1 rounded bg-elevated text-textMuted hover:text-rose-400 transition-colors shrink-0">
+              <button onClick={() => navigate('/me?bind=github')} className="ml-auto text-3xs text-primary-400 hover:text-primary-500 dark:hover:text-primary-300 transition-colors shrink-0">更换</button>
+              <button onClick={doUnbind} className="inline-flex items-center gap-1 text-3xs px-2 py-1 rounded bg-elevated text-textMuted hover:text-rose-400 transition-colors shrink-0">
                 <Unlink size={10} /> 解绑
               </button>
             </>
@@ -466,7 +466,7 @@ export default function MarketPage() {
               <span className="text-textMuted">未绑定 GitHub（同步时用你的身份推送）</span>
               <button
                 onClick={() => navigate('/me?bind=github')}
-                className="ml-auto inline-flex items-center gap-1 text-[10px] px-2 py-1 rounded bg-primary-500/15 text-primary-400 hover:bg-primary-500/25 transition-colors shrink-0"
+                className="ml-auto inline-flex items-center gap-1 text-3xs px-2 py-1 rounded bg-primary-500/15 text-primary-400 hover:bg-primary-500/25 transition-colors shrink-0"
               >
                 <Link2 size={10} /> 去绑定 GitHub →
               </button>
@@ -488,7 +488,7 @@ export default function MarketPage() {
                   onChange={(e) => setQ(e.target.value)}
                   onKeyDown={(e) => { if (e.key === 'Enter') loadLocal() }}
                   placeholder="搜索世界标题 / 描述…"
-                  className="w-full bg-elevated text-sm pl-8 pr-3 py-1.5 rounded-lg border border-border outline-none focus:border-primary-500/50 text-textPrimary"
+                  className="w-full bg-elevated text-sm pl-8 pr-3 py-1.5 rounded-control border border-border outline-none focus:border-primary-500/50 text-textPrimary"
                 />
               </div>
               <input
@@ -496,32 +496,32 @@ export default function MarketPage() {
                 onChange={(e) => setTag(e.target.value)}
                 onKeyDown={(e) => { if (e.key === 'Enter') loadLocal() }}
                 placeholder="标签，如 2d冒险"
-                className="w-32 sm:w-36 bg-elevated text-sm px-3 py-1.5 rounded-lg border border-border outline-none focus:border-primary-500/50 text-textPrimary shrink-0"
+                className="w-32 sm:w-36 bg-elevated text-sm px-3 py-1.5 rounded-control border border-border outline-none focus:border-primary-500/50 text-textPrimary shrink-0"
               />
-              <button onClick={loadLocal} className="text-xs px-3 py-1.5 rounded-lg bg-elevated hover:bg-border text-textSecondary transition-colors shrink-0">
+              <button onClick={loadLocal} className="text-xs px-3 py-1.5 rounded-control bg-elevated hover:bg-border text-textSecondary transition-colors shrink-0">
                 搜索
               </button>
             </>
           ) : (
             <>
-              <div className="flex-1 text-[10px] text-textMuted">
+              <div className="flex-1 text-3xs text-textMuted">
                 {ghSyncedAt ? `快照时间: ${fmtDate(ghSyncedAt)}（点击刷新获取最新）` : 'GitHub 快照为空，点击刷新获取'}
               </div>
               <button
                 onClick={doRefreshGithub}
                 disabled={refreshing}
-                className="inline-flex items-center gap-1 text-xs px-3 py-1.5 rounded-lg bg-elevated hover:bg-border text-textSecondary transition-colors shrink-0 disabled:opacity-40"
+                className="inline-flex items-center gap-1 text-xs px-3 py-1.5 rounded-control bg-elevated hover:bg-border text-textSecondary transition-colors shrink-0 disabled:opacity-40"
               >
                 <RefreshCw size={11} className={refreshing ? 'animate-spin' : ''} /> {refreshing ? '刷新中…' : '刷新'}
               </button>
               <button
                 onClick={openGithubSettings}
-                className="inline-flex items-center gap-1 text-xs px-3 py-1.5 rounded-lg bg-elevated hover:bg-border text-textSecondary transition-colors shrink-0"
+                className="inline-flex items-center gap-1 text-xs px-3 py-1.5 rounded-control bg-elevated hover:bg-border text-textSecondary transition-colors shrink-0"
                 title="实例 GitHub 配置（管理员）"
               >
                 <Settings size={11} /> 实例配置
               </button>
-              {settingsDenied && <span className="text-[10px] text-textMuted shrink-0">仅管理员可配置实例 GitHub</span>}
+              {settingsDenied && <span className="text-3xs text-textMuted shrink-0">仅管理员可配置实例 GitHub</span>}
             </>
           )}
         </div>
@@ -537,16 +537,16 @@ export default function MarketPage() {
             <div className="text-center text-textMuted text-sm py-16 space-y-2">
               <Package size={32} className="mx-auto opacity-40" />
               <div>本地商城还没有世界。把做好的世界发布出来吧。</div>
-              <button onClick={openPublish} className="text-xs px-3 py-1.5 rounded-lg bg-elevated hover:bg-border text-primary-400 transition-colors">
+              <button onClick={openPublish} className="text-xs px-3 py-1.5 rounded-control bg-elevated hover:bg-border text-primary-400 transition-colors">
                 + 发布第一个世界
               </button>
             </div>
           ) : (
             <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-3">
               {items.map((item) => (
-                <div key={item.id} className="rounded-xl bg-surface border border-border p-3 flex flex-col gap-2 hover:border-primary-500/40 transition-colors cursor-pointer" onClick={() => setDetail({ kind: 'local', item })}>
+                <div key={item.id} className="rounded-card bg-surface border border-border p-3 flex flex-col gap-2 hover:border-primary-500/40 transition-colors cursor-pointer" onClick={() => setDetail({ kind: 'local', item })}>
                   <div className="flex items-start gap-2">
-                    <div className="w-9 h-9 rounded-lg bg-primary-500/15 text-primary-400 flex items-center justify-center shrink-0">
+                    <div className="w-9 h-9 rounded-control bg-primary-500/15 text-primary-400 flex items-center justify-center shrink-0">
                       <Globe size={16} />
                     </div>
                     <div className="min-w-0 flex-1">
@@ -554,7 +554,7 @@ export default function MarketPage() {
                         <span className="text-sm font-semibold text-textPrimary truncate">{item.title}</span>
                         <SyncBadge item={item} />
                       </div>
-                      <div className="text-[10px] text-textMuted flex items-center gap-1 mt-0.5">
+                      <div className="text-3xs text-textMuted flex items-center gap-1 mt-0.5">
                         <User size={10} /> {item.author_name || `#${item.author_id}`}
                         <span className="mx-0.5">·</span>
                         <Clock size={10} /> 更新 {fmtDate(item.updated_at)}
@@ -584,13 +584,13 @@ export default function MarketPage() {
                         <button
                           key={tg}
                           onClick={(e) => { e.stopPropagation(); setTag(tg); loadLocal() }}
-                          className="inline-flex items-center gap-0.5 text-[10px] px-1.5 py-0.5 rounded bg-elevated text-textMuted hover:text-primary-400 transition-colors"
+                          className="inline-flex items-center gap-0.5 text-3xs px-1.5 py-0.5 rounded bg-elevated text-textMuted hover:text-primary-400 transition-colors"
                         ><Tag size={9} /> {tg}</button>
                       ))}
                     </div>
                   )}
                   <div className="flex items-center justify-between mt-auto pt-1 border-t border-border/50">
-                    <span className="text-[10px] text-textMuted space-x-2">
+                    <span className="text-3xs text-textMuted space-x-2">
                       <span>本地 {item.downloads} 次导入</span>
                       {item.github_downloads != null && <span>云端 {item.github_downloads} 次</span>}
                       {item.sync_state === 'stale' && <span className="text-accent-400/80">云端 {fmtDate(item.github_updated_at)}</span>}
@@ -600,7 +600,7 @@ export default function MarketPage() {
                         onClick={(e) => { e.stopPropagation(); doSync(item) }}
                         disabled={syncingId === item.id || item.sync_state === 'synced'}
                         title={item.sync_state === 'synced' ? '已是最新' : '同步到 GitHub'}
-                        className="inline-flex items-center gap-1 text-[10px] px-2 py-1 rounded bg-elevated text-textMuted hover:text-primary-400 transition-colors disabled:opacity-40 shrink-0"
+                        className="inline-flex items-center gap-1 text-3xs px-2 py-1 rounded bg-elevated text-textMuted hover:text-primary-400 transition-colors disabled:opacity-40 shrink-0"
                       >
                         <ArrowUpCircle size={11} />
                         {syncingId === item.id ? '同步中…' : item.sync_state === 'synced' ? '已同步' : '同步'}
@@ -610,7 +610,7 @@ export default function MarketPage() {
                       <button
                         onClick={(e) => { e.stopPropagation(); doImport(item) }}
                         disabled={importingId === item.id}
-                        className="inline-flex items-center gap-1 text-xs px-2.5 py-1 rounded-lg bg-primary-500/15 text-primary-400 hover:bg-primary-500/25 transition-colors disabled:opacity-40"
+                        className="inline-flex items-center gap-1 text-xs px-2.5 py-1 rounded-control bg-primary-500/15 text-primary-400 hover:bg-primary-500/25 transition-colors disabled:opacity-40"
                       >
                         <Download size={11} />
                         {importingId === item.id ? '导入中…' : '一键导入'}
@@ -628,28 +628,28 @@ export default function MarketPage() {
             <div className="text-center text-textMuted text-sm py-16 space-y-2">
               <Github size={32} className="mx-auto opacity-40" />
               <div>GitHub 快照为空。点击右上「刷新」从仓库拉取世界列表。</div>
-              <div className="text-[10px] opacity-60">仓库: Coprexist/AIsChat-Community · 管理员可在后台配置仓库与自动获取</div>
+              <div className="text-3xs opacity-60">仓库: Coprexist/AIsChat-Community · 管理员可在后台配置仓库与自动获取</div>
             </div>
           ) : (
             <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-3">
               {ghItems.map((item) => (
-                <div key={item.id} className="rounded-xl bg-surface border border-border p-3 flex flex-col gap-2 hover:border-primary-500/40 transition-colors cursor-pointer" onClick={() => setDetail({ kind: 'github', item })}>
+                <div key={item.id} className="rounded-card bg-surface border border-border p-3 flex flex-col gap-2 hover:border-primary-500/40 transition-colors cursor-pointer" onClick={() => setDetail({ kind: 'github', item })}>
                   <div className="flex items-start gap-2">
-                    <div className="w-9 h-9 rounded-lg bg-[#24292F]/10 dark:bg-white/10 text-[#24292F] dark:text-white flex items-center justify-center shrink-0">
+                    <div className="w-9 h-9 rounded-control bg-[#24292F]/10 dark:bg-white/10 text-[#24292F] dark:text-white flex items-center justify-center shrink-0">
                       <Github size={16} />
                     </div>
                     <div className="min-w-0 flex-1">
                       <div className="flex items-center gap-1.5">
                         <span className="text-sm font-semibold text-textPrimary truncate">{item.title}</span>
                         {item.is_mine ? (
-                          <span className="inline-flex items-center gap-1 text-[10px] px-1.5 py-0.5 rounded bg-mint-500/15 text-mint-400 shrink-0" title="GitHub 数字 id 与你绑定的账户一致">👑 我的</span>
+                          <span className="inline-flex items-center gap-1 text-3xs px-1.5 py-0.5 rounded bg-mint-500/15 text-mint-400 shrink-0" title="GitHub 数字 id 与你绑定的账户一致">👑 我的</span>
                         ) : item.is_local ? (
-                          <span className="inline-flex items-center gap-1 text-[10px] px-1.5 py-0.5 rounded bg-primary-500/15 text-primary-400 shrink-0"><Store size={9} /> 本地</span>
+                          <span className="inline-flex items-center gap-1 text-3xs px-1.5 py-0.5 rounded bg-primary-500/15 text-primary-400 shrink-0"><Store size={9} /> 本地</span>
                         ) : (
-                          <span className="inline-flex items-center gap-1 text-[10px] px-1.5 py-0.5 rounded bg-elevated text-textMuted shrink-0"><Github size={9} /> 远程</span>
+                          <span className="inline-flex items-center gap-1 text-3xs px-1.5 py-0.5 rounded bg-elevated text-textMuted shrink-0"><Github size={9} /> 远程</span>
                         )}
                       </div>
-                      <div className="text-[10px] text-textMuted flex items-center gap-1 mt-0.5">
+                      <div className="text-3xs text-textMuted flex items-center gap-1 mt-0.5">
                         <User size={10} /> {item.author_github ? `@${item.author_github}` : (item.author_name || 'GitHub')}
                         {item.signature_valid === true && <span className="text-mint-400/80">· 机器人已验证</span>}
                         {item.signature_valid === false && <span className="text-rose-400/80">· 签名无效</span>}
@@ -664,12 +664,12 @@ export default function MarketPage() {
                   {item.tags.length > 0 && (
                     <div className="flex flex-wrap gap-1">
                       {item.tags.map((tg) => (
-                        <span key={tg} className="inline-flex items-center gap-0.5 text-[10px] px-1.5 py-0.5 rounded bg-elevated text-textMuted"><Tag size={9} /> {tg}</span>
+                        <span key={tg} className="inline-flex items-center gap-0.5 text-3xs px-1.5 py-0.5 rounded bg-elevated text-textMuted"><Tag size={9} /> {tg}</span>
                       ))}
                     </div>
                   )}
                   <div className="flex items-center justify-between mt-auto pt-1 border-t border-border/50">
-                    <span className="text-[10px] text-textMuted">
+                    <span className="text-3xs text-textMuted">
                       {item.downloads != null ? `云端 ${item.downloads} 次下载` : ''}
                       {item.slug ? ` · ${item.slug}` : ''}
                     </span>
@@ -677,7 +677,7 @@ export default function MarketPage() {
                       <button
                         onClick={(e) => { e.stopPropagation(); doImport(item) }}
                         disabled={importingId === item.id}
-                        className="inline-flex items-center gap-1 text-xs px-2.5 py-1 rounded-lg bg-primary-500/15 text-primary-400 hover:bg-primary-500/25 transition-colors disabled:opacity-40"
+                        className="inline-flex items-center gap-1 text-xs px-2.5 py-1 rounded-control bg-primary-500/15 text-primary-400 hover:bg-primary-500/25 transition-colors disabled:opacity-40"
                       >
                         <Download size={11} />
                         {importingId === item.id ? '导入中…' : '导入到我的世界'}
@@ -690,13 +690,13 @@ export default function MarketPage() {
           )
         )}
         {!loading && tab === 'local' && items.length > 0 && (
-          <div className="text-center text-[10px] text-textMuted mt-3">共 {total} 个世界</div>
+          <div className="text-center text-3xs text-textMuted mt-3">共 {total} 个世界</div>
         )}
       </div>
 
       {/* 居中 toast */}
       {toast && (
-        <div className="fixed top-6 left-1/2 -translate-x-1/2 z-[60] flex items-center gap-2 px-4 py-2.5 rounded-xl bg-surface border border-border shadow-2xl text-sm text-mint-400">
+        <div className="fixed top-6 left-1/2 -translate-x-1/2 z-toast flex items-center gap-2 px-4 py-2.5 rounded-card bg-surface border border-border shadow-2xl text-sm text-mint-400">
           <CheckCircle2 size={16} className="shrink-0" />
           <span className="whitespace-nowrap">{toast}</span>
         </div>
@@ -707,53 +707,53 @@ export default function MarketPage() {
 
       {/* 编辑弹窗 */}
       {editItem && (
-        <div className="fixed inset-0 z-50 bg-black/50 flex items-center justify-center p-4" onClick={() => setEditItem(null)}>
-          <div className="w-full max-w-md rounded-2xl bg-surface border border-border p-4 space-y-3" onClick={(e) => e.stopPropagation()}>
+        <Dialog onClose={() =>  setEditItem(null)} className="flex items-center justify-center p-4">
+          <div className="w-full max-w-md rounded-dialog bg-surface border border-border p-4 space-y-3" onClick={(e) => e.stopPropagation()}>
             <div className="flex items-center justify-between">
               <span className="text-sm font-semibold text-textPrimary">编辑商品介绍</span>
               <button onClick={() => setEditItem(null)} className="p-1 text-textMuted hover:text-textPrimary"><X size={15} /></button>
             </div>
             <div>
-              <div className="text-[10px] text-textMuted mb-1">标题</div>
+              <div className="text-3xs text-textMuted mb-1">标题</div>
               <input
                 value={editTitle}
                 onChange={(e) => setEditTitle(e.target.value)}
-                className="w-full bg-elevated text-sm p-2 rounded-lg border border-border outline-none focus:border-primary-500/50 text-textPrimary"
+                className="w-full bg-elevated text-sm p-2 rounded-control border border-border outline-none focus:border-primary-500/50 text-textPrimary"
               />
             </div>
             <div>
-              <div className="text-[10px] text-textMuted mb-1">描述</div>
+              <div className="text-3xs text-textMuted mb-1">描述</div>
               <textarea
                 value={editDesc}
                 onChange={(e) => setEditDesc(e.target.value)}
                 rows={3}
-                className="w-full bg-elevated text-sm p-2 rounded-lg border border-border outline-none resize-none focus:border-primary-500/50 text-textPrimary"
+                className="w-full bg-elevated text-sm p-2 rounded-control border border-border outline-none resize-none focus:border-primary-500/50 text-textPrimary"
               />
             </div>
             <div>
-              <div className="text-[10px] text-textMuted mb-1">标签（逗号分隔）</div>
+              <div className="text-3xs text-textMuted mb-1">标签（逗号分隔）</div>
               <input
                 value={editTags}
                 onChange={(e) => setEditTags(e.target.value)}
-                className="w-full bg-elevated text-sm p-2 rounded-lg border border-border outline-none focus:border-primary-500/50 text-textPrimary"
+                className="w-full bg-elevated text-sm p-2 rounded-control border border-border outline-none focus:border-primary-500/50 text-textPrimary"
               />
             </div>
             <button
               onClick={doEdit}
               disabled={editing}
-              className="w-full py-2 text-sm bg-primary-500 hover:bg-primary-600 text-white rounded-lg transition-colors disabled:opacity-40"
+              className="btn btn-sm btn-primary w-full"
             >
               {editing ? '保存中…' : '保存'}
             </button>
           </div>
-        </div>
+        </Dialog>
       )}
 
 
       {/* 实例 GitHub 配置（管理员） */}
       {settingsOpen && (
-        <div className="fixed inset-0 z-50 bg-black/60 flex items-center justify-center p-4" onClick={() => setSettingsOpen(false)}>
-          <div className="w-full max-w-lg bg-surface border border-border rounded-2xl max-h-[85vh] overflow-y-auto shadow-xl" onClick={(e) => e.stopPropagation()}>
+        <Dialog onClose={() =>  setSettingsOpen(false)} className="flex items-center justify-center p-4">
+          <div className="w-full max-w-lg bg-surface border border-border rounded-dialog max-h-[85vh] overflow-y-auto shadow-xl" onClick={(e) => e.stopPropagation()}>
             <div className="sticky top-0 bg-surface border-b border-border px-4 py-3 flex items-center justify-between">
               <span className="text-sm font-semibold text-textPrimary">实例 GitHub 配置</span>
               <button onClick={() => setSettingsOpen(false)} className="p-1 text-textMuted hover:text-textPrimary transition-colors"><X size={16} /></button>
@@ -762,7 +762,7 @@ export default function MarketPage() {
               <MarketGithubTab />
             </div>
           </div>
-        </div>
+        </Dialog>
       )}
     </div>
   )

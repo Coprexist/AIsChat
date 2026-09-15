@@ -3,6 +3,7 @@ import { api } from '../api/client'
 import { useT } from '../i18n/I18nContext'
 import { FileText, Settings, Bot, Eye, ChevronDown, ChevronUp, Loader2, Save, Sliders, X } from 'lucide-react'
 import Toggle from './Toggle'
+import { Dialog } from './ui'
 
 interface GlobalConfig {
   max_conversation_logs: number
@@ -160,7 +161,7 @@ export default function ConversationLogTab() {
     <div className="flex flex-col gap-6">
       <div className="max-w-xl flex flex-col gap-6">
         {/* Section tabs */}
-        <div className="flex gap-2 bg-canvas border border-border rounded-xl p-1 w-full">
+        <div className="flex gap-2 bg-canvas border border-border rounded-card p-1 w-full">
         {[
           { k: 'config', label: t('admin.convlogGlobal'), icon: Settings },
           { k: 'agents', label: t('admin.convlogPerAgent'), icon: Sliders },
@@ -169,7 +170,7 @@ export default function ConversationLogTab() {
           <button
             key={s.k}
             onClick={() => setSection(s.k as any)}
-            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-colors ${
+            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-control text-xs font-medium transition-colors ${
               section === s.k ? 'bg-elevated text-textPrimary shadow-sm' : 'text-textMuted hover:text-textSecondary hover:bg-elevated'
             }`}
           >
@@ -180,7 +181,7 @@ export default function ConversationLogTab() {
 
       {/* ── Global Config ── */}
       {section === 'config' && (
-        <div className="bg-elevated border border-border rounded-xl p-5 max-w-xl">
+        <div className="bg-elevated border border-border rounded-card p-5 max-w-xl">
           <h3 className="text-sm font-semibold text-textPrimary mb-4 flex items-center gap-2">
             <Settings size={16} className="text-primary-400" /> {t('admin.convlogConfigTitle')}
           </h3>
@@ -194,7 +195,7 @@ export default function ConversationLogTab() {
                   type="number" min={1} max={500}
                   value={config.max_conversation_logs}
                   onChange={e => setConfig({ ...config, max_conversation_logs: parseInt(e.target.value) || 30 })}
-                  className="w-full px-3 py-2 rounded-lg border border-border bg-canvas text-sm text-textPrimary focus:outline-none focus:ring-2 focus:ring-primary-500/50"
+                  className="w-full px-3 py-2 rounded-control border border-border bg-canvas text-sm text-textPrimary focus:outline-none focus:ring-2 focus:ring-primary-500/50"
                 />
               </div>
               <div>
@@ -203,7 +204,7 @@ export default function ConversationLogTab() {
                   type="number" min={1} max={config.max_conversation_logs}
                   value={config.default_user_conversation_logs}
                   onChange={e => setConfig({ ...config, default_user_conversation_logs: parseInt(e.target.value) || 20 })}
-                  className="w-full px-3 py-2 rounded-lg border border-border bg-canvas text-sm text-textPrimary focus:outline-none focus:ring-2 focus:ring-primary-500/50"
+                  className="w-full px-3 py-2 rounded-control border border-border bg-canvas text-sm text-textPrimary focus:outline-none focus:ring-2 focus:ring-primary-500/50"
                 />
               </div>
               <div className="flex items-center justify-between">
@@ -213,7 +214,7 @@ export default function ConversationLogTab() {
               <div className="flex items-center justify-between">
                 <div>
                   <label className="text-xs font-medium text-textSecondary">{t('admin.convlogDefaultDelay')}</label>
-                  <p className="text-[10px] text-textMuted mt-0.5">{t('admin.convlogDefaultDelayDesc')}</p>
+                  <p className="text-3xs text-textMuted mt-0.5">{t('admin.convlogDefaultDelayDesc')}</p>
                 </div>
                 <Toggle checked={config.default_delay_reply_enabled} onChange={(v) => setConfig({ ...config, default_delay_reply_enabled: v })} />
               </div>
@@ -227,12 +228,12 @@ export default function ConversationLogTab() {
                   onChange={e => setConfig({ ...config, compression_threshold: parseInt(e.target.value) })}
                   className="w-full accent-primary-500"
                 />
-                <p className="text-[10px] text-textMuted mt-0.5">达到上下文窗口的此百分比时自动压缩。调低=更早压缩，调高=收集更多消息再压缩</p>
+                <p className="text-3xs text-textMuted mt-0.5">达到上下文窗口的此百分比时自动压缩。调低=更早压缩，调高=收集更多消息再压缩</p>
               </div>
               <button
                 onClick={saveConfig}
                 disabled={configSaving}
-                className="flex items-center gap-2 px-4 py-2 rounded-lg bg-primary-500 text-white hover:bg-primary-600 disabled:opacity-40 text-sm font-medium transition-colors"
+                className="btn btn-sm btn-primary gap-2"
               >
                 <Save size={14} /> {configSaving ? t('common.saving') : t('admin.saveConfig')}
               </button>
@@ -243,7 +244,7 @@ export default function ConversationLogTab() {
 
       {/* ── Per-Agent Settings ── */}
       {section === 'agents' && (
-        <div className="bg-elevated border border-border rounded-xl p-5 max-w-xl">
+        <div className="bg-elevated border border-border rounded-card p-5 max-w-xl">
           <h3 className="text-sm font-semibold text-textPrimary mb-4 flex items-center gap-2">
             <Bot size={16} className="text-primary-400" /> {t('admin.perAgentSettings')}
           </h3>
@@ -260,12 +261,12 @@ export default function ConversationLogTab() {
                       loadAgents(e.target.value)
                     }}
                     placeholder={t('admin.searchAiPlaceholder') || '搜索 AI 名称...'}
-                    className="flex-1 px-3 py-2 rounded-lg border border-border bg-canvas text-sm text-textPrimary focus:outline-none focus:ring-2 focus:ring-primary-500/50"
+                    className="flex-1 px-3 py-2 rounded-control border border-border bg-canvas text-sm text-textPrimary focus:outline-none focus:ring-2 focus:ring-primary-500/50"
                   />
                   <select
                     value={selectedAgentId || ''}
                     onChange={e => setSelectedAgentId(e.target.value ? parseInt(e.target.value) : null)}
-                    className="w-full px-3 py-2 rounded-lg border border-border bg-canvas text-sm text-textPrimary focus:outline-none focus:ring-2 focus:ring-primary-500/50 min-w-0"
+                    className="w-full px-3 py-2 rounded-control border border-border bg-canvas text-sm text-textPrimary focus:outline-none focus:ring-2 focus:ring-primary-500/50 min-w-0"
                   >
                     <option value="">{t('admin.selectAiPlaceholder')}</option>
                     {agentSearching ? (
@@ -283,7 +284,7 @@ export default function ConversationLogTab() {
             {agentSettings && (
               <>
                 <div
-                  className="p-3 rounded-lg bg-canvas text-xs text-textSecondary"
+                  className="p-3 rounded-control bg-canvas text-xs text-textSecondary"
                   dangerouslySetInnerHTML={{
                     __html: t('admin.currentEffective')
                       .replace('{retention}', `<b class="text-textPrimary">${agentSettings.effective_limit}</b>`)
@@ -299,7 +300,7 @@ export default function ConversationLogTab() {
                     value={agentLimit}
                     onChange={e => setAgentLimit(e.target.value)}
                     placeholder={t('admin.retentionLimit').replace('{max}', String(agentSettings.system_max))}
-                    className="w-full px-3 py-2 rounded-lg border border-border bg-canvas text-sm text-textPrimary focus:outline-none focus:ring-2 focus:ring-primary-500/50"
+                    className="w-full px-3 py-2 rounded-control border border-border bg-canvas text-sm text-textPrimary focus:outline-none focus:ring-2 focus:ring-primary-500/50"
                   />
                 </div>
                 <div className="flex items-center justify-between">
@@ -329,7 +330,7 @@ export default function ConversationLogTab() {
                 <button
                   onClick={saveAgentSettings}
                   disabled={agentSaving}
-                  className="flex items-center gap-2 px-4 py-2 rounded-lg bg-primary-500 text-white hover:bg-primary-600 disabled:opacity-40 text-sm font-medium transition-colors"
+                  className="btn btn-sm btn-primary gap-2"
                 >
                   <Save size={14} /> {agentSaving ? t('common.saving') : t('admin.saveSettings')}
                 </button>
@@ -351,7 +352,7 @@ export default function ConversationLogTab() {
                 loadAgents(e.target.value)
               }}
               placeholder={t('admin.searchAiPlaceholder') || '搜索 AI 名称...'}
-              className="flex-1 px-3 py-2 rounded-lg border border-border bg-elevated text-sm text-textPrimary focus:outline-none focus:ring-2 focus:ring-primary-500/50"
+              className="flex-1 px-3 py-2 rounded-control border border-border bg-elevated text-sm text-textPrimary focus:outline-none focus:ring-2 focus:ring-primary-500/50"
             />
             <select
               value={viewAgentId || ''}
@@ -360,7 +361,7 @@ export default function ConversationLogTab() {
                 setLogs([])
                 setSelectedLog(null)
               }}
-              className="px-3 py-2 rounded-lg border border-border bg-elevated text-sm text-textPrimary focus:outline-none focus:ring-2 focus:ring-primary-500/50"
+              className="px-3 py-2 rounded-control border border-border bg-elevated text-sm text-textPrimary focus:outline-none focus:ring-2 focus:ring-primary-500/50"
             >
               <option value="">{t('admin.selectAiPlaceholder')}</option>
               {agentSearching ? (
@@ -374,7 +375,7 @@ export default function ConversationLogTab() {
             <button
               onClick={loadLogs}
               disabled={!viewAgentId || logsLoading}
-              className="px-4 py-2 rounded-lg bg-primary-500 text-white hover:bg-primary-600 disabled:opacity-40 text-sm font-medium transition-colors shrink-0"
+              className="btn btn-sm btn-primary shrink-0"
             >
               {logsLoading ? <Loader2 className="animate-spin" size={14} /> : t('common.load')}
             </button>
@@ -382,7 +383,7 @@ export default function ConversationLogTab() {
 
           {/* Log list */}
           {logs.length > 0 && (
-            <div className="bg-elevated border border-border rounded-xl overflow-hidden">
+            <div className="bg-elevated border border-border rounded-card overflow-hidden">
               <div className="divide-y divide-border">
                 {logs.map(log => (
                   <div
@@ -430,9 +431,9 @@ export default function ConversationLogTab() {
 
           {/* Log detail modal */}
           {selectedLog && (
-            <div className="fixed inset-0 bg-black/70 flex items-start justify-center z-50 pt-10 overflow-y-auto" onClick={() => { setSelectedLog(null); setLogDetail(null) }}>
+            <Dialog onClose={() =>  { setSelectedLog(null); setLogDetail(null) } } className="flex items-start justify-center pt-10 overflow-y-auto">
               <div
-                className="bg-elevated border border-border rounded-2xl p-5 w-full max-w-2xl mx-4 shadow-2xl shadow-black/30 max-h-[80vh] overflow-y-auto"
+                className="bg-elevated border border-border rounded-dialog p-5 w-full max-w-2xl mx-4 shadow-2xl shadow-black/30 max-h-[80vh] overflow-y-auto"
                 onClick={e => e.stopPropagation()}
               >
                 <div className="flex items-center justify-between mb-4">
@@ -449,7 +450,7 @@ export default function ConversationLogTab() {
                       <span>{t('admin.logModel')} {logDetail.model || '-'}</span>
                       <span>{formatTime(logDetail.created_at)}</span>
                     </div>
-                    <div className="bg-canvas rounded-xl p-3 max-h-[50vh] overflow-y-auto">
+                    <div className="bg-canvas rounded-card p-3 max-h-[50vh] overflow-y-auto">
                       <pre className="text-xs text-textSecondary whitespace-pre-wrap font-mono leading-relaxed">
                         {JSON.stringify(logDetail.messages, null, 2)}
                       </pre>
@@ -457,7 +458,7 @@ export default function ConversationLogTab() {
                   </div>
                 ) : null}
               </div>
-            </div>
+            </Dialog>
           )}
         </div>
       )}

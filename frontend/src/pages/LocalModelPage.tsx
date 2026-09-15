@@ -4,6 +4,7 @@ import { useT } from '../i18n/I18nContext'
 import { isDesktop } from '../utils/platform'
 import { invoke } from '../utils/tauri'
 import { Cpu, RefreshCw, Play, Square, Star, Loader2, ArrowLeft, Circle } from 'lucide-react'
+import { PageHeader } from '../components/ui'
 
 interface OllamaModel {
   name: string
@@ -115,23 +116,21 @@ export default function LocalModelPage() {
 
   return (
     <div className="h-full flex flex-col bg-canvas">
-      {/* 头部 */}
-      <div className="px-4 h-14 border-b border-border bg-surface flex items-center gap-3 shrink-0">
-        <button
-          onClick={() => navigate('/settings')}
-          className="p-1.5 -ml-1 rounded-lg hover:bg-elevated text-textSecondary transition-colors"
-        >
-          <ArrowLeft size={18} />
-        </button>
-        <Cpu size={18} className="text-primary-400" />
-        <h1 className="font-semibold text-textPrimary text-sm">{t('desktop.localModelTitle')}</h1>
-      </div>
+      <PageHeader
+        title={
+          <span className="flex items-center gap-2">
+            <Cpu size={18} className="text-primary-400" />
+            {t('desktop.localModelTitle')}
+          </span>
+        }
+        onBack={() => navigate('/settings')}
+      />
 
       {/* 内容 */}
       <div className="flex-1 overflow-y-auto p-4 md:p-6">
         <div className="max-w-2xl mx-auto space-y-4">
           {/* 连接状态 */}
-          <div className="bg-surface rounded-xl border border-border p-4">
+          <div className="bg-surface rounded-card border border-border p-4">
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-3">
                 <Circle
@@ -164,7 +163,7 @@ export default function LocalModelPage() {
                 <button
                   onClick={detectOllama}
                   disabled={detecting}
-                  className="p-2 rounded-lg hover:bg-elevated text-textMuted hover:text-textSecondary transition-colors disabled:opacity-30"
+                  className="icon-btn text-textMuted"
                   title={t('desktop.refresh')}
                 >
                   <RefreshCw size={15} className={detecting ? 'animate-spin' : ''} />
@@ -173,7 +172,7 @@ export default function LocalModelPage() {
                   <button
                     onClick={handleStop}
                     disabled={stopping}
-                    className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-rose-500/20 text-rose-400 hover:bg-rose-500/10 text-xs font-medium transition-colors disabled:opacity-30"
+                    className="flex items-center gap-1.5 px-3 py-1.5 rounded-control border border-rose-500/20 text-rose-400 hover:bg-rose-500/10 text-xs font-medium transition-colors disabled:opacity-30"
                   >
                     {stopping ? <Loader2 size={13} className="animate-spin" /> : <Square size={13} />}
                     {t('desktop.stopService')}
@@ -182,7 +181,7 @@ export default function LocalModelPage() {
                   <button
                     onClick={handleStart}
                     disabled={starting}
-                    className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-mint-400/10 border border-mint-400/20 text-mint-400 hover:bg-mint-400/20 text-xs font-medium transition-colors disabled:opacity-30"
+                    className="flex items-center gap-1.5 px-3 py-1.5 rounded-control bg-mint-400/10 border border-mint-400/20 text-mint-400 hover:bg-mint-400/20 text-xs font-medium transition-colors disabled:opacity-30"
                   >
                     {starting ? <Loader2 size={13} className="animate-spin" /> : <Play size={13} />}
                     {t('desktop.startService')}
@@ -194,13 +193,13 @@ export default function LocalModelPage() {
 
           {/* 错误提示 */}
           {error && (
-            <div className="text-xs text-rose-400 bg-rose-500/10 border border-rose-500/20 rounded-xl px-3 py-2">
+            <div className="text-xs text-rose-400 bg-rose-500/10 border border-rose-500/20 rounded-card px-3 py-2">
               {error}
             </div>
           )}
 
           {/* 已安装模型列表 */}
-          <div className="bg-surface rounded-xl border border-border p-4">
+          <div className="bg-surface rounded-card border border-border p-4">
             <h3 className="text-sm font-semibold text-textPrimary mb-3">
               {t('desktop.installedModels')}
             </h3>
@@ -217,7 +216,7 @@ export default function LocalModelPage() {
                 {models.map((model) => (
                   <div
                     key={model.name}
-                    className="flex items-center justify-between p-3 rounded-xl border border-border bg-canvas"
+                    className="flex items-center justify-between p-3 rounded-card border border-border bg-canvas"
                   >
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center gap-2">
@@ -225,19 +224,19 @@ export default function LocalModelPage() {
                           {model.name}
                         </p>
                         {model.name === defaultModel && (
-                          <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-primary-500/10 text-primary-400 shrink-0">
+                          <span className="chip chip-primary shrink-0">
                             {t('desktop.isDefault')}
                           </span>
                         )}
                       </div>
-                      <p className="text-[10px] text-textMuted mt-0.5">
+                      <p className="text-3xs text-textMuted mt-0.5">
                         {formatSize(model.size)} · {formatDate(model.modified_at)}
                       </p>
                     </div>
                     {model.name !== defaultModel && (
                       <button
                         onClick={() => handleSetDefault(model.name)}
-                        className="flex items-center gap-1 px-2.5 py-1.5 rounded-lg hover:bg-elevated text-textMuted hover:text-primary-400 transition-colors text-xs"
+                        className="flex items-center gap-1 px-2.5 py-1.5 rounded-control hover:bg-elevated text-textMuted hover:text-primary-400 transition-colors text-xs"
                       >
                         <Star size={13} />
                         {t('desktop.defaultModel')}

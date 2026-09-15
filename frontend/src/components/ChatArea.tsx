@@ -12,6 +12,7 @@ import { Bell, BellOff, UserPlus, Settings, ArrowLeft, Bot, User, Globe, X, Chec
 import { useT } from '../i18n/I18nContext'
 import { useResizableSidebar } from '../hooks/useResizableSidebar'
 import { isEmbedded } from '../embed/bridge'
+import { Dialog } from './ui'
 
 /** 嵌入模式（?embed=1）：隐藏聊天列表侧边栏，只渲染对话区，导航由宿主提供 */
 const EMBED = isEmbedded()
@@ -121,7 +122,7 @@ export default function ChatArea({ groupId, dmSessionId }: ChatAreaProps) {
       {!EMBED && (
       <div
         ref={sidebarRef}
-        className={`shrink-0 ${mobileSidebarOpen ? 'absolute inset-0 z-30' : 'hidden md:block'} md:relative md:z-auto`}
+        className={`shrink-0 ${mobileSidebarOpen ? 'absolute inset-0 z-overlay' : 'hidden md:block'} md:relative md:z-auto`}
         style={!mobileSidebarOpen ? { width: sidebarWidth } : undefined}
       >
         <ChatSidebar
@@ -136,7 +137,7 @@ export default function ChatArea({ groupId, dmSessionId }: ChatAreaProps) {
         />
         {/* 拖拽手柄（仅桌面端） */}
         <div
-          className="hidden md:block absolute top-0 -right-1.5 w-1.5 h-full cursor-col-resize hover:bg-primary-400/30 active:bg-primary-400/50 transition-colors z-[55]"
+          className="hidden md:block absolute top-0 -right-1.5 w-1.5 h-full cursor-col-resize hover:bg-primary-400/30 active:bg-primary-400/50 transition-colors z-overlay"
           onMouseDown={handleResizeStart}
         />
       </div>
@@ -154,7 +155,7 @@ export default function ChatArea({ groupId, dmSessionId }: ChatAreaProps) {
             {groups.length === 0 ? (
               <button
                 onClick={(e) => { e.stopPropagation(); setShowCreateGroup(true) }}
-                className="mt-5 px-5 py-2.5 bg-primary-500 text-white rounded-xl hover:bg-primary-600 text-sm font-medium transition-all shadow-lg shadow-primary-500/20"
+                className="mt-5 px-5 py-2.5 bg-primary-500 text-white rounded-card hover:bg-primary-600 text-sm font-medium transition-all shadow-lg shadow-primary-500/20"
               >
                 {t('chat.createFirstGroup')}
               </button>
@@ -169,7 +170,7 @@ export default function ChatArea({ groupId, dmSessionId }: ChatAreaProps) {
           <div className="px-4 h-14 border-b border-border bg-surface flex items-center gap-2 shrink-0">
             <button
               onClick={() => navigate('/chat')}
-              className="md:hidden p-1.5 -ml-1 rounded-lg hover:bg-elevated text-textSecondary transition-colors"
+              className="md:hidden p-1.5 -ml-1 rounded-control hover:bg-elevated text-textSecondary transition-colors"
               title={t('chat.sessionList')}
             >
               <ArrowLeft size={20} />
@@ -181,7 +182,7 @@ export default function ChatArea({ groupId, dmSessionId }: ChatAreaProps) {
               # {currentGroup?.name || t('chat.loading')}
             </h2>
             {currentGroup?.is_federated && (
-              <span className="inline-flex items-center gap-1 text-[10px] text-primary-400 bg-primary-500/10 px-1.5 py-0.5 rounded-full shrink-0"
+              <span className="chip chip-primary shrink-0"
                     title={t('chat.federatedGroup')}>
                 <Globe size={11} />
                 {t('chat.federated')}
@@ -189,12 +190,12 @@ export default function ChatArea({ groupId, dmSessionId }: ChatAreaProps) {
             )}
             <button
               onClick={() => setShowInvite(true)}
-              className="p-1 rounded-lg hover:bg-elevated text-textMuted hover:text-primary-400 transition-colors"
+              className="p-1 rounded-control hover:bg-elevated text-textMuted hover:text-primary-400 transition-colors"
               title={t('chat.inviteMembers')}
             >
               <UserPlus size={16} />
             </button>
-            <span className={`inline-flex items-center gap-1 text-[10px] font-medium ${(currentGroup?.online_count ?? 0) === 0 ? 'text-slate-400' : 'text-mint-400'}`}>
+            <span className={`inline-flex items-center gap-1 text-3xs font-medium ${(currentGroup?.online_count ?? 0) === 0 ? 'text-slate-400' : 'text-mint-400'}`}>
               <span className={`w-1.5 h-1.5 rounded-full ${(currentGroup?.online_count ?? 0) === 0 ? 'bg-slate-400' : 'bg-mint-400'}`} /> {t('chat.onlineCount')}: {currentGroup?.online_count ?? 0}
             </span>
             <button
@@ -210,7 +211,7 @@ export default function ChatArea({ groupId, dmSessionId }: ChatAreaProps) {
                   }
                 } catch { /* ignore */ }
               }}
-              className={`p-1 rounded-lg transition-colors ml-auto ${
+              className={`p-1 rounded-control transition-colors ml-auto ${
                 currentGroup?.dnd_until
                   ? 'text-rose-400 hover:bg-rose-400/10'
                   : 'text-textMuted hover:text-rose-400 hover:bg-elevated'
@@ -222,7 +223,7 @@ export default function ChatArea({ groupId, dmSessionId }: ChatAreaProps) {
             {currentGroup && (
               <button
                 onClick={() => setShowSettings(true)}
-                className="p-1 rounded-lg hover:bg-elevated text-textMuted hover:text-textSecondary transition-colors"
+                className="p-1 rounded-control hover:bg-elevated text-textMuted hover:text-textSecondary transition-colors"
                 title={t('chat.groupSettings')}
               >
                 <Settings size={14} />
@@ -240,20 +241,20 @@ export default function ChatArea({ groupId, dmSessionId }: ChatAreaProps) {
 
       {/* 添加好友弹窗 */}
       {showAddFriend && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70" onClick={() => setShowAddFriend(false)}>
+        <Dialog onClose={() =>  setShowAddFriend(false)} className="flex items-center justify-center">
           <div
-            className="bg-elevated border border-border rounded-2xl p-6 w-full max-w-md mx-4 shadow-2xl shadow-black/30 pb-[var(--safe-bottom)] md:pb-6"
+            className="bg-elevated border border-border rounded-dialog p-6 w-full max-w-md mx-4 shadow-2xl shadow-black/30 pb-[var(--safe-bottom)] md:pb-6"
             onClick={(e) => e.stopPropagation()}
           >
             <div className="flex items-center justify-between mb-4">
               <h2 className="text-lg font-semibold text-textPrimary">{t('friends.add')}</h2>
-              <button onClick={() => setShowAddFriend(false)} className="p-1 hover:bg-canvas rounded-lg text-textMuted hover:text-textSecondary">
+              <button onClick={() => setShowAddFriend(false)} className="p-1 hover:bg-canvas rounded-control text-textMuted hover:text-textSecondary">
                 <X size={18} />
               </button>
             </div>
             <SearchOverlay />
           </div>
-        </div>
+        </Dialog>
       )}
 
       {profileGroup && (
@@ -395,9 +396,9 @@ function CreateGroupModal({
   }
 
   return (
-    <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-50" onClick={onClose}>
+    <Dialog onClose={onClose} className="flex items-center justify-center">
       <div
-        className="bg-elevated border border-border rounded-2xl p-6 w-full max-w-md mx-4 shadow-2xl shadow-black/30"
+        className="bg-elevated border border-border rounded-dialog p-6 w-full max-w-md mx-4 shadow-2xl shadow-black/30"
         onClick={(e) => e.stopPropagation()}
       >
         <h2 className="text-lg font-semibold mb-4 text-textPrimary">{t('chat.createNewGroup')}</h2>
@@ -408,7 +409,7 @@ function CreateGroupModal({
             value={name}
             onChange={(e) => setName(e.target.value)}
             onKeyDown={(e) => e.key === 'Enter' && handleCreate()}
-            className="w-full px-3.5 py-2.5 rounded-xl border border-border bg-canvas text-textPrimary placeholder:text-textMuted text-sm focus:outline-none focus:ring-2 focus:ring-primary-500/50"
+            className="w-full px-3.5 py-2.5 rounded-card border border-border bg-canvas text-textPrimary placeholder:text-textMuted text-sm focus:outline-none focus:ring-2 focus:ring-primary-500/50"
             placeholder={t('chat.groupNamePlaceholder')}
             autoFocus
           />
@@ -422,11 +423,11 @@ function CreateGroupModal({
           <input
             type="text" value={memberQuery}
             onChange={(e) => setMemberQuery(e.target.value)}
-            className="w-full px-3.5 py-2 rounded-xl border border-border bg-canvas text-textPrimary placeholder:text-textMuted text-sm focus:outline-none focus:ring-2 focus:ring-primary-500/50"
+            className="w-full px-3.5 py-2 rounded-card border border-border bg-canvas text-textPrimary placeholder:text-textMuted text-sm focus:outline-none focus:ring-2 focus:ring-primary-500/50"
             placeholder={t('chat.searchMembers')}
           />
           {memberResults.length > 0 && (
-            <div className="mt-1 border border-border rounded-xl bg-canvas max-h-40 overflow-y-auto">
+            <div className="mt-1 border border-border rounded-card bg-canvas max-h-40 overflow-y-auto">
               {memberResults.map(r => {
                 const key = `${r.type}:${r.id}`
                 const sel = selectedMembers.has(key)
@@ -437,7 +438,7 @@ function CreateGroupModal({
                       {sel && <Check size={10} className="text-white" />}
                     </span>
                     <span className="text-textPrimary truncate flex-1">{r.name}</span>
-                    <span className="text-[10px] text-textMuted shrink-0">{r.type === 'ai' ? 'AI' : t('chat.human')}</span>
+                    <span className="text-3xs text-textMuted shrink-0">{r.type === 'ai' ? 'AI' : t('chat.human')}</span>
                   </button>
                 )
               })}
@@ -450,7 +451,7 @@ function CreateGroupModal({
         {selectedMembers.size > 0 && (
           <div className="flex flex-wrap gap-1.5 mb-3">
             {Array.from(selectedMembers.entries()).map(([key, r]) => (
-              <span key={key} className="inline-flex items-center gap-1 px-2 py-1 bg-primary-500/10 border border-primary-500/20 rounded-lg text-xs text-textPrimary">
+              <span key={key} className="inline-flex items-center gap-1 px-2 py-1 bg-primary-500/10 border border-primary-500/20 rounded-control text-xs text-textPrimary">
                 {r.type === 'ai' ? <Bot size={10} className="text-mint-400" /> : <User size={10} className="text-primary-400" />}
                 {r.name}
                 <button onClick={() => removeMember(key)} className="ml-0.5 hover:text-rose-400 transition-colors"><X size={12} /></button>
@@ -463,20 +464,20 @@ function CreateGroupModal({
         <div className="flex gap-2 mt-4">
           <button
             onClick={onClose}
-            className="flex-1 py-2.5 text-sm border border-border rounded-xl hover:bg-elevated text-textSecondary transition-colors font-medium"
+            className="btn btn-md btn-outline flex-1"
           >
             {t('common.cancel')}
           </button>
           <button
             onClick={handleCreate}
             disabled={!canCreate}
-            className="flex-1 py-2.5 text-sm bg-primary-500 text-white rounded-xl hover:bg-primary-600 disabled:opacity-30 font-medium transition-all shadow-lg shadow-primary-500/20"
+            className="btn btn-md btn-primary flex-1"
           >
             {loading ? t('chat.creating') : t('chat.create')}
           </button>
         </div>
       </div>
-    </div>
+    </Dialog>
   )
 }
 
@@ -685,9 +686,9 @@ function InviteMemberModal({
   }
 
   return (
-    <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-[60]" onClick={onClose}>
+    <Dialog onClose={onClose} layer="toast" className="flex items-center justify-center">
       <div
-        className="bg-elevated border border-border rounded-2xl p-6 w-full max-w-md mx-4 shadow-2xl shadow-black/30 max-h-[80vh] flex flex-col"
+        className="bg-elevated border border-border rounded-dialog p-6 w-full max-w-md mx-4 shadow-2xl shadow-black/30 max-h-[80vh] flex flex-col"
         onClick={(e) => e.stopPropagation()}
       >
         <h2 className="text-lg font-semibold mb-1 text-textPrimary">{t('chat.inviteMembers')}</h2>
@@ -700,13 +701,13 @@ function InviteMemberModal({
             value={query}
             onChange={(e) => setQuery(e.target.value)}
             placeholder={t('chat.searchNamePlaceholder')}
-            className="w-full px-3 py-2 rounded-lg border border-border bg-canvas text-sm text-textPrimary placeholder:text-textMuted focus:outline-none focus:ring-2 focus:ring-primary-500/50"
+            className="w-full px-3 py-2 rounded-control border border-border bg-canvas text-sm text-textPrimary placeholder:text-textMuted focus:outline-none focus:ring-2 focus:ring-primary-500/50"
           />
         </div>
 
         {/* 搜索结果 */}
         <div
-          className="flex-1 overflow-y-auto border border-border rounded-xl divide-y divide-border/50 mb-4 max-h-64"
+          className="flex-1 overflow-y-auto border border-border rounded-card divide-y divide-border/50 mb-4 max-h-64"
           onScroll={(e) => {
             const el = e.currentTarget
             // 空输入（好友列表）滚到底 → 加载更多；搜索模式不加载
@@ -747,7 +748,7 @@ function InviteMemberModal({
             <div className="text-xs text-textMuted mb-1.5">{t('chat.selectedMembers').replace('{size}', String(selected.size))}</div>
             <div className="flex flex-wrap gap-1.5">
               {Array.from(selectedEntries.entries()).map(([key, r]) => (
-                <span key={key} className="inline-flex items-center gap-1 px-2 py-1 bg-primary-500/10 border border-primary-500/20 rounded-lg text-xs text-textPrimary">
+                <span key={key} className="inline-flex items-center gap-1 px-2 py-1 bg-primary-500/10 border border-primary-500/20 rounded-control text-xs text-textPrimary">
                   {r.type === 'ai' ? <Bot size={10} className="text-mint-400" /> : <User size={10} className="text-primary-400" />}
                   {r.name}
                   <button onClick={() => toggleMember(r)} className="ml-0.5 hover:text-rose-400 transition-colors" title="取消选择"><X size={12} /></button>
@@ -765,13 +766,13 @@ function InviteMemberModal({
             {t('chat.manualId')}
           </button>
         ) : (
-          <div className="space-y-2 mb-3 border border-dashed border-border rounded-xl p-3">
+          <div className="space-y-2 mb-3 border border-dashed border-border rounded-card p-3">
             <div className="flex gap-2">
               {(['ai', 'human'] as const).map((type) => (
                 <button
                   key={type}
                   onClick={() => setManualType(type)}
-                  className={`flex-1 py-1.5 text-xs rounded-lg border transition-colors ${
+                  className={`flex-1 py-1.5 text-xs rounded-control border transition-colors ${
                     manualType === type
                       ? 'bg-primary-500/15 border-primary-500/40 text-primary-600 dark:text-primary-300'
                       : 'border-border text-textSecondary hover:bg-elevated'
@@ -787,14 +788,14 @@ function InviteMemberModal({
                 value={manualId}
                 onChange={(e) => setManualId(e.target.value)}
                 onKeyDown={(e) => e.key === 'Enter' && handleManualInvite()}
-                className="flex-1 px-3 py-1.5 rounded-lg border border-border bg-canvas text-sm text-textPrimary placeholder:text-textMuted focus:outline-none focus:ring-2 focus:ring-primary-500/50"
+                className="flex-1 px-3 py-1.5 rounded-control border border-border bg-canvas text-sm text-textPrimary placeholder:text-textMuted focus:outline-none focus:ring-2 focus:ring-primary-500/50"
                 placeholder={t('chat.manualIdPlaceholder')}
                 min={1}
               />
               <button
                 onClick={handleManualInvite}
                 disabled={!manualId.trim() || loading}
-                className="px-3 py-1.5 text-xs bg-elevated text-textSecondary rounded-lg hover:bg-border disabled:opacity-30"
+                className="px-3 py-1.5 text-xs bg-elevated text-textSecondary rounded-control hover:bg-border disabled:opacity-30"
               >
                 {t('chat.invite')}
               </button>
@@ -806,7 +807,7 @@ function InviteMemberModal({
         )}
 
         {error && (
-          <div className="text-sm text-rose-400 bg-rose-500/10 border border-rose-500/30 rounded-lg px-3 py-2.5 mb-3 flex items-start gap-2 whitespace-pre-line">
+          <div className="text-sm text-rose-400 bg-rose-500/10 border border-rose-500/30 rounded-control px-3 py-2.5 mb-3 flex items-start gap-2 whitespace-pre-line">
             <AlertTriangle size={14} className="shrink-0 mt-0.5" />
             <span>{error}</span>
           </div>
@@ -818,19 +819,19 @@ function InviteMemberModal({
         <div className="flex gap-2">
           <button
             onClick={onClose}
-            className="flex-1 py-2.5 text-sm border border-border rounded-xl hover:bg-elevated text-textSecondary transition-colors font-medium"
+            className="btn btn-md btn-outline flex-1"
           >
             {t('common.cancel')}
           </button>
           <button
             onClick={handleInviteSelected}
             disabled={selected.size === 0 || loading}
-            className="flex-1 py-2.5 text-sm bg-primary-500 text-white rounded-xl hover:bg-primary-600 disabled:opacity-30 font-medium transition-all shadow-lg shadow-primary-500/20"
+            className="btn btn-md btn-primary flex-1"
           >
             {loading ? t('chat.inviting') : t('chat.inviteCount').replace('{count}', String(selected.size))}
           </button>
         </div>
       </div>
-    </div>
+    </Dialog>
   )
 }

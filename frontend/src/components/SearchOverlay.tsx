@@ -122,7 +122,7 @@ export default function SearchOverlay() {
   return (
     <div ref={containerRef} className="relative">
       {/* 搜索框 */}
-      <div className="flex items-center gap-2 px-3 py-2 bg-canvas border border-border rounded-xl">
+      <div className="flex items-center gap-2 px-3 py-2 bg-canvas border border-border rounded-card">
         <Search size={14} className="text-textMuted shrink-0" />
         <input
           ref={inputRef}
@@ -142,7 +142,7 @@ export default function SearchOverlay() {
 
       {/* 下拉结果 */}
       {showDropdown && (
-        <div className="absolute top-full left-0 right-0 mt-1 bg-elevated border border-border rounded-xl shadow-2xl shadow-black/30 z-50 max-h-80 overflow-y-auto">
+        <div className="absolute top-full left-0 right-0 mt-1 bg-elevated border border-border rounded-card shadow-2xl shadow-black/30 z-modal max-h-80 overflow-y-auto">
           {loading ? (
             <div className="p-3 text-sm text-textMuted text-center">{t('search.searching')}</div>
           ) : results.length === 0 ? (
@@ -203,7 +203,7 @@ export default function SearchOverlay() {
                   <button
                     onClick={() => handleSendDM(item)}
                     disabled={sendingDM === key}
-                    className="flex items-center gap-1 px-2 py-1 text-xs rounded-lg bg-primary-500/10 text-primary-400 hover:bg-primary-500/20 shrink-0 transition-colors disabled:opacity-50"
+                    className="flex items-center gap-1 px-2 py-1 text-xs rounded-control bg-primary-500/10 text-primary-400 hover:bg-primary-500/20 shrink-0 transition-colors disabled:opacity-50"
                   >
                     <MessageSquare size={12} />
                     {sendingDM === key ? '...' : t('search.sendDM')}
@@ -217,7 +217,7 @@ export default function SearchOverlay() {
                       onKeyDown={(e) => { if (e.key === 'Enter') handleAddFriend(item) }}
                       placeholder={t('profileCard.friendMessagePlaceholder')}
                       maxLength={200}
-                      className="w-24 md:w-32 px-2 py-1 rounded-lg border border-border bg-canvas text-xs text-textPrimary placeholder:text-textMuted focus:outline-none focus:ring-1 focus:ring-primary-500/50"
+                      className="w-24 md:w-32 px-2 py-1 rounded-control border border-border bg-canvas text-xs text-textPrimary placeholder:text-textMuted focus:outline-none focus:ring-1 focus:ring-primary-500/50"
                       autoFocus
                     />
                     <button
@@ -237,7 +237,7 @@ export default function SearchOverlay() {
                 ) : (
                   <button
                     onClick={() => openProfile(item)}
-                    className="flex items-center gap-1 px-2 py-1 text-xs rounded-lg bg-mint-400/10 text-mint-400 hover:bg-mint-400/20 shrink-0 transition-colors"
+                    className="flex items-center gap-1 px-2 py-1 text-xs rounded-control bg-mint-400/10 text-mint-400 hover:bg-mint-400/20 shrink-0 transition-colors"
                   >
                     <UserPlus size={12} />
                     {t('search.addFriend')}

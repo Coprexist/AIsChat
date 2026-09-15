@@ -6,7 +6,7 @@ import { useNavigate } from 'react-router-dom'
 import { ChevronRight, Store, Trash2, Plus, Eye } from 'lucide-react'
 import { api } from '../api/client'
 import BindGroupModal from '../components/world/BindGroupModal'
-import PageHeader from '../components/PageHeader'
+import { Button, PageShell } from '../components/ui'
 
 interface World {
   id: number
@@ -77,26 +77,26 @@ export default function WorldsPage() {
   if (loading) return <div className="flex items-center justify-center h-screen text-textMuted">加载中...</div>
 
   return (
-    <div className="h-full flex flex-col bg-canvas text-textPrimary">
-      <PageHeader title="群视界" subtitle="给群聊一个可编程的世界——游戏、聊天室、小说互动，什么都行">
-        <button
-          onClick={() => navigate('/market')}
-          className="px-3 py-1.5 bg-elevated hover:bg-border text-textSecondary rounded-lg text-xs inline-flex items-center gap-1.5 transition-colors"
-          title="世界商城：浏览 / 一键导入别人发布的世界"
-        >
-          <Store size={14} /> 商城
-        </button>
-        <button onClick={() => setShowCreate(!showCreate)} className="px-3 py-1.5 bg-primary-500 hover:bg-primary-600 text-white rounded-lg text-xs inline-flex items-center gap-1 transition-colors">
-          <Plus size={14} />创建世界
-        </button>
-      </PageHeader>
-
-      <div className="flex-1 overflow-y-auto">
-        <div className="max-w-3xl mx-auto p-4 sm:p-6">
+    <PageShell
+      title="群视界"
+      subtitle="给群聊一个可编程的世界——游戏、聊天室、小说互动，什么都行"
+      width="content"
+      contentClassName=""
+      actions={
+        <>
+          <Button size="sm" variant="secondary" icon={<Store size={14} />} title="世界商城：浏览 / 一键导入别人发布的世界" onClick={() => navigate('/market')}>
+            商城
+          </Button>
+          <Button size="sm" icon={<Plus size={14} />} onClick={() => setShowCreate(!showCreate)}>
+            创建世界
+          </Button>
+        </>
+      }
+    >
           {msg && <div className="text-sm text-accent-400 mb-4">{msg}</div>}
 
           {showCreate && (
-            <div className="bg-surface border border-border rounded-lg p-4 mb-6 space-y-3">
+            <div className="bg-surface border border-border rounded-control p-4 mb-6 space-y-3">
               <input
                 value={name}
                 onChange={(e) => setName(e.target.value)}
@@ -110,7 +110,7 @@ export default function WorldsPage() {
                 rows={2}
                 className="w-full bg-elevated text-textPrimary px-3 py-2 rounded text-sm outline-none resize-none border border-border focus:border-primary-500/50"
               />
-              <button onClick={create} className="px-4 py-2 bg-primary-500 hover:bg-primary-600 text-white rounded-lg text-sm transition-colors">创建并进入设计页</button>
+              <button onClick={create} className="btn btn-sm btn-primary">创建并进入设计页</button>
             </div>
           )}
 
@@ -123,16 +123,16 @@ export default function WorldsPage() {
 
           <div className="space-y-3">
             {worlds.map((w) => (
-              <div key={w.id} className="bg-surface border border-border rounded-lg p-4 flex flex-col sm:flex-row sm:items-center gap-3 sm:gap-4 hover:border-primary-500/40 transition-colors">
+              <div key={w.id} className="bg-surface border border-border rounded-control p-4 flex flex-col sm:flex-row sm:items-center gap-3 sm:gap-4 hover:border-primary-500/40 transition-colors">
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-2 flex-wrap">
                     <span className="font-medium text-textPrimary truncate">{w.name}</span>
-                    <span className={`text-[10px] px-2 py-0.5 rounded-full shrink-0 ${w.status === 'active' ? 'bg-mint-500/20 text-mint-400' : 'bg-elevated text-textMuted'}`}>
+                    <span className={`text-3xs px-2 py-0.5 rounded-full shrink-0 ${w.status === 'active' ? 'bg-mint-500/20 text-mint-400' : 'bg-elevated text-textMuted'}`}>
                       {w.status === 'active' ? '活跃' : '休眠'}
                     </span>
                   </div>
                   {w.description && <div className="text-xs text-textSecondary truncate mt-0.5">{w.description}</div>}
-                  <div className="text-[10px] text-textMuted mt-1 truncate">
+                  <div className="text-3xs text-textMuted mt-1 truncate">
                     入口: {w.bindings?.length ? w.bindings.map((b) => `${b.entity_type}#${b.entity_id}`).join(', ') : '未绑定'}
                   </div>
                 </div>
@@ -167,8 +167,6 @@ export default function WorldsPage() {
               </div>
             ))}
           </div>
-        </div>
-      </div>
 
       {/* 绑定群弹窗：选类型 → 勾选群批量绑定（BindGroupModal 自包含） */}
       {bindWorld && (
@@ -178,6 +176,7 @@ export default function WorldsPage() {
           onClose={() => setBindWorld(null)}
           onBound={() => { setBindWorld(null); load() }}
         />
-      )}    </div>
+      )}
+    </PageShell>
   )
 }

@@ -143,7 +143,7 @@ export default function UsageDashboardTab() {
               <button
                 key={d}
                 onClick={() => setDays(d)}
-                className={`px-4 py-2 rounded-xl text-xs font-medium transition-colors ${
+                className={`px-4 py-2 rounded-card text-xs font-medium transition-colors ${
                   days === d
                     ? 'bg-primary-500/15 text-primary-600 dark:text-primary-300 border border-primary-400/30'
                     : 'bg-surface border border-border text-textSecondary hover:bg-elevated'
@@ -163,10 +163,10 @@ export default function UsageDashboardTab() {
                 { label: t('admin.activeAgents'), value: global.unique_agents, icon: Activity },
                 { label: t('admin.activeUsers'), value: global.unique_users, icon: Users },
               ].map(item => (
-                <div key={item.label} className="bg-surface rounded-xl border border-border p-4 text-center">
+                <div key={item.label} className="bg-surface rounded-card border border-border p-4 text-center">
                   <item.icon size={16} className="text-primary-400 mx-auto mb-1" />
                   <div className="text-lg font-semibold text-textPrimary">{item.value}</div>
-                  <div className="text-[10px] text-textMuted">{item.label}</div>
+                  <div className="text-3xs text-textMuted">{item.label}</div>
                 </div>
               ))}
             </div>
@@ -174,7 +174,7 @@ export default function UsageDashboardTab() {
 
           {/* 全站每日图表 */}
           {dailyData.length > 0 && (
-            <div className="bg-surface rounded-2xl border border-border p-5">
+            <div className="bg-surface rounded-dialog border border-border p-5">
               <h3 className="text-sm font-semibold text-textPrimary mb-4">{t('admin.dailyTokenConsumption')}</h3>
               <div className="h-72">
                 <ResponsiveContainer width="100%" height="100%">
@@ -203,7 +203,7 @@ export default function UsageDashboardTab() {
           )}
 
           {/* 按用户明细 */}
-          <div className="bg-surface rounded-2xl border border-border overflow-hidden">
+          <div className="bg-surface rounded-dialog border border-border overflow-hidden">
             <div className="px-5 py-3 border-b border-border">
               <h3 className="text-sm font-semibold text-textPrimary">{t('admin.usageByUser')}</h3>
             </div>
@@ -249,7 +249,7 @@ export default function UsageDashboardTab() {
 
           {/* 选中 AI 的每日图表 */}
           {selectedAgentId && (
-            <div className="bg-surface rounded-2xl border border-border p-5">
+            <div className="bg-surface rounded-dialog border border-border p-5">
               <h3 className="text-sm font-semibold text-textPrimary mb-4">
                 {t('admin.aiDailyTokens').replace('{id}', String(selectedAgentId))}
               </h3>

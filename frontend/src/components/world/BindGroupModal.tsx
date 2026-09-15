@@ -7,6 +7,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import { X, Link2, Users, CheckSquare, Loader2, AlertCircle, Bot } from 'lucide-react'
 import { api } from '../../api/client'
+import { Dialog } from '../ui'
 
 interface GroupType {
   slug: string
@@ -143,21 +144,21 @@ export default function BindGroupModal({ worldId, initialTypeSlug, initialTab = 
   }
 
   return (
-    <div className="fixed inset-0 z-50 bg-black/60 flex items-center justify-center p-4" onClick={onClose}>
-      <div className="w-full max-w-md bg-surface border border-border rounded-2xl max-h-[85vh] flex flex-col shadow-xl" onClick={(e) => e.stopPropagation()}>
+    <Dialog onClose={onClose} className="flex items-center justify-center p-4">
+      <div className="w-full max-w-md bg-surface border border-border rounded-dialog max-h-[85vh] flex flex-col shadow-xl" onClick={(e) => e.stopPropagation()}>
         {/* 头部 */}
         <div className="flex items-center justify-between p-4 pb-2 shrink-0">
           <div className="flex items-center gap-2">
             <Link2 size={16} className="text-primary-400" />
             <span className="text-sm font-semibold text-textPrimary">绑定入口</span>
-            <span className="text-[10px] text-textMuted">选类型 → 勾选 → 批量绑定</span>
+            <span className="text-3xs text-textMuted">选类型 → 勾选 → 批量绑定</span>
           </div>
           {/* Tab：群聊 / AI */}
-          <div className="flex items-center gap-1 bg-elevated rounded-lg p-0.5 shrink-0">
-            <button onClick={() => { setTab('group'); setSelected(new Set()); setTypeSlug('') }} className={`inline-flex items-center gap-1 text-xs px-3 py-1 rounded-md ${tab === 'group' ? 'bg-primary-500/15 text-primary-400' : 'text-textSecondary'}`}>
+          <div className="flex items-center gap-1 bg-elevated rounded-control p-0.5 shrink-0">
+            <button onClick={() => { setTab('group'); setSelected(new Set()); setTypeSlug('') }} className={`inline-flex items-center gap-1 text-xs px-3 py-1 rounded-control ${tab === 'group' ? 'bg-primary-500/15 text-primary-400' : 'text-textSecondary'}`}>
               <Users size={12} /> 群聊
             </button>
-            <button onClick={() => { setTab('agent'); setSelected(new Set()); setTypeSlug('') }} className={`inline-flex items-center gap-1 text-xs px-3 py-1 rounded-md ${tab === 'agent' ? 'bg-primary-500/15 text-primary-400' : 'text-textSecondary'}`}>
+            <button onClick={() => { setTab('agent'); setSelected(new Set()); setTypeSlug('') }} className={`inline-flex items-center gap-1 text-xs px-3 py-1 rounded-control ${tab === 'agent' ? 'bg-primary-500/15 text-primary-400' : 'text-textSecondary'}`}>
               <Bot size={12} /> AI
             </button>
           </div>
@@ -167,20 +168,20 @@ export default function BindGroupModal({ worldId, initialTypeSlug, initialTab = 
         <div className="flex-1 overflow-y-auto px-4 py-3 space-y-3">
           {/* 1. 选类型 */}
           <div>
-            <div className="text-[10px] text-textSecondary uppercase tracking-wide font-medium mb-1.5 flex items-center gap-1"><Users size={11} className="text-primary-400" /> 1. 选择{tab === 'group' ? '群类型' : 'AI 类型'}</div>
+            <div className="text-3xs text-textSecondary uppercase tracking-wide font-medium mb-1.5 flex items-center gap-1"><Users size={11} className="text-primary-400" /> 1. 选择{tab === 'group' ? '群类型' : 'AI 类型'}</div>
             {types.length === 0 ? (
-              <div className="text-xs text-textMuted bg-elevated/40 rounded-xl p-3">{tab === 'group' ? '还没有群类型——先去「群类型与群助手」里创建（如 冒险团/商会/座谈会），才能给群分类。' : '还没有类型定义——群与 AI 共用同一套类型，先去「群类型与群助手」里创建。'}</div>
+              <div className="text-xs text-textMuted bg-elevated/40 rounded-card p-3">{tab === 'group' ? '还没有群类型——先去「群类型与群助手」里创建（如 冒险团/商会/座谈会），才能给群分类。' : '还没有类型定义——群与 AI 共用同一套类型，先去「群类型与群助手」里创建。'}</div>
             ) : (
               <div className="space-y-1.5">
                 {types.map((t) => (
                   <button
                     key={t.slug}
                     onClick={() => setTypeSlug(t.slug)}
-                    className={`w-full text-left px-3 py-2 rounded-xl border transition-colors ${typeSlug === t.slug ? 'border-primary-500/50 bg-primary-500/10' : 'border-border bg-elevated/40 hover:bg-elevated'}`}
+                    className={`w-full text-left px-3 py-2 rounded-card border transition-colors ${typeSlug === t.slug ? 'border-primary-500/50 bg-primary-500/10' : 'border-border bg-elevated/40 hover:bg-elevated'}`}
                   >
                     <div className="flex items-center justify-between">
                       <span className="text-sm text-textPrimary">{t.name}</span>
-                      <span className="text-[10px] text-textMuted">{t.bound_count ?? '?'}/{t.bind_limit === -1 ? '∞' : t.bind_limit} {tab === 'group' ? '群' : 'AI'}</span>
+                      <span className="text-3xs text-textMuted">{t.bound_count ?? '?'}/{t.bind_limit === -1 ? '∞' : t.bind_limit} {tab === 'group' ? '群' : 'AI'}</span>
                     </div>
                     {t.description && <div className="text-xs text-textSecondary line-clamp-1 mt-0.5">{t.description}</div>}
                   </button>
@@ -192,9 +193,9 @@ export default function BindGroupModal({ worldId, initialTypeSlug, initialTab = 
           {/* 2. 勾选群 */}
           {typeSlug && (
             <div>
-              <div className="text-[10px] text-textSecondary uppercase tracking-wide font-medium mb-1.5 flex items-center gap-1"><CheckSquare size={11} className="text-primary-400" /> 2. 勾选{tab === 'group' ? '群聊（仅显示你群主的群）' : 'AI（仅显示你创建的 AI）'}</div>
+              <div className="text-3xs text-textSecondary uppercase tracking-wide font-medium mb-1.5 flex items-center gap-1"><CheckSquare size={11} className="text-primary-400" /> 2. 勾选{tab === 'group' ? '群聊（仅显示你群主的群）' : 'AI（仅显示你创建的 AI）'}</div>
               {candidates.length === 0 ? (
-                <div className="text-xs text-textMuted bg-elevated/40 rounded-xl p-3">{tab === 'group' ? '你没有可绑定的群（需要是你创建的群）。' : '你没有可绑定的 AI（需要是你创建的 AI）。'}</div>
+                <div className="text-xs text-textMuted bg-elevated/40 rounded-card p-3">{tab === 'group' ? '你没有可绑定的群（需要是你创建的群）。' : '你没有可绑定的 AI（需要是你创建的 AI）。'}</div>
               ) : (
                 <div className="space-y-1">
                   {candidates.map((g: any) => {
@@ -205,7 +206,7 @@ export default function BindGroupModal({ worldId, initialTypeSlug, initialTab = 
                     return (
                       <label
                         key={g.id}
-                        className={`flex items-center gap-2 px-3 py-2 rounded-xl border cursor-pointer transition-colors ${isSelected ? 'border-primary-500/50 bg-primary-500/10' : isBound ? 'border-border bg-elevated/30 opacity-60' : 'border-border bg-elevated/40 hover:bg-elevated'}`}
+                        className={`flex items-center gap-2 px-3 py-2 rounded-card border cursor-pointer transition-colors ${isSelected ? 'border-primary-500/50 bg-primary-500/10' : isBound ? 'border-border bg-elevated/30 opacity-60' : 'border-border bg-elevated/40 hover:bg-elevated'}`}
                       >
                         <input
                           type="checkbox"
@@ -215,8 +216,8 @@ export default function BindGroupModal({ worldId, initialTypeSlug, initialTab = 
                           className="accent-primary-500 shrink-0"
                         />
                         <span className="truncate flex-1 text-sm text-textPrimary">{g.name}</span>
-                        <span className="shrink-0 text-[10px] text-textMuted">#{g.id}</span>
-                        {isBound && <span className="shrink-0 text-[10px] text-textMuted">已绑定</span>}
+                        <span className="shrink-0 text-3xs text-textMuted">#{g.id}</span>
+                        {isBound && <span className="shrink-0 text-3xs text-textMuted">已绑定</span>}
                       </label>
                     )
                   })}
@@ -229,18 +230,18 @@ export default function BindGroupModal({ worldId, initialTypeSlug, initialTab = 
 
         {/* 底部操作 */}
         <div className="p-4 pt-3 shrink-0 border-t border-border flex items-center gap-2">
-          <button onClick={onClose} className="px-4 py-2 text-sm text-textMuted hover:text-textPrimary transition-colors rounded-lg">取消</button>
+          <button onClick={onClose} className="px-4 py-2 text-sm text-textMuted hover:text-textPrimary transition-colors rounded-control">取消</button>
           <div className="flex-1" />
           <button
             onClick={doBind}
             disabled={!typeSlug || selected.size === 0 || binding}
-            className="inline-flex items-center gap-1.5 px-4 py-2 text-sm bg-primary-500 hover:bg-primary-600 text-white rounded-lg transition-colors disabled:opacity-40"
+            className="btn btn-sm btn-primary gap-1.5"
           >
             {binding ? <Loader2 size={14} className="animate-spin" /> : <Link2 size={14} />}
             绑定 {selected.size > 0 ? `${selected.size} 个${tab === 'group' ? '群' : 'AI'}` : ''}
           </button>
         </div>
       </div>
-    </div>
+    </Dialog>
   )
 }

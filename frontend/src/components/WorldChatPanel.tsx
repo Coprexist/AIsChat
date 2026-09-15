@@ -37,7 +37,7 @@ function ToolBubble({ name, label, detail, error, icon, running }: {
   const expandable = !!body
   return (
     <div
-      className={`world-msg max-w-[90%] mx-auto text-[11px] rounded-lg overflow-hidden border ${
+      className={`world-msg max-w-[90%] mx-auto text-2xs rounded-control overflow-hidden border ${
         state === 'error' ? 'bg-rose-500/10 border-rose-500/25' :
         state === 'running' ? 'bg-mint-400/5 border-mint-400/20' :
         'bg-mint-400/10 border-mint-400/20'
@@ -93,15 +93,15 @@ function ModeSwitch({ mode, busy, onChange }: { mode: string; busy: boolean; onC
   return (
     <div className="flex items-center gap-2 px-3 py-1.5 border-t border-border bg-surface/60">
       <ShieldAlert size={11} className="shrink-0 text-textMuted" />
-      <span className="shrink-0 text-[10px] text-textMuted">{t('tool:world.mode.label')}</span>
-      <div className="flex-1 min-w-0 flex items-center gap-0.5 p-0.5 rounded-lg bg-elevated border border-border">
+      <span className="shrink-0 text-3xs text-textMuted">{t('tool:world.mode.label')}</span>
+      <div className="flex-1 min-w-0 flex items-center gap-0.5 p-0.5 rounded-control bg-elevated border border-border">
         {MODE_ITEMS.map((m) => (
           <button
             key={m.key}
             onClick={() => { if (m.key !== mode && !busy) onChange(m.key) }}
             disabled={busy}
             title={t(m.hintKey)}
-            className={`flex-1 min-w-0 px-1.5 py-[3px] text-[11px] rounded-md transition-colors truncate disabled:opacity-60 ${
+            className={`flex-1 min-w-0 px-1.5 py-[3px] text-2xs rounded-control transition-colors truncate disabled:opacity-60 ${
               m.key === mode ? `font-semibold shadow-sm ${m.active}` : 'text-textMuted hover:text-textPrimary'
             }`}
           >{t(m.labelKey)}</button>
@@ -118,23 +118,23 @@ function ApprovalDialog({ approval, onDecide }: { approval: Approval; onDecide: 
   const kindKey = `tool:world.kind.${approval.kind}`
   const localized = t(kindKey)
   return (
-    <div className="world-msg fixed inset-0 z-50 bg-black/60 flex items-center justify-center p-4">
-      <div className="w-full max-w-md bg-surface border border-border rounded-2xl shadow-xl overflow-hidden">
+    <div className="world-msg fixed inset-0 z-modal bg-black/60 flex items-center justify-center p-4">
+      <div className="w-full max-w-md bg-surface border border-border rounded-dialog shadow-xl overflow-hidden">
         <div className="flex items-center gap-2 px-4 py-2.5 border-b border-border">
           <ShieldAlert size={14} className="text-amber-400" />
           <span className="text-sm font-medium">{t('tool:world.approval.title')}</span>
-          <span className="text-[10px] px-1.5 py-0.5 rounded bg-elevated text-textMuted">
+          <span className="text-3xs px-1.5 py-0.5 rounded bg-elevated text-textMuted">
             {localized && localized !== kindKey ? localized : approval.kind}
           </span>
         </div>
         <div className="px-4 py-3 max-h-[50vh] overflow-y-auto">
           <div className="text-sm font-medium mb-1">{approval.title}</div>
           {approval.detail && (
-            <pre className="text-[11px] whitespace-pre-wrap break-all bg-elevated rounded-lg p-2 text-textSecondary">{approval.detail}</pre>
+            <pre className="text-2xs whitespace-pre-wrap break-all bg-elevated rounded-control p-2 text-textSecondary">{approval.detail}</pre>
           )}
         </div>
         <div className="flex items-center gap-2 px-4 py-3 border-t border-border">
-          <span className="flex-1 text-[10px] text-textMuted">{t('tool:world.approval.waiting')}</span>
+          <span className="flex-1 text-3xs text-textMuted">{t('tool:world.approval.waiting')}</span>
           <button
             onClick={() => onDecide(false)}
             className="px-3 py-1.5 text-xs rounded border border-border text-textSecondary hover:text-rose-400 hover:border-rose-500/40 transition-colors"
@@ -174,7 +174,7 @@ function ReasoningBubble({ text, running }: { text: string; running?: boolean })
 
   return (
     <div
-      className={`world-msg max-w-[90%] mx-auto select-none text-[11px] rounded-lg overflow-hidden border ${
+      className={`world-msg max-w-[90%] mx-auto select-none text-2xs rounded-control overflow-hidden border ${
         expanded
           ? 'bg-elevated/60 border-border/60'
           : 'bg-elevated/40 border-border/40 cursor-pointer hover:bg-elevated/70 transition-colors'
@@ -183,7 +183,7 @@ function ReasoningBubble({ text, running }: { text: string; running?: boolean })
     >
       <div className="flex items-center gap-1.5 px-2 py-1">
         <Brain size={12} className="shrink-0 text-textMuted" />
-        <span className="shrink-0 text-[10px] text-textMuted font-medium">{t('tool:world.reasoning') || '思考'}</span>
+        <span className="shrink-0 text-3xs text-textMuted font-medium">{t('tool:world.reasoning') || '思考'}</span>
         <span className="shrink-0 w-px h-2.5 bg-border/60 mx-0.5" aria-hidden />
         <span
           ref={summaryRef}
@@ -421,11 +421,11 @@ const WorldChatPanel = memo(forwardRef<WorldChatHandle, WorldChatPanelProps>(({ 
       // group：让下方操作条（复制/重新生成）在悬停整条消息时显形。
       // ⚠️ 必须用**匿名** group——子元素里的 group/details 是命名组，只响应 group-hover/details:
       <div key={m.id} className="space-y-2 group">
-        <div className={`world-msg text-sm max-w-[90%] p-2 rounded-lg ${m.error ? 'bg-rose-500/10 border border-rose-500/30 text-rose-400' : m.role === 'user' ? 'bg-primary-500/20 ml-auto' : 'bg-elevated/80'}`}>
-          <div className="text-[10px] text-textMuted mb-0.5">{m.error ? '错误' : m.role === 'user' ? (m.pending ? '我（排队中，发送后生效）' : '我') : (prevIsReasoning ? '' : (creatorName || '世界 AI'))}</div>
+        <div className={`world-msg text-sm max-w-[90%] p-2 rounded-control ${m.error ? 'bg-rose-500/10 border border-rose-500/30 text-rose-400' : m.role === 'user' ? 'bg-primary-500/20 ml-auto' : 'bg-elevated/80'}`}>
+          <div className="text-3xs text-textMuted mb-0.5">{m.error ? '错误' : m.role === 'user' ? (m.pending ? '我（排队中，发送后生效）' : '我') : (prevIsReasoning ? '' : (creatorName || '世界 AI'))}</div>
           {!m.error && (m.role === 'ai' || m.role === 'note') && !!m.reasoning && (
             <details className="group/details mb-1.5">
-              <summary className="flex items-center gap-1 text-[10px] text-textMuted cursor-pointer select-none hover:text-textSecondary list-none [&::-webkit-details-marker]:hidden">
+              <summary className="flex items-center gap-1 text-3xs text-textMuted cursor-pointer select-none hover:text-textSecondary list-none [&::-webkit-details-marker]:hidden">
                 <ChevronRight size={11} className="transition-transform group-open/details:rotate-90" />
                 <Brain size={11} className="text-textMuted" />
                 思考过程
@@ -442,7 +442,7 @@ const WorldChatPanel = memo(forwardRef<WorldChatHandle, WorldChatPanelProps>(({ 
                     <img src={url} alt={att.name} className="max-h-40 max-w-full rounded border border-border/60" />
                   </a>
                 ) : (
-                  <span key={ai} className="text-[10px] text-textMuted">{att.name}</span>
+                  <span key={ai} className="text-3xs text-textMuted">{att.name}</span>
                 )
               })}
             </div>
@@ -484,8 +484,8 @@ const WorldChatPanel = memo(forwardRef<WorldChatHandle, WorldChatPanelProps>(({ 
         {/* 中断 → "你可以：继续" */}
         {isLastAi && isInterrupted && !chat.chatSending && !chat.chatProcessing && (
           <div className="space-y-1.5 pl-1 w-full max-w-[420px]">
-            <div className="text-[10px] text-textMuted">你可以：</div>
-            <div className="flex items-stretch rounded-lg bg-elevated border border-border overflow-hidden w-full">
+            <div className="text-3xs text-textMuted">你可以：</div>
+            <div className="flex items-stretch rounded-control bg-elevated border border-border overflow-hidden w-full">
               <button
                 onClick={() => handleSubmit('继续')}
                 className="flex-1 min-w-0 px-2.5 py-1.5 text-left text-xs text-textSecondary hover:bg-primary-500/20 hover:text-primary-500 dark:hover:text-primary-300 transition-colors truncate"
@@ -504,9 +504,9 @@ const WorldChatPanel = memo(forwardRef<WorldChatHandle, WorldChatPanelProps>(({ 
         {/* 建议列表 */}
         {(isLastAi || chat.chatMsgs.length === 0) && !isInterrupted && chat.suggestions.length > 0 && !chat.chatSending && !chat.chatProcessing && (
           <div className="space-y-1.5 pl-1 w-full max-w-[420px]">
-            <div className="text-[10px] text-textMuted">你可以：</div>
+            <div className="text-3xs text-textMuted">你可以：</div>
             {chat.suggestions.map((q, i) => (
-              <div key={i} className="flex items-stretch rounded-lg bg-elevated border border-border overflow-hidden w-full">
+              <div key={i} className="flex items-stretch rounded-control bg-elevated border border-border overflow-hidden w-full">
                 <button
                   onClick={() => handleSubmit(q)}
                   className="flex-1 min-w-0 px-2.5 py-1.5 text-left text-xs text-textSecondary hover:bg-primary-500/20 hover:text-primary-500 dark:hover:text-primary-300 transition-colors truncate"
@@ -539,7 +539,7 @@ const WorldChatPanel = memo(forwardRef<WorldChatHandle, WorldChatPanelProps>(({ 
       {chat.suggestions.length > 0 && !chat.chatSending && !chat.chatProcessing && (
         <div className="flex flex-col items-center gap-1.5 w-full max-w-[420px]">
           {chat.suggestions.map((q, i) => (
-            <div key={i} className="flex items-stretch rounded-lg bg-elevated border border-border overflow-hidden w-full">
+            <div key={i} className="flex items-stretch rounded-control bg-elevated border border-border overflow-hidden w-full">
               <button
                 onClick={() => handleSubmit(q)}
                 className="flex-1 min-w-0 px-2.5 py-1.5 text-left text-xs text-textSecondary hover:bg-primary-500/20 hover:text-primary-500 dark:hover:text-primary-300 transition-colors truncate"
@@ -566,7 +566,7 @@ const WorldChatPanel = memo(forwardRef<WorldChatHandle, WorldChatPanelProps>(({ 
 
   // ── 命令下拉菜单 ──
   const renderCmdMenu = () => (
-    <div className="absolute bottom-full left-3 mb-1 w-64 max-h-40 overflow-y-auto rounded-xl bg-elevated border border-border shadow-xl z-50">
+    <div className="absolute bottom-full left-3 mb-1 w-64 max-h-40 overflow-y-auto rounded-card bg-elevated border border-border shadow-xl z-modal">
       {localCmdFiltered.map((c, i) => (
         <button
           key={c.cmd}
@@ -574,7 +574,7 @@ const WorldChatPanel = memo(forwardRef<WorldChatHandle, WorldChatPanelProps>(({ 
           onMouseDown={(e) => { e.preventDefault(); handleCmdSelect(c.cmd) }}
         >
           <span className="font-mono text-xs">{c.cmd}</span>
-          <span className="block text-[10px] text-textMuted">{c.desc}</span>
+          <span className="block text-3xs text-textMuted">{c.desc}</span>
         </button>
       ))}
     </div>
@@ -587,13 +587,13 @@ const WorldChatPanel = memo(forwardRef<WorldChatHandle, WorldChatPanelProps>(({ 
       <div className="flex-1 min-h-0 relative" {...attachments.zoneProps('list')}>
         <DropMask {...attachments.dropState('list')} label="拖动到此处上传图片" />
         <div ref={chat.chatListRef} className="absolute inset-0 overflow-y-auto p-3 space-y-2">
-          {chat.chatLoadingOlder && <div className="text-[10px] text-textMuted text-center py-1">加载更早消息…</div>}
+          {chat.chatLoadingOlder && <div className="text-3xs text-textMuted text-center py-1">加载更早消息…</div>}
           {chat.chatMsgs.length === 0 ? renderEmptySuggestions() : chat.chatMsgs.map((m, i) => renderMessage(m, i))}
 
           {/* 回到底部 / 新消息按钮：不在底部（或未读>0，或列表不可滚动时给入口）才显示；可滚动且在底部隐藏
               sticky 固定在聊天列表视口右下角（输入区正上方）：列表滚动时不动，不随消息内容滚 */}
           {(!chat.isAtBottom || !chat.chatCanScroll || chat.unreadCount > 0) && (
-            <div className="sticky bottom-3 flex justify-end pointer-events-none z-40">
+            <div className="sticky bottom-3 flex justify-end pointer-events-none z-drawer">
               <button
                 onClick={() => chat.scrollToBottom(true)}
                 className={`pointer-events-auto flex items-center justify-center gap-1 px-3 h-8 rounded-full shadow-lg transition-all ${
@@ -621,7 +621,7 @@ const WorldChatPanel = memo(forwardRef<WorldChatHandle, WorldChatPanelProps>(({ 
       <ModeSwitch mode={mode} busy={modeBusy} onChange={switchMode} />
 
       {/* 会话工具条：当前会话 + 收藏 + 新对话 + 会话列表（/new 后对话保存可切回） */}
-      <div className="flex items-center gap-1.5 px-3 py-1.5 border-t border-border bg-surface/60 text-[10px] text-textMuted relative" {...attachments.zoneProps('toolbar')}>
+      <div className="flex items-center gap-1.5 px-3 py-1.5 border-t border-border bg-surface/60 text-3xs text-textMuted relative" {...attachments.zoneProps('toolbar')}>
         {/* 这条只有 20 来像素高，不放文字——蒙版加深就够，但必须接住拖放（否则浏览器会直接打开图片） */}
         <DropMask {...attachments.dropState('toolbar')} />
         <span
@@ -646,15 +646,15 @@ const WorldChatPanel = memo(forwardRef<WorldChatHandle, WorldChatPanelProps>(({ 
           className="shrink-0 inline-flex items-center gap-1 px-1.5 py-0.5 rounded hover:bg-elevated hover:text-textSecondary transition-colors"
         ><ChevronDown size={11} /> 会话列表（{chat.sessionList.length}）</button>
         {sessionOpen && chat.sessionList.length > 0 && (
-          <div className="absolute bottom-full right-3 mb-1 w-72 max-h-56 overflow-y-auto rounded-xl bg-elevated border border-border shadow-xl z-50">
-            <div className="px-3 py-1.5 text-[10px] text-textMuted border-b border-border truncate" title="按最近聊天排序；带 📌 的已收藏，不会被自动清理">
+          <div className="absolute bottom-full right-3 mb-1 w-72 max-h-56 overflow-y-auto rounded-card bg-elevated border border-border shadow-xl z-modal">
+            <div className="px-3 py-1.5 text-3xs text-textMuted border-b border-border truncate" title="按最近聊天排序；带 📌 的已收藏，不会被自动清理">
               会话列表 · 按最近聊天排序 <Pin size={9} className="inline text-accent-400 fill-current" /> 收藏不清理
             </div>
             {chat.sessionList.map((s) => (
               <button
                 key={s.id}
                 onClick={async () => { if (await chat.switchSession(s.id)) setSessionOpen(false) }}
-                className={`w-full flex items-center gap-1.5 px-3 py-1.5 text-[11px] text-left border-b border-border/40 last:border-b-0 transition-colors ${s.id === chat.currentSession ? 'bg-primary-500/15 text-primary-300' : 'hover:bg-surface text-textSecondary'}`}
+                className={`w-full flex items-center gap-1.5 px-3 py-1.5 text-2xs text-left border-b border-border/40 last:border-b-0 transition-colors ${s.id === chat.currentSession ? 'bg-primary-500/15 text-primary-300' : 'hover:bg-surface text-textSecondary'}`}
               >
                 <span
                   className={`truncate min-w-0 flex-1 ${s.title ? '' : 'font-mono'}`}
@@ -662,7 +662,7 @@ const WorldChatPanel = memo(forwardRef<WorldChatHandle, WorldChatPanelProps>(({ 
 ${s.id}` : s.id}
                 >{s.title || (s.id === 'default' ? '默认会话' : s.id)}</span>
                 {s.last_active_at && (
-                  <span className="shrink-0 text-[10px] text-textMuted">{formatRelativeTime(s.last_active_at, lang)}</span>
+                  <span className="shrink-0 text-3xs text-textMuted">{formatRelativeTime(s.last_active_at, lang)}</span>
                 )}
                 {/* 当前会话靠整行高亮标识，不再写"当前"两个字（用户 2026-09-15 反馈） */}
                 {s.pinned && <Pin size={10} className="shrink-0 text-accent-400 fill-current" />}
@@ -677,17 +677,17 @@ ${s.id}` : s.id}
         <DropMask {...attachments.dropState('input')} label="拖动到此处上传图片" />
         {/* 排队消息（AI 处理中，输入框上方弹窗展示） */}
         {chat.pendingItems.length > 0 && (
-          <div className="absolute bottom-full left-3 right-3 mb-1 max-h-32 overflow-y-auto rounded-xl bg-elevated border border-border shadow-xl z-50">
-            <div className="px-3 py-1.5 text-[10px] text-textMuted border-b border-border">
+          <div className="absolute bottom-full left-3 right-3 mb-1 max-h-32 overflow-y-auto rounded-card bg-elevated border border-border shadow-xl z-modal">
+            <div className="px-3 py-1.5 text-3xs text-textMuted border-b border-border">
               AI 处理中，以下 {chat.pendingItems.length} 条排队（普通消息将插入下一轮 AI 思考，命令等本轮结束执行）
             </div>
             {chat.pendingItems.map((it, i) => (
               <div key={i} className="flex items-center gap-2 px-3 py-1.5 text-xs border-b border-border/40 last:border-b-0">
                 <span className={`truncate flex-1 ${it.kind === 'cmd' ? 'font-mono text-primary-400' : 'text-textPrimary'}`}>
                   {it.text || (it.attachments?.length ? '（图片）' : '')}
-                  {!!it.attachments?.length && <span className="ml-1 text-[10px] text-textMuted">+{it.attachments.length}图</span>}
+                  {!!it.attachments?.length && <span className="ml-1 text-3xs text-textMuted">+{it.attachments.length}图</span>}
                 </span>
-                <span className="shrink-0 text-[10px] text-textMuted">{it.kind === 'cmd' ? '命令' : '消息'}</span>
+                <span className="shrink-0 text-3xs text-textMuted">{it.kind === 'cmd' ? '命令' : '消息'}</span>
                 <button
                   onClick={() => chat.setPendingItems((items) => items.filter((_, j) => j !== i))}
                   className="shrink-0 text-textMuted hover:text-rose-400 transition-colors"
@@ -745,11 +745,11 @@ ${s.id}` : s.id}
           </button>
         </div>
         {chat.chatProcessing && (
-          <div className="text-[10px] text-textMuted mt-2 text-center">
+          <div className="text-3xs text-textMuted mt-2 text-center">
             上一轮还在执行（刷新不影响），完成后自动显示
           </div>
         )}
-        <div className="text-[10px] text-textMuted mt-2 text-center">
+        <div className="text-3xs text-textMuted mt-2 text-center">
           世界级会话（非 DM）：账单走世界主人，让它改界面、加功能
         </div>
       </div>

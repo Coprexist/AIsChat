@@ -180,7 +180,7 @@ export default function ProviderPresetSelector() {
   }
 
   return (
-    <section className="bg-surface border border-border rounded-xl p-5 space-y-4">
+    <section className="bg-surface border border-border rounded-card p-5 space-y-4">
       <h3 className="text-sm font-semibold text-textPrimary flex items-center gap-2">
         <Server size={16} className="text-accent-400" />
         {t('admin.llmProvider') || 'LLM 厂商预设'}
@@ -192,7 +192,7 @@ export default function ProviderPresetSelector() {
           {providers.map((p, idx) => {
             const isOpen = expanded === p.name
             return (
-              <div key={p.name} className={`border rounded-lg p-3 ${p.is_default ? 'border-primary-500/40 bg-primary-500/5' : 'border-border bg-canvas'}`}>
+              <div key={p.name} className={`border rounded-control p-3 ${p.is_default ? 'border-primary-500/40 bg-primary-500/5' : 'border-border bg-canvas'}`}>
                 <div className="flex items-center justify-between">
                   <button
                     onClick={() => isOpen ? setExpanded(null) : startEdit(p, idx)}
@@ -202,12 +202,12 @@ export default function ProviderPresetSelector() {
                     {p.name}
                     <span className="text-xs text-textMuted">({p.provider})</span>
                     {p.thinking_supported && (
-                      <span className="text-primary-400 bg-primary-500/10 px-1.5 py-0.5 rounded-full text-xs">🧠</span>
+                      <span className="chip chip-primary shrink-0">🧠</span>
                     )}
                   </button>
                   <div className="flex items-center gap-2">
                     {p.is_default && (
-                      <span className="text-xs text-accent-400 bg-accent-500/10 px-2 py-0.5 rounded-full">
+                      <span className="chip chip-accent shrink-0">
                         {t('admin.defaultProvider') || '默认'}
                       </span>
                     )}
@@ -257,7 +257,7 @@ export default function ProviderPresetSelector() {
 
       {/* 添加新供应商 */}
       {adding ? (
-        <div className="border border-primary-500/40 rounded-lg p-4 bg-primary-500/5 space-y-3">
+        <div className="border border-primary-500/40 rounded-control p-4 bg-primary-500/5 space-y-3">
           <div className="flex items-center justify-between">
             <h4 className="text-sm font-medium text-textPrimary">
               {t('admin.addProvider') || '添加供应商'}
@@ -277,7 +277,7 @@ export default function ProviderPresetSelector() {
                 key={p.key}
                 disabled={newPreset === p.key}
                 onClick={() => startAdd(p.key)}
-                className={`px-3 py-1.5 text-xs rounded-lg font-medium transition-colors border ${
+                className={`px-3 py-1.5 text-xs rounded-control font-medium transition-colors border ${
                   newPreset === p.key
                     ? 'bg-primary-500/15 border-primary-500/40 text-primary-500'
                     : 'bg-canvas border-border text-textSecondary hover:text-textPrimary hover:border-primary-500/30'
@@ -289,7 +289,7 @@ export default function ProviderPresetSelector() {
             <button
               disabled={newPreset === 'manual'}
               onClick={() => startAdd('manual')}
-              className={`px-3 py-1.5 text-xs rounded-lg font-medium transition-colors border ${
+              className={`px-3 py-1.5 text-xs rounded-control font-medium transition-colors border ${
                 newPreset === 'manual'
                   ? 'bg-accent-500/15 border-accent-500/40 text-accent-500'
                   : 'bg-canvas border-border text-textMuted hover:text-textSecondary'
@@ -322,7 +322,7 @@ export default function ProviderPresetSelector() {
       ) : (
         <button
           onClick={() => setAdding(true)}
-          className="flex items-center gap-1.5 px-3 py-1.5 text-xs rounded-lg border border-dashed border-border text-textMuted hover:text-primary-500 hover:border-primary-500/40 transition-colors"
+          className="flex items-center gap-1.5 px-3 py-1.5 text-xs rounded-control border border-dashed border-border text-textMuted hover:text-primary-500 hover:border-primary-500/40 transition-colors"
         >
           <Plus size={14} />
           {t('admin.addProvider') || '添加供应商'}
@@ -396,7 +396,7 @@ function ProviderEditForm({
           <input
             type="text" value={editName}
             onChange={e => setEditName(e.target.value)}
-            className="w-full px-3 py-2 rounded-lg border border-border bg-canvas text-textPrimary text-xs focus:outline-none focus:ring-2 focus:ring-primary-500/60"
+            className="w-full px-3 py-2 rounded-control border border-border bg-canvas text-textPrimary text-xs focus:outline-none focus:ring-2 focus:ring-primary-500/60"
             placeholder="deepseek-主号"
           />
         </div>
@@ -407,7 +407,7 @@ function ProviderEditForm({
           <input
             type="text" value={editBaseUrl}
             onChange={e => setEditBaseUrl(e.target.value)}
-            className="w-full px-3 py-2 rounded-lg border border-border bg-canvas text-textPrimary text-xs font-mono focus:outline-none focus:ring-2 focus:ring-primary-500/60"
+            className="w-full px-3 py-2 rounded-control border border-border bg-canvas text-textPrimary text-xs font-mono focus:outline-none focus:ring-2 focus:ring-primary-500/60"
           />
         </div>
         <div>
@@ -415,7 +415,7 @@ function ProviderEditForm({
           <input
             type="text" value={editChat}
             onChange={e => setEditChat(e.target.value)}
-            className="w-full px-3 py-2 rounded-lg border border-border bg-canvas text-textPrimary text-xs focus:outline-none focus:ring-2 focus:ring-primary-500/60"
+            className="w-full px-3 py-2 rounded-control border border-border bg-canvas text-textPrimary text-xs focus:outline-none focus:ring-2 focus:ring-primary-500/60"
           />
         </div>
         <div>
@@ -423,7 +423,7 @@ function ProviderEditForm({
           <input
             type="text" value={editWork}
             onChange={e => setEditWork(e.target.value)}
-            className="w-full px-3 py-2 rounded-lg border border-border bg-canvas text-textPrimary text-xs focus:outline-none focus:ring-2 focus:ring-primary-500/60"
+            className="w-full px-3 py-2 rounded-control border border-border bg-canvas text-textPrimary text-xs focus:outline-none focus:ring-2 focus:ring-primary-500/60"
           />
         </div>
         <div>
@@ -431,7 +431,7 @@ function ProviderEditForm({
           <input
             type="text" value={editEmbed}
             onChange={e => setEditEmbed(e.target.value)}
-            className="w-full px-3 py-2 rounded-lg border border-border bg-canvas text-textPrimary text-xs focus:outline-none focus:ring-2 focus:ring-primary-500/60"
+            className="w-full px-3 py-2 rounded-control border border-border bg-canvas text-textPrimary text-xs focus:outline-none focus:ring-2 focus:ring-primary-500/60"
           />
         </div>
       </div>
@@ -443,7 +443,7 @@ function ProviderEditForm({
             <input
               type="text" value={editGlobalChatModel}
               onChange={e => setEditGlobalChatModel(e.target.value)}
-              className="w-full px-3 py-2 rounded-lg border border-border bg-canvas text-textPrimary text-xs focus:outline-none focus:ring-2 focus:ring-primary-500/60"
+              className="w-full px-3 py-2 rounded-control border border-border bg-canvas text-textPrimary text-xs focus:outline-none focus:ring-2 focus:ring-primary-500/60"
               placeholder="例如：glm-5.2"
             />
           </div>
@@ -452,7 +452,7 @@ function ProviderEditForm({
             <input
               type="text" value={editGlobalWorkModel}
               onChange={e => setEditGlobalWorkModel(e.target.value)}
-              className="w-full px-3 py-2 rounded-lg border border-border bg-canvas text-textPrimary text-xs focus:outline-none focus:ring-2 focus:ring-primary-500/60"
+              className="w-full px-3 py-2 rounded-control border border-border bg-canvas text-textPrimary text-xs focus:outline-none focus:ring-2 focus:ring-primary-500/60"
               placeholder="例如：glm-4.7-flash"
             />
           </div>
@@ -484,13 +484,13 @@ function ProviderEditForm({
               type="text" value={fetchKey}
               onChange={e => setFetchKey(e.target.value)}
               placeholder={t('admin.fetchModelsHint') || 'API Key（仅用于获取，不会保存）'}
-              className="w-56 px-2 py-1 rounded-lg border border-border bg-canvas text-textPrimary text-[11px] font-mono focus:outline-none focus:ring-2 focus:ring-primary-500/60"
+              className="w-56 px-2 py-1 rounded-control border border-border bg-canvas text-textPrimary text-2xs font-mono focus:outline-none focus:ring-2 focus:ring-primary-500/60"
             />
             <button
               onClick={handleFetchModels}
               disabled={fetching || !editBaseUrl.trim()}
               title={!editBaseUrl.trim() ? '请先填 API Base URL' : undefined}
-              className="inline-flex items-center gap-1 px-2.5 py-1 text-xs rounded-lg border border-border bg-canvas text-textSecondary hover:text-primary-500 hover:border-primary-500/40 disabled:opacity-40 disabled:hover:text-textSecondary transition-colors shrink-0"
+              className="btn btn-xs btn-outline gap-1 bg-canvas hover:text-primary-500 hover:border-primary-500/40 disabled:hover:text-textSecondary shrink-0"
             >
               {fetching ? <Loader2 size={12} className="animate-spin" /> : <Download size={12} />}
               {t('admin.fetchModels') || '获取模型'}
@@ -501,17 +501,17 @@ function ProviderEditForm({
           rows={3}
           value={editModels}
           onChange={e => setEditModels(e.target.value)}
-          className="w-full px-3 py-2 rounded-lg border border-border bg-canvas text-textPrimary text-xs font-mono focus:outline-none focus:ring-2 focus:ring-primary-500/60 resize-y"
+          className="w-full px-3 py-2 rounded-control border border-border bg-canvas text-textPrimary text-xs font-mono focus:outline-none focus:ring-2 focus:ring-primary-500/60 resize-y"
         />
         {fetchMsg && (
-          <p className={'text-[11px] mt-1 break-all ' + (fetchMsg.ok ? 'text-mint-400' : 'text-rose-400')}>{fetchMsg.text}</p>
+          <p className={'text-2xs mt-1 break-all ' + (fetchMsg.ok ? 'text-mint-400' : 'text-rose-400')}>{fetchMsg.text}</p>
         )}
       </div>
       <div className="flex items-center gap-3">
         <button
           onClick={onSave}
           disabled={saving || !editName.trim()}
-          className="px-4 py-2 text-sm rounded-lg bg-primary-500 hover:bg-primary-600 disabled:opacity-30 text-white font-medium transition-colors flex items-center gap-1.5"
+          className="btn btn-sm btn-primary gap-1.5"
         >
           {saving ? <Loader2 size={14} className="animate-spin" /> : <Check size={14} />}
           {saving ? t('common.saving') : t('common.save')}

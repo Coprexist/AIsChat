@@ -3,7 +3,7 @@ import { Link, useNavigate } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
 import { useT, useLang } from '../i18n/I18nContext'
 import { api } from '../api/client'
-import PageHeader from '../components/PageHeader'
+import { Dialog, PageShell } from '../components/ui'
 import ExternalLinkSafe from '../components/ExternalLinkSafe'
 import { AI_TYPE_LABEL } from '../constants'
 import { fmtTokenNum } from '../utils/format'
@@ -43,10 +43,10 @@ function StatCard({ icon, value, label, onClick, bg }: {
   icon: React.ReactNode; value: string | number; label: string; onClick: () => void; bg: string;
 }) {
   return (
-    <button onClick={onClick} className={`rounded-xl p-3.5 text-center hover:brightness-95 transition-all cursor-pointer w-full ${bg}`}>
+    <button onClick={onClick} className={`rounded-card p-3.5 text-center hover:brightness-95 transition-all cursor-pointer w-full ${bg}`}>
       <div className="mx-auto mb-1 flex justify-center">{icon}</div>
       <div className="text-lg font-bold text-textPrimary tabular-nums">{value}</div>
-      <div className="text-[10px] text-textMuted mt-0.5">{label}</div>
+      <div className="text-3xs text-textMuted mt-0.5">{label}</div>
     </button>
   )
 }
@@ -288,13 +288,10 @@ export default function MePage() {
   if (!user) return null
 
   return (
-    <div className="h-full flex flex-col bg-canvas">
-      <PageHeader title={t('me.title')} />
-      <div className="flex-1 overflow-y-auto">
-        <div className="max-w-2xl mx-auto p-4 md:p-6 space-y-5 pb-24 md:pb-6">
+    <PageShell title={t('me.title')} width="content" contentClassName="space-y-5">
 
       {/* ====== 个人资料卡 ====== */}
-      <div className="bg-surface rounded-2xl border border-border p-5">
+      <div className="bg-surface rounded-dialog border border-border p-5">
         <div className="flex items-center gap-4">
           {/* 头像 */}
           <div className="shrink-0">
@@ -314,7 +311,7 @@ export default function MePage() {
             <div className="flex items-center gap-2">
               <h2 className="text-lg font-semibold text-textPrimary truncate">{user.username}</h2>
               {user.role === 'admin' && (
-                <span className="shrink-0 text-[10px] px-2 py-0.5 rounded-full bg-accent-500/10 text-accent-400 font-medium">{t('me.adminBadge')}</span>
+                <span className="chip chip-accent shrink-0">{t('me.adminBadge')}</span>
               )}
             </div>
             <div className="flex items-center gap-3 mt-1 text-xs text-textMuted">
@@ -336,15 +333,15 @@ export default function MePage() {
             </button>
             {/* 邮箱 */}
             <div className="mt-3 pt-3 border-t border-border/60">
-              <span className="text-[10px] text-textMuted uppercase tracking-wider">{t('auth.email')}</span>
+              <span className="text-3xs text-textMuted uppercase tracking-wider">{t('auth.email')}</span>
               <div className="flex items-center gap-2 mt-1">
                 {user?.email ? (
                   <>
                     <span className="text-sm text-textPrimary truncate">{user.email}</span>
                     {user.email_verified ? (
-                      <span className="text-[10px] text-mint-400 bg-mint-500/10 px-1.5 py-0.5 rounded-full">{t('auth.emailVerified')}</span>
+                      <span className="chip chip-mint shrink-0">{t('auth.emailVerified')}</span>
                     ) : (
-                      <span className="text-[10px] text-accent-400 bg-accent-500/10 px-1.5 py-0.5 rounded-full">{t('auth.emailNotVerified')}</span>
+                      <span className="chip chip-accent shrink-0">{t('auth.emailNotVerified')}</span>
                     )}
                   </>
                 ) : (
@@ -352,14 +349,14 @@ export default function MePage() {
                 )}
                 <button
                   onClick={() => setShowBindEmail(true)}
-                  className="text-[10px] text-primary-400 hover:text-primary-500 transition-colors"
+                  className="text-3xs text-primary-400 hover:text-primary-500 transition-colors"
                 >
                   {user?.email ? t('auth.changeEmail') : t('auth.bindEmailTitle')}
                 </button>
                 {user?.email && (
                   <button
                     onClick={handleRemoveEmail}
-                    className="text-[10px] text-rose-400 hover:text-rose-500 dark:hover:text-rose-300 transition-colors"
+                    className="text-3xs text-rose-400 hover:text-rose-500 dark:hover:text-rose-300 transition-colors"
                   >
                     {t('auth.removeEmail')}
                   </button>
@@ -368,33 +365,33 @@ export default function MePage() {
             </div>
             {/* GitHub（商城同步身份） */}
             <div className="mt-3 pt-3 border-t border-border/60">
-              <span className="text-[10px] text-textMuted uppercase tracking-wider">GitHub</span>
+              <span className="text-3xs text-textMuted uppercase tracking-wider">GitHub</span>
               <div className="flex items-center gap-2 mt-1">
                 <Github size={13} className="text-textMuted shrink-0" />
                 {ghBind.bound ? (
                   <>
                     <span className="text-sm text-textPrimary truncate">@{ghBind.username}</span>
-                    <span className="text-[10px] text-mint-400 bg-mint-500/10 px-1.5 py-0.5 rounded-full">已绑定</span>
+                    <span className="chip chip-mint shrink-0">已绑定</span>
                   </>
                 ) : (
                   <span className="text-sm text-textMuted">未绑定</span>
                 )}
                 <button
                   onClick={() => setShowBindGithub(true)}
-                  className="text-[10px] text-primary-400 hover:text-primary-500 transition-colors"
+                  className="text-3xs text-primary-400 hover:text-primary-500 transition-colors"
                 >
                   {ghBind.bound ? '更换' : '绑定'}
                 </button>
                 {ghBind.bound && (
                   <button
                     onClick={doUnbindGithub}
-                    className="text-[10px] text-rose-400 hover:text-rose-500 dark:hover:text-rose-300 transition-colors"
+                    className="text-3xs text-rose-400 hover:text-rose-500 dark:hover:text-rose-300 transition-colors"
                   >
                     解绑
                   </button>
                 )}
               </div>
-              <div className="text-[10px] text-textMuted mt-1">用于世界商城同步，以你的身份推送</div>
+              <div className="text-3xs text-textMuted mt-1">用于世界商城同步，以你的身份推送</div>
             </div>
           </div>
         </div>
@@ -433,7 +430,7 @@ export default function MePage() {
       </div>
 
       {/* ====== 我的 AI ====== */}
-      <div className="bg-surface rounded-2xl border border-border p-5">
+      <div className="bg-surface rounded-dialog border border-border p-5">
         <div className="flex items-center justify-between mb-3">
           <h3 className="text-sm font-semibold text-textPrimary flex items-center gap-2">
             <Bot size={16} className="text-primary-400" /> {t('me.myAiSection')}
@@ -450,7 +447,7 @@ export default function MePage() {
               <Link
                 key={a.id}
                 to={`/agents/${a.id}`}
-                className="shrink-0 w-28 bg-canvas rounded-xl p-3 border border-border hover:border-primary-400/30 transition-colors text-center"
+                className="shrink-0 w-28 bg-canvas rounded-card p-3 border border-border hover:border-primary-400/30 transition-colors text-center"
               >
                 {a.avatar_url ? (
                   <div className="relative w-10 h-10 rounded-full mx-auto mb-1.5 shadow shadow-primary-500/15 overflow-hidden">
@@ -463,7 +460,7 @@ export default function MePage() {
                   </div>
                 )}
                 <div className="text-xs font-medium text-textPrimary truncate">{a.name}</div>
-                <div className="text-[10px] text-textMuted mt-0.5">{a.state === 'active' ? t('me.stateActive') : a.state === 'dnd' ? t('me.stateDnd') : t('me.stateOffline')}</div>
+                <div className="text-3xs text-textMuted mt-0.5">{a.state === 'active' ? t('me.stateActive') : a.state === 'dnd' ? t('me.stateDnd') : t('me.stateOffline')}</div>
                 {(AI_TYPE_LABEL[a.ai_type]) && (
                   <span className={`inline-block text-[9px] px-1.5 py-0.5 rounded-full mt-1 font-medium ${AI_TYPE_LABEL[a.ai_type].cls}`}>
                     {t(AI_TYPE_LABEL[a.ai_type].key)}
@@ -476,7 +473,7 @@ export default function MePage() {
       </div>
 
       {/* ====== API 用量 ====== */}
-      <div className="bg-surface rounded-2xl border border-border p-5">
+      <div className="bg-surface rounded-dialog border border-border p-5">
         <div className="flex items-center justify-between mb-3">
           <h3 className="text-sm font-semibold text-textPrimary flex items-center gap-2">
             <BarChart3 size={16} className="text-primary-400" /> {t('me.apiUsage30d')}
@@ -495,10 +492,10 @@ export default function MePage() {
               { key: 'me.cacheHitRate', value: `${cacheRate}%`, icon: FileText, color: 'text-accent-400' },
               { key: 'me.thinkingTokens', value: fmtTokenNum(totalReasoning, lang), icon: Activity, color: 'text-accent-400' },
             ].map(item => (
-              <div key={item.key} className="bg-canvas rounded-xl p-3 text-center">
+              <div key={item.key} className="bg-canvas rounded-card p-3 text-center">
                 <item.icon size={16} className={`${item.color} mx-auto mb-1`} />
                 <div className="text-sm font-semibold text-textPrimary">{item.value}</div>
-                <div className="text-[10px] text-textMuted">{t(item.key)}</div>
+                <div className="text-3xs text-textMuted">{t(item.key)}</div>
               </div>
             ))}
           </div>
@@ -506,7 +503,7 @@ export default function MePage() {
       </div>
 
       {/* ====== 存储概览 ====== */}
-      <a href="/me/storage" className="block bg-surface rounded-2xl border border-border p-5 hover:bg-elevated transition-colors">
+      <a href="/me/storage" className="block bg-surface rounded-dialog border border-border p-5 hover:bg-elevated transition-colors">
         <div className="flex items-center justify-between mb-3">
           <h3 className="text-sm font-semibold text-textPrimary flex items-center gap-2">
             <HardDrive size={16} className="text-primary-400" /> {t('me.storageSection')}
@@ -531,7 +528,7 @@ export default function MePage() {
                 style={{ width: `${Math.min(storage.usage_percent, 100)}%` }}
               />
             </div>
-            <div className="flex items-center justify-between text-[10px] text-textMuted">
+            <div className="flex items-center justify-between text-3xs text-textMuted">
               <span>{storage.total_files} {t('me.fileCountSuffix')}</span>
               <span>{t('me.quota')} {storage.quota_mb}MB</span>
             </div>
@@ -545,7 +542,7 @@ export default function MePage() {
       </a>
 
       {/* ====== 兑换码 ====== */}
-      <div id="redeem-section" className="bg-surface rounded-2xl border border-border p-5">
+      <div id="redeem-section" className="bg-surface rounded-dialog border border-border p-5">
         <h3 className="text-sm font-semibold text-textPrimary mb-3 flex items-center gap-2">
           <Gift size={16} className="text-primary-400" /> {t('me.redeemSection')}
         </h3>
@@ -555,12 +552,12 @@ export default function MePage() {
             value={redeemCode}
             onChange={e => setRedeemCode(e.target.value)}
             placeholder={t('me.redeemPlaceholder')}
-            className="flex-1 px-3 py-2 rounded-xl border border-border bg-canvas text-sm text-textPrimary placeholder:text-textMuted focus:outline-none focus:ring-2 focus:ring-primary-500/50 font-mono"
+            className="flex-1 px-3 py-2 rounded-card border border-border bg-canvas text-sm text-textPrimary placeholder:text-textMuted focus:outline-none focus:ring-2 focus:ring-primary-500/50 font-mono"
           />
           <button
             onClick={handleRedeem}
             disabled={redeeming || !redeemCode.trim()}
-            className="px-4 py-2 rounded-xl bg-primary-500 text-white hover:bg-primary-600 disabled:opacity-40 text-sm font-medium transition-colors"
+            className="btn btn-sm btn-primary"
           >
             {redeeming ? <Loader2 size={14} className="animate-spin" /> : t('me.redeemButton')}
           </button>
@@ -574,7 +571,7 @@ export default function MePage() {
 
       {/* ====== 管理员入口 ====== */}
       {user.role === 'admin' && (
-        <div className="bg-surface rounded-2xl border border-border">
+        <div className="bg-surface rounded-dialog border border-border">
           <Link
             to="/admin"
             className="flex items-center gap-3 px-5 py-3 hover:bg-elevated transition-colors"
@@ -592,7 +589,7 @@ export default function MePage() {
       {/* ====== 设置入口 ====== */}
       <Link
         to="/settings"
-        className="bg-surface rounded-2xl border border-border p-5 flex items-center gap-3 hover:bg-elevated transition-colors"
+        className="bg-surface rounded-dialog border border-border p-5 flex items-center gap-3 hover:bg-elevated transition-colors"
       >
         <Settings size={18} className="text-textMuted shrink-0" />
         <div className="flex-1 min-w-0">
@@ -604,21 +601,21 @@ export default function MePage() {
       {/* ====== 退出登录 ====== */}
       <button
         onClick={logout}
-        className="w-full py-3 rounded-xl border border-rose-500/20 text-rose-400 hover:bg-rose-500/5 text-sm font-medium transition-colors flex items-center justify-center gap-2"
+        className="w-full py-3 rounded-card border border-rose-500/20 text-rose-400 hover:bg-rose-500/5 text-sm font-medium transition-colors flex items-center justify-center gap-2"
       >
         <LogOut size={14} /> {t('me.logout')}
       </button>
 
       {/* ====== 编辑资料弹窗 ====== */}
       {showEditProfile && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60" onClick={() => setShowEditProfile(false)}>
+        <Dialog onClose={() =>  setShowEditProfile(false)} className="flex items-center justify-center">
           <div
-            className="bg-surface rounded-2xl border border-border w-full max-w-sm mx-4 shadow-2xl"
+            className="bg-surface rounded-dialog border border-border w-full max-w-sm mx-4 shadow-2xl"
             onClick={e => e.stopPropagation()}
           >
             <div className="flex items-center justify-between px-5 py-4 border-b border-border">
               <h3 className="text-sm font-semibold text-textPrimary">{t('me.editProfileModalTitle')}</h3>
-              <button onClick={() => setShowEditProfile(false)} className="p-1 rounded-lg hover:bg-elevated text-textMuted">
+              <button onClick={() => setShowEditProfile(false)} className="p-1 rounded-control hover:bg-elevated text-textMuted">
                 <X size={16} />
               </button>
             </div>
@@ -647,7 +644,7 @@ export default function MePage() {
                   value={editUsername}
                   onChange={e => setEditUsername(e.target.value)}
                   placeholder={user.username}
-                  className="w-full px-3 py-2 rounded-xl border border-border bg-canvas text-sm text-textPrimary focus:outline-none focus:ring-2 focus:ring-primary-500/50"
+                  className="w-full px-3 py-2 rounded-card border border-border bg-canvas text-sm text-textPrimary focus:outline-none focus:ring-2 focus:ring-primary-500/50"
                 />
               </div>
               <div>
@@ -657,7 +654,7 @@ export default function MePage() {
                   onChange={e => setEditBio(e.target.value)}
                   placeholder={t('me.bioPlaceholder')}
                   rows={3}
-                  className="w-full px-3 py-2 rounded-xl border border-border bg-canvas text-sm text-textPrimary placeholder:text-textMuted focus:outline-none focus:ring-2 focus:ring-primary-500/50 resize-none"
+                  className="w-full px-3 py-2 rounded-card border border-border bg-canvas text-sm text-textPrimary placeholder:text-textMuted focus:outline-none focus:ring-2 focus:ring-primary-500/50 resize-none"
                 />
               </div>
               <div>
@@ -667,9 +664,9 @@ export default function MePage() {
                   value={editStatusText}
                   onChange={e => setEditStatusText(e.target.value)}
                   placeholder={t('me.statusTextPlaceholder')}
-                  className="w-full px-3 py-2 rounded-xl border border-border bg-canvas text-sm text-textPrimary placeholder:text-textMuted focus:outline-none focus:ring-2 focus:ring-primary-500/50"
+                  className="w-full px-3 py-2 rounded-card border border-border bg-canvas text-sm text-textPrimary placeholder:text-textMuted focus:outline-none focus:ring-2 focus:ring-primary-500/50"
                 />
-                <p className="text-[10px] text-textMuted mt-1">{editStatusText.length} 字</p>
+                <p className="text-3xs text-textMuted mt-1">{editStatusText.length} 字</p>
               </div>
               <div>
                 <label className="block text-xs font-medium text-textSecondary mb-1">{t('me.statusColorLabel')}</label>
@@ -710,20 +707,20 @@ export default function MePage() {
                   value={editPassword}
                   onChange={e => setEditPassword(e.target.value)}
                   placeholder={t('me.passwordMinHint')}
-                  className="w-full px-3 py-2 rounded-xl border border-border bg-canvas text-sm text-textPrimary focus:outline-none focus:ring-2 focus:ring-primary-500/50"
+                  className="w-full px-3 py-2 rounded-card border border-border bg-canvas text-sm text-textPrimary focus:outline-none focus:ring-2 focus:ring-primary-500/50"
                 />
               </div>
               <button
                 onClick={handleSaveProfile}
                 disabled={editSaving}
-                className="w-full py-2.5 rounded-xl bg-primary-500 text-white hover:bg-primary-600 disabled:opacity-40 text-sm font-medium transition-colors flex items-center justify-center gap-2"
+                className="btn btn-md btn-primary w-full gap-2"
               >
                 {editSaving ? <Loader2 size={14} className="animate-spin" /> : <Check size={14} />}
                 {editSaving ? t('me.savingProfile') : t('me.saveButton')}
               </button>
             </div>
           </div>
-        </div>
+        </Dialog>
       )}
 
       {/* 头像裁剪弹窗 */}
@@ -740,8 +737,8 @@ export default function MePage() {
 
       {/* v0.2.0 邮箱绑定弹窗 */}
       {showBindEmail && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4" onClick={() => setShowBindEmail(false)}>
-          <div className="bg-surface border border-border rounded-2xl p-6 w-full max-w-sm shadow-2xl" onClick={e => e.stopPropagation()}>
+        <Dialog onClose={() =>  setShowBindEmail(false)} className="flex items-center justify-center p-4">
+          <div className="bg-surface border border-border rounded-dialog p-6 w-full max-w-sm shadow-2xl" onClick={e => e.stopPropagation()}>
             <h3 className="text-lg font-semibold text-textPrimary mb-4">{t('auth.bindEmailTitle')}</h3>
             <div className="space-y-3">
               <div>
@@ -750,7 +747,7 @@ export default function MePage() {
                   type="email"
                   value={bindEmail}
                   onChange={e => { setBindEmail(e.target.value); setBindCodeSent(false) }}
-                  className="w-full px-3 py-2 rounded-xl border border-border bg-canvas text-textPrimary text-sm focus:outline-none focus:ring-2 focus:ring-primary-500/60"
+                  className="w-full px-3 py-2 rounded-card border border-border bg-canvas text-textPrimary text-sm focus:outline-none focus:ring-2 focus:ring-primary-500/60"
                   placeholder={t('auth.emailPlaceholder')}
                 />
               </div>
@@ -758,7 +755,7 @@ export default function MePage() {
                 type="button"
                 onClick={handleSendBindCode}
                 disabled={!bindEmail || bindSendCooldown > 0}
-                className="w-full py-2 text-sm font-medium rounded-xl border border-primary-500/30 text-primary-500 hover:bg-primary-500/10 disabled:opacity-40 transition-colors"
+                className="w-full py-2 text-sm font-medium rounded-card border border-primary-500/30 text-primary-500 hover:bg-primary-500/10 disabled:opacity-40 transition-colors"
               >
                 {bindSendCooldown > 0
                   ? t('auth.codeResendIn').replace('{seconds}', String(bindSendCooldown))
@@ -776,34 +773,34 @@ export default function MePage() {
                 </div>
               )}
               {bindError && (
-                <div className="text-sm text-rose-400 bg-rose-500/10 border border-rose-500/20 rounded-xl px-3 py-2">{bindError}</div>
+                <div className="text-sm text-rose-400 bg-rose-500/10 border border-rose-500/20 rounded-card px-3 py-2">{bindError}</div>
               )}
               <div className="flex gap-2 pt-2">
-                <button onClick={() => setShowBindEmail(false)} className="flex-1 py-2 text-sm rounded-xl border border-border text-textSecondary hover:text-textPrimary transition-colors">{t('common.cancel')}</button>
+                <button onClick={() => setShowBindEmail(false)} className="flex-1 py-2 text-sm rounded-card border border-border text-textSecondary hover:text-textPrimary transition-colors">{t('common.cancel')}</button>
                 <button
                   onClick={handleConfirmBind}
                   disabled={!bindEmail || !bindCode || bindLoading}
-                  className="flex-1 py-2 text-sm rounded-xl bg-primary-500 hover:bg-primary-600 disabled:opacity-30 text-white font-medium transition-colors"
+                  className="btn btn-sm btn-primary flex-1"
                 >
                   {bindLoading ? t('auth.verifying') : t('common.confirm')}
                 </button>
               </div>
             </div>
           </div>
-        </div>
+        </Dialog>
       )}
 
       {/* GitHub 绑定弹窗 */}
       {showBindGithub && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4" onClick={() => setShowBindGithub(false)}>
-          <div className="bg-surface border border-border rounded-2xl p-6 w-full max-w-sm shadow-2xl" onClick={e => e.stopPropagation()}>
+        <Dialog onClose={() =>  setShowBindGithub(false)} className="flex items-center justify-center p-4">
+          <div className="bg-surface border border-border rounded-dialog p-6 w-full max-w-sm shadow-2xl" onClick={e => e.stopPropagation()}>
             <h3 className="text-lg font-semibold text-textPrimary mb-1">绑定 GitHub 账户</h3>
             <p className="text-xs text-textMuted mb-4">用于世界商城同步——以你的身份推送到 AIsChat-Community。Token 加密存储，仅本实例可见。</p>
             <div className="space-y-3">
               <div>
                 <div className="flex items-center justify-between mb-1">
                   <label className="block text-xs text-textSecondary">GitHub Token（classic 或 fine-grained，需仓库写权限）</label>
-                  <ExternalLinkSafe href="https://github.com/settings/tokens/new" className="text-[10px] text-primary-400 hover:text-primary-500 dark:hover:text-primary-300 transition-colors shrink-0">去 GitHub 生成 token →</ExternalLinkSafe>
+                  <ExternalLinkSafe href="https://github.com/settings/tokens/new" className="text-3xs text-primary-400 hover:text-primary-500 dark:hover:text-primary-300 transition-colors shrink-0">去 GitHub 生成 token →</ExternalLinkSafe>
                 </div>
                 <input
                   type="password"
@@ -811,33 +808,31 @@ export default function MePage() {
                   onChange={e => setGhToken(e.target.value)}
                   onKeyDown={e => { if (e.key === 'Enter') doBindGithub() }}
                   placeholder="ghp_… / github_pat_…"
-                  className="w-full px-3 py-2 rounded-xl border border-border bg-canvas text-textPrimary text-sm focus:outline-none focus:ring-2 focus:ring-primary-500/60"
+                  className="w-full px-3 py-2 rounded-card border border-border bg-canvas text-textPrimary text-sm focus:outline-none focus:ring-2 focus:ring-primary-500/60"
                 />
               </div>
               {ghError && (
-                <div className="text-sm text-rose-400 bg-rose-500/10 border border-rose-500/20 rounded-xl px-3 py-2">{ghError}</div>
+                <div className="text-sm text-rose-400 bg-rose-500/10 border border-rose-500/20 rounded-card px-3 py-2">{ghError}</div>
               )}
               <div className="flex gap-2 pt-2">
                 <button
                   onClick={() => setShowBindGithub(false)}
-                  className="flex-1 py-2 text-sm rounded-xl border border-border text-textSecondary hover:bg-elevated transition-colors"
+                  className="flex-1 py-2 text-sm rounded-card border border-border text-textSecondary hover:bg-elevated transition-colors"
                 >
                   取消
                 </button>
                 <button
                   onClick={doBindGithub}
                   disabled={!ghToken.trim() || ghBinding}
-                  className="flex-1 py-2 text-sm rounded-xl bg-primary-500 hover:bg-primary-600 disabled:opacity-30 text-white font-medium transition-colors"
+                  className="btn btn-sm btn-primary flex-1"
                 >
                   {ghBinding ? '绑定中…' : '绑定'}
                 </button>
               </div>
             </div>
           </div>
-        </div>
+        </Dialog>
       )}
-        </div>
-      </div>
-    </div>
+    </PageShell>
   )
 }

@@ -43,9 +43,9 @@ export default function CleanupTab() {
   return (
     <div className="space-y-5">
       {/* 运行清理 */}
-      <div className="bg-surface rounded-xl border border-border p-5">
+      <div className="bg-surface rounded-card border border-border p-5">
         <div className="flex items-center gap-3 mb-4">
-          <div className="w-10 h-10 rounded-xl bg-primary-500/10 flex items-center justify-center">
+          <div className="w-10 h-10 rounded-card bg-primary-500/10 flex items-center justify-center">
             <Eraser size={20} className="text-primary-400" />
           </div>
           <div>
@@ -57,7 +57,7 @@ export default function CleanupTab() {
         <button
           onClick={handleRun}
           disabled={running}
-          className="px-5 py-2.5 bg-primary-500 text-white rounded-xl hover:bg-primary-600 disabled:opacity-40 disabled:cursor-not-allowed text-sm font-medium transition-colors inline-flex items-center gap-2"
+          className="btn btn-md btn-primary gap-2"
         >
           {running ? (
             <>
@@ -76,14 +76,14 @@ export default function CleanupTab() {
         </button>
 
         {error && (
-          <div className="mt-3 p-3 bg-rose-400/10 border border-rose-400/20 rounded-xl">
+          <div className="mt-3 p-3 bg-rose-400/10 border border-rose-400/20 rounded-card">
             <p className="text-sm text-rose-400">{error}</p>
           </div>
         )}
       </div>
 
       {/* 上次清理统计 */}
-      <div className="bg-surface rounded-xl border border-border p-5">
+      <div className="bg-surface rounded-card border border-border p-5">
         <div className="flex items-center gap-2 mb-4">
           <Clock size={16} className="text-textSecondary" />
           <h3 className="font-semibold text-textPrimary">{t('admin.cleanupLastRun')}</h3>
@@ -93,7 +93,7 @@ export default function CleanupTab() {
           <p className="text-sm text-textMuted">{t('admin.cleanupNever')}</p>
         ) : (
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-            <div className="bg-canvas rounded-xl border border-border p-4">
+            <div className="bg-canvas rounded-card border border-border p-4">
               <div className="flex items-center gap-2 mb-2">
                 <File size={16} className="text-mint-400" />
                 <span className="text-xs text-textMuted">{t('admin.cleanupFilesDeleted')}</span>
@@ -101,7 +101,7 @@ export default function CleanupTab() {
               <p className="text-2xl font-bold text-textPrimary">{stats.cleaned_files ?? 0}</p>
             </div>
 
-            <div className="bg-canvas rounded-xl border border-border p-4">
+            <div className="bg-canvas rounded-card border border-border p-4">
               <div className="flex items-center gap-2 mb-2">
                 <FileX2 size={16} className="text-accent-400" />
                 <span className="text-xs text-textMuted">{t('admin.cleanupOrphansDeleted')}</span>
@@ -109,7 +109,7 @@ export default function CleanupTab() {
               <p className="text-2xl font-bold text-textPrimary">{stats.orphan_cleaned ?? 0}</p>
             </div>
 
-            <div className="bg-canvas rounded-xl border border-border p-4">
+            <div className="bg-canvas rounded-card border border-border p-4">
               <div className="flex items-center gap-2 mb-2">
                 <Clock size={16} className="text-textSecondary" />
                 <span className="text-xs text-textMuted">{t('admin.cleanupLastRun')}</span>

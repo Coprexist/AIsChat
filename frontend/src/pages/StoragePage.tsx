@@ -84,18 +84,15 @@ export default function StoragePage() {
   }
 
   return (
-    <div className="h-full flex flex-col bg-canvas">
-      <PageHeader title="存储空间" onBack={() => navigate('/me')} />
-      <div className="flex-1 overflow-y-auto">
-        <div className="max-w-2xl mx-auto p-4 space-y-4">
+    <PageShell title="存储空间" onBack={() => navigate('/me')} width="content" contentClassName="space-y-4">
 
       {error && (
-        <p className="text-sm text-rose-400 bg-rose-500/10 rounded-xl px-4 py-3">{error}</p>
+        <p className="text-sm text-rose-400 bg-rose-500/10 rounded-card px-4 py-3">{error}</p>
       )}
 
       {/* 用量概览 */}
       {storage && (
-        <div className="bg-surface rounded-2xl border border-border p-5">
+        <div className="bg-surface rounded-dialog border border-border p-5">
           <div className="flex items-center gap-2 mb-3">
             <HardDrive size={16} className="text-primary-400" />
             <span className="text-sm font-medium text-textPrimary">用量</span>
@@ -114,7 +111,7 @@ export default function StoragePage() {
               style={{ width: `${Math.min(storage.usage_percent, 100)}%` }}
             />
           </div>
-          <div className="flex items-center justify-between text-[10px] text-textMuted">
+          <div className="flex items-center justify-between text-3xs text-textMuted">
             <span>{storage.total_files} 个文件</span>
             <span>配额 {storage.quota_mb}MB</span>
           </div>
@@ -128,7 +125,7 @@ export default function StoragePage() {
       <div className="flex items-center gap-2">
         <button
           onClick={() => fileInputRef.current?.click()}
-          className="text-xs px-4 py-2 bg-primary-500 text-white rounded-lg hover:bg-primary-600 transition-colors"
+          className="text-xs px-4 py-2 bg-primary-500 text-white rounded-control hover:bg-primary-600 transition-colors"
         >
           上传文件
         </button>
@@ -136,7 +133,7 @@ export default function StoragePage() {
       </div>
 
       {/* 文件列表 */}
-      <div className="bg-surface rounded-2xl border border-border p-5">
+      <div className="bg-surface rounded-dialog border border-border p-5">
         <h3 className="text-sm font-semibold text-textPrimary mb-3">文件列表</h3>
         {files.length === 0 ? (
           <p className="text-sm text-textMuted text-center py-8">暂无文件</p>
@@ -145,14 +142,14 @@ export default function StoragePage() {
             {files.map((f) => {
               const name = f.path.split('/').pop() || f.path
               return (
-                <div key={f.id} className="flex items-center gap-2 px-2 py-2 rounded-lg hover:bg-elevated transition-colors group cursor-pointer"
+                <div key={f.id} className="flex items-center gap-2 px-2 py-2 rounded-control hover:bg-elevated transition-colors group cursor-pointer"
                   onClick={() => setPreviewFile(f)}>
                   <FileText size={14} className={`shrink-0 ${f.is_forwarded ? 'text-accent-400' : 'text-textMuted'}`} />
                   <span className="text-xs text-textPrimary truncate flex-1" title={name}>
                     {name}
-                    {f.is_forwarded && <span className="text-[10px] text-accent-400 ml-1.5">转发</span>}
+                    {f.is_forwarded && <span className="text-3xs text-accent-400 ml-1.5">转发</span>}
                   </span>
-                  <span className="text-[10px] text-textMuted shrink-0">{formatSize(f.size)}</span>
+                  <span className="text-3xs text-textMuted shrink-0">{formatSize(f.size)}</span>
                   <button
                     onClick={(e) => { e.stopPropagation(); openForward(f); }}
                     className="p-1 rounded hover:bg-primary-500/10 text-textMuted hover:text-primary-400 transition-colors opacity-0 group-hover:opacity-100"
@@ -185,12 +182,10 @@ export default function StoragePage() {
           onClose={() => setForwardFile(null)}
         />
       )}
-    </div>
-      </div>
-    </div>
+    </PageShell>
   )
 }
 
 // 复用已有的转发组件
 import ForwardFileModal from '../components/ForwardFileModal'
-import PageHeader from '../components/PageHeader'
+import { PageShell } from '../components/ui'

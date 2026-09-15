@@ -144,7 +144,7 @@ function PhonePreview() {
   }
   return (
     <div
-      className="w-full max-w-[300px] mx-auto rounded-2xl overflow-hidden select-none"
+      className="w-full max-w-[300px] mx-auto rounded-dialog overflow-hidden select-none"
       style={{ background: S.surface, border: `1px solid ${S.border}`, boxShadow: '0 8px 30px rgba(0,0,0,0.08)' }}
     >
       {/* 顶栏 */}
@@ -348,8 +348,8 @@ export default function ThemeCustomizer() {
           {t('settings.themeCustom')}
         </p>
         <div className="flex items-center gap-2">
-          {dirty && <span className="text-[10px] text-accent-500">{t('settings.unsaved')}</span>}
-          {saved && <span className="text-[10px] text-mint-400 flex items-center gap-0.5"><Check size={11} /> {t('settings.saved')}</span>}
+          {dirty && <span className="text-3xs text-accent-500">{t('settings.unsaved')}</span>}
+          {saved && <span className="text-3xs text-mint-400 flex items-center gap-0.5"><Check size={11} /> {t('settings.saved')}</span>}
         </div>
       </div>
       <p className="text-xs text-textMuted mb-3">{t('settings.themeCustomDesc')}</p>
@@ -357,7 +357,7 @@ export default function ThemeCustomizer() {
       <div className="flex flex-col md:flex-row gap-5">
         {/* 左侧：实时预览 */}
         <div className="md:w-[300px] flex-none">
-          <p className="text-[11px] font-medium text-textSecondary mb-2 flex items-center gap-1">
+          <p className="text-2xs font-medium text-textSecondary mb-2 flex items-center gap-1">
             <span className="w-1.5 h-1.5 rounded-full bg-mint-400" /> {t('settings.themeDesignPreview')}
           </p>
           <PhonePreview />
@@ -369,8 +369,8 @@ export default function ThemeCustomizer() {
             {THEME_COLOR_KEYS.map((key) => (
               <div key={key}>
                 <div className="flex items-center justify-between mb-1.5">
-                  <span className="text-[11px] font-medium text-textSecondary">{KEY_LABELS[key]}</span>
-                  <span className="text-[10px] font-mono text-textMuted">{(colors[key] || '').toUpperCase()}</span>
+                  <span className="text-2xs font-medium text-textSecondary">{KEY_LABELS[key]}</span>
+                  <span className="text-3xs font-mono text-textMuted">{(colors[key] || '').toUpperCase()}</span>
                 </div>
                 <div className="flex flex-wrap items-center gap-1.5">
                   {CANDIDATES[key].map((c) => {
@@ -380,7 +380,7 @@ export default function ThemeCustomizer() {
                         key={c.hex}
                         onClick={() => pick(key, c.hex)}
                         title={c.hex + ' · ' + c.label}
-                        className={`w-8 h-8 rounded-lg transition-transform hover:scale-110 ${selected ? 'ring-2 ring-textPrimary ring-offset-1' : ''}`}
+                        className={`w-8 h-8 rounded-control transition-transform hover:scale-110 ${selected ? 'ring-2 ring-textPrimary ring-offset-1' : ''}`}
                         style={{ background: c.hex }}
                         aria-label={c.hex}
                       />
@@ -388,7 +388,7 @@ export default function ThemeCustomizer() {
                   })}
                   {/* 原生取色器 */}
                   <label
-                    className="w-8 h-8 rounded-lg border border-border flex items-center justify-center cursor-pointer hover:bg-elevated"
+                    className="w-8 h-8 rounded-control border border-border flex items-center justify-center cursor-pointer hover:bg-elevated"
                     title={t('settings.themeDesignPicker')}
                     style={{ background: 'conic-gradient(#f00,#ff0,#0f0,#0ff,#00f,#f0f,#f00)' }}
                   >
@@ -405,7 +405,7 @@ export default function ThemeCustomizer() {
                     onChange={(e) => pick(key, e.target.value)}
                     placeholder="#RRGGBB"
                     spellCheck={false}
-                    className="w-24 h-8 px-2 rounded-lg border border-border bg-canvas text-[11px] font-mono text-textPrimary outline-none focus:border-primary-400"
+                    className="w-24 h-8 px-2 rounded-control border border-border bg-canvas text-2xs font-mono text-textPrimary outline-none focus:border-primary-400"
                   />
                 </div>
               </div>
@@ -416,12 +416,12 @@ export default function ThemeCustomizer() {
 
       {/* 预设区 */}
       <div className="mt-5">
-        <p className="text-[11px] font-medium text-textSecondary mb-2">{t('settings.themeDesignPresets')}</p>
+        <p className="text-2xs font-medium text-textSecondary mb-2">{t('settings.themeDesignPresets')}</p>
         <div className="grid grid-cols-2 md:grid-cols-3 gap-2">
           {presetCards.map((p) => (
             <div
               key={p.id}
-              className="relative rounded-xl border border-border bg-surface p-3 transition-all hover:border-primary-400/40 hover:bg-elevated cursor-pointer"
+              className="relative rounded-card border border-border bg-surface p-3 transition-all hover:border-primary-400/40 hover:bg-elevated cursor-pointer"
               onClick={() => applyAll(p.colors)}
               title={t('settings.themeDesignPresetApply')}
             >
@@ -438,7 +438,7 @@ export default function ThemeCustomizer() {
                   <button
                     onClick={(e) => { e.stopPropagation(); deletePreset(p.name) }}
                     title={t('settings.themeDesignDeletePreset')}
-                    className="ml-auto w-5 h-5 rounded-md flex items-center justify-center text-textMuted hover:text-rose-500 hover:bg-rose-400/10"
+                    className="ml-auto w-5 h-5 rounded-control flex items-center justify-center text-textMuted hover:text-rose-500 hover:bg-rose-400/10"
                   >
                     <Trash2 size={11} />
                   </button>
@@ -449,7 +449,7 @@ export default function ThemeCustomizer() {
           ))}
 
           {/* 存为我的预设 */}
-          <div className="rounded-xl border border-dashed border-border bg-canvas p-3 flex flex-col justify-center min-h-[64px]">
+          <div className="rounded-card border border-dashed border-border bg-canvas p-3 flex flex-col justify-center min-h-[64px]">
             {presetInput ? (
               <div className="flex gap-1.5">
                 <input
@@ -458,12 +458,12 @@ export default function ThemeCustomizer() {
                   placeholder={t('settings.themeDesignPresetName')}
                   maxLength={20}
                   autoFocus
-                  className="flex-1 min-w-0 h-8 px-2 rounded-lg border border-border bg-surface text-[11px] text-textPrimary outline-none focus:border-primary-400"
+                  className="flex-1 min-w-0 h-8 px-2 rounded-control border border-border bg-surface text-2xs text-textPrimary outline-none focus:border-primary-400"
                 />
                 <button
                   onClick={savePreset}
                   disabled={!presetName.trim()}
-                  className="h-8 px-2.5 rounded-lg bg-primary-500 text-white text-[11px] font-medium disabled:opacity-40 hover:bg-primary-600"
+                  className="btn btn-xs btn-primary h-8 text-2xs"
                 >
                   <Check size={12} />
                 </button>
@@ -471,7 +471,7 @@ export default function ThemeCustomizer() {
             ) : (
               <button
                 onClick={() => setPresetInput(true)}
-                className="flex items-center justify-center gap-1 text-[11px] text-textSecondary hover:text-primary-400 py-1"
+                className="flex items-center justify-center gap-1 text-2xs text-textSecondary hover:text-primary-400 py-1"
               >
                 <Plus size={12} /> {t('settings.themeDesignSaveAsPreset')}
               </button>
@@ -479,10 +479,10 @@ export default function ThemeCustomizer() {
           </div>
         </div>
         {presetMsg && (
-          <p className={`text-[10px] mt-2 ${presetMsg.ok ? 'text-mint-400' : 'text-rose-400'}`}>{presetMsg.text}</p>
+          <p className={`text-3xs mt-2 ${presetMsg.ok ? 'text-mint-400' : 'text-rose-400'}`}>{presetMsg.text}</p>
         )}
         {!presetInput && Object.keys(myPresets).length === 0 && (
-          <p className="text-[10px] text-textMuted mt-2">{t('settings.themeDesignPresetEmpty')}</p>
+          <p className="text-3xs text-textMuted mt-2">{t('settings.themeDesignPresetEmpty')}</p>
         )}
       </div>
 

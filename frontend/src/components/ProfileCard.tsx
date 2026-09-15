@@ -7,6 +7,7 @@ import { useT, useLang } from '../i18n/I18nContext'
 import { getStatusTextStyle, BG_ELEVATED_LIGHT, BG_ELEVATED_DARK } from '../utils/statusColor.tsx'
 import { formatMessageTime } from '../utils/time'
 import { useTheme } from '../context/ThemeContext'
+import { Dialog } from './ui'
 
 interface ProfileCardProps {
   entityType: 'human' | 'ai' | 'group'
@@ -119,16 +120,16 @@ export default function ProfileCard({ entityType, entityId, entityName, state, a
 
   if (loading) {
     return (
-      <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-50" onClick={onClose}>
+      <Dialog onClose={onClose} className="flex items-center justify-center">
         <div
-          className="bg-elevated border border-border rounded-2xl p-6 w-full max-w-md mx-4 shadow-2xl shadow-black/30"
+          className="bg-elevated border border-border rounded-dialog p-6 w-full max-w-md mx-4 shadow-2xl shadow-black/30"
           onClick={(e) => e.stopPropagation()}
         >
           <div className="flex items-center justify-center py-8">
             <div className="animate-spin w-6 h-6 border-2 border-primary-500 border-t-transparent rounded-full" />
           </div>
         </div>
-      </div>
+      </Dialog>
     )
   }
 
@@ -141,12 +142,12 @@ export default function ProfileCard({ entityType, entityId, entityName, state, a
   const createdAt = profile?.created_at
   const isFriend = profile?.is_friend ?? false
   const isGroup = entityType === 'group'
-  const avatarShape = isGroup ? 'rounded-xl' : 'rounded-full'
+  const avatarShape = isGroup ? 'rounded-card' : 'rounded-full'
 
   return (
-    <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-50" onClick={onClose}>
+    <Dialog onClose={onClose} className="flex items-center justify-center">
       <div
-        className="bg-elevated border border-border rounded-2xl p-6 w-full max-w-md mx-4 shadow-2xl shadow-black/30 pb-[var(--safe-bottom)] md:pb-6"
+        className="bg-elevated border border-border rounded-dialog p-6 w-full max-w-md mx-4 shadow-2xl shadow-black/30 pb-[var(--safe-bottom)] md:pb-6"
         onClick={(e) => e.stopPropagation()}
       >
         {/* 头部 */}
@@ -182,7 +183,7 @@ export default function ProfileCard({ entityType, entityId, entityName, state, a
               </div>
             </div>
           </div>
-          <button onClick={onClose} className="p-1 hover:bg-canvas rounded-lg text-textMuted hover:text-textSecondary shrink-0">
+          <button onClick={onClose} className="icon-btn-sm text-textMuted shrink-0">
             <X size={20} />
           </button>
         </div>
@@ -217,7 +218,7 @@ export default function ProfileCard({ entityType, entityId, entityName, state, a
             <button
               onClick={handleTogglePriority}
               disabled={togglingPriority}
-              className={`w-full flex items-center justify-center gap-2 py-2 rounded-xl border text-sm font-medium transition-colors ${
+              className={`w-full flex items-center justify-center gap-2 py-2 rounded-card border text-sm font-medium transition-colors ${
                 isPriority
                   ? 'bg-accent-400/10 border-accent-400/30 text-accent-400 hover:bg-accent-400/20'
                   : 'bg-canvas border-border text-textSecondary hover:bg-elevated'
@@ -238,20 +239,20 @@ export default function ProfileCard({ entityType, entityId, entityName, state, a
                   placeholder={t('profileCard.friendMessagePlaceholder')}
                   rows={2}
                   maxLength={200}
-                  className="w-full px-3 py-2 rounded-xl border border-border bg-canvas text-sm text-textPrimary placeholder:text-textMuted focus:outline-none focus:ring-2 focus:ring-primary-500/50 resize-none"
+                  className="w-full px-3 py-2 rounded-card border border-border bg-canvas text-sm text-textPrimary placeholder:text-textMuted focus:outline-none focus:ring-2 focus:ring-primary-500/50 resize-none"
                   autoFocus
                 />
                 <div className="flex gap-2">
                   <button
                     onClick={() => { setShowAddFriend(false); setFriendMessage('') }}
-                    className="flex-1 py-2 text-xs border border-border rounded-lg hover:bg-canvas text-textSecondary transition-colors"
+                    className="flex-1 py-2 text-xs border border-border rounded-control hover:bg-canvas text-textSecondary transition-colors"
                   >
                     {t('common.cancel')}
                   </button>
                   <button
                     onClick={handleAddFriend}
                     disabled={addingFriend}
-                    className="flex-1 flex items-center justify-center gap-1.5 py-2 text-xs rounded-lg bg-mint-400 text-white hover:bg-mint-500 disabled:opacity-40 transition-colors"
+                    className="flex-1 flex items-center justify-center gap-1.5 py-2 text-xs rounded-control bg-mint-400 text-white hover:bg-mint-500 disabled:opacity-40 transition-colors"
                   >
                     <UserPlus size={12} />
                     {addingFriend ? '...' : t('profileCard.sendRequest')}
@@ -261,7 +262,7 @@ export default function ProfileCard({ entityType, entityId, entityName, state, a
             ) : (
               <button
                 onClick={() => setShowAddFriend(true)}
-                className="w-full flex items-center justify-center gap-2 py-2.5 rounded-xl bg-mint-400/10 border border-mint-400/20 text-mint-400 hover:bg-mint-400/20 transition-colors text-sm font-medium"
+                className="w-full flex items-center justify-center gap-2 py-2.5 rounded-card bg-mint-400/10 border border-mint-400/20 text-mint-400 hover:bg-mint-400/20 transition-colors text-sm font-medium"
               >
                 <UserPlus size={16} />
                 {t('profileCard.addFriend')}
@@ -275,7 +276,7 @@ export default function ProfileCard({ entityType, entityId, entityName, state, a
           <button
             onClick={handleSendDM}
             disabled={sending}
-            className="w-full flex items-center justify-center gap-2 py-2.5 rounded-xl bg-primary-500 text-white hover:bg-primary-600 disabled:opacity-30 transition-all text-sm font-medium shadow-lg shadow-primary-500/20"
+            className="btn btn-md btn-primary w-full gap-2"
           >
             <MessageSquare size={16} />
             {sending ? t('profileCard.sending') : isFriend ? t('profileCard.sendDM') : t('profileCard.sendDM')}
@@ -283,7 +284,7 @@ export default function ProfileCard({ entityType, entityId, entityName, state, a
 
           {/* 群聊信息 */}
           {isGroup && (
-            <div className="text-[11px] text-textMuted text-center pt-2">
+            <div className="text-2xs text-textMuted text-center pt-2">
               {createdAt && <span>{t('profileCard.createdOn') || '创建于'} {new Date(createdAt).toLocaleDateString('zh-CN')}</span>}
             </div>
           )}
@@ -292,13 +293,13 @@ export default function ProfileCard({ entityType, entityId, entityName, state, a
 
       {/* 查看大图 */}
       {fullImg && (
-        <div className="fixed inset-0 bg-black/90 z-[60] flex items-center justify-center" onClick={() => setFullImg(null)}>
+        <div className="fixed inset-0 bg-black/90 z-toast flex items-center justify-center" onClick={() => setFullImg(null)}>
           <img src={fullImg} alt="" className="max-w-[90vw] max-h-[90vh] object-contain" />
           <button onClick={() => setFullImg(null)} className="absolute top-4 right-4 p-2 rounded-full bg-black/50 text-white hover:bg-black/70">
             <X size={24} />
           </button>
         </div>
       )}
-    </div>
+    </Dialog>
   )
 }

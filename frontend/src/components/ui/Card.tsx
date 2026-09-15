@@ -3,7 +3,7 @@ import { ReactNode } from 'react'
 /**
  * 统一 Card 区块组件
  *
- * 消灭各处重复的 bg-surface border rounded-xl p-5 容器。
+ * 样式来自 .card / .card-pad-lg 语义类（index.css），与手写卡片同一规范源。
  */
 interface CardProps {
   title?: ReactNode
@@ -15,7 +15,7 @@ interface CardProps {
 
 export default function Card({ title, icon, hint, children, className = '' }: CardProps) {
   return (
-    <section className={`bg-surface border border-border rounded-xl p-5 space-y-4 ${className}`}>
+    <section className={`card card-pad-lg space-y-4 ${className}`}>
       {title && (
         <h3 className="text-sm font-semibold text-textPrimary flex items-center gap-2">
           {icon}

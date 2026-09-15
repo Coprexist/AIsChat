@@ -59,13 +59,13 @@ export default function DocExportTab() {
 
       {/* 状态卡 */}
       {!status && (
-        <div className="rounded-xl border border-accent-500/30 bg-accent-500/10 p-4 text-xs text-accent-400">
+        <div className="rounded-card border border-accent-500/30 bg-accent-500/10 p-4 text-xs text-accent-400">
           状态加载失败——后端可能未重启（新接口 /kb/status 未生效）。
           <button onClick={load} className="ml-2 text-primary-400 hover:text-primary-500 dark:hover:text-primary-300 transition-colors">重试</button>
         </div>
       )}
       {status && (
-      <div className="rounded-xl border border-border bg-elevated/40 p-4">
+      <div className="rounded-card border border-border bg-elevated/40 p-4">
         <div className="flex items-center gap-2">
           <FileText size={16} className="text-primary-400 shrink-0" />
           <span className="text-sm text-textPrimary">pandoc 状态</span>
@@ -89,7 +89,7 @@ export default function DocExportTab() {
         <button
           onClick={doInstall}
           disabled={installing || status.installing}
-          className="inline-flex items-center gap-1.5 px-4 py-2 text-sm bg-primary-500 hover:bg-primary-600 text-white rounded-lg transition-colors disabled:opacity-40"
+          className="btn btn-sm btn-primary gap-1.5"
         >
           {installing || status.installing ? <Loader2 size={14} className="animate-spin" /> : <PackagePlus size={14} />}
           {installing || status.installing ? '安装中…' : '安装 pandoc'}

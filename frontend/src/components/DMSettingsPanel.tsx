@@ -130,7 +130,7 @@ export default function DMSettingsPanel({ sessionId, partner, myDndUntil, onClos
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex justify-end">
+    <div className="fixed inset-0 z-modal flex justify-end">
       {/* 点击外部关闭（桌面端） */}
       <div className="absolute inset-0 bg-black/30 hidden md:block" onClick={onClose} />
 
@@ -140,13 +140,13 @@ export default function DMSettingsPanel({ sessionId, partner, myDndUntil, onClos
           <div className="flex items-center gap-2">
             <button
               onClick={onClose}
-              className="md:hidden p-1.5 -ml-1 rounded-lg hover:bg-elevated text-textSecondary transition-colors"
+              className="icon-btn-sm md:hidden -ml-1 text-textSecondary"
             >
               <ArrowLeft size={20} />
             </button>
             <h2 className="font-semibold text-sm text-textPrimary">{t('dmSettings.title')}</h2>
           </div>
-          <button onClick={onClose} className="p-1 rounded-lg hover:bg-elevated text-textMuted hidden md:block">
+          <button onClick={onClose} className="icon-btn-sm text-textMuted hidden md:block">
             <X size={16} />
           </button>
         </div>
@@ -154,7 +154,7 @@ export default function DMSettingsPanel({ sessionId, partner, myDndUntil, onClos
         {/* 内容区 */}
         <div className="flex-1 overflow-y-auto p-4 space-y-4 pb-[var(--safe-bottom)] md:pb-4">
           {error && (
-            <div className="text-xs text-rose-400 bg-rose-400/10 rounded-lg px-3 py-2">{error}</div>
+            <div className="text-xs text-rose-400 bg-rose-400/10 rounded-control px-3 py-2">{error}</div>
           )}
 
           {/* === 免打扰设置 === */}
@@ -166,14 +166,14 @@ export default function DMSettingsPanel({ sessionId, partner, myDndUntil, onClos
 
             {myDndUntil ? (
               <div className="space-y-3">
-                <div className="bg-mint-400/10 text-mint-400 rounded-lg px-3 py-2 text-xs flex items-center gap-2">
+                <div className="bg-mint-400/10 text-mint-400 rounded-control px-3 py-2 text-xs flex items-center gap-2">
                   <BellOff size={14} />
                   {t('dmSettings.dndEnabled')}
                 </div>
                 <button
                   onClick={handleCancelDnd}
                   disabled={loading}
-                  className="w-full px-4 py-2.5 bg-primary-500 text-white rounded-lg text-sm font-medium hover:bg-primary-600 disabled:opacity-50 transition-colors"
+                  className="btn btn-md btn-primary w-full"
                 >
                   {t('dmSettings.cancelDnd')}
                 </button>
@@ -187,7 +187,7 @@ export default function DMSettingsPanel({ sessionId, partner, myDndUntil, onClos
                       key={d.key}
                       onClick={() => handleSetDnd(d.minutes)}
                       disabled={loading}
-                      className="flex items-center justify-center gap-1.5 px-3 py-2.5 bg-elevated hover:bg-primary-500/10 hover:text-primary-400 text-textSecondary border border-border rounded-lg text-xs font-medium transition-colors disabled:opacity-50"
+                      className="flex items-center justify-center gap-1.5 px-3 py-2.5 bg-elevated hover:bg-primary-500/10 hover:text-primary-400 text-textSecondary border border-border rounded-control text-xs font-medium transition-colors disabled:opacity-50"
                     >
                       <Clock size={12} />
                       {t(d.key)}
@@ -204,12 +204,12 @@ export default function DMSettingsPanel({ sessionId, partner, myDndUntil, onClos
                     max={10080}
                     disabled={loading}
                     onKeyDown={(e) => { if (e.key === 'Enter') handleCustomDnd() }}
-                    className="flex-1 bg-elevated border border-border rounded-lg px-3 py-2 text-sm text-textPrimary outline-none focus:border-primary-400 placeholder:text-textMuted disabled:opacity-50"
+                    className="flex-1 bg-elevated border border-border rounded-control px-3 py-2 text-sm text-textPrimary outline-none focus:border-primary-400 placeholder:text-textMuted disabled:opacity-50"
                   />
                   <button
                     onClick={handleCustomDnd}
                     disabled={loading || !customMinutes.trim()}
-                    className="px-3 py-2 bg-primary-500 text-white rounded-lg text-xs font-medium hover:bg-primary-600 disabled:opacity-50 transition-colors shrink-0"
+                    className="btn btn-xs btn-primary shrink-0"
                   >
                     {t('common.set')}
                   </button>
@@ -285,7 +285,7 @@ export default function DMSettingsPanel({ sessionId, partner, myDndUntil, onClos
                     <button
                       key={f.key}
                       onClick={() => setExportFormat(f.key)}
-                      className={`flex-1 py-2 rounded-lg border text-center text-xs font-medium transition-colors ${
+                      className={`flex-1 py-2 rounded-control border text-center text-xs font-medium transition-colors ${
                         exportFormat === f.key
                           ? 'border-primary-400 bg-primary-500/10 text-primary-600 dark:text-primary-300'
                           : 'border-border bg-elevated text-textSecondary hover:bg-canvas'
@@ -300,7 +300,7 @@ export default function DMSettingsPanel({ sessionId, partner, myDndUntil, onClos
               <button
                 onClick={handleExportChat}
                 disabled={exporting}
-                className="w-full flex items-center justify-center gap-2 px-4 py-2.5 bg-primary-500 text-white rounded-lg hover:bg-primary-600 disabled:opacity-40 text-sm font-medium transition-all"
+                className="btn btn-md btn-primary w-full gap-2"
               >
                 <Download size={16} />
                 {exporting ? t('common.exporting') : t('dmSettings.downloadExport')}

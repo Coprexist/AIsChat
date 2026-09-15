@@ -92,7 +92,7 @@ export default function MagicVisionFilter({ value, onChange }: Props) {
         <div className="flex items-center gap-2">
           <WandSparkles size={16} className="text-accent-400" />
           <span className="text-sm font-semibold text-textPrimary">魔视界</span>
-          <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-accent-500/10 text-accent-500 border border-accent-500/20">BETA</span>
+          <span className="text-3xs px-1.5 py-0.5 rounded-full bg-accent-500/10 text-accent-500 border border-accent-500/20">BETA</span>
         </div>
         <Toggle checked={enabled} onChange={handleToggleEnabled} />
       </div>
@@ -102,7 +102,7 @@ export default function MagicVisionFilter({ value, onChange }: Props) {
       {enabled && (
         <>
           {warn && (
-            <div className="flex items-start gap-2 p-2.5 mb-3 rounded-lg bg-accent-500/5 border border-accent-500/15 text-xs text-textSecondary">
+            <div className="flex items-start gap-2 p-2.5 mb-3 rounded-control bg-accent-500/5 border border-accent-500/15 text-xs text-textSecondary">
               <AlertTriangle size={14} className="shrink-0 mt-0.5 text-accent-500" />
               <span>部分滤镜（如模糊、投影）可能影响页面性能。如遇卡顿请关闭不必要的魔棒。</span>
             </div>
@@ -110,13 +110,13 @@ export default function MagicVisionFilter({ value, onChange }: Props) {
 
           {/* 应用对象 */}
           <div className="mb-3">
-            <span className="text-[11px] font-medium text-textSecondary mb-1.5 block">应用对象</span>
+            <span className="text-2xs font-medium text-textSecondary mb-1.5 block">应用对象</span>
             <div className="flex gap-1.5">
               {SCOPE_OPTS.map(o => {
                 const Icon = o.icon
                 return (
                   <button key={o.value} onClick={() => setScope(o.value)}
-                    className={`flex items-center gap-1.5 px-2.5 py-1.5 text-xs rounded-lg border transition-colors flex-1 ${
+                    className={`flex items-center gap-1.5 px-2.5 py-1.5 text-xs rounded-control border transition-colors flex-1 ${
                       scope === o.value
                         ? 'border-accent-500/40 bg-accent-500/10 text-accent-500'
                         : 'border-border text-textSecondary hover:text-textPrimary hover:border-accent-500/20'
@@ -134,14 +134,14 @@ export default function MagicVisionFilter({ value, onChange }: Props) {
               const st = filters[def.id] || { enabled: false, value: def.defaultVal }
               const Icon = ICON_MAP[def.id]
               return (
-                <div key={def.id} className={`p-2.5 rounded-xl border transition-colors ${
+                <div key={def.id} className={`p-2.5 rounded-card border transition-colors ${
                   st.enabled ? 'border-accent-500/30 bg-accent-500/5' : 'border-border bg-canvas/30'
                 }`}>
                   <div className="flex items-center justify-between mb-1.5">
                     <div className="flex items-center gap-2 min-w-0">
                       {Icon && <Icon size={14} className={`shrink-0 ${st.enabled ? 'text-accent-400' : 'text-textMuted'}`} />}
                       <span className="text-xs font-medium text-textPrimary">{def.label}</span>
-                      <code className="text-[10px] text-textMuted font-mono">{def.id}</code>
+                      <code className="text-3xs text-textMuted font-mono">{def.id}</code>
                     </div>
                     <Toggle checked={st.enabled} onChange={(v) => toggle(def.id, v)} />
                   </div>
@@ -157,7 +157,7 @@ export default function MagicVisionFilter({ value, onChange }: Props) {
                       </span>
                       {st.value !== def.defaultVal && (
                         <button onClick={() => slide(def.id, def.defaultVal)}
-                          className="text-[10px] text-textMuted hover:text-textSecondary shrink-0">重置</button>
+                          className="text-3xs text-textMuted hover:text-textSecondary shrink-0">重置</button>
                       )}
                     </div>
                   )}
@@ -169,12 +169,12 @@ export default function MagicVisionFilter({ value, onChange }: Props) {
           {/* 底部按钮 */}
           <div className="flex items-center gap-2 mt-4 pt-3 border-t border-border">
             <button onClick={reset}
-              className="flex items-center gap-1 px-3 py-1.5 text-xs rounded-lg border border-border text-textSecondary hover:text-textPrimary transition-colors">
+              className="btn btn-xs btn-outline gap-1 hover:text-textPrimary">
               <RotateCcw size={12} />重置全部
             </button>
             <div className="flex-1" />
             <button onClick={handleApply} disabled={!anyActive || saving}
-              className="flex items-center gap-1 px-4 py-1.5 text-xs rounded-lg bg-accent-500 hover:bg-accent-600 text-white font-medium transition-colors disabled:opacity-40 disabled:cursor-not-allowed">
+              className="flex items-center gap-1 px-4 py-1.5 text-xs rounded-control bg-accent-500 hover:bg-accent-600 text-white font-medium transition-colors disabled:opacity-40 disabled:cursor-not-allowed">
               {saving ? '保存中…' : '应用'}
             </button>
           </div>

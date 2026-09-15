@@ -55,7 +55,7 @@ export default function LoginPage() {
                 window.parent?.postMessage({ source: 'aischat-embed', type: 'request-login' }, '*')
               } catch { /* 静默 */ }
             }}
-            className="px-5 py-2 rounded-lg bg-primary-600 text-white text-sm font-medium hover:bg-primary-500"
+            className="px-5 py-2 rounded-control bg-primary-600 text-white text-sm font-medium hover:bg-primary-500"
           >
             去登录
           </button>
@@ -186,7 +186,7 @@ export default function LoginPage() {
           <div className="relative inline-flex items-center justify-center mb-6">
             <div className="absolute w-20 h-20 rounded-full ai-pulse-active" />
             <div className="absolute w-16 h-16 rounded-full bg-primary-500/20 blur-xl" />
-            <div className="relative w-14 h-14 rounded-2xl flex items-center justify-center shadow-lg shadow-primary-500/25 overflow-hidden">
+            <div className="relative w-14 h-14 rounded-dialog flex items-center justify-center shadow-lg shadow-primary-500/25 overflow-hidden">
               <img src="/logo.png" alt="AIsChat" className="w-full h-full object-contain" />
             </div>
           </div>
@@ -196,12 +196,12 @@ export default function LoginPage() {
 
         {/* 表单卡片 */}
         <div className="w-full max-w-sm">
-          <div className="bg-surface border border-border rounded-2xl p-6 shadow-2xl shadow-black/30">
+          <div className="bg-surface border border-border rounded-dialog p-6 shadow-2xl shadow-black/30">
             {/* 登录/注册切换 */}
-            <div className="flex bg-canvas rounded-lg p-1 mb-4 ring-1 ring-border/50">
+            <div className="flex bg-canvas rounded-control p-1 mb-4 ring-1 ring-border/50">
               <button
                 onClick={() => { setMode('login'); setError('') }}
-                className={`flex-1 py-2 text-sm font-medium rounded-md transition-all duration-200 ${
+                className={`flex-1 py-2 text-sm font-medium rounded-control transition-all duration-200 ${
                   mode === 'login' ? 'bg-primary-600/20 text-primary-600 dark:text-primary-300 shadow-sm' : 'text-textMuted hover:text-textSecondary'
                 }`}
               >
@@ -209,7 +209,7 @@ export default function LoginPage() {
               </button>
               <button
                 onClick={() => { setMode('register'); setError('') }}
-                className={`flex-1 py-2 text-sm font-medium rounded-md transition-all duration-200 ${
+                className={`flex-1 py-2 text-sm font-medium rounded-control transition-all duration-200 ${
                   mode === 'register' ? 'bg-primary-600/20 text-primary-600 dark:text-primary-300 shadow-sm' : 'text-textMuted hover:text-textSecondary'
                 }`}
               >
@@ -251,7 +251,7 @@ export default function LoginPage() {
                       value={email}
                       onChange={(e) => { setEmail(e.target.value); setCodeSent(false) }}
                       required={requireEmailVerification}
-                      className="w-full px-3.5 py-2.5 rounded-xl border border-border bg-canvas text-textPrimary placeholder:text-textMuted focus:outline-none focus:ring-2 focus:ring-primary-500/60 focus:border-primary-500/40 text-sm transition-shadow"
+                      className="w-full px-3.5 py-2.5 rounded-card border border-border bg-canvas text-textPrimary placeholder:text-textMuted focus:outline-none focus:ring-2 focus:ring-primary-500/60 focus:border-primary-500/40 text-sm transition-shadow"
                       placeholder={t('auth.emailPlaceholder')}
                     />
                   </div>
@@ -262,7 +262,7 @@ export default function LoginPage() {
                       type="button"
                       onClick={handleSendCode}
                       disabled={!email || sendCooldown > 0}
-                      className="w-full py-2 text-sm font-medium rounded-xl border border-primary-500/30 text-primary-500 hover:bg-primary-500/10 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+                      className="w-full py-2 text-sm font-medium rounded-card border border-primary-500/30 text-primary-500 hover:bg-primary-500/10 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
                     >
                       {sendCooldown > 0
                         ? t('auth.codeResendIn').replace('{seconds}', String(sendCooldown))
@@ -294,7 +294,7 @@ export default function LoginPage() {
                       value={username}
                       onChange={(e) => setUsername(e.target.value)}
                       required minLength={2}
-                      className="w-full px-3.5 py-2.5 rounded-xl border border-border bg-canvas text-textPrimary placeholder:text-textMuted focus:outline-none focus:ring-2 focus:ring-primary-500/60 focus:border-primary-500/40 text-sm transition-shadow"
+                      className="w-full px-3.5 py-2.5 rounded-card border border-border bg-canvas text-textPrimary placeholder:text-textMuted focus:outline-none focus:ring-2 focus:ring-primary-500/60 focus:border-primary-500/40 text-sm transition-shadow"
                       placeholder={t('auth.usernamePlaceholder')}
                     />
                   </div>
@@ -309,7 +309,7 @@ export default function LoginPage() {
                       value={password}
                       onChange={(e) => setPassword(e.target.value)}
                       required minLength={6}
-                      className="w-full px-3.5 py-2.5 rounded-xl border border-border bg-canvas text-textPrimary placeholder:text-textMuted focus:outline-none focus:ring-2 focus:ring-primary-500/60 focus:border-primary-500/40 text-sm transition-shadow"
+                      className="w-full px-3.5 py-2.5 rounded-card border border-border bg-canvas text-textPrimary placeholder:text-textMuted focus:outline-none focus:ring-2 focus:ring-primary-500/60 focus:border-primary-500/40 text-sm transition-shadow"
                       placeholder={'••••••••（' + t('auth.passwordHint') + '）'}
                     />
                   </div>
@@ -331,7 +331,7 @@ export default function LoginPage() {
                           value={username}
                           onChange={(e) => setUsername(e.target.value)}
                           required
-                          className="w-full px-3.5 py-2.5 rounded-xl border border-border bg-canvas text-textPrimary placeholder:text-textMuted focus:outline-none focus:ring-2 focus:ring-primary-500/60 focus:border-primary-500/40 text-sm transition-shadow"
+                          className="w-full px-3.5 py-2.5 rounded-card border border-border bg-canvas text-textPrimary placeholder:text-textMuted focus:outline-none focus:ring-2 focus:ring-primary-500/60 focus:border-primary-500/40 text-sm transition-shadow"
                           placeholder={t('auth.usernamePlaceholder')}
                         />
                       </div>
@@ -344,7 +344,7 @@ export default function LoginPage() {
                           value={password}
                           onChange={(e) => setPassword(e.target.value)}
                           required minLength={6}
-                          className="w-full px-3.5 py-2.5 rounded-xl border border-border bg-canvas text-textPrimary placeholder:text-textMuted focus:outline-none focus:ring-2 focus:ring-primary-500/60 focus:border-primary-500/40 text-sm transition-shadow"
+                          className="w-full px-3.5 py-2.5 rounded-card border border-border bg-canvas text-textPrimary placeholder:text-textMuted focus:outline-none focus:ring-2 focus:ring-primary-500/60 focus:border-primary-500/40 text-sm transition-shadow"
                           placeholder={'••••••••（' + t('auth.passwordHint') + '）'}
                         />
                       </div>
@@ -363,7 +363,7 @@ export default function LoginPage() {
                           value={email}
                           onChange={(e) => { setEmail(e.target.value); setCodeSent(false) }}
                           required
-                          className="w-full px-3.5 py-2.5 rounded-xl border border-border bg-canvas text-textPrimary placeholder:text-textMuted focus:outline-none focus:ring-2 focus:ring-primary-500/60 focus:border-primary-500/40 text-sm transition-shadow"
+                          className="w-full px-3.5 py-2.5 rounded-card border border-border bg-canvas text-textPrimary placeholder:text-textMuted focus:outline-none focus:ring-2 focus:ring-primary-500/60 focus:border-primary-500/40 text-sm transition-shadow"
                           placeholder={t('auth.emailPlaceholder')}
                         />
                       </div>
@@ -371,7 +371,7 @@ export default function LoginPage() {
                         type="button"
                         onClick={handleSendCode}
                         disabled={!email || sendCooldown > 0}
-                        className="w-full py-2 text-sm font-medium rounded-xl border border-primary-500/30 text-primary-500 hover:bg-primary-500/10 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+                        className="w-full py-2 text-sm font-medium rounded-card border border-primary-500/30 text-primary-500 hover:bg-primary-500/10 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
                       >
                         {sendCooldown > 0
                           ? t('auth.codeResendIn').replace('{seconds}', String(sendCooldown))
@@ -396,7 +396,7 @@ export default function LoginPage() {
 
               {/* 错误 */}
               {error && (
-                <div className="text-sm text-rose-400 bg-rose-500/10 border border-rose-500/20 rounded-xl px-3.5 py-2.5">
+                <div className="text-sm text-rose-400 bg-rose-500/10 border border-rose-500/20 rounded-card px-3.5 py-2.5">
                   {error}
                 </div>
               )}
@@ -405,7 +405,7 @@ export default function LoginPage() {
               <button
                 type="submit"
                 disabled={loading || (isLogin && loginMethod === 'direct' && (!username || !password)) || (isLogin && loginMethod === 'email_code' && (!email || !code)) || (isRegister && !username)}
-                className="w-full py-2.5 bg-primary-500 hover:bg-primary-600 disabled:opacity-30 disabled:cursor-not-allowed text-white rounded-xl font-semibold text-sm transition-all duration-200 shadow-lg shadow-primary-500/20 hover:shadow-primary-400/30 mt-2"
+                className="btn btn-md btn-primary w-full duration-200 hover:shadow-primary-400/30 mt-2"
               >
                 {loading ? (
                   <span className="inline-flex items-center gap-2">

@@ -4,6 +4,7 @@ import { api, ApiError } from '../api/client'
 import { Bot, Plus, Edit3, History, Power, Download, Upload, X, RotateCcw, Eye, EyeOff, ArrowLeft, Menu } from 'lucide-react'
 import { useAuth } from '../context/AuthContext'
 import Toggle from '../components/Toggle'
+import { Button, Dialog, IconButton, PageHeader } from '../components/ui'
 import { useT } from '../i18n/I18nContext'
 import CreateAgentModal from '../components/CreateAgentModal'
 import { STATE_BADGE_COLORS, AI_TYPE_LABEL } from '../constants'
@@ -118,34 +119,26 @@ export default function AgentsPage() {
 
   return (
     <div className="h-full flex flex-col bg-canvas">
-      {/* 头部 */}
-      <div className="px-4 h-14 border-b border-border bg-surface flex items-center gap-2 shrink-0">
-        <button
-          onClick={openDrawer}
-          className="md:hidden p-1.5 -ml-1 rounded-lg hover:bg-elevated text-textSecondary transition-colors"
-          title={t('chatlist.menu')}
-        >
-          <Menu size={18} />
-        </button>
-        <h1 className="font-semibold text-textPrimary text-sm">{t('agents.title')}</h1>
-        <span className="text-xs text-textMuted hidden sm:inline">{t('agents.subtitle')}</span>
-        <div className="ml-auto flex items-center gap-2">
-          <button
-            onClick={() => setShowImport(true)}
-            className="flex items-center gap-1.5 md:gap-2 px-2.5 md:px-3 py-1.5 md:py-2 border border-border text-textSecondary rounded-lg hover:bg-elevated text-xs font-medium transition-colors"
-          >
-            <Upload size={13} className="md:w-3.5 md:h-3.5" />
-            <span className="inline">{t('agents.import')}</span>
-          </button>
-          <button
-            onClick={() => setShowCreate(true)}
-            className="flex items-center gap-1.5 px-2.5 md:px-3 py-1.5 md:py-2 bg-primary-500 text-white rounded-lg hover:bg-primary-600 text-xs font-medium transition-all shadow-lg shadow-primary-500/20"
-          >
-            <Plus size={13} />
-            <span className="inline">{t('agents.create')}</span>
-          </button>
-        </div>
-      </div>
+      <PageHeader
+        title={t('agents.title')}
+        subtitle={t('agents.subtitle')}
+        leading={
+          <IconButton
+            size="sm"
+            icon={<Menu size={18} />}
+            label={t('chatlist.menu')}
+            onClick={openDrawer}
+            className="md:hidden -ml-1"
+          />
+        }
+      >
+        <Button size="sm" variant="outline" icon={<Upload size={13} />} onClick={() => setShowImport(true)}>
+          {t('agents.import')}
+        </Button>
+        <Button size="sm" icon={<Plus size={13} />} onClick={() => setShowCreate(true)}>
+          {t('agents.create')}
+        </Button>
+      </PageHeader>
 
       {/* 内容 */}
       <div className="flex-1 overflow-y-auto">
@@ -170,7 +163,7 @@ export default function AgentsPage() {
                 <div
                   key={agent.id}
                   onClick={() => navigate(`/agents/${agent.id}`)}
-                  className="bg-surface border border-border rounded-xl p-5 hover:border-primary-500/30 transition-all duration-200 cursor-pointer"
+                  className="bg-surface border border-border rounded-card p-5 hover:border-primary-500/30 transition-all duration-200 cursor-pointer"
                 >
                   <div className="flex items-center justify-between mb-3">
                     <div className="flex items-center gap-3">
@@ -213,7 +206,7 @@ export default function AgentsPage() {
                       <span className="text-mint-400">{t('agents.selfEditable')}</span>
                     )}
                     {AI_TYPE_LABEL[agent.ai_type] && (
-                      <span className={`text-[10px] px-1.5 py-0.5 rounded-full font-medium ${AI_TYPE_LABEL[agent.ai_type].cls}`}>
+                      <span className={`text-3xs px-1.5 py-0.5 rounded-full font-medium ${AI_TYPE_LABEL[agent.ai_type].cls}`}>
                         {t(AI_TYPE_LABEL[agent.ai_type].key)}
                       </span>
                     )}
@@ -228,25 +221,25 @@ export default function AgentsPage() {
                   <div className="flex items-center gap-2 mt-3 pt-3 border-t border-border flex-wrap">
                     <button
                       onClick={(e) => { e.stopPropagation(); navigate(`/agents/${agent.id}`) }}
-                      className="flex items-center gap-1 px-2 py-1 text-xs text-textSecondary hover:text-primary-400 rounded-lg hover:bg-elevated transition-colors"
+                      className="flex items-center gap-1 px-2 py-1 text-xs text-textSecondary hover:text-primary-400 rounded-control hover:bg-elevated transition-colors"
                     >
                       <Edit3 size={12} /> {t('agents.edit')}
                     </button>
                     <button
                       onClick={(e) => { e.stopPropagation(); setHistoryAgent(agent) }}
-                      className="flex items-center gap-1 px-2 py-1 text-xs text-textSecondary hover:text-primary-400 rounded-lg hover:bg-elevated transition-colors"
+                      className="flex items-center gap-1 px-2 py-1 text-xs text-textSecondary hover:text-primary-400 rounded-control hover:bg-elevated transition-colors"
                     >
                       <History size={12} /> {t('agents.history')}
                     </button>
                     <button
                       onClick={(e) => { e.stopPropagation(); setStateAgent(agent) }}
-                      className="flex items-center gap-1 px-2 py-1 text-xs text-textSecondary hover:text-accent-400 rounded-lg hover:bg-elevated transition-colors"
+                      className="flex items-center gap-1 px-2 py-1 text-xs text-textSecondary hover:text-accent-400 rounded-control hover:bg-elevated transition-colors"
                     >
                       <Power size={12} /> {t('agents.state')}
                     </button>
                     <button
                       onClick={(e) => { e.stopPropagation(); handleExport(agent) }}
-                      className="flex items-center gap-1 px-2 py-1 text-xs text-textSecondary hover:text-mint-400 rounded-lg hover:bg-elevated transition-colors"
+                      className="flex items-center gap-1 px-2 py-1 text-xs text-textSecondary hover:text-mint-400 rounded-control hover:bg-elevated transition-colors"
                     >
                       <Download size={12} /> {t('agents.export')}
                     </button>
@@ -458,18 +451,18 @@ function EditAgentModal({ agent, onClose, onUpdated }: {
   ]
 
   return (
-    <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-50" onClick={onClose}>
-      <div className="bg-elevated border border-border rounded-2xl p-6 w-full max-w-2xl mx-4 max-h-[90vh] overflow-y-auto shadow-2xl shadow-black/30 pb-[var(--safe-bottom)] md:pb-6" onClick={(e) => e.stopPropagation()}>
+    <Dialog onClose={onClose} className="flex items-center justify-center">
+      <div className="bg-elevated border border-border rounded-dialog p-6 w-full max-w-2xl mx-4 max-h-[90vh] overflow-y-auto shadow-2xl shadow-black/30 pb-[var(--safe-bottom)] md:pb-6" onClick={(e) => e.stopPropagation()}>
         <div className="flex items-center justify-between mb-4">
           <h2 className="text-lg font-semibold text-textPrimary">{t('agents.editTitle')} {agent.name}</h2>
-          <button onClick={onClose} className="p-1 hover:bg-elevated rounded-lg text-textMuted hover:text-textSecondary">
+          <button onClick={onClose} className="icon-btn-sm text-textMuted">
             <X size={18} />
           </button>
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
           {/* 原始设定（只读） */}
-          <div className="bg-canvas rounded-xl p-4 border border-border">
+          <div className="bg-canvas rounded-card p-4 border border-border">
             <h3 className="text-sm font-semibold text-textSecondary mb-3 flex items-center gap-1">
               {t('agents.originalSettings')}
             </h3>
@@ -498,13 +491,13 @@ function EditAgentModal({ agent, onClose, onUpdated }: {
           </div>
 
           {/* 当前设定（可编辑） */}
-          <div className="bg-primary-500/5 rounded-xl p-4 border border-primary-500/20">
+          <div className="bg-primary-500/5 rounded-card p-4 border border-primary-500/20">
             <div className="flex items-center justify-between mb-3">
               <h3 className="text-sm font-semibold text-primary-400 flex items-center gap-1">
                 {t('agents.currentSettings')}{hasModified ? t('agents.currentSettingsModified') : ''}
               </h3>
               {/* 档位标签 */}
-              <span className="text-[10px] px-2 py-0.5 rounded-full bg-primary-500/20 text-primary-400 font-medium">
+              <span className="chip chip-primary shrink-0">
                 {configProfile === 'chat' ? t('agents.badgeChat') : configProfile === 'immersive' ? t('agents.badgeImmersive') : t('agents.badgeDigitalLife')}
               </span>
             </div>
@@ -515,7 +508,7 @@ function EditAgentModal({ agent, onClose, onUpdated }: {
                   key={p.key}
                   onClick={() => handleApplyPreset(p.key)}
                   disabled={applyingPreset || configProfile === p.key}
-                  className={`flex-1 py-1.5 text-xs rounded-lg font-medium transition-all ${
+                  className={`flex-1 py-1.5 text-xs rounded-control font-medium transition-all ${
                     configProfile === p.key
                       ? 'bg-primary-500 text-white shadow-sm'
                       : 'bg-canvas border border-border text-textSecondary hover:border-primary-500/40 hover:text-primary-400'
@@ -533,7 +526,7 @@ function EditAgentModal({ agent, onClose, onUpdated }: {
                   value={systemPrompt}
                   onChange={(e) => setSystemPrompt(e.target.value)}
                   rows={3}
-                  className="w-full px-3 py-1.5 rounded-lg border border-border bg-canvas text-sm text-textPrimary placeholder:text-textMuted focus:outline-none focus:ring-2 focus:ring-primary-500/50 resize-none mt-0.5"
+                  className="w-full px-3 py-1.5 rounded-control border border-border bg-canvas text-sm text-textPrimary placeholder:text-textMuted focus:outline-none focus:ring-2 focus:ring-primary-500/50 resize-none mt-0.5"
                 />
               </div>
               {/* 模型选择 */}
@@ -543,7 +536,7 @@ function EditAgentModal({ agent, onClose, onUpdated }: {
                   <select
                     value={chatModel}
                     onChange={(e) => setChatModel(e.target.value)}
-                    className="w-full mt-0.5 px-2 py-1.5 rounded-lg border border-border bg-canvas text-xs text-textPrimary focus:outline-none focus:ring-2 focus:ring-primary-500/50"
+                    className="w-full mt-0.5 px-2 py-1.5 rounded-control border border-border bg-canvas text-xs text-textPrimary focus:outline-none focus:ring-2 focus:ring-primary-500/50"
                   >
                     <option value="">{t('common.default')} ({defaults.chat_model})</option>
                     {modelOptions.map(m => (
@@ -556,7 +549,7 @@ function EditAgentModal({ agent, onClose, onUpdated }: {
                   <select
                     value={workModel}
                     onChange={(e) => setWorkModel(e.target.value)}
-                    className="w-full mt-0.5 px-2 py-1.5 rounded-lg border border-border bg-canvas text-xs text-textPrimary focus:outline-none focus:ring-2 focus:ring-primary-500/50"
+                    className="w-full mt-0.5 px-2 py-1.5 rounded-control border border-border bg-canvas text-xs text-textPrimary focus:outline-none focus:ring-2 focus:ring-primary-500/50"
                   >
                     <option value="">{t('common.default')} ({defaults.work_model})</option>
                     {modelOptions.map(m => (
@@ -565,7 +558,7 @@ function EditAgentModal({ agent, onClose, onUpdated }: {
                   </select>
                 </div>
               </div>
-              <div className="text-[10px] text-textMuted">
+              <div className="text-3xs text-textMuted">
                 {t('agents.effectiveChatPrefix')} {effectiveChatModel} {t('agents.effectiveWorkPrefix')} {effectiveWorkModel}
               </div>
               <div className="space-y-1.5 text-xs">
@@ -594,7 +587,7 @@ function EditAgentModal({ agent, onClose, onUpdated }: {
                 <div className="flex items-center justify-between pt-2 border-t border-border mt-2">
                   <div>
                     <span className="text-xs text-textSecondary">{t('agents.thinkingModeLabel')}</span>
-                    <p className="text-[10px] text-textMuted mt-0.5">{t('agents.thinkingModeDesc')}</p>
+                    <p className="text-3xs text-textMuted mt-0.5">{t('agents.thinkingModeDesc')}</p>
                   </div>
                   <Toggle checked={thinkingEnabled} onChange={setThinkingEnabled} />
                 </div>
@@ -603,7 +596,7 @@ function EditAgentModal({ agent, onClose, onUpdated }: {
               <div className="flex items-center justify-between pt-2 border-t border-border mt-2">
                 <div>
                   <span className="text-xs text-textSecondary">{t('agents.hideAiLabel')}</span>
-                  <p className="text-[10px] text-textMuted mt-0.5">{t('agents.hideAiDesc')}</p>
+                  <p className="text-3xs text-textMuted mt-0.5">{t('agents.hideAiDesc')}</p>
                 </div>
                 <label className="relative inline-flex items-center cursor-pointer">
                   <Toggle checked={hideAiIdentity} onChange={setHideAiIdentity} />
@@ -613,7 +606,7 @@ function EditAgentModal({ agent, onClose, onUpdated }: {
               <div className="flex items-center justify-between pt-2 border-t border-border mt-2">
                 <div>
                   <span className="text-xs text-textSecondary">向量化情感（更拟人）</span>
-                  <p className="text-[10px] text-textMuted mt-0.5">情感用 8 轴向量表达（开心/伤心/愤怒/恐惧/厌恶/惊讶/信任/期待），可同时多轴非零；不勾则用文字心情描述</p>
+                  <p className="text-3xs text-textMuted mt-0.5">情感用 8 轴向量表达（开心/伤心/愤怒/恐惧/厌恶/惊讶/信任/期待），可同时多轴非零；不勾则用文字心情描述</p>
                 </div>
                 <label className="relative inline-flex items-center cursor-pointer">
                   <Toggle checked={emotionVectorized} onChange={setEmotionVectorized} />
@@ -623,7 +616,7 @@ function EditAgentModal({ agent, onClose, onUpdated }: {
               <div className="flex items-center justify-between pt-2 border-t border-border mt-2">
                 <div>
                   <span className="text-xs text-textSecondary">{t('agents.delayReplyLabel')}</span>
-                  <p className="text-[10px] text-textMuted mt-0.5">{t('agents.delayReplyDesc')}</p>
+                  <p className="text-3xs text-textMuted mt-0.5">{t('agents.delayReplyDesc')}</p>
                 </div>
                 <select
                   value={delayReplyEnabled === null ? 'inherit' : delayReplyEnabled ? 'on' : 'off'}
@@ -631,7 +624,7 @@ function EditAgentModal({ agent, onClose, onUpdated }: {
                     const v = e.target.value
                     setDelayReplyEnabled(v === 'inherit' ? null : v === 'on')
                   }}
-                  className="text-xs px-2 py-1 rounded-lg border border-border bg-canvas text-textPrimary focus:outline-none focus:ring-2 focus:ring-primary-500/50"
+                  className="text-xs px-2 py-1 rounded-control border border-border bg-canvas text-textPrimary focus:outline-none focus:ring-2 focus:ring-primary-500/50"
                 >
                   <option value="inherit">{t('agents.inheritGlobal')}</option>
                   <option value="on">{t('agents.enable')}</option>
@@ -643,7 +636,7 @@ function EditAgentModal({ agent, onClose, onUpdated }: {
         </div>
 
         {/* ── 工具调用 & 闹钟 ── */}
-        <div className="bg-canvas rounded-xl p-4 border border-border mb-4">
+        <div className="bg-canvas rounded-card p-4 border border-border mb-4">
           <h3 className="text-sm font-semibold text-textSecondary mb-3">{t('agentDetail.toolCallsAndAlarms')}</h3>
           <div className="grid grid-cols-2 gap-3 text-sm">
             <div>
@@ -685,14 +678,14 @@ function EditAgentModal({ agent, onClose, onUpdated }: {
           <div className="flex items-center justify-between mt-3 pt-3 border-t border-border/60">
             <div>
               <span className="text-xs text-textSecondary">{t('agents.selfEditable')}</span>
-              <p className="text-[10px] text-textMuted mt-0.5">{t('agents.selfEditableDesc')}</p>
+              <p className="text-3xs text-textMuted mt-0.5">{t('agents.selfEditableDesc')}</p>
             </div>
             <Toggle checked={isAiEditable} onChange={setIsAiEditable} />
           </div>
         </div>
 
         {/* 独立 API 配置 */}
-        <div className="bg-canvas rounded-xl p-4 border border-border mb-4">
+        <div className="bg-canvas rounded-card p-4 border border-border mb-4">
           <h3 className="text-sm font-semibold text-textSecondary mb-3">{t('agents.independentApi')}</h3>
           <div className="space-y-2">
             <div>
@@ -701,7 +694,7 @@ function EditAgentModal({ agent, onClose, onUpdated }: {
                 type="text"
                 value={agentApiBaseUrl}
                 onChange={(e) => setAgentApiBaseUrl(e.target.value)}
-                className="w-full mt-0.5 px-3 py-1.5 rounded-lg border border-border bg-canvas text-xs text-textPrimary placeholder:text-textMuted focus:outline-none focus:ring-2 focus:ring-primary-500/50"
+                className="w-full mt-0.5 px-3 py-1.5 rounded-control border border-border bg-canvas text-xs text-textPrimary placeholder:text-textMuted focus:outline-none focus:ring-2 focus:ring-primary-500/50"
                 placeholder="https://api.deepseek.com"
               />
             </div>
@@ -712,9 +705,9 @@ function EditAgentModal({ agent, onClose, onUpdated }: {
                 value={agentApiKey}
                 onChange={(e) => setAgentApiKey(e.target.value)}
                 placeholder={agent.has_api_key ? t('agents.apiKeyPlaceholderSet') : t('agents.apiKeyPlaceholder')}
-                className="w-full mt-0.5 px-3 py-1.5 rounded-lg border border-border bg-canvas text-xs text-textPrimary placeholder:text-textMuted focus:outline-none focus:ring-2 focus:ring-primary-500/50"
+                className="w-full mt-0.5 px-3 py-1.5 rounded-control border border-border bg-canvas text-xs text-textPrimary placeholder:text-textMuted focus:outline-none focus:ring-2 focus:ring-primary-500/50"
               />
-              {agent.has_api_key && <p className="text-[10px] text-mint-400 mt-0.5">{t('agents.apiKeySet')}</p>}
+              {agent.has_api_key && <p className="text-3xs text-mint-400 mt-0.5">{t('agents.apiKeySet')}</p>}
             </div>
           </div>
         </div>
@@ -723,7 +716,7 @@ function EditAgentModal({ agent, onClose, onUpdated }: {
 
         {/* ── 预设切换预览确认 ── */}
         {presetPreview && (
-          <div className="mb-4 bg-accent-500/5 border border-accent-500/20 rounded-xl p-4">
+          <div className="mb-4 bg-accent-500/5 border border-accent-500/20 rounded-card p-4">
             <h4 className="text-sm font-semibold text-textPrimary mb-2">{t('agents.presetConfirmTitle')}</h4>
             <p className="text-xs text-textSecondary mb-3">
               {t('agents.presetFrom')} <b>{presetPreview.old_profile}</b> {t('agents.presetTo')}{' '}
@@ -734,7 +727,7 @@ function EditAgentModal({ agent, onClose, onUpdated }: {
             {Object.keys(presetPreview.changed_fields || {}).length > 0 ? (
               <div className="space-y-1.5 mb-3 text-xs">
                 {Object.entries(presetPreview.changed_fields as Record<string, {old: any; new: any}>).map(([key, v]: [string, any]) => (
-                  <div key={key} className="flex items-center justify-between bg-canvas rounded-lg px-3 py-1.5">
+                  <div key={key} className="flex items-center justify-between bg-canvas rounded-control px-3 py-1.5">
                     <span className="text-textSecondary">{key}</span>
                     <span className="text-textMuted font-mono">
                       <span>{String(v.old)}</span>
@@ -748,17 +741,17 @@ function EditAgentModal({ agent, onClose, onUpdated }: {
               <p className="text-xs text-textMuted mb-3">{t('agents.presetNoChange')}</p>
             )}
             {presetPreview.independent_untouched?.length > 0 && (
-              <p className="text-[10px] text-textMuted mb-3">
+              <p className="text-3xs text-textMuted mb-3">
                 {t('agents.presetIndependentFields')} {presetPreview.independent_untouched.join('、')}
               </p>
             )}
             <div className="flex gap-2">
               <button onClick={() => { setPresetPreview(null); setApplyingPreset(false) }}
-                className="flex-1 py-1.5 text-xs border border-border rounded-lg hover:bg-elevated text-textSecondary transition-colors">
+                className="flex-1 py-1.5 text-xs border border-border rounded-control hover:bg-elevated text-textSecondary transition-colors">
                 {t('agents.cancel')}
               </button>
               <button onClick={confirmApplyPreset} disabled={applyingPreset}
-                className="flex-1 py-1.5 text-xs bg-primary-500 text-white rounded-lg hover:bg-primary-600 disabled:opacity-30 transition-all">
+                className="btn btn-xs btn-primary flex-1">
                 {applyingPreset ? t('agents.applying') : t('agents.confirmSwitch')}
               </button>
             </div>
@@ -766,19 +759,19 @@ function EditAgentModal({ agent, onClose, onUpdated }: {
         )}
 
         <div className="flex gap-2">
-          <button onClick={onClose} className="flex-1 py-2.5 text-sm border border-border rounded-xl hover:bg-elevated text-textSecondary transition-colors font-medium">
+          <button onClick={onClose} className="btn btn-md btn-outline flex-1">
             {t('agents.cancel')}
           </button>
           <button
             onClick={handleSave}
             disabled={loading}
-            className="flex-1 py-2.5 text-sm bg-primary-500 text-white rounded-xl hover:bg-primary-600 disabled:opacity-30 font-medium transition-all shadow-lg shadow-primary-500/20"
+            className="btn btn-md btn-primary flex-1"
           >
             {loading ? t('agents.saving') : t('agents.saveChanges')}
           </button>
         </div>
       </div>
-    </div>
+    </Dialog>
   )
 }
 
@@ -822,11 +815,11 @@ function HistoryModal({ agent, onClose, onRollback }: {
   }
 
   return (
-    <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-50" onClick={onClose}>
-      <div className="bg-elevated border border-border rounded-2xl p-6 w-full max-w-xl mx-4 max-h-[80vh] overflow-y-auto shadow-2xl shadow-black/30 pb-[var(--safe-bottom)] md:pb-6" onClick={(e) => e.stopPropagation()}>
+    <Dialog onClose={onClose} className="flex items-center justify-center">
+      <div className="bg-elevated border border-border rounded-dialog p-6 w-full max-w-xl mx-4 max-h-[80vh] overflow-y-auto shadow-2xl shadow-black/30 pb-[var(--safe-bottom)] md:pb-6" onClick={(e) => e.stopPropagation()}>
         <div className="flex items-center justify-between mb-4">
           <h2 className="text-lg font-semibold text-textPrimary">{agent.name} · {t('agents.configHistory')}</h2>
-          <button onClick={onClose} className="p-1 hover:bg-elevated rounded-lg text-textMuted hover:text-textSecondary">
+          <button onClick={onClose} className="icon-btn-sm text-textMuted">
             <X size={18} />
           </button>
         </div>
@@ -842,7 +835,7 @@ function HistoryModal({ agent, onClose, onRollback }: {
               return (
                 <div
                   key={h.id}
-                  className={`rounded-xl p-4 border ${
+                  className={`rounded-card p-4 border ${
                     isLatest
                       ? 'border-primary-500/30 bg-primary-500/5'
                       : 'border-border bg-canvas'
@@ -857,7 +850,7 @@ function HistoryModal({ agent, onClose, onRollback }: {
                       <button
                         onClick={() => handleRollback(h.id)}
                         disabled={rollingBack === h.id}
-                        className="flex items-center gap-1 px-2 py-0.5 text-xs text-accent-400 hover:bg-accent-400/10 rounded-lg transition-colors disabled:opacity-30"
+                        className="flex items-center gap-1 px-2 py-0.5 text-xs text-accent-400 hover:bg-accent-400/10 rounded-control transition-colors disabled:opacity-30"
                       >
                         <RotateCcw size={11} />
                         {rollingBack === h.id ? t('agents.rollingBack') : t('agents.rollbackTo')}
@@ -883,7 +876,7 @@ function HistoryModal({ agent, onClose, onRollback }: {
 
         {error && <div className="text-sm text-rose-400 mt-3">{error}</div>}
       </div>
-    </div>
+    </Dialog>
   )
 }
 
@@ -922,11 +915,11 @@ function StateModal({ agent, onClose, onUpdated }: {
   }
 
   return (
-    <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-50" onClick={onClose}>
-      <div className="bg-elevated border border-border rounded-2xl p-6 w-full max-w-sm mx-4 shadow-2xl shadow-black/30 pb-[var(--safe-bottom)] md:pb-6" onClick={(e) => e.stopPropagation()}>
+    <Dialog onClose={onClose} className="flex items-center justify-center">
+      <div className="bg-elevated border border-border rounded-dialog p-6 w-full max-w-sm mx-4 shadow-2xl shadow-black/30 pb-[var(--safe-bottom)] md:pb-6" onClick={(e) => e.stopPropagation()}>
         <div className="flex items-center justify-between mb-4">
           <h2 className="text-lg font-semibold text-textPrimary">{agent.name} · {t('agents.state')}</h2>
-          <button onClick={onClose} className="p-1 hover:bg-elevated rounded-lg text-textMuted hover:text-textSecondary">
+          <button onClick={onClose} className="icon-btn-sm text-textMuted">
             <X size={18} />
           </button>
         </div>
@@ -937,7 +930,7 @@ function StateModal({ agent, onClose, onUpdated }: {
             <select
               value={targetState}
               onChange={(e) => setTargetState(e.target.value)}
-              className="w-full px-3 py-2 rounded-lg border border-border bg-canvas text-sm text-textPrimary focus:outline-none focus:ring-2 focus:ring-primary-500/50"
+              className="w-full px-3 py-2 rounded-control border border-border bg-canvas text-sm text-textPrimary focus:outline-none focus:ring-2 focus:ring-primary-500/50"
             >
               {Object.entries(stateLabelKeys).map(([k, v]) => (
                 <option key={k} value={k}>{t(v)}</option>
@@ -953,7 +946,7 @@ function StateModal({ agent, onClose, onUpdated }: {
                 min={1} max={72}
                 value={durationHours}
                 onChange={(e) => setDurationHours(parseInt(e.target.value) || 1)}
-                className="w-full px-3 py-2 rounded-lg border border-border bg-canvas text-sm text-textPrimary focus:outline-none focus:ring-2 focus:ring-primary-500/50"
+                className="w-full px-3 py-2 rounded-control border border-border bg-canvas text-sm text-textPrimary focus:outline-none focus:ring-2 focus:ring-primary-500/50"
               />
             </div>
           )}
@@ -964,7 +957,7 @@ function StateModal({ agent, onClose, onUpdated }: {
               type="text"
               value={reason}
               onChange={(e) => setReason(e.target.value)}
-              className="w-full px-3 py-2 rounded-lg border border-border bg-canvas text-sm text-textPrimary placeholder:text-textMuted focus:outline-none focus:ring-2 focus:ring-primary-500/50"
+              className="w-full px-3 py-2 rounded-control border border-border bg-canvas text-sm text-textPrimary placeholder:text-textMuted focus:outline-none focus:ring-2 focus:ring-primary-500/50"
               placeholder={t('agents.reasonPlaceholder')}
             />
           </div>
@@ -973,19 +966,19 @@ function StateModal({ agent, onClose, onUpdated }: {
         {error && <div className="text-sm text-rose-400 mt-3">{error}</div>}
 
         <div className="flex gap-2 mt-4">
-          <button onClick={onClose} className="flex-1 py-2.5 text-sm border border-border rounded-xl hover:bg-elevated text-textSecondary transition-colors font-medium">
+          <button onClick={onClose} className="btn btn-md btn-outline flex-1">
             {t('agents.cancel')}
           </button>
           <button
             onClick={handleSwitch}
             disabled={loading || targetState === agent.state}
-            className="flex-1 py-2.5 text-sm bg-primary-500 text-white rounded-xl hover:bg-primary-600 disabled:opacity-30 font-medium transition-all shadow-lg shadow-primary-500/20"
+            className="btn btn-md btn-primary flex-1"
           >
             {loading ? t('agents.switchingState') : t('agents.switchState')}
           </button>
         </div>
       </div>
-    </div>
+    </Dialog>
   )
 }
 
@@ -1044,11 +1037,11 @@ function ImportSoulModal({ onClose, onImported }: { onClose: () => void; onImpor
   }
 
   return (
-    <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-50" onClick={onClose}>
-      <div className="bg-elevated border border-border rounded-2xl p-6 w-full max-w-md mx-4 shadow-2xl pb-[var(--safe-bottom)] md:pb-6" onClick={(e) => e.stopPropagation()}>
+    <Dialog onClose={onClose} className="flex items-center justify-center">
+      <div className="bg-elevated border border-border rounded-dialog p-6 w-full max-w-md mx-4 shadow-2xl pb-[var(--safe-bottom)] md:pb-6" onClick={(e) => e.stopPropagation()}>
         <div className="flex items-center justify-between mb-4">
           <h2 className="text-lg font-semibold text-textPrimary">{t('agents.importSoulTitle')}</h2>
-          <button onClick={onClose} className="p-1 hover:bg-elevated rounded-lg text-textMuted hover:text-textSecondary">
+          <button onClick={onClose} className="icon-btn-sm text-textMuted">
             <X size={18} />
           </button>
         </div>
@@ -1057,11 +1050,11 @@ function ImportSoulModal({ onClose, onImported }: { onClose: () => void; onImpor
           type="file"
           accept=".json"
           onChange={handleFileChange}
-          className="block w-full text-sm text-textPrimary file:mr-3 file:py-2 file:px-4 file:rounded-xl file:border-0 file:text-sm file:bg-elevated file:text-textPrimary hover:file:bg-border mb-3"
+          className="block w-full text-sm text-textPrimary file:mr-3 file:py-2 file:px-4 file:rounded-card file:border-0 file:text-sm file:bg-elevated file:text-textPrimary hover:file:bg-border mb-3"
         />
 
         {preview && (
-          <div className="bg-canvas rounded-xl p-3 mb-3 text-sm space-y-1">
+          <div className="bg-canvas rounded-card p-3 mb-3 text-sm space-y-1">
             <p className="font-medium text-textPrimary">{preview.agent_name || t('agents.unnamed')}</p>
             <p className="text-xs text-textSecondary">{t('agents.memoryCount')} {preview.memories?.length || 0}</p>
             <p className="text-xs text-textSecondary">{t('agents.friendCount')} {preview.friends?.length || 0}</p>
@@ -1082,19 +1075,19 @@ function ImportSoulModal({ onClose, onImported }: { onClose: () => void; onImpor
         {error && <div className="text-sm text-rose-400 mb-3">{error}</div>}
 
         <div className="flex gap-2">
-          <button onClick={onClose} className="flex-1 py-2.5 text-sm border border-border rounded-xl hover:bg-elevated text-textSecondary transition-colors font-medium">
+          <button onClick={onClose} className="btn btn-md btn-outline flex-1">
             {t('agents.cancel')}
           </button>
           <button
             onClick={handleImport}
             disabled={!file || loading}
-            className="flex-1 py-2.5 text-sm bg-primary-500 text-white rounded-xl hover:bg-primary-600 disabled:opacity-30 font-medium transition-all shadow-lg shadow-primary-500/20"
+            className="btn btn-md btn-primary flex-1"
           >
             {loading ? t('agents.importing') : t('agents.importButton')}
           </button>
         </div>
       </div>
-    </div>
+    </Dialog>
   )
 }
 

@@ -7,11 +7,11 @@ import { Loader2 } from 'lucide-react'
  * 样式来自 CSS 语义类（.btn .btn-md .btn-primary 等，见 index.css）——
  * 与手写按钮共享同一规范源，一处定义全站统一。
  *
- * 变体：primary / accent / secondary / ghost / danger
- * 尺寸：sm(32px) / md(40px) / lg(48px) —— 固定高度，任何内容严格等高
+ * 变体：primary / accent / secondary / outline / ghost / danger
+ * 尺寸：xs(24px) / sm(32px) / md(40px) / lg(48px) —— 固定高度，任何内容严格等高
  */
-type Variant = 'primary' | 'accent' | 'secondary' | 'ghost' | 'danger'
-type Size = 'sm' | 'md' | 'lg'
+type Variant = 'primary' | 'accent' | 'secondary' | 'outline' | 'ghost' | 'danger'
+type Size = 'xs' | 'sm' | 'md' | 'lg'
 
 interface ButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
   variant?: Variant
@@ -25,15 +25,19 @@ const VARIANT_CLASS: Record<Variant, string> = {
   primary: 'btn-primary',
   accent: 'btn-accent',
   secondary: 'btn-secondary',
+  outline: 'btn-outline',
   ghost: 'btn-ghost',
   danger: 'btn-danger',
 }
 
 const SIZE_CLASS: Record<Size, string> = {
+  xs: 'btn-xs',
   sm: 'btn-sm',
   md: 'btn-md',
   lg: 'btn-lg',
 }
+
+const ICON_SIZE: Record<Size, number> = { xs: 12, sm: 14, md: 16, lg: 18 }
 
 export default function Button({
   variant = 'primary',
@@ -43,15 +47,17 @@ export default function Button({
   children,
   className = '',
   disabled,
+  type = 'button',
   ...rest
 }: ButtonProps) {
   return (
     <button
+      type={type}
       disabled={disabled || loading}
       className={`btn ${VARIANT_CLASS[variant]} ${SIZE_CLASS[size]} ${className}`}
       {...rest}
     >
-      {loading ? <Loader2 size={size === 'sm' ? 14 : 16} className="animate-spin" /> : icon}
+      {loading ? <Loader2 size={ICON_SIZE[size]} className="animate-spin" /> : icon}
       {children}
     </button>
   )

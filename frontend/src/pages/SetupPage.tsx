@@ -362,7 +362,7 @@ export default function SetupPage() {
               }`}>
                 {isCompleted ? <Check size={14} /> : <Icon size={14} />}
               </div>
-              <span className={`text-[10px] whitespace-nowrap px-1 transition-colors ${
+              <span className={`text-3xs whitespace-nowrap px-1 transition-colors ${
                 isCurrent ? 'text-textPrimary font-medium' : 'text-textMuted'
               }`}>
                 {t(s.labelKey)}
@@ -398,7 +398,7 @@ export default function SetupPage() {
               <button
                 key={l.code}
                 onClick={() => handleSelectLang(l.code)}
-                className={`w-full flex items-center gap-4 p-4 rounded-xl border-2 text-left transition-all duration-200 ${
+                className={`w-full flex items-center gap-4 p-4 rounded-card border-2 text-left transition-all duration-200 ${
                   selectedLang === l.code
                     ? 'border-primary-400 bg-primary-500/10 shadow-sm shadow-primary-500/10'
                     : 'border-border hover:border-borderHover bg-canvas'
@@ -437,7 +437,7 @@ export default function SetupPage() {
                   <button
                     key={l.code}
                     onClick={() => setInstanceLang(l.code)}
-                    className={`flex-1 py-2.5 rounded-xl border-2 text-sm font-medium transition-all ${
+                    className={`flex-1 py-2.5 rounded-card border-2 text-sm font-medium transition-all ${
                       instanceLang === l.code
                         ? 'border-primary-400 bg-primary-500/10 text-textPrimary'
                         : 'border-border bg-canvas text-textSecondary hover:border-borderHover'
@@ -454,7 +454,7 @@ export default function SetupPage() {
                 type="number" min={0}
                 value={instanceCredit}
                 onChange={e => setInstanceCredit(parseInt(e.target.value) || 0)}
-                className="w-full px-3.5 py-2.5 rounded-xl bg-canvas border border-border text-textPrimary text-sm focus:border-primary-400 focus:outline-none"
+                className="w-full px-3.5 py-2.5 rounded-card bg-canvas border border-border text-textPrimary text-sm focus:border-primary-400 focus:outline-none"
               />
             </div>
             <div>
@@ -463,7 +463,7 @@ export default function SetupPage() {
                 type="number" min={1}
                 value={instanceFileQuota}
                 onChange={e => setInstanceFileQuota(parseInt(e.target.value) || 1)}
-                className="w-full px-3.5 py-2.5 rounded-xl bg-canvas border border-border text-textPrimary text-sm focus:border-primary-400 focus:outline-none"
+                className="w-full px-3.5 py-2.5 rounded-card bg-canvas border border-border text-textPrimary text-sm focus:border-primary-400 focus:outline-none"
               />
             </div>
             <div>
@@ -472,7 +472,7 @@ export default function SetupPage() {
                 type="number" min={1} max={20}
                 value={instanceConcurrency}
                 onChange={e => setInstanceConcurrency(parseInt(e.target.value) || 3)}
-                className="w-full px-3.5 py-2.5 rounded-xl bg-canvas border border-border text-textPrimary text-sm focus:border-primary-400 focus:outline-none"
+                className="w-full px-3.5 py-2.5 rounded-card bg-canvas border border-border text-textPrimary text-sm focus:border-primary-400 focus:outline-none"
               />
             </div>
           </div>
@@ -505,7 +505,7 @@ export default function SetupPage() {
               ) : (
                 <div className="flex flex-col items-center gap-0.5 text-textMuted">
                   <Upload size={16} />
-                  <span className="text-[10px]">{t('setup.avatarUpload')}</span>
+                  <span className="text-3xs">{t('setup.avatarUpload')}</span>
                 </div>
               )}
             </button>
@@ -525,7 +525,7 @@ export default function SetupPage() {
               onChange={e => setBio(e.target.value)}
               placeholder={t('setup.bioPlaceholder')}
               rows={3}
-              className="w-full px-3.5 py-2.5 rounded-xl bg-canvas border border-border text-textPrimary text-sm focus:border-primary-400 focus:outline-none resize-none"
+              className="w-full px-3.5 py-2.5 rounded-card bg-canvas border border-border text-textPrimary text-sm focus:border-primary-400 focus:outline-none resize-none"
             />
           </div>
 
@@ -537,7 +537,7 @@ export default function SetupPage() {
               onChange={e => setStatusText(e.target.value)}
               placeholder={t('setup.statusTextPlaceholder')}
               maxLength={100}
-              className="w-full px-3.5 py-2.5 rounded-xl bg-canvas border border-border text-textPrimary text-sm focus:border-primary-400 focus:outline-none"
+              className="w-full px-3.5 py-2.5 rounded-card bg-canvas border border-border text-textPrimary text-sm focus:border-primary-400 focus:outline-none"
             />
           </div>
 
@@ -606,7 +606,7 @@ export default function SetupPage() {
                     <button
                       key={p.name}
                       onClick={() => setApiBaseUrl(p.base_url)}
-                      className={`px-3 py-1.5 text-xs rounded-lg font-medium transition-colors border ${
+                      className={`px-3 py-1.5 text-xs rounded-control font-medium transition-colors border ${
                         apiBaseUrl === p.base_url
                           ? 'bg-primary-500/15 border-primary-500/40 text-primary-500'
                           : 'bg-canvas border-border text-textSecondary hover:text-textPrimary hover:border-primary-500/30'
@@ -624,7 +624,7 @@ export default function SetupPage() {
                 value={apiBaseUrl}
                 onChange={e => setApiBaseUrl(e.target.value)}
                 placeholder={t('setup.apiBaseUrlPlaceholder')}
-                className="w-full px-3.5 py-2.5 rounded-xl bg-canvas border border-border text-textPrimary text-sm focus:border-primary-400 focus:outline-none"
+                className="w-full px-3.5 py-2.5 rounded-card bg-canvas border border-border text-textPrimary text-sm focus:border-primary-400 focus:outline-none"
               />
             </div>
             <div>
@@ -635,7 +635,7 @@ export default function SetupPage() {
                   value={apiKey}
                   onChange={e => setApiKey(e.target.value)}
                   placeholder={t('setup.apiKeyPlaceholder')}
-                  className="w-full px-3.5 py-2.5 pr-10 rounded-xl bg-canvas border border-border text-textPrimary text-sm focus:border-primary-400 focus:outline-none"
+                  className="w-full px-3.5 py-2.5 pr-10 rounded-card bg-canvas border border-border text-textPrimary text-sm focus:border-primary-400 focus:outline-none"
                 />
                 <button
                   onClick={() => setShowApiKey(!showApiKey)}
@@ -649,7 +649,7 @@ export default function SetupPage() {
                   href={getApiKeyUrl(apiBaseUrl)}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="inline-flex items-center gap-1 text-[11px] text-primary-400 hover:text-primary-500 dark:hover:text-primary-300 underline underline-offset-2 mt-1.5"
+                  className="inline-flex items-center gap-1 text-2xs text-primary-400 hover:text-primary-500 dark:hover:text-primary-300 underline underline-offset-2 mt-1.5"
                 >
                   {t('setup.getApiKey') || '获取 API Key'}
                   <ExternalLink size={11} />
@@ -676,7 +676,7 @@ export default function SetupPage() {
 
           {aiCreated ? (
             /* 已创建成功 → 展示摘要 */
-            <div className="bg-mint-400/10 border border-mint-400/20 rounded-xl p-5 text-center">
+            <div className="bg-mint-400/10 border border-mint-400/20 rounded-card p-5 text-center">
               <div className="w-12 h-12 rounded-full bg-mint-400/20 flex items-center justify-center mx-auto mb-3">
                 <Check size={24} className="text-mint-400" />
               </div>
@@ -685,7 +685,7 @@ export default function SetupPage() {
             </div>
           ) : (
             /* 未创建 → 引导按钮 */
-            <div className="bg-canvas border-2 border-dashed border-border rounded-xl p-8 text-center">
+            <div className="bg-canvas border-2 border-dashed border-border rounded-card p-8 text-center">
               <div className="w-16 h-16 rounded-full bg-primary-500/10 flex items-center justify-center mx-auto mb-4">
                 <Bot size={28} className="text-primary-400" />
               </div>
@@ -693,7 +693,7 @@ export default function SetupPage() {
               <p className="text-xs text-textMuted mb-5">{t('setup.aiCreateHintDesc') || '使用完整创建体验，预设档位、详细参数一应俱全'}</p>
               <button
                 onClick={() => setShowCreateModal(true)}
-                className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-primary-500 hover:bg-primary-600 text-white text-sm font-semibold transition-all shadow-lg shadow-primary-500/20"
+                className="inline-flex items-center gap-2 px-5 py-2.5 rounded-card bg-primary-500 hover:bg-primary-600 text-white text-sm font-semibold transition-all shadow-lg shadow-primary-500/20"
               >
                 <Sparkles size={16} />
                 {t('setup.aiCreateButton') || '创建 AI'}
@@ -735,7 +735,7 @@ export default function SetupPage() {
                 <input
                   value={smtpHost}
                   onChange={e => setSmtpHost(e.target.value)}
-                  className="w-full px-3.5 py-2.5 rounded-xl bg-canvas border border-border text-textPrimary text-sm focus:border-primary-400 focus:outline-none"
+                  className="w-full px-3.5 py-2.5 rounded-card bg-canvas border border-border text-textPrimary text-sm focus:border-primary-400 focus:outline-none"
                 />
               </div>
               <div className="w-24">
@@ -744,7 +744,7 @@ export default function SetupPage() {
                   type="number"
                   value={smtpPort}
                   onChange={e => setSmtpPort(parseInt(e.target.value) || 587)}
-                  className="w-full px-3.5 py-2.5 rounded-xl bg-canvas border border-border text-textPrimary text-sm focus:border-primary-400 focus:outline-none"
+                  className="w-full px-3.5 py-2.5 rounded-card bg-canvas border border-border text-textPrimary text-sm focus:border-primary-400 focus:outline-none"
                 />
               </div>
             </div>
@@ -753,7 +753,7 @@ export default function SetupPage() {
               <input
                 value={smtpUsername}
                 onChange={e => setSmtpUsername(e.target.value)}
-                className="w-full px-3.5 py-2.5 rounded-xl bg-canvas border border-border text-textPrimary text-sm focus:border-primary-400 focus:outline-none"
+                className="w-full px-3.5 py-2.5 rounded-card bg-canvas border border-border text-textPrimary text-sm focus:border-primary-400 focus:outline-none"
               />
             </div>
             <div>
@@ -762,7 +762,7 @@ export default function SetupPage() {
                 type="password"
                 value={smtpPassword}
                 onChange={e => setSmtpPassword(e.target.value)}
-                className="w-full px-3.5 py-2.5 rounded-xl bg-canvas border border-border text-textPrimary text-sm focus:border-primary-400 focus:outline-none"
+                className="w-full px-3.5 py-2.5 rounded-card bg-canvas border border-border text-textPrimary text-sm focus:border-primary-400 focus:outline-none"
               />
             </div>
             <div className="flex gap-3">
@@ -771,7 +771,7 @@ export default function SetupPage() {
                 <input
                   value={smtpFromEmail}
                   onChange={e => setSmtpFromEmail(e.target.value)}
-                  className="w-full px-3.5 py-2.5 rounded-xl bg-canvas border border-border text-textPrimary text-sm focus:border-primary-400 focus:outline-none"
+                  className="w-full px-3.5 py-2.5 rounded-card bg-canvas border border-border text-textPrimary text-sm focus:border-primary-400 focus:outline-none"
                 />
               </div>
               <div className="flex-1">
@@ -779,7 +779,7 @@ export default function SetupPage() {
                 <input
                   value={smtpFromName}
                   onChange={e => setSmtpFromName(e.target.value)}
-                  className="w-full px-3.5 py-2.5 rounded-xl bg-canvas border border-border text-textPrimary text-sm focus:border-primary-400 focus:outline-none"
+                  className="w-full px-3.5 py-2.5 rounded-card bg-canvas border border-border text-textPrimary text-sm focus:border-primary-400 focus:outline-none"
                 />
               </div>
             </div>
@@ -816,7 +816,7 @@ export default function SetupPage() {
                 value={poolKeyName}
                 onChange={e => setPoolKeyName(e.target.value)}
                 placeholder={t('setup.keyPoolName')}
-                className="w-full px-3.5 py-2.5 rounded-xl bg-canvas border border-border text-textPrimary text-sm focus:border-primary-400 focus:outline-none"
+                className="w-full px-3.5 py-2.5 rounded-card bg-canvas border border-border text-textPrimary text-sm focus:border-primary-400 focus:outline-none"
               />
             </div>
             <div>
@@ -824,7 +824,7 @@ export default function SetupPage() {
               <input
                 value={poolKeyBaseUrl}
                 onChange={e => setPoolKeyBaseUrl(e.target.value)}
-                className="w-full px-3.5 py-2.5 rounded-xl bg-canvas border border-border text-textPrimary text-sm focus:border-primary-400 focus:outline-none"
+                className="w-full px-3.5 py-2.5 rounded-card bg-canvas border border-border text-textPrimary text-sm focus:border-primary-400 focus:outline-none"
               />
             </div>
             <div>
@@ -834,7 +834,7 @@ export default function SetupPage() {
                 value={poolKey}
                 onChange={e => setPoolKey(e.target.value)}
                 placeholder={t('setup.keyPoolKey')}
-                className="w-full px-3.5 py-2.5 rounded-xl bg-canvas border border-border text-textPrimary text-sm focus:border-primary-400 focus:outline-none"
+                className="w-full px-3.5 py-2.5 rounded-card bg-canvas border border-border text-textPrimary text-sm focus:border-primary-400 focus:outline-none"
               />
             </div>
             {!poolKey && (
@@ -881,12 +881,12 @@ export default function SetupPage() {
         {renderStepBar()}
 
         {/* 内容卡片 */}
-        <div className="bg-surface border border-border rounded-2xl p-5 md:p-6 shadow-xl">
+        <div className="bg-surface border border-border rounded-dialog p-5 md:p-6 shadow-xl">
           {renderStep()}
 
           {/* 错误提示 */}
           {error && (
-            <div className="mt-4 text-sm text-rose-400 bg-rose-500/10 border border-rose-500/20 rounded-xl px-3.5 py-2.5">
+            <div className="mt-4 text-sm text-rose-400 bg-rose-500/10 border border-rose-500/20 rounded-card px-3.5 py-2.5">
               {error}
             </div>
           )}
@@ -897,7 +897,7 @@ export default function SetupPage() {
               <button
                 onClick={handleBack}
                 disabled={currentIdx === 0 || saving}
-                className="flex items-center gap-1 px-4 py-2 rounded-xl border border-border text-sm text-textSecondary hover:bg-canvas disabled:opacity-30 transition-colors"
+                className="btn btn-sm btn-outline gap-1"
               >
                 <ChevronLeft size={16} />
                 {t('setup.back')}
@@ -908,7 +908,7 @@ export default function SetupPage() {
                 {showSkipLabel && (
                   <button
                     onClick={handleNext}
-                    className="px-4 py-2 rounded-xl text-sm text-textMuted hover:text-textSecondary hover:bg-canvas transition-colors"
+                    className="px-4 py-2 rounded-card text-sm text-textMuted hover:text-textSecondary hover:bg-canvas transition-colors"
                   >
                     {t('setup.skip')}
                   </button>
@@ -918,7 +918,7 @@ export default function SetupPage() {
                 <button
                   onClick={handleNext}
                   disabled={saving}
-                  className="flex items-center gap-1.5 px-5 py-2 rounded-xl bg-primary-500 hover:bg-primary-600 disabled:opacity-40 disabled:cursor-not-allowed text-white text-sm font-semibold transition-all shadow-lg shadow-primary-500/20"
+                  className="btn btn-sm btn-primary gap-1.5"
                 >
                   {saving ? (
                     <span className="inline-flex items-center gap-2">
@@ -941,7 +941,7 @@ export default function SetupPage() {
             <button
               onClick={handleNext}
               disabled={saving}
-              className="w-full mt-6 py-3 rounded-xl bg-mint-400 hover:bg-mint-500 disabled:opacity-40 text-white font-semibold text-sm transition-all shadow-lg shadow-mint-400/20"
+              className="w-full mt-6 py-3 rounded-card bg-mint-400 hover:bg-mint-500 disabled:opacity-40 text-white font-semibold text-sm transition-all shadow-lg shadow-mint-400/20"
             >
               {saving ? (
                 <span className="inline-flex items-center gap-2">

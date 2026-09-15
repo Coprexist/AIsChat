@@ -370,7 +370,7 @@
 
 /* 包装器：窄屏横向滚动 —— 颜色由气泡动态注入 CSS 变量控制 */
 .markdown-table-wrapper {
-  @apply w-full overflow-x-auto my-3 rounded-lg border border-border;
+  @apply w-full overflow-x-auto my-3 rounded-control border border-border;
 }
 .markdown-table-wrapper table {
   @apply w-full min-w-full border-collapse text-sm;
@@ -542,7 +542,7 @@
   align-items: center;
   justify-content: center;
   font-weight: 500;
-  border-radius: 0.5rem; /* rounded-lg —— 更利落，对齐群视界顶部按钮 */
+  border-radius: 0.5rem; /* rounded-control —— 更利落，对齐群视界顶部按钮 */
   transition: background-color .15s ease, color .15s ease, border-color .15s ease;
   white-space: nowrap;
   cursor: pointer;
@@ -568,3 +568,89 @@
 .btn-ghost:hover { background: rgb(var(--tw-canvas)); color: rgb(var(--tw-text-primary)); }
 .btn-danger { background: rgb(var(--tw-rose-500)); color: #fff; }
 .btn-danger:hover { background: rgb(var(--tw-rose-600)); }
+/* 描边次级按钮 —— 列表/工具条里最常见的「白底描边」按钮 */
+.btn-outline { background: transparent; border: 1px solid rgb(var(--tw-border)); color: rgb(var(--tw-text-secondary)); }
+.btn-outline:hover { background: rgb(var(--tw-elevated)); color: rgb(var(--tw-text-primary)); }
+
+/* 补档 xs=24px —— 工具条/列表行里的小按钮（此前的 px-2 py-0.5 一族） */
+.btn-xs { height: 1.5rem; padding: 0 0.5rem; font-size: 0.6875rem; gap: 0.25rem; }
+
+/* ────────────────────────────────────────────────
+   图标按钮规范（2026-09）
+   单一来源：不再手写 p-1/p-1.5/p-2/w-8/w-9/w-10 正方形按钮。
+   尺寸：sm=28px / md=32px（默认）/ lg=40px
+   ──────────────────────────────────────────────── */
+.icon-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  width: 2rem;
+  height: 2rem;
+  border-radius: 0.5rem;
+  color: rgb(var(--tw-text-muted));
+  transition: background-color .15s ease, color .15s ease;
+  cursor: pointer;
+}
+.icon-btn:hover { background: rgb(var(--tw-elevated)); color: rgb(var(--tw-text-primary)); }
+.icon-btn:disabled { opacity: .5; cursor: not-allowed; }
+.icon-btn:focus-visible { outline: 2px solid rgb(var(--tw-primary-400) / .5); outline-offset: 1px; }
+.icon-btn-sm { width: 1.75rem; height: 1.75rem; }
+.icon-btn-lg { width: 2.5rem; height: 2.5rem; }
+
+/* ────────────────────────────────────────────────
+   表单控件规范（2026-09）
+   input / select / textarea 共用同一套边框、圆角、焦点态。
+   尺寸：md=40px（默认）/ sm=32px；多行用 textarea.field。
+   ──────────────────────────────────────────────── */
+.field {
+  width: 100%;
+  height: 2.5rem;
+  padding: 0 0.75rem;
+  border: 1px solid rgb(var(--tw-border));
+  border-radius: 0.5rem;
+  background: rgb(var(--tw-canvas));
+  color: rgb(var(--tw-text-primary));
+  font-size: 0.875rem;
+  transition: border-color .15s ease, box-shadow .15s ease;
+}
+.field::placeholder { color: rgb(var(--tw-text-muted)); }
+.field:focus {
+  outline: none;
+  border-color: rgb(var(--tw-primary-500));
+  box-shadow: 0 0 0 3px rgb(var(--tw-primary-500) / .25);
+}
+.field:disabled { opacity: .6; cursor: not-allowed; }
+.field-sm { height: 2rem; padding: 0 0.5rem; font-size: 0.75rem; }
+select.field { padding-right: 0.5rem; cursor: pointer; }
+textarea.field { height: auto; padding: 0.5rem 0.75rem; resize: vertical; }
+
+/* ────────────────────────────────────────────────
+   卡片 / 徽标规范（2026-09）
+   .card 是唯一的容器底色+描边+圆角来源；
+   .chip 是唯一的胶囊标签来源（状态、分类、计数）。
+   ──────────────────────────────────────────────── */
+.card {
+  background: rgb(var(--tw-surface));
+  border: 1px solid rgb(var(--tw-border));
+  border-radius: 0.75rem;
+}
+.card-pad { padding: 1rem; }
+.card-pad-lg { padding: 1.25rem; }
+
+.chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  padding: 0.125rem 0.5rem;
+  border-radius: 9999px;
+  font-size: 0.6875rem;
+  line-height: 1.25rem;
+  font-weight: 500;
+  white-space: nowrap;
+}
+.chip-primary { background: rgb(var(--tw-primary-500) / .12); color: rgb(var(--tw-primary-400)); }
+.chip-mint    { background: rgb(var(--tw-mint-500) / .16);   color: rgb(var(--tw-mint-700)); }
+.chip-accent  { background: rgb(var(--tw-accent-400) / .2);  color: rgb(var(--tw-accent-600)); }
+.chip-rose    { background: rgb(var(--tw-rose-500) / .12);   color: rgb(var(--tw-rose-400)); }
+.chip-muted   { background: rgb(var(--tw-elevated));         color: rgb(var(--tw-text-secondary)); }

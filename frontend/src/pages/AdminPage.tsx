@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
-import Modal from '../components/Modal'
+import { Modal } from '../components/ui'
 import { Link, useNavigate, useSearchParams, useOutletContext } from 'react-router-dom'
 import { api } from '../api/client'
 import { Users, Bot, MessageCircle, Ticket, FileText, Activity, Terminal, Database, Globe, BookOpen, ScrollText, ArrowLeft, BarChart3, ChevronRight, Key, Settings, Layers, Wrench, Shield, Plug, X, Eraser, Store, AlertTriangle } from 'lucide-react'
@@ -107,7 +107,7 @@ export default function AdminPage() {
           {mobileView === 'detail' ? (
             <button
               onClick={backToList}
-              className="md:hidden p-1.5 -ml-1 rounded-lg hover:bg-elevated text-textSecondary transition-colors"
+              className="icon-btn-sm md:hidden -ml-1 text-textSecondary"
               title={t('admin.backToList')}
             >
               <ArrowLeft size={20} />
@@ -115,7 +115,7 @@ export default function AdminPage() {
           ) : (
             <button
               onClick={() => navigate('/me')}
-              className="md:hidden p-1.5 -ml-1 rounded-lg hover:bg-elevated text-textSecondary transition-colors"
+              className="md:hidden p-1.5 -ml-1 rounded-control hover:bg-elevated text-textSecondary transition-colors"
               title={t('admin.backToMe')}
             >
               <ArrowLeft size={20} />
@@ -152,7 +152,7 @@ export default function AdminPage() {
             const catTabs = tabs.filter(t => t.category === cat)
             return (
               <div key={cat}>
-                <div className="px-3 h-8 border-b border-border font-medium text-[11px] text-textMuted uppercase tracking-wider flex items-center shrink-0">
+                <div className="px-3 h-8 border-b border-border font-medium text-2xs text-textMuted uppercase tracking-wider flex items-center shrink-0">
                   {cat}
                 </div>
                 <div className="py-0.5">
@@ -160,7 +160,7 @@ export default function AdminPage() {
                     <button
                       key={tab.key}
                       onClick={() => switchTab(tab.key)}
-                      className={`w-full flex items-center gap-2 px-3 py-1.5 text-[13px] transition-colors text-left ${
+                      className={`w-full flex items-center gap-2 px-3 py-1.5 text-sm transition-colors text-left ${
                         activeTab === tab.key
                           ? 'bg-primary-500/10 text-primary-600 dark:text-primary-300 border-r-2 border-primary-400'
                           : 'text-textSecondary hover:bg-elevated hover:text-textPrimary border-r-2 border-transparent'
@@ -176,7 +176,7 @@ export default function AdminPage() {
           })}
           {/* 拖拽手柄 */}
           <div
-            className="absolute top-0 -right-1.5 w-1.5 h-full cursor-col-resize hover:bg-primary-400/30 active:bg-primary-400/50 transition-colors z-[70]"
+            className="absolute top-0 -right-1.5 w-1.5 h-full cursor-col-resize hover:bg-primary-400/30 active:bg-primary-400/50 transition-colors z-toast"
             onMouseDown={handleResizeStart}
           />
         </div>
@@ -199,9 +199,9 @@ export default function AdminPage() {
                     <button
                       key={tab.key}
                       onClick={() => switchTab(tab.key)}
-                      className="w-full flex items-center gap-3 px-4 py-3 rounded-xl hover:bg-elevated active:bg-border/50 transition-colors text-left"
+                      className="w-full flex items-center gap-3 px-4 py-3 rounded-card hover:bg-elevated active:bg-border/50 transition-colors text-left"
                     >
-                      <div className="w-9 h-9 rounded-lg bg-primary-500/10 flex items-center justify-center shrink-0">
+                      <div className="w-9 h-9 rounded-control bg-primary-500/10 flex items-center justify-center shrink-0">
                         <tab.icon size={18} className="text-primary-400" />
                       </div>
                       <div className="flex-1 min-w-0">
@@ -281,18 +281,18 @@ function OverviewTab() {
         <StatCard label={t('admin.pendingRequests')} value={stats.pending_vector_requests} icon={Activity} />
       </div>
       {/* ── 状态条 + 双开关 ── */}
-      <div className="bg-surface rounded-xl border border-border p-4 space-y-3">
+      <div className="bg-surface rounded-card border border-border p-4 space-y-3">
         <div className="flex items-center justify-between flex-wrap gap-2">
           <div className="flex items-center gap-3">
-            <div className={`w-9 h-9 rounded-xl flex items-center justify-center ${mt.hard ? 'bg-rose-500/10' : mt.soft || mt.auto ? 'bg-accent-500/10' : 'bg-mint-500/10'}`}>
+            <div className={`w-9 h-9 rounded-card flex items-center justify-center ${mt.hard ? 'bg-rose-500/10' : mt.soft || mt.auto ? 'bg-accent-500/10' : 'bg-mint-500/10'}`}>
               <Wrench size={18} className={mt.hard ? 'text-rose-400' : mt.soft || mt.auto ? 'text-accent-400' : 'text-mint-400'} />
             </div>
             <div>
               <div className="flex items-center gap-2">
                 <span className="text-sm font-medium text-textPrimary">{t('admin.maintenanceMode')}</span>
-                <span className={`text-[11px] px-2 py-0.5 rounded-full ${statusBadge.cls}`}>{statusBadge.label}</span>
+                <span className={`text-2xs px-2 py-0.5 rounded-full ${statusBadge.cls}`}>{statusBadge.label}</span>
               </div>
-              <div className="flex items-center gap-1.5 text-[11px] text-textMuted mt-0.5">
+              <div className="flex items-center gap-1.5 text-2xs text-textMuted mt-0.5">
                 <span className={`w-1.5 h-1.5 rounded-full ${statusDot}`} />
                 {statusDesc}
               </div>
@@ -300,20 +300,20 @@ function OverviewTab() {
           </div>
           <div className="flex gap-2">
             <button onClick={toggleHard} disabled={!!mtBusy} title="用户看到弹窗或顶栏，API 全部返回 503"
-              className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-colors disabled:opacity-50 ${
+              className={`px-3 py-1.5 rounded-control text-xs font-medium transition-colors disabled:opacity-50 ${
                 mt.hard ? 'bg-mint-500 hover:bg-mint-600 text-white' : 'bg-rose-500/10 hover:bg-rose-500/20 text-rose-400 border border-rose-500/30'
               }`}>
               {mtBusy === 'hard' ? '···' : mt.hard ? t('admin.maintenanceResumeService') : t('admin.maintenancePauseService')}
             </button>
             <button onClick={toggleSoft} disabled={!!mtBusy} title="用户看到顶栏或弹窗提示，API 正常运行"
-              className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-colors disabled:opacity-50 ${
+              className={`px-3 py-1.5 rounded-control text-xs font-medium transition-colors disabled:opacity-50 ${
                 mt.soft ? 'bg-mint-500 hover:bg-mint-600 text-white' : 'bg-accent-500/10 hover:bg-accent-500/20 text-accent-400 border border-accent-500/30'
               }`}>
               {mtBusy === 'soft' ? '···' : mt.soft ? t('admin.maintenanceCancelTip') : t('admin.maintenanceShowTip')}
             </button>
           </div>
         </div>
-        {mtError && <p className="text-[11px] text-rose-400">{mtError}</p>}
+        {mtError && <p className="text-2xs text-rose-400">{mtError}</p>}
       </div>
 
       {/* 文案编辑 */}
@@ -324,9 +324,9 @@ function OverviewTab() {
 
 function StatCard({ label, value, icon: Icon }: { label: string; value: number; icon: React.ElementType }) {
   return (
-    <div className="bg-surface rounded-xl border border-border p-5 hover:border-primary-500/20 transition-colors">
+    <div className="bg-surface rounded-card border border-border p-5 hover:border-primary-500/20 transition-colors">
       <div className="flex items-center gap-3">
-        <div className="w-10 h-10 rounded-xl bg-primary-500/10 flex items-center justify-center">
+        <div className="w-10 h-10 rounded-card bg-primary-500/10 flex items-center justify-center">
           <Icon size={20} className="text-primary-400" />
         </div>
         <div>
@@ -370,17 +370,17 @@ function ResetPasswordDialog({ target, onDone, onClose }: {
         value={password}
         onChange={e => setPassword(e.target.value)}
         placeholder={t('admin.resetPasswordPlaceholder')}
-        className="w-full px-3 py-2 text-sm border border-border bg-canvas rounded-lg focus:outline-none focus:ring-1 focus:ring-primary-500 mb-3"
+        className="w-full px-3 py-2 text-sm border border-border bg-canvas rounded-control focus:outline-none focus:ring-1 focus:ring-primary-500 mb-3"
         onKeyDown={e => e.key === 'Enter' && reset()}
       />
       <div className="flex justify-end gap-2">
-        <button onClick={onClose} className="text-xs px-3 py-1.5 border border-border rounded-lg text-textSecondary hover:bg-elevated">
+        <button onClick={onClose} className="btn btn-xs btn-outline">
           {t('common.cancel')}
         </button>
         <button
           disabled={password.length < 6 || busy}
           onClick={reset}
-          className="text-xs px-3 py-1.5 bg-primary-500 text-white rounded-lg hover:bg-primary-600 disabled:opacity-40"
+          className="btn btn-xs btn-primary"
         >
           {busy ? t('common.loading') : t('admin.resetPassword')}
         </button>
@@ -418,19 +418,19 @@ function CreateUserDialog({ onDone, onClose }: { onDone: () => void; onClose: ()
     <Modal open title={t('admin.createUserTitle')} onClose={onClose}>
       {error && <p className="text-xs text-rose-400 mb-2">{error}</p>}
       <input value={username} onChange={e => setUsername(e.target.value)} placeholder={t('admin.createUserUsername')}
-        className="w-full px-3 py-2 text-sm border border-border bg-canvas rounded-lg mb-2 focus:outline-none focus:ring-1 focus:ring-primary-500" />
-      <p className="text-[11px] text-textMuted -mt-1.5 mb-2">{username.length > 0 && !usernameOk ? t('admin.createUserUsernameHint') : '\u00a0'}</p>
+        className="w-full px-3 py-2 text-sm border border-border bg-canvas rounded-control mb-2 focus:outline-none focus:ring-1 focus:ring-primary-500" />
+      <p className="text-2xs text-textMuted -mt-1.5 mb-2">{username.length > 0 && !usernameOk ? t('admin.createUserUsernameHint') : '\u00a0'}</p>
       <input type="password" value={password} onChange={e => setPassword(e.target.value)} placeholder={t('admin.createUserPassword')}
-        className="w-full px-3 py-2 text-sm border border-border bg-canvas rounded-lg mb-2 focus:outline-none focus:ring-1 focus:ring-primary-500" />
-      <p className="text-[11px] text-textMuted -mt-1.5 mb-2">{password.length > 0 && !passwordOk ? t('admin.createUserPasswordHint') : '\u00a0'}</p>
+        className="w-full px-3 py-2 text-sm border border-border bg-canvas rounded-control mb-2 focus:outline-none focus:ring-1 focus:ring-primary-500" />
+      <p className="text-2xs text-textMuted -mt-1.5 mb-2">{password.length > 0 && !passwordOk ? t('admin.createUserPasswordHint') : '\u00a0'}</p>
       <input value={email} onChange={e => setEmail(e.target.value)} placeholder={t('admin.createUserEmail')}
-        className="w-full px-3 py-2 text-sm border border-border bg-canvas rounded-lg mb-3 focus:outline-none focus:ring-1 focus:ring-primary-500" />
+        className="w-full px-3 py-2 text-sm border border-border bg-canvas rounded-control mb-3 focus:outline-none focus:ring-1 focus:ring-primary-500" />
       <div className="flex justify-end gap-2">
-        <button onClick={onClose} className="text-xs px-3 py-1.5 border border-border rounded-lg text-textSecondary hover:bg-elevated">{t('common.cancel')}</button>
+        <button onClick={onClose} className="btn btn-xs btn-outline">{t('common.cancel')}</button>
         <button
           disabled={!usernameOk || !passwordOk || busy}
           onClick={submit}
-          className="text-xs px-3 py-1.5 bg-primary-500 text-white rounded-lg hover:bg-primary-600 disabled:opacity-40"
+          className="btn btn-xs btn-primary"
         >{busy ? t('common.loading') : t('admin.createUser')}</button>
       </div>
     </Modal>
@@ -478,17 +478,17 @@ function ImportCsvDialog({ onDone, onClose }: { onDone: (count: number) => void;
               </div>
             </>
           )}
-          <button onClick={onClose} className="text-xs px-3 py-1.5 bg-primary-500 text-white rounded-lg hover:bg-primary-600 mt-2">{t('common.close')}</button>
+          <button onClick={onClose} className="btn btn-xs btn-primary mt-2">{t('common.close')}</button>
         </div>
       ) : (
         <>
           <p className="text-xs text-textMuted mb-3">{t('admin.importCsvHint')}</p>
           <input ref={fileRef} type="file" accept=".csv"
-            className="w-full text-sm file:mr-3 file:py-1.5 file:px-3 file:rounded-lg file:border-0 file:text-xs file:font-medium file:bg-primary-500 file:text-white hover:file:bg-primary-400 mb-3" />
+            className="w-full text-sm file:mr-3 file:py-1.5 file:px-3 file:rounded-control file:border-0 file:text-xs file:font-medium file:bg-primary-500 file:text-white hover:file:bg-primary-400 mb-3" />
           <div className="flex justify-end gap-2">
-            <button onClick={onClose} className="text-xs px-3 py-1.5 border border-border rounded-lg text-textSecondary hover:bg-elevated">{t('common.cancel')}</button>
+            <button onClick={onClose} className="btn btn-xs btn-outline">{t('common.cancel')}</button>
             <button disabled={busy} onClick={submit}
-              className="text-xs px-3 py-1.5 bg-primary-500 text-white rounded-lg hover:bg-primary-600 disabled:opacity-40"
+              className="btn btn-xs btn-primary"
             >{busy ? t('common.loading') : t('admin.importCsv')}</button>
           </div>
         </>
@@ -534,11 +534,11 @@ function UsersTab() {
       )}
       <div className="flex items-center gap-2 mb-3">
         <button onClick={() => setShowCreate(true)}
-          className="text-xs px-3 py-1.5 bg-primary-500 text-white rounded-lg hover:bg-primary-600 transition-colors">
+          className="text-xs px-3 py-1.5 bg-primary-500 text-white rounded-control hover:bg-primary-600 transition-colors">
           + {t('admin.createUser')}
         </button>
         <button onClick={() => setShowImport(true)}
-          className="text-xs px-3 py-1.5 border border-border rounded-lg text-textSecondary hover:bg-elevated transition-colors">
+          className="text-xs px-3 py-1.5 border border-border rounded-control text-textSecondary hover:bg-elevated transition-colors">
           {t('admin.importCsv')}
         </button>
       </div>
@@ -799,13 +799,13 @@ function CodesTab() {
   return (
     <div className="space-y-6">
       {/* 生成兑换码 */}
-      <div className="bg-surface rounded-xl border border-border p-5">
+      <div className="bg-surface rounded-card border border-border p-5">
         <h3 className="font-semibold text-textPrimary mb-3">{t('admin.generateCode')}</h3>
         <div className="flex flex-wrap items-end gap-3">
           <div>
             <label className="block text-xs mb-1 text-textSecondary">{t('admin.codeType')}</label>
             <select value={codeType} onChange={(e) => setCodeType(e.target.value)}
-              className="px-2 py-1.5 border border-border bg-canvas rounded-xl text-sm text-textPrimary">
+              className="px-2 py-1.5 border border-border bg-canvas rounded-card text-sm text-textPrimary">
               {Object.entries(CODE_TYPES).map(([k, v]) => (
                 <option key={k} value={k}>{v}</option>
               ))}
@@ -815,13 +815,13 @@ function CodesTab() {
             <label className="block text-xs mb-1 text-textSecondary">{t('me.quota')}</label>
             <input type="number" value={quota} onChange={(e) => setQuota(parseInt(e.target.value) || 0)}
               min={1} max={(codeType === 'file_size' || codeType === 'file_quota') ? 1024 : 100}
-              className="w-24 px-2 py-1.5 border border-border bg-canvas rounded-xl text-sm text-textPrimary" />
+              className="w-24 px-2 py-1.5 border border-border bg-canvas rounded-card text-sm text-textPrimary" />
           </div>
           <div>
             <label className="block text-xs mb-1 text-textSecondary">{t('admin.expiresDays')}</label>
             <input type="number" value={days} onChange={(e) => setDays(parseInt(e.target.value) || 1)}
               min={1} max={365}
-              className="w-20 px-2 py-1.5 border border-border bg-canvas rounded-xl text-sm text-textPrimary" />
+              className="w-20 px-2 py-1.5 border border-border bg-canvas rounded-card text-sm text-textPrimary" />
           </div>
           <div className="flex items-center gap-1.5 self-end mb-1">
             <input type="checkbox" id="isApiPool" checked={isApiPool} onChange={(e) => setIsApiPool(e.target.checked)}
@@ -831,7 +831,7 @@ function CodesTab() {
           <button
             onClick={handleGenerate}
             disabled={generating || quota < 1 || days < 1}
-            className="px-4 py-1.5 bg-primary-500 text-white rounded-xl hover:bg-primary-600 disabled:opacity-40 disabled:cursor-not-allowed text-sm font-medium transition-colors"
+            className="btn btn-xs btn-primary"
           >
             {generating ? t('admin.generating') : t('admin.generate')}
           </button>
@@ -842,20 +842,20 @@ function CodesTab() {
             <label className="block text-xs mb-1 text-textSecondary">{t('admin.codeNote')}</label>
             <input type="text" value={note} onChange={(e) => setNote(e.target.value)}
               placeholder={t('admin.codeNotePlaceholder')}
-              className="w-48 px-2 py-1.5 border border-border bg-canvas rounded-xl text-sm text-textPrimary placeholder:text-textMuted" />
+              className="w-48 px-2 py-1.5 border border-border bg-canvas rounded-card text-sm text-textPrimary placeholder:text-textMuted" />
           </div>
           <div>
             <label className="block text-xs mb-1 text-textSecondary">{t('admin.maxUsageLabel')}</label>
             <input type="number" value={maxUsage ?? ''} onChange={(e) => setMaxUsage(e.target.value ? parseInt(e.target.value) : null)}
               min={1}
-              className="w-28 px-2 py-1.5 border border-border bg-canvas rounded-xl text-sm text-textPrimary" />
+              className="w-28 px-2 py-1.5 border border-border bg-canvas rounded-card text-sm text-textPrimary" />
           </div>
-          <span className="text-[11px] text-textMuted pb-1.5">
+          <span className="text-2xs text-textMuted pb-1.5">
             {t('admin.balanceHint')}
           </span>
         </div>
         {generatedCode && (
-          <div className="mt-3 p-3 bg-mint-400/10 border border-mint-400/20 rounded-xl">
+          <div className="mt-3 p-3 bg-mint-400/10 border border-mint-400/20 rounded-card">
             <p className="text-sm font-mono text-mint-400 break-all">{generatedCode}</p>
             <p className="text-xs text-mint-400 mt-1">{t('admin.codeOneTimeWarning')}</p>
           </div>
@@ -863,7 +863,7 @@ function CodesTab() {
       </div>
 
       {/* 已生成的兑换码 */}
-      <div className="bg-surface rounded-xl border border-border p-5">
+      <div className="bg-surface rounded-card border border-border p-5">
         <h3 className="font-semibold text-textPrimary mb-3">{t('admin.codeList')}</h3>
         <div className="overflow-x-auto">
           <table className="w-full text-sm text-textPrimary">
@@ -882,7 +882,7 @@ function CodesTab() {
                 <tr key={c.code} className="border-b border-border/50">
                   <td className="py-2 px-3 font-mono text-xs text-textPrimary">
                     {c.code}
-                    {c.is_api_pool && <span className="ml-1 px-1 py-0.5 bg-accent-400/10 text-accent-400 rounded text-[10px]">{t('admin.pool')}</span>}
+                    {c.is_api_pool && <span className="ml-1 px-1 py-0.5 bg-accent-400/10 text-accent-400 rounded text-3xs">{t('admin.pool')}</span>}
                   </td>
                   <td className="py-2 px-3 text-xs text-textSecondary">{CODE_TYPES[c.code_type] || c.code_type || t('admin.codeTypeDefault')}</td>
                   <td className="py-2 px-3 text-textPrimary">{c.quota_amount}{(c.code_type === 'file_size' || c.code_type === 'file_quota') ? ' MB' : ''}</td>
@@ -1112,7 +1112,7 @@ function BackupTab() {
     <div className="space-y-5">
       {/* ========== 当前数据库后端信息 ========== */}
       {backupInfo && (
-        <div className="bg-amber-400/5 border border-amber-400/20 rounded-xl p-4 flex items-start gap-3">
+        <div className="bg-amber-400/5 border border-amber-400/20 rounded-card p-4 flex items-start gap-3">
           <AlertTriangle size={18} className="text-amber-400 shrink-0 mt-0.5" />
           <div className="flex-1 min-w-0">
             <p className="text-sm text-textPrimary">
@@ -1125,12 +1125,12 @@ function BackupTab() {
       )}
 
       {/* ========== 导出区 ========== */}
-      <div className="bg-surface rounded-xl border border-border p-5">
+      <div className="bg-surface rounded-card border border-border p-5">
         <h3 className="font-semibold text-textPrimary mb-1">{t('admin.exportTitle')}</h3>
         <p className="text-sm text-textMuted mb-5">{t('admin.exportDesc')}</p>
 
         {/* 完整备份 */}
-        <div className="bg-mint-400/5 border border-mint-400/20 rounded-xl p-4 mb-3">
+        <div className="bg-mint-400/5 border border-mint-400/20 rounded-card p-4 mb-3">
           <div className="flex items-start gap-3">
             <Database size={20} className="text-mint-400 shrink-0" />
             <div className="flex-1 min-w-0">
@@ -1140,7 +1140,7 @@ function BackupTab() {
             <button
               onClick={handleFullBackup}
               disabled={downloadingFull}
-              className="shrink-0 px-4 py-2 bg-mint-400 text-white rounded-xl hover:bg-mint-500 disabled:opacity-40 text-sm font-medium transition-colors"
+              className="shrink-0 px-4 py-2 bg-mint-400 text-white rounded-card hover:bg-mint-500 disabled:opacity-40 text-sm font-medium transition-colors"
             >
               {downloadingFull ? t('admin.packing') : t('admin.downloadFullBackup')}
             </button>
@@ -1148,7 +1148,7 @@ function BackupTab() {
         </div>
 
         {/* 仅数据库 */}
-        <div className="bg-canvas border border-border rounded-xl p-4">
+        <div className="bg-canvas border border-border rounded-card p-4">
           <div className="flex items-start gap-3">
             <Database size={20} className="text-textSecondary shrink-0" />
             <div className="flex-1 min-w-0">
@@ -1158,7 +1158,7 @@ function BackupTab() {
             <button
               onClick={handleBackup}
               disabled={downloading}
-              className="shrink-0 px-4 py-2 bg-primary-500 text-white rounded-xl hover:bg-primary-600 disabled:opacity-40 text-sm font-medium transition-colors"
+              className="btn btn-sm btn-primary shrink-0"
             >
               {downloading ? t('admin.exporting') : t('admin.downloadDbOnly')}
             </button>
@@ -1167,20 +1167,20 @@ function BackupTab() {
       </div>
 
       {/* ========== 本地自动备份（每日备份 + 回档） ========== */}
-      <div className="bg-surface rounded-xl border border-border p-5">
+      <div className="bg-surface rounded-card border border-border p-5">
         <div className="flex items-center justify-between mb-1">
           <h3 className="font-semibold text-textPrimary">本地自动备份</h3>
           <button onClick={loadLocalBackups} className="text-xs text-textSecondary hover:text-textPrimary">🔄 刷新</button>
         </div>
         <p className="text-sm text-textMuted mb-4">每日备份功能产生的文件（服务器 data/backups/），可选择一个回档（覆盖当前所有数据）</p>
         {localBackups.length === 0 ? (
-          <div className="text-sm text-textMuted bg-canvas border border-border rounded-xl p-4">
+          <div className="text-sm text-textMuted bg-canvas border border-border rounded-card p-4">
             暂无本地备份——在「系统设置」里开启每日备份后，每天会自动生成
           </div>
         ) : (
           <div className="space-y-2">
             {localBackups.map((b) => (
-              <div key={b.name} className="flex items-center gap-3 bg-canvas border border-border rounded-xl px-4 py-2.5">
+              <div key={b.name} className="flex items-center gap-3 bg-canvas border border-border rounded-card px-4 py-2.5">
                 <Database size={16} className="text-textSecondary shrink-0" />
                 <div className="flex-1 min-w-0">
                   <div className="text-sm text-textPrimary truncate">{b.name}</div>
@@ -1189,7 +1189,7 @@ function BackupTab() {
                 <button
                   onClick={() => handleRestoreLocal(b.name)}
                   disabled={restoringLocal === b.name}
-                  className="shrink-0 px-3 py-1.5 text-sm bg-rose-500/80 text-white rounded-lg hover:bg-rose-500 disabled:opacity-40 transition-colors"
+                  className="shrink-0 px-3 py-1.5 text-sm bg-rose-500/80 text-white rounded-control hover:bg-rose-500 disabled:opacity-40 transition-colors"
                 >
                   {restoringLocal === b.name ? '回档中...' : '⏪ 回档'}
                 </button>
@@ -1200,12 +1200,12 @@ function BackupTab() {
       </div>
 
       {/* ========== 导入区 ========== */}
-      <div className="bg-surface rounded-xl border border-rose-500/30 p-5">
+      <div className="bg-surface rounded-card border border-rose-500/30 p-5">
         <h3 className="font-semibold text-textPrimary mb-1">{t('admin.restoreTitle')}</h3>
         <p className="text-sm text-rose-400 mb-5">{t('admin.restoreWarning')}</p>
 
         {/* 完整恢复 */}
-        <div className="bg-rose-400/5 border border-rose-400/20 rounded-xl p-4 mb-3">
+        <div className="bg-rose-400/5 border border-rose-400/20 rounded-card p-4 mb-3">
           <div className="flex items-start gap-3">
             <Database size={20} className="text-rose-400 shrink-0" />
             <div className="flex-1 min-w-0">
@@ -1217,7 +1217,7 @@ function BackupTab() {
                 accept=".tar.gz,.tgz"
                 onChange={handleFullRestore}
                 disabled={restoringFull}
-                className="block mt-2 text-sm text-textPrimary file:mr-3 file:py-2 file:px-4 file:rounded-xl file:border-0 file:text-sm file:bg-elevated file:text-textPrimary hover:file:bg-border"
+                className="block mt-2 text-sm text-textPrimary file:mr-3 file:py-2 file:px-4 file:rounded-card file:border-0 file:text-sm file:bg-elevated file:text-textPrimary hover:file:bg-border"
               />
               {restoringFull && <p className="text-sm text-textMuted mt-2">{t('admin.restoringFull')}</p>}
             </div>
@@ -1225,7 +1225,7 @@ function BackupTab() {
         </div>
 
         {/* 仅数据库恢复 */}
-        <div className="bg-canvas border border-border rounded-xl p-4">
+        <div className="bg-canvas border border-border rounded-card p-4">
           <div className="flex items-start gap-3">
             <Database size={20} className="text-textSecondary shrink-0" />
             <div className="flex-1 min-w-0">
@@ -1237,7 +1237,7 @@ function BackupTab() {
                 accept=".sql,.db"
                 onChange={handleRestore}
                 disabled={restoring}
-                className="block mt-2 text-sm text-textPrimary file:mr-3 file:py-2 file:px-4 file:rounded-xl file:border-0 file:text-sm file:bg-elevated file:text-textPrimary hover:file:bg-border"
+                className="block mt-2 text-sm text-textPrimary file:mr-3 file:py-2 file:px-4 file:rounded-card file:border-0 file:text-sm file:bg-elevated file:text-textPrimary hover:file:bg-border"
               />
               {restoring && <p className="text-sm text-textMuted mt-2">{t('admin.restoring')}</p>}
             </div>
@@ -1246,10 +1246,10 @@ function BackupTab() {
       </div>
 
       {message && (
-        <div className="text-sm text-mint-400 bg-mint-400/10 px-3 py-2 rounded-lg">{message}</div>
+        <div className="text-sm text-mint-400 bg-mint-400/10 px-3 py-2 rounded-control">{message}</div>
       )}
       {error && (
-        <div className="text-sm text-rose-400 bg-rose-400/10 px-3 py-2 rounded-lg">{error}</div>
+        <div className="text-sm text-rose-400 bg-rose-400/10 px-3 py-2 rounded-control">{error}</div>
       )}
     </div>
   )
@@ -1314,7 +1314,7 @@ function LogsTab() {
                   {loc && (loc.city || loc.country) && (
                     <>
                       <br />
-                      <span className="text-[10px] text-textMuted" title={loc.isp || ''}>
+                      <span className="text-3xs text-textMuted" title={loc.isp || ''}>
                         {[loc.city, loc.country].filter(Boolean).join(', ')}
                       </span>
                     </>
@@ -1349,12 +1349,12 @@ function OpenCLITab() {
 
   return (
     <div className="space-y-4">
-      <div className="flex gap-2 bg-canvas border border-border rounded-xl p-1 w-full overflow-x-auto">
+      <div className="flex gap-2 bg-canvas border border-border rounded-card p-1 w-full overflow-x-auto">
         {subTabs.map((t) => (
           <button
             key={t.key}
             onClick={() => setTab(t.key)}
-            className={`px-3 py-1.5 text-sm rounded-lg transition-colors font-medium ${
+            className={`px-3 py-1.5 text-sm rounded-control transition-colors font-medium ${
               tab === t.key
                 ? 'bg-elevated text-textPrimary shadow-sm'
                 : 'text-textMuted hover:text-textSecondary hover:bg-elevated'
@@ -1406,7 +1406,7 @@ function OpenCLIConfigSection() {
   if (!config) return <p className="text-textMuted">{t('common.loading')}</p>
 
   return (
-    <div className="bg-surface rounded-xl border border-border p-5 max-w-lg">
+    <div className="bg-surface rounded-card border border-border p-5 max-w-lg">
       <h3 className="font-semibold text-textPrimary mb-4">{t('admin.globalConfig')}</h3>
       <div className="space-y-4">
         <div className="flex items-center gap-3">
@@ -1415,15 +1415,15 @@ function OpenCLIConfigSection() {
         <div>
           <label className="block text-sm font-medium mb-1 text-textSecondary">{t('admin.rateLimit')}</label>
           <input type="number" value={rate} onChange={(e) => setRate(parseInt(e.target.value))}
-            className="w-24 px-2 py-1.5 border border-border bg-canvas rounded-xl text-sm text-textPrimary" />
+            className="w-24 px-2 py-1.5 border border-border bg-canvas rounded-card text-sm text-textPrimary" />
         </div>
         <div>
           <label className="block text-sm font-medium mb-1 text-textSecondary">{t('admin.timeoutSeconds')}</label>
           <input type="number" value={timeout} onChange={(e) => setTimeout_(parseInt(e.target.value))}
-            className="w-24 px-2 py-1.5 border border-border bg-canvas rounded-xl text-sm text-textPrimary" />
+            className="w-24 px-2 py-1.5 border border-border bg-canvas rounded-card text-sm text-textPrimary" />
         </div>
         <button onClick={handleSave} disabled={saving}
-          className="px-4 py-2 bg-primary-500 text-white rounded-xl hover:bg-primary-600 text-sm">
+          className="btn btn-sm btn-primary">
           {saving ? t('admin.saving') : t('admin.save')}
         </button>
       </div>
@@ -1448,7 +1448,7 @@ function OpenCLIAgentsSection() {
   if (!data.length) return <p className="text-textMuted">{t('common.loading')}</p>
 
   return (
-    <div className="bg-surface rounded-xl border border-border p-5">
+    <div className="bg-surface rounded-card border border-border p-5">
       <h3 className="font-semibold text-textPrimary mb-3">{t('admin.opencliAiWhitelist')}</h3>
       <div className="overflow-x-auto">
         <table className="w-full text-sm text-textPrimary">
@@ -1587,7 +1587,7 @@ function OpenCLICommandsSection() {
   return (
     <div className="space-y-4">
       {/* ── 预设命令快速添加（新手友好） ── */}
-      <div className="bg-surface rounded-xl border border-border p-5">
+      <div className="bg-surface rounded-card border border-border p-5">
         <div className="flex items-center justify-between mb-3">
           <div>
             <h3 className="font-semibold text-textPrimary">{t('admin.presetCommands')}</h3>
@@ -1598,7 +1598,7 @@ function OpenCLICommandsSection() {
           <button
             onClick={handleAddAllPresets}
             disabled={addingPresets}
-            className="px-4 py-2 bg-mint-500 text-white rounded-xl hover:bg-mint-400 disabled:opacity-50 text-sm font-medium transition-colors"
+            className="px-4 py-2 bg-mint-500 text-white rounded-card hover:bg-mint-400 disabled:opacity-50 text-sm font-medium transition-colors"
           >
             {addingPresets ? t('common.saving') : t('admin.addAllPresets')}
           </button>
@@ -1622,7 +1622,7 @@ function OpenCLICommandsSection() {
                   return (
                     <div
                       key={`${p.pattern}-${p.is_regex}`}
-                      className={`rounded-lg border p-3 text-sm transition-colors ${
+                      className={`rounded-control border p-3 text-sm transition-colors ${
                         added
                           ? 'border-mint-400/30 bg-mint-400/5'
                           : 'border-border bg-canvas hover:border-primary-400/30'
@@ -1637,7 +1637,7 @@ function OpenCLICommandsSection() {
                         <button
                           onClick={() => !added && handleAddPreset(p.pattern, p.is_regex, p.description)}
                           disabled={added}
-                          className={`shrink-0 px-2.5 py-1 rounded-lg text-xs font-medium transition-colors ${
+                          className={`shrink-0 px-2.5 py-1 rounded-control text-xs font-medium transition-colors ${
                             added
                               ? 'bg-mint-400/10 text-mint-400 cursor-default'
                               : 'bg-primary-500 text-white hover:bg-primary-600'
@@ -1656,14 +1656,14 @@ function OpenCLICommandsSection() {
       </div>
 
       {/* ── 手动添加表单 ── */}
-      <div className="bg-surface rounded-xl border border-border p-5 max-w-lg">
+      <div className="bg-surface rounded-card border border-border p-5 max-w-lg">
         <h3 className="font-semibold mb-3 text-textPrimary">{t('admin.manualAddCommand')}</h3>
         <p className="text-xs text-textMuted mb-3" dangerouslySetInnerHTML={{ __html: t('admin.manualAddDesc') }} />
         <div className="flex flex-wrap items-end gap-3">
           <div>
             <label className="block text-xs mb-1 text-textSecondary">{t('admin.commandPattern')}</label>
             <input value={pattern} onChange={(e) => setPattern(e.target.value)}
-              className="w-40 px-2 py-1.5 border border-border bg-canvas rounded-xl text-sm text-textPrimary"
+              className="w-40 px-2 py-1.5 border border-border bg-canvas rounded-card text-sm text-textPrimary"
               placeholder={t('admin.commandPatternPlaceholder')} />
           </div>
           <div className="flex items-center gap-1.5 mb-1">
@@ -1674,18 +1674,18 @@ function OpenCLICommandsSection() {
           <div>
             <label className="block text-xs mb-1 text-textSecondary">{t('admin.description')}</label>
             <input value={desc} onChange={(e) => setDesc(e.target.value)}
-              className="w-32 px-2 py-1.5 border border-border bg-canvas rounded-xl text-sm text-textPrimary"
+              className="w-32 px-2 py-1.5 border border-border bg-canvas rounded-card text-sm text-textPrimary"
               placeholder={t('common.optional')} />
           </div>
           <button onClick={handleAdd}
-            className="px-3 py-1.5 bg-primary-500 text-white rounded-xl hover:bg-primary-600 text-sm">
+            className="btn btn-xs btn-primary">
             {t('admin.addCmd')}
           </button>
         </div>
       </div>
 
       {/* ── 白名单列表 ── */}
-      <div className="bg-surface rounded-xl border border-border p-5">
+      <div className="bg-surface rounded-card border border-border p-5">
         <h3 className="font-semibold mb-3 text-textPrimary">{t('admin.commandWhitelist')}</h3>
         <div className="overflow-x-auto">
           <table className="w-full text-sm text-textPrimary">
@@ -1754,7 +1754,7 @@ function OpenCLILogsSection() {
   if (!data) return <p className="text-textMuted">{t('common.loading')}</p>
 
   return (
-    <div className="bg-surface rounded-xl border border-border p-5">
+    <div className="bg-surface rounded-card border border-border p-5">
       <h3 className="font-semibold text-textPrimary mb-3">{t('admin.usageLogs')}</h3>
       <div className="overflow-x-auto">
         <table className="w-full text-sm text-textPrimary">
@@ -1905,7 +1905,7 @@ function SystemSettingsTab() {
   if (!config) return <p className="text-textMuted p-6">{t('common.loading')}</p>
 
   return (
-    <div className="bg-surface rounded-xl border border-border p-5 max-w-lg space-y-6">
+    <div className="bg-surface rounded-card border border-border p-5 max-w-lg space-y-6">
       <h3 className="font-semibold text-textPrimary">{t('admin.systemSettings')}</h3>
 
       {/* 默认语言 */}
@@ -1918,7 +1918,7 @@ function SystemSettingsTab() {
             setLang(e.target.value)
             handleSave('language', e.target.value)
           }}
-          className="w-full px-3.5 py-2.5 rounded-xl border border-border bg-canvas text-sm text-textPrimary"
+          className="w-full px-3.5 py-2.5 rounded-card border border-border bg-canvas text-sm text-textPrimary"
         >
           {LANGUAGES.map((l) => (
             <option key={l.code} value={l.code}>{t(l.i18nKey)}</option>
@@ -1942,12 +1942,12 @@ function SystemSettingsTab() {
             min={0}
             max={999999}
             disabled={platformCredit > 0 && !hasActiveKeys}
-            className="w-32 px-3 py-2 rounded-xl border border-border bg-canvas text-sm text-textPrimary focus:outline-none focus:ring-2 focus:ring-primary-500/50 disabled:opacity-40"
+            className="w-32 px-3 py-2 rounded-card border border-border bg-canvas text-sm text-textPrimary focus:outline-none focus:ring-2 focus:ring-primary-500/50 disabled:opacity-40"
           />
           <button
             onClick={handlePlatformCreditSave}
             disabled={saving || platformCredit === (config?.default_platform_credit || 0)}
-            className="px-3 py-2 bg-primary-500 text-white rounded-xl hover:bg-primary-600 text-sm disabled:opacity-40 transition-colors"
+            className="btn btn-sm btn-primary"
           >
             {t('settings.save')}
           </button>
@@ -1968,7 +1968,7 @@ function SystemSettingsTab() {
             onChange={(e) => setFileQuota(parseInt(e.target.value) || 1)}
             min={1}
             max={1048576}
-            className="w-32 px-3 py-2 rounded-xl border border-border bg-canvas text-sm text-textPrimary focus:outline-none focus:ring-2 focus:ring-primary-500/50"
+            className="w-32 px-3 py-2 rounded-card border border-border bg-canvas text-sm text-textPrimary focus:outline-none focus:ring-2 focus:ring-primary-500/50"
           />
           <span className="text-xs text-textMuted">MB</span>
           <button
@@ -1989,7 +1989,7 @@ function SystemSettingsTab() {
               handleSave('file_quota', fileQuota)
             }}
             disabled={saving || fileQuota === (config?.default_file_quota_mb ?? 100)}
-            className="px-3 py-2 bg-primary-500 text-white rounded-xl hover:bg-primary-600 text-sm disabled:opacity-40 transition-colors"
+            className="px-3 py-2 bg-primary-500 text-white rounded-card hover:bg-primary-600 text-sm disabled:opacity-40 transition-colors"
           >
             {t('settings.save')}
           </button>
@@ -2003,7 +2003,7 @@ function SystemSettingsTab() {
         <div className="flex items-center gap-2">
           <input type="number" value={uploadMaxSizeMb}
             onChange={(e) => setUploadMaxSizeMb(parseInt(e.target.value) || 1)} min={1} max={1024}
-            className="w-32 px-3 py-2 rounded-xl border border-border bg-canvas text-sm text-textPrimary focus:outline-none focus:ring-2 focus:ring-primary-500/50" />
+            className="w-32 px-3 py-2 rounded-card border border-border bg-canvas text-sm text-textPrimary focus:outline-none focus:ring-2 focus:ring-primary-500/50" />
           <span className="text-xs text-textMuted">MB</span>
           <button
             onClick={async () => {
@@ -2015,7 +2015,7 @@ function SystemSettingsTab() {
               finally { setSaving(false) }
             }}
             disabled={saving}
-            className="px-3 py-2 bg-primary-500 text-white rounded-xl hover:bg-primary-600 text-sm disabled:opacity-40 transition-colors"
+            className="px-3 py-2 bg-primary-500 text-white rounded-card hover:bg-primary-600 text-sm disabled:opacity-40 transition-colors"
           >{t('settings.save')}</button>
         </div>
       </div>
@@ -2027,7 +2027,7 @@ function SystemSettingsTab() {
         <div className="flex items-center gap-2">
           <input type="number" value={avatarMaxSizeMb}
             onChange={(e) => setAvatarMaxSizeMb(parseInt(e.target.value) || 1)} min={1} max={100}
-            className="w-32 px-3 py-2 rounded-xl border border-border bg-canvas text-sm text-textPrimary focus:outline-none focus:ring-2 focus:ring-primary-500/50" />
+            className="w-32 px-3 py-2 rounded-card border border-border bg-canvas text-sm text-textPrimary focus:outline-none focus:ring-2 focus:ring-primary-500/50" />
           <span className="text-xs text-textMuted">MB</span>
           <button
             onClick={async () => {
@@ -2039,7 +2039,7 @@ function SystemSettingsTab() {
               finally { setSaving(false) }
             }}
             disabled={saving}
-            className="px-3 py-2 bg-primary-500 text-white rounded-xl hover:bg-primary-600 text-sm disabled:opacity-40 transition-colors"
+            className="px-3 py-2 bg-primary-500 text-white rounded-card hover:bg-primary-600 text-sm disabled:opacity-40 transition-colors"
           >{t('settings.save')}</button>
         </div>
       </div>
@@ -2067,11 +2067,11 @@ function SystemSettingsTab() {
         <div className="flex items-center gap-2">
           <input type="number" value={auditRetention}
             onChange={e => setAuditRetention(parseInt(e.target.value) || 90)} min={7} max={730}
-            className="w-24 px-3 py-2 rounded-xl border border-border bg-canvas text-sm text-textPrimary focus:outline-none focus:ring-2 focus:ring-primary-500/50" />
+            className="w-24 px-3 py-2 rounded-card border border-border bg-canvas text-sm text-textPrimary focus:outline-none focus:ring-2 focus:ring-primary-500/50" />
           <span className="text-xs text-textMuted">天</span>
           <button onClick={() => handleSave('audit_retention', auditRetention)}
             disabled={saving || auditRetention === (config?.audit_log_retention_days ?? 90)}
-            className="px-3 py-2 bg-primary-500 text-white rounded-xl hover:bg-primary-600 text-sm disabled:opacity-40 transition-colors"
+            className="px-3 py-2 bg-primary-500 text-white rounded-card hover:bg-primary-600 text-sm disabled:opacity-40 transition-colors"
           >{t('settings.save')}</button>
         </div>
       </div>
@@ -2082,11 +2082,11 @@ function SystemSettingsTab() {
         <div className="flex items-center gap-2">
           <input type="number" value={messageRetention}
             onChange={e => setMessageRetention(parseInt(e.target.value) || 0)} min={0} max={3650}
-            className="w-24 px-3 py-2 rounded-xl border border-border bg-canvas text-sm text-textPrimary focus:outline-none focus:ring-2 focus:ring-primary-500/50" />
+            className="w-24 px-3 py-2 rounded-card border border-border bg-canvas text-sm text-textPrimary focus:outline-none focus:ring-2 focus:ring-primary-500/50" />
           <span className="text-xs text-textMuted">天{messageRetention === 0 ? '（永久）' : ''}</span>
           <button onClick={() => handleSave('message_retention', messageRetention)}
             disabled={saving || messageRetention === (config?.message_retention_days ?? 0)}
-            className="px-3 py-2 bg-primary-500 text-white rounded-xl hover:bg-primary-600 text-sm disabled:opacity-40 transition-colors"
+            className="px-3 py-2 bg-primary-500 text-white rounded-card hover:bg-primary-600 text-sm disabled:opacity-40 transition-colors"
           >{t('settings.save')}</button>
         </div>
       </div>
@@ -2109,11 +2109,11 @@ function SystemSettingsTab() {
         <div className="flex items-center gap-2 mt-2">
           <input type="number" value={dailyBackupKeep}
             onChange={e => setDailyBackupKeep(parseInt(e.target.value) || 7)} min={1} max={365}
-            className="w-24 px-3 py-2 rounded-xl border border-border bg-canvas text-sm text-textPrimary focus:outline-none focus:ring-2 focus:ring-primary-500/50" />
+            className="w-24 px-3 py-2 rounded-card border border-border bg-canvas text-sm text-textPrimary focus:outline-none focus:ring-2 focus:ring-primary-500/50" />
           <span className="text-xs text-textMuted">份（超出自动清除最旧备份）</span>
           <button onClick={() => handleSave('daily_backup_keep', dailyBackupKeep)}
             disabled={saving || dailyBackupKeep === (config?.daily_backup_keep ?? 7)}
-            className="px-3 py-2 bg-primary-500 text-white rounded-xl hover:bg-primary-600 text-sm disabled:opacity-40 transition-colors"
+            className="px-3 py-2 bg-primary-500 text-white rounded-card hover:bg-primary-600 text-sm disabled:opacity-40 transition-colors"
           >{t('settings.save')}</button>
         </div>
       </div>
@@ -2149,12 +2149,12 @@ function SystemSettingsTab() {
             value={geoipUrl}
             onChange={e => setGeoipUrl(e.target.value)}
             placeholder="http://ip-api.com/json/{ip}?fields=..."
-            className="flex-1 px-3 py-2 rounded-xl border border-border bg-canvas text-sm text-textPrimary focus:outline-none focus:ring-2 focus:ring-primary-500/50"
+            className="flex-1 px-3 py-2 rounded-card border border-border bg-canvas text-sm text-textPrimary focus:outline-none focus:ring-2 focus:ring-primary-500/50"
           />
           <button
             onClick={() => handleSave('geoip_url', geoipUrl)}
             disabled={saving}
-            className="px-3 py-2 bg-primary-500 text-white rounded-xl hover:bg-primary-600 text-sm disabled:opacity-40 transition-colors"
+            className="px-3 py-2 bg-primary-500 text-white rounded-card hover:bg-primary-600 text-sm disabled:opacity-40 transition-colors"
           >{t('settings.save')}</button>
         </div>
       </div>
@@ -2168,11 +2168,11 @@ function SystemSettingsTab() {
         <div className="flex items-center gap-2">
           <input type="number" value={defaultConcurrentAiLimit}
             onChange={(e) => setDefaultConcurrentAiLimit(parseInt(e.target.value) || 3)} min={1} max={20}
-            className="w-32 px-3 py-2 rounded-xl border border-border bg-canvas text-sm text-textPrimary focus:outline-none focus:ring-2 focus:ring-primary-500/50" />
+            className="w-32 px-3 py-2 rounded-card border border-border bg-canvas text-sm text-textPrimary focus:outline-none focus:ring-2 focus:ring-primary-500/50" />
           <button
             onClick={() => handleSave('concurrent_ai_limit', defaultConcurrentAiLimit)}
             disabled={saving || defaultConcurrentAiLimit === (config?.default_concurrent_ai_limit ?? 3)}
-            className="px-3 py-2 bg-primary-500 text-white rounded-xl hover:bg-primary-600 text-sm disabled:opacity-40 transition-colors"
+            className="px-3 py-2 bg-primary-500 text-white rounded-card hover:bg-primary-600 text-sm disabled:opacity-40 transition-colors"
           >{t('settings.save')}</button>
         </div>
       </div>
@@ -2184,7 +2184,7 @@ function SystemSettingsTab() {
         <div className="flex items-center gap-2">
           <input type="number" value={bulkConcurrency}
             onChange={(e) => setBulkConcurrency(parseInt(e.target.value) || 3)} min={1} max={20}
-            className="w-32 px-3 py-2 rounded-xl border border-border bg-canvas text-sm text-textPrimary focus:outline-none focus:ring-2 focus:ring-primary-500/50" />
+            className="w-32 px-3 py-2 rounded-card border border-border bg-canvas text-sm text-textPrimary focus:outline-none focus:ring-2 focus:ring-primary-500/50" />
           <button
             onClick={async () => {
               if (!confirm(`确定将所有群的 AI 并发数设为 ${bulkConcurrency}？此操作不可撤销。`)) return
@@ -2196,7 +2196,7 @@ function SystemSettingsTab() {
               finally { setBulking(false) }
             }}
             disabled={bulking}
-            className="px-3 py-2 bg-accent-500 text-white rounded-xl hover:bg-accent-400 text-sm disabled:opacity-40 transition-colors"
+            className="px-3 py-2 bg-accent-500 text-white rounded-card hover:bg-accent-400 text-sm disabled:opacity-40 transition-colors"
           >{bulking ? '执行中...' : '批量应用'}</button>
         </div>
       </div>

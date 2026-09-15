@@ -121,7 +121,7 @@ export default function SystemPromptTab() {
         <div className="ml-auto flex items-center gap-2">
           <button
             onClick={() => setPreviewOpen(!previewOpen)}
-            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-elevated hover:bg-canvas border border-border text-xs text-textSecondary hover:text-textPrimary transition-colors"
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-control bg-elevated hover:bg-canvas border border-border text-xs text-textSecondary hover:text-textPrimary transition-colors"
           >
             <Eye size={13} />
             {previewOpen ? '隐藏预览' : '预览拼接'}
@@ -130,14 +130,14 @@ export default function SystemPromptTab() {
       </div>
 
       {message && (
-        <div className={`text-sm px-3 py-2 rounded-xl ${
+        <div className={`text-sm px-3 py-2 rounded-card ${
           message.includes('失败') ? 'bg-rose-400/10 text-rose-400' : 'bg-mint-400/10 text-mint-400'
         }`}>{message}</div>
       )}
 
       {/* 预览面板 */}
       {previewOpen && (
-        <div className="bg-canvas border border-border rounded-xl p-4 max-h-96 overflow-y-auto">
+        <div className="bg-canvas border border-border rounded-card p-4 max-h-96 overflow-y-auto">
           <pre className="text-xs text-textSecondary whitespace-pre-wrap font-mono">{previewText || '（空）'}</pre>
         </div>
       )}
@@ -147,7 +147,7 @@ export default function SystemPromptTab() {
         {segments.map((seg, idx) => (
           <div
             key={seg.key}
-            className={`bg-surface border rounded-xl transition-colors ${
+            className={`bg-surface border rounded-card transition-colors ${
               seg.is_overridden ? 'border-accent-400/30' :
               seg.readonly ? 'border-border/60 opacity-70' : 'border-border'
             }`}
@@ -157,19 +157,19 @@ export default function SystemPromptTab() {
               className="flex items-center gap-2 px-4 py-3 cursor-pointer select-none"
               onClick={() => setExpandedKey(expandedKey === seg.key ? null : seg.key)}
             >
-              <span className="text-[10px] w-5 h-5 rounded-full bg-elevated border border-border flex items-center justify-center text-textMuted font-mono shrink-0">
+              <span className="text-3xs w-5 h-5 rounded-full bg-elevated border border-border flex items-center justify-center text-textMuted font-mono shrink-0">
                 {idx + 1}
               </span>
               <div className="flex-1 min-w-0">
                 <div className="flex items-center gap-2">
                   <span className="text-sm font-medium text-textPrimary truncate">{seg.label}</span>
                   {seg.is_overridden && (
-                    <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-accent-400/10 text-accent-400 border border-accent-400/20 shrink-0">
+                    <span className="text-3xs px-1.5 py-0.5 rounded-full bg-accent-400/10 text-accent-400 border border-accent-400/20 shrink-0">
                       已覆盖
                     </span>
                   )}
                   {seg.readonly && (
-                    <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-canvas text-textMuted border border-border shrink-0">
+                    <span className="text-3xs px-1.5 py-0.5 rounded-full bg-canvas text-textMuted border border-border shrink-0">
                       动态
                     </span>
                   )}
@@ -187,20 +187,20 @@ export default function SystemPromptTab() {
                     <textarea
                       value={editValue}
                       onChange={e => setEditValue(e.target.value)}
-                      className="w-full h-48 px-3 py-2 rounded-lg border border-border bg-canvas text-sm text-textPrimary font-mono resize-y focus:outline-none focus:ring-2 focus:ring-primary-500/50"
+                      className="w-full h-48 px-3 py-2 rounded-control border border-border bg-canvas text-sm text-textPrimary font-mono resize-y focus:outline-none focus:ring-2 focus:ring-primary-500/50"
                     />
                     <div className="flex items-center gap-2">
                       <button
                         onClick={() => saveEdit(seg)}
                         disabled={saving}
-                        className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-mint-400 text-white hover:bg-mint-500 disabled:opacity-40 text-xs font-medium transition-colors"
+                        className="flex items-center gap-1.5 px-3 py-1.5 rounded-control bg-mint-400 text-white hover:bg-mint-500 disabled:opacity-40 text-xs font-medium transition-colors"
                       >
                         {saving ? <Loader2 size={12} className="animate-spin" /> : <Save size={12} />}
                         保存
                       </button>
                       <button
                         onClick={cancelEdit}
-                        className="px-3 py-1.5 rounded-lg bg-canvas border border-border text-xs text-textSecondary hover:text-textPrimary transition-colors"
+                        className="btn btn-xs btn-outline bg-canvas hover:text-textPrimary"
                       >
                         取消
                       </button>
@@ -208,14 +208,14 @@ export default function SystemPromptTab() {
                   </div>
                 ) : (
                   <div className="space-y-2">
-                    <pre className="text-xs text-textSecondary whitespace-pre-wrap bg-canvas rounded-lg p-3 max-h-40 overflow-y-auto border border-border/60 font-mono">
+                    <pre className="text-xs text-textSecondary whitespace-pre-wrap bg-canvas rounded-control p-3 max-h-40 overflow-y-auto border border-border/60 font-mono">
                       {seg.current}
                     </pre>
                     {!seg.readonly && (
                       <div className="flex items-center gap-2">
                         <button
                           onClick={() => startEdit(seg)}
-                          className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-primary-500/10 text-primary-400 hover:bg-primary-500/20 text-xs font-medium transition-colors"
+                          className="flex items-center gap-1.5 px-3 py-1.5 rounded-control bg-primary-500/10 text-primary-400 hover:bg-primary-500/20 text-xs font-medium transition-colors"
                         >
                           <Edit3 size={12} /> 编辑
                         </button>
@@ -223,7 +223,7 @@ export default function SystemPromptTab() {
                           <button
                             onClick={() => resetSegment(seg)}
                             disabled={saving}
-                            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-canvas border border-border text-xs text-textMuted hover:text-textPrimary transition-colors"
+                            className="flex items-center gap-1.5 px-3 py-1.5 rounded-control bg-canvas border border-border text-xs text-textMuted hover:text-textPrimary transition-colors"
                           >
                             <RotateCcw size={12} /> 恢复默认
                           </button>
@@ -239,7 +239,7 @@ export default function SystemPromptTab() {
       </div>
 
       {/* 组装顺序（可编辑） */}
-      <div className="bg-surface border border-border rounded-xl p-4">
+      <div className="bg-surface border border-border rounded-card p-4">
         <div className="flex items-center justify-between mb-3">
           <h4 className="text-xs font-medium text-textSecondary flex items-center gap-2">
             <Layers size={13} className="text-primary-400" />
@@ -255,7 +255,7 @@ export default function SystemPromptTab() {
               finally { setSaving(false) }
             }}
             disabled={saving}
-            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-mint-400 text-white hover:bg-mint-500 disabled:opacity-40 text-xs font-medium transition-colors"
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-control bg-mint-400 text-white hover:bg-mint-500 disabled:opacity-40 text-xs font-medium transition-colors"
           >
             {saving ? <Loader2 size={12} className="animate-spin" /> : <Save size={12} />}
             保存顺序
@@ -277,21 +277,21 @@ export default function SystemPromptTab() {
               setOrder(next)
             }
             return (
-              <div key={k} className="flex items-center gap-2 px-3 py-2 rounded-lg bg-canvas border border-border/60">
-                <span className="text-[10px] w-5 h-5 rounded-full bg-elevated border border-border flex items-center justify-center text-textMuted font-mono shrink-0">
+              <div key={k} className="flex items-center gap-2 px-3 py-2 rounded-control bg-canvas border border-border/60">
+                <span className="text-3xs w-5 h-5 rounded-full bg-elevated border border-border flex items-center justify-center text-textMuted font-mono shrink-0">
                   {i + 1}
                 </span>
                 <span className="text-xs text-textPrimary flex-1">{seg?.label || k}</span>
                 <button
                   onClick={moveUp} disabled={i === 0}
-                  className="p-1 rounded hover:bg-elevated text-textMuted hover:text-textPrimary disabled:opacity-20 transition-colors"
+                  className="icon-btn-sm text-textMuted"
                   title="上移"
                 >
                   <ArrowUp size={14} />
                 </button>
                 <button
                   onClick={moveDown} disabled={i === order.length - 1}
-                  className="p-1 rounded hover:bg-elevated text-textMuted hover:text-textPrimary disabled:opacity-20 transition-colors"
+                  className="icon-btn-sm text-textMuted"
                   title="下移"
                 >
                   <ArrowDown size={14} />
@@ -300,7 +300,7 @@ export default function SystemPromptTab() {
             )
           })}
         </div>
-        <p className="text-[10px] text-textMuted mt-2">点击 ↑↓ 调整段的拼接顺序，点「保存顺序」持久化到数据库。</p>
+        <p className="text-3xs text-textMuted mt-2">点击 ↑↓ 调整段的拼接顺序，点「保存顺序」持久化到数据库。</p>
       </div>
     </div>
   )

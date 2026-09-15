@@ -2,7 +2,7 @@ import { memo, useState, useEffect, useRef, useMemo, useCallback, type ReactNode
 import { useNavigate } from 'react-router-dom'
 import { api } from '../api/client'
 import { Plus, BellOff, Menu, UserPlus, Users, Bot, Globe, ShieldAlert, MessageCircle, Inbox, Pin, ChevronDown, ChevronRight } from 'lucide-react'
-import EmptyState from './EmptyState'
+import { EmptyState } from './ui'
 import { getStateDotColor, CHAT_REFRESH_EVENT } from '../constants'
 import { formatRelativeTime } from '../utils/time'
 import { GroupAvatarGroup, thumbUrl } from './GroupAvatar'
@@ -301,7 +301,7 @@ const ChatSidebar = memo(function ChatSidebar({
               <span className="truncate block">{g.name}</span>
             </div>
             {g.unread_count > 0 && (
-              <span className={`shrink-0 ml-1 min-w-[18px] h-[18px] rounded-full flex items-center justify-center text-[10px] font-bold text-white ${
+              <span className={`shrink-0 ml-1 min-w-[18px] h-[18px] rounded-full flex items-center justify-center text-3xs font-bold text-white ${
                 g.has_mention
                   ? 'bg-rose-500 shadow-sm shadow-rose-500/30'
                   : 'bg-primary-500/80'
@@ -310,7 +310,7 @@ const ChatSidebar = memo(function ChatSidebar({
               </span>
             )}
           </div>
-          <div className="text-[11px] text-textMuted mt-0.5 flex items-center gap-1 min-w-0">
+          <div className="text-2xs text-textMuted mt-0.5 flex items-center gap-1 min-w-0">
             {g.dnd_until && <BellOff size={10} className="text-rose-400 shrink-0" />}
             {g.has_mention && !g.dnd_until && (
               <span className="text-rose-400 font-medium shrink-0">{t('chatlist.atYou')}</span>
@@ -355,7 +355,7 @@ const ChatSidebar = memo(function ChatSidebar({
               {s.is_federated && <Globe size={11} className="text-primary-400 shrink-0" />}
               <span className="truncate">{s.partner.name}</span>
               {s.partner.status_text && (
-                <span className="text-[11px] font-medium truncate" style={s.partner.status_color
+                <span className="text-2xs font-medium truncate" style={s.partner.status_color
                   ? getStatusTextStyle(s.partner.status_color, theme === 'dark' ? BG_SURFACE_DARK : BG_SURFACE_LIGHT)
                   : undefined}>
                   · {s.partner.status_text}
@@ -363,12 +363,12 @@ const ChatSidebar = memo(function ChatSidebar({
               )}
             </div>
             {s.unread_count > 0 && (
-              <span className="shrink-0 ml-1 min-w-[18px] h-[18px] rounded-full flex items-center justify-center text-[10px] font-bold text-white bg-primary-500/80">
+              <span className="shrink-0 ml-1 min-w-[18px] h-[18px] rounded-full flex items-center justify-center text-3xs font-bold text-white bg-primary-500/80">
                 {s.unread_count > 99 ? '99+' : s.unread_count}
               </span>
             )}
           </div>
-          <div className="text-[11px] text-textMuted mt-0.5 flex items-center gap-1 min-w-0">
+          <div className="text-2xs text-textMuted mt-0.5 flex items-center gap-1 min-w-0">
             <span className="min-w-0 flex-1" style={{ display: 'block' }}>
               <PreviewText text={s.last_message_preview} placeholder={t('chatlist.noMessages')} />
             </span>
@@ -396,7 +396,7 @@ const ChatSidebar = memo(function ChatSidebar({
     <div className="flex items-center px-3 py-1 group">
       <button
         onClick={onToggle}
-        className="flex items-center gap-1 text-[10px] font-semibold uppercase tracking-wider text-textMuted hover:text-textSecondary transition-colors"
+        className="flex items-center gap-1 text-3xs font-semibold uppercase tracking-wider text-textMuted hover:text-textSecondary transition-colors"
       >
         {collapsed ? <ChevronRight size={12} /> : <ChevronDown size={12} />}
         {label}
@@ -418,7 +418,7 @@ const ChatSidebar = memo(function ChatSidebar({
         <div className="flex items-center gap-2">
           <button
             onClick={openDrawer}
-            className="md:hidden p-1 rounded-lg hover:bg-elevated text-textSecondary transition-colors"
+            className="icon-btn-sm md:hidden text-textSecondary"
             title={t('chatlist.menu')}
           >
             <Menu size={18} />
@@ -428,15 +428,15 @@ const ChatSidebar = memo(function ChatSidebar({
         <div className="relative">
           <button
             onClick={() => setShowPlusMenu(!showPlusMenu)}
-            className="p-1 rounded-lg hover:bg-elevated text-textMuted hover:text-primary-400 transition-colors"
+            className="p-1 rounded-control hover:bg-elevated text-textMuted hover:text-primary-400 transition-colors"
             title={t('chatlist.createNewGroup')}
           >
             <Plus size={16} />
           </button>
           {showPlusMenu && (
             <>
-              <div className="fixed inset-0 z-40" onClick={() => setShowPlusMenu(false)} />
-              <div className="absolute right-0 top-full mt-1 w-36 bg-elevated border border-border rounded-xl shadow-xl z-50 py-1 overflow-hidden">
+              <div className="fixed inset-0 z-drawer" onClick={() => setShowPlusMenu(false)} />
+              <div className="absolute right-0 top-full mt-1 w-36 bg-elevated border border-border rounded-card shadow-xl z-modal py-1 overflow-hidden">
                 <button
                   onClick={() => { setShowPlusMenu(false); onCreateGroup() }}
                   className="w-full flex items-center gap-2.5 px-3.5 py-2.5 text-sm text-textSecondary hover:bg-canvas hover:text-textPrimary transition-colors"

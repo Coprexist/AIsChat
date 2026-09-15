@@ -13,7 +13,7 @@ import {
 } from 'lucide-react'
 import AvatarPickerModal from '../components/AvatarPickerModal'
 import AgentSettingsModal from '../components/AgentSettingsModal'
-import EmptyState from '../components/EmptyState'
+import { Dialog, EmptyState } from '../components/ui'
 import FilePreviewModal from '../components/FilePreviewModal'
 
 /** 扩展名→MIME 类型映射（后端未返回 mime_type 时 fallback） */
@@ -140,11 +140,11 @@ function VectorMemoryCard({ mem, t: _t }: { mem: MemoryItem; t: any }) {
     private: '私有', group: '群组', cross_user: '跨用户',
   }
   return (
-    <div className="p-3 rounded-lg bg-canvas border border-border">
+    <div className="p-3 rounded-control bg-canvas border border-border">
       <button onClick={() => setShowFull(!showFull)} className="w-full text-left">
         <div className="flex items-center justify-between mb-0.5">
           <span className="text-sm font-medium text-textPrimary">{mem.title}</span>
-          <span className={`text-[10px] px-1.5 py-0.5 rounded border ${scopeColor[mem.scope] || scopeColor.private}`}>
+          <span className={`text-3xs px-1.5 py-0.5 rounded border ${scopeColor[mem.scope] || scopeColor.private}`}>
             {scopeLabel[mem.scope] || mem.scope}
           </span>
         </div>
@@ -154,7 +154,7 @@ function VectorMemoryCard({ mem, t: _t }: { mem: MemoryItem; t: any }) {
           {mem.content}
         </p>
       )}
-      <p className="text-[10px] text-textMuted mt-1">
+      <p className="text-3xs text-textMuted mt-1">
         {mem.created_at ? new Date(mem.created_at).toLocaleString('zh-CN') : ''}
       </p>
     </div>
@@ -213,14 +213,14 @@ function StructuredMemoryView({ agentId }: { agentId: number }) {
         const isCatOpen = expandedCat === cat.category
         const CatIcon = CAT_ICONS[cat.category] || Bookmark
         return (
-          <div key={cat.category} className="rounded-lg border border-border overflow-hidden">
+          <div key={cat.category} className="rounded-control border border-border overflow-hidden">
             <button
               onClick={() => setExpandedCat(isCatOpen ? null : cat.category)}
               className="w-full flex items-center gap-2.5 px-3.5 py-2.5 hover:bg-elevated transition-colors text-left"
             >
               <CatIcon size={15} className="text-primary-400 shrink-0" />
               <span className="text-sm font-medium text-textPrimary">{cat.category}</span>
-              <span className="text-[11px] text-textMuted bg-canvas px-1.5 py-0.5 rounded ml-auto">{cat.record_count} 条</span>
+              <span className="text-2xs text-textMuted bg-canvas px-1.5 py-0.5 rounded ml-auto">{cat.record_count} 条</span>
               {isCatOpen ? <ChevronDown size={14} className="text-textMuted shrink-0" /> : <ChevronRight size={14} className="text-textMuted shrink-0" />}
             </button>
             {isCatOpen && (
@@ -235,16 +235,16 @@ function StructuredMemoryView({ agentId }: { agentId: number }) {
                       >
                         {isSubOpen ? <ChevronDown size={11} className="text-textMuted shrink-0" /> : <ChevronRight size={11} className="text-textMuted shrink-0" />}
                         <span className="text-xs text-textPrimary font-medium">{sub.sub_key}</span>
-                        <span className="text-[10px] text-textMuted ml-auto">{sub.field_count} 项</span>
+                        <span className="text-3xs text-textMuted ml-auto">{sub.field_count} 项</span>
                         {sub.last_update && (
-                          <span className="text-[10px] text-textMuted/60">{new Date(sub.last_update).toLocaleDateString('zh-CN')}</span>
+                          <span className="text-3xs text-textMuted/60">{new Date(sub.last_update).toLocaleDateString('zh-CN')}</span>
                         )}
                       </button>
                       {isSubOpen && (
                         <div className="border-t border-border/40 ml-9 py-1.5 px-3 space-y-1">
                           {Object.entries(sub.fields).map(([field, value]) => (
                             <div key={field} className="flex gap-2 text-xs py-0.5">
-                              <span className="text-primary-400 font-medium shrink-0 min-w-[70px] text-[11px]">{field}</span>
+                              <span className="text-primary-400 font-medium shrink-0 min-w-[70px] text-2xs">{field}</span>
                               <span className="text-textSecondary/90 break-words leading-relaxed">{value.length > 120 ? value.slice(0, 120) + '…' : value}</span>
                             </div>
                           ))}
@@ -692,7 +692,7 @@ export default function AgentDetailPage() {
             <ArrowLeft size={20} />
           </button>
           <div className="flex items-center gap-3 flex-1">
-            <div className="w-12 h-12 rounded-xl bg-primary-500/10 flex items-center justify-center overflow-hidden">
+            <div className="w-12 h-12 rounded-card bg-primary-500/10 flex items-center justify-center overflow-hidden">
               {agent.avatar_url ? (
                 <img src={agent.avatar_url} alt={agent.name} className="w-full h-full object-cover" />
               ) : (
@@ -748,7 +748,7 @@ export default function AgentDetailPage() {
             {/* 完整设置入口 */}
             <button
               onClick={() => setShowFullSettings(true)}
-              className="w-full flex items-center justify-center gap-2 py-2.5 rounded-xl border-2 border-dashed border-primary-400/50 bg-primary-500/5 hover:bg-primary-500/10 text-primary-400 hover:text-primary-500 dark:hover:text-primary-300 text-sm font-medium transition-colors"
+              className="w-full flex items-center justify-center gap-2 py-2.5 rounded-card border-2 border-dashed border-primary-400/50 bg-primary-500/5 hover:bg-primary-500/10 text-primary-400 hover:text-primary-500 dark:hover:text-primary-300 text-sm font-medium transition-colors"
             >
               <Settings size={16} />
               {t('agentDetail.fullSettings')}
@@ -756,7 +756,7 @@ export default function AgentDetailPage() {
             </button>
 
             {/* Quick Edit Prompt */}
-            <div className="bg-surface rounded-xl border border-border p-4">
+            <div className="bg-surface rounded-card border border-border p-4">
               <div className="flex items-center justify-between mb-3">
                 <div className="flex items-center gap-2">
                   <Edit3 size={16} className="text-primary-400" />
@@ -785,7 +785,7 @@ export default function AgentDetailPage() {
                   value={promptText}
                   onChange={(e) => setPromptText(e.target.value)}
                   rows={6}
-                  className="w-full px-3 py-2 rounded-xl border border-border bg-canvas text-sm text-textPrimary focus:outline-none focus:ring-2 focus:ring-primary-500/50 resize-y"
+                  className="w-full px-3 py-2 rounded-card border border-border bg-canvas text-sm text-textPrimary focus:outline-none focus:ring-2 focus:ring-primary-500/50 resize-y"
                 />
               ) : (
                 <p className="text-sm text-textSecondary leading-relaxed whitespace-pre-wrap">
@@ -795,7 +795,7 @@ export default function AgentDetailPage() {
             </div>
 
             {/* 个人资料 */}
-            <div className="bg-surface rounded-xl border border-border p-4">
+            <div className="bg-surface rounded-card border border-border p-4">
               <div className="flex items-center gap-2 mb-3">
                 <User size={16} className="text-primary-400" />
                 <h3 className="font-medium text-textPrimary text-sm">{t('agentDetail.profileSection')}</h3>
@@ -812,7 +812,7 @@ export default function AgentDetailPage() {
                       }}
                       rows={3}
                       maxLength={500}
-                      className="w-full px-3 py-2 rounded-lg border border-border bg-canvas text-sm text-textPrimary placeholder:text-textMuted focus:outline-none focus:ring-2 focus:ring-primary-500/50 resize-y"
+                      className="w-full px-3 py-2 rounded-control border border-border bg-canvas text-sm text-textPrimary placeholder:text-textMuted focus:outline-none focus:ring-2 focus:ring-primary-500/50 resize-y"
                       placeholder={t('agentDetail.bioPlaceholder')}
                     />
                   </div>
@@ -826,10 +826,10 @@ export default function AgentDetailPage() {
                       const val = e.target.value
                       if (val !== (agent?.status_text || '')) handleUpdateAgentField('status_text', val || null)
                     }}
-                    className="w-full mt-1 px-3 py-2 rounded-lg border border-border bg-canvas text-sm text-textPrimary placeholder:text-textMuted focus:outline-none focus:ring-2 focus:ring-primary-500/50"
+                    className="w-full mt-1 px-3 py-2 rounded-control border border-border bg-canvas text-sm text-textPrimary placeholder:text-textMuted focus:outline-none focus:ring-2 focus:ring-primary-500/50"
                     placeholder={t('agentDetail.statusTextPlaceholder')}
                   />
-                  <p className="text-[10px] text-textMuted mt-1">{t('agentDetail.statusTextHint')}</p>
+                  <p className="text-3xs text-textMuted mt-1">{t('agentDetail.statusTextHint')}</p>
                 </div>
                 <div>
                   <label className="text-xs text-textMuted">{t('me.statusColorLabel')}</label>
@@ -867,7 +867,7 @@ export default function AgentDetailPage() {
             </div>
 
             {/* Config Info */}
-            <div className="bg-surface rounded-xl border border-border p-4">
+            <div className="bg-surface rounded-card border border-border p-4">
               <h3 className="font-medium text-textPrimary text-sm mb-3">{t('agentDetail.modelConfig')}</h3>
               <div className="grid grid-cols-2 gap-3 text-sm">
                 <div>
@@ -1031,7 +1031,7 @@ export default function AgentDetailPage() {
             </div>
 
             {/* API Config */}
-            <div className="bg-surface rounded-xl border border-border p-4">
+            <div className="bg-surface rounded-card border border-border p-4">
               <div className="flex items-center gap-2 mb-3">
                 <Key size={16} className="text-primary-400" />
                 <h3 className="font-medium text-textPrimary text-sm">{t('agentDetail.apiConfig')}</h3>
@@ -1053,20 +1053,20 @@ export default function AgentDetailPage() {
             </div>
 
             {/* Actions */}
-            <div className="bg-surface rounded-xl border border-border p-4">
+            <div className="bg-surface rounded-card border border-border p-4">
               <h3 className="font-medium text-textPrimary text-sm mb-3">{t('agentDetail.actions')}</h3>
               <div className="flex flex-wrap gap-2">
                 {/* Export */}
-                <button onClick={handleExport} className="flex items-center gap-1.5 px-3 py-2 rounded-lg border border-border text-sm text-textSecondary hover:text-textPrimary hover:border-primary-500/30 transition-colors">
+                <button onClick={handleExport} className="btn btn-sm btn-outline gap-1.5 hover:text-textPrimary hover:border-primary-500/30">
                   <Download size={14} /> {t('agentDetail.downloadExport')}
                 </button>
-                <button onClick={handleCopyExport} className="flex items-center gap-1.5 px-3 py-2 rounded-lg border border-border text-sm text-textSecondary hover:text-textPrimary hover:border-primary-500/30 transition-colors">
+                <button onClick={handleCopyExport} className="btn btn-sm btn-outline gap-1.5 hover:text-textPrimary hover:border-primary-500/30">
                   {copied ? <Check size={14} className="text-mint-400" /> : <Copy size={14} />}
                   {copied ? t('agentDetail.copied') : t('agentDetail.copyJson')}
                 </button>
 
                 {/* Import */}
-                <label className="flex items-center gap-1.5 px-3 py-2 rounded-lg border border-border text-sm text-textSecondary hover:text-textPrimary hover:border-primary-500/30 transition-colors cursor-pointer">
+                <label className="flex items-center gap-1.5 px-3 py-2 rounded-control border border-border text-sm text-textSecondary hover:text-textPrimary hover:border-primary-500/30 transition-colors cursor-pointer">
                   <Upload size={14} />
                   {importing ? t('common.saving') : t('agentDetail.importSoul')}
                   <input type="file" accept=".json" onChange={handleImport} className="hidden" />
@@ -1076,19 +1076,19 @@ export default function AgentDetailPage() {
                 <button
                   onClick={() => setAvatarPickerOpen(true)}
                   disabled={uploadingAvatar}
-                  className="flex items-center gap-1.5 px-3 py-2 rounded-lg border border-border text-sm text-textSecondary hover:text-textPrimary hover:border-primary-500/30 transition-colors disabled:opacity-50"
+                  className="flex items-center gap-1.5 px-3 py-2 rounded-control border border-border text-sm text-textSecondary hover:text-textPrimary hover:border-primary-500/30 transition-colors disabled:opacity-50"
                 >
                   <Image size={14} />
                   {uploadingAvatar ? t('me.uploadingAvatar') : t('agentDetail.changeAvatar')}
                 </button>
 
                 {/* Token */}
-                <button onClick={handleGenerateToken} disabled={generatingToken} className="flex items-center gap-1.5 px-3 py-2 rounded-lg border border-border text-sm text-textSecondary hover:text-textPrimary hover:border-primary-500/30 transition-colors disabled:opacity-50">
+                <button onClick={handleGenerateToken} disabled={generatingToken} className="btn btn-sm btn-outline gap-1.5 hover:text-textPrimary hover:border-primary-500/30">
                   <RefreshCw size={14} className={generatingToken ? 'animate-spin' : ''} />
                   {tokenMasked ? `Token: ${tokenMasked}` : t('agentDetail.generateToken')}
                 </button>
                 {token && (
-                  <div className="w-full flex items-center gap-2 mt-2 p-2 rounded-lg bg-accent-400/5 border border-accent-400/20">
+                  <div className="w-full flex items-center gap-2 mt-2 p-2 rounded-control bg-accent-400/5 border border-accent-400/20">
                     <code className="text-xs text-accent-400 flex-1 break-all">{token}</code>
                     <button
                       onClick={() => { navigator.clipboard.writeText(token); setToken(null) }}
@@ -1100,7 +1100,7 @@ export default function AgentDetailPage() {
                 )}
 
                 {/* Delete */}
-                <button onClick={() => setShowDelete(true)} className="flex items-center gap-1.5 px-3 py-2 rounded-lg border border-rose-500/20 text-sm text-rose-400 hover:bg-rose-500/10 transition-colors">
+                <button onClick={() => setShowDelete(true)} className="flex items-center gap-1.5 px-3 py-2 rounded-control border border-rose-500/20 text-sm text-rose-400 hover:bg-rose-500/10 transition-colors">
                   <Trash2 size={14} /> {t('agentDetail.deleteAgent')}
                 </button>
               </div>
@@ -1109,7 +1109,7 @@ export default function AgentDetailPage() {
         )}
 
         {activeTab === 'storage' && (
-          <div className="bg-surface rounded-xl border border-border p-4">
+          <div className="bg-surface rounded-card border border-border p-4">
             <div className="flex items-center gap-2 mb-4">
               <HardDrive size={16} className="text-primary-400" />
               <h3 className="font-medium text-textPrimary text-sm">{t('agentDetail.storageTitle')}</h3>
@@ -1147,15 +1147,15 @@ export default function AgentDetailPage() {
 
                 {/* 统计卡片 */}
                 <div className="flex gap-3 mb-4 text-sm">
-                  <div className="flex-1 px-3 py-2 rounded-lg bg-canvas border border-border text-center">
+                  <div className="flex-1 px-3 py-2 rounded-control bg-canvas border border-border text-center">
                     <div className="text-textMuted text-xs">{t('agentDetail.fileCountLabel')}</div>
                     <div className="text-textPrimary font-semibold">{storage.file_count}</div>
                   </div>
-                  <div className="flex-1 px-3 py-2 rounded-lg bg-canvas border border-border text-center">
+                  <div className="flex-1 px-3 py-2 rounded-control bg-canvas border border-border text-center">
                     <div className="text-textMuted text-xs">{t('agentDetail.totalSize')}</div>
                     <div className="text-textPrimary font-semibold">{formatSize(storage.total_size)}</div>
                   </div>
-                  <div className="flex-1 px-3 py-2 rounded-lg bg-canvas border border-border text-center">
+                  <div className="flex-1 px-3 py-2 rounded-control bg-canvas border border-border text-center">
                     <div className="text-textMuted text-xs">{t('agentDetail.quotaLabel')}</div>
                     <div className="text-textPrimary font-semibold">{storage.quota_mb}MB</div>
                   </div>
@@ -1194,7 +1194,7 @@ export default function AgentDetailPage() {
         )}
 
         {activeTab === 'logs' && (
-          <div className="bg-surface rounded-xl border border-border p-4">
+          <div className="bg-surface rounded-card border border-border p-4">
             <div className="flex items-center gap-2 mb-3">
               <ScrollText size={16} className="text-primary-400" />
               <h3 className="font-medium text-textPrimary text-sm">{t('agentDetail.logTitle')}</h3>
@@ -1220,7 +1220,7 @@ export default function AgentDetailPage() {
             ) : (
               <div className="space-y-2 max-h-96 overflow-y-auto">
                 {logs.map((log) => (
-                  <div key={log.id} className="p-3 rounded-lg bg-canvas border border-border">
+                  <div key={log.id} className="p-3 rounded-control bg-canvas border border-border">
                     <div className="flex items-center justify-between mb-1">
                       <div className="flex items-center gap-2">
                         <span className="text-xs px-1.5 py-0.5 rounded bg-primary-500/10 text-primary-400">
@@ -1273,9 +1273,9 @@ export default function AgentDetailPage() {
 
             {/* 日志详情弹窗 */}
             {selectedLog && (
-              <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60" onClick={() => setSelectedLog(null)}>
+              <Dialog onClose={() =>  setSelectedLog(null)} className="flex items-center justify-center">
                 <div
-                  className="bg-surface rounded-xl border border-border max-w-2xl w-full mx-4 max-h-[80vh] flex flex-col shadow-2xl"
+                  className="bg-surface rounded-card border border-border max-w-2xl w-full mx-4 max-h-[80vh] flex flex-col shadow-2xl"
                   onClick={e => e.stopPropagation()}
                 >
                   <div className="flex items-center justify-between px-4 py-3 border-b border-border">
@@ -1333,7 +1333,7 @@ export default function AgentDetailPage() {
                     ))}
                   </div>
                 </div>
-              </div>
+              </Dialog>
             )}
           </div>
         )}
@@ -1342,14 +1342,14 @@ export default function AgentDetailPage() {
           <div className="space-y-4">
             {/* 非 owner 的合作者提示 */}
             {!isOwner && agent && user && agent.owner_id !== user.id && (
-              <div className="bg-primary-500/10 border border-primary-500/20 rounded-xl p-3 text-sm text-primary-500">
+              <div className="bg-primary-500/10 border border-primary-500/20 rounded-card p-3 text-sm text-primary-500">
                 {t('agentDetail.collaboratorNote')}
               </div>
             )}
 
             {/* Owner: 添加合作者 */}
             {isOwner && (
-              <div className="bg-surface rounded-xl border border-border p-4">
+              <div className="bg-surface rounded-card border border-border p-4">
                 <h3 className="font-medium text-textPrimary text-sm mb-3">{t('agentDetail.addCollaborator')}</h3>
                 <div className="flex gap-2 mb-3">
                   <input
@@ -1357,7 +1357,7 @@ export default function AgentDetailPage() {
                     value={collabSearch}
                     onChange={e => { setCollabSearch(e.target.value); searchUsers(e.target.value) }}
                     placeholder={t('agentDetail.searchUserPlaceholder')}
-                    className="flex-1 px-3 py-2 rounded-lg border border-border bg-canvas text-sm text-textPrimary focus:outline-none focus:ring-2 focus:ring-primary-500/50"
+                    className="flex-1 px-3 py-2 rounded-control border border-border bg-canvas text-sm text-textPrimary focus:outline-none focus:ring-2 focus:ring-primary-500/50"
                   />
                 </div>
                 {/* 权限勾选 */}
@@ -1385,7 +1385,7 @@ export default function AgentDetailPage() {
                 {collabSearchResults.length > 0 && (
                   <div className="space-y-1 max-h-48 overflow-y-auto">
                     {collabSearchResults.map(u => (
-                      <div key={u.id} className="flex items-center justify-between px-3 py-2 rounded-lg bg-canvas border border-border/60">
+                      <div key={u.id} className="flex items-center justify-between px-3 py-2 rounded-control bg-canvas border border-border/60">
                         <div className="flex items-center gap-2">
                           {u.avatar_url ? (
                             <img src={u.avatar_url} alt="" className="w-6 h-6 rounded-full object-cover" />
@@ -1397,7 +1397,7 @@ export default function AgentDetailPage() {
                         <button
                           onClick={() => handleAddCollaborator(u.id)}
                           disabled={addingCollab}
-                          className="px-3 py-1 rounded-lg bg-mint-400 text-white text-xs hover:bg-mint-500 disabled:opacity-40 transition-colors"
+                          className="px-3 py-1 rounded-control bg-mint-400 text-white text-xs hover:bg-mint-500 disabled:opacity-40 transition-colors"
                         >
                           {addingCollab ? '...' : t('agentDetail.addCollaboratorBtn')}
                         </button>
@@ -1410,11 +1410,11 @@ export default function AgentDetailPage() {
 
             {/* 合作者列表 */}
             {collaborators.length > 0 && (
-              <div className="bg-surface rounded-xl border border-border p-4">
+              <div className="bg-surface rounded-card border border-border p-4">
                 <h3 className="font-medium text-textPrimary text-sm mb-3">{t('agentDetail.collaboratorList')} ({collaborators.length})</h3>
                 <div className="space-y-2">
                   {collaborators.map(c => (
-                    <div key={c.id} className="flex items-center justify-between px-3 py-2 rounded-lg bg-canvas border border-border/60">
+                    <div key={c.id} className="flex items-center justify-between px-3 py-2 rounded-control bg-canvas border border-border/60">
                       <div className="flex items-center gap-2">
                         {c.avatar_url ? (
                           <img src={c.avatar_url} alt="" className="w-7 h-7 rounded-full object-cover" />
@@ -1426,24 +1426,24 @@ export default function AgentDetailPage() {
                         <div>
                           <span className="text-sm text-textPrimary">{c.username || `ID:${c.user_id}`}</span>
                           <div className="flex gap-1 mt-0.5">
-                            {c.can_edit && <span className="text-[10px] px-1.5 py-0.5 rounded bg-mint-400/10 text-mint-400 border border-mint-400/20">{t('agentDetail.permEdit')}</span>}
-                            {c.can_delete && <span className="text-[10px] px-1.5 py-0.5 rounded bg-rose-400/10 text-rose-400 border border-rose-400/20">{t('agentDetail.permDelete')}</span>}
-                            {c.can_manage_collaborators && <span className="text-[10px] px-1.5 py-0.5 rounded bg-accent-400/10 text-accent-400 border border-accent-400/20">{t('agentDetail.permManageCollaborators')}</span>}
+                            {c.can_edit && <span className="text-3xs px-1.5 py-0.5 rounded bg-mint-400/10 text-mint-400 border border-mint-400/20">{t('agentDetail.permEdit')}</span>}
+                            {c.can_delete && <span className="text-3xs px-1.5 py-0.5 rounded bg-rose-400/10 text-rose-400 border border-rose-400/20">{t('agentDetail.permDelete')}</span>}
+                            {c.can_manage_collaborators && <span className="text-3xs px-1.5 py-0.5 rounded bg-accent-400/10 text-accent-400 border border-accent-400/20">{t('agentDetail.permManageCollaborators')}</span>}
                           </div>
                         </div>
                       </div>
                       {isOwner && (
                         <div className="flex items-center gap-2">
                           <div className="flex items-center gap-1">
-                            <span className="text-[10px] text-textMuted">{t('agentDetail.permEdit')}</span>
+                            <span className="text-3xs text-textMuted">{t('agentDetail.permEdit')}</span>
                             <Toggle checked={c.can_edit} onChange={v => handleUpdateCollaborator(c.user_id, { can_edit: v })} />
                           </div>
                           <div className="flex items-center gap-1">
-                            <span className="text-[10px] text-textMuted">{t('agentDetail.permDelete')}</span>
+                            <span className="text-3xs text-textMuted">{t('agentDetail.permDelete')}</span>
                             <Toggle checked={c.can_delete} onChange={v => handleUpdateCollaborator(c.user_id, { can_delete: v })} />
                           </div>
                           <div className="flex items-center gap-1">
-                            <span className="text-[10px] text-textMuted">{t('agentDetail.permManageCollaborators')}</span>
+                            <span className="text-3xs text-textMuted">{t('agentDetail.permManageCollaborators')}</span>
                             <Toggle checked={c.can_manage_collaborators} onChange={v => handleUpdateCollaborator(c.user_id, { can_manage_collaborators: v })} />
                           </div>
                           <button
@@ -1471,16 +1471,16 @@ export default function AgentDetailPage() {
         )}
 
         {activeTab === 'memories' && (
-          <div className="bg-surface rounded-xl border border-border p-4">
+          <div className="bg-surface rounded-card border border-border p-4">
             <div className="flex items-center gap-2 mb-3">
               <Brain size={16} className="text-primary-400" />
               <h3 className="font-medium text-textPrimary text-sm">{t('agentDetail.memoryTitlePrefix')}{memTotal}{t('agentDetail.memoryTitleSuffix')}</h3>
-              <div className="flex gap-0.5 ml-auto bg-canvas rounded-lg p-0.5 border border-border">
+              <div className="flex gap-0.5 ml-auto bg-canvas rounded-control p-0.5 border border-border">
                 {(['structured', 'vector'] as const).map((st) => (
                   <button
                     key={st}
                     onClick={() => { setMemSubTab(st); if (st === 'vector') loadMemories(1) }}
-                    className={`px-2.5 py-1 text-xs font-medium rounded-md transition-colors ${
+                    className={`px-2.5 py-1 text-xs font-medium rounded-control transition-colors ${
                       memSubTab === st ? 'bg-primary-500 text-white shadow-sm' : 'text-textMuted hover:text-textSecondary'
                     }`}
                   >
@@ -1508,7 +1508,7 @@ export default function AgentDetailPage() {
                     <button
                       onClick={() => loadMemories(memPage - 1)}
                       disabled={memPage <= 1}
-                      className="px-3 py-1 text-xs rounded-lg border border-border text-textSecondary hover:text-textPrimary disabled:opacity-30"
+                      className="px-3 py-1 text-xs rounded-control border border-border text-textSecondary hover:text-textPrimary disabled:opacity-30"
                     >
                       {t('agentDetail.prevPage')}
                     </button>
@@ -1516,7 +1516,7 @@ export default function AgentDetailPage() {
                     <button
                       onClick={() => loadMemories(memPage + 1)}
                       disabled={memPage >= Math.ceil(memTotal / 20)}
-                      className="px-3 py-1 text-xs rounded-lg border border-border text-textSecondary hover:text-textPrimary disabled:opacity-30"
+                      className="px-3 py-1 text-xs rounded-control border border-border text-textSecondary hover:text-textPrimary disabled:opacity-30"
                     >
                       {t('agentDetail.nextPage')}
                     </button>
@@ -1528,7 +1528,7 @@ export default function AgentDetailPage() {
         )}
 
         {activeTab === 'workspace' && (
-          <div className="bg-surface rounded-xl border border-border p-4">
+          <div className="bg-surface rounded-card border border-border p-4">
             <div className="flex items-center gap-2 mb-3">
               <Edit3 size={16} className="text-primary-400" />
               <h3 className="font-medium text-textPrimary text-sm">{t('agentDetail.workspaceTitle')}</h3>
@@ -1551,7 +1551,7 @@ export default function AgentDetailPage() {
               ))}
             </div>
             {/* Content */}
-            <pre className="text-xs text-textSecondary whitespace-pre-wrap max-h-80 overflow-y-auto p-3 rounded-lg bg-canvas border border-border leading-relaxed font-mono min-h-[120px]">
+            <pre className="text-xs text-textSecondary whitespace-pre-wrap max-h-80 overflow-y-auto p-3 rounded-control bg-canvas border border-border leading-relaxed font-mono min-h-[120px]">
               {workspace[wsActive] || `（${wsActive === 'todo' ? t('agentDetail.workspaceTodoLabel') : wsActive === 'plan' ? t('agentDetail.workspacePlanLabel') : t('agentDetail.workspaceJournalLabel')} ${t('agentDetail.workspaceEmptySuffix')}`}
             </pre>
           </div>
@@ -1560,8 +1560,8 @@ export default function AgentDetailPage() {
 
       {/* Delete Confirm Modal */}
       {showDelete && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
-          <div className="bg-surface rounded-2xl border border-border p-6 w-full max-w-sm mx-4 pb-[var(--safe-bottom)] md:pb-6">
+        <div className="fixed inset-0 z-modal flex items-center justify-center bg-black/50">
+          <div className="bg-surface rounded-dialog border border-border p-6 w-full max-w-sm mx-4 pb-[var(--safe-bottom)] md:pb-6">
             <h3 className="text-lg font-bold text-textPrimary mb-2">{t('agentDetail.deleteConfirmTitle')}</h3>
             <p className="text-sm text-textSecondary mb-4">
               {t('agentDetail.deleteConfirmText')}<span className="text-mint-400 font-medium">{agent.api_credit_cost}</span> {t('agentDetail.deleteConfirmText2')}
@@ -1571,20 +1571,20 @@ export default function AgentDetailPage() {
               type="text"
               value={deleteConfirmName}
               onChange={(e) => setDeleteConfirmName(e.target.value)}
-              className="w-full px-3.5 py-2.5 rounded-xl border border-border bg-canvas text-sm text-textPrimary focus:outline-none focus:ring-2 focus:ring-rose-500/50 mb-4"
+              className="w-full px-3.5 py-2.5 rounded-card border border-border bg-canvas text-sm text-textPrimary focus:outline-none focus:ring-2 focus:ring-rose-500/50 mb-4"
               placeholder={agent.name}
             />
             <div className="flex gap-3">
               <button
                 onClick={() => { setShowDelete(false); setDeleteConfirmName('') }}
-                className="flex-1 px-4 py-2 rounded-xl border border-border text-sm text-textSecondary hover:text-textPrimary"
+                className="flex-1 px-4 py-2 rounded-card border border-border text-sm text-textSecondary hover:text-textPrimary"
               >
                 {t('common.cancel')}
               </button>
               <button
                 onClick={handleDelete}
                 disabled={deleteConfirmName !== agent.name || deleting}
-                className="flex-1 px-4 py-2 rounded-xl bg-rose-500 text-white text-sm font-medium hover:bg-rose-400 disabled:opacity-30 transition-colors"
+                className="flex-1 px-4 py-2 rounded-card bg-rose-500 text-white text-sm font-medium hover:bg-rose-400 disabled:opacity-30 transition-colors"
               >
                 {deleting ? t('agentDetail.deleting') : t('agentDetail.confirmDelete')}
               </button>
@@ -1615,8 +1615,8 @@ export default function AgentDetailPage() {
 
       {/* 文件删除确认弹窗 */}
       {deleteFileTarget && (
-        <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-[70] p-4" onClick={() => { setDeleteFileTarget(null); setDeleteFileRefs(null) }}>
-          <div className="bg-elevated border border-border rounded-2xl p-6 w-full max-w-md shadow-2xl" onClick={(e) => e.stopPropagation()}>
+        <Dialog onClose={() =>  { setDeleteFileTarget(null); setDeleteFileRefs(null) } } layer="toast" className="flex items-center justify-center p-4">
+          <div className="bg-elevated border border-border rounded-dialog p-6 w-full max-w-md shadow-2xl" onClick={(e) => e.stopPropagation()}>
             <div className="flex items-center gap-2 mb-4">
               <div className="w-8 h-8 rounded-full bg-rose-500/10 flex items-center justify-center">
                 <Trash2 size={16} className="text-rose-400" />
@@ -1629,7 +1629,7 @@ export default function AgentDetailPage() {
             </p>
 
             {/* 引用信息 */}
-            <div className="bg-canvas rounded-lg p-3 mb-4 text-xs">
+            <div className="bg-canvas rounded-control p-3 mb-4 text-xs">
               {deleteFileLoading ? (
                 <div className="flex items-center gap-2 text-textMuted py-2">
                   <Loader2 size={14} className="animate-spin" />
@@ -1647,7 +1647,7 @@ export default function AgentDetailPage() {
                       </div>
                     ))}
                   </div>
-                  <p className="text-textMuted mt-2 text-[10px]">{t('agentDetail.deleteFileConsequence')}</p>
+                  <p className="text-textMuted mt-2 text-3xs">{t('agentDetail.deleteFileConsequence')}</p>
                 </>
               ) : (
                 <p className="text-textMuted">{t('agentDetail.fileNoReferences')}</p>
@@ -1657,20 +1657,20 @@ export default function AgentDetailPage() {
             <div className="flex gap-3">
               <button
                 onClick={() => { setDeleteFileTarget(null); setDeleteFileRefs(null) }}
-                className="flex-1 py-2.5 text-sm border border-border text-textSecondary rounded-xl hover:bg-elevated font-medium transition-colors"
+                className="flex-1 py-2.5 text-sm border border-border text-textSecondary rounded-card hover:bg-elevated font-medium transition-colors"
               >
                 {t('common.cancel')}
               </button>
               <button
                 onClick={handleDeleteFile}
                 disabled={deletingFile}
-                className="flex-1 py-2.5 text-sm bg-rose-500 text-white rounded-xl hover:bg-rose-400 font-medium transition-all disabled:opacity-50"
+                className="flex-1 py-2.5 text-sm bg-rose-500 text-white rounded-card hover:bg-rose-400 font-medium transition-all disabled:opacity-50"
               >
                 {deletingFile ? <Loader2 size={16} className="animate-spin mx-auto" /> : t('common.delete')}
               </button>
             </div>
           </div>
-        </div>
+        </Dialog>
       )}
 
       {/* 完整设置弹窗 */}

@@ -97,7 +97,7 @@ export default function VerificationCodeInput({ value, onChange, disabled, error
               value={char}
               onChange={e => handleChange(i, e.target.value)}
               onKeyDown={e => handleKeyDown(i, e)}
-              className={`w-11 h-14 rounded-xl border-2 text-center text-xl font-bold transition-all
+              className={`w-11 h-14 rounded-card border-2 text-center text-xl font-bold transition-all
                 focus:outline-none focus:ring-2 focus:ring-primary-500/50
                 disabled:opacity-30 disabled:cursor-not-allowed
                 ${isFilled

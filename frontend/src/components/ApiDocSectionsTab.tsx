@@ -81,25 +81,25 @@ export default function ApiDocSectionsTab() {
       ) : (
         <div className="space-y-2">
           {sections.map((s) => (
-            <div key={s.id} className="rounded-xl border border-border bg-elevated/30 p-3 space-y-2">
+            <div key={s.id} className="rounded-card border border-border bg-elevated/30 p-3 space-y-2">
               <div className="flex items-center gap-2">
-                <span className="text-[10px] font-mono text-primary-400 bg-primary-500/10 rounded px-1.5 py-0.5">{s.id}</span>
+                <span className="text-3xs font-mono text-primary-400 bg-primary-500/10 rounded px-1.5 py-0.5">{s.id}</span>
                 <input
                   value={s.title}
                   onChange={(e) => update(s.id, 'title', e.target.value)}
-                  className="flex-1 bg-transparent text-sm text-textPrimary border border-border rounded-lg px-2 py-1 focus:border-primary-500/50 focus:outline-none"
+                  className="flex-1 bg-transparent text-sm text-textPrimary border border-border rounded-control px-2 py-1 focus:border-primary-500/50 focus:outline-none"
                   placeholder="标题"
                 />
-                {s.title_changed && <span className="shrink-0 text-[10px] text-accent-400">已改（与文档不同）</span>}
+                {s.title_changed && <span className="shrink-0 text-3xs text-accent-400">已改（与文档不同）</span>}
               </div>
               <textarea
                 value={s.intro}
                 onChange={(e) => update(s.id, 'intro', e.target.value)}
                 rows={2}
-                className="w-full bg-transparent text-xs text-textSecondary border border-border rounded-lg px-2 py-1.5 focus:border-primary-500/50 focus:outline-none resize-none"
+                className="w-full bg-transparent text-xs text-textSecondary border border-border rounded-control px-2 py-1.5 focus:border-primary-500/50 focus:outline-none resize-none"
                 placeholder="区介绍"
               />
-              {s.intro_changed && <div className="text-[10px] text-accent-400 -mt-1">介绍与文档不同</div>}
+              {s.intro_changed && <div className="text-3xs text-accent-400 -mt-1">介绍与文档不同</div>}
             </div>
           ))}
         </div>
@@ -109,7 +109,7 @@ export default function ApiDocSectionsTab() {
         <button
           onClick={save}
           disabled={saving}
-          className="inline-flex items-center gap-1.5 text-xs px-3 py-2 rounded-lg bg-primary-500 hover:bg-primary-600 text-white transition-colors disabled:opacity-50"
+          className="btn btn-xs btn-primary gap-1.5"
         >
           <Save size={13} /> {saving ? '保存中…' : '保存'}
         </button>
@@ -121,14 +121,14 @@ export default function ApiDocSectionsTab() {
         <button
           onClick={syncFromDocs}
           disabled={syncing}
-          className="inline-flex items-center gap-1.5 text-xs px-3 py-2 rounded-lg bg-elevated hover:bg-border text-textSecondary transition-colors disabled:opacity-50"
+          className="inline-flex items-center gap-1.5 text-xs px-3 py-2 rounded-control bg-elevated hover:bg-border text-textSecondary transition-colors disabled:opacity-50"
         >
           <RefreshCw size={13} /> {syncing ? '同步中…' : '从文档中更新'}
         </button>
       </div>
 
       {msg && <div className="inline-flex items-center gap-1 text-xs text-mint-400"><CheckCircle2 size={12} /> {msg}</div>}
-      <div className="flex items-center gap-1 text-[10px] text-textMuted"><BookOpen size={11} /> 变更即时生效：管理页/设计页的接口文档列表读取 DB 快照</div>
+      <div className="flex items-center gap-1 text-3xs text-textMuted"><BookOpen size={11} /> 变更即时生效：管理页/设计页的接口文档列表读取 DB 快照</div>
     </div>
   )
 }

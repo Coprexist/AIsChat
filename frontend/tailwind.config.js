@@ -74,6 +74,28 @@ export default {
           900: 'rgb(var(--tw-rose-900) / <alpha-value>)',
         },
       },
+      /* ── 尺度令牌（全站单一来源，新增代码只用令牌名，不写裸数值）─────
+         圆角：control=8px 控件/按钮 · card=12px 卡片/面板 · dialog=16px 弹窗/抽屉
+               胶囊与圆头像用 rounded-full，其余裸值不再使用。 */
+      borderRadius: {
+        control: '0.5rem',
+        card: '0.75rem',
+        dialog: '1rem',
+      },
+      /* 字号：3xs=10px 极小徽标 · 2xs=11px 次级说明 · xs=12px 正文辅助
+              sm=14px 正文 · base=16px 强调 …（其余沿用 Tailwind 默认） */
+      fontSize: {
+        '3xs': ['0.625rem', { lineHeight: '0.875rem' }],
+        '2xs': ['0.6875rem', { lineHeight: '1rem' }],
+      },
+      /* 层级：只允许这五档，禁止再写裸 z-[n] */
+      zIndex: {
+        overlay: '30',   // 页面内局部遮罩 / 拖拽把手
+        drawer: '40',    // 侧边抽屉 / 移动端导航
+        modal: '50',     // 弹窗
+        toast: '60',     // 全局通知 / 嵌套弹窗 / 维护横幅
+        max: '100',      // 阻断式提示（余额不足等）
+      },
       animation: {
         'pulse-ring': 'pulseRing 2s cubic-bezier(0.4, 0, 0.6, 1) infinite',
         'shimmer': 'shimmer 2.5s ease-in-out infinite',

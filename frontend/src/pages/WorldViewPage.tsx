@@ -80,7 +80,7 @@ export default function WorldViewPage() {
         </button>
         <span className="font-medium truncate">{title}</span>
         <div className="flex-1" />
-        <span className="text-[10px] text-gray-600">WORLD_ID={wid}{groupId ? ` · GROUP_ID=${groupId}` : ''}</span>
+        <span className="text-3xs text-gray-600">WORLD_ID={wid}{groupId ? ` · GROUP_ID=${groupId}` : ''}</span>
       </div>
 
       {/* 世界渲染区 */}

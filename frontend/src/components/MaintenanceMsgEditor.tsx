@@ -148,7 +148,7 @@ export default function MaintenanceMsgEditor() {
       <button
         onClick={onSave}
         disabled={state === 'saving' || state === 'saved'}
-        className={`flex items-center gap-1 px-2.5 py-1 rounded-lg text-[11px] font-medium transition-colors ${
+        className={`flex items-center gap-1 px-2.5 py-1 rounded-control text-2xs font-medium transition-colors ${
           state === 'dirty'
             ? 'bg-primary-500 text-white hover:bg-primary-600'
             : state === 'saved'
@@ -250,11 +250,11 @@ export default function MaintenanceMsgEditor() {
 
   if (!loaded) {
     return (
-      <div className="bg-surface rounded-xl border border-border p-4">
+      <div className="bg-surface rounded-card border border-border p-4">
         {loadError ? (
           <div className="flex items-center gap-2 text-xs text-rose-400">
             <AlertTriangle size={14} /> {loadError}
-            <button onClick={load} className="ml-auto px-2 py-1 rounded border border-border text-textSecondary hover:text-textPrimary">重试</button>
+            <button onClick={load} className="btn btn-xs btn-outline ml-auto hover:text-textPrimary">重试</button>
           </div>
         ) : (
           <p className="text-xs text-textMuted">{t('common.loading')}</p>
@@ -269,25 +269,25 @@ export default function MaintenanceMsgEditor() {
       {/* ── 维护状态提示行（保存按钮在各栏内） ── */}
       <div className="flex flex-wrap items-center gap-2">
         {mtState && (
-          <span className={`text-[11px] px-2 py-0.5 rounded-full ${
+          <span className={`text-2xs px-2 py-0.5 rounded-full ${
             mtState.hard ? 'bg-rose-500/15 text-rose-400' : mtState.soft ? 'bg-accent-500/15 text-accent-400' : 'bg-mint-500/15 text-mint-400'
           }`}>
             {mtState.auto ? '启动中' : mtState.hard ? '暂停服务中' : mtState.soft ? '温馨提示中' : '未开启'}
           </span>
         )}
         {mtState && !mtState.hard && !mtState.soft && (
-          <span className="flex items-center gap-1.5 text-[11px] text-textMuted">
+          <span className="flex items-center gap-1.5 text-2xs text-textMuted">
             <Info size={12} /> 保存的文案将在开启「暂停服务」或「温馨提示」后展示给用户
           </span>
         )}
-        {saveError && <span className="text-[11px] text-rose-400 flex items-center gap-1"><AlertTriangle size={12} />{saveError}</span>}
+        {saveError && <span className="text-2xs text-rose-400 flex items-center gap-1"><AlertTriangle size={12} />{saveError}</span>}
       </div>
 
       {/* ── 预设栏 ── */}
-      <div className="bg-surface rounded-xl border border-border p-3.5 space-y-2">
+      <div className="bg-surface rounded-card border border-border p-3.5 space-y-2">
         <div className="flex flex-wrap items-center gap-2">
           <select value={selPreset} onChange={e => { const v = e.target.value; if (v) applyPreset(v); else setSelPreset('') }}
-            className="flex-1 min-w-[140px] px-3 py-1.5 rounded-lg border border-border bg-canvas text-xs text-textPrimary focus:outline-none focus:ring-1 focus:ring-primary-500/50">
+            className="flex-1 min-w-[140px] px-3 py-1.5 rounded-control border border-border bg-canvas text-xs text-textPrimary focus:outline-none focus:ring-1 focus:ring-primary-500/50">
             <option value="">{t('admin.presets')} ···</option>
             {presets.map(p => <option key={p.name} value={p.name}>{p.name}</option>)}
           </select>
@@ -297,17 +297,17 @@ export default function MaintenanceMsgEditor() {
               placeholder={selPreset ? '另存为新预设…' : '新预设名称'}
               onChange={e => setPresetInput(e.target.value)}
               onKeyDown={e => { if (e.key === 'Enter' && presetInput.trim()) { savePreset(presetInput); setPresetInput('') } }}
-              className="w-28 px-2 py-1.5 rounded-lg border border-border bg-canvas text-[11px] text-textPrimary focus:outline-none"
+              className="w-28 px-2 py-1.5 rounded-control border border-border bg-canvas text-2xs text-textPrimary focus:outline-none"
             />
             <button onClick={() => { if (presetInput.trim()) savePreset(presetInput); setPresetInput('') }}
-              className="shrink-0 px-2.5 py-1.5 text-[11px] rounded-lg bg-primary-500/10 border border-primary-500/30 text-primary-400 hover:bg-primary-500/20 transition-colors">
+              className="shrink-0 px-2.5 py-1.5 text-2xs rounded-control bg-primary-500/10 border border-primary-500/30 text-primary-400 hover:bg-primary-500/20 transition-colors">
               <Save size={13} className="inline mr-0.5" />存预设
             </button>
           </div>
           {selPreset && (
             <div className="flex items-center gap-1">
-              <button onClick={() => { setRenaming(selPreset); setRenameValue(selPreset) }} className="p-1.5 rounded-lg text-textMuted hover:text-textPrimary hover:bg-elevated transition-colors" title="重命名"><Pencil size={13} /></button>
-              <button onClick={() => deletePreset(selPreset)} className="p-1.5 rounded-lg text-rose-400/70 hover:text-rose-400 hover:bg-rose-500/10 transition-colors" title="删除"><Trash2 size={13} /></button>
+              <button onClick={() => { setRenaming(selPreset); setRenameValue(selPreset) }} className="p-1.5 rounded-control text-textMuted hover:text-textPrimary hover:bg-elevated transition-colors" title="重命名"><Pencil size={13} /></button>
+              <button onClick={() => deletePreset(selPreset)} className="p-1.5 rounded-control text-rose-400/70 hover:text-rose-400 hover:bg-rose-500/10 transition-colors" title="删除"><Trash2 size={13} /></button>
             </div>
           )}
         </div>
@@ -318,24 +318,24 @@ export default function MaintenanceMsgEditor() {
               value={renameValue}
               onChange={e => setRenameValue(e.target.value)}
               onKeyDown={e => { if (e.key === 'Enter') renamePreset(renaming, renameValue); if (e.key === 'Escape') setRenaming(null) }}
-              className="flex-1 px-2 py-1.5 rounded-lg border border-border bg-canvas text-[11px] focus:outline-none focus:ring-1 focus:ring-primary-500/50"
+              className="flex-1 px-2 py-1.5 rounded-control border border-border bg-canvas text-2xs focus:outline-none focus:ring-1 focus:ring-primary-500/50"
             />
             <button onClick={() => renamePreset(renaming, renameValue)}
-              className="px-2 py-1.5 text-[11px] rounded-lg bg-mint-500/10 border border-mint-500/30 text-mint-400 hover:bg-mint-500/20"><Check size={12} /></button>
+              className="px-2 py-1.5 text-2xs rounded-control bg-mint-500/10 border border-mint-500/30 text-mint-400 hover:bg-mint-500/20"><Check size={12} /></button>
             <button onClick={() => setRenaming(null)} className="p-1.5 text-textMuted hover:text-textPrimary"><X size={13} /></button>
           </div>
         )}
-        {presetError && <p className="text-[11px] text-rose-400">{presetError}</p>}
+        {presetError && <p className="text-2xs text-rose-400">{presetError}</p>}
       </div>
 
       {/* ── 双栏编辑 ── */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">
         {/* 硬维护 */}
-        <div className="bg-surface rounded-xl border border-border p-4 space-y-3">
+        <div className="bg-surface rounded-card border border-border p-4 space-y-3">
           <div className="flex items-center gap-1.5 text-xs font-semibold text-textPrimary">
             <span className="w-2 h-2 rounded-full bg-rose-400 animate-pulse" />
             <Lock size={13} className="text-rose-400" /> 暂停服务
-            <span className="text-textMuted font-normal text-[10px] ml-1 hidden sm:inline">——用户看到弹窗/顶栏，API 全部返回 503</span>
+            <span className="text-textMuted font-normal text-3xs ml-1 hidden sm:inline">——用户看到弹窗/顶栏，API 全部返回 503</span>
             <span className="ml-auto shrink-0">
               <SaveButton section="hard" state={hardState} onSave={() => save('hard')} />
             </span>
@@ -345,18 +345,18 @@ export default function MaintenanceMsgEditor() {
               <div className="relative shrink-0">
                 <input type="color" value={msg.hard_color} onChange={e => updateMsg({ hard_color: e.target.value })}
                   onMouseDown={e => e.stopPropagation()} className="absolute inset-0 opacity-0 w-8 h-8 cursor-pointer" />
-                <div className="w-8 h-8 rounded-lg border border-border/50" style={{ backgroundColor: msg.hard_color }} />
+                <div className="w-8 h-8 rounded-control border border-border/50" style={{ backgroundColor: msg.hard_color }} />
               </div>
               <div className="flex-1 space-y-2">
                 <input value={msg.hard_title} onChange={e => updateMsg({ hard_title: e.target.value })} placeholder="标题"
-                  className="w-full px-3 py-1.5 rounded-lg border border-border bg-canvas text-xs text-textPrimary focus:outline-none focus:border-primary-500/40" />
+                  className="w-full px-3 py-1.5 rounded-control border border-border bg-canvas text-xs text-textPrimary focus:outline-none focus:border-primary-500/40" />
                 <input value={msg.hard_body} onChange={e => updateMsg({ hard_body: e.target.value })} placeholder="正文"
-                  className="w-full px-3 py-1.5 rounded-lg border border-border bg-canvas text-xs text-textPrimary focus:outline-none focus:border-primary-500/40" />
+                  className="w-full px-3 py-1.5 rounded-control border border-border bg-canvas text-xs text-textPrimary focus:outline-none focus:border-primary-500/40" />
               </div>
             </div>
             <div className="flex items-center gap-3">
               <div className="flex items-center gap-1.5">
-                <span className="text-[10px] text-textMuted">文字色</span>
+                <span className="text-3xs text-textMuted">文字色</span>
                 <div className="relative">
                   <input type="color" value={msg.hard_text_color} onChange={e => updateMsg({ hard_text_color: e.target.value })}
                     onMouseDown={e => e.stopPropagation()} className="absolute inset-0 opacity-0 w-6 h-6 cursor-pointer" />
@@ -364,7 +364,7 @@ export default function MaintenanceMsgEditor() {
                 </div>
               </div>
               <select value={msg.hard_style} onChange={e => updateMsg({ hard_style: e.target.value })}
-                className="px-2.5 py-1.5 rounded-lg border border-border bg-canvas text-[11px] text-textPrimary focus:outline-none">
+                className="px-2.5 py-1.5 rounded-control border border-border bg-canvas text-2xs text-textPrimary focus:outline-none">
                 <option value="popup">弹窗</option>
                 <option value="banner">顶栏</option>
               </select>
@@ -372,9 +372,9 @@ export default function MaintenanceMsgEditor() {
             <div>
               <div className="flex gap-1.5">
                 <input value={msg.hard_image} onChange={e => updateMsg({ hard_image: e.target.value })} placeholder="图片 URL"
-                  className="flex-1 px-3 py-1.5 rounded-lg border border-border bg-canvas text-xs text-textPrimary focus:outline-none focus:border-primary-500/40" />
-                <button onClick={addImageUrl} className="shrink-0 px-2.5 py-1.5 rounded-lg border border-border bg-canvas text-[11px] text-textSecondary hover:text-primary-400 transition-colors" title="添加外链"><ImageIcon size={13} /></button>
-                <label className={`shrink-0 px-2.5 py-1.5 rounded-lg border border-border bg-canvas text-[11px] text-textSecondary hover:text-primary-400 cursor-pointer transition-colors ${uploading ? 'opacity-40 pointer-events-none' : ''}`}>
+                  className="flex-1 px-3 py-1.5 rounded-control border border-border bg-canvas text-xs text-textPrimary focus:outline-none focus:border-primary-500/40" />
+                <button onClick={addImageUrl} className="btn btn-xs btn-outline shrink-0 bg-canvas text-2xs hover:text-primary-400" title="添加外链"><ImageIcon size={13} /></button>
+                <label className={`shrink-0 px-2.5 py-1.5 rounded-control border border-border bg-canvas text-2xs text-textSecondary hover:text-primary-400 cursor-pointer transition-colors ${uploading ? 'opacity-40 pointer-events-none' : ''}`}>
                   {uploading ? '···' : <Upload size={13} />}
                   <input ref={fileRef} type="file" accept="image/*" className="hidden" disabled={uploading} onChange={e => { const f = e.target.files?.[0]; if (f) handleUpload(f); e.target.value = '' }} />
                 </label>
@@ -383,7 +383,7 @@ export default function MaintenanceMsgEditor() {
               {images.length > 0 && (
                 <div className="flex flex-wrap gap-1.5 mt-2">
                   {images.map((url, i) => (
-                    <div key={i} className={`group relative rounded-lg overflow-hidden border transition-colors ${msg.hard_image === url ? 'border-primary-500 ring-1 ring-primary-500/40' : 'border-border/50 hover:border-primary-500/40'}`}>
+                    <div key={i} className={`group relative rounded-control overflow-hidden border transition-colors ${msg.hard_image === url ? 'border-primary-500 ring-1 ring-primary-500/40' : 'border-border/50 hover:border-primary-500/40'}`}>
                       <button onClick={() => updateMsg({ hard_image: url })} className="block w-12 h-12" title={urlLabel(url)}>
                         <img src={url} alt="" className="w-12 h-12 object-cover bg-black/20" />
                       </button>
@@ -396,19 +396,19 @@ export default function MaintenanceMsgEditor() {
               )}
             </div>
             {/* 硬维护实时预览 */}
-            <div className="rounded-lg border border-border/30 overflow-hidden">
-              <div className="text-[10px] text-textMuted px-3 py-1 bg-canvas/50 border-b border-border/30">预览</div>
+            <div className="rounded-control border border-border/30 overflow-hidden">
+              <div className="text-3xs text-textMuted px-3 py-1 bg-canvas/50 border-b border-border/30">预览</div>
               <div className="p-2.5">
                 {msg.hard_style === 'banner' ? (
-                  <div className="text-[11px] rounded-lg px-3 py-2 flex items-center justify-center gap-2" style={{ backgroundColor: msg.hard_color, color: msg.hard_text_color }}>
+                  <div className="text-2xs rounded-control px-3 py-2 flex items-center justify-center gap-2" style={{ backgroundColor: msg.hard_color, color: msg.hard_text_color }}>
                     <span>{msg.hard_title} · {msg.hard_body}</span>
                   </div>
                 ) : (
-                  <div className="rounded-xl border border-border/40 bg-canvas/60 p-3 text-center">
+                  <div className="rounded-card border border-border/40 bg-canvas/60 p-3 text-center">
                     {msg.hard_image && <img src={msg.hard_image} alt="" className="w-12 h-12 object-contain mx-auto mb-1.5 rounded" onError={e => { (e.target as HTMLImageElement).style.display = 'none' }} />}
                     <div className="text-xs font-semibold mb-1" style={{ color: msg.hard_color }}>{msg.hard_title}</div>
-                    <div className="text-[11px] text-textSecondary mb-2">{msg.hard_body}</div>
-                    <span className="inline-block px-3 py-1 text-[10px] rounded-md" style={{ backgroundColor: msg.hard_color, color: msg.hard_text_color }}>知道了</span>
+                    <div className="text-2xs text-textSecondary mb-2">{msg.hard_body}</div>
+                    <span className="inline-block px-3 py-1 text-3xs rounded-control" style={{ backgroundColor: msg.hard_color, color: msg.hard_text_color }}>知道了</span>
                   </div>
                 )}
               </div>
@@ -417,11 +417,11 @@ export default function MaintenanceMsgEditor() {
         </div>
 
         {/* 软维护 */}
-        <div className="bg-surface rounded-xl border border-border p-4 space-y-3">
+        <div className="bg-surface rounded-card border border-border p-4 space-y-3">
           <div className="flex items-center gap-1.5 text-xs font-semibold text-textPrimary">
             <span className="w-2 h-2 rounded-full bg-accent-400" />
             <Megaphone size={13} className="text-accent-400" /> 温馨提示
-            <span className="text-textMuted font-normal text-[10px] ml-1 hidden sm:inline">——用户看到顶栏/弹窗提示，API 正常运行</span>
+            <span className="text-textMuted font-normal text-3xs ml-1 hidden sm:inline">——用户看到顶栏/弹窗提示，API 正常运行</span>
             <span className="ml-auto shrink-0">
               <SaveButton section="soft" state={softState} onSave={() => save('soft')} />
             </span>
@@ -431,14 +431,14 @@ export default function MaintenanceMsgEditor() {
               <div className="relative shrink-0">
                 <input type="color" value={msg.soft_color} onChange={e => updateMsg({ soft_color: e.target.value })}
                   onMouseDown={e => e.stopPropagation()} className="absolute inset-0 opacity-0 w-8 h-8 cursor-pointer" />
-                <div className="w-8 h-8 rounded-lg border border-border/50" style={{ backgroundColor: msg.soft_color }} />
+                <div className="w-8 h-8 rounded-control border border-border/50" style={{ backgroundColor: msg.soft_color }} />
               </div>
               <input value={msg.soft_text} onChange={e => updateMsg({ soft_text: e.target.value })} placeholder="播报文字"
-                className="flex-1 px-3 py-1.5 rounded-lg border border-border bg-canvas text-xs text-textPrimary focus:outline-none focus:border-primary-500/40" />
+                className="flex-1 px-3 py-1.5 rounded-control border border-border bg-canvas text-xs text-textPrimary focus:outline-none focus:border-primary-500/40" />
             </div>
             <div className="flex items-center gap-3">
               <div className="flex items-center gap-1.5">
-                <span className="text-[10px] text-textMuted">文字色</span>
+                <span className="text-3xs text-textMuted">文字色</span>
                 <div className="relative">
                   <input type="color" value={msg.soft_text_color} onChange={e => updateMsg({ soft_text_color: e.target.value })}
                     onMouseDown={e => e.stopPropagation()} className="absolute inset-0 opacity-0 w-6 h-6 cursor-pointer" />
@@ -446,27 +446,27 @@ export default function MaintenanceMsgEditor() {
                 </div>
               </div>
               <select value={msg.soft_style} onChange={e => updateMsg({ soft_style: e.target.value })}
-                className="px-2.5 py-1.5 rounded-lg border border-border bg-canvas text-[11px] text-textPrimary focus:outline-none">
+                className="px-2.5 py-1.5 rounded-control border border-border bg-canvas text-2xs text-textPrimary focus:outline-none">
                 <option value="banner">顶栏</option>
                 <option value="popup">弹窗</option>
               </select>
-              <label className="flex items-center gap-1.5 text-[11px] text-textSecondary cursor-pointer select-none ml-auto">
+              <label className="flex items-center gap-1.5 text-2xs text-textSecondary cursor-pointer select-none ml-auto">
                 <input type="checkbox" checked={msg.soft_once} onChange={e => updateMsg({ soft_once: e.target.checked })} className="rounded" />
                 仅首次
               </label>
             </div>
             {msg.soft_text && (
-              <div className="rounded-lg border border-border/30 overflow-hidden">
-                <div className="text-[10px] text-textMuted px-3 py-1 bg-canvas/50 border-b border-border/30">预览</div>
+              <div className="rounded-control border border-border/30 overflow-hidden">
+                <div className="text-3xs text-textMuted px-3 py-1 bg-canvas/50 border-b border-border/30">预览</div>
                 <div className="p-2.5">
                   {msg.soft_style === 'banner' ? (
-                    <div className="text-[11px] rounded-lg px-3 py-2 text-center" style={{ backgroundColor: msg.soft_color, color: msg.soft_text_color }}>
+                    <div className="text-2xs rounded-control px-3 py-2 text-center" style={{ backgroundColor: msg.soft_color, color: msg.soft_text_color }}>
                       {msg.soft_text}
                     </div>
                   ) : (
-                    <div className="rounded-xl border border-border/40 bg-canvas/60 p-3 text-center">
+                    <div className="rounded-card border border-border/40 bg-canvas/60 p-3 text-center">
                       <div className="text-xs mb-2" style={{ color: msg.soft_text_color }}>{msg.soft_text}</div>
-                      <span className="inline-block px-3 py-1 text-[10px] rounded-md" style={{ backgroundColor: msg.soft_color, color: msg.soft_text_color }}>知道了</span>
+                      <span className="inline-block px-3 py-1 text-3xs rounded-control" style={{ backgroundColor: msg.soft_color, color: msg.soft_text_color }}>知道了</span>
                     </div>
                   )}
                 </div>

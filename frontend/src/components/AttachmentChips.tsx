@@ -16,7 +16,7 @@ export function AttachmentChips({ items, onRemove, errorText = '上传失败' }:
       {items.map((att) => (
         <div
           key={att.id}
-          className={`relative group flex items-center gap-2 pl-3 pr-1 py-1.5 rounded-xl text-xs border transition-colors ${
+          className={`relative group flex items-center gap-2 pl-3 pr-1 py-1.5 rounded-card text-xs border transition-colors ${
             att.error ? 'bg-rose-500/10 border-rose-500/30'
               : att.uploading ? 'bg-canvas border-border animate-pulse'
               : 'bg-canvas border-border hover:bg-elevated'
@@ -27,8 +27,8 @@ export function AttachmentChips({ items, onRemove, errorText = '上传失败' }:
             {att.name}
           </span>
           {att.uploading && <Loader2 size={12} className="animate-spin text-textMuted shrink-0" />}
-          {att.error && <span className="text-rose-400 text-[10px] shrink-0" title={att.error}>{errorText}</span>}
-          <span className="text-textMuted text-[10px] shrink-0">{(att.size / 1024).toFixed(0)}KB</span>
+          {att.error && <span className="text-rose-400 text-3xs shrink-0" title={att.error}>{errorText}</span>}
+          <span className="text-textMuted text-3xs shrink-0">{(att.size / 1024).toFixed(0)}KB</span>
           <button
             onClick={() => onRemove(att.id)}
             className="shrink-0 p-0.5 rounded text-textMuted hover:text-rose-400 hover:bg-rose-500/10 transition-colors"
@@ -56,7 +56,7 @@ export function DropMask({ active, strong = false, label }: {
   if (!active) return null
   return (
     <div
-      className={`pointer-events-none absolute inset-0 z-50 flex items-center justify-center transition-colors duration-150 ${
+      className={`pointer-events-none absolute inset-0 z-modal flex items-center justify-center transition-colors duration-150 ${
         strong ? 'bg-primary-500/20' : 'bg-primary-500/[0.07]'
       }`}
     >

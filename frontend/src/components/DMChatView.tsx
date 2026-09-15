@@ -80,7 +80,7 @@ export default function DMChatView({ sessionId, onMobileBack }: DMChatViewProps)
         {/* 移动端：打开会话列表 */}
         <button
           onClick={() => navigate('/chat')}
-          className="md:hidden p-1.5 -ml-1 rounded-lg hover:bg-elevated text-textSecondary transition-colors"
+          className="md:hidden p-1.5 -ml-1 rounded-control hover:bg-elevated text-textSecondary transition-colors"
           title={t('dm.sessionList')}
         >
           <ArrowLeft size={20} />
@@ -119,7 +119,7 @@ export default function DMChatView({ sessionId, onMobileBack }: DMChatViewProps)
               {partner?.name || t('dm.loading')}
             </span>
           </div>
-          <span className="text-[10px] text-textMuted">
+          <span className="text-3xs text-textMuted">
             {partner?.type === 'system' ? <><ShieldAlert size={12} className="inline text-rose-400" /> 系统通知</>
             : partner?.type === 'ai' ? <><Bot size={12} className="inline" /> {t('dm.ai')}</>
             : <><User size={12} className="inline" /> {t('dm.user')}</>}
@@ -136,7 +136,7 @@ export default function DMChatView({ sessionId, onMobileBack }: DMChatViewProps)
 
         {/* 联邦标签 */}
         {partner?.is_federated && (
-          <span className="inline-flex items-center gap-1 text-[10px] text-primary-400 bg-primary-500/10 px-1.5 py-0.5 rounded-full shrink-0"
+          <span className="chip chip-primary shrink-0"
                 title={t('chat.federatedGroup')}>
             <Globe size={11} />
             {t('chat.federated')}
@@ -144,7 +144,7 @@ export default function DMChatView({ sessionId, onMobileBack }: DMChatViewProps)
         )}
 
         {/* 在线状态指示 */}
-        <span className={`inline-flex items-center gap-1 text-[10px] font-medium ${isActive ? 'text-mint-400' : partner?.state === 'dnd' ? 'text-rose-400' : 'text-textMuted'}`}>
+        <span className={`inline-flex items-center gap-1 text-3xs font-medium ${isActive ? 'text-mint-400' : partner?.state === 'dnd' ? 'text-rose-400' : 'text-textMuted'}`}>
           <span className={`w-1.5 h-1.5 rounded-full ${stateColor}`} />
           {isActive ? t('dm.online') : partner?.state === 'dnd' ? t('dm.shortDnd') : partner?.last_active_at ? `${t('dm.lastActive')} ${formatMessageTime(partner.last_active_at, lang)}` : t('dm.offline')}
         </span>
@@ -152,7 +152,7 @@ export default function DMChatView({ sessionId, onMobileBack }: DMChatViewProps)
         {/* 免打扰按钮 */}
         <button
           onClick={handleToggleDnd}
-          className={`p-1 rounded-lg transition-colors ${
+          className={`p-1 rounded-control transition-colors ${
             myDndUntil
               ? 'text-rose-400 hover:bg-rose-400/10'
               : 'text-textMuted hover:text-rose-400 hover:bg-elevated'
@@ -165,7 +165,7 @@ export default function DMChatView({ sessionId, onMobileBack }: DMChatViewProps)
         {/* 设置按钮（与群聊头部的 Settings 对齐） */}
         <button
           onClick={() => setShowSettings(true)}
-          className="p-1 rounded-lg hover:bg-elevated text-textMuted hover:text-textSecondary transition-colors"
+          className="p-1 rounded-control hover:bg-elevated text-textMuted hover:text-textSecondary transition-colors"
           title={t('dm.dmSettings')}
         >
           <Settings size={14} />

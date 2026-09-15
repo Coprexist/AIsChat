@@ -134,7 +134,7 @@ export default function PluginManager() {
         <h2 className="text-base font-semibold text-textPrimary mb-1">插件管理</h2>
 
         {/* ═══ 统一插件（内容插件：皮肤 / 技能 / 世界）═══ */}
-        <div className="rounded-xl border border-border bg-elevated/30 p-4 mb-4">
+        <div className="rounded-card border border-border bg-elevated/30 p-4 mb-4">
           <div className="flex items-center justify-between mb-1">
             <h3 className="text-sm font-medium text-textPrimary flex items-center gap-1.5">
               <Plug size={15} className="text-primary-400" /> 统一插件（目录即插件）
@@ -142,7 +142,7 @@ export default function PluginManager() {
             <button
               onClick={handleRescan}
               disabled={contentLoading}
-              className="flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-medium bg-primary-500/10 text-primary-400 hover:bg-primary-500/20 border border-primary-400/20 transition-colors disabled:opacity-50"
+              className="flex items-center gap-1 px-2.5 py-1 rounded-control text-xs font-medium bg-primary-500/10 text-primary-400 hover:bg-primary-500/20 border border-primary-400/20 transition-colors disabled:opacity-50"
             >
               <RefreshCcw size={12} className={contentLoading ? 'animate-spin' : ''} /> 重扫目录
             </button>
@@ -161,20 +161,20 @@ export default function PluginManager() {
                 const Icon = CATEGORY_ICON[plugin.category] || Box
                 const on = plugin.global_enabled
                 return (
-                  <div key={plugin.id} className="flex items-start justify-between gap-3 p-3 rounded-lg border border-border bg-surface">
+                  <div key={plugin.id} className="flex items-start justify-between gap-3 p-3 rounded-control border border-border bg-surface">
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center gap-2 flex-wrap">
                         <Icon size={14} className="text-textMuted shrink-0" />
                         <span className="font-medium text-sm text-textPrimary">{plugin.name}</span>
-                        <span className="px-1.5 py-0.5 rounded text-[10px] font-medium bg-primary-400/10 text-primary-400 border border-primary-400/20">
+                        <span className="px-1.5 py-0.5 rounded text-3xs font-medium bg-primary-400/10 text-primary-400 border border-primary-400/20">
                           {CATEGORY_LABEL[plugin.category] || plugin.category}
                         </span>
-                        <span className="text-[10px] font-mono text-textMuted">v{plugin.version}</span>
+                        <span className="text-3xs font-mono text-textMuted">v{plugin.version}</span>
                         {plugin.builtin && (
-                          <span className="px-1.5 py-0.5 rounded text-[10px] bg-gray-100 dark:bg-gray-800 text-gray-500 dark:text-gray-400">内置</span>
+                          <span className="px-1.5 py-0.5 rounded text-3xs bg-gray-100 dark:bg-gray-800 text-gray-500 dark:text-gray-400">内置</span>
                         )}
                         {plugin.users_count != null && plugin.users_count > 0 && (
-                          <span className="px-1.5 py-0.5 rounded text-[10px] bg-mint-400/10 text-mint-400 border border-mint-400/20">
+                          <span className="px-1.5 py-0.5 rounded text-3xs bg-mint-400/10 text-mint-400 border border-mint-400/20">
                             {plugin.users_count} 人{plugin.category === 'skin' ? '在用' : '启用'}
                           </span>
                         )}
@@ -184,7 +184,7 @@ export default function PluginManager() {
                     <button
                       onClick={() => handleContentToggle(plugin)}
                       disabled={contentToggling === plugin.id}
-                      className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium transition-colors shrink-0 disabled:opacity-50 ${
+                      className={`flex items-center gap-1.5 px-3 py-1.5 rounded-control text-sm font-medium transition-colors shrink-0 disabled:opacity-50 ${
                         on
                           ? 'bg-mint-500 text-white hover:bg-mint-600'
                           : 'bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-400 hover:bg-gray-200 dark:hover:bg-gray-700'
@@ -207,12 +207,12 @@ export default function PluginManager() {
         </div>
 
         {/* 可选能力：文档导出（pandoc）——并入插件管理 */}
-        <div className="rounded-xl border border-border bg-elevated/30 p-4 mb-4">
+        <div className="rounded-card border border-border bg-elevated/30 p-4 mb-4">
           <DocExportTab />
         </div>
 
         {/* 接口文档分区管理（标题/介绍表单注入） */}
-        <div className="rounded-xl border border-border bg-elevated/30 p-4 mb-4">
+        <div className="rounded-card border border-border bg-elevated/30 p-4 mb-4">
           <ApiDocSectionsTab />
         </div>
         <p className="text-sm text-textSecondary">
@@ -221,7 +221,7 @@ export default function PluginManager() {
       </div>
 
       {message && (
-        <div className={`p-3 rounded-lg text-sm ${
+        <div className={`p-3 rounded-control text-sm ${
           message.type === 'success'
             ? 'bg-mint-50 dark:bg-mint-900/20 text-mint-700 dark:text-mint-400 border border-mint-200 dark:border-mint-800'
             : 'bg-rose-50 dark:bg-rose-900/20 text-rose-700 dark:text-rose-400 border border-rose-200 dark:border-rose-800'
@@ -234,7 +234,7 @@ export default function PluginManager() {
         {plugins.map(plugin => (
           <div
             key={plugin.id}
-            className="p-4 rounded-xl border border-border bg-surface hover:bg-elevated transition-colors"
+            className="p-4 rounded-card border border-border bg-surface hover:bg-elevated transition-colors"
           >
             <div className="flex items-start justify-between gap-4">
               <div className="flex-1 min-w-0">
@@ -243,17 +243,17 @@ export default function PluginManager() {
                   <h3 className="font-medium text-textPrimary">{plugin.name}</h3>
                   {plugin.installed && (
                     plugin.running ? (
-                      <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-medium bg-mint-100 dark:bg-mint-900/30 text-mint-700 dark:text-mint-400">
+                      <span className="chip chip-mint shrink-0 dark:bg-mint-900/30 dark:text-mint-400">
                         <CheckCircle size={11} /> 运行中 :{plugin.port}
                       </span>
                     ) : (
-                      <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-medium bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-400">
+                      <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-2xs font-medium bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-400">
                         <Circle size={11} /> 已停止
                       </span>
                     )
                   )}
                   {!plugin.installed && (
-                    <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-medium bg-rose-100 dark:bg-rose-900/30 text-rose-700 dark:text-rose-400">
+                    <span className="chip chip-rose shrink-0 dark:bg-rose-900/30 dark:text-rose-400">
                       未安装
                     </span>
                   )}
@@ -264,7 +264,7 @@ export default function PluginManager() {
                 <button
                   onClick={() => handleToggle(plugin)}
                   disabled={toggling === plugin.id}
-                  className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium transition-colors shrink-0 ${
+                  className={`flex items-center gap-1.5 px-3 py-1.5 rounded-control text-sm font-medium transition-colors shrink-0 ${
                     plugin.running
                       ? 'bg-rose-50 dark:bg-rose-900/20 text-rose-600 dark:text-rose-400 hover:bg-rose-100 dark:hover:bg-rose-900/40 border border-rose-200 dark:border-rose-800'
                       : 'bg-mint-500 text-white hover:bg-mint-600'
@@ -290,7 +290,7 @@ export default function PluginManager() {
                       setMessage({ type: res.ok ? 'success' : 'error', text: (res.ok ? `${res.message}` : `${res.error}`) + detail })
                     } catch (e: any) { setMessage({ type: 'error', text: `请求失败: ${e?.message || e}` }) }
                   }}
-                  className="flex items-center gap-1 px-3 py-1.5 rounded-lg text-sm font-medium bg-blue-50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400 hover:bg-blue-100 border border-blue-200 dark:border-blue-800 transition-colors shrink-0"
+                  className="flex items-center gap-1 px-3 py-1.5 rounded-control text-sm font-medium bg-blue-50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400 hover:bg-blue-100 border border-blue-200 dark:border-blue-800 transition-colors shrink-0"
                 >
                   测通百度
                 </button>

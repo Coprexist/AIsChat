@@ -89,7 +89,7 @@ function ToolRegistryTab() {
       {/* 统计概览 */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
         {data.segments.map(seg => (
-          <div key={seg.key} className="bg-surface rounded-lg border border-border p-3">
+          <div key={seg.key} className="bg-surface rounded-control border border-border p-3">
             <div className="text-xs text-textSecondary">{seg.name}</div>
             <div className="text-lg font-semibold text-textPrimary mt-0.5">{seg.tool_count}</div>
           </div>
@@ -97,7 +97,7 @@ function ToolRegistryTab() {
       </div>
 
       {/* 浏览器服务状态提示 */}
-      <div className={`rounded-lg border px-3.5 py-2.5 text-xs flex items-center gap-2 ${
+      <div className={`rounded-control border px-3.5 py-2.5 text-xs flex items-center gap-2 ${
         browserStatus === 'running'
           ? 'bg-mint-500/10 border-mint-500/20 text-mint-600 dark:text-mint-400'
           : browserStatus === 'loading'
@@ -123,7 +123,7 @@ function ToolRegistryTab() {
           <select
             value={filterSegment}
             onChange={e => setFilterSegment(e.target.value)}
-            className="text-sm border border-border rounded-lg px-2.5 py-1.5 bg-surface text-textPrimary"
+            className="text-sm border border-border rounded-control px-2.5 py-1.5 bg-surface text-textPrimary"
           >
             <option value="all">{t('admin.toolsFilterAll')}</option>
             {data.segments.map(seg => (
@@ -136,7 +136,7 @@ function ToolRegistryTab() {
           <select
             value={filterState}
             onChange={e => setFilterState(e.target.value)}
-            className="text-sm border border-border rounded-lg px-2.5 py-1.5 bg-surface text-textPrimary"
+            className="text-sm border border-border rounded-control px-2.5 py-1.5 bg-surface text-textPrimary"
           >
             <option value="all">{t('admin.toolsFilterAll')}</option>
             {stateOptions.filter(s => s !== 'all').map(s => (
@@ -152,7 +152,7 @@ function ToolRegistryTab() {
       {/* 工具列表 */}
       <div className="space-y-1.5 max-h-[60vh] overflow-y-auto">
         {filtered.map(tool => (
-          <details key={tool.name} className="group bg-surface rounded-lg border border-border">
+          <details key={tool.name} className="group bg-surface rounded-control border border-border">
             <summary className="px-4 py-3 cursor-pointer hover:bg-elevated transition-colors flex items-center gap-3 select-none">
               <span className="font-mono text-sm font-medium text-textPrimary min-w-[140px]">{tool.name}</span>
               <span className="text-xs px-2 py-0.5 rounded bg-primary-50 text-primary-600 dark:bg-primary-900/20 dark:text-primary-400">
@@ -243,7 +243,7 @@ function SkillManagementTab() {
         <select
           value={selectedAgent ?? ''}
           onChange={e => setSelectedAgent(Number(e.target.value) || null)}
-          className="text-sm border border-border rounded-lg px-3 py-2 bg-surface text-textPrimary min-w-[200px]"
+          className="text-sm border border-border rounded-control px-3 py-2 bg-surface text-textPrimary min-w-[200px]"
           disabled={loadingAgents}
         >
           {loadingAgents && <option value="">加载中...</option>}
@@ -297,7 +297,7 @@ function SkillManagementTab() {
                   <td className="px-3 py-2.5">
                     <button
                       onClick={() => handleToggle(skill.id, skill.is_enabled)}
-                      className={`text-xs px-2.5 py-1 rounded-lg border transition-colors ${skill.is_enabled
+                      className={`text-xs px-2.5 py-1 rounded-control border transition-colors ${skill.is_enabled
                         ? 'border-rose-200 text-rose-600 hover:bg-rose-50 dark:border-rose-800 dark:text-rose-400'
                         : 'border-mint-200 text-mint-600 hover:bg-mint-50 dark:border-mint-800 dark:text-mint-400'
                       }`}
@@ -328,12 +328,12 @@ export default function ToolsSkillsTab() {
   return (
     <div className="space-y-5">
       {/* 子页签 */}
-      <div className="flex gap-1 bg-elevated rounded-lg p-1 w-fit">
+      <div className="flex gap-1 bg-elevated rounded-control p-1 w-fit">
         {subTabs.map(st => (
           <button
             key={st.key}
             onClick={() => setSubTab(st.key)}
-            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-sm transition-colors ${subTab === st.key
+            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-control text-sm transition-colors ${subTab === st.key
               ? 'bg-surface text-textPrimary shadow-sm'
               : 'text-textSecondary hover:text-textPrimary'
             }`}

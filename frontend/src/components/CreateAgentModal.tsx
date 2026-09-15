@@ -222,7 +222,7 @@ function ApiKeyGetLink({ providers }: { providers: ProviderInfo[] }) {
       href={defaultProvider.api_key_url}
       target="_blank"
       rel="noopener noreferrer"
-      className="text-[10px] text-primary-400 hover:text-primary-500 dark:hover:text-primary-300 underline underline-offset-2 font-normal"
+      className="text-3xs text-primary-400 hover:text-primary-500 dark:hover:text-primary-300 underline underline-offset-2 font-normal"
     >
       获取 API Key →
     </a>
@@ -474,14 +474,14 @@ export default function CreateAgentModal({
     : ''
 
   return (
-    <div className="fixed inset-0 md:bg-black/70 flex items-center justify-center z-50 overflow-y-auto bg-surface" onClick={onClose}>
+    <div className="fixed inset-0 md:bg-black/70 flex items-center justify-center z-modal overflow-y-auto bg-surface" onClick={onClose}>
       <div
-        className="bg-elevated border border-border rounded-none md:rounded-2xl p-6 w-full max-w-full md:max-w-2xl mx-0 md:mx-4 shadow-2xl shadow-black/30 my-0 md:my-8 h-full md:h-auto flex flex-col"
+        className="bg-elevated border border-border rounded-none md:rounded-dialog p-6 w-full max-w-full md:max-w-2xl mx-0 md:mx-4 shadow-2xl shadow-black/30 my-0 md:my-8 h-full md:h-auto flex flex-col"
         onClick={(e) => e.stopPropagation()}
       >
         {/* 移动端头部：ArrowLeft + 标题 */}
         <div className="flex items-center justify-between mb-5 md:hidden shrink-0">
-          <button onClick={onClose} className="p-1 -ml-1 rounded-lg hover:bg-elevated text-textSecondary transition-colors">
+          <button onClick={onClose} className="icon-btn-sm -ml-1 text-textSecondary">
             <ArrowLeft size={20} />
           </button>
           <h2 className="text-base font-semibold text-textPrimary">{t('modal.createAgentTitle')}</h2>
@@ -506,7 +506,7 @@ export default function CreateAgentModal({
             type="text"
             value={name}
             onChange={(e) => setName(e.target.value)}
-            className="w-full px-3.5 py-2.5 rounded-xl border border-border bg-canvas text-sm text-textPrimary placeholder:text-textMuted focus:outline-none focus:ring-2 focus:ring-primary-500/50"
+            className="w-full px-3.5 py-2.5 rounded-card border border-border bg-canvas text-sm text-textPrimary placeholder:text-textMuted focus:outline-none focus:ring-2 focus:ring-primary-500/50"
             placeholder={t('modal.createAgentNamePlaceholder')}
           />
         </div>
@@ -518,7 +518,7 @@ export default function CreateAgentModal({
             value={systemPrompt}
             onChange={(e) => setSystemPrompt(e.target.value)}
             rows={3}
-            className="w-full px-3.5 py-2.5 rounded-xl border border-border bg-canvas text-sm text-textPrimary placeholder:text-textMuted focus:outline-none focus:ring-2 focus:ring-primary-500/50 resize-none"
+            className="w-full px-3.5 py-2.5 rounded-card border border-border bg-canvas text-sm text-textPrimary placeholder:text-textMuted focus:outline-none focus:ring-2 focus:ring-primary-500/50 resize-none"
             placeholder={t('modal.createAgentSystemPromptPlaceholder')}
           />
         </div>
@@ -538,7 +538,7 @@ export default function CreateAgentModal({
                 >
                   <button
                     onClick={() => handleCardClick(key)}
-                    className={`w-full h-full text-left rounded-xl border transition-colors duration-300 min-h-[150px] md:min-h-[160px]
+                    className={`w-full h-full text-left rounded-card border transition-colors duration-300 min-h-[150px] md:min-h-[160px]
                       bg-gradient-to-b ${icon.color}
                       ${isSelected
                         ? 'border-primary-400/60 shadow-lg shadow-primary-500/10'
@@ -551,7 +551,7 @@ export default function CreateAgentModal({
                       <p className="text-xs text-textSecondary leading-snug">{t(`preset.${preset.key}Desc` as any)}</p>
 
                       {hasSub && (
-                        <span className="text-xs text-primary-400 bg-primary-500/10 px-2 py-0.5 rounded-full mt-1">
+                        <span className="chip chip-primary shrink-0 mt-1">
                           <SubIcon name={SUB_OPTIONS[key]?.find(s => s.id === selectedSub)?.icon || ''} /> {selectedSub ? t(getSubPresetKey(selectedSub)) : ''}
                         </span>
                       )}
@@ -569,7 +569,7 @@ export default function CreateAgentModal({
             <div className="flex items-center gap-2 mb-2">
               <label className="text-xs font-medium text-textSecondary">{t('modal.detailSettingsAiType')}</label>
               {selectedSub && (
-                <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-primary-500/15 text-primary-500">{t('modal.aiTypeRecommended')}</span>
+                <span className="chip chip-primary shrink-0">{t('modal.aiTypeRecommended')}</span>
               )}
             </div>
             <div className="grid grid-cols-3 gap-2">
@@ -582,7 +582,7 @@ export default function CreateAgentModal({
                   key={type.value}
                   type="button"
                   onClick={() => setAiType(type.value)}
-                  className={`flex flex-col items-center gap-1 p-2.5 rounded-xl border text-center transition-all ${
+                  className={`flex flex-col items-center gap-1 p-2.5 rounded-card border text-center transition-all ${
                     aiType === type.value
                       ? 'border-primary-400 bg-primary-500/10 text-primary-600 dark:text-primary-300'
                       : 'border-border bg-canvas text-textSecondary hover:bg-elevated'
@@ -615,14 +615,14 @@ export default function CreateAgentModal({
             placeholder={t('agentDetail.bioPlaceholder')}
             rows={2}
             maxLength={500}
-            className="w-full px-3 py-2 rounded-lg border border-border bg-canvas text-sm text-textPrimary placeholder:text-textMuted focus:outline-none focus:ring-2 focus:ring-primary-500/50 resize-none"
+            className="w-full px-3 py-2 rounded-control border border-border bg-canvas text-sm text-textPrimary placeholder:text-textMuted focus:outline-none focus:ring-2 focus:ring-primary-500/50 resize-none"
           />
           <input
             type="text"
             value={statusText}
             onChange={(e) => setStatusText(e.target.value)}
             placeholder={t('agentDetail.statusTextPlaceholder')}
-            className="w-full px-3 py-2 rounded-lg border border-border bg-canvas text-sm text-textPrimary placeholder:text-textMuted focus:outline-none focus:ring-2 focus:ring-primary-500/50"
+            className="w-full px-3 py-2 rounded-control border border-border bg-canvas text-sm text-textPrimary placeholder:text-textMuted focus:outline-none focus:ring-2 focus:ring-primary-500/50"
           />
         </div>
 
@@ -630,7 +630,7 @@ export default function CreateAgentModal({
         <div className="flex gap-3">
           <button
             onClick={() => setShowDetailSettings(true)}
-            className="flex-1 py-2.5 text-sm border border-border rounded-xl hover:bg-elevated text-textSecondary transition-colors font-medium flex items-center justify-center gap-1.5"
+            className="flex-1 py-2.5 text-sm border border-border rounded-card hover:bg-elevated text-textSecondary transition-colors font-medium flex items-center justify-center gap-1.5"
           >
             <Settings size={14} />
             {t('modal.createAgentDetailSettings')}
@@ -638,7 +638,7 @@ export default function CreateAgentModal({
           <button
             onClick={handleCreate}
             disabled={!name.trim() || loading}
-            className="flex-1 py-2.5 text-sm bg-primary-500 text-white rounded-xl hover:bg-primary-600 disabled:opacity-30 font-medium transition-all shadow-lg shadow-primary-500/20"
+            className="btn btn-md btn-primary flex-1"
           >
             {loading ? t('modal.createAgentCreating') : t('modal.createAgentCreate')}
           </button>
@@ -737,14 +737,14 @@ function SubOptionModal({
   const icon = CARD_ICONS[preset.key]
   const subOptions = SUB_OPTIONS[preset.key] || []
   return (
-    <div className="fixed inset-0 md:bg-black/60 flex items-center justify-center z-[70] bg-surface" onClick={onClose}>
+    <div className="fixed inset-0 md:bg-black/60 flex items-center justify-center z-toast bg-surface" onClick={onClose}>
       <div
-        className="bg-elevated border border-border rounded-none md:rounded-2xl p-6 w-full max-w-full md:max-w-md mx-0 md:mx-4 shadow-2xl shadow-black/30 md:animate-pop-in h-full md:h-auto flex flex-col"
+        className="bg-elevated border border-border rounded-none md:rounded-dialog p-6 w-full max-w-full md:max-w-md mx-0 md:mx-4 shadow-2xl shadow-black/30 md:animate-pop-in h-full md:h-auto flex flex-col"
         onClick={(e) => e.stopPropagation()}
       >
         {/* 移动端头部 */}
         <div className="flex items-center justify-between mb-3 md:hidden shrink-0">
-          <button onClick={onClose} className="p-1 -ml-1 rounded-lg hover:bg-elevated text-textSecondary transition-colors">
+          <button onClick={onClose} className="icon-btn-sm -ml-1 text-textSecondary">
             <ArrowLeft size={20} />
           </button>
           <div className="flex items-center gap-2">
@@ -768,7 +768,7 @@ function SubOptionModal({
         {/* 可滚动内容 */}
         <div className="flex-1 overflow-y-auto md:overflow-visible pb-[var(--safe-bottom)] md:pb-0">
         <p className="text-xs text-textMuted mb-4">{t(`preset.${preset.key}Desc` as any)}</p>
-        <p className="text-xs text-textMuted mb-4 italic text-center bg-canvas/50 rounded-lg py-2">
+        <p className="text-xs text-textMuted mb-4 italic text-center bg-canvas/50 rounded-control py-2">
           {t('modal.createAgentPresetHint')}
         </p>
         <div className="space-y-3">
@@ -776,7 +776,7 @@ function SubOptionModal({
             <button
               key={sub.id}
               onClick={() => onSelect(sub.id)}
-              className={`w-full text-left p-4 rounded-xl border transition-all duration-150
+              className={`w-full text-left p-4 rounded-card border transition-all duration-150
                 ${selectedSub === sub.id
                   ? 'border-primary-400/60 bg-primary-500/10 shadow-md shadow-primary-500/5'
                   : 'border-border/50 bg-elevated hover:border-primary-500/30 hover:bg-canvas'
@@ -936,14 +936,14 @@ function DetailSettingsModal({
   }
 
   return (
-    <div className="fixed inset-0 md:bg-black/70 flex items-start justify-center z-[60] md:pt-8 overflow-y-auto bg-surface" onClick={onClose}>
+    <div className="fixed inset-0 md:bg-black/70 flex items-start justify-center z-toast md:pt-8 overflow-y-auto bg-surface" onClick={onClose}>
       <div
-        className="bg-elevated border border-border rounded-none md:rounded-2xl p-6 w-full max-w-full md:max-w-2xl mx-0 md:mx-4 shadow-2xl shadow-black/30 my-0 md:my-4 h-full md:h-auto flex flex-col pb-[var(--safe-bottom)] md:pb-6"
+        className="bg-elevated border border-border rounded-none md:rounded-dialog p-6 w-full max-w-full md:max-w-2xl mx-0 md:mx-4 shadow-2xl shadow-black/30 my-0 md:my-4 h-full md:h-auto flex flex-col pb-[var(--safe-bottom)] md:pb-6"
         onClick={(e) => e.stopPropagation()}
       >
         {/* 移动端头部 */}
         <div className="flex items-center justify-between mb-5 md:hidden shrink-0">
-          <button onClick={onClose} className="p-1 -ml-1 rounded-lg hover:bg-elevated text-textSecondary transition-colors">
+          <button onClick={onClose} className="icon-btn-sm -ml-1 text-textSecondary">
             <ArrowLeft size={20} />
           </button>
           <h2 className="text-base font-semibold text-textPrimary">{t('modal.detailSettingsTitle')}</h2>
@@ -968,7 +968,7 @@ function DetailSettingsModal({
                 type="text"
                 value={name}
                 onChange={(e) => setName(e.target.value)}
-                className="w-full px-3 py-2 rounded-lg border border-border bg-canvas text-sm text-textPrimary placeholder:text-textMuted focus:outline-none focus:ring-2 focus:ring-primary-500/50"
+                className="w-full px-3 py-2 rounded-control border border-border bg-canvas text-sm text-textPrimary placeholder:text-textMuted focus:outline-none focus:ring-2 focus:ring-primary-500/50"
               />
             </div>
             <div>
@@ -977,7 +977,7 @@ function DetailSettingsModal({
                 value={systemPrompt}
                 onChange={(e) => setSystemPrompt(e.target.value)}
                 rows={3}
-                className="w-full px-3 py-2 rounded-lg border border-border bg-canvas text-sm text-textPrimary placeholder:text-textMuted focus:outline-none focus:ring-2 focus:ring-primary-500/50 resize-none"
+                className="w-full px-3 py-2 rounded-control border border-border bg-canvas text-sm text-textPrimary placeholder:text-textMuted focus:outline-none focus:ring-2 focus:ring-primary-500/50 resize-none"
                 placeholder={t('modal.createAgentSystemPromptPlaceholder')}
               />
             </div>
@@ -998,7 +998,7 @@ function DetailSettingsModal({
                   {t('modal.detailSettingsChatModel')} <span className="text-textMuted">{t('modal.detailSettingsDefaultLabel')} {defaults.chat_model})</span>
                 </label>
                 <select value={chatModel} onChange={(e) => setChatModel(e.target.value)}
-                  className="w-full px-3 py-2 rounded-lg border border-border bg-canvas text-sm text-textPrimary focus:outline-none focus:ring-2 focus:ring-primary-500/50">
+                  className="w-full px-3 py-2 rounded-control border border-border bg-canvas text-sm text-textPrimary focus:outline-none focus:ring-2 focus:ring-primary-500/50">
                   <option value="">{t('modal.detailSettingsGlobalDefault')}</option>
                   {renderModelOptions(modelOptions, providers)}
                 </select>
@@ -1008,7 +1008,7 @@ function DetailSettingsModal({
                   {t('modal.detailSettingsWorkModel')} <span className="text-textMuted">{t('modal.detailSettingsDefaultLabel')} {defaults.work_model})</span>
                 </label>
                 <select value={workModel} onChange={(e) => setWorkModel(e.target.value)}
-                  className="w-full px-3 py-2 rounded-lg border border-border bg-canvas text-sm text-textPrimary focus:outline-none focus:ring-2 focus:ring-primary-500/50">
+                  className="w-full px-3 py-2 rounded-control border border-border bg-canvas text-sm text-textPrimary focus:outline-none focus:ring-2 focus:ring-primary-500/50">
                   <option value="">{t('modal.detailSettingsGlobalDefault')}</option>
                   {renderModelOptions(modelOptions, providers)}
                 </select>
@@ -1037,13 +1037,13 @@ function DetailSettingsModal({
               <select
                 value={memoryLoadMode}
                 onChange={(e) => setMemoryLoadMode(e.target.value)}
-                className="w-full px-3 py-2 rounded-lg border border-border bg-canvas text-sm text-textPrimary focus:outline-none focus:ring-2 focus:ring-primary-500/50"
+                className="w-full px-3 py-2 rounded-control border border-border bg-canvas text-sm text-textPrimary focus:outline-none focus:ring-2 focus:ring-primary-500/50"
               >
                 <option value="index_only">{t('modal.detailSettingsMemoryLoadModeIndexOnly')}</option>
                 <option value="index_plus_recent">{t('modal.detailSettingsMemoryLoadModeIndexRecent')}</option>
                 <option value="index_plus_semantic">{t('modal.detailSettingsMemoryLoadModeIndexSemantic')}</option>
               </select>
-              <p className="text-[10px] text-textMuted mt-1">{t('modal.detailSettingsMemoryLoadModeDesc')}</p>
+              <p className="text-3xs text-textMuted mt-1">{t('modal.detailSettingsMemoryLoadModeDesc')}</p>
             </div>
             {memoryLoadMode === 'index_plus_recent' && (
               <NumberField label={t('modal.detailSettingsMemoryRecentCount')} value={memoryRecentCount} setValue={setMemoryRecentCount} min={0} max={50} desc={t('modal.detailSettingsMemoryRecentCountDesc')} />
@@ -1053,13 +1053,13 @@ function DetailSettingsModal({
               <select
                 value={memorySharedScope}
                 onChange={(e) => setMemorySharedScope(e.target.value)}
-                className="w-full px-3 py-2 rounded-lg border border-border bg-canvas text-sm text-textPrimary focus:outline-none focus:ring-2 focus:ring-primary-500/50"
+                className="w-full px-3 py-2 rounded-control border border-border bg-canvas text-sm text-textPrimary focus:outline-none focus:ring-2 focus:ring-primary-500/50"
               >
                 <option value="private_only">{t('modal.detailSettingsMemorySharedScopePrivate')}</option>
                 <option value="private_plus_shared_by_user">{t('modal.detailSettingsMemorySharedScopeByUser')}</option>
                 <option value="private_plus_shared_all">{t('modal.detailSettingsMemorySharedScopeAll')}</option>
               </select>
-              <p className="text-[10px] text-textMuted mt-1">{t('modal.detailSettingsMemorySharedScopeDesc')}</p>
+              <p className="text-3xs text-textMuted mt-1">{t('modal.detailSettingsMemorySharedScopeDesc')}</p>
             </div>
           </Section>
 
@@ -1076,21 +1076,21 @@ function DetailSettingsModal({
               <input type="number" min={1} max={10000} value={conversationLogsLimit ?? ''}
                 onChange={(e) => setConversationLogsLimit(e.target.value ? parseInt(e.target.value) : null)}
                 placeholder={t('modal.detailSettingsConversationLogsLimitDesc') || '留空继承全局'}
-                className="w-full px-3 py-2 rounded-lg border border-border bg-canvas text-sm text-textPrimary placeholder:text-textMuted focus:outline-none focus:ring-2 focus:ring-primary-500/50" />
-              <p className="text-[10px] text-textMuted mt-0.5">{t('modal.detailSettingsConversationLogsLimitDesc') || '留空继承全局设置'}</p>
+                className="w-full px-3 py-2 rounded-control border border-border bg-canvas text-sm text-textPrimary placeholder:text-textMuted focus:outline-none focus:ring-2 focus:ring-primary-500/50" />
+              <p className="text-3xs text-textMuted mt-0.5">{t('modal.detailSettingsConversationLogsLimitDesc') || '留空继承全局设置'}</p>
             </div>
             <div>
               <label className="block text-xs font-medium mb-1 text-textSecondary">{t('modal.detailSettingsUserCanViewLogs') || '允许用户查看日志'}</label>
               <select
                 value={userCanViewLogs === null ? 'inherit' : userCanViewLogs ? 'on' : 'off'}
                 onChange={(e) => { const v = e.target.value; setUserCanViewLogs(v === 'inherit' ? null : v === 'on') }}
-                className="w-full px-3 py-2 rounded-lg border border-border bg-canvas text-sm text-textPrimary focus:outline-none focus:ring-2 focus:ring-primary-500/50"
+                className="w-full px-3 py-2 rounded-control border border-border bg-canvas text-sm text-textPrimary focus:outline-none focus:ring-2 focus:ring-primary-500/50"
               >
                 <option value="inherit">{t('modal.detailSettingsInheritGlobal')}</option>
                 <option value="on">{t('common.enabled')}</option>
                 <option value="off">{t('common.disabled')}</option>
               </select>
-              <p className="text-[10px] text-textMuted mt-0.5">{t('modal.detailSettingsUserCanViewLogsDesc') || '留空继承全局默认设置'}</p>
+              <p className="text-3xs text-textMuted mt-0.5">{t('modal.detailSettingsUserCanViewLogsDesc') || '留空继承全局默认设置'}</p>
             </div>
           </Section>
 
@@ -1106,7 +1106,7 @@ function DetailSettingsModal({
                   key={type.value}
                   type="button"
                   onClick={() => setAiType(type.value)}
-                  className={`flex flex-col items-center gap-1 p-2.5 rounded-xl border text-center transition-all ${
+                  className={`flex flex-col items-center gap-1 p-2.5 rounded-card border text-center transition-all ${
                     aiType === type.value
                       ? 'border-primary-400 bg-primary-500/10 text-primary-600 dark:text-primary-300'
                       : 'border-border bg-canvas text-textSecondary hover:bg-elevated'
@@ -1130,7 +1130,7 @@ function DetailSettingsModal({
                   const v = e.target.value
                   setDelayReplyEnabled(v === 'inherit' ? null : v === 'on')
                 }}
-                className="w-full px-3 py-2 rounded-lg border border-border bg-canvas text-sm text-textPrimary focus:outline-none focus:ring-2 focus:ring-primary-500/50"
+                className="w-full px-3 py-2 rounded-control border border-border bg-canvas text-sm text-textPrimary focus:outline-none focus:ring-2 focus:ring-primary-500/50"
               >
                 <option value="inherit">{t('modal.detailSettingsInheritGlobal')}</option>
                 <option value="on">{t('common.enabled')}</option>
@@ -1144,7 +1144,7 @@ function DetailSettingsModal({
               <select
                 value={reminderGrace}
                 onChange={(e) => setReminderGrace(e.target.value)}
-                className="w-full px-3 py-2 rounded-lg border border-border bg-canvas text-sm text-textPrimary focus:outline-none focus:ring-2 focus:ring-primary-500/50"
+                className="w-full px-3 py-2 rounded-control border border-border bg-canvas text-sm text-textPrimary focus:outline-none focus:ring-2 focus:ring-primary-500/50"
               >
                 <option value="every_time">{t('modal.detailSettingsReminderGraceEvery')}</option>
                 <option value="once">{t('modal.detailSettingsReminderGraceOnce')}</option>
@@ -1181,10 +1181,10 @@ function DetailSettingsModal({
                     <div className="flex items-center gap-3">
                       <NumberField label={t('agents.othersChatQuotaLabel')} value={othersChatQuota} setValue={setOthersChatQuota} min={1} max={9999} />
                       <div className="flex items-center gap-2 pt-5">
-                        <span className="text-[11px] text-textMuted">{t('agents.othersChatUsed')}: {othersChatUsed}</span>
-                        <button type="button" onClick={() => setOthersChatUsed(0)} className="text-[10px] px-2 py-0.5 rounded border border-border text-textMuted hover:text-textSecondary transition-colors">{t('agents.othersChatUsedReset')}</button>
+                        <span className="text-2xs text-textMuted">{t('agents.othersChatUsed')}: {othersChatUsed}</span>
+                        <button type="button" onClick={() => setOthersChatUsed(0)} className="text-3xs px-2 py-0.5 rounded border border-border text-textMuted hover:text-textSecondary transition-colors">{t('agents.othersChatUsedReset')}</button>
                       </div>
-                      <p className="text-[10px] text-textMuted leading-relaxed">{t('agents.othersChatQuotaDesc')}</p>
+                      <p className="text-3xs text-textMuted leading-relaxed">{t('agents.othersChatQuotaDesc')}</p>
                     </div>
                     <ToggleField label={t('agents.autoResetQuota') || '自动重置配额'} value={autoResetQuota} setValue={setAutoResetQuota} desc={t('agents.autoResetQuotaDesc') || '用户每次 DM 后自动重置配额计数至上限'} />
                   </>
@@ -1193,7 +1193,7 @@ function DetailSettingsModal({
               </div>
             ) : (
               <div className="ml-4 pl-3 border-l-2 border-rose-400/30 space-y-2 mt-1">
-                <label className="text-[11px] font-medium text-textMuted mb-2 block">{t('agents.disallowModeLabel')}</label>
+                <label className="text-2xs font-medium text-textMuted mb-2 block">{t('agents.disallowModeLabel')}</label>
                 <div className="flex items-center gap-3">
                   <label className="flex items-center gap-1.5 cursor-pointer">
                     <input type="radio" name="disallowMode" value="strict" checked={disallowMode === 'strict'} onChange={() => setDisallowMode('strict')} className="text-primary-500" />
@@ -1205,7 +1205,7 @@ function DetailSettingsModal({
                   </label>
                 </div>
                 {disallowMode === 'own_key' && (
-                  <p className="text-[10px] text-textMuted leading-relaxed">{t('agents.disallowOwnKeyDesc')}</p>
+                  <p className="text-3xs text-textMuted leading-relaxed">{t('agents.disallowOwnKeyDesc')}</p>
                 )}
               </div>
             )}
@@ -1224,7 +1224,7 @@ function DetailSettingsModal({
                 type="text"
                 value={apiBaseUrl}
                 onChange={(e) => setApiBaseUrl(e.target.value)}
-                className="w-full px-3 py-2 rounded-lg border border-border bg-canvas text-sm text-textPrimary placeholder:text-textMuted focus:outline-none focus:ring-2 focus:ring-primary-500/50"
+                className="w-full px-3 py-2 rounded-control border border-border bg-canvas text-sm text-textPrimary placeholder:text-textMuted focus:outline-none focus:ring-2 focus:ring-primary-500/50"
                 placeholder={t('modal.detailSettingsApiBaseUrlPlaceholder')}
               />
             </div>
@@ -1238,14 +1238,14 @@ function DetailSettingsModal({
                 value={apiKey}
                 onChange={(e) => setApiKey(e.target.value)}
                 autoComplete="off"
-                className="w-full px-3 py-2 rounded-lg border border-border bg-canvas text-sm text-textPrimary placeholder:text-textMuted focus:outline-none focus:ring-2 focus:ring-primary-500/50"
+                className="w-full px-3 py-2 rounded-control border border-border bg-canvas text-sm text-textPrimary placeholder:text-textMuted focus:outline-none focus:ring-2 focus:ring-primary-500/50"
                 placeholder={t('modal.detailSettingsApiKeyPlaceholder')}
               />
             </div>
             <button
               onClick={handleTestApi}
               disabled={testingApi || (!apiBaseUrl.trim() && !apiKey.trim())}
-              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-border text-xs text-textSecondary hover:bg-elevated disabled:opacity-40 transition-colors"
+              className="btn btn-xs btn-outline gap-1.5"
             >
               {testingApi ? <Loader2 size={12} className="animate-spin" /> : <RotateCw size={12} />}
               {t('settings.testConnection')}
@@ -1266,14 +1266,14 @@ function DetailSettingsModal({
                   type="text"
                   value={redeemCode}
                   onChange={(e) => setRedeemCode(e.target.value)}
-                  className="w-full pl-9 pr-3 py-2 rounded-lg border border-border bg-canvas text-sm text-textPrimary placeholder:text-textMuted focus:outline-none focus:ring-2 focus:ring-primary-500/50"
+                  className="w-full pl-9 pr-3 py-2 rounded-control border border-border bg-canvas text-sm text-textPrimary placeholder:text-textMuted focus:outline-none focus:ring-2 focus:ring-primary-500/50"
                   placeholder={t('modal.detailSettingsRedeemPlaceholder')}
                 />
               </div>
               <button
                 onClick={handleRedeem}
                 disabled={redeeming || !redeemCode.trim()}
-                className="flex items-center gap-1 px-4 py-2 rounded-lg bg-primary-500 text-white text-sm font-medium hover:bg-primary-600 disabled:opacity-40 transition-colors shrink-0"
+                className="btn btn-sm btn-primary gap-1 shrink-0"
               >
                 {redeeming ? <Loader2 size={14} className="animate-spin" /> : <span>{t('me.redeem')}</span>}
               </button>
@@ -1289,7 +1289,7 @@ function DetailSettingsModal({
 
         <button
           onClick={onClose}
-          className="w-full mt-5 py-2.5 text-sm bg-primary-500 text-white rounded-xl hover:bg-primary-600 font-medium transition-all shadow-lg shadow-primary-500/20"
+          className="btn btn-md btn-primary w-full mt-5"
         >
           {t('modal.detailSettingsSaveAndClose')}
         </button>
@@ -1302,9 +1302,9 @@ function DetailSettingsModal({
 
 function Section({ title, desc, children }: { title: string; desc: string; children: React.ReactNode }) {
   return (
-    <div className="bg-canvas/50 rounded-xl p-4 border border-border/50">
+    <div className="bg-canvas/50 rounded-card p-4 border border-border/50">
       <h3 className="text-xs font-semibold text-textPrimary mb-1">{title}</h3>
-      <p className="text-[10px] text-textMuted mb-3 leading-relaxed">{desc}</p>
+      <p className="text-3xs text-textMuted mb-3 leading-relaxed">{desc}</p>
       <div className="space-y-2.5">{children}</div>
     </div>
   )
@@ -1330,7 +1330,7 @@ function SliderField({
         onChange={(e) => setValue(parseFloat(e.target.value))}
         className="w-full"
       />
-      {desc && <p className="text-[10px] text-textMuted mt-0.5">{desc}</p>}
+      {desc && <p className="text-3xs text-textMuted mt-0.5">{desc}</p>}
     </div>
   )
 }
@@ -1350,9 +1350,9 @@ function NumberField({
         type="number" min={min} max={max}
         value={value}
         onChange={(e) => setValue(parseInt(e.target.value) || min)}
-        className="w-full px-3 py-2 rounded-lg border border-border bg-canvas text-sm text-textPrimary focus:outline-none focus:ring-2 focus:ring-primary-500/50"
+        className="w-full px-3 py-2 rounded-control border border-border bg-canvas text-sm text-textPrimary focus:outline-none focus:ring-2 focus:ring-primary-500/50"
       />
-      {desc && <p className="text-[10px] text-textMuted mt-0.5">{desc}</p>}
+      {desc && <p className="text-3xs text-textMuted mt-0.5">{desc}</p>}
     </div>
   )
 }
@@ -1368,7 +1368,7 @@ function ToggleField({
     <div className="flex items-center justify-between">
       <div className="flex-1 min-w-0">
         <span className="text-xs text-textSecondary">{label}</span>
-        {desc && <p className="text-[10px] text-textMuted mt-0.5">{desc}</p>}
+        {desc && <p className="text-3xs text-textMuted mt-0.5">{desc}</p>}
       </div>
       <Toggle checked={value} onChange={setValue} />
     </div>

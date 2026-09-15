@@ -3,6 +3,7 @@ import { api } from '../api/client'
 import { useT } from '../i18n/I18nContext'
 import { Globe, Link, Plus, Trash2, RefreshCw, Power, Shield, X } from 'lucide-react'
 import ExternalLinkSafe from './ExternalLinkSafe'
+import { Dialog } from './ui'
 
 interface InstanceInfo {
   instance_id: string
@@ -356,15 +357,15 @@ export default function FederationTab() {
     <div className="space-y-6">
       {/* 操作错误横幅（可关闭，不破坏整个页面） */}
       {error && (
-        <div className="flex items-start gap-2 bg-rose-400/5 border border-rose-400/20 rounded-lg px-4 py-2.5">
+        <div className="flex items-start gap-2 bg-rose-400/5 border border-rose-400/20 rounded-control px-4 py-2.5">
           <span className="text-rose-400 text-sm flex-1 whitespace-pre-wrap">{error}</span>
           <button onClick={() => setError('')} className="text-rose-400/60 hover:text-rose-400 shrink-0 text-sm"><X size={14} /></button>
         </div>
       )}
       {/* 风险告知弹窗 */}
       {registerState === 'confirm' && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60" onClick={() => { setRegisterState('idle'); setDialogToken('') }}>
-          <div className="bg-surface border border-border rounded-xl p-6 max-w-md mx-4 shadow-2xl" onClick={e => e.stopPropagation()}>
+        <Dialog onClose={() =>  { setRegisterState('idle'); setDialogToken('') } } className="flex items-center justify-center">
+          <div className="bg-surface border border-border rounded-card p-6 max-w-md mx-4 shadow-2xl" onClick={e => e.stopPropagation()}>
             <h3 className="text-base font-semibold text-textPrimary mb-3">{t('admin.registerNotice')}</h3>
             <div className="text-sm text-textSecondary space-y-2 mb-5">
               <p>{t('admin.registerNoticeText')}</p>
@@ -378,7 +379,7 @@ export default function FederationTab() {
               <p className="text-xs text-textMuted mt-2">{t('admin.registerNoticeVerify')}</p>
             </div>
             {/* Token 输入区：未配置时突出显示，已配置时可折叠更换 */}
-            <div className={`mb-4 p-3 rounded-lg ${!instance?.github_token_configured ? 'bg-accent-500/5 border border-accent-500/20' : 'bg-canvas border border-border'}`}>
+            <div className={`mb-4 p-3 rounded-control ${!instance?.github_token_configured ? 'bg-accent-500/5 border border-accent-500/20' : 'bg-canvas border border-border'}`}>
               {instance?.github_token_configured ? (
                 <details className="text-xs">
                   <summary className="text-textMuted cursor-pointer hover:text-textPrimary transition-colors">
@@ -389,10 +390,10 @@ export default function FederationTab() {
                       type="password"
                       value={dialogToken}
                       onChange={e => setDialogToken(e.target.value)}
-                      className="w-full px-3 py-1.5 text-sm bg-canvas border border-border rounded-lg text-textPrimary font-mono"
+                      className="w-full px-3 py-1.5 text-sm bg-canvas border border-border rounded-control text-textPrimary font-mono"
                       placeholder={t('admin.pasteNewToken')}
                     />
-                    <p className="text-[10px] text-textMuted mt-1">
+                    <p className="text-3xs text-textMuted mt-1">
                       {t('admin.tokenHintOrGet')} <ExternalLinkSafe href="https://github.com/settings/tokens/new" className="text-primary-400 hover:text-primary-500 dark:hover:text-primary-300">github.com/settings/tokens</ExternalLinkSafe>
                     </p>
                   </div>
@@ -405,12 +406,12 @@ export default function FederationTab() {
                       {t('common.back')} →
                     </ExternalLinkSafe>
                   </label>
-                  <p className="text-[10px] text-textMuted mb-1.5" dangerouslySetInnerHTML={{ __html: t('admin.tokenHelpText') }} />
+                  <p className="text-3xs text-textMuted mb-1.5" dangerouslySetInnerHTML={{ __html: t('admin.tokenHelpText') }} />
                   <input
                     type="password"
                     value={dialogToken}
                     onChange={e => setDialogToken(e.target.value)}
-                    className="w-full px-3 py-1.5 text-sm bg-canvas border border-border rounded-lg text-textPrimary font-mono"
+                    className="w-full px-3 py-1.5 text-sm bg-canvas border border-border rounded-control text-textPrimary font-mono"
                     placeholder="ghp_xxxxxxxxxxxxxxxx"
                   />
                 </>
@@ -419,14 +420,14 @@ export default function FederationTab() {
             <div className="flex gap-2 justify-end">
               <button
                 onClick={() => { setRegisterState('idle'); setDialogToken('') }}
-                className="px-4 py-1.5 text-xs bg-canvas border border-border text-textSecondary rounded-lg hover:bg-border/20 transition-colors"
+                className="px-4 py-1.5 text-xs bg-canvas border border-border text-textSecondary rounded-control hover:bg-border/20 transition-colors"
               >
                 {t('common.cancel')}
               </button>
               <button
                 onClick={handleRegister}
                 disabled={!instance?.github_token_configured && !dialogToken.trim()}
-                className={`px-4 py-1.5 text-xs rounded-lg transition-colors ${
+                className={`px-4 py-1.5 text-xs rounded-control transition-colors ${
                   !instance?.github_token_configured && !dialogToken.trim()
                     ? 'bg-canvas text-textMuted cursor-not-allowed'
                     : 'bg-mint-600 hover:bg-mint-500 text-white'
@@ -436,10 +437,10 @@ export default function FederationTab() {
               </button>
             </div>
           </div>
-        </div>
+        </Dialog>
       )}
       {/* 实例身份 */}
-      <section className="bg-surface border border-border rounded-xl p-5">
+      <section className="bg-surface border border-border rounded-card p-5">
         <div className="flex items-center justify-between mb-4">
           <h2 className="text-sm font-semibold text-textPrimary flex items-center gap-2">
             <Shield size={16} /> {t('admin.instanceIdentity')}
@@ -459,7 +460,7 @@ export default function FederationTab() {
               <input
                 value={instanceForm.display_name}
                 onChange={e => setInstanceForm({ ...instanceForm, display_name: e.target.value })}
-                className="w-full mt-1 px-3 py-1.5 text-sm bg-canvas border border-border rounded-lg text-textPrimary"
+                className="w-full mt-1 px-3 py-1.5 text-sm bg-canvas border border-border rounded-control text-textPrimary"
                 placeholder={t('admin.instanceNamePlaceholder')}
               />
             </div>
@@ -503,11 +504,11 @@ export default function FederationTab() {
                 <input
                   value={instanceForm.public_id}
                   readOnly
-                  className="flex-1 px-3 py-1.5 text-sm bg-canvas border border-border rounded-lg text-textPrimary font-mono cursor-default"
+                  className="flex-1 px-3 py-1.5 text-sm bg-canvas border border-border rounded-control text-textPrimary font-mono cursor-default"
                 />
                 <button
                   onClick={handleRegenerateId}
-                  className="shrink-0 px-2 py-1.5 text-[10px] text-textMuted hover:text-accent-400 border border-border rounded-lg hover:bg-accent-500/10 transition-colors"
+                  className="btn btn-xs btn-outline shrink-0 text-3xs text-textMuted hover:text-accent-400 hover:bg-accent-500/10"
                   title={t('admin.confirmRegenerateId')}
                 >
                   {t('admin.regenerate')}
@@ -521,19 +522,19 @@ export default function FederationTab() {
                   {t('common.back')} →
                 </ExternalLinkSafe>
               </label>
-              <p className="text-[10px] text-textMuted mb-1" dangerouslySetInnerHTML={{ __html: t('admin.tokenHelpText') }} />
+              <p className="text-3xs text-textMuted mb-1" dangerouslySetInnerHTML={{ __html: t('admin.tokenHelpText') }} />
               <div className="flex gap-2 mt-1">
                 <input
                   type="password"
                   value={githubToken}
                   onChange={e => setGithubToken(e.target.value)}
-                  className="flex-1 px-3 py-1.5 text-sm bg-canvas border border-border rounded-lg text-textPrimary font-mono"
+                  className="flex-1 px-3 py-1.5 text-sm bg-canvas border border-border rounded-control text-textPrimary font-mono"
                   placeholder={instance?.github_token_configured ? t('admin.tokenConfiguredPlaceholder') : t('admin.tokenPlaceholder')}
                 />
                 <button
                   onClick={handleSaveToken}
                   disabled={tokenSaving || !githubToken.trim()}
-                  className={`shrink-0 px-3 py-1.5 text-xs rounded-lg transition-colors ${
+                  className={`shrink-0 px-3 py-1.5 text-xs rounded-control transition-colors ${
                     tokenSaving || !githubToken.trim()
                       ? 'bg-canvas text-textMuted cursor-not-allowed'
                       : 'bg-accent-600 hover:bg-accent-500 text-white'
@@ -543,20 +544,20 @@ export default function FederationTab() {
                 </button>
               </div>
               {instance?.github_token_configured && !githubToken && (
-                <p className="text-[10px] text-mint-400 mt-1">{t('admin.tokenConfigured')}</p>
+                <p className="text-3xs text-mint-400 mt-1">{t('admin.tokenConfigured')}</p>
               )}
             </div>
             <div className="flex gap-2">
               <button
                 onClick={handleSaveInstance}
-                className="px-4 py-1.5 text-xs bg-primary-600 hover:bg-primary-500 text-white rounded-lg transition-colors"
+                className="btn btn-xs btn-primary"
               >
                 {t('admin.saveInstanceInfo')}
               </button>
               <button
                 onClick={handleRegister}
                 disabled={registerState === 'loading'}
-                className={`px-4 py-1.5 text-xs rounded-lg transition-colors ${
+                className={`px-4 py-1.5 text-xs rounded-control transition-colors ${
                   registerState === 'loading'
                     ? 'bg-canvas text-textMuted cursor-not-allowed'
                     : registerState === 'success'
@@ -574,7 +575,7 @@ export default function FederationTab() {
                 'text-rose-400'
               }`}>
                 {registerErrorCode && (
-                  <span className="inline-block px-1.5 py-0.5 rounded text-[10px] bg-rose-500/10 text-rose-400 mr-1 font-mono">
+                  <span className="inline-block px-1.5 py-0.5 rounded text-3xs bg-rose-500/10 text-rose-400 mr-1 font-mono">
                     {registerErrorCode}
                   </span>
                 )}
@@ -588,13 +589,13 @@ export default function FederationTab() {
                   type="password"
                   value={quickToken}
                   onChange={e => setQuickToken(e.target.value)}
-                  className="flex-1 px-3 py-1.5 text-sm bg-canvas border border-border rounded-lg text-textPrimary font-mono"
+                  className="flex-1 px-3 py-1.5 text-sm bg-canvas border border-border rounded-control text-textPrimary font-mono"
                   placeholder="ghp_xxxxxxxxxxxxxxxx"
                 />
                 <button
                   onClick={handleQuickSaveToken}
                   disabled={registerState === 'loading' || !quickToken.trim()}
-                  className="shrink-0 px-3 py-1.5 text-xs bg-accent-600 hover:bg-accent-500 text-white rounded-lg transition-colors disabled:opacity-50"
+                  className="shrink-0 px-3 py-1.5 text-xs bg-accent-600 hover:bg-accent-500 text-white rounded-control transition-colors disabled:opacity-50"
                 >
                   {registerState === 'loading' ? t('common.saving') : t('admin.saveAndRetry')}
                 </button>
@@ -634,7 +635,7 @@ export default function FederationTab() {
                   </p>
                   <button
                     onClick={() => setShowTokenInput(!showTokenInput)}
-                    className="text-[10px] text-textMuted hover:text-textPrimary border border-border rounded px-1.5 py-0.5 transition-colors"
+                    className="text-3xs text-textMuted hover:text-textPrimary border border-border rounded px-1.5 py-0.5 transition-colors"
                   >
                     {showTokenInput ? t('common.cancel') : instance?.github_token_configured ? t('admin.change') : t('admin.configure')}
                   </button>
@@ -645,7 +646,7 @@ export default function FederationTab() {
                       type="password"
                       value={manageToken}
                       onChange={e => setManageToken(e.target.value)}
-                      className="flex-1 px-2 py-1 text-xs bg-canvas border border-border rounded-lg text-textPrimary font-mono"
+                      className="flex-1 px-2 py-1 text-xs bg-canvas border border-border rounded-control text-textPrimary font-mono"
                       placeholder={instance?.github_token_configured ? t('admin.pasteNewToken') : t('admin.tokenPlaceholder')}
                     />
                     <button
@@ -664,7 +665,7 @@ export default function FederationTab() {
                 <button
                   onClick={handleRegister}
                   disabled={isRegistering}
-                  className={`px-3 py-1 text-xs rounded-lg transition-colors ${
+                  className={`px-3 py-1 text-xs rounded-control transition-colors ${
                     isRegistering
                       ? 'bg-canvas text-textMuted cursor-not-allowed'
                       : 'bg-mint-600 hover:bg-mint-500 text-white'
@@ -689,13 +690,13 @@ export default function FederationTab() {
                       type="password"
                       value={quickToken}
                       onChange={e => setQuickToken(e.target.value)}
-                      className="flex-1 px-3 py-1.5 text-sm bg-canvas border border-border rounded-lg text-textPrimary font-mono"
+                      className="flex-1 px-3 py-1.5 text-sm bg-canvas border border-border rounded-control text-textPrimary font-mono"
                       placeholder={t('admin.tokenPlaceholder')}
                     />
                     <button
                       onClick={handleQuickSaveToken}
                       disabled={registerState === 'loading' || !quickToken.trim()}
-                      className="shrink-0 px-3 py-1.5 text-xs bg-accent-600 hover:bg-accent-500 text-white rounded-lg transition-colors disabled:opacity-50"
+                      className="shrink-0 px-3 py-1.5 text-xs bg-accent-600 hover:bg-accent-500 text-white rounded-control transition-colors disabled:opacity-50"
                     >
                       {registerState === 'loading' ? t('common.saving') : t('admin.saveAndRetry')}
                     </button>
@@ -708,7 +709,7 @@ export default function FederationTab() {
       </section>
 
       {/* 对等端列表 */}
-      <section className="bg-surface border border-border rounded-xl p-5">
+      <section className="bg-surface border border-border rounded-card p-5">
         <div className="flex items-center justify-between mb-4">
           <h2 className="text-sm font-semibold text-textPrimary flex items-center gap-2">
             <Link size={16} /> {t('admin.peers').replace('{count}', String(peers.length))}
@@ -723,14 +724,14 @@ export default function FederationTab() {
 
         {/* 添加对等端表单 */}
         {showAddPeer && (
-          <div className="mb-4 p-4 bg-canvas rounded-lg border border-border space-y-3">
+          <div className="mb-4 p-4 bg-canvas rounded-control border border-border space-y-3">
             <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
               <div>
                 <label className="text-xs text-textMuted">{t('admin.peerPublicId')}</label>
                 <input
                   value={newPeer.peer_public_id}
                   onChange={e => setNewPeer({ ...newPeer, peer_public_id: e.target.value })}
-                  className="w-full mt-1 px-3 py-1.5 text-sm bg-surface border border-border rounded-lg text-textPrimary font-mono"
+                  className="w-full mt-1 px-3 py-1.5 text-sm bg-surface border border-border rounded-control text-textPrimary font-mono"
                   placeholder={t('admin.peerIdPlaceholder')}
                 />
               </div>
@@ -739,7 +740,7 @@ export default function FederationTab() {
                 <input
                   value={newPeer.display_name}
                   onChange={e => setNewPeer({ ...newPeer, display_name: e.target.value })}
-                  className="w-full mt-1 px-3 py-1.5 text-sm bg-surface border border-border rounded-lg text-textPrimary"
+                  className="w-full mt-1 px-3 py-1.5 text-sm bg-surface border border-border rounded-control text-textPrimary"
                   placeholder={t('admin.peerNamePlaceholder')}
                 />
               </div>
@@ -776,7 +777,7 @@ export default function FederationTab() {
                     /federation/ws
                   </span>
                 </div>
-                <p className="text-[10px] text-textMuted mt-1">{t('admin.peerUrlOptionalHint')}</p>
+                <p className="text-3xs text-textMuted mt-1">{t('admin.peerUrlOptionalHint')}</p>
               </div>
               <div className="md:col-span-2">
                 <label className="text-xs text-textMuted">{t('admin.sharedSecret')}</label>
@@ -784,7 +785,7 @@ export default function FederationTab() {
                   type="password"
                   value={newPeer.shared_secret}
                   onChange={e => setNewPeer({ ...newPeer, shared_secret: e.target.value })}
-                  className="w-full mt-1 px-3 py-1.5 text-sm bg-surface border border-border rounded-lg text-textPrimary"
+                  className="w-full mt-1 px-3 py-1.5 text-sm bg-surface border border-border rounded-control text-textPrimary"
                   placeholder={t('admin.secretPlaceholder')}
                 />
               </div>
@@ -792,13 +793,13 @@ export default function FederationTab() {
             <div className="flex gap-2">
               <button
                 onClick={handleAddPeer}
-                className="px-4 py-1.5 text-xs bg-primary-600 hover:bg-primary-500 text-white rounded-lg transition-colors"
+                className="btn btn-xs btn-primary"
               >
                 {t('admin.addAndConnect')}
               </button>
               <button
                 onClick={() => setShowAddPeer(false)}
-                className="px-4 py-1.5 text-xs bg-canvas border border-border text-textSecondary rounded-lg hover:bg-border/20 transition-colors"
+                className="px-4 py-1.5 text-xs bg-canvas border border-border text-textSecondary rounded-control hover:bg-border/20 transition-colors"
               >
                 {t('common.cancel')}
               </button>
@@ -813,7 +814,7 @@ export default function FederationTab() {
           <div className="space-y-2">
             {peers.map(peer => (
               <Fragment key={peer.id}>
-                <div className="flex items-center justify-between p-3 bg-canvas rounded-lg border border-border hover:border-primary-500/20 transition-colors">
+                <div className="flex items-center justify-between p-3 bg-canvas rounded-control border border-border hover:border-primary-500/20 transition-colors">
                 <div className="flex items-center gap-3 min-w-0">
                   <div className={`w-2 h-2 rounded-full shrink-0 ${
                     peer.connection_state === 'connected' ? 'bg-mint-400' :
@@ -825,7 +826,7 @@ export default function FederationTab() {
                       {peer.display_name || peer.peer_public_id}
                     </p>
                     <p className="text-xs text-textMuted font-mono truncate">{peer.peer_public_id}</p>
-                    <p className="text-[10px] text-textMuted truncate">{peer.remote_url}</p>
+                    <p className="text-3xs text-textMuted truncate">{peer.remote_url}</p>
                   </div>
                 </div>
                 <div className="flex items-center gap-2 shrink-0">
@@ -834,14 +835,14 @@ export default function FederationTab() {
                     <>
                       <button
                         onClick={() => handleRotateUrl(peer.id)}
-                        className="p-1.5 text-primary-400 hover:text-primary-500 dark:hover:text-primary-300 hover:bg-primary-500/10 rounded-lg transition-colors"
+                        className="p-1.5 text-primary-400 hover:text-primary-500 dark:hover:text-primary-300 hover:bg-primary-500/10 rounded-control transition-colors"
                         title={t('admin.rotateUrl')}
                       >
                         <RefreshCw size={14} />
                       </button>
                       <button
                         onClick={() => handleDisconnect(peer.id)}
-                        className="p-1.5 text-rose-400 hover:text-rose-500 dark:hover:text-rose-300 dark:hover:text-rose-300 hover:bg-rose-500/10 rounded-lg transition-colors"
+                        className="p-1.5 text-rose-400 hover:text-rose-500 dark:hover:text-rose-300 dark:hover:text-rose-300 hover:bg-rose-500/10 rounded-control transition-colors"
                         title={t('admin.disconnect')}
                       >
                         <Power size={14} />
@@ -851,14 +852,14 @@ export default function FederationTab() {
                     <>
                       <button
                         onClick={() => handleConnect(peer.id)}
-                        className="p-1.5 text-primary-400 hover:text-primary-500 dark:hover:text-primary-300 hover:bg-primary-500/10 rounded-lg transition-colors"
+                        className="p-1.5 text-primary-400 hover:text-primary-500 dark:hover:text-primary-300 hover:bg-primary-500/10 rounded-control transition-colors"
                         title={t('admin.connect')}
                       >
                         <RefreshCw size={14} />
                       </button>
                       <button
                         onClick={() => handleEditPeer(peer)}
-                        className="p-1.5 text-textMuted hover:text-accent-400 hover:bg-accent-500/10 rounded-lg transition-colors"
+                        className="p-1.5 text-textMuted hover:text-accent-400 hover:bg-accent-500/10 rounded-control transition-colors"
                         title={t('common.edit')}
                       >
                         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
@@ -867,7 +868,7 @@ export default function FederationTab() {
                   )}
                   <button
                     onClick={() => handleDeletePeer(peer.id)}
-                    className="p-1.5 text-textMuted hover:text-rose-400 hover:bg-rose-500/10 rounded-lg transition-colors"
+                    className="p-1.5 text-textMuted hover:text-rose-400 hover:bg-rose-500/10 rounded-control transition-colors"
                     title={t('common.delete')}
                   >
                     <Trash2 size={14} />
@@ -876,10 +877,10 @@ export default function FederationTab() {
               </div>
               {/* 编辑对等端表单 */}
               {editingPeerId === peer.id && (
-                <div className="p-3 bg-canvas rounded-lg border border-accent-500/20 space-y-2">
+                <div className="p-3 bg-canvas rounded-control border border-accent-500/20 space-y-2">
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
                     <div>
-                      <label className="text-[10px] text-textMuted">{t('admin.displayName')}</label>
+                      <label className="text-3xs text-textMuted">{t('admin.displayName')}</label>
                       <input
                         value={editPeerForm.display_name}
                         onChange={e => setEditPeerForm({ ...editPeerForm, display_name: e.target.value })}
@@ -887,7 +888,7 @@ export default function FederationTab() {
                       />
                     </div>
                     <div>
-                      <label className="text-[10px] text-textMuted">{t('admin.peerUrl')}</label>
+                      <label className="text-3xs text-textMuted">{t('admin.peerUrl')}</label>
                       <div className="flex items-stretch mt-0.5">
                         <select
                           value={(editPeerForm.remote_url.match(/^(wss?):\/\//)?.[1]) || 'wss'}
@@ -913,13 +914,13 @@ export default function FederationTab() {
                           className="flex-1 px-2 py-1 text-xs bg-surface border border-border border-x-0 text-textPrimary font-mono"
                           placeholder="aischat.example.com:5228"
                         />
-                        <span className="inline-flex items-center px-1.5 text-[10px] text-textMuted bg-surface border border-border rounded-r shrink-0 font-mono">
+                        <span className="inline-flex items-center px-1.5 text-3xs text-textMuted bg-surface border border-border rounded-r shrink-0 font-mono">
                           /federation/ws
                         </span>
                       </div>
                     </div>
                     <div className="md:col-span-2">
-                      <label className="text-[10px] text-textMuted">{t('admin.secretNoChange')}</label>
+                      <label className="text-3xs text-textMuted">{t('admin.secretNoChange')}</label>
                       <input
                         type="password"
                         value={editPeerForm.shared_secret}
@@ -932,7 +933,7 @@ export default function FederationTab() {
                   <div className="flex gap-2">
                     <button
                       onClick={handleSavePeer}
-                      className="px-3 py-1 text-xs bg-primary-600 hover:bg-primary-500 text-white rounded transition-colors"
+                      className="btn btn-xs btn-primary"
                     >
                       {t('common.save')}
                     </button>
@@ -947,7 +948,7 @@ export default function FederationTab() {
               )}
               {/* 轮换 URL 表单 */}
               {rotatingPeerId === peer.id && (
-                <div className="p-3 bg-canvas rounded-lg border border-primary-500/20 space-y-2">
+                <div className="p-3 bg-canvas rounded-control border border-primary-500/20 space-y-2">
                   <div className="flex items-center gap-2 text-xs text-primary-400">
                     <RefreshCw size={12} className="animate-spin" />
                     <span>{t('admin.rotateHint')}</span>
@@ -991,7 +992,7 @@ export default function FederationTab() {
               )}
               {/* 轮换次数 */}
               {peer.url_rotation_count > 0 && (
-                <p className="text-[10px] text-textMuted ml-11">
+                <p className="text-3xs text-textMuted ml-11">
                   {t('admin.urlRotated')} <span className="text-primary-400">{peer.url_rotation_count}</span>
                   {peer.url_rotated_at && (
                     <span> · {t('admin.lastRotated')} {new Date(peer.url_rotated_at).toLocaleString()}</span>
@@ -1007,7 +1008,7 @@ export default function FederationTab() {
       {/* 联邦实体 */}
       <FederatedEntitiesSection />
       {/* GitHub 注册说明（可选） */}
-      <section className="bg-surface border border-border rounded-xl p-5">
+      <section className="bg-surface border border-border rounded-card p-5">
         <h2 className="text-sm font-semibold text-textPrimary flex items-center gap-2 mb-4">
           <Globe size={16} /> {t('admin.federationDiscovery')}
         </h2>
@@ -1075,10 +1076,10 @@ function FederatedEntitiesSection() {
     return map[entityType] || entityType
   }
 
-  if (loading) return <div className="bg-surface border border-border rounded-xl p-5 text-sm text-textMuted">{t('common.loading')}</div>
+  if (loading) return <div className="bg-surface border border-border rounded-card p-5 text-sm text-textMuted">{t('common.loading')}</div>
 
   return (
-    <section className="bg-surface border border-border rounded-xl p-5">
+    <section className="bg-surface border border-border rounded-card p-5">
       <div className="flex items-center justify-between mb-4">
         <h2 className="text-sm font-semibold text-textPrimary flex items-center gap-2">
           <Globe size={16} /> {t('admin.federationEntities').replace('{count}', String(entities.length))}
@@ -1091,13 +1092,13 @@ function FederatedEntitiesSection() {
       ) : (
         <div className="space-y-2">
           {entities.map(entity => (
-            <div key={entity.id} className="flex items-center justify-between p-3 bg-canvas rounded-lg border border-border">
+            <div key={entity.id} className="flex items-center justify-between p-3 bg-canvas rounded-control border border-border">
               <div className="flex items-center gap-3 min-w-0">
                 <span className="text-textMuted shrink-0">{typeIcon(entity.entity_type)}</span>
                 <div className="min-w-0">
                   <div className="flex items-center gap-2">
                     <p className="text-sm text-textPrimary font-mono truncate">{entity.federated_id}</p>
-                    <span className="text-[10px] px-1.5 py-0.5 rounded bg-primary-500/10 text-primary-400">
+                    <span className="text-3xs px-1.5 py-0.5 rounded bg-primary-500/10 text-primary-400">
                       {typeLabel(entity.entity_type)}
                     </span>
                   </div>
@@ -1123,7 +1124,7 @@ function FederatedEntitiesSection() {
                 </button>
                 <button
                   onClick={() => deleteEntity(entity)}
-                  className="p-1.5 text-textMuted hover:text-rose-400 hover:bg-rose-500/10 rounded-lg transition-colors"
+                  className="p-1.5 text-textMuted hover:text-rose-400 hover:bg-rose-500/10 rounded-control transition-colors"
                   title={t('common.delete')}
                 >
                   <Trash2 size={14} />

@@ -1,23 +1,40 @@
-import { ReactNode, useEffect } from 'react'
+import { ReactNode, useId } from 'react'
 import { X } from 'lucide-react'
+import IconButton from './IconButton'
+import Dialog from './Dialog'
 
 /**
- * 统一 Modal 弹窗组件
+ * 统一 Modal 弹窗组件（全站唯一弹窗底座）
  *
- * 消灭 23 个手写 Modal（fixed inset-0 重复）。特性：
+ * 消灭各处手写的 fixed inset-0 遮罩 + 卡片。特性：
  * - 居中卡片 + 半透明遮罩 + 点击遮罩关闭
- * - ESC 键关闭
+ * - ESC 键关闭 · 打开时锁定背景滚动
  * - 标题栏（可选关闭按钮）+ 内容 + 底部操作区（可选）
- * - 滚动锁定（打开时禁止背景滚动）
+ * 圆角/层级走令牌：rounded-dialog + z-modal。
  */
+type ModalSize = 'sm' | 'md' | 'lg' | 'xl'
+
+const SIZE_CLASS: Record<ModalSize, string> = {
+  sm: 'max-w-sm',
+  md: 'max-w-lg',
+  lg: 'max-w-2xl',
+  xl: 'max-w-4xl',
+}
+
 interface ModalProps {
   open: boolean
   onClose: () => void
   title?: ReactNode
   children: ReactNode
   footer?: ReactNode
+  /** 尺寸档位（优先于 width） */
+  size?: ModalSize
+  /** 自定义最大宽度类名，保留给历史调用 */
   width?: string
   closeOnOverlay?: boolean
+  /** 是否显示右上角关闭按钮（无标题时默认显示） */
+  showClose?: boolean
+  bodyClassName?: string
 }
 
 export default function Modal({
@@ -26,56 +43,38 @@ export default function Modal({
   title,
   children,
   footer,
-  width = 'max-w-lg',
+  size = 'md',
+  width,
   closeOnOverlay = true,
+  showClose,
+  bodyClassName = '',
 }: ModalProps) {
-  // ESC 关闭 + 滚动锁定
-  useEffect(() => {
-    if (!open) return
-    const onKey = (e: KeyboardEvent) => e.key === 'Escape' && onClose()
-    window.addEventListener('keydown', onKey)
-    const prev = document.body.style.overflow
-    document.body.style.overflow = 'hidden'
-    return () => {
-      window.removeEventListener('keydown', onKey)
-      document.body.style.overflow = prev
-    }
-  }, [open, onClose])
+  const titleId = useId()
 
   if (!open) return null
+  const withClose = showClose ?? true
 
   return (
-    <div
-      className="fixed inset-0 z-50 flex items-center justify-center p-4"
-      role="dialog"
-      aria-modal="true"
-    >
-      {/* 遮罩 */}
-      <div
-        className="absolute inset-0 bg-black/60 backdrop-blur-sm"
-        onClick={closeOnOverlay ? onClose : undefined}
-      />
+    <Dialog onClose={onClose} closeOnOverlay={closeOnOverlay} backdrop="bg-black/60 backdrop-blur-sm">
       {/* 卡片 */}
-      <div className={`relative w-full ${width} bg-surface border border-border rounded-2xl shadow-2xl max-h-[85vh] flex flex-col`}>
-        {title && (
-          <div className="flex items-center justify-between px-5 py-4 border-b border-border shrink-0">
-            <h3 className="font-semibold text-textPrimary">{title}</h3>
-            <button
-              onClick={onClose}
-              className="p-1 rounded-lg text-textMuted hover:text-textPrimary hover:bg-canvas transition-colors"
-              aria-label="关闭"
-            >
-              <X size={18} />
-            </button>
+      <div
+        className={`relative w-full ${width || SIZE_CLASS[size]} bg-surface border border-border rounded-dialog shadow-2xl max-h-[85vh] flex flex-col`}
+      >
+        {(title || withClose) && (
+          <div className="flex items-center justify-between gap-2 px-5 py-4 border-b border-border shrink-0">
+            <h3 id={title ? titleId : undefined} className="font-semibold text-textPrimary text-sm flex items-center gap-2 min-w-0">
+              {title}
+            </h3>
+            {withClose && <IconButton icon={<X size={18} />} label="关闭" onClick={onClose} className="-mr-2" />}
           </div>
         )}
-        <div className="px-5 py-4 overflow-y-auto flex-1">{children}</div>
+        <div className={`px-5 py-4 overflow-y-auto flex-1 ${bodyClassName}`}>{children}</div>
         {footer && (
           <div className="flex items-center justify-end gap-2 px-5 py-4 border-t border-border shrink-0">
             {footer}
           </div>
         )}
       </div>
-    </div>
+    </Dialog>
   )
 }

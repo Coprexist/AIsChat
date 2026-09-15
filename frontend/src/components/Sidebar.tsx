@@ -31,7 +31,7 @@ export default function Sidebar({ mobile, onClose, translucent }: { mobile?: boo
       <div className="h-14 px-4 border-b border-border flex items-center justify-between shrink-0">
         {!collapsed && (
           <div className="flex items-center gap-2">
-            <div className="w-6 h-6 rounded-md flex items-center justify-center shadow shadow-primary-500/30 overflow-hidden">
+            <div className="w-6 h-6 rounded-control flex items-center justify-center shadow shadow-primary-500/30 overflow-hidden">
               <img src="/logo.png" alt="AIsChat" className="w-full h-full object-contain" />
             </div>
             <span className="text-base font-bold text-textPrimary tracking-tight">AIsChat</span>
@@ -40,14 +40,14 @@ export default function Sidebar({ mobile, onClose, translucent }: { mobile?: boo
         {mobile ? (
           <button
             onClick={onClose}
-            className="p-1.5 rounded-lg hover:bg-elevated text-textMuted hover:text-textSecondary transition-colors ml-auto"
+            className="icon-btn-sm text-textMuted ml-auto"
           >
             <X size={20} />
           </button>
         ) : (
           <button
             onClick={() => setCollapsed(!collapsed)}
-            className="p-1.5 rounded-lg hover:bg-elevated text-textMuted hover:text-textSecondary transition-colors"
+            className="p-1.5 rounded-control hover:bg-elevated text-textMuted hover:text-textSecondary transition-colors"
             title={collapsed ? t('sidebar.expand') : t('sidebar.collapse')}
           >
             {collapsed ? <Menu size={16} /> : <ChevronLeft size={16} />}
@@ -165,7 +165,7 @@ export default function Sidebar({ mobile, onClose, translucent }: { mobile?: boo
       <div className="p-2 border-t border-border shrink-0 relative">
         <button
           onClick={() => setToolsOpen(!toolsOpen)}
-          className={`flex items-center rounded-xl text-textSecondary hover:text-textPrimary hover:bg-elevated transition-all duration-200 text-sm ${
+          className={`flex items-center rounded-card text-textSecondary hover:text-textPrimary hover:bg-elevated transition-all duration-200 text-sm ${
             collapsed ? 'justify-center w-10 h-10' : 'gap-3 w-full px-3 py-2.5'
           }`}
           title={t('sidebar.tools')}
@@ -175,9 +175,9 @@ export default function Sidebar({ mobile, onClose, translucent }: { mobile?: boo
         </button>
         {toolsOpen && (
           <>
-            <div className="fixed inset-0 z-40" onClick={() => setToolsOpen(false)} />
+            <div className="fixed inset-0 z-drawer" onClick={() => setToolsOpen(false)} />
             <div
-              className={`absolute bottom-full mb-2 z-50 w-44 rounded-xl border border-border bg-surface shadow-2xl py-1.5 ${collapsed ? 'left-0' : 'left-2'}`}
+              className={`absolute bottom-full mb-2 z-modal w-44 rounded-card border border-border bg-surface shadow-2xl py-1.5 ${collapsed ? 'left-0' : 'left-2'}`}
             >
               <button
                 onClick={() => { setToolsOpen(false); navigate('/study') }}
@@ -195,7 +195,7 @@ export default function Sidebar({ mobile, onClose, translucent }: { mobile?: boo
       <div className="p-2 border-t border-border shrink-0">
         <button
           onClick={handleLogout}
-          className={`flex items-center rounded-xl text-textSecondary hover:text-rose-400 hover:bg-rose-500/10 transition-all duration-200 text-sm ${
+          className={`flex items-center rounded-card text-textSecondary hover:text-rose-400 hover:bg-rose-500/10 transition-all duration-200 text-sm ${
             collapsed ? 'justify-center w-10 h-10' : 'gap-3 w-full px-3 py-2.5'
           }`}
           title={collapsed ? t('sidebar.logout') : undefined}

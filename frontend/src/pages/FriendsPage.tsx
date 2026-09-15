@@ -41,7 +41,7 @@ interface FriendRequest {
 
 // 头像组件：优先显示真实头像，否则显示首字母
 function AvatarPic({ url, name, size = 'md' }: { url: string | null | undefined; name: string; size?: 'sm' | 'md' | 'lg' }) {
-  const sizeClass = size === 'sm' ? 'w-7 h-7 text-[10px]' : size === 'lg' ? 'w-12 h-12 text-xl' : 'w-10 h-10 text-lg'
+  const sizeClass = size === 'sm' ? 'w-7 h-7 text-3xs' : size === 'lg' ? 'w-12 h-12 text-xl' : 'w-10 h-10 text-lg'
   return (
     <div className={`${sizeClass} rounded-full shrink-0 overflow-hidden relative ${!url ? 'bg-gradient-to-br from-primary-500 to-primary-700 flex items-center justify-center shadow shadow-primary-500/15' : ''}`}>
       {url ? (
@@ -222,7 +222,7 @@ export default function FriendsPage() {
         value={searchQuery}
         onChange={(e) => setSearchQuery(e.target.value)}
         placeholder={t('friends.searchPlaceholder')}
-        className="w-full pl-9 pr-8 py-2 rounded-xl border border-border bg-canvas text-sm text-textPrimary placeholder:text-textMuted focus:outline-none focus:ring-2 focus:ring-primary-500/50"
+        className="w-full pl-9 pr-8 py-2 rounded-card border border-border bg-canvas text-sm text-textPrimary placeholder:text-textMuted focus:outline-none focus:ring-2 focus:ring-primary-500/50"
         autoFocus={showSearch}
       />
       {searchQuery && (
@@ -242,7 +242,7 @@ export default function FriendsPage() {
       <div className="px-4 h-14 border-b border-border bg-surface flex items-center gap-2 shrink-0">
         <button
           onClick={openDrawer}
-          className="md:hidden p-1.5 -ml-1 rounded-lg hover:bg-elevated text-textSecondary transition-colors"
+          className="icon-btn-sm md:hidden -ml-1 text-textSecondary"
           title={t('chatlist.menu')}
         >
           <Menu size={18} />
@@ -260,7 +260,7 @@ export default function FriendsPage() {
               <select
                 value={sortMode}
                 onChange={(e) => setSortMode(e.target.value as SortMode)}
-                className="appearance-none pl-2 pr-6 py-1 rounded-lg border border-border bg-canvas text-[11px] text-textSecondary focus:outline-none focus:ring-1 focus:ring-primary-500/50 cursor-pointer"
+                className="appearance-none pl-2 pr-6 py-1 rounded-control border border-border bg-canvas text-2xs text-textSecondary focus:outline-none focus:ring-1 focus:ring-primary-500/50 cursor-pointer"
               >
                 {SORT_OPTIONS.map(o => (
                   <option key={o.value} value={o.value}>{t(o.key)}</option>
@@ -271,7 +271,7 @@ export default function FriendsPage() {
             {/* 搜索按钮 */}
             <button
               onClick={() => setShowSearch(true)}
-              className="p-1.5 rounded-lg hover:bg-elevated text-textMuted hover:text-textSecondary transition-colors"
+              className="p-1.5 rounded-control hover:bg-elevated text-textMuted hover:text-textSecondary transition-colors"
               title={t('friends.searchButton')}
             >
               <Search size={16} />
@@ -302,7 +302,7 @@ export default function FriendsPage() {
         >
           {t('friends.tabRequests')}
           {pendingCount > 0 && (
-            <span className="absolute top-1 right-4 inline-flex items-center justify-center min-w-[18px] h-[18px] px-1 text-[10px] font-bold text-white bg-rose-500 rounded-full">
+            <span className="absolute top-1 right-4 inline-flex items-center justify-center min-w-[18px] h-[18px] px-1 text-3xs font-bold text-white bg-rose-500 rounded-full">
               {pendingCount}
             </span>
           )}
@@ -392,7 +392,7 @@ export default function FriendsPage() {
                             {req.message || t('friends.defaultRequestMessage')}
                           </span>
                           {req.auto_respond_friend_request && (
-                            <span className="inline-block mt-0.5 text-[10px] text-accent-400 bg-accent-400/10 px-1.5 py-0.5 rounded">
+                            <span className="inline-block mt-0.5 text-3xs text-accent-400 bg-accent-400/10 px-1.5 py-0.5 rounded">
                               {t('friends.autoRespondWarning')}
                             </span>
                           )}
@@ -400,14 +400,14 @@ export default function FriendsPage() {
                         <div className="flex items-center gap-1.5 shrink-0">
                           <button
                             onClick={() => handleAccept(req.id)}
-                            className="p-1.5 rounded-lg bg-mint-400/15 text-mint-400 hover:bg-mint-400/25 transition-colors"
+                            className="p-1.5 rounded-control bg-mint-400/15 text-mint-400 hover:bg-mint-400/25 transition-colors"
                             title={t('friends.accept')}
                           >
                             <Check size={16} />
                           </button>
                           <button
                             onClick={() => handleReject(req.id)}
-                            className="p-1.5 rounded-lg bg-rose-400/15 text-rose-400 hover:bg-rose-400/25 transition-colors"
+                            className="p-1.5 rounded-control bg-rose-400/15 text-rose-400 hover:bg-rose-400/25 transition-colors"
                             title={t('friends.reject')}
                           >
                             <X size={16} />
@@ -441,7 +441,7 @@ export default function FriendsPage() {
                         <div className="flex items-center gap-1.5 shrink-0">
                           <button
                             onClick={() => handleCancelSent(req.id)}
-                            className="p-1.5 rounded-lg bg-rose-400/15 text-rose-400 hover:bg-rose-400/25 transition-colors"
+                            className="p-1.5 rounded-control bg-rose-400/15 text-rose-400 hover:bg-rose-400/25 transition-colors"
                             title={t('friends.cancelRequest')}
                           >
                             <X size={16} />
@@ -461,11 +461,11 @@ export default function FriendsPage() {
       {showSearch && (
         <>
           {/* 移动端：全屏 */}
-          <div className="md:hidden fixed inset-0 z-50 bg-surface flex flex-col">
+          <div className="md:hidden fixed inset-0 z-modal bg-surface flex flex-col">
             <div className="px-4 h-14 border-b border-border flex items-center gap-3 shrink-0">
               <button
                 onClick={() => { setShowSearch(false); setSearchQuery('') }}
-                className="p-1.5 -ml-1 rounded-lg hover:bg-elevated text-textSecondary transition-colors"
+                className="p-1.5 -ml-1 rounded-control hover:bg-elevated text-textSecondary transition-colors"
               >
                 <ArrowLeft size={20} />
               </button>
@@ -507,12 +507,12 @@ export default function FriendsPage() {
           </div>
 
           {/* 桌面端：悬浮下拉 */}
-          <div className="hidden md:block fixed inset-0 z-50" onClick={() => { setShowSearch(false); setSearchQuery('') }}>
+          <div className="hidden md:block fixed inset-0 z-modal" onClick={() => { setShowSearch(false); setSearchQuery('') }}>
             <div
               className="absolute top-[4.5rem] left-1/2 -translate-x-1/2 w-full max-w-sm"
               onClick={(e) => e.stopPropagation()}
             >
-              <div className="bg-elevated border border-border rounded-2xl shadow-2xl shadow-black/30 mx-4 overflow-hidden">
+              <div className="bg-elevated border border-border rounded-dialog shadow-2xl shadow-black/30 mx-4 overflow-hidden">
                 <div className="p-3">
                   {searchBox}
                 </div>
@@ -537,7 +537,7 @@ export default function FriendsPage() {
                               <span className="text-sm font-medium text-textPrimary truncate">{f.friend_name}</span>
                               {stateIcon(f.state)}
                             </div>
-                            <span className="text-[10px] text-textMuted">
+                            <span className="text-3xs text-textMuted">
                               {f.friend_type === 'ai' ? <><Bot size={12} className="inline" /> {t('friends.friendAi')}</> : <><User size={12} className="inline" /> {t('friends.friendHuman')}</>}
                             </span>
                           </div>

@@ -3,6 +3,7 @@ import { api } from '../api/client'
 import { useT } from '../i18n/I18nContext'
 import { Mail, Shield, CheckCircle, XCircle, Loader2, Plus, Trash2, ChevronUp, ChevronDown, X } from 'lucide-react'
 import ProviderPresetSelector from './ProviderPresetSelector'
+import { Dialog } from './ui'
 
 interface SmtpConfigItem {
   host: string
@@ -247,7 +248,7 @@ export default function AuthSettingsTab() {
         <iframe
           srcDoc={applyPreviewVars(tpl.body_html)}
           title="email-preview"
-          className="w-full border-0 rounded-lg"
+          className="w-full border-0 rounded-control"
           style={{ minHeight: 400 }}
           sandbox="allow-same-origin"
         />
@@ -290,7 +291,7 @@ export default function AuthSettingsTab() {
   return (
     <div className="space-y-6 max-w-2xl">
       {/* ── SMTP 多配置管理 ── */}
-      <section className="bg-surface border border-border rounded-xl p-5">
+      <section className="bg-surface border border-border rounded-card p-5">
         <div className="flex items-center justify-between mb-4">
           <h3 className="text-sm font-semibold text-textPrimary flex items-center gap-2">
             <Mail size={16} className="text-primary-400" />
@@ -298,7 +299,7 @@ export default function AuthSettingsTab() {
           </h3>
           <button
             onClick={addConfig}
-            className="flex items-center gap-1 px-3 py-1.5 text-xs rounded-lg border border-border hover:bg-elevated text-textSecondary transition-colors"
+            className="btn btn-xs btn-outline gap-1"
           >
             <Plus size={14} />
             {t('admin.smtpAdd')}
@@ -312,7 +313,7 @@ export default function AuthSettingsTab() {
             return (
               <div
                 key={index}
-                className={`border rounded-lg p-4 transition-colors ${
+                className={`border rounded-control p-4 transition-colors ${
                   cfg.is_active
                     ? 'border-border bg-canvas/50'
                     : 'border-border/50 bg-canvas/30 opacity-60'
@@ -331,7 +332,7 @@ export default function AuthSettingsTab() {
                   {/* 启用/停用 */}
                   <button
                     onClick={() => updateConfig(index, { is_active: !cfg.is_active })}
-                    className={`px-2 py-0.5 text-[10px] rounded-full font-medium transition-colors ${
+                    className={`px-2 py-0.5 text-3xs rounded-full font-medium transition-colors ${
                       cfg.is_active
                         ? 'bg-mint-500/10 text-mint-400 border border-mint-500/20'
                         : 'bg-rose-500/10 text-rose-400 border border-rose-500/20'
@@ -370,7 +371,7 @@ export default function AuthSettingsTab() {
                 {/* 表单字段 */}
                 <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
                   <div>
-                    <label className="block text-[10px] text-textMuted mb-0.5">{t('admin.smtpPort')}</label>
+                    <label className="block text-3xs text-textMuted mb-0.5">{t('admin.smtpPort')}</label>
                     <input
                       type="number" value={cfg.port}
                       onChange={e => updateConfig(index, { port: parseInt(e.target.value) || 587 })}
@@ -378,7 +379,7 @@ export default function AuthSettingsTab() {
                     />
                   </div>
                   <div>
-                    <label className="block text-[10px] text-textMuted mb-0.5">{t('admin.smtpUsername')}</label>
+                    <label className="block text-3xs text-textMuted mb-0.5">{t('admin.smtpUsername')}</label>
                     <input
                       type="text" value={cfg.username}
                       onChange={e => updateConfig(index, { username: e.target.value })}
@@ -386,7 +387,7 @@ export default function AuthSettingsTab() {
                     />
                   </div>
                   <div>
-                    <label className="block text-[10px] text-textMuted mb-0.5">{t('admin.smtpPassword')}</label>
+                    <label className="block text-3xs text-textMuted mb-0.5">{t('admin.smtpPassword')}</label>
                     <input
                       type="password" value={cfg.password}
                       onChange={e => updateConfig(index, { password: e.target.value })}
@@ -395,7 +396,7 @@ export default function AuthSettingsTab() {
                     />
                   </div>
                   <div>
-                    <label className="block text-[10px] text-textMuted mb-0.5">{t('admin.smtpFromEmail')}</label>
+                    <label className="block text-3xs text-textMuted mb-0.5">{t('admin.smtpFromEmail')}</label>
                     <input
                       type="email" value={cfg.from_email}
                       onChange={e => updateConfig(index, { from_email: e.target.value })}
@@ -404,7 +405,7 @@ export default function AuthSettingsTab() {
                     />
                   </div>
                   <div>
-                    <label className="block text-[10px] text-textMuted mb-0.5">{t('admin.smtpFromName')}</label>
+                    <label className="block text-3xs text-textMuted mb-0.5">{t('admin.smtpFromName')}</label>
                     <input
                       type="text" value={cfg.from_name}
                       onChange={e => updateConfig(index, { from_name: e.target.value })}
@@ -418,7 +419,7 @@ export default function AuthSettingsTab() {
                         onChange={e => updateConfig(index, { use_tls: e.target.checked })}
                         className="rounded"
                       />
-                      <span className="text-[10px] text-textMuted">{t('admin.smtpUseTls')}</span>
+                      <span className="text-3xs text-textMuted">{t('admin.smtpUseTls')}</span>
                     </label>
                   </div>
                 </div>
@@ -428,7 +429,7 @@ export default function AuthSettingsTab() {
                   <button
                     onClick={() => handleTestSmtp(index)}
                     disabled={!cfg.host || !cfg.username || isTesting}
-                    className="px-3 py-1.5 text-xs rounded-lg border border-border text-textSecondary hover:text-textPrimary hover:bg-elevated disabled:opacity-30 transition-colors"
+                    className="px-3 py-1.5 text-xs rounded-control border border-border text-textSecondary hover:text-textPrimary hover:bg-elevated disabled:opacity-30 transition-colors"
                   >
                     {isTesting ? t('admin.smtpTesting') : t('admin.smtpTest')}
                   </button>
@@ -447,11 +448,11 @@ export default function AuthSettingsTab() {
         </div>
 
         <div className="flex justify-between items-center mt-4">
-          <p className="text-[10px] text-textMuted">{t('admin.smtpPriority')}</p>
+          <p className="text-3xs text-textMuted">{t('admin.smtpPriority')}</p>
           <button
             onClick={handleSaveSmtp}
             disabled={smtpSaving || smtpConfigs.length < 1}
-            className="px-4 py-2 text-sm rounded-lg bg-primary-500 hover:bg-primary-600 disabled:opacity-30 text-white font-medium transition-colors"
+            className="btn btn-sm btn-primary"
           >
             {smtpSaving ? t('common.saving') : t('common.save')}
           </button>
@@ -459,7 +460,7 @@ export default function AuthSettingsTab() {
       </section>
 
       {/* ── 邮件模板编辑（v1.1.0: 预设选择）── */}
-      <section className="bg-surface border border-border rounded-xl p-5">
+      <section className="bg-surface border border-border rounded-card p-5">
         <h3 className="text-sm font-semibold text-textPrimary flex items-center gap-2 mb-4">
           <Mail size={16} className="text-accent-400" />
           {t('admin.emailTemplates')}
@@ -483,7 +484,7 @@ export default function AuthSettingsTab() {
                       await loadTemplates()
                     } catch { /* */ }
                   }}
-                  className={`flex-1 py-2 text-xs rounded-lg font-medium border-2 transition-all ${
+                  className={`flex-1 py-2 text-xs rounded-control font-medium border-2 transition-all ${
                     templatePreset === p
                       ? 'border-primary-400 bg-primary-500/10 text-primary-500 shadow-sm'
                       : 'border-border bg-canvas text-textMuted hover:text-textSecondary hover:border-borderHover'
@@ -505,7 +506,7 @@ export default function AuthSettingsTab() {
                     <button
                       key={l.key}
                       onClick={() => setTemplateLang(l.key)}
-                      className={`px-3 py-1 text-xs rounded-lg font-medium transition-colors ${
+                      className={`px-3 py-1 text-xs rounded-control font-medium transition-colors ${
                         templateLang === l.key
                           ? 'bg-primary-500 text-white'
                           : 'bg-canvas border border-border text-textMuted hover:text-textSecondary'
@@ -522,7 +523,7 @@ export default function AuthSettingsTab() {
                     <button
                       key={p.key}
                       onClick={() => setTemplatePurpose(p.key)}
-                      className={`px-3 py-1 text-xs rounded-lg font-medium transition-colors ${
+                      className={`px-3 py-1 text-xs rounded-control font-medium transition-colors ${
                         templatePurpose === p.key
                           ? 'bg-primary-500/10 border border-primary-500/30 text-primary-500'
                           : 'bg-canvas border border-border text-textMuted hover:text-textSecondary'
@@ -540,7 +541,7 @@ export default function AuthSettingsTab() {
                     type="text"
                     value={editSubject}
                     onChange={e => setEditSubject(e.target.value)}
-                    className="w-full px-3 py-2 text-sm rounded-lg border border-border bg-canvas text-textPrimary focus:outline-none focus:ring-2 focus:ring-primary-500/50"
+                    className="w-full px-3 py-2 text-sm rounded-control border border-border bg-canvas text-textPrimary focus:outline-none focus:ring-2 focus:ring-primary-500/50"
                   />
                 </div>
 
@@ -551,12 +552,12 @@ export default function AuthSettingsTab() {
                     value={editBody}
                     onChange={e => setEditBody(e.target.value)}
                     rows={10}
-                    className="w-full px-3 py-2 text-xs font-mono rounded-lg border border-border bg-canvas text-textPrimary focus:outline-none focus:ring-2 focus:ring-primary-500/50 resize-y"
+                    className="w-full px-3 py-2 text-xs font-mono rounded-control border border-border bg-canvas text-textPrimary focus:outline-none focus:ring-2 focus:ring-primary-500/50 resize-y"
                   />
                 </div>
 
                 {/* 变量提示 */}
-                <p className="text-[10px] text-textMuted mb-4 bg-canvas rounded-lg px-3 py-2 border border-border/50">
+                <p className="text-3xs text-textMuted mb-4 bg-canvas rounded-control px-3 py-2 border border-border/50">
                   💡 {t('admin.emailTemplateVarHint')}
                 </p>
 
@@ -564,14 +565,14 @@ export default function AuthSettingsTab() {
                 <div className="flex gap-2">
                   <button
                     onClick={handleResetTemplates}
-                    className="px-3 py-1.5 text-xs rounded-lg border border-border text-textSecondary hover:text-rose-400 transition-colors"
+                    className="btn btn-xs btn-outline hover:text-rose-400"
                   >
                     {t('admin.emailTemplateResetAll')}
                   </button>
                   <button
                     onClick={handleSaveTemplates}
                     disabled={tplSaving}
-                    className="px-4 py-1.5 text-xs rounded-lg bg-primary-500 hover:bg-primary-600 disabled:opacity-30 text-white font-medium transition-colors"
+                    className="btn btn-xs btn-primary"
                   >
                     {tplSaving ? t('common.saving') : t('admin.emailTemplatesSave')}
                   </button>
@@ -579,7 +580,7 @@ export default function AuthSettingsTab() {
               </>
             ) : (
               /* 预设版：显示提示信息 + 预览 */
-              <div className="bg-mint-400/5 border border-mint-400/20 rounded-xl p-5 text-center">
+              <div className="bg-mint-400/5 border border-mint-400/20 rounded-card p-5 text-center">
                 <div className="w-10 h-10 rounded-full bg-mint-400/20 flex items-center justify-center mx-auto mb-3">
                   <CheckCircle size={20} className="text-mint-400" />
                 </div>
@@ -607,14 +608,14 @@ export default function AuthSettingsTab() {
 
       {/* ── 邮件模板预览弹窗 ── */}
       {showPreview && templates && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60" onClick={() => setShowPreview(false)}>
-          <div className="relative w-full max-w-3xl max-h-[90vh] bg-surface rounded-2xl border border-border shadow-2xl overflow-hidden flex flex-col" onClick={e => e.stopPropagation()}>
+        <Dialog onClose={() =>  setShowPreview(false)} className="flex items-center justify-center">
+          <div className="relative w-full max-w-3xl max-h-[90vh] bg-surface rounded-dialog border border-border shadow-2xl overflow-hidden flex flex-col" onClick={e => e.stopPropagation()}>
             {/* 头部 */}
             <div className="flex items-center justify-between px-5 py-3 border-b border-border shrink-0">
               <h3 className="text-sm font-semibold text-textPrimary">
                 {t('admin.emailTemplateViewPreview') || '邮件模板预览'}
               </h3>
-              <button onClick={() => setShowPreview(false)} className="p-1 rounded-lg text-textMuted hover:text-textPrimary hover:bg-elevated transition-colors">
+              <button onClick={() => setShowPreview(false)} className="p-1 rounded-control text-textMuted hover:text-textPrimary hover:bg-elevated transition-colors">
                 <X size={16} />
               </button>
             </div>
@@ -624,7 +625,7 @@ export default function AuthSettingsTab() {
                 <button
                   key={l.key}
                   onClick={() => setPreviewLang(l.key)}
-                  className={`px-3 py-1 text-xs rounded-lg font-medium transition-colors ${
+                  className={`px-3 py-1 text-xs rounded-control font-medium transition-colors ${
                     previewLang === l.key
                       ? 'bg-primary-500 text-white'
                       : 'bg-canvas border border-border text-textMuted hover:text-textSecondary'
@@ -640,7 +641,7 @@ export default function AuthSettingsTab() {
                 <button
                   key={p.key}
                   onClick={() => setPreviewPurpose(p.key)}
-                  className={`px-3 py-1 text-xs rounded-lg font-medium transition-colors ${
+                  className={`px-3 py-1 text-xs rounded-control font-medium transition-colors ${
                     previewPurpose === p.key
                       ? 'bg-primary-500 text-white'
                       : 'bg-canvas border border-border text-textMuted hover:text-textSecondary'
@@ -655,14 +656,14 @@ export default function AuthSettingsTab() {
               {previewContent || <p className="text-xs text-textMuted text-center py-8">暂无模板</p>}
             </div>
           </div>
-        </div>
+        </Dialog>
       )}
 
       {/* ── LLM 厂商预设 ── */}
       <ProviderPresetSelector />
 
       {/* ── 认证设置 ── */}
-      <section className="bg-surface border border-border rounded-xl p-5">
+      <section className="bg-surface border border-border rounded-card p-5">
         <h3 className="text-sm font-semibold text-textPrimary flex items-center gap-2 mb-4">
           <Shield size={16} className="text-accent-400" />
           {t('admin.auth')}
@@ -700,7 +701,7 @@ export default function AuthSettingsTab() {
                 key={opt.key}
                 onClick={() => toggleProvider(opt.key)}
                 disabled={providers.includes(opt.key) && providers.length <= 1}
-                className={`px-3 py-1.5 text-xs rounded-lg font-medium transition-colors border ${
+                className={`px-3 py-1.5 text-xs rounded-control font-medium transition-colors border ${
                   providers.includes(opt.key)
                     ? 'bg-primary-500/10 border-primary-500/30 text-primary-500'
                     : 'bg-canvas border-border text-textMuted hover:text-textSecondary'
@@ -715,7 +716,7 @@ export default function AuthSettingsTab() {
         <button
           onClick={handleSaveAuth}
           disabled={authSaving || providers.length < 1}
-          className="mt-3 px-4 py-2 text-sm rounded-lg bg-primary-500 hover:bg-primary-600 disabled:opacity-30 text-white font-medium transition-colors"
+          className="btn btn-sm btn-primary mt-3"
         >
           {authSaving ? t('common.saving') : t('common.save')}
         </button>

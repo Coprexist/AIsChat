@@ -3,6 +3,7 @@ import { Search, Send, X, FileIcon, Loader2, Check, Users, MessageSquare } from 
 import { api } from '../api/client'
 import { useT } from '../i18n/I18nContext'
 import { CHAT_REFRESH_EVENT } from '../constants'
+import { Dialog } from './ui'
 
 interface ForwardTarget {
   type: 'group' | 'dm'
@@ -125,7 +126,7 @@ export default function ForwardFileModal({ file, onClose }: ForwardFileModalProp
     if (items.length === 0) return null
     return (
       <div className="mb-3">
-        <div className="flex items-center gap-1.5 text-[11px] font-medium text-textMuted mb-1.5 px-1">
+        <div className="flex items-center gap-1.5 text-2xs font-medium text-textMuted mb-1.5 px-1">
           {icon}
           {label}
         </div>
@@ -137,7 +138,7 @@ export default function ForwardFileModal({ file, onClose }: ForwardFileModalProp
               <button
                 key={key}
                 onClick={() => toggle(key)}
-                className={`w-full flex items-center gap-2.5 px-2 py-2 rounded-lg text-left transition-colors ${
+                className={`w-full flex items-center gap-2.5 px-2 py-2 rounded-control text-left transition-colors ${
                   checked
                     ? 'bg-primary-500/10 text-primary-600 dark:text-primary-300'
                     : 'hover:bg-elevated text-textPrimary'
@@ -157,7 +158,7 @@ export default function ForwardFileModal({ file, onClose }: ForwardFileModalProp
                   {item.avatar_url ? (
                     <img src={item.avatar_url} className="w-6 h-6 rounded-full object-cover" alt="" loading="lazy" />
                   ) : (
-                    <span className="text-[10px] font-medium text-primary-400">
+                    <span className="text-3xs font-medium text-primary-400">
                       {item.name.slice(0, 1)}
                     </span>
                   )}
@@ -172,9 +173,9 @@ export default function ForwardFileModal({ file, onClose }: ForwardFileModalProp
   }
 
   return (
-    <div className="fixed inset-0 bg-black/70 z-50 flex items-center justify-center p-4" onClick={onClose}>
+    <Dialog onClose={onClose} className="flex items-center justify-center p-4">
       <div
-        className="bg-surface border border-border rounded-2xl shadow-2xl shadow-black/30 w-full max-w-sm max-h-[80vh] flex flex-col"
+        className="bg-surface border border-border rounded-dialog shadow-2xl shadow-black/30 w-full max-w-sm max-h-[80vh] flex flex-col"
         onClick={(e) => e.stopPropagation()}
       >
         {/* 头部 */}
@@ -185,7 +186,7 @@ export default function ForwardFileModal({ file, onClose }: ForwardFileModalProp
           </div>
           <button
             onClick={onClose}
-            className="p-1 rounded-lg hover:bg-elevated text-textMuted transition-colors"
+            className="icon-btn-sm text-textMuted"
           >
             <X size={16} />
           </button>
@@ -193,7 +194,7 @@ export default function ForwardFileModal({ file, onClose }: ForwardFileModalProp
 
         {/* 搜索框 */}
         <div className="px-3 py-2 shrink-0">
-          <div className="flex items-center gap-2 px-3 py-2 rounded-xl bg-canvas border border-border">
+          <div className="flex items-center gap-2 px-3 py-2 rounded-card bg-canvas border border-border">
             <Search size={14} className="text-textMuted shrink-0" />
             <input
               type="text"
@@ -233,14 +234,14 @@ export default function ForwardFileModal({ file, onClose }: ForwardFileModalProp
           </span>
           <button
             onClick={onClose}
-            className="px-3 py-1.5 rounded-lg text-xs text-textSecondary hover:bg-elevated transition-colors"
+            className="px-3 py-1.5 rounded-control text-xs text-textSecondary hover:bg-elevated transition-colors"
           >
             {done ? t('common.close') : t('common.cancel')}
           </button>
           <button
             onClick={handleSend}
             disabled={selected.size === 0 || sending || done}
-            className="flex items-center gap-1.5 px-4 py-1.5 rounded-lg bg-primary-500 text-white text-xs font-medium hover:bg-primary-600 disabled:opacity-40 transition-colors"
+            className="btn btn-xs btn-primary gap-1.5"
           >
             {sending ? (
               <Loader2 size={14} className="animate-spin" />
@@ -251,6 +252,6 @@ export default function ForwardFileModal({ file, onClose }: ForwardFileModalProp
           </button>
         </div>
       </div>
-    </div>
+    </Dialog>
   )
 }

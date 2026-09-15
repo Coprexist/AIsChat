@@ -5,6 +5,7 @@ import { formatFileSize } from '../utils/format'
 import { isTextPreviewable, getCodeLang, isMarkdownFile, resolveMimeType, EXT_LANG_MAP } from '../utils/mime'
 import MarkdownContent from './shared/MarkdownContent'
 import ForwardFileModal from './ForwardFileModal'
+import { Dialog } from './ui'
 
 // FileCodeRenderer ——已迁移到 components/shared/CodeRenderer.tsx
 
@@ -304,7 +305,7 @@ export default function FilePreviewModal({ fileId, fileName, fileSize, mimeType,
     <div className="flex items-center gap-3 px-4 h-12 border-b border-border bg-surface shrink-0 rounded-t-2xl">
       <button
         onClick={onClose}
-        className="p-1 -ml-1 rounded-lg hover:bg-elevated text-textSecondary transition-colors"
+        className="icon-btn-sm -ml-1 text-textSecondary"
         title={t('common.close')}
       >
         <ArrowLeft size={18} className="md:hidden" />
@@ -314,14 +315,14 @@ export default function FilePreviewModal({ fileId, fileName, fileSize, mimeType,
       <FileIcon size={18} className="text-textMuted shrink-0" />
       <div className="flex-1 min-w-0">
         <p className="text-sm font-medium text-textPrimary truncate">{fileName}</p>
-        <p className="text-[10px] text-textMuted">{formatFileSize(fileSize)}</p>
+        <p className="text-3xs text-textMuted">{formatFileSize(fileSize)}</p>
       </div>
 
       {/* 富文本：渲染 ↔ 原文 切换（看源码用） */}
       {isRichText && content !== null && (
         <button
           onClick={() => setShowSource((v) => !v)}
-          className="px-2 py-1 rounded-lg text-xs border border-border bg-elevated hover:bg-border text-textSecondary transition-colors shrink-0"
+          className="px-2 py-1 rounded-control text-xs border border-border bg-elevated hover:bg-border text-textSecondary transition-colors shrink-0"
           title={showSource ? '查看渲染效果' : '查看原文源码'}
         >
           {showSource ? '👁 渲染' : '📄 原文'}
@@ -332,7 +333,7 @@ export default function FilePreviewModal({ fileId, fileName, fileSize, mimeType,
       {isImage && (
         <div className="flex items-center gap-2">
           <button onClick={zoomOut} disabled={scale <= ZOOM_MIN}
-            className="p-1 rounded hover:bg-elevated text-textSecondary disabled:opacity-30 transition-colors" title={t('common.zoomOut')}>
+            className="icon-btn-sm text-textSecondary" title={t('common.zoomOut')}>
             <ZoomOut size={16} />
           </button>
 
@@ -360,7 +361,7 @@ export default function FilePreviewModal({ fileId, fileName, fileSize, mimeType,
             />
           </div>
 
-          <span ref={sliderDisplayRef} className="text-[11px] text-textMuted w-9 text-center tabular-nums">
+          <span ref={sliderDisplayRef} className="text-2xs text-textMuted w-9 text-center tabular-nums">
             {Math.round(scale * 100)}%
           </span>
           <button onClick={zoomIn} disabled={scale >= ZOOM_MAX}
@@ -368,7 +369,7 @@ export default function FilePreviewModal({ fileId, fileName, fileSize, mimeType,
             <ZoomIn size={16} />
           </button>
           <button onClick={zoomReset}
-            className="p-1 rounded hover:bg-elevated text-textSecondary transition-colors" title={t('common.resetZoom')}>
+            className="icon-btn-sm text-textSecondary" title={t('common.resetZoom')}>
             <RotateCcw size={14} />
           </button>
         </div>
@@ -377,7 +378,7 @@ export default function FilePreviewModal({ fileId, fileName, fileSize, mimeType,
       {/* 全屏按钮（仅电脑版） */}
       <button
         onClick={toggleFullscreen}
-        className="hidden md:flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg border border-border text-textSecondary hover:bg-elevated text-xs font-medium transition-colors"
+        className="btn btn-xs btn-outline hidden md:flex gap-1.5"
         title={isFullscreen ? t('common.exitFullscreen') : t('common.fullscreen')}
       >
         {isFullscreen ? <Minimize2 size={14} /> : <Maximize2 size={14} />}
@@ -385,7 +386,7 @@ export default function FilePreviewModal({ fileId, fileName, fileSize, mimeType,
 
       <button
         onClick={() => setForwardFile({ file_id: fileId ?? 0, name: fileName, size: fileSize, mime_type: mimeType })}
-        className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-border text-textSecondary hover:bg-elevated text-xs font-medium transition-colors"
+        className="flex items-center gap-1.5 px-3 py-1.5 rounded-control border border-border text-textSecondary hover:bg-elevated text-xs font-medium transition-colors"
         title={t('forward.send')}
       >
         <Share2 size={14} />
@@ -394,7 +395,7 @@ export default function FilePreviewModal({ fileId, fileName, fileSize, mimeType,
 
       <button
         onClick={handleDownload}
-        className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-primary-500 text-white text-xs font-medium hover:bg-primary-600 transition-colors"
+        className="btn btn-xs btn-primary gap-1.5"
         title={t('common.download')}
       >
         <Download size={14} />
@@ -405,10 +406,10 @@ export default function FilePreviewModal({ fileId, fileName, fileSize, mimeType,
 
   return (
     <>
-      <div className="fixed inset-0 bg-black/70 z-50 flex items-center justify-center p-0 md:p-6" onClick={(e) => { if (!wasResizing.current && e.target === e.currentTarget) onClose() }}>
+      <Dialog onClose={() =>  { if (!wasResizing.current) onClose() } } className="flex items-center justify-center p-0 md:p-6">
         <div
           ref={modalRef}
-          className={`bg-surface border border-border md:rounded-2xl shadow-2xl shadow-black/30 flex flex-col relative
+          className={`bg-surface border border-border md:rounded-dialog shadow-2xl shadow-black/30 flex flex-col relative
                         ${isFullscreen ? 'w-full h-full md:w-full md:h-full md:max-h-full' : 'w-full h-full ' + defaultWidth + ' ' + defaultHeight}`}
           style={sizeStyle}
           onClick={(e) => e.stopPropagation()}
@@ -425,7 +426,7 @@ export default function FilePreviewModal({ fileId, fileName, fileSize, mimeType,
               <div className="flex flex-col items-center justify-center py-20 gap-3 text-textMuted w-full h-full">
                 <AlertTriangle size={24} className="text-rose-400" />
                 <p className="text-sm">{error}</p>
-                <button onClick={handleDownload} className="px-4 py-2 rounded-xl bg-primary-500 text-white text-sm">
+                <button onClick={handleDownload} className="btn btn-sm btn-primary">
                   {t('common.downloadInstead')}
                 </button>
               </div>
@@ -483,55 +484,55 @@ export default function FilePreviewModal({ fileId, fileName, fileSize, mimeType,
           {!isFullscreen && (
             <>
               {/* 外发光描边 — outline 天然在元素外部，配合 offset 完全在外侧 */}
-              <div className="absolute inset-0 rounded-2xl pointer-events-none z-30"
+              <div className="absolute inset-0 rounded-dialog pointer-events-none z-overlay"
                 style={{ outline: '3px solid rgba(99,102,241,0.45)', outlineOffset: '3px', boxShadow: '0 0 14px rgba(99,102,241,0.25)' }} />
 
               {/* 四边拖拽条 — 微光可见，hover 更亮 */}
               <div
-                className="hidden md:block absolute inset-y-0 -left-1 w-[8px] cursor-ew-resize z-30
+                className="hidden md:block absolute inset-y-0 -left-1 w-[8px] cursor-ew-resize z-overlay
                   bg-gradient-to-r from-primary-500/25 to-transparent
                   hover:from-primary-500/45 active:from-primary-500/55 transition-all duration-150"
                 onMouseDown={startResize('w')}
               />
               <div
-                className="hidden md:block absolute inset-y-0 -right-1 w-[8px] cursor-ew-resize z-30
+                className="hidden md:block absolute inset-y-0 -right-1 w-[8px] cursor-ew-resize z-overlay
                   bg-gradient-to-l from-primary-500/25 to-transparent
                   hover:from-primary-500/45 active:from-primary-500/55 transition-all duration-150"
                 onMouseDown={startResize('e')}
               />
               <div
-                className="hidden md:block absolute inset-x-0 -bottom-1 h-[8px] cursor-ns-resize z-30
+                className="hidden md:block absolute inset-x-0 -bottom-1 h-[8px] cursor-ns-resize z-overlay
                   bg-gradient-to-b from-primary-500/25 to-transparent
                   hover:from-primary-500/45 active:from-primary-500/55 transition-all duration-150"
                 onMouseDown={startResize('s')}
               />
               <div
-                className="hidden md:block absolute inset-x-0 -top-1 h-[8px] cursor-ns-resize z-30
+                className="hidden md:block absolute inset-x-0 -top-1 h-[8px] cursor-ns-resize z-overlay
                   bg-gradient-to-t from-primary-500/25 to-transparent
                   hover:from-primary-500/45 active:from-primary-500/55 transition-all duration-150"
                 onMouseDown={startResize('n')}
               />
               {/* 四角 — 圆角 2xl 完全贴合弹窗弧线，hover 加厚加亮 */}
               <div
-                className="hidden md:block absolute -top-1 -left-1 w-[12px] h-[12px] cursor-nwse-resize z-30
+                className="hidden md:block absolute -top-1 -left-1 w-[12px] h-[12px] cursor-nwse-resize z-overlay
                   rounded-tl-2xl border-l-[2px] border-t-[2px] border-primary-500/45
                   hover:border-[3px] hover:border-primary-500/70 hover:bg-primary-500/15 active:bg-primary-500/25 transition-all"
                 onMouseDown={startResize('nw')}
               />
               <div
-                className="hidden md:block absolute -top-1 -right-1 w-[12px] h-[12px] cursor-nesw-resize z-30
+                className="hidden md:block absolute -top-1 -right-1 w-[12px] h-[12px] cursor-nesw-resize z-overlay
                   rounded-tr-2xl border-r-[2px] border-t-[2px] border-primary-500/45
                   hover:border-[3px] hover:border-primary-500/70 hover:bg-primary-500/15 active:bg-primary-500/25 transition-all"
                 onMouseDown={startResize('ne')}
               />
               <div
-                className="hidden md:block absolute -bottom-1 -left-1 w-[12px] h-[12px] cursor-nesw-resize z-30
+                className="hidden md:block absolute -bottom-1 -left-1 w-[12px] h-[12px] cursor-nesw-resize z-overlay
                   rounded-bl-2xl border-l-[2px] border-b-[2px] border-primary-500/45
                   hover:border-[3px] hover:border-primary-500/70 hover:bg-primary-500/15 active:bg-primary-500/25 transition-all"
                 onMouseDown={startResize('sw')}
               />
               <div
-                className="hidden md:block absolute -bottom-1 -right-1 w-[12px] h-[12px] cursor-nwse-resize z-30
+                className="hidden md:block absolute -bottom-1 -right-1 w-[12px] h-[12px] cursor-nwse-resize z-overlay
                   rounded-br-2xl border-r-[2px] border-b-[2px] border-primary-500/45
                   hover:border-[3px] hover:border-primary-500/70 hover:bg-primary-500/15 active:bg-primary-500/25 transition-all"
                 onMouseDown={startResize('se')}
@@ -539,7 +540,7 @@ export default function FilePreviewModal({ fileId, fileName, fileSize, mimeType,
             </>
           )}
         </div>
-      </div>
+      </Dialog>
 
       {forwardFile && (
         <ForwardFileModal

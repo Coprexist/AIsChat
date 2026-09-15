@@ -88,19 +88,19 @@ export default function MarketGithubTab() {
         <button
           onClick={doTest}
           disabled={testing}
-          className="inline-flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-lg bg-elevated hover:bg-border text-textSecondary transition-colors disabled:opacity-40 shrink-0"
+          className="inline-flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-control bg-elevated hover:bg-border text-textSecondary transition-colors disabled:opacity-40 shrink-0"
         >
           <RefreshCw size={12} className={testing ? 'animate-spin' : ''} /> {testing ? '测试中…' : '测试连接'}
         </button>
       </div>
 
       {msg && (
-        <div className={`text-sm px-4 py-3 rounded-xl ${msg.ok ? 'text-mint-400 bg-mint-500/10' : 'text-rose-400 bg-rose-500/10'}`}>
+        <div className={`text-sm px-4 py-3 rounded-card ${msg.ok ? 'text-mint-400 bg-mint-500/10' : 'text-rose-400 bg-rose-500/10'}`}>
           {msg.text}
         </div>
       )}
 
-      <div className="bg-surface border border-border rounded-xl p-4 space-y-4 max-w-xl">
+      <div className="bg-surface border border-border rounded-card p-4 space-y-4 max-w-xl">
         <div>
           <label className="flex items-center gap-1.5 text-xs text-textSecondary mb-1.5">
             <Globe size={11} /> 公共仓库（owner/repo）
@@ -109,24 +109,24 @@ export default function MarketGithubTab() {
             value={repo}
             onChange={(e) => setRepo(e.target.value)}
             placeholder="Coprexist/AIsChat-Community"
-            className="w-full bg-elevated text-sm px-3 py-2 rounded-lg border border-border outline-none focus:border-primary-500/50 text-textPrimary"
+            className="w-full bg-elevated text-sm px-3 py-2 rounded-control border border-border outline-none focus:border-primary-500/50 text-textPrimary"
           />
-          <div className="text-[10px] text-textMuted mt-1">同步目标仓库；本地用户绑定的 GitHub 也需对该仓库有写权限</div>
+          <div className="text-3xs text-textMuted mt-1">同步目标仓库；本地用户绑定的 GitHub 也需对该仓库有写权限</div>
         </div>
 
         <div>
           <label className="flex items-center gap-1.5 text-xs text-textSecondary mb-1.5">
             <Key size={11} /> 系统 Token（classic 或 fine-grained，需仓库写权限）
-            <ExternalLinkSafe href="https://github.com/settings/tokens/new" className="text-[10px] text-primary-400 hover:text-primary-500 dark:hover:text-primary-300 transition-colors shrink-0 ml-auto">去 GitHub 生成 token →</ExternalLinkSafe>
+            <ExternalLinkSafe href="https://github.com/settings/tokens/new" className="text-3xs text-primary-400 hover:text-primary-500 dark:hover:text-primary-300 transition-colors shrink-0 ml-auto">去 GitHub 生成 token →</ExternalLinkSafe>
           </label>
           <input
             type="password"
             value={token}
             onChange={(e) => setToken(e.target.value)}
             placeholder={hasToken ? `已配置 ${masked}（留空保持不变）` : '未配置'}
-            className="w-full bg-elevated text-sm px-3 py-2 rounded-lg border border-border outline-none focus:border-primary-500/50 text-textPrimary"
+            className="w-full bg-elevated text-sm px-3 py-2 rounded-control border border-border outline-none focus:border-primary-500/50 text-textPrimary"
           />
-          <div className="text-[10px] text-textMuted mt-1">
+          <div className="text-3xs text-textMuted mt-1">
             {hasToken ? `已配置系统 token（加密存储，仅显示 ${masked}）` : '未配置——用户未绑定 GitHub 时同步将失败'}
           </div>
         </div>
@@ -145,7 +145,7 @@ export default function MarketGithubTab() {
           <button
             onClick={doSave}
             disabled={saving || loading}
-            className="inline-flex items-center gap-1.5 text-xs px-4 py-2 rounded-lg bg-primary-500 hover:bg-primary-600 text-white transition-colors disabled:opacity-40"
+            className="btn btn-xs btn-primary gap-1.5"
           >
             {saving ? <RefreshCw size={12} className="animate-spin" /> : <Save size={12} />} {saving ? '保存中…' : '保存配置'}
           </button>
@@ -153,7 +153,7 @@ export default function MarketGithubTab() {
         </div>
       </div>
 
-      <div className="text-[10px] text-textMuted max-w-xl space-y-1">
+      <div className="text-3xs text-textMuted max-w-xl space-y-1">
         <div className="flex items-center gap-1"><CheckCircle size={10} className="text-mint-400" /> 同步身份优先级：用户绑定的 GitHub → 系统 token</div>
         <div className="flex items-center gap-1"><CheckCircle size={10} className="text-mint-400" /> 商城的「GitHub」板块读本地快照，管理员可在此测试连接/刷新</div>
         <div className="flex items-center gap-1"><XCircle size={10} className="text-textMuted" /> Token 仅存于数据库配置，绝不出现在代码与日志</div>

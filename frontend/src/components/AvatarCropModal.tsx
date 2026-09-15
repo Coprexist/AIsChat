@@ -93,19 +93,19 @@ export default function AvatarCropModal({ file, onConfirm, onCancel, cropShape }
 
   if (!imageSrc) {
     return (
-      <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70">
+      <div className="fixed inset-0 z-modal flex items-center justify-center bg-black/70">
         <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-white" />
       </div>
     )
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex flex-col bg-black/90">
+    <div className="fixed inset-0 z-modal flex flex-col bg-black/90">
       {/* 顶部工具栏 */}
       <div className="flex items-center justify-between px-4 h-14 shrink-0">
         <button
           onClick={onCancel}
-          className="p-2 rounded-full hover:bg-white/10 text-white transition-colors"
+          className="icon-btn hover:bg-white/10 text-white rounded-full"
         >
           <X size={22} />
         </button>

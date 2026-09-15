@@ -5,7 +5,7 @@ export function getChatStyle(): 'cozy' | 'compact' {
 
 /** 根据聊天样式返回间距/尺寸类名 */
 export function chatStyleClasses(style: 'cozy' | 'compact') {
-  if (style === 'compact') return { gap: 'gap-2', mb: 'mb-3', avatar: 'w-7 h-7', textSize: 'text-[10px]' }
+  if (style === 'compact') return { gap: 'gap-2', mb: 'mb-3', avatar: 'w-7 h-7', textSize: 'text-3xs' }
   return { gap: 'gap-3', mb: 'mb-5', avatar: 'w-9 h-9', textSize: 'text-xs' }
 }
 

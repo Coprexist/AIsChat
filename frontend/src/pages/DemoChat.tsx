@@ -114,13 +114,13 @@ export default function DemoChat() {
         <div className="flex items-center gap-2">
           <Bot size={20} className="text-primary-400" />
           <span className="font-semibold text-sm text-textPrimary">AIsChat Demo</span>
-          <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-accent-500/10 text-accent-500 border border-accent-500/20">DEMO</span>
+          <span className="text-3xs px-1.5 py-0.5 rounded-full bg-accent-500/10 text-accent-500 border border-accent-500/20">DEMO</span>
         </div>
         <div className="flex items-center gap-2">
           <a href="https://github.com/Coprexist/AIsChat" target="_blank" rel="noreferrer" className="flex items-center gap-1 text-xs text-textMuted hover:text-textSecondary">
             <Github size={14} /> GitHub
           </a>
-          <button onClick={() => setDark(!dark)} className="p-1.5 rounded-lg hover:bg-canvas text-textMuted hover:text-textSecondary">
+          <button onClick={() => setDark(!dark)} className="p-1.5 rounded-control hover:bg-canvas text-textMuted hover:text-textSecondary">
             {dark ? <Sun size={14} /> : <Moon size={14} />}
           </button>
         </div>
@@ -137,7 +137,7 @@ export default function DemoChat() {
             onKeyDown={e => e.key === 'Enter' && saveKey()}
           />
           <button onClick={saveKey} disabled={!keyInput.trim()}
-            className="px-3 py-1 text-xs rounded-lg bg-accent-500 hover:bg-accent-600 text-white font-medium disabled:opacity-40 transition-colors">
+            className="px-3 py-1 text-xs rounded-control bg-accent-500 hover:bg-accent-600 text-white font-medium disabled:opacity-40 transition-colors">
             确认
           </button>
         </div>
@@ -162,7 +162,7 @@ export default function DemoChat() {
                 <Bot size={14} className="text-primary-400" />
               </div>
             )}
-            <div className={`max-w-[80%] rounded-2xl px-3.5 py-2 text-sm leading-relaxed whitespace-pre-wrap ${
+            <div className={`max-w-[80%] rounded-dialog px-3.5 py-2 text-sm leading-relaxed whitespace-pre-wrap ${
               m.role === 'user'
                 ? 'bg-primary-500 text-white rounded-br-lg'
                 : 'bg-surface border border-border text-textPrimary rounded-bl-lg'
@@ -186,10 +186,10 @@ export default function DemoChat() {
             value={input} onChange={e => setInput(e.target.value)} onKeyDown={handleKey}
             placeholder="输入消息..."
             rows={1}
-            className="flex-1 px-3.5 py-2.5 rounded-xl border border-border bg-canvas text-sm text-textPrimary placeholder:text-textMuted resize-none outline-none focus:ring-2 focus:ring-primary-500/50"
+            className="flex-1 px-3.5 py-2.5 rounded-card border border-border bg-canvas text-sm text-textPrimary placeholder:text-textMuted resize-none outline-none focus:ring-2 focus:ring-primary-500/50"
           />
           <button onClick={send} disabled={!input.trim() || !apiKey || loading}
-            className="p-2.5 rounded-xl bg-primary-500 hover:bg-primary-600 text-white disabled:opacity-40 disabled:cursor-not-allowed transition-colors">
+            className="icon-btn-lg bg-primary-500 hover:bg-primary-600 text-white">
             <Send size={16} />
           </button>
         </div>
