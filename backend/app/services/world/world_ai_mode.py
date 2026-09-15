@@ -50,7 +50,7 @@ SAFE_TOOLS = frozenset({
     "manage_records", "store_memory", "recall_memory",
     "web_fetch", "web_search",
     "clear_context", "compact_context",
-    "ask_user", "present_plan",
+    "ask_user", "present_plan", "rename_session",   # 命名自己的对话：无副作用（只改会话元信息）
 })
 
 _APPROVAL_TIMEOUT = 300                 # 审阅/计划：等用户点按钮的上限（秒）；超时 = 不通过（安全默认）

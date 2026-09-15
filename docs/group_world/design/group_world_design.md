@@ -693,6 +693,21 @@ OpenAI 兼容接口要求 **assistant 消息里每个 `tool_call_id` 都必须�
 - 对话面板：审批弹窗（`[APPROVAL]` 事件驱动；刷新后由 `/chat/status` 的 `approvals` 恢复重画）
 - 空闲轮询 10s：别处发起的轮次（群消息唤起常驻世界、别的标签页发消息）也能被本页面接住并弹窗
 
+### 7.14 对话命名与会话列表（2026-09-15）
+
+**产品口径（用户原话）**：能不能给 AI 一个给此对话命名或改名的功能？列表就显示 AI 改的名字，别再显示编号 id。
+
+- **工具 `rename_session(title)`**：AI 给**当前会话**起名/改名（`set_session_title` 纯函数写 `worlds.config.sessions[当前].title`）。
+  清洗规则：压空白、限 20 字、空串 = 清除命名。归入**无副作用工具**（`SAFE_TOOLS`）——起名不该触发审阅弹窗
+- **列表单一来源 `world_chat_service.list_sessions()`**：`GET /worlds/{id}/chat` 与 `/chat/session`、`/chat/session/new` 三处共用：
+  - 带 `title`（AI 起的名字；没有则回落 `默认会话` / 会话 id）
+  - `last_active_at` 取**该会话最后一条消息时间**（一次 `group by session_id` 查询），config 里的值只作兜底——
+    老会话与默认会话原本没有时间，列表会空一半
+  - **按最近聊天倒序**（最近用过的排最前）；默认会话（`session_id` 为空 = 旧数据入口）也在列
+- **前端**：会话列表每行右侧 `formatRelativeTime`（与主站聊天列表同一实现），工具条上的当前会话优先显示名字
+- **时区**：时间按**浏览器本地时区**渲染（`utils/time.ts` 对 naive UTC 串补 `Z` 后交给 `toLocaleTimeString`），
+  同一份数据在 UTC 与东八区下分别显示 `04:22` / `12:22`（已实测）
+
 ---
 
 ## 八、世界线一致性

@@ -746,21 +746,9 @@ async def get_chat(
     msgs = await get_chat_history(world_repo, world_id, limit=limit + 1, before_id=before_id, session_id=sid)
     has_more = len(msgs) > limit
     cfg = world.config or {}
-    sessions = [
-        {"id": k, "created_at": (v or {}).get("created_at"), "last_active_at": (v or {}).get("last_active_at"),
-         "pinned": bool((v or {}).get("pinned_by"))}
-        for k, v in (cfg.get("sessions") or {}).items()
-    ]
-    # 默认会话（旧数据无 session_id）若还有消息，也进列表（否则点哪个都空、默认会话找不到）
-    from sqlalchemy import func as _f
-    from app.models.world import WorldChatMessage as _WCM
-    has_default = (await db.execute(
-        select(_f.count()).select_from(_WCM).where(
-            _WCM.world_id == world_id, _WCM.session_id.is_(None),
-        )
-    )).scalar() or 0
-    if has_default:
-        sessions.insert(0, {"id": "default", "last_active_at": None, "pinned": bool((cfg.get("sessions") or {}).get("default", {}).get("pinned_by"))})
+    # 会话列表单一来源（含每个会话的最近聊天时间，按最近使用倒序）
+    from app.services.world.world_chat_service import list_sessions
+    sessions = await list_sessions(world_repo, world)
     # 命令目录随历史一起下发：前端输入框补全 + 排队/插入分流都以此为准
     # （COMMAND_SPECS 是唯一来源，前端不再自己维护一份命令表）
     from app.services.world.world_chat_commands import COMMAND_SPECS
@@ -865,25 +853,13 @@ async def _session_payload(db, world_repo, world_id: int, world, current_session
 
     "切会话"与"新建会话"两个端点共用，避免会话列表拼装逻辑写两遍。
     """
-    from sqlalchemy import func as _f
-    from app.models.world import WorldChatMessage as _WCM
-    from app.services.world.world_chat_service import get_chat_history, session_id_for_db
+    from app.services.world.world_chat_service import get_chat_history, list_sessions, session_id_for_db
 
-    sessions = (world.config or {}).get("sessions") or {}
     msgs = await get_chat_history(world_repo, world_id, 30, session_id=session_id_for_db(world))
-    has_default = (await db.execute(
-        select(_f.count()).select_from(_WCM).where(
-            _WCM.world_id == world_id, _WCM.session_id.is_(None),
-        )
-    )).scalar() or 0
-    out = [
-        {"id": k, "created_at": (v or {}).get("created_at"), "last_active_at": (v or {}).get("last_active_at"),
-         "pinned": bool((v or {}).get("pinned_by"))}
-        for k, v in sessions.items()
-    ]
-    if has_default:
-        out.insert(0, {"id": "default", "last_active_at": None, "pinned": bool(sessions.get("default", {}).get("pinned_by"))})
-    return {"current_session": current_session, "messages": msgs, "sessions": out}
+    return {
+        "current_session": current_session, "messages": msgs,
+        "sessions": await list_sessions(world_repo, world),
+    }
 
 
 @router.post("/{world_id}/chat/session")

@@ -45,7 +45,10 @@ FORCED_PROMPT_SEGMENTS = [
     # 能力边界
     "\n【能力边界】平台里有两类 AI，能力不同，被问起时准确回答，不要凭猜测：\n- 你（世界 AI / 群视界机器人）= 造物主：平台工具 + 设计侧技能库（data/world_ai_skills/，全局共享），在世界之外设计世界，不用也不会拿到世界侧技能\n- 群里的 AI 成员（居民，平台 agent，如绑定了本世界的群 AI）= 绑定本世界后拥有：① 世界侧技能（data/worlds/{id}/skills/ 下颁布的 manifest+code.py，像调普通工具一样 function calling 直接调用）② world_command 文本命令工具（把命令发到群里，由世界程序 main.py handle() 解析执行，与用户共用同一套语法）——所以群 AI 不是「只会说话没有工具」，它有工具，能力取决于这个世界颁布了什么技能\n- 世界侧技能由你（或世界配置）颁布：在世界的 skills/ 目录放 manifest.json + code.py，绑定本世界的群 AI 就能直接工具调用；你没颁布技能时它们就没有世界侧工具（只剩 world_command 和平台默认工具）\n- 用户/群成员直接在群里发命令文本（如「收诗：xxx」「我去 2,3」）→ 群消息钩子 → 世界程序 main.py 解析执行——这是「人直接与世界交互」，与群 AI 调工具是两条并存的路径，别混为一谈",
     # 注意事项（通用行为准则，浓缩版）
-    "\n【注意事项】遇到含糊指令主动提问确认，不瞎猜；调用工具后不要在回复里重复工具原始输出，直接说做了什么；创建文件后告知路径；给建议时简要阐述每个建议是什么（别只丢列表）；收尾最后一句写实质内容，不用「等你定方向」这类空话。",
+    "\n【注意事项】遇到含糊指令主动提问确认，不瞎猜；调用工具后不要在回复里重复工具原始输出，直接说做了什么；创建文件后告知路径；给建议时简要阐述每个建议是什么（别只丢列表）；收尾最后一句写实质内容，不用「等你定方向」这类空话。\n"
+    "【对话命名】一个话题聊出眉目、或换了新话题时，用 rename_session 给这场对话起个 6~20 字的短名字"
+    "（如「造卡牌对战界面」「修地缝掉落」）——用户在会话列表里靠名字认对话，别让它一直显示 w12:m:3f9a… 这种编号；"
+    "用户说「这个对话叫 xxx」就照改。",
     # 接口文档
     "\n【接口文档】平台接口文档按区分区（01 世界编号变量 / 02 WorldUI 桥 / 03 文件操作 / 04 积木体系 / 05 群聊 API / 06 页面与资源 / 07 懒通知与世界时间 / 08 错误与安全 / 09 受控数据 API / 10 同步与限流机制）。需要接口细节时用 view_api_doc 打开对应分区（工具描述里有各区介绍，先看介绍再决定开哪个，不要一次全读）。",
     # 文件同步机制（2026-08-21 新增：DSH 镜像双向同步，防止把「无变化」误判成没生效）
@@ -378,6 +381,93 @@ def touch_session(world) -> None:
     sessions[key] = meta
     cfg["sessions"] = sessions
     world.config = cfg
+
+
+SESSION_TITLE_MAX = 20            # 对话名上限（短名字才好在列表里看）
+
+
+def normalize_session_title(raw: str) -> str | None:
+    """对话名清洗：去空白/换行、压空格、限长；空 → None（纯函数，便于测试）"""
+    title = " ".join(str(raw or "").split())
+    if not title:
+        return None
+    return title[:SESSION_TITLE_MAX]
+
+
+def set_session_title(world, title: str) -> str | None:
+    """给**当前会话**命名/改名（纯函数：只改 world.config，调用方负责 commit）。
+
+    会话名归 AI 自己写（用户也可以看）——列表里显示名字比显示 w12:m:3f9a… 好认。
+    返回规范化后的名字；名字为空则清除命名（回落到默认显示）。
+    """
+    name = normalize_session_title(title)
+    cfg = dict(world.config or {})
+    key = cfg.get("current_session") or "default"
+    sessions = dict(cfg.get("sessions") or {})
+    meta = dict(sessions.get(key) or {})
+    if name:
+        meta["title"] = name
+    else:
+        meta.pop("title", None)
+    sessions[key] = meta
+    cfg["sessions"] = sessions
+    world.config = cfg
+    return name
+
+
+async def list_sessions(repo, world) -> list[dict]:
+    """会话列表（单一来源，含「最近聊天时间」）。
+
+    - 时间取**该会话最后一条消息的时间**（权威），config 里的 last_active_at 只作兜底——
+      老会话/默认会话原本没有时间，前端列表会有一半空白
+    - 默认会话（session_id 为空 = 旧数据入口）也在列，否则用户找不到它
+    - **按最近聊天时间倒序**：最近用过的排最前
+    """
+    from datetime import datetime as _dt
+    from sqlalchemy import func as _f, select as _sel
+    from app.models.world import WorldChatMessage
+
+    cfg = world.config or {}
+    meta = dict(cfg.get("sessions") or {})
+    rows = (await repo.execute(
+        _sel(WorldChatMessage.session_id, _f.max(WorldChatMessage.created_at))
+        .where(WorldChatMessage.world_id == world.id)
+        .group_by(WorldChatMessage.session_id)
+    )).all()
+    last_msg: dict = {sid: ts for sid, ts in rows}
+
+    def _iso(value):
+        return value.isoformat() if isinstance(value, _dt) else value
+
+    out: list[dict] = []
+    for sid in list(meta) + [s for s in last_msg if s]:
+        if sid not in meta and not last_msg.get(sid):
+            continue
+        item = meta.get(sid) or {}
+        out.append({
+            "id": sid,
+            "title": item.get("title"),
+            "created_at": item.get("created_at"),
+            "last_active_at": _iso(last_msg.get(sid)) or item.get("last_active_at"),
+            "pinned": bool(item.get("pinned_by")),
+        })
+    if None in last_msg:                      # 默认会话：session_id 为空的历史
+        item = meta.get("default") or {}
+        out.append({
+            "id": "default", "title": item.get("title"), "created_at": item.get("created_at"),
+            # 默认会话没有消息时也别空着：回落到 config 记的活跃时间（新会话就是刚建的）
+            "last_active_at": _iso(last_msg[None]) or item.get("last_active_at"),
+            "pinned": bool(item.get("pinned_by")),
+        })
+    # 去重（config 里万一同名存过 default）+ 按最近聊天倒序（没时间的排最后）
+    seen, uniq = set(), []
+    for s in out:
+        if s["id"] in seen:
+            continue
+        seen.add(s["id"])
+        uniq.append(s)
+    uniq.sort(key=lambda s: s["last_active_at"] or "", reverse=True)
+    return uniq
 
 
 async def ensure_session_lifecycle(world_repo, world) -> dict:

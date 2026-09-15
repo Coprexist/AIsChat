@@ -5,7 +5,8 @@ import { useWorldChat, type Approval, type ChatMsg } from '../hooks/useWorldChat
 import { useAttachmentUpload, isImageAttachment } from '../hooks/useAttachmentUpload'
 import { AttachmentChips, DropMask } from './AttachmentChips'
 import { api } from '../api/client'
-import { useT } from '../i18n/I18nContext'
+import { useLang, useT } from '../i18n/I18nContext'
+import { formatRelativeTime } from '../utils/time'
 
 // 工具气泡图标：按摘要内容关键词映射（后端文本不带 emoji，图标由前端渲染）
 function toolIcon(content: string) {
@@ -228,6 +229,7 @@ interface WorldChatPanelProps {
  */
 const WorldChatPanel = memo(forwardRef<WorldChatHandle, WorldChatPanelProps>(({ wid, onRefresh, onMsg, onUnreadCountChange, creatorName, aiMode, onModeChange }, ref) => {
   const t = useT()
+  const lang = useLang()
   // 运行模式（对话栏内切换；与设计页配置弹窗是同一个后端字段，切换后回调父组件同步）
   const [mode, setMode] = useState(aiMode || 'review')
   const [modeBusy, setModeBusy] = useState(false)
@@ -250,6 +252,12 @@ const WorldChatPanel = memo(forwardRef<WorldChatHandle, WorldChatPanelProps>(({ 
   const chat = useWorldChat({ wid, onRefresh, onMsg })
 
   // ── 计算派生状态 ──
+  // 当前对话的显示名：AI 起过名字就用名字（列表与工具条一致），没有才回落编号
+  const currentTitle = useMemo(
+    () => chat.sessionList.find((s) => s.id === chat.currentSession)?.title || '',
+    [chat.sessionList, chat.currentSession],
+  )
+
   const isInterrupted = useMemo(() => {
     for (let i = chat.chatMsgs.length - 1; i >= 0; i--) {
       const m = chat.chatMsgs[i]
@@ -613,7 +621,10 @@ const WorldChatPanel = memo(forwardRef<WorldChatHandle, WorldChatPanelProps>(({ 
       <div className="flex items-center gap-1.5 px-3 py-1.5 border-t border-border bg-surface/60 text-[10px] text-textMuted relative" {...attachments.zoneProps('toolbar')}>
         {/* 这条只有 20 来像素高，不放文字——蒙版加深就够，但必须接住拖放（否则浏览器会直接打开图片） */}
         <DropMask {...attachments.dropState('toolbar')} />
-        <span className="truncate font-mono max-w-[180px] shrink-0" title={chat.currentSession}>{chat.currentSession === 'default' ? '默认会话' : chat.currentSession}</span>
+        <span
+          className={`truncate max-w-[180px] shrink-0 ${currentTitle ? 'text-textSecondary' : 'font-mono'}`}
+          title={chat.currentSession}
+        >{currentTitle || (chat.currentSession === 'default' ? '默认会话' : chat.currentSession)}</span>
         <button
           onClick={async () => { const p = await chat.togglePin(); if (!p && onMsg) onMsg('已取消收藏（收藏的会话不会被自动清理）') }}
           className={`shrink-0 p-1 rounded transition-colors ${chat.sessionList.find((s) => s.id === chat.currentSession)?.pinned ? 'text-accent-400 bg-accent-400/10' : 'hover:bg-elevated hover:text-textSecondary'}`}
@@ -633,14 +644,23 @@ const WorldChatPanel = memo(forwardRef<WorldChatHandle, WorldChatPanelProps>(({ 
         ><ChevronDown size={11} /> 会话列表（{chat.sessionList.length}）</button>
         {sessionOpen && chat.sessionList.length > 0 && (
           <div className="absolute bottom-full right-3 mb-1 w-72 max-h-56 overflow-y-auto rounded-xl bg-elevated border border-border shadow-xl z-50">
-            <div className="px-3 py-1.5 text-[10px] text-textMuted border-b border-border flex items-center gap-1">会话列表（点击切换；<Pin size={9} className="text-accent-400 fill-current" />=已收藏，不会被自动清理）</div>
+            <div className="px-3 py-1.5 text-[10px] text-textMuted border-b border-border truncate" title="按最近聊天排序；带 📌 的已收藏，不会被自动清理">
+              会话列表 · 按最近聊天排序 <Pin size={9} className="inline text-accent-400 fill-current" /> 收藏不清理
+            </div>
             {chat.sessionList.map((s) => (
               <button
                 key={s.id}
                 onClick={async () => { if (await chat.switchSession(s.id)) setSessionOpen(false) }}
                 className={`w-full flex items-center gap-1.5 px-3 py-1.5 text-[11px] text-left border-b border-border/40 last:border-b-0 transition-colors ${s.id === chat.currentSession ? 'bg-primary-500/15 text-primary-300' : 'hover:bg-surface text-textSecondary'}`}
               >
-                <span className="truncate flex-1 font-mono" title={s.id}>{s.id === 'default' ? '默认会话' : s.id}</span>
+                <span
+                  className={`truncate min-w-0 flex-1 ${s.title ? '' : 'font-mono'}`}
+                  title={s.title ? `${s.title}
+${s.id}` : s.id}
+                >{s.title || (s.id === 'default' ? '默认会话' : s.id)}</span>
+                {s.last_active_at && (
+                  <span className="shrink-0 text-[10px] text-textMuted">{formatRelativeTime(s.last_active_at, lang)}</span>
+                )}
                 <span className="shrink-0 flex items-center gap-1 text-textMuted">{s.pinned ? <Pin size={10} className="text-accent-400 fill-current" /> : ''}{s.id === chat.currentSession ? '当前' : ''}</span>
               </button>
             ))}

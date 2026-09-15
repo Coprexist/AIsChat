@@ -132,7 +132,7 @@ export interface UseWorldChatReturn {
   isAtBottom: boolean
   chatCanScroll: boolean
   currentSession: string
-  sessionList: { id: string; last_active_at?: string; pinned?: boolean }[]
+  sessionList: { id: string; title?: string; last_active_at?: string; pinned?: boolean }[]
   switchSession: (sid: string) => Promise<boolean>
   newSession: () => Promise<string | null>
   togglePin: () => Promise<boolean>
@@ -155,7 +155,7 @@ export function useWorldChat({ wid, onRefresh, onMsg }: UseWorldChatOptions) {
   const [approvals, setApprovals] = useState<Approval[]>([])
   // 会话（/new 开新对话、可切回；展示当前会话 id + 列表）
   const [currentSession, setCurrentSession] = useState<string>('default')
-  const [sessionList, setSessionList] = useState<{ id: string; last_active_at?: string; pinned?: boolean }[]>([])
+  const [sessionList, setSessionList] = useState<{ id: string; title?: string; last_active_at?: string; pinned?: boolean }[]>([])
   const currentSessionRef = useRef(currentSession)
   currentSessionRef.current = currentSession
   // 供 WS 回调（onMessage 闭包）引用组件级滚动函数——[INSERT] 插入消息后滚到底部
@@ -223,7 +223,7 @@ export function useWorldChat({ wid, onRefresh, onMsg }: UseWorldChatOptions) {
       const q = opts?.before_id ? `?before_id=${opts.before_id}&limit=30` : '?limit=30'
       // 翻页时记录原滚动位置（prepend 后补回，作用于所有面板实例）
       const heights = listElsRef.current.map((el) => el.scrollHeight)
-      const r = await api.get<{ messages: ChatMsg[]; has_more: boolean; current_session?: string; sessions?: { id: string; last_active_at?: string; pinned?: boolean }[]; commands?: CmdSpec[] }>(`/worlds/${wid}/chat${q}`)
+      const r = await api.get<{ messages: ChatMsg[]; has_more: boolean; current_session?: string; sessions?: { id: string; title?: string; last_active_at?: string; pinned?: boolean }[]; commands?: CmdSpec[] }>(`/worlds/${wid}/chat${q}`)
       if (r.current_session) setCurrentSession(r.current_session)
       if (Array.isArray(r.sessions)) setSessionList(r.sessions)
       // 命令目录以后端为准（唯一来源）；空数组不下发时保留本地兜底
@@ -667,7 +667,7 @@ export function useWorldChat({ wid, onRefresh, onMsg }: UseWorldChatOptions) {
   // ── 会话切换 / 收藏（/new /use /pin 的前端等价操作，走 API 不占对话轮次）──
   const switchSession = useCallback(async (sid: string): Promise<boolean> => {
     try {
-      const r = await api.post<{ messages: ChatMsg[]; current_session: string; sessions: { id: string; last_active_at?: string; pinned?: boolean }[] }>(
+      const r = await api.post<{ messages: ChatMsg[]; current_session: string; sessions: { id: string; title?: string; last_active_at?: string; pinned?: boolean }[] }>(
         `/worlds/${wid}/chat/session`, { session_id: sid },
       )
       setCurrentSession(r.current_session)
@@ -684,7 +684,7 @@ export function useWorldChat({ wid, onRefresh, onMsg }: UseWorldChatOptions) {
    *  不再像过去那样发一条 /new 聊天消息（那会把 /new 写进旧会话并占一个轮次）。 */
   const newSession = useCallback(async (): Promise<string | null> => {
     try {
-      const r = await api.post<{ messages: ChatMsg[]; current_session: string; sessions: { id: string; created_at?: string; last_active_at?: string; pinned?: boolean }[] }>(
+      const r = await api.post<{ messages: ChatMsg[]; current_session: string; sessions: { id: string; title?: string; created_at?: string; last_active_at?: string; pinned?: boolean }[] }>(
         `/worlds/${wid}/chat/session/new`, {},
       )
       setCurrentSession(r.current_session)
