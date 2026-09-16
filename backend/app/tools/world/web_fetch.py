@@ -38,5 +38,6 @@ class WebFetchTool(WorldToolPlugin):
     def summary(self, result: dict) -> str:
         ok = bool(result.get("success"))
         if ok:
-            return f"已获取 {result.get('url', '')[:60]}"
+            via = f"（经镜像 {result['via']}）" if result.get("via") else ""
+            return f"已获取 {result.get('url', '')[:60]}{via}"
         return f"抓取失败：{result.get('error', '未知错误')}"

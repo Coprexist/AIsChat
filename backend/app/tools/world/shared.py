@@ -144,7 +144,8 @@ async def web_download(world, arguments: str, approved: bool = False) -> dict:
 
     try:
         async with httpx.AsyncClient(timeout=30) as client:
-            r = await safe_get(client, url, headers={"User-Agent": "Mozilla/5.0 (AIsChat world downloader)"})
+            fetched = await safe_get(client, url, headers={"User-Agent": "Mozilla/5.0 (AIsChat world downloader)"})
+        r = fetched.response
         if r.status_code != 200:
             return {"success": False, "error": f"下载失败：HTTP {r.status_code}"}
         content = r.content
@@ -162,10 +163,12 @@ async def web_download(world, arguments: str, approved: bool = False) -> dict:
         return {"success": False, "error": f"保存失败：{str(e)[:160]}"}
     except httpx.HTTPError as e:
         return {"success": False, "error": f"下载失败：{str(e)[:120]}"}
-    logger.info(f"🌐 世界 #{wid} 已下载 {url[:60]} → {path}（{len(content)}B）")
+    logger.info(f"🌐 世界 #{wid} 已下载 {url[:60]} → {path}（{len(content)}B）"
+                + (f"｜经镜像 {fetched.mirror}" if fetched.mirror else ""))
 
     if approved or get_mode(world) == "auto":
-        return {"success": True, "path": path, "size": len(content), "url": url}
+        return {"success": True, "path": path, "size": len(content), "url": url,
+                **fetched.as_result_extra()}     # 走了国内镜像要说清楚（内容来自第三方）
 
     # 旁路下载：没经过平台门禁 → 按产品要求，下载完成后再问用户是否保留
     # 事后确认同样不默认保留：没人应答就删掉（on_timeout=False，安全默认）
@@ -177,8 +180,8 @@ async def web_download(world, arguments: str, approved: bool = False) -> dict:
     )
     if keep.approved:
         # 用户可能顺便写了要求（"留着，但改名叫 x.png"）——不能让这句话烂在弹窗里
-        return with_user_note({"success": True, "path": path, "size": len(content), "url": url},
-                              keep.instruction)
+        return with_user_note({"success": True, "path": path, "size": len(content), "url": url,
+                               **fetched.as_result_extra()}, keep.instruction)
     try:
         delete_file(wid, path)
     except (ValueError, FileNotFoundError) as e:

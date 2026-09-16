@@ -47,6 +47,25 @@
 - **旁路下载的事后确认**：没走平台门禁的路径（决策技能/定时/斜杠命令）下载完成后弹窗问「是否保留」，
   没人应答按不保留删除
 
+#### 官网失败自动轮播国内镜像（GitHub / npm / PyPI / HuggingFace）
+- 用户 2026-09-16 提议："镜像是不是还可以加一个官网失败自动轮播镜像这种？"——采纳。
+  `mirror_table.py` 是唯一的镜像表，`safe_get()` 里实现轮播：
+  **官方永远第一优先**，只有官方失败（DNS 污染 / 连不上 / 超时）才按表里的顺序试镜像；
+  **镜像返回错误码也算失败**，继续下一个；全都不行就抛官方那个错误，绝不假装成功
+- 四条硬约束：① 只读（只用于 GET，绝不代发 POST）；② 不带任何凭据；
+  ③ 镜像自己也要过同一套 SSRF 复检（挑地址 / 钉连接 / 逐跳复检重定向）；
+  ④ **用了镜像必须标出来**——结果里带 `via` / `via_url`，工具卡片写「（经镜像 ghproxy.net）」：
+  内容来自第三方，不能让 AI 或用户以为那还是官方原文
+- 表里**只登记实测过的**（2026-09-16 逐条验证状态码 + 真内容）：GitHub 系（raw / release / archive / codeload /
+  objects / gist）→ `ghproxy.net` / `gh-proxy.com` / `ghfast.top`；`registry.npmjs.org` → `registry.npmmirror.com`；
+  `pypi.org` → `mirrors.aliyun.com/pypi`；`huggingface.co` → `hf-mirror.com`。
+  没验证过的（`gitclone.com`、`raw.gitmirror.com` 实测不通）不进表；`cdn.jsdelivr.net` 因为要拆 owner/repo/ref
+  重排路径（不是前缀代理那一种写法）也没进表
+- `web_fetch` 的工具说明同时写清"要搜索用 web_search（Bing）—— google / duckduckgo 这类国内抓不到，别去抓搜索页"
+- 实测：官方正常时 `via` 为空、一次镜像都不碰；把官方 DNS 掐掉后真的从 `ghproxy.net` 取回真内容
+  （`# Logs …`），卡片显示「（经镜像 ghproxy.net）」；官方与镜像 DNS 全掐掉 → 如实报「域名解析失败」。
+  测试 111 条全绿（新增 5 条：表渲染、官方优先、失败轮播与 5xx 跳过、全失败不假装成功、可关掉镜像）
+
 #### 群视界：用户可手动改会话名 + 下载会话记录（Markdown / JSON）
 - 改名不再只有 AI 能做：前端会话列表每行常驻 `✎`（**列表里任意一场都能改**），当前会话工具条也有 `✎`；
   后端 `PUT /worlds/{id}/chat/session/title`（省略 `session_id` = 当前会话）。清洗与存储复用

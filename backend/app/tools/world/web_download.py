@@ -34,5 +34,6 @@ class WebDownloadTool(WorldToolPlugin):
 
     def summary(self, result: dict) -> str:
         if result.get("success"):
-            return f"已下载到 {result.get('path', '')}（{result.get('size', 0)}B）"
+            via = f"（经镜像 {result['via']}）" if result.get("via") else ""
+            return f"已下载到 {result.get('path', '')}（{result.get('size', 0)}B）{via}"
         return f"下载失败：{result.get('error', '未知错误')}"
