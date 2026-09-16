@@ -519,6 +519,10 @@ HTTP 三种入参（`items` / `messages` / `message`）只在**路由层归一�
 - `mid_turn=False`（默认）= 等本轮结束再执行；`mid_turn=True` = 允许工具轮进行中直接插入
 - 未注册的斜杠命令保守按"必须等待"处理
 - 新增命令 = 表里加一行 + 写个 handler，执行分发/前端补全/排队分流三处自动一致
+- **命令回执的文案与成败都由命令自己报**（`CmdResult(text, ok)`；handler 返回 str 等价于 `ok=True`）：
+  调用方把 `text` 写进对话、把 `ok` 当 `[TOOL_UPDATE].success` 下发（原先硬写 `success: True`，失败也画 ✓）。
+  **要展示工具结果就走 `tool_result_summary()`（唯一展示入口），不要在命令里再拼一遍格式**——
+  `/compact` 曾因此漏掉"无需压缩"分支，用户看到「上下文已压缩：None → None tokens（压缩率 None%）」
 - ⚠️ 清弹窗的依据是「这条当初是否走了插入通道」（同一判定），**不是**弹窗项的显示标签；
   否则将来把某命令标为 `mid_turn=True` 时，`[INSERTED]` 会清不掉它，被 drain 重复发送
 
@@ -724,6 +728,20 @@ OpenAI 兼容接口要求 **assistant 消息里每个 `tool_call_id` 都必须�
 - **前端**：会话列表每行右侧 `formatRelativeTime`（与主站聊天列表同一实现），工具条上的当前会话优先显示名字
 - **时区**：时间按**浏览器本地时区**渲染（`utils/time.ts` 对 naive UTC 串补 `Z` 后交给 `toLocaleTimeString`），
   同一份数据在 UTC 与东八区下分别显示 `04:22` / `12:22`（已实测）
+
+**用户侧：改名 + 把记录拿走**（2026-09-16 用户要求"用户前端可手动改会话名和下载会话记录"）
+- **改名 `PUT /worlds/{id}/chat/session/title`**（`{session_id?, title}`）：省略 `session_id` = 当前会话，
+  也可指定列表里的**任意一场**。清洗与存储仍是 `set_session_title` / `normalize_session_title` **一处**——
+  AI 的 `rename_session` 工具走的是同一个函数，不存在"用户改的规则和 AI 改的不一样"；空串 = 清除命名
+- **导出 `GET /worlds/{id}/chat/export?session_id=&format=md|json`**：只导出**这场对话本身**
+  （正文 + 思考 + 工具调用含报错 + 附件名），与聊天面板所见一致；**不含**系统提示词、模型/实例配置、
+  API Key，也不含其他世界/用户的数据。渲染在 `world_chat_export.py`（纯函数，可单测）：
+  Markdown 给人看（思考用引用块、工具调用用围栏块，与紧邻思考条重复的那份不再导出两遍），
+  JSON 给机器（字段与库表一致）。文件名 `世界名-会话名-日期.ext` 走 RFC 5987（中文名也能正确落盘）；
+  世界自己的 API token 若被 AI 打进工具输出，导出时**按值打码**
+- **前端**：会话列表每行常驻 `✎ / MD / JSON`（不藏 hover，触屏也点得到），当前会话工具条也有 `✎`；
+  改名弹窗用 `Dialog + Input`（留空 = 清除并按编号显示）；下载走 `api.download()`——带鉴权取回 + 落盘
+  的**唯一入口**，文件名以服务端 `Content-Disposition` 为准（RFC 5987 解析）
 
 ---
 
