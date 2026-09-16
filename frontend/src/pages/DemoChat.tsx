@@ -189,7 +189,7 @@ export default function DemoChat() {
             className="flex-1 px-3.5 py-2.5 rounded-card border border-border bg-canvas text-sm text-textPrimary placeholder:text-textMuted resize-none outline-none focus:ring-2 focus:ring-primary-500/50"
           />
           <button onClick={send} disabled={!input.trim() || !apiKey || loading}
-            className="icon-btn-lg bg-primary-500 hover:bg-primary-600 text-white">
+            className="icon-btn-lg icon-btn-primary">
             <Send size={16} />
           </button>
         </div>

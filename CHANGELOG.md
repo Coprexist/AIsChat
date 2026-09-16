@@ -47,6 +47,20 @@
 - **旁路下载的事后确认**：没走平台门禁的路径（决策技能/定时/斜杠命令）下载完成后弹窗问「是否保留」，
   没人应答按不保留删除
 
+#### 主站发送按钮"样式乱了"（尺寸档漏写法）+ 图标按钮家族收口
+- 用户反馈「我的主站的发送按钮样式乱了」：CDP 实测主站群聊发送按钮 = `display:block / border-radius:0 /
+  图标贴左 / cursor:default`——2026-09-15 界面统一时把发送按钮写成 `icon-btn-lg`，
+  但 `-sm/-lg` 只是**尺寸档**，形态（inline-flex 居中、圆角 8px、cursor、禁用态、焦点环）在基类 `.icon-btn` 上，
+  漏写基类 = 退回浏览器原生 button。全站另有 28 处手写图标按钮同病，一并恢复
+- 修法（单一来源）：`.icon-btn / .icon-btn-sm / .icon-btn-lg` **三档共用同一套形态规则**，
+  手写按钮只写尺寸档也成立
+- 顺手收口"语义类旁边写裸 Tailwind 颜色"的 6 处（发送按钮、demo 发送、Mermaid 工具条 ×5、头像裁剪关闭）：
+  新增色调变体 `.icon-btn-primary / .icon-btn-overlay / .icon-btn-inverse`。
+  实测语义类在产物里排在 utilities **之后**，`text-white` / `hover:bg-*` 会被 `.icon-btn` 盖掉
+  ——发送按钮图标因此一直是灰的，光加基类不够
+- 验证：修复前 `display:block, radius:0px, 图标 left:0`；修复后 `display:flex, radius:8px, 图标居中`，
+  常态白图标 on primary-500、强制悬停 primary-600、禁用 opacity .5 + not-allowed；tsc / i18n 检查 0 报错
+
 #### 会话记录下载"找不到"（用户反馈：我没看到怎么下载）+ 全站下载收口
 - 上一版把下载藏在「会话列表」展开后每行右侧的灰色小字 `MD`/`JSON` 里，**工具条上什么都没有**——用户找不到。
   现在：工具条上直接一个「⤓ 下载」（当前会话），展开就是「下载为 Markdown（人看的）/ 下载为 JSON（备份用）」；

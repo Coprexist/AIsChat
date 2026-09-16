@@ -580,7 +580,11 @@
    单一来源：不再手写 p-1/p-1.5/p-2/w-8/w-9/w-10 正方形按钮。
    尺寸：sm=28px / md=32px（默认）/ lg=40px
    ──────────────────────────────────────────────── */
-.icon-btn {
+/* 三档共用同一套形态：手写按钮只写 .icon-btn-sm / .icon-btn-lg 也必须成立
+   （2026-09-17 修复：此前 sm/lg 只设宽高，漏写基类 → 29 处手写图标按钮丢圆角/居中/禁用态）*/
+.icon-btn,
+.icon-btn-sm,
+.icon-btn-lg {
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -592,11 +596,26 @@
   transition: background-color .15s ease, color .15s ease;
   cursor: pointer;
 }
-.icon-btn:hover { background: rgb(var(--tw-elevated)); color: rgb(var(--tw-text-primary)); }
-.icon-btn:disabled { opacity: .5; cursor: not-allowed; }
-.icon-btn:focus-visible { outline: 2px solid rgb(var(--tw-primary-400) / .5); outline-offset: 1px; }
+.icon-btn:hover,
+.icon-btn-sm:hover,
+.icon-btn-lg:hover { background: rgb(var(--tw-elevated)); color: rgb(var(--tw-text-primary)); }
+.icon-btn:disabled,
+.icon-btn-sm:disabled,
+.icon-btn-lg:disabled { opacity: .5; cursor: not-allowed; }
+.icon-btn:focus-visible,
+.icon-btn-sm:focus-visible,
+.icon-btn-lg:focus-visible { outline: 2px solid rgb(var(--tw-primary-400) / .5); outline-offset: 1px; }
 .icon-btn-sm { width: 1.75rem; height: 1.75rem; }
 .icon-btn-lg { width: 2.5rem; height: 2.5rem; }
+
+/* 色调变体 —— 与 .btn-primary/.btn-ghost 同规矩：手写按钮只写语义类，不写裸 Tailwind 颜色
+   （裸 text-white / hover:bg-* 会被本层规则盖掉，2026-09-17 实测：发送按钮图标变灰）*/
+.icon-btn-primary { background: rgb(var(--tw-primary-500)); color: #fff; }
+.icon-btn-primary:hover { background: rgb(var(--tw-primary-600)); color: #fff; }
+.icon-btn-overlay { background: rgb(0 0 0 / .3); color: rgb(255 255 255 / .8); }
+.icon-btn-overlay:hover { background: rgb(0 0 0 / .5); color: #fff; }
+.icon-btn-inverse { color: #fff; }
+.icon-btn-inverse:hover { background: rgb(255 255 255 / .1); color: #fff; }
 
 /* ────────────────────────────────────────────────
    表单控件规范（2026-09）

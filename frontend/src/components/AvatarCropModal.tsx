@@ -105,7 +105,7 @@ export default function AvatarCropModal({ file, onConfirm, onCancel, cropShape }
       <div className="flex items-center justify-between px-4 h-14 shrink-0">
         <button
           onClick={onCancel}
-          className="icon-btn hover:bg-white/10 text-white rounded-full"
+          className="icon-btn icon-btn-inverse rounded-full"
         >
           <X size={22} />
         </button>

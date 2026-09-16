@@ -355,13 +355,13 @@ function MermaidBlock({ code, compact = false }: MermaidBlockProps) {
           <div className={isFullscreenClass}>
             {/* 工具栏 */}
             <div className="absolute top-4 right-4 flex items-center gap-2 z-10">
-              <button onClick={zoomIn} className="icon-btn bg-black/30 hover:bg-black/50 text-white/80 hover:text-white" title="放大">
+              <button onClick={zoomIn} className="icon-btn icon-btn-overlay" title="放大">
                 <ZoomIn size={18} />
               </button>
-              <button onClick={zoomOut} className="icon-btn bg-black/30 hover:bg-black/50 text-white/80 hover:text-white" title="缩小">
+              <button onClick={zoomOut} className="icon-btn icon-btn-overlay" title="缩小">
                 <ZoomOut size={18} />
               </button>
-              <button onClick={resetTransform} className="icon-btn bg-black/30 hover:bg-black/50 text-white/80 hover:text-white text-xs font-medium" title="重置">
+              <button onClick={resetTransform} className="icon-btn icon-btn-overlay text-xs font-medium" title="重置">
                 还原
               </button>
               <button onClick={() => {
@@ -373,10 +373,10 @@ function MermaidBlock({ code, compact = false }: MermaidBlockProps) {
                 a.href = 'data:image/svg+xml,' + encodeURIComponent(raw ?? '')
                 a.download = 'diagram.svg'
                 a.click()
-              }} className="p-2 rounded-card bg-black/30 hover:bg-black/50 text-white/80 hover:text-white transition-colors" title="下载 SVG">
+              }} className="icon-btn icon-btn-overlay" title="下载 SVG">
                 <Download size={18} />
               </button>
-              <button onClick={handleClose} className="icon-btn bg-black/30 hover:bg-black/50 text-white/80 hover:text-white" title="关闭">
+              <button onClick={handleClose} className="icon-btn icon-btn-overlay" title="关闭">
                 <Minimize2 size={18} />
               </button>
             </div>
