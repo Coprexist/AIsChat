@@ -41,6 +41,27 @@ def test_skill_fallback_is_informative():
     assert "失败" in failed and "沙箱超时" in failed
 
 
+def test_world_adapters_translate_site_error_shape():
+    """主站工具的错误形状（error 是布尔）不能直接当世界的 error 文案用。
+
+    用户 2026-09-16 反馈：「抓取网页 → 抓取失败：True」，真正的原因在 message 里。
+    """
+    from app.tools.world.shared import from_site_result
+    from app.tools.world.web_fetch import WebFetchTool
+    from app.tools.world.web_search import WebSearchTool
+
+    site_error = {"error": True, "code": "TOOL_EXEC_FAILED", "message": "请求超时（15.0s）"}
+    world_error = from_site_result(site_error)
+    assert world_error == {"success": False, "error": "请求超时（15.0s）"}
+    assert WebFetchTool().summary(world_error) == "抓取失败：请求超时（15.0s）"
+    assert WebSearchTool().summary(world_error) == "搜索失败：请求超时（15.0s）"
+
+    ok = from_site_result({"success": True, "url": "https://x"})
+    assert ok == {"success": True, "url": "https://x"}
+    assert from_site_result({"url": "https://x"})["success"] is True     # 没带 success 的也算成功
+    assert from_site_result({"error": True})["error"] == "未知错误"       # 连 message 都没有也别给布尔
+
+
 def test_detail_shows_args_and_result():
     """点击卡片展开的内容：参数 + 结果（工具想更好读就覆盖 detail）"""
     text = tool_result_detail("file_read", {"path": "main.py"}, {"success": True, "path": "main.py"})

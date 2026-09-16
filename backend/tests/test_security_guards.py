@@ -162,3 +162,71 @@ async def test_federation_outbound_tls_verification_enabled():
         assert "verify=False" not in inspect.getsource(module), (
             module_name + " 又出现了 verify=False，联邦出站请走 peer_http_client()"
         )
+
+# ═══════════════════════════════════════════════════════════════
+# SSRF 防护：地址分类 + 多地址域名
+#   背景（2026-09-16 用户反馈）：lite.duckduckgo.com 被报「禁止访问内网地址 (2001::1f0d:5e0a)」，
+#   而那个地址在 2001::/32（Teredo，本机拨不到），旁边还有个好好的公网 IPv4。
+# ═══════════════════════════════════════════════════════════════
+
+def test_ssrf_address_classification():
+    """内网一律拒；特殊用途段只是"拨不到"（跳过，不能报成内网）；公网放行"""
+    from app.utils.pure.url_guard import classify_address as classify
+
+    for ip in ("127.0.0.1", "10.1.2.3", "192.168.1.1", "172.16.0.9", "169.254.169.254",
+               "0.0.0.0", "::1", "fd00::1", "fe80::1", "::ffff:127.0.0.1",
+               "2002:7f00:1::", "64:ff9b::a00:1"):
+        assert classify(ip) == "internal", f"{ip} 是内网/本机，必须拒绝"
+    for ip in ("2001::1f0d:5e0a", "2001:db8::1", "100::1"):
+        assert classify(ip) == "unusable", f"{ip} 拨不到，但不该说成内网"
+    for ip in ("104.244.46.71", "20.205.243.166", "2606:4700::1111"):
+        assert classify(ip) == "ok", f"{ip} 是公网，必须放行"
+
+
+def test_ssrf_resolve_keeps_the_usable_address_and_still_blocks_internal():
+    """一个坏地址不能拖死整单；但只要有内网地址就照旧整单拒绝（DNS rebinding）"""
+    import socket
+
+    from app.tools.file_operations import web_fetch as wf
+
+    original = socket.getaddrinfo
+
+    def mixed(host, port, *a, **k):
+        return [(socket.AF_INET6, 1, 6, "", ("2001::1f0d:5e0a", 0, 0, 0)),
+                (socket.AF_INET, 1, 6, "", ("104.244.46.71", 0))]
+
+    socket.getaddrinfo = mixed
+    try:
+        ips, block = wf.resolve_candidates("https://lite.duckduckgo.com/lite/?q=x")
+    finally:
+        socket.getaddrinfo = original
+    assert block is None and ips == ["104.244.46.71"], "应挑出公网 IPv4，而不是整单拒绝"
+
+    def half_internal(host, port, *a, **k):
+        return [(socket.AF_INET, 1, 6, "", ("192.168.1.10", 0)),
+                (socket.AF_INET, 1, 6, "", ("104.244.46.71", 0))]
+
+    socket.getaddrinfo = half_internal
+    try:
+        ips, block = wf.resolve_candidates("https://evil.example/")
+    finally:
+        socket.getaddrinfo = original
+    assert ips == [] and "内网" in block, "一半公网一半内网：必须整单拒绝"
+
+
+def test_ssrf_pins_the_vetted_address_but_keeps_the_hostname():
+    """真正拨的是复检过的 IP；Host 头与 SNI 仍用原域名（证书照常校验）"""
+    from app.tools.file_operations.web_fetch import pin_url
+
+    assert pin_url("https://example.com/a?b=1", "1.2.3.4") == "https://1.2.3.4/a?b=1"
+    assert pin_url("http://example.com:8080/x", "2001:db8::1") == "http://[2001:db8::1]:8080/x"
+
+
+def test_ssrf_localhost_is_refused_without_dns():
+    """本机名直接拒（连 DNS 都不问）"""
+    from app.tools.file_operations.web_fetch import resolve_candidates
+
+    ips, block = resolve_candidates("http://localhost:8000/admin")
+    assert ips == [] and "本机" in block
+    ips, block = resolve_candidates("http://nas.local/")
+    assert ips == [] and "本机" in block

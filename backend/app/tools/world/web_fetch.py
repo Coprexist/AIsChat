@@ -28,9 +28,10 @@ class WebFetchTool(WorldToolPlugin):
     async def execute(self, ctx: WorldToolContext) -> dict:
         # 复用主系统同一份实现（含 delay_ms 延迟抓取）
         try:
-            args = ctx.args
             from app.tools.file_operations.web_fetch import WebFetch
-            return await WebFetch().execute(ctx.world_repo.session, 0, None, args, {})
+            from app.tools.world.shared import from_site_result
+            result = await WebFetch().execute(ctx.world_repo.session, 0, None, ctx.args, {})
+            return from_site_result(result)          # 主站错误形状 → 世界约定（唯一适配点）
         except (ValueError, TypeError) as e:
             return {"success": False, "error": str(e)}
 

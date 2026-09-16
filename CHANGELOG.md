@@ -270,6 +270,26 @@
 
 ### 🐛 修复的 Bug
 
+#### 抓取网页报「禁止访问内网地址: lite.duckduckgo.com (2001::1f0d:5e0a)」——其实那是拨不到，不是内网
+- 用户 2026-09-16 反馈：AI 抓一个正常的搜索结果页，被判成"内网地址"。实测本机 DNS 给该域名返回
+  `[104.244.46.71（公网 v4）, 2001::1f0d:5e0a（Teredo 段）]`，而 `ipaddress.is_private` 把 IPv6 的
+  `2001::/23` 整段算作私有 → 一个**本机根本没有隧道、拨过去必然 "Network is unreachable"**
+  的地址，被说成内网，还连带把那个能用的公网 IPv4 一起毙掉
+- 改成：**地址由我们自己挑、自己拨**——`safe_get()` 里挑一个可拨地址（IPv4 优先），把它钉进连接
+  （Host 头与 SNI 仍是原域名，证书照常校验），**每一跳重定向都重新复检**。这比"只看第一次解析"更严：
+  唯一放松的是"不再因为一个不可拨的地址否决整次请求"，真正指向内网的照旧一律拒绝
+  （含 6to4/NAT64/v4-mapped 里嵌着的内网 v4，那正是绕 SSRF 的经典写法）
+- "哪些地址算内网"收敛到 `app/utils/pure/url_guard.py::classify_address` **一处**（出站守卫与联网工具
+  共用），分 internal / unusable / ok 三档；`web_download` 一并改用同一个取数入口
+- 实测：`https://www.baidu.com/` 正常取回正文；同一条 DuckDuckGo 链接现在如实报「连接失败」而不是「内网地址」
+
+#### 工具卡片显示「抓取失败：True」——主站的错误形状没适配成世界的
+- 主站工具的错误是 `build_tool_error` 生成的 `{"error": true, "code", "message"}`（`error` 是**布尔**），
+  世界约定是 `{"success": false, "error": "文案"}`。`web_fetch` / `web_search` 两个世界适配器原样透传，
+  于是卡片把布尔当文案：**「抓取失败：True」「搜索失败：True」**，AI 也读不到真正的原因
+- 新增唯一适配点 `world.shared.from_site_result()`，两个适配器都走它；现在显示
+  「抓取失败：连接超时」「抓取失败：域名解析失败：example.com」
+
 #### /compact 显示「上下文已压缩：None → None tokens（压缩率 None%）」，还配着一个 ✓
 - 用户反馈"为啥显示✓ 已完成 上下文已压缩：None → None tokens（压缩率 None%）"。
   病根是**命令自己抄了一遍工具的文案格式**：`compact_context` 的"无需压缩"分支里根本没有 token 数

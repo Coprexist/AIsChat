@@ -27,6 +27,20 @@ def parse_args(arguments: str) -> dict:
         return {}
 
 
+def from_site_result(result: dict) -> dict:
+    """主站工具结果 → 世界工具结果（**唯一适配点**）。
+
+    两边的错误形状不一样：主站走 `build_tool_error`，是
+    `{"error": True, "code", "message"}`（注意 error 是布尔）；世界约定是
+    `{"success": False, "error": "文案"}`。不转换就会把布尔当文案展示——
+    用户会看到「抓取失败：True」，AI 也读不到真正的原因（2026-09-16 用户反馈）。
+    """
+    if result.get("error"):
+        return {"success": False,
+                "error": str(result.get("message") or result.get("code") or "未知错误")}
+    return result if "success" in result else {"success": True, **result}
+
+
 async def bound_group_ids(ctx) -> list[int]:
     """世界绑定的群 id 列表"""
     rows = (await ctx.world_repo.execute(
@@ -106,7 +120,7 @@ async def web_download(world, arguments: str, approved: bool = False) -> dict:
       没人应答按「不保留」删除（产品 2026-09-15 定）。
     """
     import httpx
-    from app.tools.file_operations.web_fetch import _is_private_url
+    from app.tools.file_operations.web_fetch import BlockedFetch, safe_get
     from app.services.world.world_ai_mode import get_mode, request_approval, with_user_note
     from app.services.world.world_moderation import audit, inspect
     from app.services.world.world_file_service import MAX_FILE_SIZE, delete_file, write_file_bytes
@@ -115,9 +129,7 @@ async def web_download(world, arguments: str, approved: bool = False) -> dict:
     url = normalize_code_url(str(args.get("url") or "").strip())   # GitHub 页面链接 → raw 直链
     if not url.startswith(("http://", "https://")):
         return {"success": False, "error": "URL 必须以 http/https 开头"}
-    block = await asyncio.to_thread(_is_private_url, url)
-    if block:
-        return {"success": False, "error": f"禁止访问内网/本机地址：{block}"}
+    # SSRF 防护在 safe_get 一处（挑地址 + 钉住连接 + 逐跳复检），这里不再自己解析一遍
 
     wid = world.id
     want_path = str(args.get("path") or "").strip()
@@ -131,8 +143,8 @@ async def web_download(world, arguments: str, approved: bool = False) -> dict:
         return {"success": False, "error": reason}
 
     try:
-        async with httpx.AsyncClient(timeout=30, follow_redirects=True) as client:
-            r = await client.get(url, headers={"User-Agent": "Mozilla/5.0 (AIsChat world downloader)"})
+        async with httpx.AsyncClient(timeout=30) as client:
+            r = await safe_get(client, url, headers={"User-Agent": "Mozilla/5.0 (AIsChat world downloader)"})
         if r.status_code != 200:
             return {"success": False, "error": f"下载失败：HTTP {r.status_code}"}
         content = r.content
@@ -144,6 +156,8 @@ async def web_download(world, arguments: str, approved: bool = False) -> dict:
         if len(content) > MAX_FILE_SIZE:
             return {"success": False, "error": f"文件过大（{len(content) // 1024}KB > {MAX_FILE_SIZE // 1024 // 1024}MB）"}
         write_file_bytes(wid, path, content)
+    except BlockedFetch as e:
+        return {"success": False, "error": str(e)}       # 内网/不可达：原因原样给 AI
     except ValueError as e:
         return {"success": False, "error": f"保存失败：{str(e)[:160]}"}
     except httpx.HTTPError as e:

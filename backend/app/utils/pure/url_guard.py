@@ -35,17 +35,75 @@ def host_port(url: str) -> str:
     return f"{host}:{port}"
 
 
-def _ip_is_internal(ip: str) -> bool:
+# ═══════════════════════════════════════════════════════════════
+# 地址分类：internal（内网/本机）/ unusable（特殊用途，拨不到）/ ok（公网）
+#   站内唯一一处定义"哪些地址算内网"（出站守卫与联网工具共用）。
+#   为什么不用 is_private 一句话了事：IPv6 的 is_private 把 2001::/23 整段算进去，
+#   于是 2001::1f0d:5e0a（Teredo，本机没有隧道、拨过去必然失败）会被说成"内网地址"，
+#   既误导用户，又会把同域名下那个能用的公网 IPv4 一起毙掉（2026-09-16 用户实测）。
+# ═══════════════════════════════════════════════════════════════
+# 真正的内网/本机（IPv6；IPv4 直接交给 ipaddress 的判定）
+_INTERNAL_V6 = tuple(ipaddress.ip_network(n) for n in (
+    "::1/128",      # 回环
+    "::/128",       # 未指定
+    "fc00::/7",     # 唯一本地地址（ULA）
+    "fe80::/10",    # 链路本地
+    "fec0::/10",    # 站点本地（已废弃，仍是内网）
+))
+# IANA 特殊用途段里"不是内网、但本机也拨不到"的那些：拨了必然失败，只会白等一次超时
+_UNUSABLE_V6 = tuple(ipaddress.ip_network(n) for n in (
+    "2001::/32",      # Teredo（隧道端点，本机没有隧道）
+    "2001:2::/48",    # Benchmarking
+    "2001:10::/28",   # ORCHID（旧）
+    "2001:20::/28",   # ORCHIDv2
+    "2001:db8::/32",  # 文档用
+    "100::/64",       # Discard-only
+    "3fff::/20",      # 文档用
+))
+_NAT64_V6 = ipaddress.ip_network("64:ff9b::/96")     # NAT64 良知前缀（低 32 位是 v4）
+
+
+def _v4_is_internal(v4: ipaddress.IPv4Address) -> bool:
+    return bool(v4.is_private or v4.is_loopback or v4.is_link_local
+                or v4.is_reserved or v4.is_multicast or v4.is_unspecified)
+
+
+def _embedded_v4(addr: ipaddress.IPv6Address) -> ipaddress.IPv4Address | None:
+    """过渡/转换地址里真正要连的 IPv4；没有就返回 None。
+
+    必须按内嵌的 v4 判：2002:7f00:1:: 就是 127.0.0.1，64:ff9b::a00:1 就是 10.0.0.1——
+    这正是绕 SSRF 的经典写法。
+    """
+    if addr.ipv4_mapped:
+        return addr.ipv4_mapped
+    if addr.sixtofour:
+        return addr.sixtofour
+    if addr in _NAT64_V6:
+        return ipaddress.IPv4Address(addr.packed[-4:])
+    return None
+
+
+def classify_address(ip: str) -> str:
+    """地址分三档：internal（内网/本机，必须拒绝）/ unusable（特殊用途，跳过）/ ok（公网，可拨）"""
     try:
-        a = ipaddress.ip_address(ip)
+        addr = ipaddress.ip_address(str(ip).split("%")[0])
     except ValueError:
-        return False
-    # is_private 覆盖 10/8、172.16/12、192.168/16、100.64/10、169.254/16(链路本地，含云元数据段)、
-    # fd00::/8 等；回环/保留/组播/未指定再单独兜一遍
-    return bool(
-        a.is_private or a.is_loopback or a.is_link_local
-        or a.is_reserved or a.is_multicast or a.is_unspecified
-    )
+        return "unusable"
+    if addr.version == 4:
+        return "internal" if _v4_is_internal(addr) else "ok"
+    embedded = _embedded_v4(addr)                        # type: ignore[arg-type]
+    if embedded is not None:
+        return "internal" if _v4_is_internal(embedded) else "ok"
+    if addr.is_loopback or addr.is_multicast or addr.is_unspecified or any(addr in n for n in _INTERNAL_V6):
+        return "internal"
+    if any(addr in n for n in _UNUSABLE_V6):
+        return "unusable"
+    return "ok"
+
+
+def _ip_is_internal(ip: str) -> bool:
+    """出站守卫的口径：只要不是正常公网地址就要用户先登记（含拨不到的特殊用途段）"""
+    return classify_address(ip) != "ok"
 
 
 def is_private_target(url: str) -> bool:
