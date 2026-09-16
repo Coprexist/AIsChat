@@ -74,8 +74,8 @@ async def test_slash_command_reuses_the_single_summary_entry():
     自己再抄一遍格式就会漂移：/compact 原先手拼字符串，漏了「无需压缩」这条分支，
     于是用户看到「上下文已压缩：None → None tokens（压缩率 None%）」，还配着一个 ✓。
     """
-    import app.tools.world as world_tools
     from app.services.world import world_chat_commands as cmds
+    from app.services.world import world_chat_compact as wcc
 
     scripted = [
         {"success": True, "skipped": True, "real_messages": 3, "keep_last": 20},
@@ -83,17 +83,16 @@ async def test_slash_command_reuses_the_single_summary_entry():
         {"success": False, "error": "模型超时"},
     ]
 
-    async def fake_run(_repo, _world, name, arguments, *a, **k):
-        assert name == "compact_context"
+    async def fake_compact(_repo, _world):
         return scripted.pop(0)
 
-    original = world_tools.run_world_tool
-    world_tools.run_world_tool = fake_run
+    original = wcc.compact_session
+    wcc.compact_session = fake_compact
     try:
         ctx = cmds.CmdContext(world_repo=None, world=None, cmd_text="/compact", user_id=1, args="")
         noop, compacted, failed = [await cmds._cmd_compact(ctx) for _ in range(3)]
     finally:
-        world_tools.run_world_tool = original
+        wcc.compact_session = original
 
     # 空操作如实说「无需压缩」：不能假装压过了，更不该冒出 None（也不许硬画 ✓）
     assert noop.ok is True and "无需压缩" in noop.text and "None" not in noop.text

@@ -77,15 +77,15 @@ async def _cmd_clear(ctx: CmdContext) -> str:
 
 
 async def _cmd_compact(ctx: CmdContext) -> CmdResult:
-    """压缩当前会话上下文为摘要（复用主对话的压缩服务）
+    """压缩当前会话上下文（与 AI 的 compact_context 工具**同一份实现**）
 
     文案走 tool_result_summary（**唯一展示入口**）——自己再拼一遍格式就会漂移：
-    原先漏了「无需压缩」这条分支，用户看到的是「上下文已压缩：None → None tokens（压缩率 None%）」，
-    还配着一个 ✓。压缩结果里没有 token 数时，只有工具自己知道该怎么讲。
+    原先漏了「无需压缩」这条分支，用户看到的是「上下文已压缩：None → None tokens（压缩率 None%）」。
     """
-    from app.tools.world import run_world_tool, tool_result_summary
+    from app.services.world.world_chat_compact import compact_session
+    from app.tools.world import tool_result_summary
 
-    result = await run_world_tool(ctx.world_repo, ctx.world, "compact_context", "{}")
+    result = await compact_session(ctx.world_repo, ctx.world)
     return CmdResult(tool_result_summary("compact_context", result), ok=bool(result.get("success")))
 
 
