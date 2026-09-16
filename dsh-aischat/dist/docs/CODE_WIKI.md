@@ -1203,8 +1203,10 @@ Keys inside a namespace are bare (`save`, not `configGroup.save`); the backend
 | `create_world()` | `app/services/world/world_service.py` | L52 | 创建世界 |
 | `world_scheduler()` | `app/services/world/world_scheduler.py` | — | 世界懒加载调度 |
 | `skill_runtime` | `app/services/world/world_skill_runtime.py` | — | 世界 Skill 运行时 |
-| `gate_tool_call()` | `app/services/world/world_ai_mode.py` | — | 工具门禁：按运行模式放行/弹窗/拦截（工具循环唯一入口调用） |
-| `request_approval()` | `app/services/world/world_ai_mode.py` | — | 审批弹窗唯一通道（AI 的 ask_user/present_plan 与平台门禁共用） |
+| `gate_tool_call()` | `app/services/world/world_ai_mode.py` | — | 工具门禁：按运行模式放行/弹窗/拦截；放行时把用户的补充要求一并交回（工具循环唯一入口调用） |
+| `request_approval()` | `app/services/world/world_ai_mode.py` | — | 审批弹窗唯一通道（AI 的 ask_user/present_plan 与平台门禁共用），返回 `Approval`（结论 / 用户原话 / 是否有人应答） |
+| `resolve_approval()` | `app/services/world/world_ai_mode.py` | — | 弹窗回执：收下用户写的理由（`≤NOTE_MAX`）并唤醒等在原地的工具调用 |
+| `with_user_note()` | `app/services/world/world_ai_mode.py` | — | 把用户的理由/补充要求并进工具结果（`user_note` 键的唯一入口） |
 | `sweep_banned_files()` | `app/services/world/world_file_service.py` | — | 禁用后缀兜底扫描强删（唤醒/导入/启动） |
 | `inspect()` | `app/services/world/world_moderation.py` | — | 下载内容审核唯一入口（链接/文件名/正文） |
 
