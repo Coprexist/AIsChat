@@ -729,6 +729,20 @@ OpenAI 兼容接口要求 **assistant 消息里每个 `tool_call_id` 都必须�
 - **时区**：时间按**浏览器本地时区**渲染（`utils/time.ts` 对 naive UTC 串补 `Z` 后交给 `toLocaleTimeString`），
   同一份数据在 UTC 与东八区下分别显示 `04:22` / `12:22`（已实测）
 
+**用户侧：改名 + 把记录拿走**（2026-09-16 用户要求"用户前端可手动改会话名和下载会话记录"）
+- **改名 `PUT /worlds/{id}/chat/session/title`**（`{session_id?, title}`）：省略 `session_id` = 当前会话，
+  也可指定列表里的**任意一场**。清洗与存储仍是 `set_session_title` / `normalize_session_title` **一处**——
+  AI 的 `rename_session` 工具走的是同一个函数，不存在"用户改的规则和 AI 改的不一样"；空串 = 清除命名
+- **导出 `GET /worlds/{id}/chat/export?session_id=&format=md|json`**：只导出**这场对话本身**
+  （正文 + 思考 + 工具调用含报错 + 附件名），与聊天面板所见一致；**不含**系统提示词、模型/实例配置、
+  API Key，也不含其他世界/用户的数据。渲染在 `world_chat_export.py`（纯函数，可单测）：
+  Markdown 给人看（思考用引用块、工具调用用围栏块，与紧邻思考条重复的那份不再导出两遍），
+  JSON 给机器（字段与库表一致）。文件名 `世界名-会话名-日期.ext` 走 RFC 5987（中文名也能正确落盘）；
+  世界自己的 API token 若被 AI 打进工具输出，导出时**按值打码**
+- **前端**：会话列表每行常驻 `✎ / MD / JSON`（不藏 hover，触屏也点得到），当前会话工具条也有 `✎`；
+  改名弹窗用 `Dialog + Input`（留空 = 清除并按编号显示）；下载走 `api.download()`——带鉴权取回 + 落盘
+  的**唯一入口**，文件名以服务端 `Content-Disposition` 为准（RFC 5987 解析）
+
 ---
 
 ## 八、世界线一致性

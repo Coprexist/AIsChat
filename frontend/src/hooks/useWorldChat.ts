@@ -148,6 +148,10 @@ export interface UseWorldChatReturn {
   /** 待用户点按钮的审批项（队列，通常一次只有一条；刷新后由 /chat/status 恢复） */
   approvals: Approval[]
   resolveApproval: (approvalId: string, approved: boolean, note?: string) => Promise<void>
+  /** 给会话改名（sessionId = 列表里任意一场）；返回规范化后的名字，'' = 已清除命名 */
+  renameSession: (sessionId: string, title: string) => Promise<string>
+  /** 下载会话记录（md / json）；文件名以服务端 Content-Disposition 为准 */
+  exportSession: (sessionId: string, format: 'md' | 'json', fallbackName: string) => Promise<void>
 }
 
 export function useWorldChat({ wid, onRefresh, onMsg }: UseWorldChatOptions) {
@@ -716,6 +720,19 @@ export function useWorldChat({ wid, onRefresh, onMsg }: UseWorldChatOptions) {
     } catch { return false }
   }, [wid])
 
+  /** 会话改名：清洗与存储都在后端一处（set_session_title），前端只传原话 */
+  const renameSession = useCallback(async (sessionId: string, title: string) => {
+    const r = await api.put<{ session_id: string; title: string | null }>(
+      `/worlds/${wid}/chat/session/title`, { session_id: sessionId, title })
+    setSessionList((list) => list.map((s) => s.id === r.session_id ? { ...s, title: r.title || undefined } : s))
+    return r.title || ''
+  }, [wid])
+
+  /** 下载会话记录：Markdown / JSON（后端只导出这场对话本身，与面板所见一致） */
+  const exportSession = useCallback(async (sessionId: string, format: 'md' | 'json', fallbackName: string) => {
+    await api.download(`/worlds/${wid}/chat/export?session_id=${encodeURIComponent(sessionId)}&format=${format}`, fallbackName)
+  }, [wid])
+
   /** 审批弹窗回执：先乐观收起弹窗，再告诉后端（服务端据此恢复被挡住的工具调用）。
    *  note = 用户在输入框里写的理由/补充要求，随点击一起交给 AI（后端并进工具结果的 user_note）。 */
   const resolveApproval = useCallback(async (approvalId: string, approved: boolean, note = '') => {
@@ -856,6 +873,7 @@ export function useWorldChat({ wid, onRefresh, onMsg }: UseWorldChatOptions) {
     cmdActive, setCmdActive, cmdQuery, setCmdQuery, cmdIdx, setCmdIdx, cmdFiltered, worldCommands,
     submitText, insertSuggestion, isAtBottom, chatCanScroll, scrollToBottom, forceScrollToBottom,
     currentSession, sessionList, switchSession, newSession, togglePin, unreadCount,
+    renameSession, exportSession,
     approvals, resolveApproval,
   }
 }

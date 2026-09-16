@@ -394,15 +394,16 @@ def normalize_session_title(raw: str) -> str | None:
     return title[:SESSION_TITLE_MAX]
 
 
-def set_session_title(world, title: str) -> str | None:
-    """给**当前会话**命名/改名（纯函数：只改 world.config，调用方负责 commit）。
+def set_session_title(world, title: str, session_id: str | None = None) -> str | None:
+    """给会话命名/改名（纯函数：只改 world.config，调用方负责 commit）。
 
-    会话名归 AI 自己写（用户也可以看）——列表里显示名字比显示 w12:m:3f9a… 好认。
+    session_id 省略 = **当前会话**（AI 的 rename_session 走这条）；前端会话列表要改
+    "列表里的任意一场"时显式传 id（含 'default'）——清洗规则、存储位置都只有这一处。
     返回规范化后的名字；名字为空则清除命名（回落到默认显示）。
     """
     name = normalize_session_title(title)
     cfg = dict(world.config or {})
-    key = cfg.get("current_session") or "default"
+    key = (cfg.get("current_session") or "default") if session_id is None else (session_id or "default")
     sessions = dict(cfg.get("sessions") or {})
     meta = dict(sessions.get(key) or {})
     if name:

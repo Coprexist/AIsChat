@@ -192,6 +192,38 @@ async function safeRequest<T = any>(
 
 const jsonBody = (body?: any) => body instanceof FormData ? body : JSON.stringify(body)
 
+/** 从 Content-Disposition 取文件名（RFC 5987 优先，中文名也能还原） */
+function filenameFromDisposition(header: string | null): string {
+  if (!header) return ''
+  const star = /filename\*=UTF-8''([^;]+)/i.exec(header)
+  if (star) { try { return decodeURIComponent(star[1].trim()) } catch { return star[1].trim() } }
+  const plain = /filename="?([^";]+)"?/i.exec(header)
+  return plain ? plain[1].trim() : ''
+}
+
+/** 带鉴权下载文件（唯一入口：会话导出等"另存为"都走它）。
+ *  复用同一套 base + token；文件名以服务端为准，拿不到才用兜底名。 */
+async function downloadFile(path: string, fallbackName: string): Promise<void> {
+  const token = localStorage.getItem('access_token')
+  const res = await fetch(`${getApiBaseUrl()}${path}`, {
+    headers: token ? { Authorization: `Bearer ${token}` } : {},
+  })
+  if (res.status === 401) { handleUnauthorized(path); throw new ApiError('Unauthorized', 401) }
+  if (!res.ok) {
+    let detail = `HTTP ${res.status}`
+    try { detail = (await res.json())?.detail || detail } catch { /* 非 JSON 就用状态码 */ }
+    throw new ApiError(detail, res.status)
+  }
+  const url = URL.createObjectURL(await res.blob())
+  const a = document.createElement('a')
+  a.href = url
+  a.download = filenameFromDisposition(res.headers.get('Content-Disposition')) || fallbackName
+  document.body.appendChild(a)
+  a.click()
+  a.remove()
+  URL.revokeObjectURL(url)
+}
+
 export const api = {
   get: <T = any>(path: string) => request<T>(path),
   post: <T = any>(path: string, body?: any) =>
@@ -203,6 +235,7 @@ export const api = {
   delete: <T = any>(path: string) =>
     request<T>(path, { method: 'DELETE' }),
   upload: uploadFile,
+  download: downloadFile,
   // Result 风格 API（不抛异常）
   safe: {
     get: <T = any>(path: string) => safeRequest<T>(path),

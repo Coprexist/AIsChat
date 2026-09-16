@@ -5,7 +5,7 @@
 """
 import logging
 
-from fastapi import APIRouter, Depends, HTTPException, Query, UploadFile, Form
+from fastapi import APIRouter, Depends, HTTPException, Query, Response, UploadFile, Form
 from pydantic import BaseModel, Field
 from sqlalchemy import select, func
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -99,6 +99,12 @@ class ChatSessionRequest(BaseModel):
 class ChatPinRequest(BaseModel):
     """收藏/取消收藏当前会话"""
     pin: bool = True
+
+
+class SessionTitleRequest(BaseModel):
+    """会话改名（用户在前端手动改；与 AI 的 rename_session 共用同一处清洗规则）"""
+    session_id: str | None = Field(default=None, description="留空 = 当前会话")
+    title: str = Field(default="", max_length=200, description="新名字；空字符串 = 清除命名")
 
 
 class AiModeRequest(BaseModel):
@@ -912,6 +918,66 @@ async def new_chat_session(
     return await _session_payload(db, world_repo, world_id, world, sid)
 
 
+
+
+@router.put("/{world_id}/chat/session/title")
+async def rename_chat_session(
+    world_id: int,
+    req: SessionTitleRequest,
+    current_user: dict = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """给会话改名（默认当前会话，也可指定会话列表里的任意一场）。
+
+    名字的清洗与存储只有一处（set_session_title / normalize_session_title）：
+    AI 的 rename_session 工具走的是同一个函数，不存在"用户改的和 AI 改的规则不一样"。
+    """
+    await _require_owner(db, world_id, current_user["user_id"])
+    from app.models.world import World
+    from app.services.world.world_chat_service import set_session_title
+    world = await db.get(World, world_id)
+    if world is None:
+        raise HTTPException(status_code=404, detail="世界不存在")
+    sid = req.session_id or (world.config or {}).get("current_session") or "default"
+    name = set_session_title(world, req.title, req.session_id)
+    await db.commit()
+    return {"session_id": sid, "title": name}
+
+
+@router.get("/{world_id}/chat/export")
+async def export_chat_session(
+    world_id: int,
+    session_id: str = Query("default", description="要导出的会话 id（default = 默认会话）"),
+    format: str = Query("md", description="md | json"),
+    current_user: dict = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+    world_repo: WorldRepository = Depends(get_world_repo),
+):
+    """下载会话记录（Markdown / JSON，仅创建者）。
+
+    只导出**这场对话本身**（正文 + 思考 + 工具调用 + 附件名）——与聊天面板所见一致；
+    不含系统提示词、模型/实例配置、API Key，也不含其他世界/用户的数据。
+    文件名走 RFC 5987，中文名字也能正确落盘。
+    """
+    await _require_owner(db, world_id, current_user["user_id"])
+    if format not in ("md", "json"):
+        raise HTTPException(status_code=400, detail="format 必须是 md 或 json")
+    from urllib.parse import quote
+    from app.models.world import World
+    from app.services.world.world_chat_export import collect_messages, render
+    from app.services.world.world_chat_service import list_sessions
+    world = await db.get(World, world_id)
+    if world is None:
+        raise HTTPException(status_code=404, detail="世界不存在")
+    session = next((s for s in await list_sessions(world_repo, world) if s["id"] == session_id), None)
+    if session is None:
+        raise HTTPException(status_code=404, detail="会话不存在")
+    body, media_type, filename = render(world, session, await collect_messages(world_repo, world_id, session_id), format)
+    return Response(
+        content=body, media_type=media_type,
+        headers={"Content-Disposition":
+                 f"attachment; filename=\"transcript.{format}\"; filename*=UTF-8''{quote(filename)}"},
+    )
 
 
 @router.post("/{world_id}/chat/session/pin")

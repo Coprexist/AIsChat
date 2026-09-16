@@ -1,8 +1,8 @@
 import { memo, useState, useRef, useCallback, useMemo, forwardRef, useImperativeHandle, useEffect } from 'react'
-import { Send, Plus, X, ChevronRight, Brain, ArrowDown, FileText, Search, Globe, Terminal, Package, Clock, Wrench, Eraser, Pin, ChevronDown, Copy, RefreshCw, Paperclip, ShieldAlert } from 'lucide-react'
+import { Send, Plus, X, ChevronRight, Brain, ArrowDown, FileText, Search, Globe, Terminal, Package, Clock, Wrench, Eraser, Pin, ChevronDown, Copy, RefreshCw, Paperclip, ShieldAlert, Pencil, Download } from 'lucide-react'
 import MarkdownContent from './shared/MarkdownContent'
 import CodeRenderer from './shared/CodeRenderer'
-import { Button, Dialog } from './ui'
+import { Button, Dialog, Input } from './ui'
 import { useWorldChat, type Approval, type ChatMsg } from '../hooks/useWorldChat'
 import { useAttachmentUpload, isImageAttachment } from '../hooks/useAttachmentUpload'
 import { AttachmentChips, DropMask } from './AttachmentChips'
@@ -320,6 +320,29 @@ const WorldChatPanel = memo(forwardRef<WorldChatHandle, WorldChatPanelProps>(({ 
 
   // ── 会话列表下拉 ──
   const [sessionOpen, setSessionOpen] = useState(false)
+  // ── 会话改名弹窗（用户手动改；AI 用 rename_session 工具改的是同一个字段）──
+  const [renaming, setRenaming] = useState<{ id: string } | null>(null)
+  const [renameValue, setRenameValue] = useState('')
+
+  /** 改名提交：留空 = 清除命名（列表里回落到会话编号）；清洗规则在后端一处 */
+  const submitRename = useCallback(async () => {
+    if (!renaming) return
+    try {
+      await chat.renameSession(renaming.id, renameValue)
+      setRenaming(null)
+    } catch (e: any) {
+      onMsg?.(t('tool:world.session.renameFailed') + (e?.message || e))
+    }
+  }, [renaming, renameValue, chat, onMsg, t])
+
+  /** 下载会话记录：Markdown / JSON（文件名以服务端 Content-Disposition 为准） */
+  const downloadSession = useCallback(async (id: string, format: 'md' | 'json', name?: string) => {
+    try {
+      await chat.exportSession(id, format, `${name || id}.${format}`)
+    } catch (e: any) {
+      onMsg?.(t('tool:world.session.exportFailed') + (e?.message || e))
+    }
+  }, [chat, onMsg, t])
 
   // ── 本地输入状态（打字时只有此组件重渲染） ──
   const [localInput, setLocalInput] = useState('')
@@ -673,6 +696,13 @@ const WorldChatPanel = memo(forwardRef<WorldChatHandle, WorldChatPanelProps>(({ 
           title={chat.currentSession}
         >{currentTitle || (chat.currentSession === 'default' ? '默认会话' : chat.currentSession)}</span>
         <button
+          onClick={() => { setRenaming({ id: chat.currentSession }); setRenameValue(currentTitle || '') }}
+          className="shrink-0 p-1 rounded transition-colors hover:bg-elevated hover:text-textSecondary"
+          title={t('tool:world.session.rename')}
+        >
+          <Pencil size={11} />
+        </button>
+        <button
           onClick={async () => { const p = await chat.togglePin(); if (!p && onMsg) onMsg('已取消收藏（收藏的会话不会被自动清理）') }}
           className={`shrink-0 p-1 rounded transition-colors ${chat.sessionList.find((s) => s.id === chat.currentSession)?.pinned ? 'text-accent-400 bg-accent-400/10' : 'hover:bg-elevated hover:text-textSecondary'}`}
           title={chat.sessionList.find((s) => s.id === chat.currentSession)?.pinned ? '取消收藏' : '收藏此会话（不被自动清理）'}
@@ -695,26 +725,68 @@ const WorldChatPanel = memo(forwardRef<WorldChatHandle, WorldChatPanelProps>(({ 
               会话列表 · 按最近聊天排序 <Pin size={9} className="inline text-accent-400 fill-current" /> 收藏不清理
             </div>
             {chat.sessionList.map((s) => (
-              <button
+              <div
                 key={s.id}
-                onClick={async () => { if (await chat.switchSession(s.id)) setSessionOpen(false) }}
-                className={`w-full flex items-center gap-1.5 px-3 py-1.5 text-2xs text-left border-b border-border/40 last:border-b-0 transition-colors ${s.id === chat.currentSession ? 'bg-primary-500/15 text-primary-300' : 'hover:bg-surface text-textSecondary'}`}
+                className={`flex items-center gap-0.5 pl-3 pr-1.5 border-b border-border/40 last:border-b-0 transition-colors ${s.id === chat.currentSession ? 'bg-primary-500/15 text-primary-300' : 'text-textSecondary'}`}
               >
-                <span
-                  className={`truncate min-w-0 flex-1 ${s.title ? '' : 'font-mono'}`}
-                  title={s.title ? `${s.title}
+                <button
+                  onClick={async () => { if (await chat.switchSession(s.id)) setSessionOpen(false) }}
+                  className="flex items-center gap-1.5 min-w-0 flex-1 py-1.5 text-2xs text-left hover:text-textPrimary transition-colors"
+                >
+                  <span
+                    className={`truncate min-w-0 flex-1 ${s.title ? '' : 'font-mono'}`}
+                    title={s.title ? `${s.title}
 ${s.id}` : s.id}
-                >{s.title || (s.id === 'default' ? '默认会话' : s.id)}</span>
-                {s.last_active_at && (
-                  <span className="shrink-0 text-3xs text-textMuted">{formatRelativeTime(s.last_active_at, lang)}</span>
-                )}
-                {/* 当前会话靠整行高亮标识，不再写"当前"两个字（用户 2026-09-15 反馈） */}
-                {s.pinned && <Pin size={10} className="shrink-0 text-accent-400 fill-current" />}
-              </button>
+                  >{s.title || (s.id === 'default' ? '默认会话' : s.id)}</span>
+                  {s.last_active_at && (
+                    <span className="shrink-0 text-3xs text-textMuted">{formatRelativeTime(s.last_active_at, lang)}</span>
+                  )}
+                  {/* 当前会话靠整行高亮标识，不再写"当前"两个字（用户 2026-09-15 反馈） */}
+                  {s.pinned && <Pin size={10} className="shrink-0 text-accent-400 fill-current" />}
+                </button>
+                {/* 每场都能改名与导出（用户 2026-09-16 要求）；常驻不藏 hover，触屏也点得到 */}
+                <button
+                  onClick={() => { setRenaming({ id: s.id }); setRenameValue(s.title || '') }}
+                  className="shrink-0 p-1 rounded text-textMuted hover:text-textSecondary hover:bg-surface transition-colors"
+                  title={t('tool:world.session.rename')}
+                ><Pencil size={10} /></button>
+                <button
+                  onClick={() => downloadSession(s.id, 'md', s.title)}
+                  className="shrink-0 px-1 py-0.5 rounded text-3xs text-textMuted hover:text-textSecondary hover:bg-surface transition-colors"
+                  title={t('tool:world.session.exportMd')}
+                >MD</button>
+                <button
+                  onClick={() => downloadSession(s.id, 'json', s.title)}
+                  className="shrink-0 px-1 py-0.5 rounded text-3xs text-textMuted hover:text-textSecondary hover:bg-surface transition-colors"
+                  title={t('tool:world.session.exportJson')}
+                >JSON</button>
+              </div>
             ))}
           </div>
         )}
       </div>
+
+      {/* 会话改名弹窗（留空 = 清除命名，列表里回落到会话编号） */}
+      {renaming && (
+        <Dialog className="world-msg flex items-center justify-center p-4" onClose={() => setRenaming(null)}>
+          <div className="w-full max-w-sm bg-surface border border-border rounded-dialog shadow-xl p-4 space-y-3">
+            <div className="text-sm font-medium">{t('tool:world.session.renameTitle')}</div>
+            <Input
+              autoFocus
+              maxLength={20}
+              value={renameValue}
+              onChange={(e) => setRenameValue(e.target.value)}
+              onKeyDown={(e) => { if (e.key === 'Enter') submitRename() }}
+              placeholder={t('tool:world.session.renamePlaceholder')}
+              hint={t('tool:world.session.renameHint')}
+            />
+            <div className="flex justify-end gap-2">
+              <Button size="sm" variant="outline" onClick={() => setRenaming(null)}>{t('common.cancel')}</Button>
+              <Button size="sm" onClick={submitRename}>{t('common.save')}</Button>
+            </div>
+          </div>
+        </Dialog>
+      )}
 
       {/* 输入区（图片可直接拖进来放下，与点回形针等价） */}
       <div className="p-3 border-t border-border relative" {...attachments.zoneProps('input')} {...attachments.pasteProps}>
