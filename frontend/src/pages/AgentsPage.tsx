@@ -93,21 +93,7 @@ export default function AgentsPage() {
 
   const handleExport = async (agent: Agent) => {
     try {
-      const token = localStorage.getItem('access_token')
-      const res = await fetch(`/api/agents/${agent.id}/export`, {
-        headers: { 'Authorization': `Bearer ${token}` },
-      })
-      if (!res.ok) {
-        const err = await res.json()
-        throw new Error(err.detail || t('error.exportFailed'))
-      }
-      const blob = await res.blob()
-      const url = URL.createObjectURL(blob)
-      const a = document.createElement('a')
-      a.href = url
-      a.download = `soul_${agent.name}.json`
-      a.click()
-      URL.revokeObjectURL(url)
+      await api.download(`/agents/${agent.id}/export`, `soul_${agent.name}.json`)
     } catch (err: any) {
       console.error('导出失败:', err)
       alert(err.message || t('error.exportFailed'))

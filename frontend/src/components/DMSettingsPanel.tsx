@@ -105,23 +105,9 @@ export default function DMSettingsPanel({ sessionId, partner, myDndUntil, onClos
     setExporting(true)
     setExportError('')
     try {
-      const token = localStorage.getItem('access_token')
-      const res = await fetch(`/api/dm/${sessionId}/export?fmt=${exportFormat}`, {
-        headers: { 'Authorization': `Bearer ${token}` },
-      })
-      if (!res.ok) {
-        const err = await res.json()
-        throw new Error(err.detail || t('error.exportFailed'))
-      }
-      const blob = await res.blob()
       const ext = exportFormat === 'txt' ? 'txt' : exportFormat === 'html' ? 'html' : 'json'
-      const filename = `dm_${partner?.name || sessionId}_${new Date().toISOString().slice(0, 10)}.${ext}`
-      const url = URL.createObjectURL(blob)
-      const a = document.createElement('a')
-      a.href = url
-      a.download = filename
-      a.click()
-      URL.revokeObjectURL(url)
+      await api.download(`/dm/${sessionId}/export?fmt=${exportFormat}`,
+                         `dm_${partner?.name || sessionId}_${new Date().toISOString().slice(0, 10)}.${ext}`)
     } catch (e: any) {
       setExportError(e.message)
     } finally {

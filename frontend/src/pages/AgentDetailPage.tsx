@@ -446,18 +446,8 @@ export default function AgentDetailPage() {
   const exportLog = async (logId: number, format: 'json' | 'md') => {
     setLogExporting(true)
     try {
-      const token = localStorage.getItem('access_token')
-      const res = await fetch(`/api/conversation-log/agents/${agentId}/logs/${logId}/export?format=${format}`, {
-        headers: { Authorization: `Bearer ${token}` },
-      })
-      if (!res.ok) throw new Error(t('error.exportFailed'))
-      const blob = await res.blob()
-      const url = URL.createObjectURL(blob)
-      const a = document.createElement('a')
-      a.href = url
-      a.download = `log-${logId}.${format === 'md' ? 'md' : 'json'}`
-      a.click()
-      URL.revokeObjectURL(url)
+      await api.download(`/conversation-log/agents/${agentId}/logs/${logId}/export?format=${format}`,
+                         `log-${logId}.${format === 'md' ? 'md' : 'json'}`)
     } catch { /* ignore */ }
     finally { setLogExporting(false) }
   }
@@ -594,17 +584,7 @@ export default function AgentDetailPage() {
   // Export
   const handleExport = async () => {
     try {
-      const token = localStorage.getItem('access_token')
-      const res = await fetch(`/api/agents/${agentId}/export`, {
-        headers: { Authorization: `Bearer ${token}` },
-      })
-      const blob = await res.blob()
-      const url = URL.createObjectURL(blob)
-      const a = document.createElement('a')
-      a.href = url
-      a.download = `soul_${agent?.name || 'agent'}.json`
-      a.click()
-      URL.revokeObjectURL(url)
+      await api.download(`/agents/${agentId}/export`, `soul_${agent?.name || 'agent'}.json`)
     } catch (err: any) {
       alert(t('error.exportFailed'))
     }

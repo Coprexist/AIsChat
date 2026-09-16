@@ -404,25 +404,13 @@ export default function GroupSettingsPanel({ group, onClose, onUpdate, onLeave }
     setExporting(true)
     setExportError('')
     try {
-      const token = localStorage.getItem('access_token')
       const params = new URLSearchParams({ fmt: exportFormat })
       if (dateFrom) params.set('date_from', dateFrom)
       if (dateTo) params.set('date_to', dateTo)
-      const res = await fetch(`/api/groups/${group.id}/export?${params}`, {
-        headers: { 'Authorization': `Bearer ${token}` },
-      })
-      if (!res.ok) {
-        const err = await res.json()
-        throw new Error(err.detail || t('error.exportFailed'))
-      }
-      const blob = await res.blob()
       const ext = exportFormat === 'txt' ? 'txt' : exportFormat === 'html' ? 'html' : 'json'
-      const url = URL.createObjectURL(blob)
-      const a = document.createElement('a')
-      a.href = url
-      a.download = `chat_${group.name}_${new Date().toISOString().slice(0, 10)}.${ext}`
-      a.click()
-      URL.revokeObjectURL(url)
+      // 取回+落盘走唯一入口（以前这里手写 /api 前缀，嵌进 DSH 面板会 404）
+      await api.download(`/groups/${group.id}/export?${params}`,
+                         `chat_${group.name}_${new Date().toISOString().slice(0, 10)}.${ext}`)
     } catch (e: any) {
       setExportError(e.message)
     } finally {

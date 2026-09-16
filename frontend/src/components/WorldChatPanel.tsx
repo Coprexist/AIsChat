@@ -113,6 +113,42 @@ function ModeSwitch({ mode, busy, onChange }: { mode: string; busy: boolean; onC
   )
 }
 
+/** 会话记录下载（唯一入口）：工具条与「会话列表」每行共用同一个菜单，
+ *  避免"两处各写一遍下载按钮"——用户 2026-09-16 反馈"我没看到怎么下载"，
+ *  就是因为只有列表里那行小字 MD/JSON，工具条上什么都没有。 */
+function SessionExportMenu({ onPick, label }: { onPick: (fmt: 'md' | 'json') => void; label?: string }) {
+  const t = useT()
+  const [open, setOpen] = useState(false)
+  return (
+    <div className="relative shrink-0">
+      <button
+        onClick={() => setOpen((v) => !v)}
+        className="inline-flex items-center gap-1 p-1 rounded transition-colors hover:bg-elevated hover:text-textSecondary"
+        title={t('tool:world.session.export')}
+      >
+        <Download size={11} />
+        {label && <span>{label}</span>}
+      </button>
+      {open && (
+        <>
+          {/* 点空白处收起（透明遮罩：比 document 监听简单，也不会和别的弹层打架） */}
+          <div className="fixed inset-0 z-modal" onClick={() => setOpen(false)} />
+          <div className="absolute right-0 bottom-full mb-1 w-44 py-1 rounded-card bg-elevated border border-border shadow-xl z-toast">
+            <button
+              onClick={() => { setOpen(false); onPick('md') }}
+              className="w-full text-left px-3 py-1.5 text-2xs text-textSecondary hover:bg-surface hover:text-textPrimary transition-colors"
+            >{t('tool:world.session.exportMd')}</button>
+            <button
+              onClick={() => { setOpen(false); onPick('json') }}
+              className="w-full text-left px-3 py-1.5 text-2xs text-textSecondary hover:bg-surface hover:text-textPrimary transition-colors"
+            >{t('tool:world.session.exportJson')}</button>
+          </div>
+        </>
+      )}
+    </div>
+  )
+}
+
 /** 审批弹窗（审阅/计划模式）：AI 请求下载/删除/改动机制，等用户点按钮，选完服务端自动继续。
  *  事件类型关键词由后端按下发的 kind 渲染，用户一眼看清在批什么。 */
 function ApprovalDialog({ approval, onDecide }: { approval: Approval; onDecide: (ok: boolean, note: string) => void }) {
@@ -702,6 +738,10 @@ const WorldChatPanel = memo(forwardRef<WorldChatHandle, WorldChatPanelProps>(({ 
         >
           <Pencil size={11} />
         </button>
+        <SessionExportMenu
+          label={t('tool:world.session.export')}
+          onPick={(fmt) => downloadSession(chat.currentSession, fmt, currentTitle)}
+        />
         <button
           onClick={async () => { const p = await chat.togglePin(); if (!p && onMsg) onMsg('已取消收藏（收藏的会话不会被自动清理）') }}
           className={`shrink-0 p-1 rounded transition-colors ${chat.sessionList.find((s) => s.id === chat.currentSession)?.pinned ? 'text-accent-400 bg-accent-400/10' : 'hover:bg-elevated hover:text-textSecondary'}`}
@@ -750,16 +790,7 @@ ${s.id}` : s.id}
                   className="shrink-0 p-1 rounded text-textMuted hover:text-textSecondary hover:bg-surface transition-colors"
                   title={t('tool:world.session.rename')}
                 ><Pencil size={10} /></button>
-                <button
-                  onClick={() => downloadSession(s.id, 'md', s.title)}
-                  className="shrink-0 px-1 py-0.5 rounded text-3xs text-textMuted hover:text-textSecondary hover:bg-surface transition-colors"
-                  title={t('tool:world.session.exportMd')}
-                >MD</button>
-                <button
-                  onClick={() => downloadSession(s.id, 'json', s.title)}
-                  className="shrink-0 px-1 py-0.5 rounded text-3xs text-textMuted hover:text-textSecondary hover:bg-surface transition-colors"
-                  title={t('tool:world.session.exportJson')}
-                >JSON</button>
+                <SessionExportMenu onPick={(fmt) => downloadSession(s.id, fmt, s.title)} />
               </div>
             ))}
           </div>

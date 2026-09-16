@@ -4,6 +4,7 @@
  * 桌面端从 localStorage 读取实例地址拼 API 路径，Web 端保持 '/api' 相对路径
  */
 import { type Result, success, failure } from '../utils/result'
+import { saveBlob } from '../utils/download'
 
 /** 嵌入模式检测（与 embed/bridge 的 isEmbedded 同规则；此处独立实现避免循环依赖） */
 function isEmbeddedMode(): boolean {
@@ -201,12 +202,22 @@ function filenameFromDisposition(header: string | null): string {
   return plain ? plain[1].trim() : ''
 }
 
-/** 带鉴权下载文件（唯一入口：会话导出等"另存为"都走它）。
- *  复用同一套 base + token；文件名以服务端为准，拿不到才用兜底名。 */
-async function downloadFile(path: string, fallbackName: string): Promise<void> {
+/** 带鉴权下载文件（**全站"另存为"唯一入口**：会话/群聊/私信导出、备份、世界包、docx 转换…）
+ *
+ *  复用同一套 base + token（嵌入模式走宿主代理 /aischat-base，桌面端走实例地址——
+ *  以前各处自己写 `/api/...`，嵌进 DSH 面板就 404）；
+ *  文件名以服务端 Content-Disposition 为准（RFC 5987，中文名也正确），拿不到才用兜底名；
+ *  init 支持 POST（如 docx：先 POST 拿二进制）。落盘交给 utils/download.saveBlob。 */
+async function downloadFile(path: string, fallbackName: string,
+                            init: { method?: string; body?: any } = {}): Promise<void> {
   const token = localStorage.getItem('access_token')
+  const headers: Record<string, string> = {}
+  if (token) headers['Authorization'] = `Bearer ${token}`
+  if (init.body !== undefined) headers['Content-Type'] = 'application/json'
   const res = await fetch(`${getApiBaseUrl()}${path}`, {
-    headers: token ? { Authorization: `Bearer ${token}` } : {},
+    method: init.method || 'GET',
+    headers,
+    body: init.body === undefined ? undefined : JSON.stringify(init.body),
   })
   if (res.status === 401) { handleUnauthorized(path); throw new ApiError('Unauthorized', 401) }
   if (!res.ok) {
@@ -214,14 +225,7 @@ async function downloadFile(path: string, fallbackName: string): Promise<void> {
     try { detail = (await res.json())?.detail || detail } catch { /* 非 JSON 就用状态码 */ }
     throw new ApiError(detail, res.status)
   }
-  const url = URL.createObjectURL(await res.blob())
-  const a = document.createElement('a')
-  a.href = url
-  a.download = filenameFromDisposition(res.headers.get('Content-Disposition')) || fallbackName
-  document.body.appendChild(a)
-  a.click()
-  a.remove()
-  URL.revokeObjectURL(url)
+  saveBlob(await res.blob(), filenameFromDisposition(res.headers.get('Content-Disposition')) || fallbackName)
 }
 
 export const api = {

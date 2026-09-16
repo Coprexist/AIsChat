@@ -8,6 +8,7 @@ import { useEffect, useState, useCallback, useRef, useMemo } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { ChevronLeft, ChevronRight, Folder, FolderOpen, FolderInput, Upload, Plus, Pencil, Eye, MessageCircle, Save, MoreHorizontal, FileText, Trash2, Settings, RefreshCw, ExternalLink, BookOpen, X, Download } from 'lucide-react'
 import { api } from '../api/client'
+import { saveText } from '../utils/download'
 import GroupManagerModal from '../components/GroupManagerModal'
 import WorldChatPanel, { type WorldChatHandle } from '../components/WorldChatPanel'
 import MarkdownContent from '../components/shared/MarkdownContent'
@@ -106,15 +107,9 @@ export default function WorldDesignPage() {
       setDocsContent(r.content || '')
     } catch { setDocsContent('（文档读取失败）') } finally { setDocsLoading(false) }
   }
-  // 下载文档（md 文件）
+  // 下载文档（md 文件）：本地内容落盘走 utils/download（唯一入口）
   const downloadDoc = (content: string, filename: string) => {
-    const blob = new Blob([content], { type: 'text/markdown;charset=utf-8' })
-    const url = URL.createObjectURL(blob)
-    const a = document.createElement('a')
-    a.href = url
-    a.download = filename
-    a.click()
-    URL.revokeObjectURL(url)
+    saveText(content, filename, 'text/markdown;charset=utf-8')
   }
   // 收集全部文档 md（合并）
   const getAllDocsMd = async () => {
@@ -130,23 +125,9 @@ export default function WorldDesignPage() {
   // 下载 docx（pandoc，POST 原生 fetch）
   const downloadDocx = async (md: string, filename: string) => {
     try {
-      const base = (localStorage.getItem('instance_url') || '').replace(/\/+$/, '') + '/api'
-      const res = await fetch(`${base}/kb/convert`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${localStorage.getItem('access_token')}`,
-        },
-        body: JSON.stringify({ md, filename }),
-      })
-      if (!res.ok) throw new Error((await res.text()) || '导出失败')
-      const blob = await res.blob()
-      const url = URL.createObjectURL(blob)
-      const a = document.createElement('a')
-      a.href = url
-      a.download = filename.endsWith('.docx') ? filename : filename + '.docx'
-      a.click()
-      URL.revokeObjectURL(url)
+      // docx 转换：POST 拿二进制（download 支持 POST），取回+落盘走唯一入口
+      await api.download('/kb/convert', filename.endsWith('.docx') ? filename : filename + '.docx',
+                         { method: 'POST', body: { md, filename } })
     } catch (e: any) { setMsg(`docx 导出失败: ${e?.message || e}`) }
   }
   // 下载弹窗确认：按格式执行
@@ -391,18 +372,7 @@ export default function WorldDesignPage() {
   const downloadWorldZip = async (includeContent: boolean) => {
     setWorldZipOpen(false)
     try {
-      const base = (localStorage.getItem('instance_url') || '').replace(/\/+$/, '') + '/api'
-      const res = await fetch(`${base}/worlds/${worldId}/export?include_content=${includeContent}`, {
-        headers: { 'Authorization': `Bearer ${localStorage.getItem('access_token')}` },
-      })
-      if (!res.ok) throw new Error((await res.text()).slice(0, 120) || '下载失败')
-      const blob = await res.blob()
-      const url = URL.createObjectURL(blob)
-      const a = document.createElement('a')
-      a.href = url
-      a.download = `world_${worldId}.zip`
-      a.click()
-      URL.revokeObjectURL(url)
+      await api.download(`/worlds/${worldId}/export?include_content=${includeContent}`, `world_${worldId}.zip`)
       setMsg(includeContent ? '已下载世界包（含数据文件）' : '已下载世界包（不含数据文件）')
     } catch (err: any) { setMsg(`下载失败: ${err?.message || err}`) }
   }

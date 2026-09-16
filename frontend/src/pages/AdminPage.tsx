@@ -987,33 +987,15 @@ function BackupTab() {
     }
   }
 
-  const downloadFile = (blob: Blob, filename: string) => {
-    const url = URL.createObjectURL(blob)
-    const a = document.createElement('a')
-    a.href = url
-    a.download = filename
-    a.click()
-    URL.revokeObjectURL(url)
-  }
-
   // ── 仅数据库备份 ──
   const handleBackup = async () => {
     setDownloading(true)
     setError('')
     setMessage('')
     try {
-      const token = localStorage.getItem('access_token')
-      const res = await fetch('/api/admin/backup/download', {
-        headers: { 'Authorization': `Bearer ${token}` },
-      })
-      if (!res.ok) {
-        const err = await res.json()
-        throw new Error(err.detail || t('admin.downloadFailed'))
-      }
-      const blob = await res.blob()
-      // 文件扩展名由后端决定（.sql 或 .db）
-      const ext = blob.type === 'application/sql' ? '.sql' : dbExt
-      downloadFile(blob, `aischat_backup_${new Date().toISOString().slice(0, 10)}${ext}`)
+      // 文件名（含 .sql/.db 扩展名）由后端 Content-Disposition 决定，前端不再猜
+      await api.download('/admin/backup/download',
+                         `aischat_backup_${new Date().toISOString().slice(0, 10)}${dbExt}`)
       setMessage(t('admin.dbBackupSuccess'))
     } catch (e: any) {
       setError(e.message)
@@ -1028,16 +1010,8 @@ function BackupTab() {
     setError('')
     setMessage('')
     try {
-      const token = localStorage.getItem('access_token')
-      const res = await fetch('/api/admin/backup/full/download', {
-        headers: { 'Authorization': `Bearer ${token}` },
-      })
-      if (!res.ok) {
-        const err = await res.json()
-        throw new Error(err.detail || t('admin.downloadFailed'))
-      }
-      const blob = await res.blob()
-      downloadFile(blob, `aischat_full_${new Date().toISOString().slice(0, 10)}.tar.gz`)
+      await api.download('/admin/backup/full/download',
+                         `aischat_full_${new Date().toISOString().slice(0, 10)}.tar.gz`)
       setMessage(t('admin.fullBackupSuccess'))
     } catch (e: any) {
       setError(e.message)
