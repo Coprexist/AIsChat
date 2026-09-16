@@ -34,7 +34,18 @@ class CmdContext:
     args: str              # 命令头之后的参数（已 strip），如 "w1:abc"
 
 
-CmdHandler = Callable[[CmdContext], Awaitable["str | None"]]
+@dataclass
+class CmdResult:
+    """一条命令的结果：text = 写进对话的那句话，ok = 卡片该画 ✓ 还是失败。
+
+    handler 返回 str 等价于 CmdResult(text)：七条命令里只有 /compact 有"没执行成"这种结局，
+    其余不必包一层。ok 由这里说了算，调用方不再硬写 success=True（否则失败也画 ✓）。
+    """
+    text: str
+    ok: bool = True
+
+
+CmdHandler = Callable[[CmdContext], Awaitable["str | CmdResult | None"]]
 
 
 # ═══════════════════════════════════════════════════════════════
@@ -65,16 +76,17 @@ async def _cmd_clear(ctx: CmdContext) -> str:
     return "已清空当前会话上下文（历史消息+摘要+工作流记忆），其他会话保留；长期记忆保留——AI 将从记忆恢复工作状态。"
 
 
-async def _cmd_compact(ctx: CmdContext) -> str:
-    """压缩当前会话上下文为摘要（复用主对话的压缩服务）"""
-    from app.tools.world import run_world_tool
+async def _cmd_compact(ctx: CmdContext) -> CmdResult:
+    """压缩当前会话上下文为摘要（复用主对话的压缩服务）
+
+    文案走 tool_result_summary（**唯一展示入口**）——自己再拼一遍格式就会漂移：
+    原先漏了「无需压缩」这条分支，用户看到的是「上下文已压缩：None → None tokens（压缩率 None%）」，
+    还配着一个 ✓。压缩结果里没有 token 数时，只有工具自己知道该怎么讲。
+    """
+    from app.tools.world import run_world_tool, tool_result_summary
 
     result = await run_world_tool(ctx.world_repo, ctx.world, "compact_context", "{}")
-    if result.get("success"):
-        return (f"上下文已压缩：{result.get('before_tokens')} → "
-                f"{result.get('after_tokens')} tokens"
-                f"（压缩率 {result.get('compression_ratio_pct')}%）")
-    return f"⚠️ 压缩未执行：{result.get('error', '未知原因')}"
+    return CmdResult(tool_result_summary("compact_context", result), ok=bool(result.get("success")))
 
 
 async def _cmd_new(ctx: CmdContext) -> str:
@@ -206,8 +218,8 @@ def may_insert_mid_turn(text: str) -> bool:
     return bool(entry and entry["mid_turn"])
 
 
-async def run_slash_command(world_repo: WorldRepository, world, cmd_text: str, user_id: int | None = None) -> str | None:
-    """执行斜杠命令，返回结果 note；非命令 / 未注册命令返回 None（调用方继续走 LLM 流）"""
+async def run_slash_command(world_repo: WorldRepository, world, cmd_text: str, user_id: int | None = None) -> CmdResult | None:
+    """执行斜杠命令，返回 CmdResult；非命令 / 未注册命令返回 None（调用方继续走 LLM 流）"""
     head = command_head(cmd_text)
     entry = _COMMANDS.get(head) if head else None
     if entry is None:
@@ -216,4 +228,5 @@ async def run_slash_command(world_repo: WorldRepository, world, cmd_text: str, u
         world_repo=world_repo, world=world,
         cmd_text=str(cmd_text), user_id=user_id, args=command_args(cmd_text),
     )
-    return await entry["handler"](ctx)
+    out = await entry["handler"](ctx)
+    return CmdResult(out) if isinstance(out, str) else out

@@ -1283,23 +1283,24 @@ async def _handle_slash_command(
 ):
     """执行斜杠命令并下发事件；已处理时置 out["handled"]=True（调用方直接收尾返回）。
 
-    note 为 None = 非注册命令 → 不处理，继续走 LLM（未知斜杠当普通消息处理）。
+    CmdResult 为 None = 非注册命令 → 不处理，继续走 LLM（未知斜杠当普通消息处理）。
     """
     try:
         from app.services.world.world_chat_commands import run_slash_command
-        note = await run_slash_command(world_repo, world, cmd_text, user_id=user_id)
+        cmd_result = await run_slash_command(world_repo, world, cmd_text, user_id=user_id)
     except Exception as e:
         logger.warning(f"🌐 世界 #{world_id} 命令执行失败: {e}")
         yield f"data: [ERROR]命令执行失败: {e}\n\n"
         yield "data: [DONE]\n\n"
         out["handled"] = True
         return
-    if note is None:
+    if cmd_result is None:
         return
     from app.models.world import WorldChatMessage
-    world_repo.add(WorldChatMessage(world_id=world_id, user_id=None, role="tool", content=note, session_id=sid_db))
+    world_repo.add(WorldChatMessage(world_id=world_id, user_id=None, role="tool", content=cmd_result.text, session_id=sid_db))
     await world_repo.commit()
-    yield f"data: [TOOL_UPDATE]{json.dumps({'tool_id': f't_{uuid.uuid4().hex[:8]}', 'status': 'done', 'name': cmd_text.lstrip('/'), 'success': True, 'summary': note}, ensure_ascii=False)}\n\n"
+    # success 由命令自己报（原先硬写 True：/compact 没压成也画 ✓）
+    yield f"data: [TOOL_UPDATE]{json.dumps({'tool_id': f't_{uuid.uuid4().hex[:8]}', 'status': 'done', 'name': cmd_text.lstrip('/'), 'success': cmd_result.ok, 'summary': cmd_result.text}, ensure_ascii=False)}\n\n"
     yield "data: [DONE]\n\n"
     out["handled"] = True
 

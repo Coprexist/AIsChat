@@ -519,6 +519,10 @@ HTTP 三种入参（`items` / `messages` / `message`）只在**路由层归一�
 - `mid_turn=False`（默认）= 等本轮结束再执行；`mid_turn=True` = 允许工具轮进行中直接插入
 - 未注册的斜杠命令保守按"必须等待"处理
 - 新增命令 = 表里加一行 + 写个 handler，执行分发/前端补全/排队分流三处自动一致
+- **命令回执的文案与成败都由命令自己报**（`CmdResult(text, ok)`；handler 返回 str 等价于 `ok=True`）：
+  调用方把 `text` 写进对话、把 `ok` 当 `[TOOL_UPDATE].success` 下发（原先硬写 `success: True`，失败也画 ✓）。
+  **要展示工具结果就走 `tool_result_summary()`（唯一展示入口），不要在命令里再拼一遍格式**——
+  `/compact` 曾因此漏掉"无需压缩"分支，用户看到「上下文已压缩：None → None tokens（压缩率 None%）」
 - ⚠️ 清弹窗的依据是「这条当初是否走了插入通道」（同一判定），**不是**弹窗项的显示标签；
   否则将来把某命令标为 `mid_turn=True` 时，`[INSERTED]` 会清不掉它，被 drain 重复发送
 

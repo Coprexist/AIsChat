@@ -270,6 +270,19 @@
 
 ### 🐛 修复的 Bug
 
+#### /compact 显示「上下文已压缩：None → None tokens（压缩率 None%）」，还配着一个 ✓
+- 用户反馈"为啥显示✓ 已完成 上下文已压缩：None → None tokens（压缩率 None%）"。
+  病根是**命令自己抄了一遍工具的文案格式**：`compact_context` 的"无需压缩"分支里根本没有 token 数
+  （对话还没超过保留窗口），而 `_cmd_compact` 只判 `success` 就拼字符串，三个字段全取到 `None`。
+  工具的 `summary()`（经 `tool_result_summary` 暴露，唯一展示入口）本来就把这条分支讲清楚了
+- 修法：`/compact` 的文案改走 `tool_result_summary("compact_context", result)`——**不再有第二处格式**，
+  以后工具新增分支，命令自动跟上
+- 顺带修 ✓ 本身：斜杠命令回执原先硬写 `success: True`，压缩失败也画 ✓。
+  新增 `CmdResult(text, ok)`（handler 返回 str 等价于 `ok=True`），成败由命令自己报，调用方照抄
+- 验证：同一条"无需压缩"结果，旧写法 `上下文已压缩：None → None tokens（压缩率 None%）`，
+  新写法 `无需压缩：当前会话只有 3 条对话，都还在保留窗口（最近 20 条）内`；
+  新增两条测试（文案必须等于唯一展示入口的输出；`ok` 随成败、边界归一）
+
 #### 审批弹窗不渲染 AI 发过来的内容（一坨 <pre> 纯文本）
 - 用户反馈"没有做他发过来的消息的渲染"：审阅/计划弹窗把 AI 的内容当纯文本塞进 `<pre>`（`break-all`，
   代码换行乱、markdown 不生效），而聊天里同一份内容是正常渲染的
