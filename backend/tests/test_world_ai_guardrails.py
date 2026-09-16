@@ -18,11 +18,13 @@ from app.services.world import world_file_service as fs
 from app.services.world.world_ai_mode import (
     DEFAULT_MODE,
     MODES,
+    USER_NOTE_KEY,
     action_of,
     gate_tool_call,
     get_mode,
     pending_approvals,
     resolve_approval,
+    with_user_note,
 )
 from app.services.world.world_turn import TurnBroadcast, _workers
 from app.services.world.world_moderation import inspect
@@ -195,10 +197,11 @@ async def test_no_viewer_follows_unattended_policy():
     old = wam._WAIT_FOR_VIEWER
     wam._WAIT_FOR_VIEWER = 0
     try:
-        approved, note = await wam.request_approval(987656, "", kind="other", title="t", on_timeout=False)
-        assert approved is False and "无人应答" in note
-        approved, note = await wam.request_approval(987656, "", kind="other", title="t", on_timeout=True)
-        assert approved is True and "自动档" in note
+        ap = await wam.request_approval(987656, "", kind="other", title="t", on_timeout=False)
+        assert ap.approved is False and ap.attended is False and "无人应答" in ap.reason
+        assert ap.note == "" and ap.instruction == ""
+        ap = await wam.request_approval(987656, "", kind="other", title="t", on_timeout=True)
+        assert ap.approved is True and ap.attended is False and "自动档" in ap.reason
     finally:
         wam._WAIT_FOR_VIEWER = old
 
@@ -212,12 +215,12 @@ async def test_user_silence_denies_review_but_continues_auto():
     tb.subscribe()                                   # 模拟前端连着
     _workers[wid_turn] = _LiveWorker(tb)
     try:
-        approved, note = await wam.request_approval(
+        ap = await wam.request_approval(
             wid_turn, "t_timeout", kind="download", title="t", timeout=1, on_timeout=False)
-        assert approved is False and "超时" in note
-        approved, note = await wam.request_approval(
+        assert ap.approved is False and ap.attended is False and "超时" in ap.reason
+        ap = await wam.request_approval(
             wid_turn, "t_timeout", kind="other", title="t", timeout=1, on_timeout=True)
-        assert approved is True and "自动档" in note
+        assert ap.approved is True and ap.attended is False and "自动档" in ap.reason
     finally:
         _workers.pop(wid_turn, None)
 
@@ -238,9 +241,10 @@ async def test_ask_user_tool_follows_mode_when_nobody_answers():
             )
             r = await tool.execute(ctx)
             assert r["success"] is True and r["approved"] is expect, f"{mode}: {r}"
-            assert r["answered"] is False and r["answer"] == "用户未回复"
+            assert r["answered"] is False and r["answer"] == "未回复"
+            assert r[USER_NOTE_KEY] == ""
             if mode == "auto":
-                assert "自动档" in r["note"]
+                assert "自动档" in r["summary"]
     finally:
         wam._WAIT_FOR_VIEWER = old
 
@@ -259,6 +263,15 @@ class _LiveWorker:
 
     def subscribe(self, turn_id: str):
         return self.turns.get(turn_id)
+
+
+async def _take_pending(queue):
+    """取下一条 pending 审批（事件流里夹着的 resolved 回执照旧跳过）"""
+    while True:
+        raw = await asyncio.wait_for(queue.get(), timeout=2)
+        payload = json.loads(raw.removeprefix("data: [APPROVAL]").strip())
+        if payload.get("status") == "pending":
+            return payload
 
 
 async def test_review_popup_round_trip():
@@ -285,9 +298,9 @@ async def test_review_popup_round_trip():
         # 等待期间工具没被放行（还没点按钮）
         assert not task.done()
 
-        assert resolve_approval(payload["approval_id"], True, "同意下载") is True
-        allowed, approved, reason = await asyncio.wait_for(task, timeout=2)
-        assert allowed and approved and not reason
+        assert resolve_approval(payload["approval_id"], True) is True
+        allowed, approved, feedback = await asyncio.wait_for(task, timeout=2)
+        assert allowed and approved and not feedback     # 用户没写话 → 没什么要转达的
         assert pending_approvals(wid_turn) == []
         assert "download" in turn_state["approved_classes"]     # 同类操作本轮不再问
 
@@ -302,3 +315,68 @@ async def test_review_popup_round_trip():
         assert queue.qsize() == 0
     finally:
         _workers.pop(wid_turn, None)
+
+
+async def test_approval_note_is_handed_back_to_the_ai():
+    """用户点同意/不同意时写的理由或补充要求，必须回到 AI 手里（2026-09-15 用户要求）。
+
+    吞掉它 = 用户明明说了、AI 没听见：AI 会照自己原来的打算做完，还怪用户没提醒。
+    """
+    wid_turn = 987651
+    tb = TurnBroadcast("t_note")
+    queue = tb.subscribe()
+    _workers[wid_turn] = _LiveWorker(tb)
+    try:
+        # ① 同意 + 补充要求 → 放行，但要求随结果交给 AI
+        task = asyncio.create_task(gate_tool_call(
+            _World("review"), wid_turn, "file_write",
+            {"path": "a.js", "content": "1"}, {"turn_id": "t_note"},
+        ))
+        payload = await _take_pending(queue)
+        assert resolve_approval(payload["approval_id"], True, "改用蓝色，标题换成两行") is True
+        allowed, approved, feedback = await asyncio.wait_for(task, timeout=2)
+        assert allowed and approved
+        assert "同意" in feedback and "改用蓝色" in feedback
+        # 合并进工具结果（唯一键约定）后，AI 才真的能看到
+        assert with_user_note({"success": True}, feedback)[USER_NOTE_KEY] == feedback
+        assert with_user_note({"success": True}, "") == {"success": True}
+
+        # ② 不同意 + 理由 → 不执行，理由原样回给 AI（它要据此改方案，而不是换个方式绕过）
+        task = asyncio.create_task(gate_tool_call(
+            _World("review"), wid_turn, "file_delete", {"path": "a.js"}, {"turn_id": "t_note"},
+        ))
+        payload = await _take_pending(queue)
+        assert resolve_approval(payload["approval_id"], False, "先别删，我还要用") is True
+        allowed, _, reason = await asyncio.wait_for(task, timeout=2)
+        assert not allowed and "不同意" in reason and "先别删，我还要用" in reason
+    finally:
+        _workers.pop(wid_turn, None)
+
+
+async def test_ask_user_carries_the_users_own_words():
+    """ask_user 的原话与「有没有人应答」都来自 Approval 字段，不再抠"未回复"字样判断"""
+    from app.tools.world.ask_user import AskUserTool
+
+    wid_turn = 987652
+    tb = TurnBroadcast("t_ask")
+    queue = tb.subscribe()
+    _workers[wid_turn] = _LiveWorker(tb)
+    tool = AskUserTool()
+    # ask_user 用的是 ctx.world.id（门禁那条路是显式传 world_id），所以替身得跟着轮次走
+    world = _World("auto")
+    world.id = wid_turn
+    ctx = WorldToolContext(
+        world_repo=None, world=world, arguments="{}",
+        args={"kind": "other", "question": "用哪套配色？"}, turn_state={"turn_id": "t_ask"},
+    )
+    try:
+        task = asyncio.create_task(tool.execute(ctx))
+        payload = await _take_pending(queue)
+        assert resolve_approval(payload["approval_id"], True, "紫色那套，别太亮") is True
+        r = await asyncio.wait_for(task, timeout=2)
+        assert r["approved"] is True and r["answered"] is True and r["answer"] == "同意"
+        assert r[USER_NOTE_KEY] == "紫色那套，别太亮"
+        assert "紫色那套，别太亮" in tool.summary(r)      # 卡片上也看得见用户说了什么
+    finally:
+        _workers.pop(wid_turn, None)
+

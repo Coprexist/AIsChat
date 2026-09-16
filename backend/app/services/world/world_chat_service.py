@@ -14,7 +14,7 @@ from pathlib import Path
 
 from sqlalchemy import select
 from app.repositories.world_repo import WorldRepository
-from app.services.world.world_ai_mode import build_mode_prompt, gate_tool_call, get_mode
+from app.services.world.world_ai_mode import build_mode_prompt, gate_tool_call, get_mode, with_user_note
 from app.services.world.world_chat_items import ChatItem
 from app.utils.multimodal import (
     build_content, image_placeholder, image_note, injected_image_count,
@@ -923,11 +923,11 @@ async def _run_one_tool_call(
     # ⓪ 运行模式门禁（唯一入口）：审阅/计划模式下敏感操作在这里弹窗等用户点头；
     #    auto 直接放行并告知工具「平台已兜底」，工具不必自己再问一遍。
     from app.tools.world.shared import parse_args
-    allowed, approved, block_reason = await gate_tool_call(
+    allowed, approved, feedback = await gate_tool_call(
         world, world_id, acc["name"], parse_args(acc.get("arguments") or ""), turn_state,
     )
     if not allowed:
-        result = {"success": False, "error": block_reason, "blocked_by": "ai_mode"}
+        result = {"success": False, "error": feedback, "blocked_by": "ai_mode"}
     else:
         try:
             result = await execute_world_tool(
@@ -938,6 +938,8 @@ async def _run_one_tool_call(
             # 工具/技能自己抛异常：如实回传错误，交给 AI 决定下一步（别重试——副作用可能已发生）
             logger.warning(f"🌐 世界 #{world_id} 工具 {acc['name']} 执行失败: {e}")
             result = {"success": False, "error": str(e)[:500]}
+        # 用户点同意时写的理由/补充要求必须进 AI 上下文（feedback 为空时原样返回）
+        result = with_user_note(result, feedback)
     summary = tool_result_summary(acc["name"], result)
     # 卡片详情（UI 专用）：和 summary 一起算好，随事件下发 + 落库；不进 LLM 上下文
     detail = tool_result_detail(acc["name"], acc["arguments"], result)

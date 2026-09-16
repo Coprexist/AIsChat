@@ -3,6 +3,7 @@
 AI 主动发起的是/否询问；与平台门禁共用同一条审批通道（world_ai_mode.request_approval）。
 """
 
+from app.services.world.world_ai_mode import USER_NOTE_KEY
 from app.tools.world.base import WorldToolPlugin, WorldToolContext
 
 # 事件类型关键词（必填）：用户看到的弹窗按这个分类，也决定审批的归属
@@ -21,7 +22,9 @@ class AskUserTool(WorldToolPlugin):
         '审阅模式下下载/删除/改动机制本来就由平台弹窗把关，你不需要用本工具替代它；'
         '本工具用于其余需要用户当场选择、确认的场合（方案取舍、理解是否一致、要不要继续）。\n'
         '**用用户听得懂的话问**：一句话说清"要他定什么"，别用内部术语、别堆文件名与参数——'
-        '用户看到的就是弹窗标题，看不懂只能瞎点。detail 里放用户真正要看的内容（方案差异、将改动什么）。'
+        '用户看到的就是弹窗标题，看不懂只能瞎点。detail 里放用户真正要看的内容（方案差异、将改动什么）。\n'
+        '弹窗里还有个输入框：用户可能不点按钮而是写下理由或补充要求，会随答复一起给你（结果里的 '
+        f'{USER_NOTE_KEY}）——**以用户的话为准**，别只读"同意/不同意"两个字。'
     )
 
     parameters = {
@@ -45,20 +48,23 @@ class AskUserTool(WorldToolPlugin):
         # 审阅/计划档一律不放行——不能因为"等超时了"就把敏感操作默认批了
         on_timeout, timeout = unattended_policy(ctx.world)
         turn_id = (ctx.turn_state or {}).get("turn_id", "")
-        approved, note = await request_approval(
+        approval = await request_approval(
             # title = 要用户拍板的那句话；detail = AI 写的补充内容，按 markdown 渲染
             ctx.world.id, turn_id, kind=kind, title=question,
             body=detail, body_format="markdown",
             timeout=timeout, on_timeout=on_timeout,
         )
-        answered = "未回复" not in note and "无人应答" not in note
+        # attended = 真有人点了按钮（超时/没前端为 False）；别再抠"未回复"这类字样判断
         return {
-            "success": True, "approved": approved, "answered": answered,
-            "answer": ("同意" if approved else "不同意") if answered else "用户未回复",
-            "note": note,
+            "success": True, "approved": approval.approved, "answered": approval.attended,
+            "answer": ("同意" if approval.approved else "不同意") if approval.attended else "未回复",
+            USER_NOTE_KEY: approval.note,       # 用户自己写的理由/补充要求，原样交给 AI
+            "summary": approval.reason,         # 一句话结论（含无人应答的说明）
         }
 
     def summary(self, result: dict) -> str:
         if not result.get("success"):
             return f"询问失败：{result.get('error', '未知错误')}"
-        return f"用户{result.get('answer', '未答复')}（{result.get('note', '')}）"
+        text = f"用户{result.get('answer', '未答复')}"
+        note = result.get(USER_NOTE_KEY) or ""
+        return f"{text}（{note}）" if note else text

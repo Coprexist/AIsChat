@@ -8,6 +8,10 @@
 单一机制：审批一律走 request_approval() 这一条通道（弹窗 + 等服务端事件），
 AI 侧的 ask_user 工具与平台门禁共用它，不存在第二套确认逻辑。
 
+用户在弹窗里除了点同意/不同意，还可以写下理由或补充要求（回执的 note）——**这句话是给 AI 的**：
+它随审批结论一起进 AI 上下文（工具结果里的 user_note，见 Approval.instruction），AI 必须照办。
+丢掉它就等于"用户明明说了，AI 没听见"。
+
 存储：worlds.config["ai_mode"]。**只由用户/API 改**——AI 没有改模式的工具，
 否则等于让它自己拆掉审阅（安全边界不能靠自觉）。
 
@@ -21,6 +25,7 @@ import json
 import logging
 import time
 import uuid
+from dataclasses import dataclass
 
 logger = logging.getLogger(__name__)
 
@@ -89,7 +94,42 @@ def needs_gate(world, tool_name: str) -> bool:
 # ═══════════════════════════════════════════════════════════════
 # 审批通道（唯一机制：弹窗 + 等答案）
 # ═══════════════════════════════════════════════════════════════
-# approval_id → {future, kind, title, detail, world_id, created_at}
+# 用户补充说明（理由 / 补充要求）上限：够写清楚一段要求，又不至于把回执与上下文撑爆。
+# 对外也是 API 契约（路由的 ApprovalRequest.max_length 引用它），所以是公开名。
+NOTE_MAX = 2000
+
+# 用户原话进工具结果时用的键（唯一约定）：门禁放行、旁路事后确认都写它，AI 从这里读
+USER_NOTE_KEY = "user_note"
+
+
+@dataclass(frozen=True, slots=True)
+class Approval:
+    """一次审批的结论——唯一来源。
+
+    用户的原话（note）与「有没有人真的应答」（attended）分开存：调用方一律读字段，
+    **不要再从句子抠字符串**（曾经用「"未回复" not in note」判断有没有人应答，改一次措辞就崩）。
+    reason 是给日志和 AI 看的一句话，结论与用户原话都在里面。
+    """
+
+    approved: bool
+    note: str = ""            # 用户自己写的原话（理由 / 补充要求），没写就是空串
+    attended: bool = True     # 真有人点了按钮才为 True（没前端 / 等超时 = False）
+    reason: str = ""          # 一句话结论（进日志，也在无人应答时进 AI 上下文）
+
+    @property
+    def instruction(self) -> str:
+        """给 AI 的补充指示：用户写了才非空（空串 = 没什么要额外交代的）。"""
+        if not self.note:
+            return ""
+        return f"{self.reason}。请把用户的话一并考虑进接下来的操作。"
+
+
+def with_user_note(result: dict, text: str) -> dict:
+    """把给 AI 的话并进工具结果（唯一入口）。text 为空就原样返回。"""
+    return {**result, USER_NOTE_KEY: text} if text else result
+
+
+# approval_id → {future, kind, title, detail, world_id, created_at, note}
 _pending: dict[str, dict] = {}
 
 
@@ -128,16 +168,17 @@ async def request_approval(
     world_id: int, turn_id: str, *, kind: str, title: str,
     detail: str = "", body: str = "", body_format: str = "text", body_lang: str = "",
     timeout: int = _APPROVAL_TIMEOUT, on_timeout: bool = False,
-) -> tuple[bool, str]:
-    """弹窗征询用户同意（唯一审批通道）。返回 (是否同意, 说明)。
+) -> Approval:
+    """弹窗征询用户同意（唯一审批通道）。返回 Approval（结论 + 用户原话 + 有没有人应答）。
 
     on_timeout = 没有人应答（没人看 / 等超时）时算不算放行——由调用方按模式声明，
     不要在这里猜：审阅/计划必须 False，自动档的 AI 主动提问才是 True。
     """
-    def _unattended(reason: str) -> tuple[bool, str]:
+    def _unattended(reason: str) -> Approval:
         if on_timeout:
-            return True, f"{reason}；自动档按你的判断继续（在回复里说明你的决定）"
-        return False, reason
+            return Approval(approved=True, attended=False,
+                            reason=f"{reason}；自动档按你的判断继续（在回复里说明你的决定）")
+        return Approval(approved=False, attended=False, reason=reason)
     # 页面未必已经在看这个轮次（外部发起的轮次靠空闲轮询接上）——先等一小会儿再判定无人。
     tbs = _broadcasters(world_id, turn_id)
     deadline = time.monotonic() + _WAIT_FOR_VIEWER
@@ -163,38 +204,49 @@ async def request_approval(
         "title": title, "detail": entry["detail"],
         "body": entry["body"], "body_format": entry["body_format"], "body_lang": entry["body_lang"],
     })
+    # 未完成时的兜底结论（finally 里要广播回执，不能因为异常路径没赋值而炸）
+    result = Approval(approved=False, attended=False, reason="审批未完成（按「不通过」处理）")
     try:
         for tb in tbs:
             await tb.broadcast(pending_event)
         logger.info(f"🔐 世界 #{world_id} 等待用户审批（{kind}）: {title[:60]}")
         approved = bool(await asyncio.wait_for(entry["future"], timeout=timeout))
-        reason = entry.get("note") or ("用户已同意" if approved else "用户选择不同意")
+        note = entry.get("note") or ""
+        # 结论必在句子里：用户写了原话就原样附上（不改写用户的措辞），AI 才看得懂是"同意"还是"不同意"
+        result = Approval(
+            approved=approved, note=note,
+            reason=("用户同意了" if approved else "用户选择不同意")
+                   + (f"；用户补充说：{note}" if note else ""),
+        )
     except asyncio.TimeoutError:
-        approved, reason = _unattended(f"等待用户确认超时（{timeout // 60} 分钟）")
+        result = _unattended(f"等待用户确认超时（{timeout // 60} 分钟）")
     except asyncio.CancelledError:
-        approved, reason = False, "轮次被中断，审批未完成（按「不通过」处理）"
+        result = Approval(approved=False, attended=False, reason="轮次被中断，审批未完成（按「不通过」处理）")
         raise
     finally:
         _pending.pop(approval_id, None)
         resolved_event = _event({
             "approval_id": approval_id, "status": "resolved",
-            "kind": kind, "approved": approved,
+            "kind": kind, "approved": result.approved,
         })
         for tb in tbs:                               # 弹窗关不掉不影响业务结果
             try:
                 await tb.broadcast(resolved_event)
             except Exception as e:
                 logger.warning(f"🔐 世界 #{world_id} 审批结果回执广播失败: {e}")
-    logger.info(f"🔐 世界 #{world_id} 审批结果（{kind}）: {approved}｜{reason[:60]}")
-    return approved, reason
+    logger.info(f"🔐 世界 #{world_id} 审批结果（{kind}）: {result.approved}｜{result.reason[:60]}")
+    return result
 
 
 def resolve_approval(approval_id: str, approved: bool, note: str = "") -> bool:
-    """用户弹窗点击回执（HTTP 端点调用）。返回是否命中待审批项。"""
+    """用户弹窗点击回执（HTTP 端点调用）。note = 用户写的理由/补充要求（可选）。
+
+    返回是否命中待审批项。note 在这里收口裁剪：换行保留（用户可能分条写），长度封顶。
+    """
     entry = _pending.get(approval_id)
     if entry is None or entry["future"].done():
         return False
-    entry["note"] = (note or "").strip()
+    entry["note"] = (note or "").strip()[:NOTE_MAX]
     entry["future"].set_result(bool(approved))
     return True
 
@@ -215,7 +267,11 @@ def pending_approvals(world_id: int) -> list[dict]:
 # ═══════════════════════════════════════════════════════════════
 
 async def gate_tool_call(world, world_id: int, tool_name: str, args: dict, turn_state: dict):
-    """工具执行前的唯一门禁。返回 (allowed, approved_for_tool, reason)。
+    """工具执行前的唯一门禁。返回 (allowed, approved_for_tool, feedback)。
+
+    feedback = 要说给 AI 听的话（空串 = 没什么要说的）：被挡下时是拦截原因；
+    用户点了同意但写了补充要求时，是那句要求——调用方用 with_user_note() 并进工具结果。
+    （用户的话不能吞：吞了 AI 就会按自己原来的打算做完，还怪用户没提醒它。）
 
     - auto：直接放行（approved=True，工具知道平台已经兜过底了，不用再自己问）
     - plan：计划未通过 → 挡住并提示先出计划；通过后本轮全部放行
@@ -240,7 +296,7 @@ async def gate_tool_call(world, world_id: int, tool_name: str, args: dict, turn_
 
     # 门禁永不「超时放行」：审阅/计划模式下没人应答就是不同意（on_timeout=False）
     desc = describe_action(tool_name, args)
-    ok, note = await request_approval(
+    approval = await request_approval(
         world_id, turn_state.get("turn_id", ""),
         kind=action,
         # 弹窗写给用户看：一句人话的标题 + 一行摘要 + 可渲染的正文
@@ -252,13 +308,15 @@ async def gate_tool_call(world, world_id: int, tool_name: str, args: dict, turn_
         body_lang=desc.get("lang") or "",
         on_timeout=False,
     )
-    if not ok:
+    if not approval.approved:
         return False, False, (
-            f"用户没有同意本次{ACTION_LABELS[action]}（{note}），操作未执行。"
+            f"用户没有同意本次{ACTION_LABELS[action]}（{approval.reason}），操作未执行。"
             "请先向用户说明原因，得到明确同意后再来一次；不要换个方式绕过。"
         )
     approved_classes.add(action)
-    return True, True, ""
+    # 同意照常放行；用户顺手写的理由/补充要求一并带给 AI（不因此再弹一次窗——
+    # 用户点的是"同意"，让他为同一件事点两次是本末倒置）
+    return True, True, approval.instruction
 
 
 _LANG_BY_EXT = {
@@ -328,6 +386,9 @@ def build_mode_prompt(mode: str) -> str:
             "请用户确认，用户同意后才会执行（同类操作本轮同意一次即可，之后不再打断）。\n"
             "- 用户明确要求你做的改动，也只需照常调用工具（平台会弹一次确认），不用额外解释；\n"
             "- 你自己判断需要做的改动（用户没说、或与用户先前说法有出入），**先向用户说明为什么**，再调用工具；\n"
+            "- 弹窗里有个输入框，用户点同意/不同意时可能顺便写下理由或补充要求（工具结果里的 "
+            f"{USER_NOTE_KEY}）——**这是给你的指示，不是旁白**：与你的做法不一致时以用户为准，\n"
+            "  别当作没看见，更别回一句「我已经做了」；\n"
             "- 被拒绝时不要换路径、换工具、改参数重试——停下来问清楚用户的意图；\n"
             "- 需要用户在其他事情上拍板（选方案、确认理解）时用 ask_user 工具，事件类型关键词必填。"
         )
@@ -336,5 +397,6 @@ def build_mode_prompt(mode: str) -> str:
         "- 收到任务先读相关文件/资料摸清现状，然后用 present_plan 提交计划（要改哪些文件、下载什么、删什么、"
         "分几步），用户在弹窗里通过后，本轮剩下的操作按自动模式执行——此时直接干，不要再逐步请示；\n"
         "- 计划未通过前，任何写入/下载/删除工具都会被平台挡下，这是正常的，不要反复试；\n"
-        "- 用户在弹窗里可能只通过部分内容或提出修改：按用户的意见调整后重新 present_plan。"
+        "- 用户在弹窗里可能只通过部分内容，或在输入框里写下修改意见（工具结果里的 "
+        f"{USER_NOTE_KEY}）：**按用户的话调整**后重新 present_plan，不要把意见当作没看见。"
     )

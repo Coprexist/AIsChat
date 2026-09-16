@@ -107,7 +107,7 @@ async def web_download(world, arguments: str, approved: bool = False) -> dict:
     """
     import httpx
     from app.tools.file_operations.web_fetch import _is_private_url
-    from app.services.world.world_ai_mode import get_mode, request_approval
+    from app.services.world.world_ai_mode import get_mode, request_approval, with_user_note
     from app.services.world.world_moderation import audit, inspect
     from app.services.world.world_file_service import MAX_FILE_SIZE, delete_file, write_file_bytes
 
@@ -155,16 +155,18 @@ async def web_download(world, arguments: str, approved: bool = False) -> dict:
 
     # 旁路下载：没经过平台门禁 → 按产品要求，下载完成后再问用户是否保留
     # 事后确认同样不默认保留：没人应答就删掉（on_timeout=False，安全默认）
-    keep, note = await request_approval(
+    keep = await request_approval(
         wid, "", kind="download",
         title=f"是否保留刚下载的文件？{path}",
         detail=f"{url}\n{len(content) // 1024}KB → {path}",
         on_timeout=False,
     )
-    if keep:
-        return {"success": True, "path": path, "size": len(content), "url": url}
+    if keep.approved:
+        # 用户可能顺便写了要求（"留着，但改名叫 x.png"）——不能让这句话烂在弹窗里
+        return with_user_note({"success": True, "path": path, "size": len(content), "url": url},
+                              keep.instruction)
     try:
         delete_file(wid, path)
     except (ValueError, FileNotFoundError) as e:
         logger.warning(f"🌐 世界 #{wid} 未保留文件删除失败: {e}")
-    return {"success": False, "path": path, "error": f"用户选择不保留，已删除刚下载的文件（{note}）"}
+    return {"success": False, "path": path, "error": f"用户选择不保留，已删除刚下载的文件（{keep.reason}）"}

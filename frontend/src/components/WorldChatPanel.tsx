@@ -115,11 +115,13 @@ function ModeSwitch({ mode, busy, onChange }: { mode: string; busy: boolean; onC
 
 /** 审批弹窗（审阅/计划模式）：AI 请求下载/删除/改动机制，等用户点按钮，选完服务端自动继续。
  *  事件类型关键词由后端按下发的 kind 渲染，用户一眼看清在批什么。 */
-function ApprovalDialog({ approval, onDecide }: { approval: Approval; onDecide: (ok: boolean) => void }) {
+function ApprovalDialog({ approval, onDecide }: { approval: Approval; onDecide: (ok: boolean, note: string) => void }) {
   const t = useT()
   const kindKey = `tool:world.kind.${approval.kind}`
   const localized = t(kindKey)
   const body = approval.body || ''
+  // 理由/补充要求（可选）：跟那一票一起发给 AI——不同意时说清为什么，同意时顺手加要求
+  const [note, setNote] = useState('')
   return (
     // 无 onClose：审批必须由用户明确点同意/不同意（ESC 与点遮罩都不放行），
     // 但 Dialog 仍负责锁背景滚动 + 统一层级与遮罩
@@ -150,14 +152,25 @@ function ApprovalDialog({ approval, onDecide }: { approval: Approval; onDecide: 
             )
           )}
         </div>
-        <div className="flex items-center gap-2 px-4 py-3 border-t border-border">
-          <span className="flex-1 text-3xs text-textMuted">{t('tool:world.approval.waiting')}</span>
-          <Button size="sm" variant="outline" onClick={() => onDecide(false)}>
-            {t('tool:world.approval.deny')}
-          </Button>
-          <Button size="sm" onClick={() => onDecide(true)}>
-            {t('tool:world.approval.approve')}
-          </Button>
+        <div className="px-4 py-3 border-t border-border space-y-2">
+          {/* 输入框在按钮上方且不随正文滚动：想补一句时不必先把内容翻到底 */}
+          <textarea
+            className="field w-full text-xs"
+            rows={2}
+            maxLength={2000}
+            value={note}
+            onChange={(e) => setNote(e.target.value)}
+            placeholder={t('tool:world.approval.notePlaceholder')}
+          />
+          <div className="flex items-center gap-2">
+            <span className="flex-1 text-3xs text-textMuted">{t('tool:world.approval.waiting')}</span>
+            <Button size="sm" variant="outline" onClick={() => onDecide(false, note)}>
+              {t('tool:world.approval.deny')}
+            </Button>
+            <Button size="sm" onClick={() => onDecide(true, note)}>
+              {t('tool:world.approval.approve')}
+            </Button>
+          </div>
         </div>
       </div>
     </Dialog>
@@ -788,8 +801,10 @@ ${s.id}` : s.id}
       {/* 审批弹窗：一次只显示队首（后端同一时刻几乎只会挂一个待审批） */}
       {chat.approvals.length > 0 && (
         <ApprovalDialog
+          // key：换了一条审批就重挂载，输入框不会带着上一条残留的字
+          key={chat.approvals[0].approval_id}
           approval={chat.approvals[0]}
-          onDecide={(ok) => chat.resolveApproval(chat.approvals[0].approval_id, ok)}
+          onDecide={(ok, note) => chat.resolveApproval(chat.approvals[0].approval_id, ok, note)}
         />
       )}
     </>

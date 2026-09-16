@@ -12,6 +12,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.database import get_db
 from app.repositories.world_repo import WorldRepository
+from app.services.world.world_ai_mode import NOTE_MAX
 from app.utils.auth import get_current_user
 from app.routers.deps import get_world_repo
 
@@ -109,7 +110,8 @@ class ApprovalRequest(BaseModel):
     """审批弹窗回执（审阅/计划模式下 AI 的敏感操作等用户点按钮）"""
     approval_id: str = Field(..., description="弹窗事件里的 approval_id")
     approved: bool = Field(..., description="用户是否同意")
-    note: str | None = Field(default=None, description="用户补充说明（可选）")
+    note: str | None = Field(default=None, max_length=NOTE_MAX,
+                           description="用户写的理由或补充要求（可选，随同意/不同意一起交给 AI）")
 
 
 class ChatSettingsUpdate(BaseModel):

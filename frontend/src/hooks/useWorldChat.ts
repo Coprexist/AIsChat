@@ -147,7 +147,7 @@ export interface UseWorldChatReturn {
   unreadCount: number
   /** 待用户点按钮的审批项（队列，通常一次只有一条；刷新后由 /chat/status 恢复） */
   approvals: Approval[]
-  resolveApproval: (approvalId: string, approved: boolean) => Promise<void>
+  resolveApproval: (approvalId: string, approved: boolean, note?: string) => Promise<void>
 }
 
 export function useWorldChat({ wid, onRefresh, onMsg }: UseWorldChatOptions) {
@@ -716,12 +716,13 @@ export function useWorldChat({ wid, onRefresh, onMsg }: UseWorldChatOptions) {
     } catch { return false }
   }, [wid])
 
-  /** 审批弹窗回执：先乐观收起弹窗，再告诉后端（服务端据此恢复被挡住的工具调用） */
-  const resolveApproval = useCallback(async (approvalId: string, approved: boolean) => {
+  /** 审批弹窗回执：先乐观收起弹窗，再告诉后端（服务端据此恢复被挡住的工具调用）。
+   *  note = 用户在输入框里写的理由/补充要求，随点击一起交给 AI（后端并进工具结果的 user_note）。 */
+  const resolveApproval = useCallback(async (approvalId: string, approved: boolean, note = '') => {
     setApprovals((list) => list.filter((a) => a.approval_id !== approvalId))
     try {
       await api.post<{ success: boolean }>(`/worlds/${wid}/chat/approval`, {
-        approval_id: approvalId, approved,
+        approval_id: approvalId, approved, note: note.trim() || undefined,
       })
     } catch (e: any) {
       onMsg(`审批提交失败: ${e?.message || e}`)
