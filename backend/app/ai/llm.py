@@ -107,7 +107,7 @@ async def chat_completion(
     frequency_penalty: float = 0.5,
     max_tokens: int = LLM_MAX_TOKENS_DEFAULT,
     response_format: dict | None = None,
-    thinking_enabled: bool = False,
+    thinking_enabled: bool | None = None,
     user_id: str | None = None,
     stream: bool = False,
     pool_key_id: int | None = None,
@@ -194,12 +194,15 @@ def _build_chat_payload(
     response_format: dict | None = None,
     presence_penalty: float = 0.5,
     frequency_penalty: float = 0.5,
-    thinking_enabled: bool = False,
+    thinking_enabled: bool | None = None,
     user_id: str | None = None,
     provider_supports_thinking: bool | None = None,
     stream: bool = False,
 ) -> dict:
-    """构建 LLM chat completions 请求 payload（流式/非流式共用主体）。"""
+    """构建 LLM chat completions 请求 payload（流式/非流式共用主体）。
+
+    thinking_enabled 三态：None=不表态、True=显式开、False=显式关（摘要等短输出调用必须显式关，
+    否则思考 token 会吃满 max_tokens）。"""
     payload = {
         "model": model,
         "messages": messages,
@@ -218,9 +221,13 @@ def _build_chat_payload(
         payload["tool_choice"] = "auto"
     if response_format:
         payload["response_format"] = response_format
+    # 思考开关是**三态**：None=不表态（交给服务端默认）、True=显式开、False=显式关。
+    # 显式关不是可有可无：DeepSeek v4 默认就会思考，思考 token 与正文**抢同一个 max_tokens 预算**，
+    # 摘要这类短输出调用会被思考吃满 → content 为空（2026-09-17 实测：budget=800 时
+    # completion=800 / reasoning=800 / finish_reason=length / content 空）。
     _thinking_ok = provider_supports_thinking if provider_supports_thinking is not None else settings.is_deepseek_api
-    if thinking_enabled and _thinking_ok:
-        payload["thinking"] = {"type": "enabled"}
+    if _thinking_ok and thinking_enabled is not None:
+        payload["thinking"] = {"type": "enabled" if thinking_enabled else "disabled"}
     if user_id and _thinking_ok:
         payload["user_id"] = user_id
     return payload
@@ -238,7 +245,7 @@ async def _chat_completion_non_streaming(
     frequency_penalty: float = 0.5,
     max_tokens: int = LLM_MAX_TOKENS_DEFAULT,
     response_format: dict | None = None,
-    thinking_enabled: bool = False,
+    thinking_enabled: bool | None = None,
     user_id: str | None = None,
     pool_key_id: int | None = None,
     provider_supports_thinking: bool | None = None,
@@ -299,7 +306,7 @@ async def _chat_completion_streaming(
     frequency_penalty: float = 0.5,
     max_tokens: int = LLM_MAX_TOKENS_DEFAULT,
     response_format: dict | None = None,
-    thinking_enabled: bool = False,
+    thinking_enabled: bool | None = None,
     user_id: str | None = None,
     pool_key_id: int | None = None,
     provider_supports_thinking: bool | None = None,

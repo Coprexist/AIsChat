@@ -36,8 +36,11 @@ COMPRESSION_TARGET_MIN = 0.05   # 建议不低于触发值的 5%
 COMPRESSION_TARGET_MAX = 0.20   # 建议不超过触发值的 20%
 # 压缩后至少保留的最近消息数
 DEFAULT_KEEP_LAST_N = 20
-# 压缩用摘要的最大 token 数
-SUMMARY_MAX_TOKENS = 800
+# 压缩用摘要的最大 token 数（摘要正文预算；思考已显式关闭，见 _request_summary）
+SUMMARY_MAX_TOKENS = 1500
+# 首答为空时的重试预算：思考关不掉的第三方模型/超长 prompt 仍可能把预算吃满，
+# 留一次"加大预算重试"，别让用户看到"LLM 返回空摘要"
+SUMMARY_RETRY_MAX_TOKENS = 6000
 # messages 总数低于此值不压缩
 MIN_MESSAGES_FOR_COMPRESSION = 8
 
@@ -156,6 +159,44 @@ def _not_compressed(messages: list[dict], reason: str) -> dict:
     }
 
 
+async def _request_summary(
+    compression_messages: list[dict],
+    *,
+    model: str,
+    api_base_url: str,
+    api_key: str | None,
+    user_id: str | None = None,
+) -> str:
+    """摘要调用（唯一入口）：显式关思考 + 首答为空就加大预算重试一次。
+
+    **为什么必须显式关思考**（2026-09-17 用户报"上下文压缩失败：摘要生成失败: LLM 返回空摘要"）：
+    DeepSeek v4 默认就思考，思考 token 与正文抢**同一个** max_tokens 预算。实测同一份 22k tokens
+    的压缩输入：budget=800 → completion=800/reasoning=800/finish_reason=length/content 空；
+    显式 `thinking: disabled` 后 reasoning=0、几十个 token 就出摘要。
+    """
+    from app.ai.llm import chat_completion   # 延迟导入：避免 ai.llm ↔ services 循环
+
+    last = ""
+    for budget in (SUMMARY_MAX_TOKENS, SUMMARY_RETRY_MAX_TOKENS):
+        response = await chat_completion(
+            messages=compression_messages,
+            model=model,
+            api_base_url=api_base_url,
+            api_key=api_key,
+            temperature=0.3,           # 低温度，保持准确
+            max_tokens=budget,
+            user_id=user_id,
+            stream=False,
+            thinking_enabled=False,    # 摘要是短输出：思考只会抢预算、多花钱
+        )
+        summary = (response.get("content") or "").strip()
+        if summary:
+            return summary
+        last = f"finish_reason={response.get('finish_reason')}, completion={((response.get('usage') or {}).get('completion_tokens'))}"
+        logger.warning(f"上下文压缩：摘要为空（max_tokens={budget}, {last}）→ 加大预算重试")
+    raise ValueError(f"LLM 返回空摘要（{last}）")
+
+
 async def compress_messages(
     messages: list[dict],
     api_base_url: str,
@@ -180,8 +221,6 @@ async def compress_messages(
     返回:
         (new_messages, stats) — 压缩后的消息列表和统计信息
     """
-    from app.ai.llm import chat_completion
-
     original_count = len(messages)
     original_tokens = estimate_tokens(messages)
 
@@ -210,19 +249,10 @@ async def compress_messages(
     ]
 
     try:
-        response = await chat_completion(
-            messages=compression_messages,
-            model=model,
-            api_base_url=api_base_url,
-            api_key=api_key,
-            temperature=0.3,       # 低温度，保持准确
-            max_tokens=SUMMARY_MAX_TOKENS,
+        summary = await _request_summary(
+            compression_messages, model=model, api_base_url=api_base_url, api_key=api_key,
             user_id=user_id,
-            stream=False,
         )
-        summary = (response.get("content") or "").strip()
-        if not summary:
-            raise ValueError("LLM 返回空摘要")
     except Exception as e:
         logger.error(f"上下文压缩失败（LLM 摘要调用出错）: {e}")
         return messages, _not_compressed(messages, f"摘要生成失败: {e}")

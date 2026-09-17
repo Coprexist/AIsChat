@@ -47,6 +47,20 @@
 - **旁路下载的事后确认**：没走平台门禁的路径（决策技能/定时/斜杠命令）下载完成后弹窗问「是否保留」，
   没人应答按不保留删除
 
+#### 上下文压缩失败「摘要生成失败: LLM 返回空摘要」（思考 token 吃满了预算）
+- 用户 2026-09-17 反馈：压缩卡片显示「上下文压缩失败：摘要生成失败: LLM 返回空摘要」
+- 根因（实测同一份 22k tokens 压缩输入 / deepseek-v4-flash）：
+  `max_tokens=800` 时 `completion=800 / reasoning=800 / finish_reason=length / content 空`
+  ——DeepSeek v4 默认就思考，**思考 token 与正文抢同一个 max_tokens 预算**，摘要这种短输出被整段吃掉
+- 修法（单一入口）：
+  · `chat_completion(thinking_enabled=...)` 改**三态**：None=不表态 / True=显式开 / False=显式关，
+    只有显式值才下发 `thinking`。实测显式关 → reasoning=0、几十个 token 就出摘要（顺带省掉思考计费）
+  · 摘要调用收口到 `_request_summary()`：显式关思考 + 首答为空**加大预算重试一次**，
+    两次都空才报错，且报错带 `finish_reason`（不再是光秃秃一句"LLM 返回空摘要"）
+  · 正文预算 `SUMMARY_MAX_TOKENS` 800→1500，重试预算 6000
+- 实测：同一会话从"失败"变为 `compressed=True / 9604→644 tokens / 压缩率 93% / 摘要 2.5k 字符`
+- 守卫测试：显式关思考、空摘要重试、两次都空报错带 finish_reason、三态 payload
+
 #### 主站发送按钮"样式乱了"（尺寸档漏写法）+ 图标按钮家族收口
 - 用户反馈「我的主站的发送按钮样式乱了」：CDP 实测主站群聊发送按钮 = `display:block / border-radius:0 /
   图标贴左 / cursor:default`——2026-09-15 界面统一时把发送按钮写成 `icon-btn-lg`，

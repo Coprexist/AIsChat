@@ -149,5 +149,67 @@ async def test_command_and_tool_share_one_summary_text():
     assert "6 条" in out.text and "工具卡片与思考不进模型上下文" in out.text
 
 
+async def test_summary_call_disables_thinking_and_retries_when_budget_is_eaten():
+    """2026-09-17 用户报「上下文压缩失败：摘要生成失败: LLM 返回空摘要」的契约守卫。
+
+    病根：DeepSeek v4 默认思考，思考 token 与正文抢**同一个** max_tokens 预算——同一份 22k tokens
+    输入实测 budget=800 时 completion=800/reasoning=800/finish_reason=length/content 空。
+    契约：① 摘要调用必须**显式关思考**；② 首答为空要**加大预算重试**；③ 两次都空才报错（带 finish_reason）。
+    """
+    import app.ai.llm as llm
+
+    calls: list[dict] = []
+
+    async def fake_chat_completion(**kw):
+        calls.append(kw)
+        if len(calls) == 1:
+            return {"content": "  ", "finish_reason": "length", "usage": {"completion_tokens": 1500}}
+        return {"content": "摘要正文", "finish_reason": "stop", "usage": {"completion_tokens": 200}}
+
+    original = llm.chat_completion
+    llm.chat_completion = fake_chat_completion
+    try:
+        summary = await ccs._request_summary(
+            [{"role": "user", "content": "请总结"}],
+            model="m", api_base_url="https://api", api_key="k",
+        )
+    finally:
+        llm.chat_completion = original
+
+    assert summary == "摘要正文"
+    assert [c["thinking_enabled"] for c in calls] == [False, False]       # 每次都显式关思考
+    assert calls[1]["max_tokens"] > calls[0]["max_tokens"]                # 空摘要 → 加大预算
+
+
+async def test_summary_call_reports_finish_reason_when_still_empty():
+    import app.ai.llm as llm
+
+    async def always_empty(**kw):
+        return {"content": "", "finish_reason": "length", "usage": {"completion_tokens": 6000}}
+
+    original = llm.chat_completion
+    llm.chat_completion = always_empty
+    try:
+        try:
+            await ccs._request_summary([{"role": "user", "content": "请总结"}],
+                                       model="m", api_base_url="https://api", api_key="k")
+            raise AssertionError("空摘要必须报错，不能当成压缩成功")
+        except ValueError as e:
+            assert "空摘要" in str(e) and "finish_reason=length" in str(e)   # 报错要能诊断
+    finally:
+        llm.chat_completion = original
+
+
+def test_thinking_flag_is_three_state():
+    """None=不表态、True=显式开、False=显式关（关掉才不会被思考吃满短输出预算）"""
+    from app.ai.llm import _build_chat_payload
+
+    base = dict(messages=[], model="m", temperature=0.3, top_p=0.9, max_tokens=800,
+                provider_supports_thinking=True)
+    assert "thinking" not in _build_chat_payload(**base, thinking_enabled=None)
+    assert _build_chat_payload(**base, thinking_enabled=True)["thinking"] == {"type": "enabled"}
+    assert _build_chat_payload(**base, thinking_enabled=False)["thinking"] == {"type": "disabled"}
+
+
 async def _async(value):
     return value
