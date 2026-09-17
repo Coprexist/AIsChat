@@ -5,8 +5,8 @@
  * 普通用户可直接用；专业用户可编辑代码（专业模式）。
  */
 import { useEffect, useState, useCallback, useRef, useMemo } from 'react'
-import { useParams, useNavigate } from 'react-router-dom'
-import { ChevronLeft, ChevronRight, Folder, FolderOpen, FolderInput, Upload, Plus, Pencil, Eye, MessageCircle, Save, MoreHorizontal, FileText, Trash2, Settings, RefreshCw, ExternalLink, BookOpen, X, Download } from 'lucide-react'
+import { useParams, useNavigate, useSearchParams } from 'react-router-dom'
+import { ChevronLeft, ChevronRight, Folder, FolderOpen, FolderInput, Upload, Plus, Pencil, Eye, MessageCircle, Save, MoreHorizontal, FileText, Trash2, Settings, RefreshCw, ExternalLink, BookOpen, X, Download, Maximize2, Minimize2 } from 'lucide-react'
 import { api } from '../api/client'
 import { saveText } from '../utils/download'
 import GroupManagerModal from '../components/GroupManagerModal'
@@ -73,6 +73,18 @@ export default function WorldDesignPage() {
   currentFileRef.current = currentFile
   const [content, setContent] = useState('')
   const [mode, setMode] = useState<'files' | 'preview'>('files')
+  // 对话布满网页（?focus=1）：收起文件树与编辑/预览，把整页让给对话。
+  // 放 URL 而不是组件 state —— 刷新/前进后退都能还原，且 Layout 能据此一并收起应用侧边栏
+  const [searchParams, setSearchParams] = useSearchParams()
+  const chatFocus = searchParams.get('focus') === '1'
+  const toggleChatFocus = useCallback(() => {
+    setSearchParams((prev) => {
+      const next = new URLSearchParams(prev)
+      if (chatFocus) next.delete('focus')
+      else next.set('focus', '1')
+      return next
+    }, { replace: true })
+  }, [chatFocus, setSearchParams])
   const [previewKey, setPreviewKey] = useState(0)
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
@@ -716,8 +728,10 @@ export default function WorldDesignPage() {
           </span>
           <span className="text-xs text-textMuted">流速 x{world.time_flow_rate}</span>
           <div className="flex-1" />
-          <button onClick={() => setMode('files')} className={`text-xs px-3 py-1 rounded transition-colors ${mode === 'files' ? 'bg-primary-500 text-white' : 'bg-elevated hover:bg-border'}`}>文件</button>
-          <button onClick={() => setMode('preview')} className={`text-xs px-3 py-1 rounded transition-colors ${mode === 'preview' ? 'bg-primary-500 text-white' : 'bg-elevated hover:bg-border'}`}>预览</button>
+          {!chatFocus && (<>
+            <button onClick={() => setMode('files')} className={`text-xs px-3 py-1 rounded transition-colors ${mode === 'files' ? 'bg-primary-500 text-white' : 'bg-elevated hover:bg-border'}`}>文件</button>
+            <button onClick={() => setMode('preview')} className={`text-xs px-3 py-1 rounded transition-colors ${mode === 'preview' ? 'bg-primary-500 text-white' : 'bg-elevated hover:bg-border'}`}>预览</button>
+          </>)}
           <button onClick={openDocs} className="p-1.5 text-textMuted hover:text-textPrimary transition-colors" title="接口文档（发给世界 AI 的 md）">
             <BookOpen size={15} />
           </button>
@@ -736,7 +750,7 @@ export default function WorldDesignPage() {
         </div>
         {/* 标题栏：文件（居中于文件树+编辑区整块） | 对话（右列上方）；内容行手柄贯穿 */}
         <div className="flex items-stretch bg-surface border-b border-border">
-          <div className="flex flex-1 relative h-9">
+          <div className={`flex flex-1 relative h-9 ${chatFocus ? 'hidden' : ''}`}>
             <div style={{ width: fileWidth }} className="shrink-0" />
             <div className="flex-1" />
             <div className="absolute inset-0 flex items-center justify-center gap-1.5 font-medium text-textSecondary">
@@ -747,13 +761,29 @@ export default function WorldDesignPage() {
               )}
             </div>
           </div>
-          <div style={{ width: effectiveChatWidth }} className="shrink-0 flex items-center justify-center gap-1.5 h-9 font-medium text-textSecondary border-l border-border">
+          <div
+            className={`flex items-center gap-1.5 h-9 font-medium text-textSecondary ${chatFocus ? 'flex-1 min-w-0' : 'shrink-0 border-l border-border'}`}
+            style={chatFocus ? undefined : { width: effectiveChatWidth }}
+          >
+            <div className="flex-1" />
             <MessageCircle size={14} className="text-textMuted" />
             对话
+            <div className="flex-1 flex justify-end pr-2">
+              <button
+                onClick={toggleChatFocus}
+                className="icon-btn-sm text-textMuted"
+                title={chatFocus ? '退出布满：显示文件树与编辑/预览' : '对话布满网页（收起文件树与编辑/预览）'}
+              >
+                {chatFocus ? <Minimize2 size={13} /> : <Maximize2 size={13} />}
+              </button>
+            </div>
           </div>
         </div>
         {/* 内容行：拖拽手柄贯穿（拖动 = 整列宽度同步） */}
         <div className="flex flex-1 min-h-0">
+        {/* 左侧工作区（文件树 + 编辑/预览）：「布满网页」时整块让给对话。
+            用 hidden（display:none）而不是卸载，编辑器内容与预览 iframe 的状态都不丢 */}
+        <div className={`flex flex-1 min-w-0 ${chatFocus ? 'hidden' : ''}`}>
         {/* 左列：文件树（仅文件模式；预览模式隐藏，让预览覆盖文件树+编辑区整块） */}
         {mode === 'files' && (
         <div ref={fileTreeRef} className="flex flex-col shrink-0 bg-surface border-r border-border" style={{ width: fileWidth }}>
@@ -837,9 +867,16 @@ export default function WorldDesignPage() {
             )}
           </div>
         </div>
+        </div>
+        {!chatFocus && (
         <div onMouseDown={chatResizeStart} className="w-1 shrink-0 cursor-col-resize hover:bg-primary-500/40 transition-colors relative z-overlay" />
-        {/* 右列：对话面板（标题已在顶部标题栏） */}
-        <div ref={chatPanelRef} className="flex flex-col shrink-0 bg-surface" style={{ width: effectiveChatWidth, maxWidth: effectiveChatWidth }}>
+        )}
+        {/* 右列：对话面板（标题已在顶部标题栏）；「布满网页」时占满整行 */}
+        <div
+          ref={chatPanelRef}
+          className={`flex flex-col bg-surface ${chatFocus ? 'flex-1 min-w-0' : 'shrink-0'}`}
+          style={chatFocus ? undefined : { width: effectiveChatWidth, maxWidth: effectiveChatWidth }}
+        >
           <div className="flex-1 min-h-0 flex flex-col">
             {renderChatInner()}
           </div>

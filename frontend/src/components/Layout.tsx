@@ -142,7 +142,11 @@ export default function Layout() {
                    || /^\/world-view\//.test(location.pathname)
 
   // 沉浸界面（世界视界）：隐藏侧边栏，全屏沉浸
-  const hideSidebar = /^\/world-view\//.test(location.pathname)
+  const isWorldView = /^\/world-view\//.test(location.pathname)
+  // 页面级专注模式（?focus=1，如群视界设计页的「对话布满网页」）：页面请求收起应用侧边栏，
+  // 把整页宽度让给内容。用查询参数而不是全局状态：刷新/后退都能还原
+  const pageFocus = new URLSearchParams(location.search).get('focus') === '1'
+  const hideSidebar = isWorldView || pageFocus
 
   // 沉浸界面：悬浮图标切换侧边栏（覆盖式，不挤压世界画面）
   const [sidebarOverlay, setSidebarOverlay] = useState(false)
@@ -176,7 +180,7 @@ export default function Layout() {
       )}
 
       {/* ── 沉浸界面：侧边栏悬浮开关（世界代码可经 WorldUI 隐藏；嵌入模式不渲染） ── */}
-      {!EMBED && hideSidebar && !floatingIconHidden && (
+      {!EMBED && isWorldView && !floatingIconHidden && (
         sidebarOverlay ? (
           <>
             {/* 点击外部关闭 */}

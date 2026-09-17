@@ -69,6 +69,9 @@ export const toolZh: TranslationDict = {
   'world.mode.hint.auto': '不打断：AI 自行下载文件、改动世界机制、删除文件',
   'world.mode.hint.review': '下载 / 删除 / 改动世界机制会弹窗请你确认（同类操作本轮只问一次）',
   'world.mode.hint.plan': 'AI 先探索并提交计划，你通过后才按自动模式执行',
+  'world.suggest.title': '发送这条建议？',
+  'world.suggest.confirm': '发送',
+  'world.suggest.modifyHint': '如需修改：点右边的 ＋ 把它插入输入框再改（不会直接发出去）。',
 }
 
 export const toolEn: TranslationDict = {
@@ -128,6 +131,9 @@ export const toolEn: TranslationDict = {
   'world.mode.hint.auto': 'No interruptions: the AI downloads, changes world mechanics and deletes on its own',
   'world.mode.hint.review': 'Downloads / deletions / changes pop up for your approval (once per kind each turn)',
   'world.mode.hint.plan': 'The AI explores and submits a plan first; on approval it runs in auto mode',
+  'world.suggest.title': 'Send this suggestion?',
+  'world.suggest.confirm': 'Send',
+  'world.suggest.modifyHint': 'To edit it instead: click ＋ on the right to insert it into the input box (nothing is sent yet).',
 }
 
 export const toolJa: TranslationDict = {
@@ -187,4 +193,7 @@ export const toolJa: TranslationDict = {
   'world.mode.hint.auto': '中断なし：AI が取得・仕組み変更・削除を自ら実行します',
   'world.mode.hint.review': '取得 / 削除 / 仕組み変更は確認ダイアログが出ます（同種はこのターン一度だけ）',
   'world.mode.hint.plan': 'AI が先に計画を提出し、承認後に自動モードで実行します',
+  'world.suggest.title': 'この提案を送信しますか？',
+  'world.suggest.confirm': '送信',
+  'world.suggest.modifyHint': '修正したい場合：右側の ＋ で入力欄に挿入してから編集できます（すぐには送信されません）。',
 }

@@ -1,2 +1,0 @@
-import{j as m}from"./index-BVoAkW6U.js";const c={sm:"icon-btn-sm",md:"",lg:"icon-btn-lg"},l={default:"",primary:"hover:text-primary-400",danger:"hover:text-rose-400",plain:"hover:bg-transparent hover:text-textPrimary"};function x({icon:r,label:t,size:n="md",tone:e="default",className:o="",type:a="button",title:i,...s}){return m.jsx("button",{type:a,"aria-label":t,title:i??t,className:`icon-btn ${c[n]} ${l[e]} ${o}`,...s,children:r})}export{x as I};
-//# sourceMappingURL=IconButton-B9BQFWDh.js.map

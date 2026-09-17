@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { ReactNode, useState } from 'react'
 import { AlertTriangle } from 'lucide-react'
 import Modal from './Modal'
 import Button from './Button'
@@ -15,7 +15,8 @@ import { useT } from '../../i18n/I18nContext'
  */
 export interface ConfirmOptions {
   title?: string
-  message: string
+  /** 正文：字符串按纯文本渲染；需要富内容（引用卡片、提示行）时传 ReactNode */
+  message: ReactNode
   confirmText?: string
   cancelText?: string
   danger?: boolean
@@ -77,7 +78,7 @@ export function ConfirmDialogHost() {
         </>
       }
     >
-      <p className="text-sm text-textSecondary">{options.message}</p>
+      <div className="text-sm text-textSecondary">{options.message}</div>
     </Modal>
   )
 }

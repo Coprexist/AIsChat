@@ -2,7 +2,7 @@ import { memo, useState, useRef, useCallback, useMemo, forwardRef, useImperative
 import { Send, Plus, X, ChevronRight, Brain, ArrowDown, FileText, Search, Globe, Terminal, Package, Clock, Wrench, Eraser, Pin, ChevronDown, Copy, RefreshCw, Paperclip, ShieldAlert, Pencil, Download } from 'lucide-react'
 import MarkdownContent from './shared/MarkdownContent'
 import CodeRenderer from './shared/CodeRenderer'
-import { Button, Dialog, Input } from './ui'
+import { Button, Dialog, Input, confirmAsync } from './ui'
 import { useWorldChat, type Approval, type ChatMsg } from '../hooks/useWorldChat'
 import { useAttachmentUpload, isImageAttachment } from '../hooks/useAttachmentUpload'
 import { AttachmentChips, DropMask } from './AttachmentChips'
@@ -443,6 +443,22 @@ const WorldChatPanel = memo(forwardRef<WorldChatHandle, WorldChatPanelProps>(({ 
     }
   }, [chat, onMsg])
 
+  /** 建议卡不再"点一下就发"：先弹窗确认（2026-09-17 用户：飞机太容易误触），
+   *  弹窗里同时提醒"想改就点 ＋ 插入输入框"。行点击与飞机共用这一处判断。 */
+  const confirmAndSendSuggestion = useCallback(async (q: string) => {
+    const ok = await confirmAsync({
+      title: t('tool:world.suggest.title') || '发送这条建议？',
+      confirmText: t('tool:world.suggest.confirm') || '发送',
+      message: (
+        <>
+          <div className="rounded-control bg-elevated border border-border px-3 py-2 text-xs text-textPrimary whitespace-pre-wrap break-words">{q}</div>
+          <div className="mt-2 text-3xs text-textMuted">{t('tool:world.suggest.modifyHint') || '如需修改：点右边的 ＋ 插入输入框再改'}</div>
+        </>
+      ),
+    })
+    if (ok) handleSubmit(q)
+  }, [handleSubmit, t])
+
   const handleInsertSuggestion = useCallback((q: string) => {
     const next = localInputRef.current ? localInputRef.current + ' ' + q : q
     localInputRef.current = next
@@ -611,13 +627,13 @@ const WorldChatPanel = memo(forwardRef<WorldChatHandle, WorldChatPanelProps>(({ 
             {chat.suggestions.map((q, i) => (
               <div key={i} className="flex items-stretch rounded-control bg-elevated border border-border overflow-hidden w-full">
                 <button
-                  onClick={() => handleSubmit(q)}
+                  onClick={() => confirmAndSendSuggestion(q)}
                   className="flex-1 min-w-0 px-2.5 py-1.5 text-left text-xs text-textSecondary hover:bg-primary-500/20 hover:text-primary-500 dark:hover:text-primary-300 transition-colors truncate"
                   title={q}
                 >{q}</button>
                 <div className="w-px bg-border shrink-0" />
                 <button
-                  onClick={(e) => { e.stopPropagation(); handleSubmit(q) }}
+                  onClick={(e) => { e.stopPropagation(); confirmAndSendSuggestion(q) }}
                   className="px-2 flex items-center text-textMuted hover:text-primary-500 dark:hover:text-primary-300 hover:bg-primary-500/20 transition-colors shrink-0"
                   title="发送这条"
                 ><Send size={11} /></button>
@@ -644,13 +660,13 @@ const WorldChatPanel = memo(forwardRef<WorldChatHandle, WorldChatPanelProps>(({ 
           {chat.suggestions.map((q, i) => (
             <div key={i} className="flex items-stretch rounded-control bg-elevated border border-border overflow-hidden w-full">
               <button
-                onClick={() => handleSubmit(q)}
+                onClick={() => confirmAndSendSuggestion(q)}
                 className="flex-1 min-w-0 px-2.5 py-1.5 text-left text-xs text-textSecondary hover:bg-primary-500/20 hover:text-primary-500 dark:hover:text-primary-300 transition-colors truncate"
                 title={q}
               >{q}</button>
               <div className="w-px bg-border shrink-0" />
               <button
-                onClick={(e) => { e.stopPropagation(); handleSubmit(q) }}
+                onClick={(e) => { e.stopPropagation(); confirmAndSendSuggestion(q) }}
                 className="px-2 flex items-center text-textMuted hover:text-primary-500 dark:hover:text-primary-300 hover:bg-primary-500/20 transition-colors shrink-0"
                 title="发送这条"
               ><Send size={11} /></button>
