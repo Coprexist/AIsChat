@@ -667,6 +667,31 @@ async def get_world_usage(
     )).one()
     calls, prompt, completion, cached = row
     hit_rate = round(cached / prompt * 100, 1) if prompt else 0.0
+    # 最近 20 轮（按 turn 聚合，正序 = 旧 → 新）：只有一个全时段数字，改完无从判断有没有用（文档 6.10）
+    turn_rows = (await db.execute(
+        select(
+            WorldLLMUsage.turn_id,
+            _func.count(WorldLLMUsage.id),
+            _func.coalesce(_func.sum(WorldLLMUsage.prompt_tokens), 0),
+            _func.coalesce(_func.sum(WorldLLMUsage.cached_tokens), 0),
+            _func.max(WorldLLMUsage.created_at),
+        )
+        .where(WorldLLMUsage.world_id == world_id)
+        .group_by(WorldLLMUsage.turn_id)
+        .order_by(_func.max(WorldLLMUsage.created_at).desc())
+        .limit(20)
+    )).all()
+    recent_turns = [
+        {
+            "turn_id": tid,
+            "calls": n,
+            "prompt_tokens": p,
+            "cached_tokens": c,
+            "hit_pct": round(c / p * 100, 1) if p else 0.0,
+            "at": ts.isoformat() if ts else None,
+        }
+        for tid, n, p, c, ts in reversed(turn_rows)
+    ]
     return {
         "world_id": world_id,
         "total_calls": calls,
@@ -674,6 +699,7 @@ async def get_world_usage(
         "completion_tokens": completion,
         "cached_tokens": cached,
         "cache_hit_rate_pct": hit_rate,
+        "recent_turns": recent_turns,
     }
 
 

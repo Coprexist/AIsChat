@@ -30,6 +30,23 @@ def window_plan(total: int, keep_last: int) -> dict:
     return {"real_messages": total, "keep_last": keep_last, "compressible": max(0, total - keep_last)}
 
 
+def forget_session_state(world, skey: str) -> None:
+    """清掉该会话的「摘要 + compact 边界 + 未完成工作流记忆」（clear / 新会话用）。
+
+    三件东西必须同进同退：少清一样，下一轮就会带着上一段会话的残留——摘要在而边界悬空、
+    或历史清了而工作流记忆还在（AI 会"接着做"已经不存在的工作）。
+    """
+    cfg = dict(world.config or {})
+    summaries = dict(cfg.get("chat_summaries") or {})
+    summaries.pop(skey, None)
+    cfg["chat_summaries"] = summaries
+    bounds = dict(cfg.get("chat_summary_bounds") or {})
+    bounds.pop(skey, None)
+    cfg["chat_summary_bounds"] = bounds
+    cfg["workflow_memory"] = None
+    world.config = cfg
+
+
 def build_compact_input(rows: list[dict], summary: str = "", *, keep_last: int,
                         cap: int = COMPACT_INPUT_MAX) -> list[dict]:
     """拼给 compress_messages 的输入：占位 system + 旧摘要 + 窗口外的对话（最近 cap 条）。
@@ -51,23 +68,19 @@ def build_compact_input(rows: list[dict], summary: str = "", *, keep_last: int,
 
 
 async def collect_real_messages(world_repo, world) -> list[dict]:
-    """该会话里**模型会看到**的消息（user/ai 两种角色，按时间正序）。
+    """该会话里**模型会看到**的消息（user/ai 两种角色，按时间正序，带 DB id）。
 
     tool/note 不进模型上下文（它们只是给你看的卡片与思考），所以既不计入、也不参与压缩。
+    查询走 get_chat_history（唯一实现）：口径必须与聊天一致——两处各写一份 SQL 必然漂移
+    （2026-09-16 那个坑就是判定口径和聊天不一致，数出来的根本不是同一个东西）。
     """
-    from sqlalchemy import select
-    from app.models.world import WorldChatMessage
-    from app.services.world.world_chat_service import session_id_for_db
-
-    sid = session_id_for_db(world)
-    query = select(WorldChatMessage).where(
-        WorldChatMessage.world_id == world.id,
-        WorldChatMessage.role.in_(("user", "ai")),
+    from app.services.world.world_chat_service import (
+        REAL_ROLES, get_chat_history, session_id_for_db,
     )
-    query = query.where(WorldChatMessage.session_id.is_(None) if sid is None
-                        else WorldChatMessage.session_id == sid)
-    rows = (await world_repo.execute(query.order_by(WorldChatMessage.id))).scalars().all()
-    return [{"role": m.role, "content": m.content or ""} for m in rows]
+    rows = await get_chat_history(
+        world_repo, world.id, limit=None, session_id=session_id_for_db(world), roles=REAL_ROLES,
+    )
+    return [{"id": r["id"], "role": r["role"], "content": r["content"] or ""} for r in rows]
 
 
 async def compact_session(world_repo, world) -> dict:
@@ -117,9 +130,17 @@ async def compact_session(world_repo, world) -> dict:
             return {"success": False, "error": "摘要提取失败", **plan}
 
         cfg = dict(world.config or {})
+        skey = session_key(world)
         summaries = dict(cfg.get("chat_summaries") or {})
-        summaries[session_key(world)] = summary
+        summaries[skey] = summary
         cfg["chat_summaries"] = summaries
+        # compact 边界 = 摘要覆盖到的最后一条（不含）的真实消息 id：下次对话从它往后**全部**带上，
+        # 之后每轮只往后追加（前缀只增不减 → 跨轮命中缓存），直到下一次 compact 前移。
+        # 取窗口前一条（+1 那个下标）才对得上"窗口内保留 KEEP_LAST 条"
+        if len(rows) > WORLD_CHAT_KEEP_LAST:
+            bounds = dict(cfg.get("chat_summary_bounds") or {})
+            bounds[skey] = rows[-WORLD_CHAT_KEEP_LAST - 1]["id"]
+            cfg["chat_summary_bounds"] = bounds
         world.config = cfg
         await _refresh_capabilities(world_repo, world)
         await world_repo.flush()

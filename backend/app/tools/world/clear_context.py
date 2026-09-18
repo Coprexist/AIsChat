@@ -29,12 +29,8 @@ class ClearContextTool(WorldToolPlugin):
             else:
                 q = q.where(WorldChatMessage.session_id == sid_db)
             await ctx.world_repo.execute(q)
-            cfg = dict(ctx.world.config or {})
-            summaries = dict(cfg.get("chat_summaries") or {})
-            summaries.pop(session_key(ctx.world), None)
-            cfg["chat_summaries"] = summaries
-            cfg["workflow_memory"] = None
-            ctx.world.config = cfg
+            from app.services.world.world_chat_compact import forget_session_state
+            forget_session_state(ctx.world, session_key(ctx.world))
             # 解锁：清空 = 新对话，前缀变更（提示词/强注入/昵称）在此生效
             try:
                 from app.repositories.capability_repo import SQLAlchemyCapabilityRepository

@@ -308,14 +308,18 @@ def world_context_block(world) -> str:
 
 
 # 世界 AI 对话上下文（与主对话压缩机制一致：128K 窗口 60% 触发提示，AI 调 compact 压缩）
-WORLD_CHAT_KEEP_LAST = 10          # 压缩后保留的最近消息数
+# 条数一律按**真实消息**（user/ai）算——文档 7.15：模型真正带的只有这两种角色，
+# 按数据库行数算会被工具卡片/思考挤成 0 条（world #45 实测 30 行里只剩 1 条真实消息）
+WORLD_CHAT_KEEP_LAST = 10          # 压缩后保留的最近真实消息数
 # 少于 N 条不提示压缩。必须比保留窗口多 1：真实消息数 ≤ 保留窗口时压缩是**空操作**，
 # 否则会出现"提示 AI 去压缩、压了却无可压缩"（旧值 6 < 10，正好落在这个空区间里）
 WORLD_CONTEXT_MIN_MESSAGES = WORLD_CHAT_KEEP_LAST + 1
 DEFAULT_MAX_TOOL_ROUNDS = 50       # 工具循环默认上限（可在设计页配置 max_tool_rounds 覆盖）
 
 
-CHAT_HISTORY_LIMIT = 30  # 每次对话携带的最近消息数
+CHAT_HISTORY_LIMIT = 30  # 没有摘要时携带的最近真实消息数
+# 进模型上下文的角色：tool（工具卡片）与 note（思考过程）只给用户看——聊天与压缩共用这份口径
+REAL_ROLES = ("user", "ai")
 
 
 def session_key(world) -> str:
@@ -556,8 +560,18 @@ async def ensure_session_lifecycle(world_repo, world) -> dict:
     return result
 
 
-async def get_chat_history(world_repo: WorldRepository, world_id: int, limit: int = 30, before_id: int | None = None, session_id: str | None = None) -> list[dict]:
-    """世界 AI 对话历史（最近 limit 条；before_id 传最旧 id 可翻更早；session_id 过滤会话）"""
+async def get_chat_history(
+    world_repo: WorldRepository, world_id: int, limit: int | None = 30,
+    before_id: int | None = None, session_id: str | None = None,
+    roles: tuple[str, ...] | None = None, since_id: int | None = None,
+) -> list[dict]:
+    """世界 AI 对话历史（最近 limit 条；limit=None 取全部）
+
+    - before_id：传最旧 id 可翻更早（前端翻页）
+    - session_id：过滤会话
+    - roles：按角色过滤——模型上下文只取 REAL_ROLES；前端要工具卡片时不要传
+    - since_id：只要这个 id 之后的（compact 边界锚定用）
+    """
     from app.models.world import WorldChatMessage
     from app.tools.world import tool_label
 
@@ -566,9 +580,15 @@ async def get_chat_history(world_repo: WorldRepository, world_id: int, limit: in
         query = query.where(WorldChatMessage.session_id.is_(None))
     else:
         query = query.where(WorldChatMessage.session_id == session_id)
+    if roles is not None:
+        query = query.where(WorldChatMessage.role.in_(roles))
     if before_id is not None:
         query = query.where(WorldChatMessage.id < before_id)
-    query = query.order_by(WorldChatMessage.id.desc()).limit(limit)
+    if since_id is not None:
+        query = query.where(WorldChatMessage.id > since_id)
+    query = query.order_by(WorldChatMessage.id.desc())
+    if limit is not None:
+        query = query.limit(limit)
     result = await world_repo.execute(query)
     return [
         {
@@ -1134,25 +1154,25 @@ async def _prepare_world_chat(
         for n in notices
     ) if notices else ""
 
-    # ── 上下文：有压缩摘要则 摘要+最近 N 条，否则最近 30 条；接近上限时提示 AI 调 compact ──
+    # ── 上下文：模型只看真实消息（user/ai）；接近上限时提示 AI 调 compact ──
+    # 有摘要 → **从 compact 边界往后全部带上**：只增不减，前缀稳定（跨轮命中缓存）且 AI 真的记得住；
+    # 边界缺失（老数据）→ 退回最近 WORLD_CHAT_KEEP_LAST 条；无摘要 → 最近 CHAT_HISTORY_LIMIT 条
     sid_db = session_id_for_db(world)  # 落库用 session_id（默认会话 None）
+    skey = session_key(world)
     summaries = (world.config or {}).get("chat_summaries") or {}
-    summary = summaries.get(session_key(world)) or ""
-    # 未完成工作流记忆：上次对话中断（无最终回复）→ 本次继续，不重做
-    wm = (world.config or {}).get("workflow_memory")
-    if wm and wm.get("tools_done"):
-        done = "、".join(wm["tools_done"][-8:])
-        system_prompt += (
-            "\n\n【未完成工作流】上次对话在 " + str(wm.get("interrupted_at", ""))[:19] +
-            " 中断，已执行：" + done + "。请继续完成剩余工作并给出总结，不要重复已完成的步骤。"
-        )
-    history = await get_chat_history(world_repo, world_id, WORLD_CHAT_KEEP_LAST if summary else CHAT_HISTORY_LIMIT, session_id=sid_db)
+    summary = summaries.get(skey) or ""
+    boundary = ((world.config or {}).get("chat_summary_bounds") or {}).get(skey) if summary else None
+    limit, since_id = (None, boundary) if (summary and boundary) else (
+        WORLD_CHAT_KEEP_LAST if summary else CHAT_HISTORY_LIMIT, None)
+    history = await get_chat_history(
+        world_repo, world_id, limit, session_id=sid_db, roles=REAL_ROLES, since_id=since_id,
+    )
     hist_llm = [
         {
             "role": "assistant" if m["role"] == "ai" else m["role"],
             "content": _history_text(m["content"], m.get("attachments")),
         }
-        for m in history if m["role"] not in ("tool", "note")
+        for m in history
     ]
     # 用户消息（单条/批量统一；批量 = 排队消息一起发，逐条气泡）
     from app.services.memory.context_compression_service import should_compress
@@ -1185,10 +1205,20 @@ async def _prepare_world_chat(
         messages.append({"role": "system", "content": image_note(_n_img)})
 
     # 动态信息全部放末尾（每次变化，不影响前缀 cache）——与主对话同规则
+    # 未完成工作流记忆：上次对话中断（无最终回复）→ 本次继续，不重做。
+    # 必须放尾部：它带 interrupted_at 时间戳，若拼进 system，一变就是整段前缀全 miss
+    wm = (world.config or {}).get("workflow_memory")
+    if wm and wm.get("tools_done"):
+        done = "、".join(wm["tools_done"][-8:])
+        messages.append({"role": "system", "content": (
+            "【未完成工作流】上次对话在 " + str(wm.get("interrupted_at", ""))[:19] +
+            " 中断，已执行：" + done + "。请继续完成剩余工作并给出总结，不要重复已完成的步骤。"
+        )})
     if notice_lines:
         messages.append({"role": "system", "content": "【用户手动改动的懒通知，回复中应体现你看到了】\n" + notice_lines})
-    # 记忆地图：只在上下文起点（无摘要 = 新会话/clear 后）注入
-    if not summary:
+    # 记忆地图：只在新会话/clear 后注入（文档 6.9：普通延续对话不注入——它是索引，
+    # 每轮重发既费 token，又把动态内容塞进尾部）
+    if not summary and not hist_llm:
         try:
             memory_map = await build_memory_map(world_repo, world_id)
             if memory_map:

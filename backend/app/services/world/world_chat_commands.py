@@ -66,12 +66,8 @@ async def _cmd_clear(ctx: CmdContext) -> str:
     else:
         q = q.where(WorldChatMessage.session_id == sid_db)
     await ctx.world_repo.execute(q)
-    cfg = dict(world.config or {})
-    summaries = dict(cfg.get("chat_summaries") or {})
-    summaries.pop(session_key(world), None)
-    cfg["chat_summaries"] = summaries
-    cfg["workflow_memory"] = None
-    world.config = cfg
+    from app.services.world.world_chat_compact import forget_session_state
+    forget_session_state(world, session_key(world))
     await ctx.world_repo.commit()
     return "已清空当前会话上下文（历史消息+摘要+工作流记忆），其他会话保留；长期记忆保留——AI 将从记忆恢复工作状态。"
 

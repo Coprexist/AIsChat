@@ -14,6 +14,7 @@ const AI_MODES = [
 ]
 import { api } from '../../api/client'
 import { Dialog } from '../ui'
+import { useT } from '../../i18n/I18nContext'
 
 export interface WorldCreator {
   id: string
@@ -28,12 +29,23 @@ export interface WorldCreator {
   tools: string[]
 }
 
+/** 单轮用量（后端按 turn 聚合，正序 = 旧 → 新） */
+export interface WorldUsageTurn {
+  turn_id: string
+  calls: number
+  prompt_tokens: number
+  cached_tokens: number
+  hit_pct: number
+  at: string | null
+}
+
 export interface WorldUsageStats {
   total_calls: number
   prompt_tokens: number
   completion_tokens: number
   cached_tokens: number
   cache_hit_rate_pct: number
+  recent_turns?: WorldUsageTurn[]
 }
 
 interface WorldCreatorConfigProps {
@@ -49,6 +61,7 @@ interface WorldCreatorConfigProps {
 }
 
 export default function WorldCreatorConfig({ wid, creator, usageStats, aiMode, onModeSaved, onSaved, onClose, onMsg }: WorldCreatorConfigProps) {
+  const t = useT()
   const [form, setForm] = useState({
     name: creator.name ?? '',
     system_prompt: creator.system_prompt ?? '',
@@ -166,6 +179,26 @@ export default function WorldCreatorConfig({ wid, creator, usageStats, aiMode, o
                 </div>
                 <div className="text-lg font-bold text-mint-400">{usageStats.cache_hit_rate_pct}%</div>
               </div>
+              {/* 逐轮趋势：只给一个全时段数字，改完无从判断有没有用（文档 6.10） */}
+              {!!usageStats.recent_turns?.length && (
+                <div className="mt-2.5 pt-2 border-t border-border">
+                  <div className="text-3xs text-textMuted">
+                    {t('tool:world.usage.recentTurns', { n: usageStats.recent_turns.length })}
+                  </div>
+                  <div className="flex items-end gap-0.5 h-6 mt-1">
+                    {usageStats.recent_turns.map(turn => (
+                      <div
+                        key={turn.turn_id}
+                        className="flex-1 bg-mint-400/60 rounded-t-sm"
+                        style={{ height: `${Math.max(8, turn.hit_pct)}%` }}
+                        title={t('tool:world.usage.turnTip', {
+                          calls: turn.calls, prompt: turn.prompt_tokens, hit: turn.hit_pct,
+                        })}
+                      />
+                    ))}
+                  </div>
+                </div>
+              )}
             </div>
           )}
 
