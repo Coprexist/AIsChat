@@ -8,6 +8,109 @@ import { useAttachmentUpload, isImageAttachment } from '../hooks/useAttachmentUp
 import { AttachmentChips, DropMask } from './AttachmentChips'
 import { api } from '../api/client'
 import { useT } from '../i18n/I18nContext'
+import { useElementWidth } from '../hooks/useElementWidth'
+
+// ── 对话内容列宽（学 DSH ConversationRoot / WidthHandle）──
+// 内容列居中，宽度是可拖的：上下限都按"列宽"推，保证两侧永远留着放拖条的留白。
+/** localStorage 键：拖动过的内容列宽（px），只存用户意图，渲染宽度每次按列宽重新收敛 */
+const CONTENT_W_KEY = 'world_chat_content_width'
+/** 内容列最小宽度：再窄代码块就没法看了（与 DSH 的 CONTENT_MIN 同值） */
+const CONTENT_MIN = 640
+/** 每侧必须留出的留白：24 内缩 + 40 拖条 + 24 安全区 —— 拖到头也还能拖回来 */
+const CONTENT_EDGE_BUDGET = 176
+/** 没有偏好时的自适应宽：列宽的 64%，夹在 680~920 之间（DSH 的同一套公式） */
+const CONTENT_ADAPTIVE_MIN = 680
+const CONTENT_ADAPTIVE_MAX = 920
+/** 内容列宽经 CSS 变量下发：拖拽期间直接改变量，不走 state，省下每帧重渲整段消息 */
+const CONTENT_W_VAR = '--world-chat-content-w'
+
+/** 读偏好：本地存储是"持久层边界"，坏值一律当没偏好 */
+function readContentWidthPref(): number | null {
+  try {
+    const raw = localStorage.getItem(CONTENT_W_KEY)
+    if (raw === null) return null
+    const v = Number(raw)
+    return Number.isFinite(v) && v > 0 ? v : null
+  } catch { return null }
+}
+
+/** 列宽 → 内容列宽：有偏好按偏好夹，没偏好按列宽自适应；上限 = 列宽 - 留白预算 */
+function resolveContentWidth(columnWidth: number, pref: number | null): number {
+  const max = Math.max(CONTENT_MIN, columnWidth - CONTENT_EDGE_BUDGET)
+  if (pref !== null) return Math.min(Math.max(pref, CONTENT_MIN), max)
+  return Math.max(CONTENT_ADAPTIVE_MIN, Math.min(columnWidth * 0.64, CONTENT_ADAPTIVE_MAX))
+}
+
+/**
+ * 内容列宽拖拽。三件事照 DSH 的做法：
+ *  1) 内容列居中，拖任一条边都是"两边各让一半"，所以宽度按 **2× 指针位移** 变，条才跟手；
+ *  2) 拖动期间只写 CSS 变量，不 setState —— 消息列表每帧重渲的代价太大，松手才落库 + 回写状态；
+ *  3) 上限由 resolveContentWidth 兜住（列宽 - 176），拖到贴边也留得下重拖的把手。
+ */
+function useContentColumnWidth(columnWidth: number, hostRef: React.RefObject<HTMLDivElement | null>) {
+  const [pref, setPref] = useState<number | null>(() => readContentWidthPref())
+  const [dragging, setDragging] = useState(false)
+  const dragRef = useRef<{ x: number; base: number; outward: 1 | -1; latest: number; frame: number | null } | null>(null)
+
+  const onHandleDown = useCallback((side: 'left' | 'right') => (e: React.MouseEvent) => {
+    e.preventDefault()
+    dragRef.current = {
+      x: e.clientX,
+      base: resolveContentWidth(columnWidth, pref),
+      outward: side === 'right' ? 1 : -1,
+      latest: e.clientX,
+      frame: null,
+    }
+    setDragging(true)
+    document.body.style.cursor = 'col-resize'
+    document.body.style.userSelect = 'none'
+  }, [columnWidth, pref])
+
+  useEffect(() => {
+    if (!dragging) return
+    /** 指针位置 → 内容列宽（居中列：两边各让一半，所以按 2× 位移算） */
+    const widthAt = (clientX: number, d: NonNullable<typeof dragRef.current>) =>
+      resolveContentWidth(columnWidth, d.base + (d.outward === 1 ? clientX - d.x : d.x - clientX) * 2)
+    const onMove = (e: MouseEvent) => {
+      const d = dragRef.current
+      if (!d) return
+      d.latest = e.clientX
+      // mousemove 一帧可能来好几次，每帧最多写一次变量
+      if (d.frame !== null) return
+      d.frame = requestAnimationFrame(() => {
+        const cur = dragRef.current
+        if (!cur) return
+        cur.frame = null
+        hostRef.current?.style.setProperty(CONTENT_W_VAR, `${widthAt(cur.latest, cur)}px`)
+      })
+    }
+    const onUp = () => {
+      const d = dragRef.current
+      if (d) {
+        if (d.frame !== null) cancelAnimationFrame(d.frame)
+        if (d.latest !== d.x) {
+          const final = widthAt(d.latest, d)
+          try { localStorage.setItem(CONTENT_W_KEY, String(final)) } catch { /* 隐私模式等写不了就算了 */ }
+          // 回写状态：变量交还给声明式，列宽变化时也按新偏好重新收敛
+          hostRef.current?.style.setProperty(CONTENT_W_VAR, `${final}px`)
+          setPref(final)
+        }
+      }
+      dragRef.current = null
+      setDragging(false)
+      document.body.style.cursor = ''
+      document.body.style.userSelect = ''
+    }
+    document.addEventListener('mousemove', onMove)
+    document.addEventListener('mouseup', onUp)
+    return () => {
+      document.removeEventListener('mousemove', onMove)
+      document.removeEventListener('mouseup', onUp)
+    }
+  }, [dragging, columnWidth, hostRef])
+
+  return { contentWidth: resolveContentWidth(columnWidth, pref), dragging, onHandleDown }
+}
 
 // 工具气泡图标：按摘要内容关键词映射（后端文本不带 emoji，图标由前端渲染）
 function toolIcon(content: string) {
@@ -290,6 +393,13 @@ interface WorldChatPanelProps {
  */
 const WorldChatPanel = memo(forwardRef<WorldChatHandle, WorldChatPanelProps>(({ wid, onRefresh, onMsg, onUnreadCountChange, creatorName, aiMode, onModeChange, onSessionsChange }, ref) => {
   const t = useT()
+  // 内容列宽：列宽靠 ResizeObserver 量（工具条/侧栏变化都要重新收敛），
+  // 内容列宽经 CSS 变量下发——拖拽时直接改变量，不触发本组件（含整段消息列表）重渲
+  const [measureRef, columnWidth] = useElementWidth()
+  // 变量宿主（display:contents 那层）只管挂 CSS 变量；列宽由消息区的量测 ref 报（= 本面板整列宽）
+  const colHostRef = useRef<HTMLDivElement | null>(null)
+  const setColumnHost = useCallback((el: HTMLDivElement | null) => { colHostRef.current = el }, [])
+  const { contentWidth, dragging: widthDragging, onHandleDown } = useContentColumnWidth(columnWidth, colHostRef)
   // 运行模式（对话栏内切换；与设计页配置弹窗是同一个后端字段，切换后回调父组件同步）
   const [mode, setMode] = useState(aiMode || 'review')
   const [modeBusy, setModeBusy] = useState(false)
@@ -689,11 +799,23 @@ const WorldChatPanel = memo(forwardRef<WorldChatHandle, WorldChatPanelProps>(({ 
 
   return (
     <>
+      {/* 内容列宽变量挂这一层：display:contents 不产生盒子，只负责把变量继承给下面所有内容。
+          拖拽期间只改这个变量——本组件（含整段消息列表）一帧都不重渲 */}
+      <div ref={setColumnHost} className="contents" style={{ [CONTENT_W_VAR]: `${contentWidth}px` } as React.CSSProperties}>
       {/* 消息列表：外层不滚动，专门用来挂拖拽提示层（放进滚动容器会随内容滚走）；
-          内层才是滚动容器——chatListRef 必须挂在滚动元素上（它读 scrollHeight/scrollTop） */}
-      <div className="flex-1 min-h-0 relative" {...attachments.zoneProps('list')}>
+          内层才是滚动容器——chatListRef 必须挂在滚动元素上（它读 scrollHeight/scrollTop）。
+          滚动容器铺满整列（滚动条贴列右边缘），居中靠"左右内边距 = 两侧留白"实现（DSH scrollBody/column 同一个意思）：
+          这样滚轮落在两侧留白里也能滚。列宽用 ResizeObserver 量，量多少算多少 */}
+      <div ref={measureRef} className="flex-1 min-h-0 relative" {...attachments.zoneProps('list')}>
         <DropMask {...attachments.dropState('list')} label="拖动到此处上传图片" />
-        <div ref={chat.chatListRef} className="absolute inset-0 overflow-y-auto p-3 space-y-2">
+        <div
+          ref={chat.chatListRef}
+          className="absolute inset-0 overflow-y-auto py-3 space-y-2 [scrollbar-gutter:stable]"
+          style={{
+            paddingLeft: `max(0px, calc((100% - var(${CONTENT_W_VAR})) / 2))`,
+            paddingRight: `max(0px, calc((100% - var(${CONTENT_W_VAR})) / 2))`,
+          }}
+        >
           {chat.chatLoadingOlder && <div className="text-3xs text-textMuted text-center py-1">加载更早消息…</div>}
           {chat.chatMsgs.length === 0 ? renderEmptySuggestions() : chat.chatMsgs.map((m, i) => renderMessage(m, i))}
 
@@ -722,6 +844,24 @@ const WorldChatPanel = memo(forwardRef<WorldChatHandle, WorldChatPanelProps>(({ 
             </div>
           )}
         </div>
+        {/* 内容列宽拖条（学 DSH 的 WidthHandle）：落在两侧留白里、比内容列边缘再外 24px；
+            宽度 min(40px, 留白 - 48px)，留白不够时自然收成 0 —— 拖到头也还留得下拖回来的把手 */}
+        {(['left', 'right'] as const).map((side) => (
+          <div
+            key={side}
+            role="separator"
+            aria-orientation="vertical"
+            onMouseDown={onHandleDown(side)}
+            title={t('tool:world.chat.width')}
+            className={`absolute top-0 bottom-0 z-overlay cursor-col-resize transition-colors ${widthDragging ? 'bg-primary-500/40' : 'hover:bg-primary-500/30'}`}
+            style={{
+              width: `max(0px, min(40px, calc((100% - var(${CONTENT_W_VAR})) / 2 - 48px)))`,
+              ...(side === 'left'
+                ? { right: `calc(50% + var(${CONTENT_W_VAR}) / 2 + 24px)` }
+                : { left: `calc(50% + var(${CONTENT_W_VAR}) / 2 + 24px)` }),
+            }}
+          />
+        ))}
       </div>
 
       {/* 输入区（图片可直接拖进来放下，与点回形针等价） */}
@@ -753,7 +893,11 @@ const WorldChatPanel = memo(forwardRef<WorldChatHandle, WorldChatPanelProps>(({ 
         <AttachmentChips items={attachments.items} onRemove={attachments.remove} />
         {/* 单层容器（学 DSH）：textarea 不再自带边框，聚焦高亮只在外层亮一次。
             原来是外框套内框，聚焦只亮内层那条，看着像没聚焦 */}
-        <div className="rounded-2xl border border-border bg-elevated/40 transition-colors focus-within:border-primary-500/60 focus-within:bg-surface">
+        {/* 输入框跟内容列同宽（DSH：内容列宽 + 32px 侧余），窄面板下自然回落成整宽 */}
+        <div
+          className="mx-auto w-full rounded-2xl border border-border bg-elevated/40 transition-colors focus-within:border-primary-500/60 focus-within:bg-surface"
+          style={{ maxWidth: `calc(var(${CONTENT_W_VAR}) + 32px)` }}
+        >
         <textarea
           ref={chat.chatInputRef}
           value={localInput}
@@ -820,6 +964,7 @@ const WorldChatPanel = memo(forwardRef<WorldChatHandle, WorldChatPanelProps>(({ 
           onDecide={(ok, note) => chat.resolveApproval(chat.approvals[0].approval_id, ok, note)}
         />
       )}
+      </div>
     </>
   )
 }))

@@ -1110,9 +1110,9 @@ export default function WorldDesignPage() {
             className={`flex flex-col bg-surface border-l border-border ${chatFocus ? 'flex-1 min-w-0' : 'shrink-0'}`}
             style={chatFocus ? undefined : { width: effectiveChatWidth, maxWidth: effectiveChatWidth }}
           >
-            {/* 内容居中收窄（学 DSH）：消息与输入区落在同一列。窄对话栏下 max-w-3xl 不生效，
-                所以不必按模式切换——专注时天然就是"居中收窄" */}
-            <div className="flex-1 min-h-0 flex flex-col mx-auto w-full max-w-3xl">
+            {/* 限宽与居中已经挪进对话面板（按可拖的"内容列宽"走，拖拽零重渲），
+                这里只把整列交给对话——专注时列自然变宽，内容仍居中 */}
+            <div className="flex-1 min-h-0 flex flex-col">
               {renderChatInner(true)}
             </div>
           </div>
