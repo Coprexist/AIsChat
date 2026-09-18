@@ -1,7 +1,11 @@
 /**
  * 世界文件树：按目录层级构建 + 文件夹可折叠 + 文件选中/删除
  * （从 WorldDesignPage 拆分；移动端目录导航复用 buildWorldTree）
+ *
+ * 效率约定：整棵树 memo（父级因页签/对话重渲时，文件不变就不重进）；
+ * 文件行单独 memo 且只吃原始值，选中文件时只有"旧选中 + 新选中"两行重渲。
  */
+import { memo, useMemo } from 'react'
 import { ChevronRight, Folder, FolderOpen, Trash2 } from 'lucide-react'
 import { fileTypeIcon } from './FileContentPane'
 
@@ -63,6 +67,43 @@ function IndentGuides({ depth }: { depth: number }) {
 /** 行内容块：图标与文字统一在这里，纵向 padding 只写这一处 */
 const ROW_INNER = 'flex items-center gap-1 min-w-0 flex-1 py-1 pl-1'
 
+interface TreeFileRowProps {
+  path: string
+  name: string
+  depth: number
+  active: boolean
+  onSelect: (path: string) => void
+  onDelete: (path: string) => void
+}
+
+/** 文件行：只吃原始值 + 稳定回调，memo 才有意义（key 也是稳定 path，不用下标） */
+const TreeFileRow = memo(function TreeFileRow({ path, name, depth, active, onSelect, onDelete }: TreeFileRowProps) {
+  return (
+    <div className="group flex items-stretch">
+      <button
+        onClick={() => onSelect(path)}
+        className={`flex items-stretch flex-1 min-w-0 text-left text-xs rounded transition-colors ${active ? 'bg-primary-500/20 text-primary-300' : 'hover:bg-elevated text-textSecondary'}`}
+        title={path}
+      >
+        <IndentGuides depth={depth} />
+        <span className={`${ROW_INNER} pr-1`}>
+          {/* 12px 占位 = 文件夹行展开箭头的宽度，同级文件名才能与文件夹名对齐 */}
+          <span className="w-3 shrink-0" aria-hidden />
+          <span className="shrink-0">{fileTypeIcon(name)}</span>
+          <span className="truncate">{name}</span>
+        </span>
+      </button>
+      <button
+        onClick={(ev) => { ev.stopPropagation(); onDelete(path) }}
+        className="hidden group-hover:flex shrink-0 items-center justify-center w-6 text-textMuted hover:text-rose-400 transition-colors"
+        title="删除此文件"
+      >
+        <Trash2 size={13} />
+      </button>
+    </div>
+  )
+})
+
 interface WorldFileTreeProps {
   files: WorldFile[]
   currentFile: string
@@ -72,8 +113,9 @@ interface WorldFileTreeProps {
   onDelete: (path: string) => void
 }
 
-export default function WorldFileTree({ files, currentFile, collapsedDirs, onToggleDir, onSelect, onDelete }: WorldFileTreeProps) {
-  const tree = buildWorldTree(files)
+const WorldFileTree = memo(function WorldFileTree({ files, currentFile, collapsedDirs, onToggleDir, onSelect, onDelete }: WorldFileTreeProps) {
+  // 建树是 O(n log n) 且每次都新建对象：按 files 定住，别让父级重渲把它一起带跑
+  const tree = useMemo(() => buildWorldTree(files), [files])
 
   const renderTree = (nodes: WorldTreeNode[], depth: number): React.ReactElement[] =>
     nodes.map((n) => (
@@ -95,31 +137,20 @@ export default function WorldFileTree({ files, currentFile, collapsedDirs, onTog
             {!collapsedDirs.has(n.path) && renderTree(n.children, depth + 1)}
           </>
         ) : (
-          <div key={n.path} className="group flex items-stretch">
-            <button
-              onClick={() => onSelect(n.path)}
-              className={`flex items-stretch flex-1 min-w-0 text-left text-xs rounded transition-colors ${currentFile === n.path ? 'bg-primary-500/20 text-primary-300' : 'hover:bg-elevated text-textSecondary'}`}
-              title={n.path}
-            >
-              <IndentGuides depth={depth} />
-              <span className={`${ROW_INNER} pr-1`}>
-                {/* 12px 占位 = 文件夹行展开箭头的宽度，同级文件名才能与文件夹名对齐 */}
-                <span className="w-3 shrink-0" aria-hidden />
-                <span className="shrink-0">{fileTypeIcon(n.name)}</span>
-                <span className="truncate">{n.name}</span>
-              </span>
-            </button>
-            <button
-              onClick={(ev) => { ev.stopPropagation(); onDelete(n.path) }}
-              className="hidden group-hover:flex shrink-0 items-center justify-center w-6 text-textMuted hover:text-rose-400 transition-colors"
-              title="删除此文件"
-            >
-              <Trash2 size={13} />
-            </button>
-          </div>
+          <TreeFileRow
+            key={n.path}
+            path={n.path}
+            name={n.name}
+            depth={depth}
+            active={currentFile === n.path}
+            onSelect={onSelect}
+            onDelete={onDelete}
+          />
         )}
       </div>
     ))
 
   return <>{renderTree(tree.children, 0)}</>
-}
+})
+
+export default WorldFileTree

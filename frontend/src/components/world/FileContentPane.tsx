@@ -2,6 +2,7 @@
  * 世界文件内容区：md/html/代码渲染、图片显示、纯文本编辑
  * （桌面右栏 / 移动端编辑器共用；从 WorldDesignPage 拆分）
  */
+import { memo } from 'react'
 import { FileText, FileCode, FileJson, FileImage, FileAudio, FileVideo, File } from 'lucide-react'
 import CodeRenderer from '../shared/CodeRenderer'
 import MarkdownContent from '../shared/MarkdownContent'
@@ -19,7 +20,8 @@ export function fileTypeIcon(name: string) {
 }
 
 // 文件内容区：md/html/代码渲染、图片显示、纯文本编辑（桌面右栏 / 移动端编辑器共用）
-export default function FileContentPane({ wid, currentFile, content, setContent, viewMode, canRender, isMdFile, fileCodeLang, isImgFile }: {
+// memo：props 全是原始值 + 稳定的 setState，左栏切页签/对话流式输出都不该让编辑器重渲一遍
+function FileContentPane({ wid, currentFile, content, setContent, viewMode, canRender, isMdFile, fileCodeLang, isImgFile }: {
   wid: number
   currentFile: string
   content: string
@@ -64,3 +66,5 @@ export default function FileContentPane({ wid, currentFile, content, setContent,
     />
   )
 }
+
+export default memo(FileContentPane)

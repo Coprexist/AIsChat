@@ -4,7 +4,7 @@
  * 布局参考 TRAE/Cursor：左（文件树/预览）右（对话窗口）
  * 普通用户可直接用；专业用户可编辑代码（专业模式）。
  */
-import { useEffect, useState, useCallback, useRef, useMemo } from 'react'
+import { useEffect, useLayoutEffect, useState, useCallback, useRef, useMemo } from 'react'
 import { useParams, useNavigate, useSearchParams } from 'react-router-dom'
 import { ChevronLeft, ChevronRight, Folder, FolderOpen, FolderInput, Upload, Plus, Pencil, Eye, MessageCircle, Save, MoreHorizontal, FileText, Trash2, Settings, RefreshCw, ExternalLink, BookOpen, X, Download, Maximize2, Minimize2, PanelLeftClose, PanelLeftOpen } from 'lucide-react'
 import { api } from '../api/client'
@@ -23,13 +23,36 @@ import { useElementWidth } from '../hooks/useElementWidth'
 import { Button, Dialog, Input } from '../components/ui'
 import { useT } from '../i18n/I18nContext'
 
-/** 左栏页签：选中＝主色文字 + 2px 粗下划线（压在容器底边上），未选灰。
- *  比"按钮块"省高度，也让"现在看的是会话还是工作区"一眼可见 */
-function RailTab({ active, label, badge, onClick }: { active: boolean; label: string; badge?: number; onClick: () => void }) {
+/**
+ * 一次性的"进场"过渡：先落在未入场态，下一帧再翻到入场态。
+ * 不用 keyframes 的原因——transition / duration / ease 那几套类能和面板其它动效共用同一套令牌，
+ * 也不必往全局 CSS 里塞动画；放进 layout effect 是因为这次翻转必须发生在浏览器绘制之前，
+ * 否则新内容会先整块闪一下再被藏起来。
+ */
+function useEnterTransition(deps: React.DependencyList) {
+  const [entered, setEntered] = useState(true)
+  useLayoutEffect(() => {
+    setEntered(false)
+    const id = requestAnimationFrame(() => setEntered(true))
+    return () => cancelAnimationFrame(id)
+  }, deps)
+  return entered
+}
+
+/** 左栏页签：只有文字与颜色，下划线由页签行里那条**共享**指示器负责（见 railTabRefs） */
+function RailTab({ active, label, badge, onClick, buttonRef }: {
+  active: boolean
+  label: string
+  badge?: number
+  onClick: () => void
+  /** 回调 ref：共享指示器要量它的 offsetLeft/offsetWidth 才能滑过去 */
+  buttonRef?: (el: HTMLButtonElement | null) => void
+}) {
   return (
     <button
+      ref={buttonRef}
       onClick={onClick}
-      className={`relative h-full inline-flex items-center gap-1 text-xs transition-colors ${active ? 'text-primary-400 font-medium' : 'text-textMuted hover:text-textSecondary'}`}
+      className={`h-full inline-flex items-center gap-1 text-xs transition-colors ${active ? 'text-primary-400 font-medium' : 'text-textMuted hover:text-textSecondary'}`}
     >
       {label}
       {!!badge && badge > 0 && (
@@ -37,7 +60,6 @@ function RailTab({ active, label, badge, onClick }: { active: boolean; label: st
           {badge > 99 ? '99+' : badge}
         </span>
       )}
-      {active && <span className="absolute inset-x-0 -bottom-px h-0.5 rounded-full bg-primary-500" aria-hidden />}
     </button>
   )
 }
@@ -84,6 +106,7 @@ export default function WorldDesignPage() {
   // 三栏动态保底：左栏 200（会话名要看得见）/ 编辑区 160 / 对话 360（对话栏要塞得下输入提示与建议卡）；
   // 上限按其他区域保底实时反推（防负：空间不足时至少 = 自身保底）
   const MIN_RAIL = 200
+  const RAIL_MINI_W = 44  // 折叠后的图标条宽度（与内部的 w-11 对齐，别让容器比图标条宽）
   const MIN_EDITOR = 160
   const MIN_CHAT = 360
   const HANDLES = 8  // 两个拖拽手柄
@@ -265,10 +288,13 @@ export default function WorldDesignPage() {
     }
   }, [wid])
 
+  // load 只依赖 wid：它内部调的 selectFile 也只在 wid 变化时重建，
+  // 不能把 selectFile 写进 deps —— 那个声明在后面，deps 数组在渲染期求值会踩 TDZ
   useEffect(() => { load() }, [load])
 
   // ── 文件操作 ──
-  const selectFile = async (path: string) => {
+  // 传给 memo 过的文件树：identity 必须稳定，否则 memo 白做（只依赖 wid，换世界自然重建）
+  const selectFile = useCallback(async (path: string) => {
     setCurrentFile(path)
     // 能内联渲染的文件默认渲染视图（md/html/代码/图片），其余默认编辑
     const ext = path.split('.').pop()?.toLowerCase() ?? ''
@@ -280,7 +306,7 @@ export default function WorldDesignPage() {
       )
       setContent(r.binary ? '(二进制文件，不可编辑)' : (r.content || ''))
     } catch { setContent('') }
-  }
+  }, [wid])
 
   // ── 记录懒通知（改动/报错都走同一条通道，agent 下次对话时收到） ──
   const pushNotice = async (file: string, location: string, summary: string) => {
@@ -371,7 +397,7 @@ export default function WorldDesignPage() {
   }
 
   // ── 删除（AI 侧已有 file_delete 工具，这里补前端入口） ──
-  const deleteFile = async (path: string) => {
+  const deleteFile = useCallback(async (path: string) => {
     if (!confirm(`删除 ${path}？`)) return
     try {
       await api.delete(`/worlds/${wid}/files?path=${encodeURIComponent(path)}`)
@@ -381,7 +407,8 @@ export default function WorldDesignPage() {
     } catch (e: any) {
       setMsg(`删除失败: ${e?.message || e}`)
     }
-  }
+    // currentFile 进了依赖：删掉的正好是当前文件时要清掉选中
+  }, [wid, currentFile, load])
 
   // ── 文件树（按目录层级构建，文件夹可折叠） ──
   const [collapsedDirs, setCollapsedDirs] = useState<Set<string>>(new Set())
@@ -413,14 +440,15 @@ export default function WorldDesignPage() {
     return node
   }, [fileTree, uploadNavDir])
 
-  const toggleDir = (path: string) => {
+  // 折叠目录：identity 稳定，交给 memo 过的文件树
+  const toggleDir = useCallback((path: string) => {
     setCollapsedDirs((prev) => {
       const next = new Set(prev)
       if (next.has(path)) next.delete(path)
       else next.add(path)
       return next
     })
-  }
+  }, [])
 
   // 发布到商城：跳转统一发布页（带当前世界预选，表单含标题/描述/标签/同步 GitHub）
   // ── 世界打包：下载 / 导入 zip ──
@@ -460,11 +488,63 @@ export default function WorldDesignPage() {
   const chatHandleRef = useRef<WorldChatHandle>(null)
   const [chatUnreadCount, setChatUnreadCount] = useState(0)
 
+  // ── 左栏动效：下划线滑动 / 列表进场 / 折叠过渡 ──
+  // 放在 chatUnreadCount 之后：量下划线要读未读数（徽标会改变页签宽度），
+  // 放前面会踩"声明前使用"（依赖数组在渲染期求值，不是等执行到才读）
+  const railTabRefs = useRef<Record<'chat' | 'files', HTMLButtonElement | null>>({ chat: null, files: null })
+  const [tabIndicator, setTabIndicator] = useState<{ left: number; width: number } | null>(null)
+  const railContentIn = useEnterTransition([railCollapsed])
+  const railListIn = useEnterTransition([railTab])
+  // will-change 只在指示器真的在滑的那 200ms 里挂着：常驻会占显存、还逼着合成层常驻
+  const [tabSliding, setTabSliding] = useState(false)
+  const tabSlideTimer = useRef<number | null>(null)
+  const switchRailTab = useCallback((next: 'chat' | 'files') => {
+    if (next === railTab) return
+    setRailTab(next)
+    setTabSliding(true)
+    if (tabSlideTimer.current) window.clearTimeout(tabSlideTimer.current)
+    // 过渡 duration-200，留一点余量再撤 will-change
+    tabSlideTimer.current = window.setTimeout(() => setTabSliding(false), 260)
+  }, [railTab])
+  useEffect(() => () => { if (tabSlideTimer.current) window.clearTimeout(tabSlideTimer.current) }, [])
+
+  /** 量当前页签在页签行里的位置：共享指示器靠它平移过去。
+   *  量而不是写死百分比——文案宽度会变（未读徽标出现/消失，以后换词也会变） */
+  const measureRailTab = useCallback(() => {
+    const el = railTabRefs.current[railTab]
+    if (!el) return
+    const next = { left: el.offsetLeft, width: el.offsetWidth }
+    // 值没变就交回同一个对象：否则每量一次都触发一轮渲染
+    setTabIndicator((prev) => (prev && prev.left === next.left && prev.width === next.width ? prev : next))
+  }, [railTab])
+  useEffect(() => { measureRailTab() }, [measureRailTab, chatUnreadCount, railCollapsed])
+  useEffect(() => {
+    // 窗口变宽变窄、字号变化都会动到页签宽度，进来重算一次
+    window.addEventListener('resize', measureRailTab)
+    return () => window.removeEventListener('resize', measureRailTab)
+  }, [measureRailTab])
+
   // 会话快照来自面板里那个 useWorldChat：值没变时引用不变，setState 会被 Object.is 吃掉，
   // 不会因为"上报"多渲染一轮
   const handleSessionsChange = useCallback((snapshot: WorldSessionsSnapshot) => {
     setSessions(snapshot.list)
     setCurrentSession(snapshot.current)
+  }, [])
+
+  // 左栏会话列表的回调：全部定住引用（只依赖 ref），否则会话行 memo 全废
+  const handleSessionSelect = useCallback((id: string) => { chatHandleRef.current?.switchSession(id) }, [])
+  const handleSessionNew = useCallback(() => { chatHandleRef.current?.newSession() }, [])
+  const handleSessionTogglePin = useCallback(() => { chatHandleRef.current?.togglePinCurrent() }, [])
+  const handleSessionRename = useCallback((id: string, title: string) => {
+    setRenaming({ id })
+    setRenameValue(title)
+  }, [])
+  const handleSessionExport = useCallback((id: string, fmt: 'md' | 'json', title: string) => {
+    chatHandleRef.current?.exportSession(id, fmt, title || undefined)
+  }, [])
+  // 运行模式回调：面板是 memo 的，这里给内联箭头会每次重渲都换 identity，把 memo 废掉
+  const handleModeChange = useCallback((mode: string) => {
+    setWorld((w) => (w ? { ...w, ai_mode: mode } : w))
   }, [])
 
   /** 改名提交：留空 = 清除命名（列表回落到会话编号）；清洗规则在后端一处 */
@@ -534,7 +614,7 @@ export default function WorldDesignPage() {
         onUnreadCountChange={setChatUnreadCount}
         creatorName={world?.creator?.name}
         aiMode={world?.ai_mode || 'review'}
-        onModeChange={(mode) => setWorld((w) => (w ? { ...w, ai_mode: mode } : w))}
+        onModeChange={handleModeChange}
         onSessionsChange={handleSessionsChange}
       />
     </>
@@ -837,86 +917,122 @@ export default function WorldDesignPage() {
         </div>
         {/* 内容行：左栏（会话/工作区，常驻可拖可折） + 中栏（编辑/预览，专注模式收起） + 右栏（对话） */}
         <div className="flex flex-1 min-h-0">
-          {railCollapsed ? (
-            /* 折成图标条（学 DSH）：点图标＝展开并切到那一栏，图标条本身不承载列表 */
-            <div className="w-11 shrink-0 border-r border-border bg-surface flex flex-col items-center gap-1 py-2">
-              <button onClick={() => setRailCollapsed(false)} className="icon-btn-sm" title={t('tool:world.rail.expand')} aria-label={t('tool:world.rail.expand')}>
-                <PanelLeftOpen size={15} />
-              </button>
-              <button
-                onClick={() => { setRailTab('chat'); setRailCollapsed(false) }}
-                className={`icon-btn-sm ${railTab === 'chat' ? 'text-primary-400' : ''}`}
-                title={t('tool:world.rail.tab.chat')}
-                aria-label={t('tool:world.rail.tab.chat')}
-              >
-                <MessageCircle size={15} />
-              </button>
-              <button
-                onClick={() => { setRailTab('files'); setRailCollapsed(false) }}
-                className={`icon-btn-sm ${railTab === 'files' ? 'text-primary-400' : ''}`}
-                title={t('tool:world.rail.tab.files')}
-                aria-label={t('tool:world.rail.tab.files')}
-              >
-                <Folder size={15} />
-              </button>
-              {chatUnreadCount > 0 && (
-                <span className="inline-flex items-center justify-center min-w-[18px] h-[18px] px-1 rounded-full bg-rose-500 text-white text-3xs font-bold">
-                  {chatUnreadCount > 99 ? '99+' : chatUnreadCount}
-                </span>
-              )}
-            </div>
-          ) : (
-            <>
-              <div
-                ref={fileTreeRef}
-                className={`flex flex-col shrink-0 bg-surface border-r border-border ${railDragging ? '' : 'transition-[width] duration-200'}`}
-                style={{ width: fileWidth }}
-              >
-                {/* 页签行：选中＝主色文字 + 2px 下划线（压在容器底边上），未选灰 */}
-                <div className="flex items-center gap-3 h-9 px-2 border-b border-border shrink-0">
-                  <RailTab active={railTab === 'chat'} label={t('tool:world.rail.tab.chat')} badge={chatUnreadCount} onClick={() => setRailTab('chat')} />
-                  <RailTab active={railTab === 'files'} label={t('tool:world.rail.tab.files')} onClick={() => setRailTab('files')} />
-                  <div className="flex-1" />
-                  <button onClick={() => setRailCollapsed(true)} className="icon-btn-sm" title={t('tool:world.rail.collapse')} aria-label={t('tool:world.rail.collapse')}>
-                    <PanelLeftClose size={15} />
+          {/* 左栏：宽度**不做过渡**——壳每变一次宽，兄弟列（编辑区/专注模式下的对话列）都要重新布局，
+              所以折叠只让壳跳一下，动效全压在内容层的 opacity/transform 上（合成层，零布局）。
+              内层固定按"展开宽度"排版，宽度方向靠壳裁切，避免动画期间文字逐帧回流。
+              没加 contain:layout_paint：它会把左栏变成 fixed 后代的包含块并裁掉它们，
+              左栏里的"点外面关菜单"遮罩就会只剩左栏那么大（那个遮罩已经改成 document 监听） */}
+          <div
+            ref={fileTreeRef}
+            className="flex flex-col shrink-0 bg-surface border-r border-border overflow-hidden"
+            style={{ width: railCollapsed ? RAIL_MINI_W : fileWidth }}
+          >
+            <div
+              className={`flex flex-col flex-1 min-h-0 shrink-0 transition-[opacity,transform] duration-150 ease-out motion-reduce:transition-none ${railContentIn ? 'opacity-100 translate-x-0' : 'opacity-0 -translate-x-1'}`}
+              style={railCollapsed ? undefined : { width: fileWidth }}
+            >
+              {railCollapsed ? (
+                /* 折成图标条（学 DSH）：点图标＝展开并切到那一栏，图标条本身不承载列表 */
+                <div className="w-11 flex flex-col items-center gap-1 py-2">
+                  <button onClick={() => setRailCollapsed(false)} className="icon-btn-sm" title={t('tool:world.rail.expand')} aria-label={t('tool:world.rail.expand')}>
+                    <PanelLeftOpen size={15} />
                   </button>
-                </div>
-                <div className="flex-1 min-h-0 overflow-y-auto">
-                  {railTab === 'chat' ? (
-                    <WorldSessionList
-                      sessions={sessions}
-                      current={currentSession}
-                      onSelect={(id) => chatHandleRef.current?.switchSession(id)}
-                      onNew={() => chatHandleRef.current?.newSession()}
-                      onRename={(s) => { setRenaming({ id: s.id }); setRenameValue(s.title || '') }}
-                      onTogglePin={() => chatHandleRef.current?.togglePinCurrent()}
-                      onExport={(s, fmt) => chatHandleRef.current?.exportSession(s.id, fmt, s.title)}
-                    />
-                  ) : (
-                    <div className="p-2">
-                      <div className="flex items-center justify-between mb-2 px-1">
-                        <span className="text-xs font-medium text-textSecondary">{t('tool:world.pane.files')}</span>
-                        <span className="flex items-center gap-2">
-                          <button onClick={() => fileInputRef.current?.click()} className="inline-flex items-center gap-0.5 text-xs text-primary-400 hover:text-primary-500 dark:hover:text-primary-300 transition-colors" title={t('tool:world.files.upload')}>
-                            <Upload size={12} /> {t('tool:world.files.upload')}
-                          </button>
-                          <button onClick={createFile} className="inline-flex items-center gap-0.5 text-xs text-primary-400 hover:text-primary-500 dark:hover:text-primary-300 transition-colors" title={t('tool:world.files.new')}>
-                            <Plus size={12} /> {t('tool:world.files.new')}
-                          </button>
-                        </span>
-                      </div>
-                      <input ref={fileInputRef} type="file" className="hidden" onChange={handleUploadPick} />
-                      {files.length === 0 && <div className="text-xs text-textMuted p-2">{t('tool:world.files.empty')}</div>}
-                      <WorldFileTree files={files} currentFile={currentFile} collapsedDirs={collapsedDirs} onToggleDir={toggleDir} onSelect={selectFile} onDelete={deleteFile} />
-                    </div>
+                  <button
+                    onClick={() => { setRailTab('chat'); setRailCollapsed(false) }}
+                    className={`icon-btn-sm ${railTab === 'chat' ? 'text-primary-400' : ''}`}
+                    title={t('tool:world.rail.tab.chat')}
+                    aria-label={t('tool:world.rail.tab.chat')}
+                  >
+                    <MessageCircle size={15} />
+                  </button>
+                  <button
+                    onClick={() => { setRailTab('files'); setRailCollapsed(false) }}
+                    className={`icon-btn-sm ${railTab === 'files' ? 'text-primary-400' : ''}`}
+                    title={t('tool:world.rail.tab.files')}
+                    aria-label={t('tool:world.rail.tab.files')}
+                  >
+                    <Folder size={15} />
+                  </button>
+                  {chatUnreadCount > 0 && (
+                    <span className="inline-flex items-center justify-center min-w-[18px] h-[18px] px-1 rounded-full bg-rose-500 text-white text-3xs font-bold">
+                      {chatUnreadCount > 99 ? '99+' : chatUnreadCount}
+                    </span>
                   )}
                 </div>
-              </div>
-              <div
-                onMouseDown={(e) => { setRailDragging(true); fileResizeStart(e) }}
-                className="w-1 shrink-0 cursor-col-resize hover:bg-primary-500/40 transition-colors relative z-overlay"
-              />
-            </>
+              ) : (
+                <>
+                  {/* 页签行：下划线是行内一条**共享的**指示器，靠 translateX 滑到当前页签
+                      （各自淡入淡出会闪）；行必须是 relative——offsetLeft 就是相对它量的 */}
+                  <div className="relative flex items-center gap-3 h-9 px-2 border-b border-border shrink-0">
+                    <RailTab
+                      active={railTab === 'chat'}
+                      label={t('tool:world.rail.tab.chat')}
+                      badge={chatUnreadCount}
+                      onClick={() => switchRailTab('chat')}
+                      buttonRef={(el) => { railTabRefs.current.chat = el }}
+                    />
+                    <RailTab
+                      active={railTab === 'files'}
+                      label={t('tool:world.rail.tab.files')}
+                      onClick={() => switchRailTab('files')}
+                      buttonRef={(el) => { railTabRefs.current.files = el }}
+                    />
+                    <div className="flex-1" />
+                    <button onClick={() => setRailCollapsed(true)} className="icon-btn-sm" title={t('tool:world.rail.collapse')} aria-label={t('tool:world.rail.collapse')}>
+                      <PanelLeftClose size={15} />
+                    </button>
+                    {/* 指示器只动 transform：宽度走 scaleX（基准 1px），连"改宽度"都不做，
+                        滑动与宽度变化就都留在合成层；will-change 只在滑的那 200ms 挂着，滑完撤掉 */}
+                    {tabIndicator && (
+                      <span
+                        aria-hidden
+                        className={`pointer-events-none absolute -bottom-px left-0 h-0.5 w-px origin-left bg-primary-500 transition-transform duration-200 ease-out motion-reduce:transition-none ${tabSliding ? 'will-change-transform' : ''}`}
+                        style={{ transform: `translateX(${tabIndicator.left}px) scaleX(${tabIndicator.width})` }}
+                      />
+                    )}
+                  </div>
+                  <div className="flex-1 min-h-0 overflow-y-auto">
+                    {/* 切页签：新列表淡入 + 上移 3px（150ms ease-out），只为止住"啪一下换掉"的突兀 */}
+                    <div className={`transition-[opacity,transform] duration-150 ease-out motion-reduce:transition-none ${railListIn ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-1'}`}>
+                      {railTab === 'chat' ? (
+                        <WorldSessionList
+                          sessions={sessions}
+                          current={currentSession}
+                          onSelect={handleSessionSelect}
+                          onNew={handleSessionNew}
+                          onRename={handleSessionRename}
+                          onTogglePin={handleSessionTogglePin}
+                          onExport={handleSessionExport}
+                        />
+                      ) : (
+                        <div className="p-2">
+                          <div className="flex items-center justify-between mb-2 px-1">
+                            <span className="text-xs font-medium text-textSecondary">{t('tool:world.pane.files')}</span>
+                            <span className="flex items-center gap-2">
+                              <button onClick={() => fileInputRef.current?.click()} className="inline-flex items-center gap-0.5 text-xs text-primary-400 hover:text-primary-500 dark:hover:text-primary-300 transition-colors" title={t('tool:world.files.upload')}>
+                                <Upload size={12} /> {t('tool:world.files.upload')}
+                              </button>
+                              <button onClick={createFile} className="inline-flex items-center gap-0.5 text-xs text-primary-400 hover:text-primary-500 dark:hover:text-primary-300 transition-colors" title={t('tool:world.files.new')}>
+                                <Plus size={12} /> {t('tool:world.files.new')}
+                              </button>
+                            </span>
+                          </div>
+                          <input ref={fileInputRef} type="file" className="hidden" onChange={handleUploadPick} />
+                          {files.length === 0 && <div className="text-xs text-textMuted p-2">{t('tool:world.files.empty')}</div>}
+                          <WorldFileTree files={files} currentFile={currentFile} collapsedDirs={collapsedDirs} onToggleDir={toggleDir} onSelect={selectFile} onDelete={deleteFile} />
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                </>
+              )}
+            </div>
+          </div>
+          {!railCollapsed && (
+            <div
+              onMouseDown={(e) => { setRailDragging(true); fileResizeStart(e) }}
+              className="w-1 shrink-0 cursor-col-resize hover:bg-primary-500/40 transition-colors relative z-overlay"
+            />
           )}
 
           {/* 中栏：编辑 / 预览。专注模式整块让给对话——文件内容与预览状态在 store/iframe 里，重新挂载不丢 */}
