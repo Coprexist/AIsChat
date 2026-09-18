@@ -4,6 +4,7 @@
 """
 
 from app.tools.world.base import WorldToolPlugin, WorldToolContext
+from app.tools.world.shared import arg_error
 
 
 class ViewApiDocTool(WorldToolPlugin):
@@ -34,7 +35,7 @@ class ViewApiDocTool(WorldToolPlugin):
             if not section:
                 from app.services.world.world_api_docs import _discover_sections
                 ids = " / ".join(s["id"] for s in _discover_sections())
-                return {"success": False, "error": f"缺少 section 参数（可选：{ids}）"}
+                return arg_error(f"缺少 section 参数（可选：{ids}）", args)
             from app.services.world.world_api_docs import view_section
             return {"success": True, **view_section(section)}
         except (ValueError, FileNotFoundError) as e:

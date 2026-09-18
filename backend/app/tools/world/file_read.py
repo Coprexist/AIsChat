@@ -4,6 +4,7 @@
 """
 
 from app.tools.world.base import WorldToolPlugin, WorldToolContext
+from app.tools.world.shared import arg_error
 
 
 class FileReadTool(WorldToolPlugin):
@@ -27,7 +28,7 @@ class FileReadTool(WorldToolPlugin):
             args = ctx.args
             path = str(args.get("path", "")).strip()
             if not path:
-                return {"success": False, "error": "缺少 path 参数"}
+                return arg_error("缺少 path 参数", args)
             from app.services.world.world_file_service import read_file
             # 2026-08-13：支持按行分页（offset/limit）——大文件先 grep 定位再分段读
             offset = args.get("offset")

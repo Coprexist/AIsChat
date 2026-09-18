@@ -14,7 +14,7 @@
 |------|------|------------------|
 | 01 | 世界编号变量 | window 注入的 `WORLD_ID / GROUP_ID / USER_ID / WORLD_AI_ID` 等变量与打包原则。**写任何世界页面代码前必读**，杜绝硬编码编号 |
 | 02 | 世界UI桥 WorldUI | 控制宿主外壳：侧边栏/悬浮图标的显隐。实现了自己的导航时用 `hideFloatingIcon` 避免两套 UI 重复 |
-| 03 | 文件操作 | `file_list / file_write / file_read / file_edit / file_delete / file_move / file_copy` 全部参数与返回、类型策略（允许清单 + 禁用后缀 + 兜底强删）、越界防护、分页读取、下载固定落点 `downloads/`。**建/改世界网页代码前必读** |
+| 03 | 文件操作 | `file_list / file_write / file_read / file_grep / file_edit / file_delete / file_move / file_copy` 全部参数与返回、类型策略（允许清单 + 禁用后缀 + 兜底强删）、越界防护、分页读取、目录/多路径搜索、下载固定落点 `downloads/`。**建/改世界网页代码前必读** |
 | 04 | 积木体系 | `list_world_blocks / view_world_block / apply_world_block` 用法、现有积木（平台侧边栏、群聊对话窗）与侧边栏约定 |
 | 05 | 群聊 API | 读消息/发消息/成员列表/角色管理/踢人工具：参数、返回、身份与权限约定（默认作用于本世界绑定群） |
 | 06 | 页面与资源 | 沉浸界面预览入口、静态资源路由 `/world/{id}/files/`、相对路径规则、资源类型 |

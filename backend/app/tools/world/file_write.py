@@ -4,6 +4,7 @@
 """
 
 from app.tools.world.base import WorldToolPlugin, WorldToolContext
+from app.tools.world.shared import arg_error
 
 
 class FileWriteTool(WorldToolPlugin):
@@ -24,7 +25,7 @@ class FileWriteTool(WorldToolPlugin):
             path = str(args.get("path", "")).strip()
             content = str(args.get("content", ""))
             if not path:
-                return {"success": False, "error": "缺少 path 参数"}
+                return arg_error("缺少 path 参数", args)
             from app.services.world.world_file_service import read_file, write_file
             # 内容相同检测：打断模型的重复写入循环（温和提示，非硬拦截）
             try:

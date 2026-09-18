@@ -4,6 +4,7 @@
 """
 
 from app.tools.world.base import WorldToolPlugin, WorldToolContext
+from app.tools.world.shared import arg_error
 
 
 class UpdateWorldInfoTool(WorldToolPlugin):
@@ -25,7 +26,7 @@ class UpdateWorldInfoTool(WorldToolPlugin):
             if k in ("name", "description") and isinstance(v, str) and v.strip()
         }
         if not patch:
-            return {"success": False, "error": "没有有效的 name/description 参数"}
+            return arg_error("缺少有效的 name / description 参数（至少给一个非空字符串）", args)
         try:
             from app.services.world.world_service import update_world
             updated = await update_world(ctx.world_repo, ctx.world.id, ctx.world.owner_id, **patch)

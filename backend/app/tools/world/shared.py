@@ -27,6 +27,33 @@ def parse_args(arguments: str) -> dict:
         return {}
 
 
+# 参数校验报错里回显的值上限：报错只是为了让模型看着自己发来的参数改，不是复述内容
+_ARGS_ECHO_VALUE_LIMIT = 120
+
+
+def args_brief(args: dict) -> str:
+    """实际收到参数的摘要（`键=值`，值截断），给参数校验报错用。"""
+    if not args:
+        return "无"
+    parts = []
+    for key, value in args.items():
+        text = value if isinstance(value, str) else json.dumps(value, ensure_ascii=False)
+        text = " ".join(str(text).split())
+        if len(text) > _ARGS_ECHO_VALUE_LIMIT:
+            text = text[:_ARGS_ECHO_VALUE_LIMIT] + f"…（共 {len(text)} 字符）"
+        parts.append(f"{key}={text}")
+    return "，".join(parts)
+
+
+def arg_error(reason: str, args: dict) -> dict:
+    """参数校验失败的标准返回：点名哪个字段缺/非法 + 回显实际收到的参数。
+
+    回显是让模型改自己发错的那个字段，而不是把整块内容重发一遍
+    （file_edit 的 new_string、file_write 的 content 动辄几千 token）。
+    """
+    return {"success": False, "error": f"{reason}；实际收到：{args_brief(args)}"}
+
+
 def from_site_result(result: dict) -> dict:
     """主站工具结果 → 世界工具结果（**唯一适配点**）。
 

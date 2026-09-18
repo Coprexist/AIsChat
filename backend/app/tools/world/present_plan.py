@@ -5,6 +5,7 @@
 
 from app.services.world.world_ai_mode import USER_NOTE_KEY
 from app.tools.world.base import WorldToolPlugin, WorldToolContext
+from app.tools.world.shared import arg_error
 
 
 class PresentPlanTool(WorldToolPlugin):
@@ -27,9 +28,10 @@ class PresentPlanTool(WorldToolPlugin):
     required = ['plan']
 
     async def execute(self, ctx: WorldToolContext) -> dict:
-        plan = str(ctx.args.get("plan") or "").strip()
+        args = ctx.args
+        plan = str(args.get("plan") or "").strip()
         if not plan:
-            return {"success": False, "error": "缺少 plan 参数"}
+            return arg_error("缺少 plan 参数", args)
         from app.services.world.world_ai_mode import request_approval
         turn_id = (ctx.turn_state or {}).get("turn_id", "")
         # 计划必须真有人点头：无人应答一律不通过（on_timeout=False），

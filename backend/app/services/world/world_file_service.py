@@ -47,6 +47,20 @@ BANNED_EXTENSIONS = {
 }
 MAX_FILE_SIZE = 32 * 1024 * 1024  # 单文件 32MB（网页资源/下载文件用）
 
+# ── 产物路径（2026-09-18 定）─────────────────────────────────────
+# 构建产物/缓存对世界 AI 没有意义，列进上下文只是烧 token（世界只会更大）：
+# file_list 默认不列、file_grep 的目录递归默认不搜，需要时由调用方显式放开。
+ARTIFACT_DIRS = {
+    "__pycache__", "node_modules", ".git", "dist", "build",
+    ".venv", "venv", ".mypy_cache", ".pytest_cache", ".ruff_cache", ".cache",
+}
+ARTIFACT_SUFFIXES = {".pyc", ".pyo", ".map"}
+ARTIFACT_FILES = {".DS_Store", "Thumbs.db"}
+
+# 目录递归搜索的护栏：一次调用最多扫这么多文件，超过 2MB 的单个文件跳过（防一次搜索卡死）
+GREP_SCAN_FILE_LIMIT = 500
+GREP_SCAN_BYTES_LIMIT = 2 * 1024 * 1024
+
 
 def _world_dir(world_id: int) -> Path:
     """世界代码目录（自动创建）"""
@@ -86,6 +100,15 @@ def _check_ext(path: Path) -> None:
         )
     if ext not in ALLOWED_EXTENSIONS:
         raise ValueError(f"不允许的文件类型: {ext}，可选: {sorted(ALLOWED_EXTENSIONS)[:8]}...")
+
+
+def is_artifact_path(rel_path: str) -> bool:
+    """产物路径判定（file_list 与 file_grep 共用一条规则）：目录名命中，或文件名/后缀命中。"""
+    parts = rel_path.replace("\\", "/").strip("/").split("/")
+    if any(part in ARTIFACT_DIRS for part in parts[:-1]):
+        return True
+    name = parts[-1]
+    return name in ARTIFACT_FILES or Path(name).suffix.lower() in ARTIFACT_SUFFIXES
 
 
 def sweep_banned_files(world_id: int) -> list[str]:
@@ -186,6 +209,83 @@ def grep_file(world_id: int, rel_path: str, pattern: str, max_hits: int = 30) ->
             if len(hits) >= max_hits:
                 break
     return {"path": rel_path, "hits": hits, "total_hits": len(hits), "max_hits": max_hits}
+
+
+def path_kind(world_id: int, rel_path: str) -> str:
+    """路径类型：file / dir / missing（越界等非法路径照旧抛 ValueError）。"""
+    target = _safe_path(world_id, rel_path)
+    if target.is_file():
+        return "file"
+    if target.is_dir():
+        return "dir"
+    return "missing"
+
+
+def _dir_scan_files(world_id: int, rel_path: str) -> tuple[list[str], int]:
+    """目录递归展开为待搜文件（跳过产物路径与超大文件），返回（文件列表，跳过的超大文件数）。"""
+    base = _world_dir(world_id).resolve()
+    files: list[str] = []
+    skipped_large = 0
+    for p in sorted(_safe_path(world_id, rel_path).rglob("*")):
+        if not p.is_file():
+            continue
+        rel = str(p.relative_to(base))
+        if is_artifact_path(rel):
+            continue
+        if p.stat().st_size > GREP_SCAN_BYTES_LIMIT:
+            skipped_large += 1
+            continue
+        files.append(rel)
+    return files, skipped_large
+
+
+def grep_paths(world_id: int, paths: list[str], pattern: str, max_hits: int = 30) -> dict:
+    """在文件/目录/多路径中搜索（file_grep 的目录与数组支持，2026-09-18 新增）。
+
+    目录递归展开（跳过产物路径与超大文件），每条命中都带 path；
+    命中累计到 max_hits、扫描累计到 GREP_SCAN_FILE_LIMIT 即停——多次调用与目录混传都不重复计。
+    single_file=True 表示只搜了一个文件，调用方据此保留原有的「不带 path」返回形状。
+    """
+    hits: list[dict] = []
+    scanned = 0
+    skipped_large = 0
+    scan_truncated = False
+    single_file = len(paths) == 1
+    binary = False
+    for rel_path in paths:
+        kind = path_kind(world_id, rel_path)
+        if kind == "missing":
+            raise FileNotFoundError(f"文件不存在: {rel_path}")
+        if kind == "file":
+            files, skipped = [rel_path], 0
+        else:
+            single_file = False
+            files, skipped = _dir_scan_files(world_id, rel_path)
+        skipped_large += skipped
+        for rel in files:
+            if scanned >= GREP_SCAN_FILE_LIMIT:
+                scan_truncated = True
+                break
+            scanned += 1
+            one = grep_file(world_id, rel, pattern, max_hits=max_hits - len(hits))
+            if one.get("binary"):
+                binary = binary or single_file        # 单文件：沿用旧的 binary 返回
+                continue
+            for hit in one.get("hits") or []:
+                hits.append({"path": rel, **hit})
+            if len(hits) >= max_hits:
+                break
+        if len(hits) >= max_hits or scan_truncated:
+            break
+    return {
+        "hits": hits,
+        "files_scanned": scanned,
+        "skipped_large": skipped_large,
+        "single_file": single_file,
+        "binary": binary,
+        "truncated": len(hits) >= max_hits,
+        "scan_truncated": scan_truncated,
+    }
 
 
 def write_file(world_id: int, rel_path: str, content: str) -> dict:

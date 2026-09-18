@@ -5,6 +5,7 @@ AI 主动发起的是/否询问；与平台门禁共用同一条审批通道（w
 
 from app.services.world.world_ai_mode import USER_NOTE_KEY
 from app.tools.world.base import WorldToolPlugin, WorldToolContext
+from app.tools.world.shared import arg_error
 
 # 事件类型关键词（必填）：用户看到的弹窗按这个分类，也决定审批的归属
 KINDS = ("download", "delete", "modify", "other")
@@ -36,13 +37,14 @@ class AskUserTool(WorldToolPlugin):
     required = ['kind', 'question']
 
     async def execute(self, ctx: WorldToolContext) -> dict:
-        kind = str(ctx.args.get("kind") or "").strip()
-        question = str(ctx.args.get("question") or "").strip()
-        detail = str(ctx.args.get("detail") or "").strip()
+        args = ctx.args
+        kind = str(args.get("kind") or "").strip()
+        question = str(args.get("question") or "").strip()
+        detail = str(args.get("detail") or "").strip()
         if kind not in KINDS:
-            return {"success": False, "error": f"kind 必填且必须是 {'/'.join(KINDS)} 之一"}
+            return arg_error(f"kind 必填且必须是 {'/'.join(KINDS)} 之一（收到 {kind!r}）", args)
         if not question:
-            return {"success": False, "error": "缺少 question 参数"}
+            return arg_error("缺少 question 参数", args)
         from app.services.world.world_ai_mode import request_approval, unattended_policy
         # 没人应答怎么办由模式决定：自动档等 10 分钟然后自行继续（对齐 DSH），
         # 审阅/计划档一律不放行——不能因为"等超时了"就把敏感操作默认批了

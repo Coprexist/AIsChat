@@ -4,6 +4,7 @@
 """
 
 from app.tools.world.base import WorldToolPlugin, WorldToolContext
+from app.tools.world.shared import arg_error
 
 
 class FileEditTool(WorldToolPlugin):
@@ -31,8 +32,11 @@ class FileEditTool(WorldToolPlugin):
             args = ctx.args
             path = str(args.get("path", "")).strip()
             operation = str(args.get("operation", "")).strip()
-            if not path or operation not in ("str_replace", "insert", "delete_lines"):
-                return {"success": False, "error": "缺少 path 或 operation 非法"}
+            if not path:
+                return arg_error("缺少 path 参数", args)
+            if operation not in ("str_replace", "insert", "delete_lines"):
+                return arg_error(
+                    f"operation 非法（收到 {operation!r}，可选 str_replace / insert / delete_lines）", args)
             from app.services.world.world_file_service import read_file, write_file
             from app.utils.pure.file_edit import apply_file_edit  # 与主站共用同一份编辑核心
             existing = read_file(ctx.world.id, path)

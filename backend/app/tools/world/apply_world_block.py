@@ -5,6 +5,7 @@
 import logging
 
 from app.tools.world.base import WorldToolPlugin, WorldToolContext
+from app.tools.world.shared import arg_error
 from app.services.world.world_blocks import apply_block
 
 
@@ -27,7 +28,7 @@ class ApplyWorldBlockTool(WorldToolPlugin):
             args = ctx.args
             block_id = str(args.get("block_id", "")).strip()
             if not block_id:
-                return {"success": False, "error": "缺少 block_id 参数"}
+                return arg_error("缺少 block_id 参数", args)
             result = apply_block(ctx.world.id, block_id)
             # 积木更新（版本变化）→ 懒通知：下次对话注入世界 AI 上下文
             if result.get("is_update") and result.get("version") and result.get("previous_version") and result["version"] != result["previous_version"]:

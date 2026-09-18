@@ -1,5 +1,5 @@
 # 03 文件操作
-> \`file_list / file_write / file_read / file_edit / file_delete / file_move / file_copy\` 全部参数与返回、类型策略（允许清单 + 禁用后缀）、越界防护、读取截断规则，以及下载文件的固定落点。**建/改世界网页代码前必读**。
+> \`file_list / file_write / file_read / file_grep / file_edit / file_delete / file_move / file_copy\` 全部参数与返回、类型策略（允许清单 + 禁用后缀）、越界防护、读取截断规则，以及下载文件的固定落点。**建/改世界网页代码前必读**。
 
 ## 1. 概述
 
@@ -26,9 +26,10 @@
 
 | 工具 | 用途 | 关键参数 |
 |------|------|----------|
-| \`file_list\` | 列出世界文件夹里的文件 | 无 |
+| \`file_list\` | 列出世界文件（默认排除产物；多了按目录汇总） | 可选 \`prefix\`、\`include_artifacts\` |
 | \`file_write\` | 创建或写入文件（自动建目录） | \`path\`（相对路径，如 \`css/style.css\`）、\`content\` |
 | \`file_read\` | 读取文件内容（编辑前确认用） | \`path\`、可选 \`offset\`/\`limit\` 按行分页 |
+| \`file_grep\` | 搜索文件内容并定位行号 | \`path\`（文件/目录/数组）、\`pattern\`、可选 \`max_hits\` |
 | \`file_edit\` | 增量编辑（查找替换/插入/删行），省 token | \`path\`、\`operation\`、按需参数 |
 | \`file_delete\` | 删除文件或目录 | \`path\` |
 | \`file_move\` | 移动 / 重命名（目录可整体搬移） | \`from\`、\`to\`（都要写完整文件名） |
@@ -38,13 +39,37 @@
 
 ### 3.1 file_list
 
+\`\`\`json
+{ "prefix": "js/", "include_artifacts": false }
 \`\`\`
-→ { "success": true, "files": ["index.html", "css/style.css", "img/logo.png"] }
+\`\`\`
+→ { "success": true, "total": 203, "shown": 0, "truncated": true, "excluded": 11,
+    "dirs": { "js/game/": 27, "content/data/achievements/": 9, "css/": 18, … },
+    "files": [],
+    "note": "共 203 个文件，超过 50 个只给目录汇总；用 prefix 缩小范围（如 prefix=\"js/game/\"）可看具体文件；已排除 11 个产物文件…" }
 \`\`\`
 
-- 返回**相对路径列表**，可用于确认目录结构后再读写。
+- 返回**相对路径列表**（\`files\`）+ \`total/shown/truncated\`，可用于确认目录结构后再读写。
+- \`prefix\` 只看某个子目录/前缀（如 \`js/\`、\`js/game/\`）；文件多时先看目录再钻进去，别一次列全部。
+- 默认**不列产物**（\`__pycache__/node_modules/.git/dist/*.pyc\` 等）；确实要看传 \`include_artifacts: true\`。
+- 文件超过 50 个：\`files\` 为空，改为给 \`dirs\`（各目录文件数）+ \`note\` 提示；目录名可直接当下一次 \`prefix\` 用。
 
-### 3.2 file_write
+### 3.2 file_grep
+
+\`\`\`json
+{ "path": ["js/", "main.py"], "pattern": "class", "max_hits": 30 }
+\`\`\`
+\`\`\`
+→ { "success": true, "paths": ["js/", "main.py"], "pattern": "class", "total_hits": 3, "files_scanned": 18,
+    "hits": [ { "path": "js/core.js", "line": 12, "content": "class Game {" } ] }
+\`\`\`
+
+- \`path\` 支持**文件、目录（递归搜索）与数组**（多文件/多目录混合），传 \`"."\` 搜整个世界——找「哪些文件用了某段代码」用它，不用自己写沙箱脚本扫目录。
+- 目录递归**跳过产物目录与超过 2MB 的大文件**；每条命中带 \`path\` + \`line\`；**单文件**时返回形状与旧版一致（命中只有 \`line\`/\`content\`）。
+- 命中默认最多 30 条（\`max_hits\`，上限 100），到上限在 \`note\` 里提示——缩小 \`path\` 或改用更精确的 \`pattern\`。
+- 正则非法时按普通子串匹配（大小写不敏感）。
+
+### 3.3 file_write
 
 \`\`\`json
 { "path": "css/style.css", "content": "body { color: red; }" }
@@ -54,7 +79,7 @@
 - **类型策略见 1.1**（禁用后缀直接拒绝）。
 - **温和去重**：若新内容与现有内容完全一致，返回 \`unchanged: true\` + 提示，不重复写入（不是错误，别重试）。
 
-### 3.3 file_read
+### 3.4 file_read
 
 \`\`\`
 → { "success": true, "path": "index.html", "content": "<html>…", "binary": false }
@@ -64,7 +89,7 @@
 - **按行分页**（推荐）：传 \`offset\`/\`limit\` 只读需要的段落，返回 \`total_lines / start_line / end_line / truncated\`——**先 file_grep 定位行号再读**，不要整文件全读浪费上下文。
 - **建议**：编辑前先 \`file_read\` 确认当前内容，避免误覆盖。
 
-### 3.4 file_edit（增量编辑，推荐）
+### 3.5 file_edit（增量编辑，推荐）
 
 \`\`\`json
 { "path": "index.html", "operation": "str_replace",
@@ -83,7 +108,7 @@
 - 编辑核心与主站共用同一份实现（\`apply_file_edit\`），语义一致。
 - 二进制文件不可编辑。
 
-### 3.5 file_delete
+### 3.6 file_delete
 
 \`\`\`json
 { "path": "old.html" }
@@ -92,7 +117,7 @@
 - 删除文件；路径是目录时**整个目录递归删除**（含里面的文件，谨慎）。
 - 审阅模式下删除会弹窗请用户确认（见 08 分区「运行模式门禁」）。
 
-### 3.6 file_move
+### 3.7 file_move
 
 \`\`\`json
 { "from": "css/old.css", "to": "assets/new.css" }
@@ -101,7 +126,7 @@
 - 同目录改名、跨目录搬移都行；源是目录时整体搬移（搬完会对目录做一次禁用后缀兜底扫描）。
 - \`to\` 要写**完整文件名**（不是目录）；源与目标都在世界目录内，\`../\` 一律拒绝。
 
-### 3.7 file_copy
+### 3.8 file_copy
 
 \`\`\`json
 { "from": "index.html", "to": "backup/index.bak.html" }

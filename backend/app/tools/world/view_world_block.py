@@ -3,6 +3,7 @@
 查看积木详情和完整代码（应用前先看，确认是否适合本世界）。
 """
 from app.tools.world.base import WorldToolPlugin, WorldToolContext
+from app.tools.world.shared import arg_error
 from app.services.world.world_blocks import view_block
 
 
@@ -22,7 +23,7 @@ class ViewWorldBlockTool(WorldToolPlugin):
             args = ctx.args
             block_id = str(args.get("block_id", "")).strip()
             if not block_id:
-                return {"success": False, "error": "缺少 block_id 参数"}
+                return arg_error("缺少 block_id 参数", args)
             return {"success": True, **view_block(block_id)}
         except ValueError as e:
             return {"success": False, "error": str(e)}

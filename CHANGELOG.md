@@ -389,6 +389,20 @@
 
 ### 🐛 修复的 Bug
 
+#### 世界 AI 三条工具摩擦：file_grep 只吃单文件 / file_list 吐 5k token / 报错不回显参数
+- **file_grep 支持目录与数组**：path 可传文件、目录（递归）、数组或 `"."`（整个世界）——「哪些文件用了某段代码」
+  一次调用就能问，不用自己写沙箱脚本扫目录（世界 AI 为找接线点发过 8 次单文件搜索）。目录递归跳过产物路径
+  与 >2MB 大文件，多文件命中带 path，单文件返回形状与旧版一致，命中默认 30/上限 100 并在 note 说明截断
+- **file_list 省上下文**：新增 `prefix` / `include_artifacts`；默认排除 `__pycache__/node_modules/.git/dist/build`
+  等产物（与 grep 递归共用 `is_artifact_path` 一条判定）；超过 50 个文件时不再逐个列路径，改成各目录文件数汇总
+  + 下一步 prefix 提示。实测 world #45：默认输出 **6237 → 533 字符**（203 项，11 个产物被排除），
+  `prefix="js/game/"` 仍返回完整 24 条
+- **参数校验报错回显实际入参**：新增 `shared.arg_error/args_brief`，world 目录 12 个工具 30 处校验统一——
+  点名缺哪个字段/哪个非法（如「operation 非法（收到 'replace'…）」）并回显实收参数（值截断 120 字符），
+  模型只改错的那个字段即可，不必把整块 new_string/content 重发（一次几千 token）
+- 已验证：`path` 的 `["string","array"]` schema 对 api.deepseek.com 返回 200，模型能正确传数组
+  （`{"path": ["js/game/wallet.js", "js/game/battle.js"]}`）；文档 `03-files.md` 3.1/3.2 与 `index.md` 同步
+
 #### 强注入段指引了不存在的工具（AI 真去找了，白烧轮次）
 - 【文件同步机制】原文让世界 AI「改完必须 world_push、用 world_read_file 复核、详见 10 分区」，
   但世界 AI（造物主）的工具集里根本没有 world_push / world_pull——那套镜像同步只存在于 DSH 工作区侧。

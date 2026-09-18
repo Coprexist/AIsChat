@@ -4,6 +4,7 @@
 """
 
 from app.tools.world.base import WorldToolPlugin, WorldToolContext
+from app.tools.world.shared import arg_error
 
 
 class FileCopyTool(WorldToolPlugin):
@@ -24,10 +25,12 @@ class FileCopyTool(WorldToolPlugin):
     required = ['from', 'to']
 
     async def execute(self, ctx: WorldToolContext) -> dict:
-        src = str(ctx.args.get("from", "")).strip()
-        dst = str(ctx.args.get("to", "")).strip()
+        args = ctx.args
+        src = str(args.get("from", "")).strip()
+        dst = str(args.get("to", "")).strip()
         if not src or not dst:
-            return {"success": False, "error": "缺少 from / to 参数"}
+            missing = " / ".join(k for k, v in (("from", src), ("to", dst)) if not v)
+            return arg_error(f"缺少 {missing} 参数", args)
         try:
             from app.services.world.world_file_service import copy_file
             result = copy_file(ctx.world.id, src, dst)
