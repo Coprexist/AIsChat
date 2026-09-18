@@ -43,6 +43,26 @@ export function buildWorldTree(files: WorldFile[]): WorldTreeNode {
   return root
 }
 
+/** 层级引导线：每级 7px + 1px 竖线，层级越深竖线越多。
+ *  原来每级 14px 纯缩进，左栏拖窄之后三四级就只能靠猜；竖线是 IDE 的通用做法，
+ *  用一半的宽度就能读出层级，深文件也不会把文件名挤没。
+ *  行是 items-stretch 且行内不留纵向 padding（padding 落在内容块上），竖线才能上下接住不出现断点。 */
+function IndentGuides({ depth }: { depth: number }) {
+  if (depth <= 0) return null
+  return (
+    <span className="flex self-stretch shrink-0" aria-hidden>
+      {Array.from({ length: depth }, (_, i) => (
+        <span key={i} className="w-[7px] flex justify-center">
+          <span className="w-px self-stretch bg-border/60" />
+        </span>
+      ))}
+    </span>
+  )
+}
+
+/** 行内容块：图标与文字统一在这里，纵向 padding 只写这一处 */
+const ROW_INNER = 'flex items-center gap-1 min-w-0 flex-1 py-1 pl-1'
+
 interface WorldFileTreeProps {
   files: WorldFile[]
   currentFile: string
@@ -62,30 +82,36 @@ export default function WorldFileTree({ files, currentFile, collapsedDirs, onTog
           <>
             <button
               onClick={() => onToggleDir(n.path)}
-              style={{ paddingLeft: 6 + depth * 14 }}
-              className="flex items-center gap-1 w-full text-left text-xs py-1 pr-2 rounded transition-colors hover:bg-elevated text-textSecondary"
+              className="flex items-stretch w-full text-left text-xs rounded transition-colors hover:bg-elevated text-textSecondary"
               title={n.path}
             >
-              <ChevronRight size={12} className={`shrink-0 transition-transform ${collapsedDirs.has(n.path) ? '' : 'rotate-90'}`} />
-              {collapsedDirs.has(n.path) ? <Folder size={13} className="text-textMuted shrink-0" /> : <FolderOpen size={13} className="text-primary-400 shrink-0" />}
-              <span className="truncate">{n.name}</span>
+              <IndentGuides depth={depth} />
+              <span className={`${ROW_INNER} pr-2`}>
+                <ChevronRight size={12} className={`shrink-0 transition-transform ${collapsedDirs.has(n.path) ? '' : 'rotate-90'}`} />
+                {collapsedDirs.has(n.path) ? <Folder size={13} className="text-textMuted shrink-0" /> : <FolderOpen size={13} className="text-primary-400 shrink-0" />}
+                <span className="truncate">{n.name}</span>
+              </span>
             </button>
             {!collapsedDirs.has(n.path) && renderTree(n.children, depth + 1)}
           </>
         ) : (
-          <div key={n.path} className="group flex items-center">
+          <div key={n.path} className="group flex items-stretch">
             <button
               onClick={() => onSelect(n.path)}
-              style={{ paddingLeft: 24 + depth * 14 }}
-              className={`flex items-center gap-1 flex-1 min-w-0 text-left text-xs py-1 pr-1 rounded truncate transition-colors ${currentFile === n.path ? 'bg-primary-500/20 text-primary-300' : 'hover:bg-elevated text-textSecondary'}`}
+              className={`flex items-stretch flex-1 min-w-0 text-left text-xs rounded transition-colors ${currentFile === n.path ? 'bg-primary-500/20 text-primary-300' : 'hover:bg-elevated text-textSecondary'}`}
               title={n.path}
             >
-              <span className="shrink-0">{fileTypeIcon(n.name)}</span>
-              <span className="truncate">{n.name}</span>
+              <IndentGuides depth={depth} />
+              <span className={`${ROW_INNER} pr-1`}>
+                {/* 12px 占位 = 文件夹行展开箭头的宽度，同级文件名才能与文件夹名对齐 */}
+                <span className="w-3 shrink-0" aria-hidden />
+                <span className="shrink-0">{fileTypeIcon(n.name)}</span>
+                <span className="truncate">{n.name}</span>
+              </span>
             </button>
             <button
               onClick={(ev) => { ev.stopPropagation(); onDelete(n.path) }}
-              className="hidden group-hover:flex shrink-0 items-center justify-center w-6 h-6 text-textMuted hover:text-rose-400 transition-colors"
+              className="hidden group-hover:flex shrink-0 items-center justify-center w-6 text-textMuted hover:text-rose-400 transition-colors"
               title="删除此文件"
             >
               <Trash2 size={13} />

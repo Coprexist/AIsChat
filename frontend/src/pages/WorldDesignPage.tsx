@@ -6,20 +6,41 @@
  */
 import { useEffect, useState, useCallback, useRef, useMemo } from 'react'
 import { useParams, useNavigate, useSearchParams } from 'react-router-dom'
-import { ChevronLeft, ChevronRight, Folder, FolderOpen, FolderInput, Upload, Plus, Pencil, Eye, MessageCircle, Save, MoreHorizontal, FileText, Trash2, Settings, RefreshCw, ExternalLink, BookOpen, X, Download, Maximize2, Minimize2 } from 'lucide-react'
+import { ChevronLeft, ChevronRight, Folder, FolderOpen, FolderInput, Upload, Plus, Pencil, Eye, MessageCircle, Save, MoreHorizontal, FileText, Trash2, Settings, RefreshCw, ExternalLink, BookOpen, X, Download, Maximize2, Minimize2, PanelLeftClose, PanelLeftOpen } from 'lucide-react'
 import { api } from '../api/client'
 import { saveText } from '../utils/download'
 import GroupManagerModal from '../components/GroupManagerModal'
-import WorldChatPanel, { type WorldChatHandle } from '../components/WorldChatPanel'
+import WorldChatPanel, { type WorldChatHandle, type WorldSessionsSnapshot } from '../components/WorldChatPanel'
 import MarkdownContent from '../components/shared/MarkdownContent'
 import WorldFileTree, { buildWorldTree, type WorldFile } from '../components/world/WorldFileTree'
+import WorldSessionList, { type WorldSessionInfo } from '../components/world/WorldSessionList'
 import FileContentPane, { fileTypeIcon } from '../components/world/FileContentPane'
 import WorldCreatorConfig, { type WorldCreator, type WorldUsageStats } from '../components/world/WorldCreatorConfig'
 import { getCodeLang, isMarkdownFile } from '../utils/mime'
 import { tryOpenWorldWindow } from '../utils/worldView'
 import { useResizableSidebar } from '../hooks/useResizableSidebar'
 import { useElementWidth } from '../hooks/useElementWidth'
-import { Dialog } from '../components/ui'
+import { Button, Dialog, Input } from '../components/ui'
+import { useT } from '../i18n/I18nContext'
+
+/** 左栏页签：选中＝主色文字 + 2px 粗下划线（压在容器底边上），未选灰。
+ *  比"按钮块"省高度，也让"现在看的是会话还是工作区"一眼可见 */
+function RailTab({ active, label, badge, onClick }: { active: boolean; label: string; badge?: number; onClick: () => void }) {
+  return (
+    <button
+      onClick={onClick}
+      className={`relative h-full inline-flex items-center gap-1 text-xs transition-colors ${active ? 'text-primary-400 font-medium' : 'text-textMuted hover:text-textSecondary'}`}
+    >
+      {label}
+      {!!badge && badge > 0 && (
+        <span className="inline-flex items-center justify-center min-w-[16px] h-4 px-1 rounded-full bg-rose-500 text-white text-3xs font-bold">
+          {badge > 99 ? '99+' : badge}
+        </span>
+      )}
+      {active && <span className="absolute inset-x-0 -bottom-px h-0.5 rounded-full bg-primary-500" aria-hidden />}
+    </button>
+  )
+}
 
 interface World {
   id: number
@@ -41,13 +62,28 @@ export default function WorldDesignPage() {
   const { worldId } = useParams()
   const navigate = useNavigate()
   const wid = Number(worldId)
+  const t = useT()
 
-  // 可拖拽面板（复用侧边栏 hook：左=文件树，右=对话）
+  // 专注模式（?focus=1）：收起中栏（编辑/预览），把宽度让给对话；左栏与会话列表照旧在，
+  // 所以专注时也还能切会话、翻文件。放 URL 而不是组件 state —— 刷新/前进后退都能还原，
+  // 且 Layout 能据此一并收起应用侧边栏
+  const [searchParams, setSearchParams] = useSearchParams()
+  const chatFocus = searchParams.get('focus') === '1'
+  const toggleChatFocus = useCallback(() => {
+    setSearchParams((prev) => {
+      const next = new URLSearchParams(prev)
+      if (chatFocus) next.delete('focus')
+      else next.set('focus', '1')
+      return next
+    }, { replace: true })
+  }, [chatFocus, setSearchParams])
+
+  // 可拖拽面板（复用侧边栏 hook：左=左栏[会话/工作区]，右=对话）
   const fileTreeRef = useRef<HTMLDivElement>(null)
   const chatPanelRef = useRef<HTMLDivElement>(null)
-  // 三栏动态保底：文件树 100 / 编辑区 160 / 对话 360（对话栏要塞得下输入提示与建议卡，不能再按 200 压）；
+  // 三栏动态保底：左栏 200（会话名要看得见）/ 编辑区 160 / 对话 360（对话栏要塞得下输入提示与建议卡）；
   // 上限按其他区域保底实时反推（防负：空间不足时至少 = 自身保底）
-  const MIN_TREE = 100
+  const MIN_RAIL = 200
   const MIN_EDITOR = 160
   const MIN_CHAT = 360
   const HANDLES = 8  // 两个拖拽手柄
@@ -55,11 +91,13 @@ export default function WorldDesignPage() {
   // 结果是文件树能拖到把对话栏挤出可视区。容器首帧未测量时退回 innerWidth。
   const [containerRef, containerWidth] = useElementWidth()
   const available = containerWidth || window.innerWidth
+  // 沿用旧的存储键：用户拖过的宽度不因为"文件树改叫左栏"就丢
   const { sidebarWidth: fileWidth, handleResizeStart: fileResizeStart } = useResizableSidebar('world_files_width', fileTreeRef, {
-    min: MIN_TREE, max: () => Math.max(MIN_TREE, available - MIN_EDITOR - MIN_CHAT - HANDLES),
+    min: MIN_RAIL, max: () => Math.max(MIN_RAIL, available - MIN_EDITOR - MIN_CHAT - HANDLES),
   })
-  // 聊天栏上限按「当前文件树实际宽度」实时反推（不是保底值）：文件树拖宽后，聊天栏同样不会被挤出右侧
-  const chatMax = () => Math.max(MIN_CHAT, available - fileWidth - MIN_EDITOR - HANDLES)
+  // 聊天栏上限按「当前左栏实际宽度」实时反推（不是保底值）：左栏拖宽后，聊天栏同样不会被挤出右侧。
+  // 专注模式下中栏（编辑/预览）不占位，上限把 MIN_EDITOR 让出来——否则专注时白留 160px 拖不过去
+  const chatMax = () => Math.max(MIN_CHAT, available - fileWidth - (chatFocus ? 0 : MIN_EDITOR) - HANDLES)
   const { sidebarWidth: chatWidth, handleResizeStart: chatResizeStart } = useResizableSidebar('world_chat_width', chatPanelRef, {
     side: 'right', min: MIN_CHAT, max: chatMax,
   })
@@ -73,18 +111,25 @@ export default function WorldDesignPage() {
   currentFileRef.current = currentFile
   const [content, setContent] = useState('')
   const [mode, setMode] = useState<'files' | 'preview'>('files')
-  // 对话布满网页（?focus=1）：收起文件树与编辑/预览，把整页让给对话。
-  // 放 URL 而不是组件 state —— 刷新/前进后退都能还原，且 Layout 能据此一并收起应用侧边栏
-  const [searchParams, setSearchParams] = useSearchParams()
-  const chatFocus = searchParams.get('focus') === '1'
-  const toggleChatFocus = useCallback(() => {
-    setSearchParams((prev) => {
-      const next = new URLSearchParams(prev)
-      if (chatFocus) next.delete('focus')
-      else next.set('focus', '1')
-      return next
-    }, { replace: true })
-  }, [chatFocus, setSearchParams])
+  // ── 左栏（会话 / 工作区两个页签，常驻且可拖可折） ──
+  const [railTab, setRailTab] = useState<'chat' | 'files'>('chat')
+  // 折叠态记在本地：DSH 那种"折成图标条"是个人习惯，不该每次进页面都重来
+  const [railCollapsed, setRailCollapsed] = useState(() => localStorage.getItem('world_rail_collapsed') === '1')
+  useEffect(() => { localStorage.setItem('world_rail_collapsed', railCollapsed ? '1' : '0') }, [railCollapsed])
+  // 拖宽过程中关掉宽度过渡：否则手柄跟手会慢半拍
+  const [railDragging, setRailDragging] = useState(false)
+  useEffect(() => {
+    if (!railDragging) return
+    const up = () => setRailDragging(false)
+    window.addEventListener('mouseup', up)
+    return () => window.removeEventListener('mouseup', up)
+  }, [railDragging])
+  const [topMenuOpen, setTopMenuOpen] = useState(false)
+  // 会话快照与改名弹窗：数据与动作都在 WorldChatPanel 里，这里只存展示用的一份
+  const [sessions, setSessions] = useState<WorldSessionInfo[]>([])
+  const [currentSession, setCurrentSession] = useState('default')
+  const [renaming, setRenaming] = useState<{ id: string } | null>(null)
+  const [renameValue, setRenameValue] = useState('')
   const [previewKey, setPreviewKey] = useState(0)
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
@@ -415,6 +460,20 @@ export default function WorldDesignPage() {
   const chatHandleRef = useRef<WorldChatHandle>(null)
   const [chatUnreadCount, setChatUnreadCount] = useState(0)
 
+  // 会话快照来自面板里那个 useWorldChat：值没变时引用不变，setState 会被 Object.is 吃掉，
+  // 不会因为"上报"多渲染一轮
+  const handleSessionsChange = useCallback((snapshot: WorldSessionsSnapshot) => {
+    setSessions(snapshot.list)
+    setCurrentSession(snapshot.current)
+  }, [])
+
+  /** 改名提交：留空 = 清除命名（列表回落到会话编号）；清洗规则在后端一处 */
+  const submitRename = useCallback(async () => {
+    if (!renaming) return
+    await chatHandleRef.current?.renameSession(renaming.id, renameValue)
+    setRenaming(null)
+  }, [renaming, renameValue])
+
   // world 首次加载完成 → 聊天面板渲染 → 确保在底部（2026-08-13 修复：只在首次滚——
   // 之前依赖 [world]，工具 done 后 onRefresh→load→setWorld 每次都触发，
   // 把用户从任意位置无条件拉到底部）
@@ -427,29 +486,31 @@ export default function WorldDesignPage() {
   }, [world])
 
   // ── 聊天面板内容（桌面右栏 / 移动端对话 tab 共用） ──
-  const renderChatInner = () => {
+  // showFocus：桌面才有"专注"这个概念，移动端没有中栏可收，传 false 不留死按钮
+  const renderChatInner = (showFocus: boolean) => {
     if (!world) return null
     return (
     <>
-      <div className="px-4 py-3 border-b border-border">
-        <div className="flex items-center gap-2">
-          <span className="text-sm font-semibold">{world.creator?.name || '群视界机器人'}</span>
-          {chatUnreadCount > 0 && (
-            <span className="inline-flex items-center justify-center min-w-[18px] h-[18px] px-1 rounded-full bg-rose-500 text-white text-3xs font-bold animate-pulse">
-              {chatUnreadCount > 99 ? '99+' : chatUnreadCount}
-            </span>
-          )}
-          <span className="text-3xs px-1.5 py-0.5 rounded bg-elevated text-textMuted">{world.creator?.id}</span>
-          <div className="flex-1" />
+      <div className="flex items-center gap-2 px-3 h-9 border-b border-border shrink-0">
+        <MessageCircle size={14} className="text-textMuted shrink-0" />
+        <span className="text-sm font-medium truncate">{world.creator?.name || '群视界机器人'}</span>
+        {chatUnreadCount > 0 && (
+          <span className="inline-flex items-center justify-center min-w-[18px] h-[18px] px-1 rounded-full bg-rose-500 text-white text-3xs font-bold animate-pulse">
+            {chatUnreadCount > 99 ? '99+' : chatUnreadCount}
+          </span>
+        )}
+        <span className="hidden sm:inline text-3xs px-1.5 py-0.5 rounded bg-elevated text-textMuted">{world.creator?.id}</span>
+        <div className="flex-1" />
+        {showFocus && (
           <button
-            onClick={() => setShowCreatorForm((v) => !v)}
-            className="inline-flex items-center gap-1 text-xs px-2 py-1 rounded bg-elevated hover:bg-border text-textSecondary transition-colors"
-            title="世界 AI 配置（单独表单，不属于 agent）"
+            onClick={toggleChatFocus}
+            className="icon-btn-sm shrink-0"
+            title={chatFocus ? t('tool:world.chat.focus.off') : t('tool:world.chat.focus.on')}
+            aria-label={chatFocus ? t('tool:world.chat.focus.off') : t('tool:world.chat.focus.on')}
           >
-            <Settings size={12} /> 配置
+            {chatFocus ? <Minimize2 size={14} /> : <Maximize2 size={14} />}
           </button>
-        </div>
-        <div className="text-xs text-textMuted mt-0.5">世界 AI 是世界的配置：让它改界面、加功能</div>
+        )}
       </div>
 
       {showCreatorForm && world && world.creator && (
@@ -474,6 +535,7 @@ export default function WorldDesignPage() {
         creatorName={world?.creator?.name}
         aiMode={world?.ai_mode || 'review'}
         onModeChange={(mode) => setWorld((w) => (w ? { ...w, ai_mode: mode } : w))}
+        onSessionsChange={handleSessionsChange}
       />
     </>
     )
@@ -497,6 +559,13 @@ export default function WorldDesignPage() {
             {world.status === 'active' ? '活跃' : '休眠'}
           </span>
           <div className="flex-1" />
+          <button
+            onClick={() => setShowCreatorForm((v) => !v)}
+            className={`shrink-0 p-1.5 transition-colors ${showCreatorForm ? 'text-primary-400' : 'text-textMuted hover:text-textPrimary'}`}
+            title="世界 AI 配置（单独表单，不属于 agent）"
+          >
+            <Settings size={14} />
+          </button>
           <button onClick={openDocs} className="shrink-0 p-1.5 text-textMuted hover:text-textPrimary transition-colors" title="接口文档（发给世界 AI 的 md）">
             <BookOpen size={14} />
           </button>
@@ -557,7 +626,7 @@ export default function WorldDesignPage() {
         {/* 内容区：对话 tab（默认）/ 预览 tab（iframe）/ 文件 tab（目录导航 → 编辑器） */}
         {mobileTab === 'chat' ? (
           <div className="flex-1 flex flex-col min-h-0 bg-surface">
-            {renderChatInner()}
+            {renderChatInner(false)}
           </div>
         ) : mobileTab === 'preview' ? (
           <div className="flex-1 flex flex-col min-h-0">
@@ -716,173 +785,221 @@ export default function WorldDesignPage() {
 
       {/* ═══ 桌面端（≥lg）：标题栏 + 三栏（分隔线贯穿，拖拽手柄覆盖标题栏与内容区） ═══ */}
       {!isMobile && <div ref={containerRef} className="flex flex-col h-full">
-        {/* 顶部工具栏 */}
-        <div className="flex items-center gap-3 px-4 h-14 bg-surface border-b border-border shrink-0">
-          <button onClick={() => navigate('/worlds')} className="inline-flex items-center gap-1 text-sm text-textMuted hover:text-textPrimary transition-colors">
-            <ChevronLeft size={14} />
-            世界列表
+        {/* 世界标题栏：只留一行。原来"文件/预览 + 接口文档 + 下载/导入/发布"摊在标题里，
+            窄窗口下世界名会被挤没；全收进 ⋯ 后标题栏从两行降到一行 */}
+        <div className="flex items-center gap-2 px-3 h-12 bg-surface border-b border-border shrink-0">
+          <button onClick={() => navigate('/worlds')} className="icon-btn-sm shrink-0" title={t('tool:world.top.back')} aria-label={t('tool:world.top.back')}>
+            <ChevronLeft size={16} />
           </button>
-          <span className="font-semibold">{world.name}</span>
-          <span className={`text-xs px-2 py-0.5 rounded-full ${world.status === 'active' ? 'bg-mint-500/20 text-mint-400' : 'bg-elevated text-textMuted'}`}>
-            {world.status === 'active' ? '活跃' : '休眠'}
+          <span className="font-semibold truncate" title={world.name}>{world.name}</span>
+          <span className={`shrink-0 text-xs px-2 py-0.5 rounded-full ${world.status === 'active' ? 'bg-mint-500/20 text-mint-400' : 'bg-elevated text-textMuted'}`}>
+            {world.status === 'active' ? t('tool:world.top.status.active') : t('tool:world.top.status.hibernating')}
           </span>
-          <span className="text-xs text-textMuted">流速 x{world.time_flow_rate}</span>
+          <span className="hidden xl:inline shrink-0 text-xs text-textMuted">{t('tool:world.top.flow', { rate: String(world.time_flow_rate) })}</span>
           <div className="flex-1" />
-          {!chatFocus && (<>
-            <button onClick={() => setMode('files')} className={`text-xs px-3 py-1 rounded transition-colors ${mode === 'files' ? 'bg-primary-500 text-white' : 'bg-elevated hover:bg-border'}`}>文件</button>
-            <button onClick={() => setMode('preview')} className={`text-xs px-3 py-1 rounded transition-colors ${mode === 'preview' ? 'bg-primary-500 text-white' : 'bg-elevated hover:bg-border'}`}>预览</button>
-          </>)}
-          <button onClick={openDocs} className="p-1.5 text-textMuted hover:text-textPrimary transition-colors" title="接口文档（发给世界 AI 的 md）">
-            <BookOpen size={15} />
-          </button>
-          <button onClick={() => setWorldZipOpen(true)} className="text-xs px-3 py-1 rounded transition-colors bg-elevated hover:bg-border text-textSecondary" title="下载世界包（zip）">
-            <Download size={13} className="inline mr-1" />下载世界包
-          </button>
+          {msg && <span className="min-w-0 truncate text-xs text-accent-400">{msg}</span>}
           <input ref={importZipRef} type="file" accept=".zip" className="hidden" onChange={handleImportZip} />
-          <button onClick={() => setWorldImportOpen(true)} className="text-xs px-3 py-1 rounded transition-colors bg-elevated hover:bg-border text-textSecondary" title="导入世界包（zip 批量导入，不动数据文件）">
-            <Upload size={13} className="inline mr-1" />导入世界包
-          </button>
-          <button onClick={publishToMarket} className="text-xs px-3 py-1 rounded transition-colors bg-elevated hover:bg-border text-primary-400" title="发布到世界商城（打包代码区）">发布</button>
-          <button onClick={() => setGroupManagerOpen(true)} className="p-1.5 text-textMuted hover:text-textPrimary transition-colors" title="群类型与群助手">
-            <MoreHorizontal size={16} />
-          </button>
-          {msg && <span className="text-xs text-accent-400">{msg}</span>}
-        </div>
-        {/* 标题栏：文件（居中于文件树+编辑区整块） | 对话（右列上方）；内容行手柄贯穿 */}
-        <div className="flex items-stretch bg-surface border-b border-border">
-          <div className={`flex flex-1 relative h-9 ${chatFocus ? 'hidden' : ''}`}>
-            <div style={{ width: fileWidth }} className="shrink-0" />
-            <div className="flex-1" />
-            <div className="absolute inset-0 flex items-center justify-center gap-1.5 font-medium text-textSecondary">
-              {mode === 'preview' ? (
-                <><Eye size={14} className="text-textMuted" /> 预览</>
-              ) : (
-                <><Folder size={14} className="text-textMuted" /> 文件</>
-              )}
-            </div>
-          </div>
-          <div
-            className={`flex items-center gap-1.5 h-9 font-medium text-textSecondary ${chatFocus ? 'flex-1 min-w-0' : 'shrink-0 border-l border-border'}`}
-            style={chatFocus ? undefined : { width: effectiveChatWidth }}
+          <button
+            onClick={() => setShowCreatorForm((v) => !v)}
+            className={`shrink-0 inline-flex items-center gap-1 h-7 px-2 rounded-control text-xs transition-colors ${showCreatorForm ? 'bg-primary-500/15 text-primary-400' : 'bg-elevated hover:bg-border text-textSecondary'}`}
+            title="世界 AI 配置（单独表单，不属于 agent）"
           >
-            <div className="flex-1" />
-            <MessageCircle size={14} className="text-textMuted" />
-            对话
-            <div className="flex-1 flex justify-end pr-2">
-              <button
-                onClick={toggleChatFocus}
-                className="icon-btn-sm text-textMuted"
-                title={chatFocus ? '退出布满：显示文件树与编辑/预览' : '对话布满网页（收起文件树与编辑/预览）'}
-              >
-                {chatFocus ? <Minimize2 size={13} /> : <Maximize2 size={13} />}
-              </button>
-            </div>
-          </div>
-        </div>
-        {/* 内容行：拖拽手柄贯穿（拖动 = 整列宽度同步） */}
-        <div className="flex flex-1 min-h-0">
-        {/* 左侧工作区（文件树 + 编辑/预览）：「布满网页」时整块让给对话。
-            用 hidden（display:none）而不是卸载，编辑器内容与预览 iframe 的状态都不丢 */}
-        <div className={`flex flex-1 min-w-0 ${chatFocus ? 'hidden' : ''}`}>
-        {/* 左列：文件树（仅文件模式；预览模式隐藏，让预览覆盖文件树+编辑区整块） */}
-        {mode === 'files' && (
-        <div ref={fileTreeRef} className="flex flex-col shrink-0 bg-surface border-r border-border" style={{ width: fileWidth }}>
-          <div className="flex-1 overflow-y-auto p-2">
-            <div className="flex items-center justify-between mb-2 px-1">
-              <span className="text-xs font-medium text-textSecondary">文件</span>
-              <span className="flex items-center gap-2">
-                <button onClick={() => fileInputRef.current?.click()} className="inline-flex items-center gap-0.5 text-xs text-primary-400 hover:text-primary-500 dark:hover:text-primary-300 transition-colors" title="上传文件（先选位置）">
-                  <Upload size={12} />
-                  上传
-                </button>
-                <button onClick={createFile} className="inline-flex items-center gap-0.5 text-xs text-primary-400 hover:text-primary-500 dark:hover:text-primary-300 transition-colors" title="新建文件">
-                  <Plus size={12} />
-                  新建
-                </button>
-              </span>
-            </div>
-            <input ref={fileInputRef} type="file" className="hidden" onChange={handleUploadPick} />
-            {files.length === 0 && <div className="text-xs text-textMuted p-2">空世界，点 + 新建或让机器人生成</div>}
-            <WorldFileTree files={files} currentFile={currentFile} collapsedDirs={collapsedDirs} onToggleDir={toggleDir} onSelect={selectFile} onDelete={deleteFile} />
-          </div>
-        </div>
-        )}
-        {mode === 'files' && (
-        <div onMouseDown={fileResizeStart} className="w-1 shrink-0 cursor-col-resize hover:bg-primary-500/40 transition-colors relative z-overlay" />
-        )}
-        {/* 中列：编辑 / 预览（预览模式撑满文件树+编辑区整块） */}
-        <div className="flex-1 flex flex-col min-w-0" style={{ minWidth: MIN_EDITOR }}>
-          <div className="flex-1 min-h-0">
-            {mode === 'files' ? (
-              <div className="h-full flex flex-col">
-                <div className="px-3 py-1.5 text-xs text-textSecondary bg-surface/60 border-b border-border flex justify-between">
-                  <span className="truncate">{currentFile || '未选择文件'}</span>
-                  {currentFile && (
-                    <span className="flex items-center gap-3 shrink-0 ml-3">
-                      {canRender && (
-                        <button
-                          onClick={() => setViewMode((v) => (v === 'render' ? 'edit' : 'render'))}
-                          className="text-primary-400 hover:text-primary-500 dark:hover:text-primary-300 transition-colors"
-                          title={viewMode === 'render' ? '切到原文/编辑' : '切到渲染视图'}
-                        >
-                          {viewMode === 'render' ? (isMdFile ? (
-                            <span className="inline-flex items-center gap-0.5"><FileText size={12} /> 查看原文</span>
-                          ) : (
-                            <span className="inline-flex items-center gap-0.5"><Pencil size={12} /> 编辑</span>
-                          )) : (
-                            <span className="inline-flex items-center gap-0.5"><Eye size={12} /> 渲染</span>
-                          )}
-                        </button>
-                      )}
-                      {viewMode !== 'render' && (
-                        <button onClick={saveFile} disabled={saving} className="text-primary-400 hover:text-primary-500 dark:hover:text-primary-300 transition-colors">
-                          {saving ? '保存中...' : (<span className="inline-flex items-center gap-1"><Save size={12} /> 保存</span>)}
-                        </button>
-                      )}
-                    </span>
-                  )}
+            <Settings size={12} /> {t('tool:world.top.config')}
+          </button>
+          <div className="relative shrink-0">
+            <button onClick={() => setTopMenuOpen((v) => !v)} className="icon-btn-sm" title={t('tool:world.top.more')} aria-label={t('tool:world.top.more')}>
+              <MoreHorizontal size={16} />
+            </button>
+            {topMenuOpen && (
+              <>
+                {/* 透明遮罩收起：与页面里其它小菜单同一套做法，不挂 document 监听 */}
+                <div className="fixed inset-0 z-modal" onClick={() => setTopMenuOpen(false)} />
+                <div className="absolute right-0 top-full mt-1 w-52 py-1 rounded-card bg-elevated border border-border shadow-xl z-toast">
+                  {([
+                    { key: 'docs', icon: <BookOpen size={13} />, label: t('tool:world.top.docs'), run: openDocs },
+                    { key: 'export', icon: <Download size={13} />, label: t('tool:world.top.export'), run: () => setWorldZipOpen(true) },
+                    { key: 'import', icon: <FolderInput size={13} />, label: t('tool:world.top.import'), run: () => setWorldImportOpen(true) },
+                    { key: 'publish', icon: <Upload size={13} />, label: t('tool:world.top.publish'), run: publishToMarket },
+                    { key: 'groups', icon: <MessageCircle size={13} />, label: t('tool:world.top.groups'), run: () => setGroupManagerOpen(true) },
+                  ]).map((it) => (
+                    <button
+                      key={it.key}
+                      onClick={() => { setTopMenuOpen(false); it.run() }}
+                      className="w-full inline-flex items-center gap-2 px-3 py-1.5 text-2xs text-textSecondary hover:bg-surface hover:text-textPrimary transition-colors"
+                    >
+                      {it.icon} {it.label}
+                    </button>
+                  ))}
                 </div>
-                <FileContentPane wid={wid} currentFile={currentFile} content={content} setContent={setContent} viewMode={viewMode} canRender={canRender} isMdFile={isMdFile} fileCodeLang={fileCodeLang} isImgFile={isImgFile} />
-              </div>
-            ) : (
-              <div className="h-full flex flex-col">
-                <div className="px-3 py-1.5 text-xs text-textSecondary bg-surface/60 border-b border-border flex items-center gap-2">
-                  <span className="truncate flex-1">世界预览（/world/{wid}/preview）</span>
-                  <button onClick={() => setPreviewKey((k) => k + 1)} className="inline-flex items-center gap-1 text-primary-400 hover:text-primary-500 dark:hover:text-primary-300 transition-colors shrink-0" title="刷新预览"><RefreshCw size={12} /> 刷新</button>
-                  <button
-                    onClick={() => { if (!tryOpenWorldWindow(wid)) navigate(`/world-view/${wid}`) }}
-                    className="inline-flex items-center gap-1 text-primary-400 hover:text-primary-500 dark:hover:text-primary-300 transition-colors shrink-0"
-                    title="在沉浸界面新窗口打开（WebView 下自动应用内跳转）"
-                  >
-                    <ExternalLink size={12} /> 沉浸窗口
-                  </button>
-                </div>
-                <iframe
-                  key={previewKey}
-                  src={`/world/${wid}/preview`}
-                  className="w-full flex-1 bg-white dark:bg-gray-900"
-                  title="世界预览"
-                />
-              </div>
+              </>
             )}
           </div>
         </div>
-        </div>
-        {!chatFocus && (
-        <div onMouseDown={chatResizeStart} className="w-1 shrink-0 cursor-col-resize hover:bg-primary-500/40 transition-colors relative z-overlay" />
-        )}
-        {/* 右列：对话面板（标题已在顶部标题栏）；「布满网页」时占满整行 */}
-        <div
-          ref={chatPanelRef}
-          className={`flex flex-col bg-surface ${chatFocus ? 'flex-1 min-w-0' : 'shrink-0'}`}
-          style={chatFocus ? undefined : { width: effectiveChatWidth, maxWidth: effectiveChatWidth }}
-        >
-          {/* 布满网页时内容居中收窄（学 DSH）：消息与输入区都落在同一列里，
-              不然整行铺满屏（实测输入框会被拉到 1500px+），读起来眼睛要来回扫 */}
-          <div className={`flex-1 min-h-0 flex flex-col ${chatFocus ? 'mx-auto w-full max-w-3xl' : ''}`}>
-            {renderChatInner()}
+        {/* 内容行：左栏（会话/工作区，常驻可拖可折） + 中栏（编辑/预览，专注模式收起） + 右栏（对话） */}
+        <div className="flex flex-1 min-h-0">
+          {railCollapsed ? (
+            /* 折成图标条（学 DSH）：点图标＝展开并切到那一栏，图标条本身不承载列表 */
+            <div className="w-11 shrink-0 border-r border-border bg-surface flex flex-col items-center gap-1 py-2">
+              <button onClick={() => setRailCollapsed(false)} className="icon-btn-sm" title={t('tool:world.rail.expand')} aria-label={t('tool:world.rail.expand')}>
+                <PanelLeftOpen size={15} />
+              </button>
+              <button
+                onClick={() => { setRailTab('chat'); setRailCollapsed(false) }}
+                className={`icon-btn-sm ${railTab === 'chat' ? 'text-primary-400' : ''}`}
+                title={t('tool:world.rail.tab.chat')}
+                aria-label={t('tool:world.rail.tab.chat')}
+              >
+                <MessageCircle size={15} />
+              </button>
+              <button
+                onClick={() => { setRailTab('files'); setRailCollapsed(false) }}
+                className={`icon-btn-sm ${railTab === 'files' ? 'text-primary-400' : ''}`}
+                title={t('tool:world.rail.tab.files')}
+                aria-label={t('tool:world.rail.tab.files')}
+              >
+                <Folder size={15} />
+              </button>
+              {chatUnreadCount > 0 && (
+                <span className="inline-flex items-center justify-center min-w-[18px] h-[18px] px-1 rounded-full bg-rose-500 text-white text-3xs font-bold">
+                  {chatUnreadCount > 99 ? '99+' : chatUnreadCount}
+                </span>
+              )}
+            </div>
+          ) : (
+            <>
+              <div
+                ref={fileTreeRef}
+                className={`flex flex-col shrink-0 bg-surface border-r border-border ${railDragging ? '' : 'transition-[width] duration-200'}`}
+                style={{ width: fileWidth }}
+              >
+                {/* 页签行：选中＝主色文字 + 2px 下划线（压在容器底边上），未选灰 */}
+                <div className="flex items-center gap-3 h-9 px-2 border-b border-border shrink-0">
+                  <RailTab active={railTab === 'chat'} label={t('tool:world.rail.tab.chat')} badge={chatUnreadCount} onClick={() => setRailTab('chat')} />
+                  <RailTab active={railTab === 'files'} label={t('tool:world.rail.tab.files')} onClick={() => setRailTab('files')} />
+                  <div className="flex-1" />
+                  <button onClick={() => setRailCollapsed(true)} className="icon-btn-sm" title={t('tool:world.rail.collapse')} aria-label={t('tool:world.rail.collapse')}>
+                    <PanelLeftClose size={15} />
+                  </button>
+                </div>
+                <div className="flex-1 min-h-0 overflow-y-auto">
+                  {railTab === 'chat' ? (
+                    <WorldSessionList
+                      sessions={sessions}
+                      current={currentSession}
+                      onSelect={(id) => chatHandleRef.current?.switchSession(id)}
+                      onNew={() => chatHandleRef.current?.newSession()}
+                      onRename={(s) => { setRenaming({ id: s.id }); setRenameValue(s.title || '') }}
+                      onTogglePin={() => chatHandleRef.current?.togglePinCurrent()}
+                      onExport={(s, fmt) => chatHandleRef.current?.exportSession(s.id, fmt, s.title)}
+                    />
+                  ) : (
+                    <div className="p-2">
+                      <div className="flex items-center justify-between mb-2 px-1">
+                        <span className="text-xs font-medium text-textSecondary">{t('tool:world.pane.files')}</span>
+                        <span className="flex items-center gap-2">
+                          <button onClick={() => fileInputRef.current?.click()} className="inline-flex items-center gap-0.5 text-xs text-primary-400 hover:text-primary-500 dark:hover:text-primary-300 transition-colors" title={t('tool:world.files.upload')}>
+                            <Upload size={12} /> {t('tool:world.files.upload')}
+                          </button>
+                          <button onClick={createFile} className="inline-flex items-center gap-0.5 text-xs text-primary-400 hover:text-primary-500 dark:hover:text-primary-300 transition-colors" title={t('tool:world.files.new')}>
+                            <Plus size={12} /> {t('tool:world.files.new')}
+                          </button>
+                        </span>
+                      </div>
+                      <input ref={fileInputRef} type="file" className="hidden" onChange={handleUploadPick} />
+                      {files.length === 0 && <div className="text-xs text-textMuted p-2">{t('tool:world.files.empty')}</div>}
+                      <WorldFileTree files={files} currentFile={currentFile} collapsedDirs={collapsedDirs} onToggleDir={toggleDir} onSelect={selectFile} onDelete={deleteFile} />
+                    </div>
+                  )}
+                </div>
+              </div>
+              <div
+                onMouseDown={(e) => { setRailDragging(true); fileResizeStart(e) }}
+                className="w-1 shrink-0 cursor-col-resize hover:bg-primary-500/40 transition-colors relative z-overlay"
+              />
+            </>
+          )}
+
+          {/* 中栏：编辑 / 预览。专注模式整块让给对话——文件内容与预览状态在 store/iframe 里，重新挂载不丢 */}
+          {!chatFocus && (
+            <div className="flex-1 flex flex-col min-w-0" style={{ minWidth: MIN_EDITOR }}>
+              <div className="flex items-center gap-2 h-9 px-2 bg-surface border-b border-border shrink-0">
+                <div className="flex items-center gap-0.5 p-0.5 rounded-control bg-elevated border border-border shrink-0">
+                  <button onClick={() => setMode('files')} className={`px-2 py-0.5 text-2xs rounded-control transition-colors ${mode === 'files' ? 'bg-surface text-textPrimary font-medium shadow-sm' : 'text-textMuted hover:text-textPrimary'}`}>{t('tool:world.pane.files')}</button>
+                  <button onClick={() => setMode('preview')} className={`px-2 py-0.5 text-2xs rounded-control transition-colors ${mode === 'preview' ? 'bg-surface text-textPrimary font-medium shadow-sm' : 'text-textMuted hover:text-textPrimary'}`}>{t('tool:world.pane.preview')}</button>
+                </div>
+                <span className="min-w-0 truncate text-xs text-textSecondary">
+                  {mode === 'preview' ? t('tool:world.pane.previewTitle', { url: `/world/${wid}/preview` }) : (currentFile || t('tool:world.pane.noSelection'))}
+                </span>
+                <div className="flex-1" />
+                {mode === 'files' ? (currentFile && (
+                  <span className="flex items-center gap-3 shrink-0 pr-1">
+                    {canRender && (
+                      <button
+                        onClick={() => setViewMode((v) => (v === 'render' ? 'edit' : 'render'))}
+                        className="inline-flex items-center gap-0.5 text-xs text-primary-400 hover:text-primary-500 dark:hover:text-primary-300 transition-colors"
+                        title={viewMode === 'render' ? '切到原文/编辑' : '切到渲染视图'}
+                      >
+                        {viewMode === 'render' ? (isMdFile ? (
+                          <><FileText size={12} /> {t('tool:world.pane.viewSource')}</>
+                        ) : (
+                          <><Pencil size={12} /> {t('tool:world.pane.edit')}</>
+                        )) : (
+                          <><Eye size={12} /> {t('tool:world.pane.render')}</>
+                        )}
+                      </button>
+                    )}
+                    {viewMode !== 'render' && (
+                      <button onClick={saveFile} disabled={saving} className="inline-flex items-center gap-1 text-xs text-primary-400 hover:text-primary-500 dark:hover:text-primary-300 transition-colors">
+                        <Save size={12} /> {saving ? t('tool:world.pane.saving') : t('tool:world.pane.save')}
+                      </button>
+                    )}
+                  </span>
+                )) : (
+                  <>
+                    <button onClick={() => setPreviewKey((k) => k + 1)} className="inline-flex items-center gap-1 text-xs text-primary-400 hover:text-primary-500 dark:hover:text-primary-300 transition-colors shrink-0" title={t('tool:world.pane.refresh')}><RefreshCw size={12} /> {t('tool:world.pane.refresh')}</button>
+                    <button
+                      onClick={() => { if (!tryOpenWorldWindow(wid)) navigate(`/world-view/${wid}`) }}
+                      className="inline-flex items-center gap-1 text-xs text-primary-400 hover:text-primary-500 dark:hover:text-primary-300 transition-colors shrink-0 pr-1"
+                      title="在沉浸界面新窗口打开（WebView 下自动应用内跳转）"
+                    >
+                      <ExternalLink size={12} /> {t('tool:world.pane.immersive')}
+                    </button>
+                  </>
+                )}
+              </div>
+              <div className="flex-1 min-h-0">
+                {mode === 'files' ? (
+                  <div className="h-full flex flex-col">
+                    <FileContentPane wid={wid} currentFile={currentFile} content={content} setContent={setContent} viewMode={viewMode} canRender={canRender} isMdFile={isMdFile} fileCodeLang={fileCodeLang} isImgFile={isImgFile} />
+                  </div>
+                ) : (
+                  <iframe
+                    key={previewKey}
+                    src={`/world/${wid}/preview`}
+                    className="w-full h-full bg-white dark:bg-gray-900"
+                    title="世界预览"
+                  />
+                )}
+              </div>
+            </div>
+          )}
+
+          {!chatFocus && (
+            <div onMouseDown={chatResizeStart} className="w-1 shrink-0 cursor-col-resize hover:bg-primary-500/40 transition-colors relative z-overlay" />
+          )}
+
+          {/* 右栏：对话（常驻，切页签不动它）。普通模式＝可拖的固定宽度；专注模式＝flex-1 吃掉中栏让出的空间 */}
+          <div
+            ref={chatPanelRef}
+            className={`flex flex-col bg-surface border-l border-border ${chatFocus ? 'flex-1 min-w-0' : 'shrink-0'}`}
+            style={chatFocus ? undefined : { width: effectiveChatWidth, maxWidth: effectiveChatWidth }}
+          >
+            {/* 内容居中收窄（学 DSH）：消息与输入区落在同一列。窄对话栏下 max-w-3xl 不生效，
+                所以不必按模式切换——专注时天然就是"居中收窄" */}
+            <div className="flex-1 min-h-0 flex flex-col mx-auto w-full max-w-3xl">
+              {renderChatInner(true)}
+            </div>
           </div>
-        </div>
         </div>
       </div>}
 
@@ -1048,6 +1165,28 @@ export default function WorldDesignPage() {
           isOwner={myId !== null && world.owner_id === myId}
           onClose={() => setGroupManagerOpen(false)}
         />
+      )}
+
+      {/* 会话改名弹窗（左栏会话列表的 ⋯ 里触发）：留空 = 清除命名，列表回落到会话编号 */}
+      {renaming && (
+        <Dialog className="flex items-center justify-center p-4" onClose={() => setRenaming(null)}>
+          <div className="w-full max-w-sm bg-surface border border-border rounded-dialog shadow-xl p-4 space-y-3" onClick={(e) => e.stopPropagation()}>
+            <div className="text-sm font-medium">{t('tool:world.session.renameTitle')}</div>
+            <Input
+              autoFocus
+              maxLength={20}
+              value={renameValue}
+              onChange={(e) => setRenameValue(e.target.value)}
+              onKeyDown={(e) => { if (e.key === 'Enter') submitRename() }}
+              placeholder={t('tool:world.session.renamePlaceholder')}
+              hint={t('tool:world.session.renameHint')}
+            />
+            <div className="flex justify-end gap-2">
+              <Button size="sm" variant="outline" onClick={() => setRenaming(null)}>{t('common.cancel')}</Button>
+              <Button size="sm" onClick={submitRename}>{t('common.save')}</Button>
+            </div>
+          </div>
+        </Dialog>
       )}
     </div>
   )

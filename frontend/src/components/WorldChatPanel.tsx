@@ -1,14 +1,13 @@
 import { memo, useState, useRef, useCallback, useMemo, forwardRef, useImperativeHandle, useEffect } from 'react'
-import { Send, Plus, X, ChevronRight, Brain, ArrowDown, FileText, Search, Globe, Terminal, Package, Clock, Wrench, Eraser, Pin, ChevronDown, Copy, RefreshCw, Paperclip, ShieldAlert, Pencil, Download } from 'lucide-react'
+import { Send, Plus, X, ChevronRight, Brain, ArrowDown, FileText, Search, Globe, Terminal, Package, Clock, Wrench, Eraser, ChevronDown, Copy, RefreshCw, ShieldAlert, HelpCircle } from 'lucide-react'
 import MarkdownContent from './shared/MarkdownContent'
 import CodeRenderer from './shared/CodeRenderer'
-import { Button, Dialog, Input, confirmAsync } from './ui'
+import { Button, Dialog, IconButton, confirmAsync } from './ui'
 import { useWorldChat, type Approval, type ChatMsg } from '../hooks/useWorldChat'
 import { useAttachmentUpload, isImageAttachment } from '../hooks/useAttachmentUpload'
 import { AttachmentChips, DropMask } from './AttachmentChips'
 import { api } from '../api/client'
-import { useLang, useT } from '../i18n/I18nContext'
-import { formatRelativeTime } from '../utils/time'
+import { useT } from '../i18n/I18nContext'
 
 // 工具气泡图标：按摘要内容关键词映射（后端文本不带 emoji，图标由前端渲染）
 function toolIcon(content: string) {
@@ -79,70 +78,47 @@ function ToolBubble({ name, label, detail, error, icon, running }: {
 }
 
 // 运行模式三档（后端 world_ai_mode.MODES 是权威定义；这里只管展示与切换）
-// 选中态用**实色块**（不是淡色 tint）：一眼看出当前档在哪。文字色按各自底色的对比度单独选，
-// 不为了"统一"把对比度统一没了（primary-500 与按钮同色，mint-400 在浅色主题偏深用白字、
-// 深色主题变亮改用深灰，amber-400 两个主题都亮 → 深灰）
-// 顺序 = 界面从左到右：计划 / 自动 / 审阅（2026-09-18 用户：计划模式提到第一位）
+// 顺序 = 菜单从上到下：计划 / 自动 / 审阅（2026-09-18 用户：计划模式提到第一位）
 const MODE_ITEMS = [
-  { key: 'plan', labelKey: 'tool:world.mode.plan', hintKey: 'tool:world.mode.hint.plan', active: 'bg-primary-500 text-white' },
-  { key: 'auto', labelKey: 'tool:world.mode.auto', hintKey: 'tool:world.mode.hint.auto', active: 'bg-mint-400 text-white dark:text-gray-900' },
-  { key: 'review', labelKey: 'tool:world.mode.review', hintKey: 'tool:world.mode.hint.review', active: 'bg-amber-400 text-gray-900' },
+  { key: 'plan', labelKey: 'tool:world.mode.plan', hintKey: 'tool:world.mode.hint.plan' },
+  { key: 'auto', labelKey: 'tool:world.mode.auto', hintKey: 'tool:world.mode.hint.auto' },
+  { key: 'review', labelKey: 'tool:world.mode.review', hintKey: 'tool:world.mode.hint.review' },
 ]
 
-/** 运行模式切换（对话栏内，随手可切）：自动 / 审阅 / 计划——
- *  用户对 AI 自主度的约束，改即生效；当前档位带色，悬停显示该档说明。 */
-function ModeSwitch({ mode, busy, onChange }: { mode: string; busy: boolean; onChange: (m: string) => void }) {
-  const t = useT()
-  return (
-    <div className="flex items-center gap-2 px-3 py-1.5 border-t border-border bg-surface/60">
-      <ShieldAlert size={11} className="shrink-0 text-textMuted" />
-      <span className="shrink-0 text-3xs text-textMuted">{t('tool:world.mode.label')}</span>
-      <div className="flex-1 min-w-0 flex items-center gap-0.5 p-0.5 rounded-control bg-elevated border border-border">
-        {MODE_ITEMS.map((m) => (
-          <button
-            key={m.key}
-            onClick={() => { if (m.key !== mode && !busy) onChange(m.key) }}
-            disabled={busy}
-            title={t(m.hintKey)}
-            className={`flex-1 min-w-0 px-1.5 py-[3px] text-2xs rounded-control transition-colors truncate disabled:opacity-60 ${
-              m.key === mode ? `font-semibold shadow-sm ${m.active}` : 'text-textMuted hover:text-textPrimary'
-            }`}
-          >{t(m.labelKey)}</button>
-        ))}
-      </div>
-    </div>
-  )
-}
-
-/** 会话记录下载（唯一入口）：工具条与「会话列表」每行共用同一个菜单，
- *  避免"两处各写一遍下载按钮"——用户 2026-09-16 反馈"我没看到怎么下载"，
- *  就是因为只有列表里那行小字 MD/JSON，工具条上什么都没有。 */
-function SessionExportMenu({ onPick, label }: { onPick: (fmt: 'md' | 'json') => void; label?: string }) {
+/** 运行模式下拉（放在输入框底部那一条里）：三档是同一件事的三种约束强度，
+ *  天天切的人少但要随手够得着——单独占一行太贵，改成"显示当前档 + 点开选"，
+ *  档位说明同时进菜单正文和按钮 title。 */
+function ModePicker({ mode, busy, onChange }: { mode: string; busy: boolean; onChange: (m: string) => void }) {
   const t = useT()
   const [open, setOpen] = useState(false)
+  const cur = MODE_ITEMS.find((m) => m.key === mode) ?? MODE_ITEMS[MODE_ITEMS.length - 1]
   return (
     <div className="relative shrink-0">
       <button
-        onClick={() => setOpen((v) => !v)}
-        className="inline-flex items-center gap-1 p-1 rounded transition-colors hover:bg-elevated hover:text-textSecondary"
-        title={t('tool:world.session.export')}
+        onClick={() => !busy && setOpen((v) => !v)}
+        disabled={busy}
+        title={`${t('tool:world.mode.label')}：${t(cur.labelKey)} —— ${t(cur.hintKey)}`}
+        className="inline-flex items-center gap-1 h-6 px-1.5 rounded-control text-2xs text-textMuted hover:text-textPrimary hover:bg-elevated transition-colors disabled:opacity-60"
       >
-        <Download size={11} />
-        {label && <span>{label}</span>}
+        <ShieldAlert size={11} className="shrink-0" />
+        <span className="max-w-[64px] truncate font-medium">{t(cur.labelKey)}</span>
+        <ChevronDown size={11} className={`shrink-0 transition-transform ${open ? 'rotate-180' : ''}`} />
       </button>
       {open && (
         <>
-          {/* 点空白处收起（透明遮罩：比 document 监听简单，也不会和别的弹层打架） */}
           <div className="fixed inset-0 z-modal" onClick={() => setOpen(false)} />
-          <div className="absolute right-0 bottom-full mb-1 w-44 py-1 rounded-card bg-elevated border border-border shadow-xl z-toast">
-            <button
-              onClick={() => { setOpen(false); onPick('md') }}
-              className="w-full text-left px-3 py-1.5 text-2xs text-textSecondary hover:bg-surface hover:text-textPrimary transition-colors"
-            >{t('tool:world.session.exportMd')}</button>
-            <button
-              onClick={() => { setOpen(false); onPick('json') }}
-              className="w-full text-left px-3 py-1.5 text-2xs text-textSecondary hover:bg-surface hover:text-textPrimary transition-colors"
-            >{t('tool:world.session.exportJson')}</button>
+          <div className="absolute bottom-full left-0 mb-1 w-64 py-1 rounded-card bg-elevated border border-border shadow-xl z-toast">
+            {MODE_ITEMS.map((m) => (
+              <button
+                key={m.key}
+                onClick={() => { setOpen(false); if (m.key !== mode) onChange(m.key) }}
+                title={t(m.hintKey)}
+                className="w-full text-left px-3 py-1.5 transition-colors hover:bg-surface"
+              >
+                <span className={`text-2xs ${m.key === mode ? 'text-primary-400 font-semibold' : 'text-textSecondary'}`}>{t(m.labelKey)}</span>
+                <span className="block text-3xs text-textMuted mt-0.5">{t(m.hintKey)}</span>
+              </button>
+            ))}
           </div>
         </>
       )}
@@ -267,11 +243,26 @@ function ReasoningBubble({ text, running }: { text: string; running?: boolean })
   )
 }
 
+/** 左栏「会话」页签要的快照（数据源仍是本组件里那个 useWorldChat 实例） */
+export interface WorldSessionsSnapshot {
+  list: { id: string; title?: string; last_active_at?: string; pinned?: boolean }[]
+  current: string
+}
+
 export interface WorldChatHandle {
   forceScrollToBottom: () => void
   unreadCount: number
   isInterrupted: boolean
   lastAiMsgId: number | null
+  /** 会话动作：左栏列表借这几个方法驱动聊天状态。
+   *  这样 useWorldChat 全页只有一个实例——否则左栏要自己再调一次接口、状态也会分叉。 */
+  newSession: () => Promise<string | null>
+  switchSession: (id: string) => Promise<boolean>
+  /** 返回后端清洗后的名字（留空即清除命名），调用方一般不用它 */
+  renameSession: (id: string, title: string) => Promise<string>
+  /** 只能收藏当前会话（后端的 pin 落库对象就是当前会话） */
+  togglePinCurrent: () => Promise<boolean>
+  exportSession: (id: string, format: 'md' | 'json', name?: string) => Promise<void>
 }
 
 interface WorldChatPanelProps {
@@ -285,6 +276,8 @@ interface WorldChatPanelProps {
   /** 世界当前运行模式（worlds.config.ai_mode；对话栏内可直接切） */
   aiMode?: string
   onModeChange?: (mode: string) => void
+  /** 左栏「会话」页签：会话列表 / 当前会话变化时上报（父组件只展示，不复制状态） */
+  onSessionsChange?: (snapshot: WorldSessionsSnapshot) => void
 }
 
 /**
@@ -295,9 +288,8 @@ interface WorldChatPanelProps {
  * - 通过 onUnreadCountChange 回调通知父组件未读变化
  * - 打字/消息更新仅重渲染此组件，不触发父组件
  */
-const WorldChatPanel = memo(forwardRef<WorldChatHandle, WorldChatPanelProps>(({ wid, onRefresh, onMsg, onUnreadCountChange, creatorName, aiMode, onModeChange }, ref) => {
+const WorldChatPanel = memo(forwardRef<WorldChatHandle, WorldChatPanelProps>(({ wid, onRefresh, onMsg, onUnreadCountChange, creatorName, aiMode, onModeChange, onSessionsChange }, ref) => {
   const t = useT()
-  const lang = useLang()
   // 运行模式（对话栏内切换；与设计页配置弹窗是同一个后端字段，切换后回调父组件同步）
   const [mode, setMode] = useState(aiMode || 'review')
   const [modeBusy, setModeBusy] = useState(false)
@@ -320,12 +312,6 @@ const WorldChatPanel = memo(forwardRef<WorldChatHandle, WorldChatPanelProps>(({ 
   const chat = useWorldChat({ wid, onRefresh, onMsg })
 
   // ── 计算派生状态 ──
-  // 当前对话的显示名：AI 起过名字就用名字（列表与工具条一致），没有才回落编号
-  const currentTitle = useMemo(
-    () => chat.sessionList.find((s) => s.id === chat.currentSession)?.title || '',
-    [chat.sessionList, chat.currentSession],
-  )
-
   const isInterrupted = useMemo(() => {
     for (let i = chat.chatMsgs.length - 1; i >= 0; i--) {
       const m = chat.chatMsgs[i]
@@ -342,35 +328,18 @@ const WorldChatPanel = memo(forwardRef<WorldChatHandle, WorldChatPanelProps>(({ 
     return null
   }, [chat.chatMsgs])
 
-  // ── 暴露给父组件的接口 ──
-  useImperativeHandle(ref, () => ({
-    forceScrollToBottom: chat.forceScrollToBottom,
-    unreadCount: chat.unreadCount,
-    isInterrupted,
-    lastAiMsgId,
-  }), [chat.forceScrollToBottom, chat.unreadCount, isInterrupted, lastAiMsgId])
+  // ── 会话快照上报给父组件（左栏「会话」页签用） ──
+  // 依赖就是 hook 里的会话状态本身：值没变时引用不变，父组件的 setState 会被 Object.is 直接吃掉，
+  // 不会因为"上报"多渲染一轮
+  useEffect(() => {
+    onSessionsChange?.({ list: chat.sessionList, current: chat.currentSession })
+  }, [chat.sessionList, chat.currentSession, onSessionsChange])
 
   // ── 通知父组件未读计数变化 ──
   useEffect(() => {
     onUnreadCountChange?.(chat.unreadCount)
   }, [chat.unreadCount, onUnreadCountChange])
 
-  // ── 会话列表下拉 ──
-  const [sessionOpen, setSessionOpen] = useState(false)
-  // ── 会话改名弹窗（用户手动改；AI 用 rename_session 工具改的是同一个字段）──
-  const [renaming, setRenaming] = useState<{ id: string } | null>(null)
-  const [renameValue, setRenameValue] = useState('')
-
-  /** 改名提交：留空 = 清除命名（列表里回落到会话编号）；清洗规则在后端一处 */
-  const submitRename = useCallback(async () => {
-    if (!renaming) return
-    try {
-      await chat.renameSession(renaming.id, renameValue)
-      setRenaming(null)
-    } catch (e: any) {
-      onMsg?.(t('tool:world.session.renameFailed') + (e?.message || e))
-    }
-  }, [renaming, renameValue, chat, onMsg, t])
 
   /** 下载会话记录：Markdown / JSON（文件名以服务端 Content-Disposition 为准） */
   const downloadSession = useCallback(async (id: string, format: 'md' | 'json', name?: string) => {
@@ -380,6 +349,20 @@ const WorldChatPanel = memo(forwardRef<WorldChatHandle, WorldChatPanelProps>(({ 
       onMsg?.(t('tool:world.session.exportFailed') + (e?.message || e))
     }
   }, [chat, onMsg, t])
+
+  // ── 暴露给父组件的接口（含会话动作：左栏列表借它驱动本组件的聊天状态）。
+  //    放在 downloadSession 之后：这里要把它包进接口，函数得先有定义 ──
+  useImperativeHandle(ref, () => ({
+    forceScrollToBottom: chat.forceScrollToBottom,
+    unreadCount: chat.unreadCount,
+    isInterrupted,
+    lastAiMsgId,
+    newSession: chat.newSession,
+    switchSession: chat.switchSession,
+    renameSession: chat.renameSession,
+    togglePinCurrent: chat.togglePin,
+    exportSession: downloadSession,
+  }), [chat.forceScrollToBottom, chat.unreadCount, isInterrupted, lastAiMsgId, chat.newSession, chat.switchSession, chat.renameSession, chat.togglePin, downloadSession])
 
   // ── 本地输入状态（打字时只有此组件重渲染） ──
   const [localInput, setLocalInput] = useState('')
@@ -406,7 +389,10 @@ const WorldChatPanel = memo(forwardRef<WorldChatHandle, WorldChatPanelProps>(({ 
     setLocalInput('')
     localInputRef.current = ''
     setLocalCmdActive(false)
-  }, [])
+    // 顺手把自适应高度归零：内容清了框还撑着，看起来像没发出去
+    const ta = chat.chatInputRef.current
+    if (ta) ta.style.height = ''
+  }, [chat.chatInputRef])
 
   const handleSubmit = useCallback((text: string) => {
     const t = text.trim()
@@ -738,105 +724,6 @@ const WorldChatPanel = memo(forwardRef<WorldChatHandle, WorldChatPanelProps>(({ 
         </div>
       </div>
 
-      {/* 运行模式：紧贴输入区上方一行，随时可切（AI 的自主度约束） */}
-      <ModeSwitch mode={mode} busy={modeBusy} onChange={switchMode} />
-
-      {/* 会话工具条：当前会话 + 收藏 + 新对话 + 会话列表（/new 后对话保存可切回） */}
-      <div className="flex items-center gap-1.5 px-3 py-1.5 border-t border-border bg-surface/60 text-3xs text-textMuted relative" {...attachments.zoneProps('toolbar')}>
-        {/* 这条只有 20 来像素高，不放文字——蒙版加深就够，但必须接住拖放（否则浏览器会直接打开图片） */}
-        <DropMask {...attachments.dropState('toolbar')} />
-        <span
-          className={`truncate max-w-[180px] shrink-0 ${currentTitle ? 'text-textSecondary' : 'font-mono'}`}
-          title={chat.currentSession}
-        >{currentTitle || (chat.currentSession === 'default' ? '默认会话' : chat.currentSession)}</span>
-        <button
-          onClick={() => { setRenaming({ id: chat.currentSession }); setRenameValue(currentTitle || '') }}
-          className="shrink-0 p-1 rounded transition-colors hover:bg-elevated hover:text-textSecondary"
-          title={t('tool:world.session.rename')}
-        >
-          <Pencil size={11} />
-        </button>
-        <SessionExportMenu
-          label={t('tool:world.session.export')}
-          onPick={(fmt) => downloadSession(chat.currentSession, fmt, currentTitle)}
-        />
-        <button
-          onClick={async () => { const p = await chat.togglePin(); if (!p && onMsg) onMsg('已取消收藏（收藏的会话不会被自动清理）') }}
-          className={`shrink-0 p-1 rounded transition-colors ${chat.sessionList.find((s) => s.id === chat.currentSession)?.pinned ? 'text-accent-400 bg-accent-400/10' : 'hover:bg-elevated hover:text-textSecondary'}`}
-          title={chat.sessionList.find((s) => s.id === chat.currentSession)?.pinned ? '取消收藏' : '收藏此会话（不被自动清理）'}
-        >
-          <Pin size={11} className={chat.sessionList.find((s) => s.id === chat.currentSession)?.pinned ? 'fill-current' : ''} />
-        </button>
-        <button
-          onClick={() => chat.newSession()}
-          className="shrink-0 inline-flex items-center gap-1 px-1.5 py-0.5 rounded hover:bg-elevated hover:text-textSecondary transition-colors"
-          title="开新对话（旧对话保存）"
-        ><Plus size={11} /> 新对话</button>
-        <div className="flex-1" />
-        <button
-          onClick={() => setSessionOpen((v) => !v)}
-          className="shrink-0 inline-flex items-center gap-1 px-1.5 py-0.5 rounded hover:bg-elevated hover:text-textSecondary transition-colors"
-        ><ChevronDown size={11} /> 会话列表（{chat.sessionList.length}）</button>
-        {sessionOpen && chat.sessionList.length > 0 && (
-          <div className="absolute bottom-full right-3 mb-1 w-72 max-h-56 overflow-y-auto rounded-card bg-elevated border border-border shadow-xl z-modal">
-            <div className="px-3 py-1.5 text-3xs text-textMuted border-b border-border truncate" title="按最近聊天排序；带 📌 的已收藏，不会被自动清理">
-              会话列表 · 按最近聊天排序 <Pin size={9} className="inline text-accent-400 fill-current" /> 收藏不清理
-            </div>
-            {chat.sessionList.map((s) => (
-              <div
-                key={s.id}
-                className={`flex items-center gap-0.5 pl-3 pr-1.5 border-b border-border/40 last:border-b-0 transition-colors ${s.id === chat.currentSession ? 'bg-primary-500/15 text-primary-300' : 'text-textSecondary'}`}
-              >
-                <button
-                  onClick={async () => { if (await chat.switchSession(s.id)) setSessionOpen(false) }}
-                  className="flex items-center gap-1.5 min-w-0 flex-1 py-1.5 text-2xs text-left hover:text-textPrimary transition-colors"
-                >
-                  <span
-                    className={`truncate min-w-0 flex-1 ${s.title ? '' : 'font-mono'}`}
-                    title={s.title ? `${s.title}
-${s.id}` : s.id}
-                  >{s.title || (s.id === 'default' ? '默认会话' : s.id)}</span>
-                  {s.last_active_at && (
-                    <span className="shrink-0 text-3xs text-textMuted">{formatRelativeTime(s.last_active_at, lang)}</span>
-                  )}
-                  {/* 当前会话靠整行高亮标识，不再写"当前"两个字（用户 2026-09-15 反馈） */}
-                  {s.pinned && <Pin size={10} className="shrink-0 text-accent-400 fill-current" />}
-                </button>
-                {/* 每场都能改名与导出（用户 2026-09-16 要求）；常驻不藏 hover，触屏也点得到 */}
-                <button
-                  onClick={() => { setRenaming({ id: s.id }); setRenameValue(s.title || '') }}
-                  className="shrink-0 p-1 rounded text-textMuted hover:text-textSecondary hover:bg-surface transition-colors"
-                  title={t('tool:world.session.rename')}
-                ><Pencil size={10} /></button>
-                <SessionExportMenu onPick={(fmt) => downloadSession(s.id, fmt, s.title)} />
-              </div>
-            ))}
-          </div>
-        )}
-      </div>
-
-      {/* 会话改名弹窗（留空 = 清除命名，列表里回落到会话编号） */}
-      {renaming && (
-        <Dialog className="world-msg flex items-center justify-center p-4" onClose={() => setRenaming(null)}>
-          <div className="w-full max-w-sm bg-surface border border-border rounded-dialog shadow-xl p-4 space-y-3">
-            <div className="text-sm font-medium">{t('tool:world.session.renameTitle')}</div>
-            <Input
-              autoFocus
-              maxLength={20}
-              value={renameValue}
-              onChange={(e) => setRenameValue(e.target.value)}
-              onKeyDown={(e) => { if (e.key === 'Enter') submitRename() }}
-              placeholder={t('tool:world.session.renamePlaceholder')}
-              hint={t('tool:world.session.renameHint')}
-            />
-            <div className="flex justify-end gap-2">
-              <Button size="sm" variant="outline" onClick={() => setRenaming(null)}>{t('common.cancel')}</Button>
-              <Button size="sm" onClick={submitRename}>{t('common.save')}</Button>
-            </div>
-          </div>
-        </Dialog>
-      )}
-
       {/* 输入区（图片可直接拖进来放下，与点回形针等价） */}
       <div className="p-3 border-t border-border relative" {...attachments.zoneProps('input')} {...attachments.pasteProps}>
         <DropMask {...attachments.dropState('input')} label="拖动到此处上传图片" />
@@ -864,6 +751,9 @@ ${s.id}` : s.id}
         )}
         {localCmdActive && localCmdFiltered.length > 0 && renderCmdMenu()}
         <AttachmentChips items={attachments.items} onRemove={attachments.remove} />
+        {/* 单层容器（学 DSH）：textarea 不再自带边框，聚焦高亮只在外层亮一次。
+            原来是外框套内框，聚焦只亮内层那条，看着像没聚焦 */}
+        <div className="rounded-2xl border border-border bg-elevated/40 transition-colors focus-within:border-primary-500/60 focus-within:bg-surface">
         <textarea
           ref={chat.chatInputRef}
           value={localInput}
@@ -871,6 +761,10 @@ ${s.id}` : s.id}
             const val = e.target.value
             localInputRef.current = val
             setLocalInput(val)
+            // 多行自适应：先归零再按 scrollHeight 长高，到 240px 为止（再长就内部滚动）
+            const el = e.target
+            el.style.height = 'auto'
+            el.style.height = Math.min(el.scrollHeight, 240) + 'px'
             const before = val.slice(0, e.target.selectionStart)
             const m = before.match(/^\/\w*$/)
             if (m) { setLocalCmdQuery(before.slice(1)); setLocalCmdActive(true); setLocalCmdIdx(0) }
@@ -891,31 +785,29 @@ ${s.id}` : s.id}
             }
           }}
           rows={2}
-          placeholder={(chat.chatSending || chat.chatProcessing) ? 'AI 处理中，消息将排队…' : '和世界 AI 对话…（输入 / 查看命令；可直接拖图或粘贴截图）'}
-          className="w-full bg-elevated text-sm p-2 rounded border border-border outline-none resize-none focus:border-primary-500/50"
+          placeholder={(chat.chatSending || chat.chatProcessing) ? t('tool:world.input.placeholder.busy') : t('tool:world.input.placeholder')}
+          className="w-full bg-transparent text-sm px-3 pt-2.5 pb-1 outline-none resize-none placeholder:text-textMuted"
         />
-        <div className="flex items-center gap-2 mt-2">
+        {/* 底部一条：左＝＋附件 / 运行模式 / 说明，右＝发送。都挤在同一行，不另占一行高度 */}
+        <div className="flex items-center gap-1 px-2 pb-1.5">
           <input ref={fileInputRef} type="file" multiple accept="image/*" className="hidden" onChange={handlePickFiles} />
-          <button
-            onClick={() => fileInputRef.current?.click()}
-            className="shrink-0 p-1.5 rounded border border-border text-textMuted hover:text-primary-400 hover:border-primary-500/40 transition-colors"
-            title="添加图片（拖到对话面板任意处 / 截图后 Ctrl+V 也行）"
-          ><Paperclip size={14} /></button>
+          <IconButton size="sm" icon={<Plus size={14} />} label={t('tool:world.input.attach')} onClick={() => fileInputRef.current?.click()} />
+          <ModePicker mode={mode} busy={modeBusy} onChange={switchMode} />
+          {/* 常驻说明收进 ? 的 title：绝大多数轮次用不到，不该天天占一行 */}
+          <IconButton size="sm" icon={<HelpCircle size={12} />} label={t('tool:world.hint.billing')} />
+          {(chat.chatSending || chat.chatProcessing) && (
+            <span className="hidden sm:inline min-w-0 truncate text-3xs text-textMuted">{t('tool:world.input.busyHint')}</span>
+          )}
+          <div className="flex-1" />
           <button
             onClick={() => handleSubmit(localInputRef.current)}
             disabled={!localInput.trim() && attachments.ready.length === 0}
-            className="flex-1 py-1.5 text-sm bg-primary-500 hover:bg-primary-600 text-white rounded transition-colors disabled:opacity-40"
+            className="shrink-0 inline-flex items-center gap-1 h-7 px-2.5 rounded-control bg-primary-500 hover:bg-primary-600 text-white text-xs font-medium transition-colors disabled:opacity-40"
           >
-            {(chat.chatSending || chat.chatProcessing) ? '排队发送' : (chat.chatSending ? '思考中...' : '发送')}
+            {(chat.chatSending || chat.chatProcessing) ? t('tool:world.input.queue') : t('tool:world.input.send')}
+            <Send size={12} />
           </button>
         </div>
-        {chat.chatProcessing && (
-          <div className="text-3xs text-textMuted mt-2 text-center">
-            上一轮还在执行（刷新不影响），完成后自动显示
-          </div>
-        )}
-        <div className="text-3xs text-textMuted mt-2 text-center">
-          世界级会话（非 DM）：账单走世界主人，让它改界面、加功能
         </div>
       </div>
 
