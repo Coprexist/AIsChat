@@ -82,10 +82,11 @@ function ToolBubble({ name, label, detail, error, icon, running }: {
 // 选中态用**实色块**（不是淡色 tint）：一眼看出当前档在哪。文字色按各自底色的对比度单独选，
 // 不为了"统一"把对比度统一没了（primary-500 与按钮同色，mint-400 在浅色主题偏深用白字、
 // 深色主题变亮改用深灰，amber-400 两个主题都亮 → 深灰）
+// 顺序 = 界面从左到右：计划 / 自动 / 审阅（2026-09-18 用户：计划模式提到第一位）
 const MODE_ITEMS = [
+  { key: 'plan', labelKey: 'tool:world.mode.plan', hintKey: 'tool:world.mode.hint.plan', active: 'bg-primary-500 text-white' },
   { key: 'auto', labelKey: 'tool:world.mode.auto', hintKey: 'tool:world.mode.hint.auto', active: 'bg-mint-400 text-white dark:text-gray-900' },
   { key: 'review', labelKey: 'tool:world.mode.review', hintKey: 'tool:world.mode.hint.review', active: 'bg-amber-400 text-gray-900' },
-  { key: 'plan', labelKey: 'tool:world.mode.plan', hintKey: 'tool:world.mode.hint.plan', active: 'bg-primary-500 text-white' },
 ]
 
 /** 运行模式切换（对话栏内，随手可切）：自动 / 审阅 / 计划——
@@ -447,6 +448,7 @@ const WorldChatPanel = memo(forwardRef<WorldChatHandle, WorldChatPanelProps>(({ 
    *  弹窗里同时提醒"想改就点 ＋ 插入输入框"。行点击与飞机共用这一处判断。 */
   const confirmAndSendSuggestion = useCallback(async (q: string) => {
     const ok = await confirmAsync({
+      key: `world.suggest:${q}`,
       title: t('tool:world.suggest.title') || '发送这条建议？',
       confirmText: t('tool:world.suggest.confirm') || '发送',
       message: (

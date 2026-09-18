@@ -421,7 +421,7 @@ export function useWorldChat({ wid, onRefresh, onMsg }: UseWorldChatOptions) {
 
   // ── 订阅 turn 直播（SSE）：发消息后 / 刷新恢复 共用 ──
   // 断开自动重连（最多 2 次）；返回是否收到 [DONE]（false = 连接失败/重连耗尽，调用方拉历史收尾）
-  const subscribeTurnStream = useCallback(async (turnId: string): Promise<boolean> => {
+  const runTurnStream = useCallback(async (turnId: string): Promise<boolean> => {
     let full = ''
     let reasoning = ''
     // 2026-08-13：正文/思考独立气泡（顺序递增 id）——思考一个气泡、正文一个气泡，
@@ -622,6 +622,22 @@ export function useWorldChat({ wid, onRefresh, onMsg }: UseWorldChatOptions) {
     }
     return gotDone
   }, [wid])
+
+  // 同一个 turn 只允许一条直播：发送路径（sendMessages）与状态轮询恢复（check）都会订阅
+  // 同一个 turn_id。各自订阅会各自累积 full/contentTargetId → 跟踪过程中出现两条一样的消息，
+  // 整轮结束 loadChat 用权威历史覆盖后才正常（2026-09-18 用户报）。
+  // 按 turn_id 单飞，与 DSH 按 rpcId 去重是同一个思路：后来的调用复用在跑的那条流。
+  const inflightTurnsRef = useRef(new Map<string, Promise<boolean>>())
+  const subscribeTurnStream = useCallback((turnId: string): Promise<boolean> => {
+    const inflight = inflightTurnsRef.current
+    const existing = inflight.get(turnId)
+    if (existing) return existing
+    const run = runTurnStream(turnId)
+    inflight.set(turnId, run)
+    const forget = () => { if (inflight.get(turnId) === run) inflight.delete(turnId) }
+    run.then(forget, forget)
+    return run
+  }, [runTurnStream])
 
   // 刷新后恢复「思考中」状态：world_turn 在服务器端继续执行，前端状态丢失后订阅直播 + 轮询恢复
   useEffect(() => {

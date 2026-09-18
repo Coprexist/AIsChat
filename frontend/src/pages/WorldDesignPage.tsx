@@ -877,7 +877,9 @@ export default function WorldDesignPage() {
           className={`flex flex-col bg-surface ${chatFocus ? 'flex-1 min-w-0' : 'shrink-0'}`}
           style={chatFocus ? undefined : { width: effectiveChatWidth, maxWidth: effectiveChatWidth }}
         >
-          <div className="flex-1 min-h-0 flex flex-col">
+          {/* 布满网页时内容居中收窄（学 DSH）：消息与输入区都落在同一列里，
+              不然整行铺满屏（实测输入框会被拉到 1500px+），读起来眼睛要来回扫 */}
+          <div className={`flex-1 min-h-0 flex flex-col ${chatFocus ? 'mx-auto w-full max-w-3xl' : ''}`}>
             {renderChatInner()}
           </div>
         </div>

@@ -1,4 +1,4 @@
-import { ReactNode, useState } from 'react'
+import { ReactNode, useEffect, useState } from 'react'
 import { AlertTriangle } from 'lucide-react'
 import Modal from './Modal'
 import Button from './Button'
@@ -20,40 +20,65 @@ export interface ConfirmOptions {
   confirmText?: string
   cancelText?: string
   danger?: boolean
+  /** 去重键：展示中/排队中的同键请求只保留一个（防重复触发弹出第二个弹窗） */
+  key?: string
 }
 
-// 全局确认队列（简单实现：一次只弹一个）
-let pendingResolver: ((v: boolean) => void) | null = null
-let pendingOptions: ConfirmOptions | null = null
+// 全局确认队列：一次只弹一个；同键请求复用同一个 Promise。
+// 2026-09-18 用户报「点了确定又出现一个，第二个还要等一会儿才自动消失」：
+// 旧实现是**单槽位覆盖式**——后一个请求直接顶掉前一个的 pendingResolver，
+// 前一个 Promise 永远不 resolve，而界面上会依次冒出两个弹窗。
+interface PendingConfirm {
+  key: string
+  options: ConfirmOptions
+  resolve: (v: boolean) => void
+  promise: Promise<boolean>
+}
+
+const queue: PendingConfirm[] = []
+let current: PendingConfirm | null = null
 const listeners = new Set<() => void>()
 
 function notify() {
   listeners.forEach((fn) => fn())
 }
 
+function next() {
+  current = queue.shift() ?? null
+  notify()
+}
+
 /** 在任意处调用：返回 Promise，用户确认后 resolve(true/false) */
 export function confirmAsync(options: ConfirmOptions): Promise<boolean> {
-  pendingOptions = options
-  notify()
-  return new Promise((resolve) => {
-    pendingResolver = resolve
-  })
+  const key = options.key ?? `${options.title ?? ''}|${typeof options.message === 'string' ? options.message : ''}`
+  const dup = current?.key === key ? current : queue.find((p) => p.key === key)
+  if (dup) return dup.promise
+  let resolve!: (v: boolean) => void
+  const promise = new Promise<boolean>((r) => { resolve = r })
+  queue.push({ key, options, resolve, promise })
+  if (!current) next()
+  return promise
 }
 
 function resolveAndClose(value: boolean) {
-  pendingResolver?.(value)
-  pendingResolver = null
-  pendingOptions = null
-  notify()
+  const done = current
+  current = null
+  done?.resolve(value)
+  next()
 }
 
 /** 全局确认弹窗组件（在 App 根部挂一次） */
 export function ConfirmDialogHost() {
   const t = useT()
   const [, force] = useState(0)
-  listeners.add(() => force((n) => n + 1))
+  // 订阅必须放 effect：写在渲染体里会每次渲染都往 Set 塞一个永不摘除的监听（泄漏，StrictMode 下翻倍）
+  useEffect(() => {
+    const listener = () => force((n) => n + 1)
+    listeners.add(listener)
+    return () => { listeners.delete(listener) }
+  }, [])
 
-  const options = pendingOptions
+  const options = current?.options
   if (!options) return null
 
   return (
