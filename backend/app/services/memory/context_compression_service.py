@@ -13,6 +13,7 @@
 """
 
 import logging
+import re
 from typing import Optional
 
 from app.repositories.memory_repo import MemoryRepository, SQLAlchemyMemoryRepository
@@ -45,22 +46,46 @@ SUMMARY_RETRY_MAX_TOKENS = 6000
 MIN_MESSAGES_FOR_COMPRESSION = 8
 
 
-def estimate_tokens(messages: list[dict]) -> int:
-    """
-    简单 token 估算：字符数 / 4。
-    对中英文混合场景足够准确（英文 ~4 char/token，中文 ~1.5 char/token，
-    取 4 作为保守估计，确保不会低估）。
+# 中文（CJK/假名/全角）与其它字符的 token 密度差 2~3 倍：一律按 4 字符/token 会把
+# 中文 prompt 低估约 2.7 倍，阈值该触发时不触发（世界 AI 实测单轮顶到 17 万 token）
+_CJK_RE = re.compile(r"[\u3000-\u303f\u3040-\u30ff\u3400-\u4dbf\u4e00-\u9fff\uf900-\ufaff\uff00-\uffef]")
+_CJK_CHARS_PER_TOKEN = 1.5   # DeepSeek 中文约 1.5 字符/token
+_OTHER_CHARS_PER_TOKEN = 4   # 英文/数字/JSON 约 4 字符/token
 
-    只计算 role 和 content 字段的字符数，跳过 metadata（如 tool_calls 结构）
-    后续可替换为 tiktoken 精确计数。
+
+def _message_text(m: dict) -> str:
+    """一条消息里真正进 payload 的文本：role + content + reasoning_content + tool_calls。
+
+    两处都不能漏：tool_calls 的 arguments 常常是整份文件内容；reasoning_content
+    （思考模式要求回传）实测占长请求的两三成——漏算它估算就永远偏低。
+    """
+    parts = []
+    for key in ("role", "content", "reasoning_content"):
+        val = m.get(key)
+        if isinstance(val, str):
+            parts.append(val)
+    for tc in m.get("tool_calls") or []:
+        fn = (tc or {}).get("function") or {}
+        parts.append(str(fn.get("name") or ""))
+        parts.append(str(fn.get("arguments") or ""))
+    return "".join(parts)
+
+
+def estimate_tokens(messages: list[dict]) -> int:
+    """粗略 token 估算：中文按 1.5 字符/token，其余按 4 字符/token。
+
+    比"总字符数 / 4"准得多（中英混排实测误差 ~5%），且不需要 tiktoken 依赖。
+    旧实现一律 /4，对中文 prompt 低估约 2.7 倍——阈值迟迟不触发，
+    等发现时单轮已经顶到 17 万 token。
     """
     total_chars = 0
+    cjk_chars = 0
     for m in messages:
-        for key in ("role", "content"):
-            val = m.get(key, "")
-            if isinstance(val, str):
-                total_chars += len(val)
-    return total_chars // 4
+        text = _message_text(m)
+        total_chars += len(text)
+        cjk_chars += len(_CJK_RE.findall(text))
+    other_chars = total_chars - cjk_chars
+    return int(cjk_chars / _CJK_CHARS_PER_TOKEN + other_chars / _OTHER_CHARS_PER_TOKEN)
 
 
 async def get_compression_threshold(db) -> float:
