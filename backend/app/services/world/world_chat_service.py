@@ -1571,7 +1571,10 @@ async def _run_tool_loop(
                 yield event
             final = ""
 
-        # 强制收尾轮：不带 tools，保证必有最终回复（含思考捕获）
+        # 强制收尾轮：照旧带 tools —— 只删 tools 会让整段前缀掉出 DeepSeek 的前缀缓存
+        # （线上实测：同一份 messages，带 tools 命中 76416/76584；去掉 tools 只剩 3328/52569）。
+        # 此时模型已收到「最后 N 轮」提示，正常会直接给总结；万一它仍只回 tool_calls，
+        # 下面取正文的 `or "（工具执行完成）"` 兜底，不会出现空回复。
         if not final:
             if heal_tool_chain(messages):   # 兜底：悬空 tool_calls 一并补齐，别让收尾轮 400
                 logger.warning(f"🔧 世界 #{world_id} 收尾前补齐悬空 tool_calls（避免 400）")
@@ -1580,7 +1583,7 @@ async def _run_tool_loop(
             out_f: dict = {}
             async for event in _stream_llm_once(
                 world_id, turn_id, "final", model, thinking, api_base, api_key,
-                messages, None, cfg, out=out_f,
+                messages, tools_for_world, cfg, out=out_f,
             ):
                 yield event
             resp_final = out_f

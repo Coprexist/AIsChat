@@ -389,6 +389,19 @@
 
 ### 🐛 修复的 Bug
 
+#### 世界 AI 收尾轮整段前缀掉出缓存（去掉 tools 就换了缓存命名空间）
+- **实测**（2026-09-18，用 world #45 的真实请求体对着 api.deepseek.com 跑 A/B）：
+  同一份 107 条 messages，带 tools 时 `prompt 76584 / 命中 76416`；去掉 tools 后
+  `prompt 52569 / 命中 3328`——**不是少算几 k，而是整段前缀全 miss**
+- **根因**：`_run_tool_loop` 的强制收尾轮传 `tools=None`（工具轮传的是 `tools_for_world`），
+  payload 一变，DeepSeek 的前缀缓存对不上 → 每次收尾轮都从零计费
+- **线上影响**：`world_llm_usage` 里 `round_no='final'` 共 18 次，命中率 4.1%，
+  吃掉了全库 17.9% 的 cache-miss token（18 次调用 vs 4465 次工具轮）
+- **修法**：收尾轮照旧带 `tools_for_world`（模型此时已收到「最后 N 轮」提示，正常会给总结；
+  万一仍只回 tool_calls，取正文处的 `or "（工具执行完成）"` 兜底）。改 1 行
+- 顺带实测记录（排查用）：`tool_choice:"none"` 会把工具表从 prompt 里摘掉，等于回到
+  无 tools 的那套前缀，**不能**用它来「既省工具表又保缓存」
+
 #### 抓取网页报「禁止访问内网地址: lite.duckduckgo.com (2001::1f0d:5e0a)」——其实那是拨不到，不是内网
 - 用户 2026-09-16 反馈：AI 抓一个正常的搜索结果页，被判成"内网地址"。实测本机 DNS 给该域名返回
   `[104.244.46.71（公网 v4）, 2001::1f0d:5e0a（Teredo 段）]`，而 `ipaddress.is_private` 把 IPv6 的
