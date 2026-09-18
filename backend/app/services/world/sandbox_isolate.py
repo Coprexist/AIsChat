@@ -200,7 +200,7 @@ def apply_seccomp(deny_net: bool = True, deny_process_creation: bool = False) ->
 
 def apply_isolate(*, world_dir: str | None = None, read_dirs: list[str] | None = None,
                   deny_net: bool = True, deny_process_creation: bool = True,
-                  stdlib_readonly: bool = True) -> dict:
+                  stdlib_readonly: bool = True, readonly: bool = False) -> dict:
     """子进程入口统一调用：Landlock（锁文件系统）+ seccomp（禁危险调用）。
 
     - world_dir：授权读写（世界目录）；read_dirs：额外只读目录（如 skill 目录）
@@ -208,10 +208,13 @@ def apply_isolate(*, world_dir: str | None = None, read_dirs: list[str] | None =
     - deny_process_creation：禁 fork/clone（skill 沙箱 True；世界代码沙箱 False——线程池兼容）
     - stdlib_readonly：授权标准库目录只读（世界代码/skill 隔离后仍可 import 标准库；
       标准库是公开代码无敏感信息，只读授权风险可忽略）
+    - readonly：世界目录只进 read_dirs、不进 write_dirs（计划模式的只读运行；
+      写文件一律 EACCES。注意仍有两条不经文件系统的写路径——受控数据 API 与群聊写
+      API——由 API token 的只读前缀在服务端封堵，见 world_proxy._authorize_world_api）
     返回 {"landlock": bool, "seccomp": bool} 各层是否生效（仅记录用）。
     """
     read_dirs = list(read_dirs or [])
-    write_dirs = [world_dir] if world_dir else []
+    write_dirs = [] if readonly else ([world_dir] if world_dir else [])
     if world_dir:
         read_dirs.append(world_dir)
     if stdlib_readonly:

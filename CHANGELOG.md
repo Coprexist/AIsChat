@@ -389,6 +389,17 @@
 
 ### 🐛 修复的 Bug
 
+#### 计划模式挡只读沙箱 → 平台强制只读运行（只锁文件系统是不够的）
+- 计划模式（现在默认第一位）下 AI 连一段纯统计沙箱脚本都跑不了，只能退化成 file_read 硬读
+- 只读必须同时封住**三条写路径**，只锁文件系统会漏：① 文件系统（Landlock：世界目录只进 read_dirs）；
+  ② 受控数据 API 的 PUT/DELETE `/data/{key}`、`POST /memories`、`POST /state` 与群聊
+  messages/roles/kick（token 加 `ro_` 前缀，写端点一律 403）；③ `POST /api/event`（会在服务端触发世界程序）
+- 另加 `PYTHONDONTWRITEBYTECODE=1` + 子进程 `-B`：否则 Python 写 `__pycache__` 撞写保护，
+  报的是假错，AI 会白花轮次排查（`python -I` 会忽略 PYTHON* 环境变量，所以必须同时加 -B）
+- readonly 由平台算（计划模式 or 显式请求），工具参数只能加严、关不掉
+- 实测（世界 45 真实沙箱）：只读运行里写文件 EACCES、PUT/DELETE /data、POST /event、/state、
+  /group/messages、/memories 全部 403，`GET /data`、`GET /world` 正常；非只读运行照旧可写
+
 #### 世界 AI 三条工具摩擦：file_grep 只吃单文件 / file_list 吐 5k token / 报错不回显参数
 - **file_grep 支持目录与数组**：path 可传文件、目录（递归）、数组或 `"."`（整个世界）——「哪些文件用了某段代码」
   一次调用就能问，不用自己写沙箱脚本扫目录（世界 AI 为找接线点发过 8 次单文件搜索）。目录递归跳过产物路径

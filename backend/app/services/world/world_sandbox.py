@@ -124,11 +124,18 @@ def _apply_rlimits(policy: Policy) -> None:
         pass  # 部分系统不可用（如非 root 调整 hard limit），尽力而为
 
 
-def _sanitized_env(world) -> dict:
+def _sanitized_env(world, *, readonly: bool = False) -> dict:
     """env 白名单：不继承后端密钥（DATABASE_URL/JWT_SECRET/API Key 等），只给运行必需项。
 
     2.3 受控数据 API：注入 WORLD_API_TOKEN / WORLD_API_BASE（世界代码经代理访问
     世界数据/对话状态；token 每世界一个、只对本世界数据有效，不是后端密钥）。
+
+    readonly（计划模式强制的只读运行）：
+    - token 加 `ro_` 前缀——前缀只声明"本次只读"，token 本体不变；受控 API 的写端点
+      （world_data PUT/DELETE、记忆、状态、群聊写）据此回 403。世界代码还有两条写路径
+      不经文件系统（受控数据 API / 群消息），只锁文件系统封不住，必须同时封到这里。
+    - PYTHONDONTWRITEBYTECODE=1 + 子进程加 -B：不写 __pycache__，否则撞上写保护报的是
+      假错，AI 白花轮次排查（python -I 会忽略 PYTHON* 环境变量，故必须同时加 -B）。
     """
     env = {
         "PATH": os.environ.get("PATH", "/usr/local/bin:/usr/bin:/bin"),
@@ -140,10 +147,15 @@ def _sanitized_env(world) -> dict:
         # 隔离库目录（子进程 import sandbox_isolate 用；-I 模式下 sys.path 不含脚本目录）
         "SANDBOX_LIB_DIR": str(Path(__file__).parent),
     }
+    if readonly:
+        # 子进程入口读它决定 apply_isolate 是否给世界目录写权限（隔离在子进程内施加，
+        # 父进程的 readonly 参数到不了那里，只能经 env 传）
+        env["WORLD_READONLY"] = "1"
+        env["PYTHONDONTWRITEBYTECODE"] = "1"
     cfg = world.config or {}
     token = cfg.get("api_token")
     if isinstance(token, str) and token:
-        env["WORLD_API_TOKEN"] = token
+        env["WORLD_API_TOKEN"] = f"ro_{token}" if readonly else token
         env["WORLD_API_BASE"] = os.environ.get(
             "WORLD_API_BASE", f"http://127.0.0.1:8000/world/{world.id}/api"
         )
@@ -161,6 +173,7 @@ async def run_world_code(
     code: str | None = None,
     entry: str | None = None,
     background: bool = False,
+    readonly: bool = False,
 ) -> dict:
     """
     在沙箱中运行世界 Python 代码（全局并发上限内排队执行）。
@@ -168,6 +181,8 @@ async def run_world_code(
     - code：直接执行的脚本（自动写入世界目录临时文件再跑，世界内相对导入可用）
     - entry：世界文件夹内的入口文件（相对路径，如 main.py）
     - background：True=无人/后台执行（内存按 sleep_memory_mb，默认 64MB）；False=有人在线
+    - readonly：只读运行（计划模式强制）：世界目录只读 + 受控 API token 带只读前缀 +
+      不写 .pyc；由平台决定，调用方不能借它关闭只读
     二者必给其一（entry 优先）。
 
     返回：{success, stdout, stderr, exit_code, duration_ms, timed_out, reason}
@@ -175,7 +190,7 @@ async def run_world_code(
     """
     _t0 = asyncio.get_event_loop().time()
     async with _get_semaphore():
-        _result = await _run_world_code(world, code=code, entry=entry, background=background)
+        _result = await _run_world_code(world, code=code, entry=entry, background=background, readonly=readonly)
     _result["queued_ms"] = max(0, int((asyncio.get_event_loop().time() - _t0) * 1000) - int(_result.get("duration_ms") or 0))
     return _result
 
@@ -185,6 +200,7 @@ async def _run_world_code(
     code: str | None = None,
     entry: str | None = None,
     background: bool = False,
+    readonly: bool = False,
 ) -> dict:
     policy = policy_for_world(world, background=background)
     workdir = _world_dir(world.id)
@@ -211,11 +227,13 @@ async def _run_world_code(
                     "duration_ms": 0, "timed_out": False, "reason": "code 和 entry 至少给一个"}
 
         cmd = [sys.executable, "-I", "-X", "utf8", "-c", _SANDBOX_RUNNER_TEMPLATE, str(target)]
+        if readonly:
+            cmd.insert(2, "-B")   # 只读运行不写 .pyc（-I 忽略 PYTHON* 环境变量，只能用命令行开关）
         # 2026-08-07 加固：经 _SANDBOX_RUNNER_TEMPLATE 执行（Landlock 锁世界目录 + seccomp 禁进程/危险调用，保留网络）
         proc = await asyncio.create_subprocess_exec(
             *cmd,
             cwd=str(workdir),
-            env=_sanitized_env(world),
+            env=_sanitized_env(world, readonly=readonly),
             stdout=asyncio.subprocess.PIPE,
             stderr=asyncio.subprocess.PIPE,
             start_new_session=True,          # 独立进程组 → 超时可 killpg 连子进程一起杀
@@ -269,7 +287,8 @@ def _main():
     world_dir = os.environ.get("WORLD_DIR", "")
     sys.path.insert(0, os.environ.get("SANDBOX_LIB_DIR", ""))
     from sandbox_isolate import apply_isolate
-    apply_isolate(world_dir=world_dir, deny_net=False, deny_process_creation=False)  # 世界代码保留网络（受控 API）+ 线程兼容（NPROC 限制，execve 仍禁）
+    readonly = os.environ.get("WORLD_READONLY") == "1"   # 只读运行：世界目录不给写权限（计划模式强制）
+    apply_isolate(world_dir=world_dir, readonly=readonly, deny_net=False, deny_process_creation=False)  # 世界代码保留网络（受控 API）+ 线程兼容（NPROC 限制，execve 仍禁）
     sys.path.insert(0, world_dir)
     runpy.run_path(target, run_name="__main__")
 
@@ -286,7 +305,8 @@ import importlib, json, sys, asyncio, io, contextlib, os
 
 sys.path.insert(0, os.environ.get("SANDBOX_LIB_DIR", ""))
 from sandbox_isolate import apply_isolate
-apply_isolate(world_dir=os.environ.get("WORLD_DIR", ""), deny_net=False, deny_process_creation=False)
+_READONLY = os.environ.get("WORLD_READONLY") == "1"   # 只读运行：世界目录不给写权限（计划模式强制）
+apply_isolate(world_dir=os.environ.get("WORLD_DIR", ""), readonly=_READONLY, deny_net=False, deny_process_creation=False)
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 ENTRY = "__ENTRY__"
@@ -330,6 +350,7 @@ async def run_world_trigger(
     event: dict | None = None,
     entry: str = "main.py",
     background: bool = False,
+    readonly: bool = False,
 ) -> dict:
     """
     2.2 触发文件：执行世界入口的 handle(event)，返回其结果（JSON 序列化）。
@@ -338,13 +359,14 @@ async def run_world_trigger(
     - entry：世界文件夹内入口（默认 main.py），需暴露 handle(event) -> dict（可 async）
     - event：触发事件 dict（经 stdin 注入 harness）
     - background：配额语义同 run_world_code（无人/后台 64MB，有人 128MB）
+    - readonly：只读运行（计划模式强制），语义同 run_world_code
 
     返回：{success, result, stdout, error, exit_code, duration_ms, timed_out, reason}
     （duration_ms = 执行耗时；queued_ms = 全局并发排队等待耗时）
     """
     _t0 = asyncio.get_event_loop().time()
     async with _get_semaphore():
-        _result = await _run_world_trigger(world, event=event, entry=entry, background=background)
+        _result = await _run_world_trigger(world, event=event, entry=entry, background=background, readonly=readonly)
     _result["queued_ms"] = max(0, int((asyncio.get_event_loop().time() - _t0) * 1000) - int(_result.get("duration_ms") or 0))
     return _result
 
@@ -354,6 +376,7 @@ async def _run_world_trigger(
     event: dict | None = None,
     entry: str = "main.py",
     background: bool = False,
+    readonly: bool = False,
 ) -> dict:
     policy = policy_for_world(world, background=background)
     workdir = _world_dir(world.id)
@@ -370,10 +393,12 @@ async def _run_world_trigger(
     try:
         tmp_file.write_text(harness, encoding="utf-8")
         cmd = [sys.executable, "-I", "-X", "utf8", str(tmp_file)]
+        if readonly:
+            cmd.insert(2, "-B")   # 只读运行不写 .pyc（-I 忽略 PYTHON* 环境变量，只能用命令行开关）
         proc = await asyncio.create_subprocess_exec(
             *cmd,
             cwd=str(workdir),
-            env=_sanitized_env(world),
+            env=_sanitized_env(world, readonly=readonly),
             stdin=asyncio.subprocess.PIPE,
             stdout=asyncio.subprocess.PIPE,
             stderr=asyncio.subprocess.PIPE,

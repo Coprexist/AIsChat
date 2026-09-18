@@ -285,6 +285,10 @@ async def gate_tool_call(world, world_id: int, tool_name: str, args: dict, turn_
         return True, True, ""
 
     if mode == "plan" and not turn_state.get("plan_approved"):
+        # run_world_code 在计划模式下由平台强制只读（不写文件/世界数据/群消息），
+        # 读代码、跑统计、探索现状正是出计划所需——放行
+        if tool_name == "run_world_code":
+            return True, False, ""
         return False, False, (
             "计划模式：本轮计划还没通过。请先用 present_plan 提交完整计划（要改哪些文件、下载什么、删什么），"
             "用户在弹窗里通过后我才会执行——先出计划，不要直接动手。"
@@ -396,6 +400,8 @@ def build_mode_prompt(mode: str) -> str:
         "\n【运行模式：计划】本世界处于计划模式：**先探索、先规划**。\n"
         "- 收到任务先读相关文件/资料摸清现状，然后用 present_plan 提交计划（要改哪些文件、下载什么、删什么、"
         "分几步），用户在弹窗里通过后，本轮剩下的操作按自动模式执行——此时直接干，不要再逐步请示；\n"
+        "- run_world_code 在计划模式下仍可用，但平台强制只读：能读文件、跑统计与探索，"
+        "不能写文件、写世界数据或发群消息（写操作会被平台拒绝，别反复试）；\n"
         "- 计划未通过前，任何写入/下载/删除工具都会被平台挡下，这是正常的，不要反复试；\n"
         "- 用户在弹窗里可能只通过部分内容，或在输入框里写下修改意见（工具结果里的 "
         f"{USER_NOTE_KEY}）：**按用户的话调整**后重新 present_plan，不要把意见当作没看见。"

@@ -18,7 +18,8 @@ class RunWorldCodeTool(WorldToolPlugin):
 
     parameters = {'code': {'type': 'string', 'description': '可选：直接执行的 Python 脚本'},
      'entry': {'type': 'string', 'description': '可选：世界文件夹内入口文件（默认 main.py，触发模式用）'},
-     'event': {'type': 'object', 'description': '可选：触发事件 dict；给了就执行入口的 handle(event) 并返回结果'}}
+     'event': {'type': 'object', 'description': '可选：触发事件 dict；给了就执行入口的 handle(event) 并返回结果'},
+     'readonly': {'type': 'boolean', 'description': '可选：声明本次只读（只能加严——计划模式本就强制只读，传 false 也关不掉）'}}
 
     required = []
 
@@ -26,6 +27,10 @@ class RunWorldCodeTool(WorldToolPlugin):
         # 2.1/2.2：沙箱执行世界代码（code 脚本）或触发入口 handle(event)
         try:
             args = ctx.args
+            # 只读由平台决定：计划模式强制只读（世界目录只读 + 受控 API token 带只读前缀），
+            # readonly 参数只用于加严，不能借它关闭平台强制的只读
+            from app.services.world.world_ai_mode import get_mode
+            readonly = get_mode(ctx.world) == "plan" or bool(args.get("readonly"))
             # 确保沙箱 env 注入 WORLD_API_TOKEN / WORLD_API_BASE（懒生成，worlds.config.api_token）
             from app.routers.world_proxy import ensure_world_api_token
             await ensure_world_api_token(ctx.world_repo.session, ctx.world)
@@ -36,11 +41,16 @@ class RunWorldCodeTool(WorldToolPlugin):
             if args.get("event") is not None:
                 entry = str(args.get("entry") or "main.py").strip()
                 await ctx.progress("触发世界入口执行中…")
-                return await _run_trigger(ctx.world, event=args.get("event"), entry=entry)
-            code = args.get("code")
-            entry = str(args.get("entry") or "").strip() or None
-            await ctx.progress("脚本运行中…")
-            return await _run_code(ctx.world, code=code if isinstance(code, str) else None, entry=entry)
+                result = await _run_trigger(ctx.world, event=args.get("event"), entry=entry, readonly=readonly)
+            else:
+                code = args.get("code")
+                entry = str(args.get("entry") or "").strip() or None
+                await ctx.progress("脚本运行中…")
+                result = await _run_code(ctx.world, code=code if isinstance(code, str) else None, entry=entry, readonly=readonly)
+            if readonly:
+                # 告诉 AI 本次是平台强制的只读运行：写文件 EACCES、写 API 403 都是预期，别反复试
+                result["readonly"] = True
+            return result
         except (ValueError, TypeError) as e:
             return {"success": False, "error": str(e)}
 

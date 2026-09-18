@@ -62,6 +62,7 @@ RATE_LIMIT_PER_USER = 120       # 每人加成（10 秒）
 GROUP_MSG_LIMIT = 20            # 写操作基础配额（10 秒）
 GROUP_MSG_LIMIT_PER_USER = 10   # 写操作每人加成（10 秒）
 ACTIVE_WINDOW = 600.0           # 活跃判定窗口（10 分钟）
+READONLY_TOKEN_PREFIX = "ro_"   # 只读运行 token 前缀（计划模式强制只读，见 world_sandbox）
 _rate_buckets: dict[int, deque] = {}
 # 世界活跃用户（world_id → {user_id: 最近活跃时刻}），供动态限流按人数加成
 _ACTIVE_USERS: dict[int, dict[int, float]] = {}
@@ -171,12 +172,25 @@ async def ensure_world_api_token(db: AsyncSession, world) -> str:
     return token
 
 
-async def _authorize_world_api(db: AsyncSession, world_id: int, request: Request):
-    """校验世界 API token（Bearer 或 X-World-Token），返回世界 ORM（未授权抛 401/404）"""
+def _world_api_token(request: Request) -> str:
+    """世界代码请求里带的 API token（Bearer 优先，其次 X-World-Token）"""
+    auth = request.headers.get("Authorization", "")
+    return auth[7:].strip() if auth.startswith("Bearer ") else request.headers.get("X-World-Token", "")
+
+
+async def _authorize_world_api(db: AsyncSession, world_id: int, request: Request, *, write: bool = False):
+    """校验世界 API token（Bearer 或 X-World-Token），返回世界 ORM（未授权抛 401/404）。
+
+    token 可带 `ro_` 前缀，声明"本次是只读运行"——前缀只影响写端点的放行，token 本体
+    照旧 compare_digest 校验（世界代码提不了权）。write=True 的写端点遇到只读 token
+    一律 403：只锁文件系统封不住受控数据 API 与群聊写这两条路径。
+    """
     from app.models.world import World
 
-    auth = request.headers.get("Authorization", "")
-    token = auth[7:].strip() if auth.startswith("Bearer ") else request.headers.get("X-World-Token", "")
+    token = _world_api_token(request)
+    readonly = token.startswith(READONLY_TOKEN_PREFIX)
+    if readonly:
+        token = token[len(READONLY_TOKEN_PREFIX):]
     if not token:
         raise HTTPException(status_code=401, detail="缺少世界 API token（沙箱环境变量 WORLD_API_TOKEN）")
     world = await db.get(World, world_id)
@@ -185,6 +199,11 @@ async def _authorize_world_api(db: AsyncSession, world_id: int, request: Request
     expected = (world.config or {}).get("api_token")
     if not expected or not secrets.compare_digest(str(expected), token):
         raise HTTPException(status_code=401, detail="世界 API token 无效")
+    if readonly and write:
+        raise HTTPException(
+            status_code=403,
+            detail="本次是计划模式的只读运行：世界数据写入与群聊写操作已被平台禁止，只读脚本请只查不写",
+        )
     _rate_limit(world)
     return world
 
@@ -289,7 +308,7 @@ async def world_api_store_memory(
     world_repo: WorldRepository = Depends(get_world_repo),
 ):
     """受控 API：存记忆（复用世界 AI 的 store_memory 同一份逻辑）"""
-    world = await _authorize_world_api(db, world_id, request)
+    world = await _authorize_world_api(db, world_id, request, write=True)
     title = str(body.get("title", "")).strip()
     content = str(body.get("content", "")).strip()
     if not title or not content:
@@ -302,7 +321,20 @@ async def world_api_store_memory(
     return {"ok": True, "title": title, "embedded": result.get("embedded", False)}
 
 
-@router.post("/{world_id}/api/event")
+async def _reject_readonly_event_token(
+    request: Request,
+    world_id: int,
+    db: AsyncSession = Depends(get_db),
+) -> None:
+    """页面事件通道不接受只读世界 token：POST /api/event 会在服务端触发世界程序
+    （handle(event)），只读运行若能走进来就等于绕过沙箱。页面自身的 JWT 不受影响。
+    """
+    if not _world_api_token(request).startswith(READONLY_TOKEN_PREFIX):
+        return
+    await _authorize_world_api(db, world_id, request, write=True)   # 只读 token → 403
+
+
+@router.post("/{world_id}/api/event", dependencies=[Depends(_reject_readonly_event_token)])
 async def world_api_event(
     world_id: int,
     body: dict,
@@ -408,7 +440,7 @@ async def world_api_publish_state(
 
     状态由世界代码全权定义（任意 JSON）；后端负责：内存最新快照 + 广播订阅者 + 落 state.json。
     """
-    world = await _authorize_world_api(db, world_id, request)
+    world = await _authorize_world_api(db, world_id, request, write=True)
     _rate_limit_write(world)
     if len(json.dumps(body, ensure_ascii=False)) > 100 * 1024:
         raise HTTPException(status_code=422, detail="状态过大（上限 100KB）")
@@ -450,7 +482,7 @@ async def world_api_data_put(
     world_repo: WorldRepository = Depends(get_world_repo),
 ):
     """受控 API：写世界数据（upsert；key ≤200 字符）"""
-    await _authorize_world_api(db, world_id, request)
+    await _authorize_world_api(db, world_id, request, write=True)
     if len(key) > 200:
         raise HTTPException(status_code=400, detail="key 过长（≤200）")
     from app.services.world.world_service import set_world_data
@@ -466,7 +498,7 @@ async def world_api_data_delete(
     world_repo: WorldRepository = Depends(get_world_repo),
 ):
     """受控 API：删世界数据"""
-    await _authorize_world_api(db, world_id, request)
+    await _authorize_world_api(db, world_id, request, write=True)
     from app.services.world.world_service import delete_world_data
     ok = await delete_world_data(repo=world_repo, world_id=world_id, key=key)
     if not ok:
@@ -601,7 +633,7 @@ async def world_api_group_send(
     world_repo: WorldRepository = Depends(get_world_repo),
 ):
     """受控 API：发群消息（世界自身身份；仅绑定群；写限流）"""
-    world = await _authorize_world_api(db, world_id, request)
+    world = await _authorize_world_api(db, world_id, request, write=True)
     try:
         gid = await _check_bound_group(db, world, body.get("group_id"))
     except (TypeError, ValueError):
@@ -628,7 +660,7 @@ async def world_api_group_role(
     world_repo: WorldRepository = Depends(get_world_repo),
 ):
     """受控 API：改成员角色（群主/管理员；仅绑定群；写限流）"""
-    world = await _authorize_world_api(db, world_id, request)
+    world = await _authorize_world_api(db, world_id, request, write=True)
     try:
         gid = await _check_bound_group(db, world, body.get("group_id"))
         mid = int(body.get("member_id") or 0)
@@ -656,7 +688,7 @@ async def world_api_group_kick(
     world_repo: WorldRepository = Depends(get_world_repo),
 ):
     """受控 API：移出成员（群主/管理员；仅绑定群；写限流）"""
-    world = await _authorize_world_api(db, world_id, request)
+    world = await _authorize_world_api(db, world_id, request, write=True)
     try:
         gid = await _check_bound_group(db, world, body.get("group_id"))
         mid = int(body.get("member_id") or 0)
