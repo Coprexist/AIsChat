@@ -45,6 +45,7 @@ FORCED_PROMPT_SEGMENTS = [
     # 能力边界
     "\n【能力边界】平台里有两类 AI，能力不同，被问起时准确回答，不要凭猜测：\n- 你（世界 AI / 群视界机器人）= 造物主：平台工具 + 设计侧技能库（data/world_ai_skills/，全局共享），在世界之外设计世界，不用也不会拿到世界侧技能\n- 群里的 AI 成员（居民，平台 agent，如绑定了本世界的群 AI）= 绑定本世界后拥有：① 世界侧技能（data/worlds/{id}/skills/ 下颁布的 manifest+code.py，像调普通工具一样 function calling 直接调用）② world_command 文本命令工具（把命令发到群里，由世界程序 main.py handle() 解析执行，与用户共用同一套语法）——所以群 AI 不是「只会说话没有工具」，它有工具，能力取决于这个世界颁布了什么技能\n- 世界侧技能由你（或世界配置）颁布：在世界的 skills/ 目录放 manifest.json + code.py，绑定本世界的群 AI 就能直接工具调用；你没颁布技能时它们就没有世界侧工具（只剩 world_command 和平台默认工具）\n- 用户/群成员直接在群里发命令文本（如「收诗：xxx」「我去 2,3」）→ 群消息钩子 → 世界程序 main.py 解析执行——这是「人直接与世界交互」，与群 AI 调工具是两条并存的路径，别混为一谈",
     # 注意事项（通用行为准则，浓缩版）
+    "\n【建议按钮】要在回复里写「下面几个建议/下一步选项」时，先用 suggest_questions 把这几条交给平台——界面显示的才是你这几条；不调用而只在正文里写，界面显示的是平台预设，两者对不上。\n"
     "\n【注意事项】遇到含糊指令主动提问确认，不瞎猜；调用工具后不要在回复里重复工具原始输出，直接说做了什么；创建文件后告知路径；给建议时简要阐述每个建议是什么（别只丢列表）；收尾最后一句写实质内容，不用「等你定方向」这类空话。\n"
     "【对话命名】一个话题聊出眉目、或换了新话题时，用 rename_session 给这场对话起个 6~20 字的短名字"
     "（如「造卡牌对战界面」「修地缝掉落」）——用户在会话列表里靠名字认对话，别让它一直显示 w12:m:3f9a… 这种编号；"
@@ -1338,12 +1339,15 @@ async def _handle_slash_command(
 
 
 async def _emit_suggestions(world_repo: WorldRepository, world, world_id: int, turn_state: dict):
-    """下发「你可以」建议：AI 调过 suggest_questions 就用它，否则轻量 LLM 兜底，再不行预设。"""
+    """下发「你可以」建议：只认 AI 自己调 suggest_questions 生成的那几条。
+
+    2026-09-18 修：AI 没给建议时旧实现会跑一次"轻量 LLM 兜底"，实测几乎总是解析失败退化成
+    随机预设（「帮我做一个聊天室」这类新手引导）——于是 AI 正文写着「下面四个建议 ①②③④」、
+    界面显示的却是另一套，用户直接问"怎么对不上"；而且它还会把 UI 持久化的 AI 建议一起覆盖掉
+    （前端 /chat/suggest 下次读到的是这些预设）。没有就什么都不发，界面保留 AI 上次的建议。
+    """
     try:
         suggestions = list(turn_state.get("suggestions") or [])
-        if not suggestions:
-            from app.services.world.world_suggestions import suggest_fallback
-            suggestions = await suggest_fallback(world_repo, world)
         if not suggestions:
             return
         try:
