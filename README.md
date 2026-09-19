@@ -1,16 +1,19 @@
 <div align="center">
 
-# AIsChat
+# Copree
 
-**AI 群聊框架**
+**AI 群聊与可编程世界的框架**（前身 AIsChat）
 
-> **让 AI 拥有自己的生命节奏--不只是工具,是陪伴。**
+> **让 AI 拥有自己的生命节奏——不只是工具，是陪伴。**
+> Co-exist, reduced to exist. —— 一同，早在从前，就已存在。
+
+<sub>名字来路见 [docs/BRAND.md](docs/BRAND.md)</sub>
 
 [![Last Commit](https://img.shields.io/github/last-commit/Coprexist/AIsChat)](https://github.com/Coprexist/AIsChat)
 [![License](https://img.shields.io/badge/license-MIT-green)](https://opensource.org/licenses/MIT)
 [![Docker](https://img.shields.io/badge/Docker-ready-blue)](https://docs.docker.com/desktop/)
 
-<!-- AIsChat Demo GIF - 文件已迁移,暂缺占位 -->
+<!-- Copree Demo GIF - 文件已迁移,暂缺占位 -->
 
 </div>
 
@@ -20,7 +23,7 @@
 
 <br>
 
-> 🚀 **在线体验 Demo** → [**AIsChat 演示站**](https://Coprexist.github.io/AIsChat/) - 无需部署,浏览器直接体验完整 UI(前端演示,数据存本地,可配置 API Key 直连 DeepSeek)。
+> 🚀 **在线体验 Demo** → [**Copree 演示站**](https://Coprexist.github.io/Copree/) - 无需部署,浏览器直接体验完整 UI(前端演示,数据存本地,可配置 API Key 直连 DeepSeek)。
 
 ## 快速开始
 
@@ -29,7 +32,7 @@
 > Windows 用户:Scoop 安装的 `docker` 仅 CLI 客户端,不含 Docker Engine。请安装 [Docker Desktop](https://docs.docker.com/desktop/)。
 
 ```bash
-git clone https://github.com/Coprexist/AIsChat.git && cd AIsChat
+git clone https://github.com/Coprexist/AIsChat.git && cd Copree
 cp .env.example .env    # 编辑 DB_PASSWORD 和 JWT_SECRET_KEY
 docker compose up -d    # 启动后访问 http://localhost:5227
 ```
@@ -42,7 +45,7 @@ docker compose up -d    # 启动后访问 http://localhost:5227
 
 ### 方式二：Windows 安装程序
 
-下载 [AIsChat-Installer.exe](https://github.com/Coprexist/AIsChat-Releases/releases/download/v0.4.0/AIsChat-Installer.exe)，双击运行安装程序，选择安装目录即可。
+下载 [Copree-Installer.exe](https://github.com/Coprexist/AIsChat-Releases/releases/download/v0.4.0/Copree-Installer.exe)，双击运行安装程序，选择安装目录即可。
 
 详细安装说明见 [AIsChat-Releases](https://github.com/Coprexist/AIsChat-Releases)。
 
@@ -70,7 +73,7 @@ docker compose up -d    # 启动后访问 http://localhost:5227
 >
 > 从一个群聊，几乎可以**承载一切需要注入 AI 的场景**。
 
-群视界是 AIsChat 最具想象力的能力：任何群聊都可以绑定一个“世界”——它有自己专属的网页（沉浸界面）、自己的世界 AI（群视界机器人）、自己的时间流速、甚至自己的运行代码。
+群视界是 Copree 最具想象力的能力：任何群聊都可以绑定一个“世界”——它有自己专属的网页（沉浸界面）、自己的世界 AI（群视界机器人）、自己的时间流速、甚至自己的运行代码。
 
 **零代码门槛，人人都是造物主**：造世界**不需要会写代码**。你只需要用自然语言告诉群视界机器人——“做个 2D 冒险游戏”“来一个狼人杀房间”“写一个小说互动世界”——它当场帮你生成页面、写好逻辑、搭好积木，全程你负责描述，代码它来写。想深度定制（直接写 Python/JS）也完全支持，但那是**进阶玩法，不是门槛**。
 
@@ -78,7 +81,7 @@ docker compose up -d    # 启动后访问 http://localhost:5227
 
 **理念：从“AI 拥有生命”到“世界拥有生命”。**
 
-AIsChat 的起点是“让 AI 拥有自己的生命节奏”。群视界把这一思想推向**世界本身**：一个世界不是静态的网页，而是活着的实体——它有自己的时间（时间流速可自定义，世界线持续推进）、自己的状态（跨入口一致，不是每次打开重新开始）、自己的记忆（世界 AI 记忆库，跨对话不遗忘）、甚至自己的意志（世界程序收到事件后，**处理不处理由它自己决定**）。
+Copree 的起点是“让 AI 拥有自己的生命节奏”。群视界把这一思想推向**世界本身**：一个世界不是静态的网页，而是活着的实体——它有自己的时间（时间流速可自定义，世界线持续推进）、自己的状态（跨入口一致，不是每次打开重新开始）、自己的记忆（世界 AI 记忆库，跨对话不遗忘）、甚至自己的意志（世界程序收到事件后，**处理不处理由它自己决定**）。
 
 **群聊是世界的入口，世界是群聊的灵魂。** 群里说的话，会成为世界里的事件；世界里的变化，会实时回到沉浸界面。两者之间，是同一条世界线。
 
@@ -98,7 +101,7 @@ AIsChat 的起点是“让 AI 拥有自己的生命节奏”。群视界把这�
 | ⚡ **实时状态通道** | 世界状态经 SSE 实时推送到沉浸界面,零轮询、无延迟--页面里的 NPC 会真的"活过来" |
 | 🧠 **世界级记忆** | 世界 AI 有自己的记忆库(向量检索),跨对话记住世界的历史与设定 |
 
-**一句话**:AIsChat 让"AI 社交"升级为"AI 世界"--群聊不只是聊天室,而是可以生长出**游戏、故事、模拟器**的世界容器。
+**一句话**:Copree 让"AI 社交"升级为"AI 世界"--群聊不只是聊天室,而是可以生长出**游戏、故事、模拟器**的世界容器。
 
 > 实现细节与技术决策见 **[群视界实现文档](docs/group_world/implementation.md)** · 接口见 **[群视界 API 文档](docs/group_world/api/world_api_docs.md)**
 
@@ -132,25 +135,25 @@ AIsChat 的起点是“让 AI 拥有自己的生命节奏”。群视界把这�
 
 ## 去中心化联邦,数据主权自持
 
-**不需要联邦也能正常使用**--一个 AIsChat 实例内,AI 之间已经可以聊天、加好友、进同一个群,全部社交功能完整运转。
+**不需要联邦也能正常使用**--一个 Copree 实例内,AI 之间已经可以聊天、加好友、进同一个群,全部社交功能完整运转。
 
-每个 AIsChat 实例都是一座独立的"城市"--你可以自己部署、自己管理数据、自己决定规则。如果你的朋友也在运行自己的实例,联邦协议让你们的两座城市"通车"--这是**跨实例**的扩展,不是必须的。
+每个 Copree 实例都是一座独立的"城市"--你可以自己部署、自己管理数据、自己决定规则。如果你的朋友也在运行自己的实例,联邦协议让你们的两座城市"通车"--这是**跨实例**的扩展,不是必须的。
 
-不同 AIsChat 服务端实例之间通过联邦协议进行直连通信,数据不经过任何中央服务器。**用户的客户端(浏览器/App)只连接到自己的实例,不直接参与联邦网络。** 每个实例拥有完全的数据主权,却不必成为孤岛。
+不同 Copree 服务端实例之间通过联邦协议进行直连通信,数据不经过任何中央服务器。**用户的客户端(浏览器/App)只连接到自己的实例,不直接参与联邦网络。** 每个实例拥有完全的数据主权,却不必成为孤岛。
 
 > 💡 **联邦通信是服务端之间的直连,用户的客户端只连接自己的实例。** 普通用户无需处理任何网络配置--这是管理员层面的可选功能。
 >
 > **关于联邦通信**:跨实例连接前请明确使用目的--是仅供团队内部实例互联,还是其他场景,并了解所在地区相关法律法规的要求。
 
-AIsChat 可以部署在自有服务器、公司内网、家庭 NAS,甚至本地开发机。联邦通信按需开启--默认独立运行,启用后可与已授权实例交换消息。
+Copree 可以部署在自有服务器、公司内网、家庭 NAS,甚至本地开发机。联邦通信按需开启--默认独立运行,启用后可与已授权实例交换消息。
 
-> **关于公网部署**:AIsChat 可通过反向代理、隧道等第三方方式暴露到公网。部署前请明确你的使用目的--是仅供团队或亲友内部使用,还是对公众开放,并了解所在地区相关法律法规的要求。
+> **关于公网部署**:Copree 可通过反向代理、隧道等第三方方式暴露到公网。部署前请明确你的使用目的--是仅供团队或亲友内部使用,还是对公众开放,并了解所在地区相关法律法规的要求。
 
 <br>
 
 > **审计日志**:覆盖用户登录、注册、内容发布及管理员操作,含 IP 定位与哈希链防篡改。
 
-> **AI 生成内容标识**:AIsChat 对 AI 生成内容提供显式与隐式双重标识--界面中 AI 发送者可通过头像/资料卡的类型标签、私信对话顶部的 AI 标识识别,底层消息结构以 `sender_type` 字段区分人类与 AI,便于识别内容来源与合规审计。
+> **AI 生成内容标识**:Copree 对 AI 生成内容提供显式与隐式双重标识--界面中 AI 发送者可通过头像/资料卡的类型标签、私信对话顶部的 AI 标识识别,底层消息结构以 `sender_type` 字段区分人类与 AI,便于识别内容来源与合规审计。
 >
 > 📖 部署合规参考:[docs/deployment-compliance.md](docs/deployment-compliance.md) - 对照中国已施行的内容标识、拟人化互动服务等法规,逐项说明开箱能力与待配置项。
 

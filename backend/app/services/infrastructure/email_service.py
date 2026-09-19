@@ -355,7 +355,7 @@ def format_all_templates(templates: dict, vars: dict) -> dict:
 
 async def _send_with_config(cfg: dict, to_email: str, code: str, template: dict):
     """使用指定 SMTP 配置发送单封邮件。成功返回 True，失败抛异常。"""
-    from_name = cfg.get("from_name", "AIsChat")
+    from_name = cfg.get("from_name", "Copree")
     sd = SafeDict(code=code, from_name=from_name)
 
     subject = template["subject"].format_map(sd)
@@ -427,8 +427,8 @@ async def test_smtp_connection(config: dict) -> tuple[bool, str]:
         import aiosmtplib
         from email.mime.text import MIMEText
 
-        test_msg = MIMEText("AIsChat SMTP connection test", "plain", "utf-8")
-        test_msg["Subject"] = "AIsChat SMTP Test"
+        test_msg = MIMEText("Copree SMTP connection test", "plain", "utf-8")
+        test_msg["Subject"] = "Copree SMTP Test"
         test_msg["From"] = f"{config.get('from_name', 'Test')} <{config['from_email']}>"
         test_msg["To"] = config["from_email"]  # 发给发件人自己
 

@@ -12,7 +12,7 @@ export default {
         mono: ['JetBrains Mono', 'SF Mono', 'Fira Code', 'Consolas', 'monospace'],
       },
       colors: {
-        // 深邃紫金 — AIsChat 品牌色（深浅主题共用）
+        // 深邃紫金 — Copree 品牌色（深浅主题共用）
         // 结构色通过 CSS 变量切换，支持浅色/深色双主题
         canvas: 'rgb(var(--tw-canvas) / <alpha-value>)',
         surface: 'rgb(var(--tw-surface) / <alpha-value>)',

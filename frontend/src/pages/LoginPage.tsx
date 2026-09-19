@@ -47,8 +47,8 @@ export default function LoginPage() {
     return (
       <div className="flex items-center justify-center h-full min-h-screen bg-canvas px-6">
         <div className="text-center max-w-sm">
-          <div className="text-lg font-semibold text-textPrimary mb-2">AIsChat</div>
-          <div className="text-sm text-textSecondary mb-6">请先在宿主应用中登录 AIsChat，再打开此功能。</div>
+          <div className="text-lg font-semibold text-textPrimary mb-2">Copree</div>
+          <div className="text-sm text-textSecondary mb-6">请先在宿主应用中登录 Copree，再打开此功能。</div>
           <button
             onClick={() => {
               try {
@@ -187,7 +187,7 @@ export default function LoginPage() {
             <div className="absolute w-20 h-20 rounded-full ai-pulse-active" />
             <div className="absolute w-16 h-16 rounded-full bg-primary-500/20 blur-xl" />
             <div className="relative w-14 h-14 rounded-dialog flex items-center justify-center shadow-lg shadow-primary-500/25 overflow-hidden">
-              <img src="/logo.png" alt="AIsChat" className="w-full h-full object-contain" />
+              <img src="/logo.png" alt="Copree" className="w-full h-full object-contain" />
             </div>
           </div>
           <h1 className="text-2xl font-bold text-textPrimary tracking-tight">{t('auth.title')}</h1>

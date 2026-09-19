@@ -1,4 +1,4 @@
-# AIsChat 备份与恢复指南 / Backup & Recovery Guide
+# Copree 备份与恢复指南 / Backup & Recovery Guide
 
 > **面向管理员。** 数据备份策略、恢复流程和灾难恢复方案。
 > **For administrators.** Data backup strategies, recovery processes, and disaster recovery plans.
@@ -67,7 +67,7 @@ flowchart TD
 
 ```mermaid
 graph TD
-    subgraph "AIsChat 数据"
+    subgraph "Copree 数据"
         DB[PostgreSQL 数据库]
         File[文件存储]
         Config[配置文件]
@@ -177,12 +177,12 @@ cp docker-compose.yml /backups/config/
 
 ```bash
 #!/bin/bash
-# full_backup.sh - AIsChat 全量备份
+# full_backup.sh - Copree 全量备份
 
 BACKUP_DIR="/backups"
 DATE=$(date +%Y-%m-%d_%H%M)
 
-echo "=== AIsChat 全量备份 ==="
+echo "=== Copree 全量备份 ==="
 
 # 1. 数据库备份
 echo "1. 备份数据库..."
@@ -231,10 +231,10 @@ echo "备份位置: ${BACKUP_DIR}"
 crontab -e
 
 # 每天凌晨 3 点全量备份
-0 3 * * * cd /path/to/AIsChat && ./scripts/full_backup.sh
+0 3 * * * cd /path/to/Copree && ./scripts/full_backup.sh
 
 # 每周日凌晨 4 点归档压缩
-0 4 * * 0 cd /path/to/AIsChat && ./scripts/archive_backup.sh
+0 4 * * 0 cd /path/to/Copree && ./scripts/archive_backup.sh
 
 # 每月 1 号清理 30 天前的备份
 0 5 1 * * find /backups -mtime +30 -delete
@@ -482,11 +482,11 @@ docker compose up -d
 ```bash
 # 1. 在新服务器安装 Docker
 # 2. 复制代码和备份
-scp -r AIsChat/ user@new-server:/path/to/
+scp -r Copree/ user@new-server:/path/to/
 rsync -avz /backups/ user@new-server:/backups/
 
 # 3. 在新服务器启动服务
-cd /path/to/AIsChat
+cd /path/to/Copree
 docker compose up -d
 
 # 4. 恢复数据

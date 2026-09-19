@@ -19,7 +19,7 @@ class InstanceConfig(Base):
 
     id = Column(Integer, primary_key=True, default=1)
     instance_id = Column(String(36), unique=True, nullable=False)  # 子网 UUID v4
-    public_id = Column(String(50), unique=True, nullable=True)      # 公网 ID: AIsChat-xxxxxxxx
+    public_id = Column(String(50), unique=True, nullable=True)      # 公网 ID: Copree-xxxxxxxx
     display_name = Column(String(100), default="")                   # 人类可读名称
     public_url = Column(String(500), default="")                     # 本实例公网可达 URL
     github_token_encrypted = Column(String, nullable=True)           # Fernet 加密的 GitHub Token（可选，仅用于公开发现）
@@ -28,7 +28,7 @@ class InstanceConfig(Base):
 
 
 class FederationPeer(Base):
-    """联邦对等端（其他 AIsChat 实例）"""
+    """联邦对等端（其他 Copree 实例）"""
     __tablename__ = "federation_peers"
 
     id = Column(Integer, primary_key=True, autoincrement=True)

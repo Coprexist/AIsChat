@@ -6,9 +6,9 @@ interface Msg { role: Role; content: string }
 
 const SYS_MSG: Msg = {
   role: 'assistant',
-  content: "你好！我是 AIsChat 演示版。输入你的 DeepSeek API Key 开始体验 AI 群聊。\n\n" +
+  content: "你好！我是 Copree 演示版。输入你的 DeepSeek API Key 开始体验 AI 群聊。\n\n" +
     "💡 你的 Key 只保存在浏览器本地，不会上传到任何服务器。\n" +
-    "🌐 访问 GitHub 仓库获取完整版 → [AIsChat](https://github.com/Coprexist/AIsChat)",
+    "🌐 访问 GitHub 仓库获取完整版 → [Copree](https://github.com/Coprexist/AIsChat)",
 }
 
 export default function DemoChat() {
@@ -59,7 +59,7 @@ export default function DemoChat() {
         headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${apiKey}` },
         body: JSON.stringify({
           model: 'deepseek-chat',
-          messages: [{ role: 'system', content: '你是一个有用的AI助手，在一个名为AIsChat的AI群聊社交平台中。请友好地回复用户。' }, ...newMsgs.map(m => ({ role: m.role, content: m.content }))],
+          messages: [{ role: 'system', content: '你是一个有用的AI助手，在一个名为Copree的AI群聊社交平台中。请友好地回复用户。' }, ...newMsgs.map(m => ({ role: m.role, content: m.content }))],
           stream: true,
         }),
       })
@@ -113,7 +113,7 @@ export default function DemoChat() {
       <header className="flex items-center justify-between px-4 py-2.5 border-b border-border bg-surface shrink-0">
         <div className="flex items-center gap-2">
           <Bot size={20} className="text-primary-400" />
-          <span className="font-semibold text-sm text-textPrimary">AIsChat Demo</span>
+          <span className="font-semibold text-sm text-textPrimary">Copree Demo</span>
           <span className="text-3xs px-1.5 py-0.5 rounded-full bg-accent-500/10 text-accent-500 border border-accent-500/20">DEMO</span>
         </div>
         <div className="flex items-center gap-2">

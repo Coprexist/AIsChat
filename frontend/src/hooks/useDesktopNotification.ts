@@ -1,7 +1,7 @@
 /**
  * 桌面通知：标签页标题未读计数 + 任务栏闪烁
  *
- * - 标签页失焦时，标题显示 "(N) AIsChat"
+ * - 标签页失焦时，标题显示 "(N) Copree"
  * - 有新未读消息时自动交替标题，触发 Edge/Chrome 任务栏闪烁
  * - 标签页聚焦后立即清除闪烁，恢复原标题
  * - localStorage "notifications_enabled" 控制开关（默认开启）
@@ -15,7 +15,7 @@ import { api } from '../api/client'
 import { CHAT_REFRESH_EVENT } from '../constants'
 
 const STORAGE_KEY = 'notifications_enabled'
-const BASE_TITLE = 'AIsChat'
+const BASE_TITLE = 'Copree'
 
 /** 从 groups + dm_sessions API 计算总未读数，排除 DND */
 async function fetchTotalUnread(): Promise<number> {

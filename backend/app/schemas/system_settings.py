@@ -59,7 +59,7 @@ class SmtpConfigRequest(BaseModel):
     username: str = Field(..., max_length=255)
     password: str | None = Field(None, description="留空保持现有密码不变")
     from_email: str = Field(..., max_length=255)
-    from_name: str = Field("AIsChat", max_length=100)
+    from_name: str = Field("Copree", max_length=100)
     use_tls: bool = True
 
 
@@ -87,7 +87,7 @@ class SmtpConfigItem(BaseModel):
     username: str = Field("", max_length=255)
     password: str | None = Field(None, description="留空保持现网不变")
     from_email: str = Field(..., max_length=255)
-    from_name: str = Field("AIsChat", max_length=100)
+    from_name: str = Field("Copree", max_length=100)
     use_tls: bool = True
     is_active: bool = True
     priority: int = Field(0, ge=0)
@@ -105,7 +105,7 @@ class SmtpTestRequest(BaseModel):
     username: str = Field("", max_length=255)
     password: str | None = Field(None)
     from_email: str = Field(..., max_length=255)
-    from_name: str = Field("AIsChat", max_length=100)
+    from_name: str = Field("Copree", max_length=100)
     use_tls: bool = True
 
 

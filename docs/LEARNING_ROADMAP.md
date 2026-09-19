@@ -1,7 +1,7 @@
-# AIsChat 学习路线图
+# Copree 学习路线图
 
 > 版本：v1.0.0 | 更新：2026-08-10
-> 本文档提供 AIsChat 项目的阶梯式学习路线，每个阶段都有明确的目标、必读文件和实践任务。
+> 本文档提供 Copree 项目的阶梯式学习路线，每个阶段都有明确的目标、必读文件和实践任务。
 > 配合 [CODE_WIKI.md](../docs/CODE_WIKI.md) 效果最佳。
 
 ---
@@ -87,7 +87,7 @@ flowchart LR
 ```bash
 # 1. 克隆项目
 git clone <repo-url>
-cd AIsChat
+cd Copree
 
 # 2. 配置环境变量
 cp .env.example .env
@@ -649,7 +649,7 @@ GET /brain/state
 
 ```mermaid
 mindmap
-  root((AIsChat 扩展))
+  root((Copree 扩展))
     新增 AI 工具
       ToolPlugin 基类
       工具注册

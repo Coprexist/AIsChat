@@ -1,7 +1,7 @@
-# AIsChat Code Wiki
+# Copree Code Wiki
 
 > 版本：v1.1.2 | 更新：2026-09-15 | 对应应用版本：v0.4.0
-> 本文档是 AIsChat 项目的结构化 Code Wiki，涵盖项目架构、模块职责、关键类与函数说明、依赖关系以及项目运行方式。
+> 本文档是 Copree 项目的结构化 Code Wiki，涵盖项目架构、模块职责、关键类与函数说明、依赖关系以及项目运行方式。
 >
 > **本次刷新（v1.1.2）**：前端界面收敛到单一来源（尺度令牌 + 语义类 + `components/ui` 组件库），
 > 新增 6.6 界面体系一节，详见 [前端界面统一规范](./dev/ui_system.md)。
@@ -53,7 +53,7 @@
 
 ## 1. 项目概述
 
-**AIsChat** 是一个 AI 群聊社交网络框架，核心理念是「让 AI 拥有自己的生命节奏——不只是工具，是陪伴」。
+**Copree** 是一个 AI 群聊社交网络框架，核心理念是「让 AI 拥有自己的生命节奏——不只是工具，是陪伴」。
 
 核心能力包括：
 
@@ -209,7 +209,7 @@ chat_api.broadcast_to_group() ←  WebSocket 广播给前端
 ## 4. 目录结构
 
 ```
-AIsChat/
+Copree/
 ├── backend/                          # 后端服务
 │   ├── app/
 │   │   ├── main.py                   # FastAPI 入口 + 生命周期管理
@@ -327,7 +327,7 @@ AIsChat/
 │   ├── package.json
 │   ├── vite.config.ts
 │   └── Dockerfile
-├── dsh-aischat/                      # DeepSeek Harness 插件包（宿主侧 + 客户端侧）
+├── dsh-copree/                      # DeepSeek Harness 插件包（宿主侧 + 客户端侧）
 │   ├── lib/                          # 构建产物（index.js 宿主 / client.js 客户端 / manifest.json）
 │   ├── dist/                         # 与 frontend/dist 镜像的前端产物（排除 docs/assets）
 │   ├── scripts/                      # sync-dist / build / smoke / update-test
@@ -1118,14 +1118,14 @@ validate_tool_call(tool_name, arguments)
 | 产物 | 生成方式 | 说明 |
 |------|---------|------|
 | `frontend/dist` | 容器内 `vite build` | Web 前端产物，Docker 部署直接用它 |
-| `dsh-aischat/dist` | `node dsh-aischat/scripts/sync-dist.mjs` | 与 `frontend/dist` 逐字节镜像，**排除** `docs/assets`（README 配图不进包） |
-| `dsh-aischat/lib/*.js`、`lib/manifest.json` | `node dsh-aischat/scripts/build.mjs` | 插件宿主/客户端产物 + 内容寻址清单，自更新按清单校验完整性 |
+| `dsh-copree/dist` | `node dsh-copree/scripts/sync-dist.mjs` | 与 `frontend/dist` 逐字节镜像，**排除** `docs/assets`（README 配图不进包） |
+| `dsh-copree/lib/*.js`、`lib/manifest.json` | `node dsh-copree/scripts/build.mjs` | 插件宿主/客户端产物 + 内容寻址清单，自更新按清单校验完整性 |
 
 ```bash
 # 改了前端源码、要让 DSH 插件面板同步生效
 docker exec -w /app ai_group_frontend sh -c "BASE_URL=/aischat-ui/ node_modules/.bin/vite build"
-node dsh-aischat/scripts/sync-dist.mjs
-node dsh-aischat/scripts/build.mjs
+node dsh-copree/scripts/sync-dist.mjs
+node dsh-copree/scripts/build.mjs
 ```
 
 > **改了后端 Python 记得重启容器**：`docker restart ai_group_backend`。
@@ -1137,8 +1137,8 @@ node dsh-aischat/scripts/build.mjs
 shows up in the UI instead of an error — `npm run i18n:check` is the guard for that.
 Keys inside a namespace are bare (`save`, not `configGroup.save`); the backend
 `CONFIG_GROUPS` schema uses the same bare names. Build artifacts:
-`frontend/dist` (web) → `dsh-aischat/dist` (plugin mirror, excluding `docs/assets`) →
-`dsh-aischat/lib` + `lib/manifest.json` (content-addressed, powers plugin self-update).
+`frontend/dist` (web) → `dsh-copree/dist` (plugin mirror, excluding `docs/assets`) →
+`dsh-copree/lib` + `lib/manifest.json` (content-addressed, powers plugin self-update).
 
 ---
 
@@ -1383,7 +1383,7 @@ REGISTRY_REPO=Coprexist/AIsChat
 ```bash
 # 1. 克隆仓库
 git clone https://github.com/Coprexist/AIsChat.git
-cd AIsChat
+cd Copree
 
 # 2. 配置环境变量
 cp .env.example .env

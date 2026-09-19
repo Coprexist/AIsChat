@@ -1,13 +1,13 @@
 /**
- * AIsChat 嵌入桥（Embed Bridge）
+ * Copree 嵌入桥（Embed Bridge）
  *
- * 当 AIsChat 以 `?embed=1` 被宿主（如 DeepSeek Harness / DSH）嵌入时，
+ * 当 Copree 以 `?embed=1` 被宿主（如 DeepSeek Harness / DSH）嵌入时，
  * 通过 postMessage 与宿主页面通信：
  *
- *   AIsChat → 宿主（source: 'aischat-embed'）
+ *   Copree → 宿主（source: 'aischat-embed'）
  *     - { type: 'ready',   loggedIn }      页面加载完成（含登录态）
  *     - { type: 'contacts', loggedIn, groups, dmSessions }  联系人列表（复用现有 API）
- *   AIsChat ← 宿主（source: 'ds-aischat'）
+ *   Copree ← 宿主（source: 'ds-aischat'）
  *     - { type: 'navigate', path }         导航到站内路径（如 /chat/gm/3）
  *     - { type: 'refresh' }                重新上报联系人列表
  *
@@ -16,7 +16,7 @@
  */
 import { api } from '../api/client'
 
-/** AIsChat 发出的消息标识 */
+/** Copree 发出的消息标识 */
 export const EMBED_SOURCE = 'aischat-embed'
 /** 宿主（DSH）发来的消息标识 */
 export const HOST_SOURCE = 'ds-aischat'

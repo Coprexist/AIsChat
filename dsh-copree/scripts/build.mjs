@@ -17,14 +17,14 @@ import { fileURLToPath } from 'node:url'
 const __dirname = dirname(fileURLToPath(import.meta.url))
 const root = join(__dirname, '..')
 
-const ID = 'dsh-aischat'
+const ID = 'dsh-copree'
 const HOST_EXTERNALS = ['@deepseek-ai/schemastery', '@deepseek-ai/dsh-settings']
 // Client externals stay external at bundle time and resolve through the web
 // ModuleLoader at runtime (same mechanism the shipped ui-* bundles use).
 const CLIENT_EXTERNALS = [
   'react',
   'react/jsx-runtime',
-  // Reuse the shipped Markdown/KaTeX renderer so AIsChat messages render
+  // Reuse the shipped Markdown/KaTeX renderer so Copree messages render
   // exactly like DSH conversation text (GFM + LaTeX + safe-HTML filtering).
   '@deepseek-ai/dsh-client-ui-primitives',
 ]
@@ -112,7 +112,7 @@ try {
 } catch { /* 后端未运行时不阻塞构建，清单里留 null */ }
 
 const manifest = {
-  name: 'dsh-aischat',
+  name: 'dsh-copree',
   version: JSON.parse(readFileSync(join(root, 'package.json'), 'utf8')).version,
   buildStamp: new Date().toISOString(),
   backendVersion,

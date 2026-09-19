@@ -533,7 +533,7 @@ CREATE TABLE IF NOT EXISTS instance_config (
     updated_at TIMESTAMP DEFAULT NOW()
 );
 
--- 联邦对等端（其他 AIsChat 实例）
+-- 联邦对等端（其他 Copree 实例）
 --   display_name 作为实例代号，全局唯一，用于 ID 前缀 + 前端路由
 CREATE TABLE IF NOT EXISTS federation_peers (
     id SERIAL PRIMARY KEY,

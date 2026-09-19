@@ -14,12 +14,12 @@ import 'katex/dist/katex.min.css'
 // 与 katex 一起走 vite 预构建（optimizeDeps.include）保证单实例
 import 'katex/dist/contrib/mhchem.mjs'
 
-const isDemo = window.location.pathname.includes('/AIsChat/') || window.location.hostname === 'coprexist.github.io'
+const isDemo = window.location.pathname.includes('/Copree/') || window.location.hostname === 'coprexist.github.io'
 
 if (isDemo) {
   setupDemo()
-  // 演示模式：BrowserRouter 带 basename，匹配 /AIsChat/ 路径
-  const base = window.location.pathname.startsWith('/AIsChat') ? '/AIsChat' : '/'
+  // 演示模式：BrowserRouter 带 basename，匹配 /Copree/ 路径
+  const base = window.location.pathname.startsWith('/Copree') ? '/Copree' : '/'
   const demoRouter = createDemoRouter(base)
   ReactDOM.createRoot(document.getElementById('root')!).render(
     <React.StrictMode>

@@ -5,7 +5,7 @@
  * 文件带 sha256，对清单规范化序列化后取摘要即为该次构建的身份——与用 digest
  * 定位镜像同一思路：内容变了身份就变，不需要谁去记得 bump 版本号。
  *
- * 更新源来自安装溯源：profile 的 package.json 里 dependencies['dsh-aischat']
+ * 更新源来自安装溯源：profile 的 package.json 里 dependencies['dsh-copree']
  * 的 file: 规格（pnpm/npm 记录的就是它），因此默认零配置。显式配置可覆盖。
  *
  * 边界：host 半（lib/index.js）正被 dsh-web 进程加载，覆盖文件不会让它热替换。
@@ -31,7 +31,7 @@ export interface PluginManifest {
 
 export type ApplyMode = 'hot' | 'restart'
 
-export const PLUGIN_NAME = 'dsh-aischat'
+export const PLUGIN_NAME = 'dsh-copree'
 export const MANIFEST_REL = 'lib/manifest.json'
 export const PLUGIN_PREFIX = '/aischat-plugin'
 

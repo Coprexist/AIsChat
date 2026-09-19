@@ -1,4 +1,4 @@
-# AIsChat 测试策略文档 / Testing Strategy
+# Copree 测试策略文档 / Testing Strategy
 
 > **面向开发者和质量保证人员。** 多层次测试策略、测试规范和质量标准。
 > **For developers and QA.** Multi-level testing strategy, test standards, and quality criteria.

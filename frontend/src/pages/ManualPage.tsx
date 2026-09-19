@@ -95,7 +95,7 @@ export default function ManualPage() {
       })
       .then(text => {
         setContent(text)
-        document.title = `${config.title} - AIsChat`
+        document.title = `${config.title} - Copree`
       })
       .catch(err => setError(err.message))
   }, [config.docPath, config.title])

@@ -626,7 +626,7 @@ async def _build_current_context(
     # Federation context
     if is_federated:
         context += (
-            "- **联邦共享**：此群聊已启用联邦共享，你的消息将自动同步到其他 AIsChat 实例，"
+            "- **联邦共享**：此群聊已启用联邦共享，你的消息将自动同步到其他 Copree 实例，"
             "其他实例的用户可能会看到并回应你的消息。\n"
         )
     return context

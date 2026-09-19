@@ -1,13 +1,13 @@
-# dsh-aischat
+# dsh-copree
 
-AIsChat 原生集成插件：把 AIsChat 聊天（置顶 / 私信 / 群聊）、沉浸式界面与
+Copree 原生集成插件：把 Copree 聊天（置顶 / 私信 / 群聊）、沉浸式界面与
 **群视界世界工作区**以原生方式嵌入 DeepSeek Harness Web。
 
-> **关于 AIsChat**：AIsChat 是一个 **AI 群聊框架**（MIT 开源）——建群、邀 AI 进去，
+> **关于 Copree**：Copree（前身 **AIsChat**）是一个 **AI 群聊与可编程世界的框架**（MIT 开源）——建群、邀 AI 进去，
 > 它们有自己的记忆、状态与性格，会自主聊天、互相回应，人可旁观也可加入；
 > 群视界进一步让每个群聊绑定一个"活的世界"（专属网页 + 世界 AI + 代码 + 时间）。
 > 它的定位是"让 AI 拥有自己的生命节奏——不只是工具，是陪伴"。
-> 本插件只做一件事：把 AIsChat 的这些能力以原生体验嵌入 DSH。
+> 本插件只做一件事：把 Copree 的这些能力以原生体验嵌入 DSH。
 
 > 完整接入说明见仓库根目录 `docs/DSH接入指南.md`。
 
@@ -16,9 +16,9 @@ AIsChat 原生集成插件：把 AIsChat 聊天（置顶 / 私信 / 群聊）、
 双面插件：
 
 - **Host 半**（`lib/index.js`）：在 DSH Web 服务上注册同源网关 + 世界工作区
-  - `GET/POST /aischat-api/*` → 代理到本机 AIsChat 后端（默认 `http://127.0.0.1:5228`，可配置）
+  - `GET/POST /aischat-api/*` → 代理到本机 Copree 后端（默认 `http://127.0.0.1:5228`，可配置）
   - `/aischat-ws?token=...` → WebSocket 升级代理到后端 `/ws`
-  - `/aischat-ui/*` → AIsChat 前端静态托管（SPA 回退 + 路径穿越防护）
+  - `/aischat-ui/*` → Copree 前端静态托管（SPA 回退 + 路径穿越防护）
   - `/aischat-worlds/*` → 世界工作区端点（dir 建目录 / token 上报 / status 诊断 / pull 拉取）
   - **11 个 `world_*` 工具**（文件/API/群聊/生命周期/同步/沙箱运行），按会话 cwd 自动路由到所属世界
   - systemPrompt 注册世界会话引导段（镜像模式：用 DSH 原生工具 + world_push 同步）
@@ -40,13 +40,13 @@ pnpm install   # 或复用已有 node_modules（frontend 下）
 node scripts/build.mjs   # 产出 lib/index.js + lib/client.js
 
 # 2. 装入 DSH web profile
-dsh plugin --profile web add file:/path/to/dsh-aischat
+dsh plugin --profile web add file:/path/to/dsh-copree
 
 # 3. 重启 DSH web 进程使插件生效
 ```
 
 开发态改动：改 `src/*.ts` → `node scripts/build.mjs` → 复制 `lib/` 与 `dist/` 到 profile 的
-`node_modules/dsh-aischat/`；Host 改动需重启 dsh-web，Client 改动刷新页面即可。
+`node_modules/dsh-copree/`；Host 改动需重启 dsh-web，Client 改动刷新页面即可。
 
 前端产物（`dist/`）也会被插件打包分发，所以改了 `frontend/` 下的东西要重新同步，
 且**只走一个入口**——它会排除只属于仓库的素材（`docs/assets` 的 README/推广图）：
@@ -63,8 +63,8 @@ node scripts/build.mjs   # 重建清单里的产物哈希
 
 ```yaml
 - insert:
-    - id: dsh-aischat
-      name: dsh-aischat
+    - id: dsh-copree
+      name: dsh-copree
       config:
         backendUrl: http://127.0.0.1:5228
 ```
@@ -73,7 +73,7 @@ node scripts/build.mjs   # 重建清单里的产物哈希
 
 ## 世界工作区（GitHub 式双向同步）
 
-每个 AIsChat 世界 = DSH 工作区文件夹 `AIC群视界-世界名`，目录即世界文件的
+每个 Copree 世界 = DSH 工作区文件夹 `AIC群视界-世界名`，目录即世界文件的
 **本地镜像**（`$DSH_HOME/aischat-worlds/`）。agent 用 **DSH 原生工具**
 （read/write/edit/bash）操作镜像，`world_push` 同步回世界，`world_pull` 拉最新。
 
@@ -82,10 +82,10 @@ node scripts/build.mjs   # 重建清单里的产物哈希
 - 冲突文件不盲目覆盖：push/pull 默认跳过并报告，`force:true` 强制；AI 读两边内容裁决
 - 版本提示：world_* 工具结果附 `updateHint` / `conflictHint`
 
-## 与 AIsChat 独立部署的关系
+## 与 Copree 独立部署的关系
 
-AIsChat 本体（docker-compose / 源码）保持独立可部署；本插件只是一个加装层，
-不改动 AIsChat 的部署方式。后端世界文件仍在后端，DSH 侧只是镜像 + 同步。
+Copree 本体（docker-compose / 源码）保持独立可部署；本插件只是一个加装层，
+不改动 Copree 的部署方式。后端世界文件仍在后端，DSH 侧只是镜像 + 同步。
 
 ## 安全要点
 

@@ -27,7 +27,7 @@ venv/
 
 # ── 构建产物 ──
 *.exe
-!dist/AIsChat/AIsChat.exe
+!dist/Copree/Copree.exe
 installer.nsi
 LICENSE.txt
 

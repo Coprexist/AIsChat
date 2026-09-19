@@ -4,7 +4,7 @@ SQLite 存储后端（免数据库服务，适合本地开发 / exe 打包）
 策略：
   - 引擎：sqlite+aiosqlite（SQLAlchemy 原生支持，模型层零改动）
   - 向量列：JSON 文本存储（TypeDecorator 封装，读写为 list[float]）
-  - 向量检索：P0 阶段降级为文本检索（复用 AIsChat 现有降级逻辑）；
+  - 向量检索：P0 阶段降级为文本检索（复用 Copree 现有降级逻辑）；
     P1 阶段可接入 sqlite-vec 扩展做真向量检索（接口已预留）
 """
 

@@ -50,7 +50,7 @@ const work = mkdtempSync(join(tmpdir(), 'aischat-plugin-update-'))
 try {
   // 按 pnpm 的真实布局摆放，让来源分类读到 <profile>/package.json
   const profile = join(work, 'profile')
-  const install = join(profile, 'node_modules', 'dsh-aischat')
+  const install = join(profile, 'node_modules', 'dsh-copree')
   const source = join(work, 'source')
   copyArtifacts(REPO, install, base)
   copyArtifacts(REPO, source, base)
@@ -115,28 +115,28 @@ try {
     'utf8',
   )
 
-  setSpec({ 'dsh-aischat': '^1.2.3' })
+  setSpec({ 'dsh-copree': '^1.2.3' })
   status = await computeStatus(install, BACKEND)
   assert(
     status.installKind === 'npm' && status.updateChannel === 'package-manager',
     `npm 来源且无市场 -> package-manager（kind=${status.installKind} channel=${status.updateChannel}）`,
   )
 
-  setSpec({ 'dsh-aischat': '^1.2.3', dshmarket: '^1.0.0' })
+  setSpec({ 'dsh-copree': '^1.2.3', dshmarket: '^1.0.0' })
   status = await computeStatus(install, BACKEND)
   assert(
     status.marketInstalled && status.updateChannel === 'market',
     `npm 来源且有市场 -> market（channel=${status.updateChannel}）`,
   )
 
-  setSpec({ 'dsh-aischat': 'github:owner/repo#path:/dsh-aischat' })
+  setSpec({ 'dsh-copree': 'github:owner/repo#path:/dsh-copree' })
   status = await computeStatus(install, BACKEND)
   assert(
     status.installKind === 'git' && status.updateChannel === 'package-manager',
     `git 来源 -> package-manager（kind=${status.installKind} channel=${status.updateChannel}）`,
   )
 
-  setSpec({ 'dsh-aischat': 'file:/tmp/x/dsh-aischat' })
+  setSpec({ 'dsh-copree': 'file:/tmp/x/dsh-copree' })
   status = await computeStatus(install, BACKEND)
   assert(
     status.installKind === 'local-file' && status.updateChannel === 'self',

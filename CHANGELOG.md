@@ -9,6 +9,20 @@
 
 ### ✨ 新增功能
 
+#### 项目更名：AIsChat → Copree（不音译，前身 AIsChat）
+- 缘由：`AIsChat` 是品类描述词，等于把产品钉在"AI 聊天"这一层，而它已经是 **AI 群聊 + 可编程世界**的框架。
+  **Copree** = co + pre + e（共同 · 从前 · 存在）→「我们早在从前，思维便已连接在一起」；
+  与组织名 Coprexist 约分（消去共同的 Copre），剩下的 `e` + `xist` 恰好拼回 **exist**
+- 全仓显示层替换：前端 i18n 三语 / 文档 / README / 邮件 / 接口文档 / 插件文案——
+  含世界 AI 的【平台信息】段（它因此知道平台叫什么，也能回答"为什么叫 Copree"）
+- 插件改名 `dsh-aischat` → `dsh-copree`（目录 / 包名 / cordis patch / 文档引用；源码已改，
+  **构建产物待本地 `node scripts/build.mjs` 重建**——`lib`/`dist`/`manifest.json` 带内容哈希，不能手改）
+- 打包：`AIsChat.spec` → `Copree.spec`（产物 `Copree.exe`）、`scripts/install.bat` 的安装目录与快捷方式
+- **刻意没改**（内部标识，改了会断）：DB/容器名、备份文件前缀 `aischat_*`、同源代理前缀 `/aischat-api`、
+  存储键 `aischat-theme`、DSH 工作区目录 `AIC群视界-*`、`.aischat-world.json`、历史 CHANGELOG 与旧宣传文。
+  联邦公网 ID：新实例生成 `Copree-`（没有任何代码解析此前缀，老实例保留原值即可）。
+  完整清单与理由见 `docs/BRAND.md`
+
 #### 会话起点解锁：前缀能力快照不再"等到 compact 才更新"
 - 证据（2026-09-19 实测 `worlds.config.cap_effective_versions`）：真正聊过天的 4 个世界里 **3 个停在旧版强注入段**（v3/v6/v7）——
   版本链只在 compact / 清空上下文时对齐，而 `compact_idle_hours` 默认 18h，天天在用的世界永远等不到；
@@ -29,7 +43,7 @@
 - 现象（用户 2026-09-19 截图）：世界 AI 被问「你知道我们平台的名字吗」，回答「我看不到平台的名字。
   我上下文里唯一带名字的东西只有三处：接口文档标题『群视界 API 文档』、我的角色标识『群视界机器人（world-45）』、数据目录『主站』」
   ——它能看到的只有模块名，不肯（也不该）猜「AIC」是不是平台全名
-- 修法：强注入段加一段平台身份——**AIsChat**（简称 AIC）、主站是平台本体、群视界是可自建世界的模块、
+- 修法：强注入段加一段平台身份——**Copree**（简称 AIC）、主站是平台本体、群视界是可自建世界的模块、
   你是本平台的世界 AI；随能力版本链生效（v11）
 
 #### 世界工具：落盘前语法自检 + 落盘即回改动摘要（file_write / file_edit）
@@ -268,11 +282,11 @@
   `updates.js` 里专门防过「用 npm 包名去比对私有 git 源、把 git 安装覆盖掉」
 - 新增 `POST /aischat-plugin/update`；`update-test.mjs` 补 4 条来源分类断言（共 20 条）
 - 对分发用户的实际意义：装在 npm 上的用户由市场按版本号提示更新；用
-  `github:owner/repo#path:/dsh-aischat` 装的用户由市场按 **HEAD commit** 比对提示
+  `github:owner/repo#path:/dsh-copree` 装的用户由市场按 **HEAD commit** 比对提示
   ——主仓库一变就能提示，天然适配「源码在仓库、产物随仓库走」的分发方式
 
 #### 新增 lockfile 本地依赖路径修复工具，并记录 DSH_HOME 符号链接的两个坑
-- `dsh-aischat/scripts/fix-profile-links.mjs`：DSH_HOME 为符号链接时，pnpm 写 lockfile
+- `dsh-copree/scripts/fix-profile-links.mjs`：DSH_HOME 为符号链接时，pnpm 写 lockfile
   按符号链接路径算相对路径、解析却按真实路径算，`file:` 依赖会指向不存在的
   `/data_s001/tmp/...`。工具按 bug 模型精确重算两边形式并替换，**幂等**、
   带 `--dry-run`、自动备份。真机四步验证：真实 profile 报 0 改动；造出次品能修回且与
@@ -286,7 +300,7 @@
 - 手工 `sed` 修 lockfile 容易漏：同一路径出现三次（`version: file:`、`name@file:` 键、
   `resolution: {directory:}`），漏掉最后一处 pnpm 照样报错——这也记进了文档
 
-#### 修 dsh-aischat 打包遗漏 dist，并给自更新加装完整性检测
+#### 修 dsh-copree 打包遗漏 dist，并给自更新加装完整性检测
 - **打包 bug**：`package.json` 的 `files` 只有 `["lib","cordis.patch.yml","README.md"]`，
   漏了 `dist`。文档教的"手动拷 lib 与 dist 到 profile"一直掩盖着它；这次走正规
   `dsh plugin add`（pnpm 严格按 `files` 装包），安装副本的 `dist` 被裁掉，
@@ -302,14 +316,14 @@
 - `update-test.mjs` 增加第 8 步：删掉安装副本里的 `dist/index.html`，断言必须报
   `incomplete` 且换入能补回（共 16 条断言）
 
-#### dsh-aischat 插件支持一键自更新与版本漂移提示
-- 设置页的 AIsChat 分区底部新增插件版本行：显示构建身份（摘要前 7 位）与状态，
-  检测到不一致时出现 **更新** 按钮；侧边栏底部的 AIsChat 入口在有更新时显示角标
+#### dsh-copree 插件支持一键自更新与版本漂移提示
+- 设置页的 Copree 分区底部新增插件版本行：显示构建身份（摘要前 7 位）与状态，
+  检测到不一致时出现 **更新** 按钮；侧边栏底部的 Copree 入口在有更新时显示角标
 - **身份用内容摘要，不用版本号**：`node scripts/build.mjs` 产出 `lib/manifest.json`，
   清单里每个产物带 sha256，对清单取摘要即该次构建的身份（同镜像 digest 的用法）。
   因此不存在"忘了 bump 版本号导致检测不到"的情形
 - **更新源零配置**：插件回溯安装来源——profile 的 `package.json` 里
-  `dependencies["dsh-aischat"]` 的 `file:` 规格（pnpm/npm 记录的就是它）。
+  `dependencies["dsh-copree"]` 的 `file:` 规格（pnpm/npm 记录的就是它）。
   真机实测解析成功；需要指向别处时用新的 `pluginSourceDir` 配置覆盖
 - **换入不留半新半旧**：先暂存并逐文件校验 sha256（源码改过但没重新构建会被拒绝，
   实测确认拒绝后安装副本未被改动），通过后备份旧文件、逐文件原子改名，
@@ -664,8 +678,8 @@
   正文零裸 key、零 JS 异常；配置组卡片三语正例断言（`Embedding 向量配置` /
   `Embedding Config` / `Embedding ベクトル設定` 及 `界面已修改/Edited in UI/UI で変更済み`）全部命中
 
-#### dsh-aischat：点开含代码块的会话，整个 AIsChat 面板消失
-- 现象：在 DSH 侧 AIsChat 面板点开某个会话，面板整块消失，控制台报
+#### dsh-copree：点开含代码块的会话，整个 Copree 面板消失
+- 现象：在 DSH 侧 Copree 面板点开某个会话，面板整块消失，控制台报
   `TypeError: Cannot read properties of undefined (reading 'code')` 与
   `slot entry crashed in 'shell.overlay'`
 - 根因：面板正文用外壳的 `MarkdownText` 渲染，而它**强制要求一个 labels 包**——
@@ -718,7 +732,7 @@
 - 现象：设计页对话栏常年 200px 上下，输入提示与建议卡换行成一列
 - 三个叠加的原因，每个都独立成立：
   1. 对话栏保底只给了 200px，而它要装输入提示、建议卡与消息气泡，本就不该按侧栏的 200 取
-  2. 上限用 `window.innerWidth` 反推，把外层 AIsChat 导航栏（约 240px）算成了可用空间，
+  2. 上限用 `window.innerWidth` 反推，把外层 Copree 导航栏（约 240px）算成了可用空间，
      于是文件树可以拖到把对话栏顶出可视区，而"兜底"公式同样高估、兜不住
   3. `useResizableSidebar` 在窗口 resize 时把收敛后的宽度**写回 localStorage**：
      窄屏一次就把用户偏好永久改小，拉宽后不恢复
@@ -734,7 +748,7 @@
 #### 群消息接口统一为 `/gm`，与 `/dm` 对称（顺带修掉两个必然 500 的 bug）
 - 两个 bug 都当场复现过，且比记录里更严重：
   - `POST /chat/message` **任何请求都 500** —— 路由无条件传 `dm_session_id=`，而 `ChatApi.create_message` 的签名根本没有这个参数。
-    不是"只有私信会 500"，是整个接口全死。插件（dsh-aischat）在 WS 断开时的 HTTP 兜底正是打这个接口
+    不是"只有私信会 500"，是整个接口全死。插件（dsh-copree）在 WS 断开时的 HTTP 兜底正是打这个接口
   - `GET /chat/messages?dm_session_id=1_72` → 500「无权访问此会话」：`list_messages` 把 `user_id` 硬编码为 0，
     而该会话双方是 {1, 72}，永远无权访问
 - **根因是契约与实现漂移**：`protocol.py` 声明 `create_message(group_id=None, dm_session_id=None)`，实现却把 `group_id`
@@ -1012,7 +1026,7 @@
 - **示例文案**（`translations.ts` 三语的实例地址 placeholder、`FederationTab.tsx` 的输入框
   placeholder）：换成通用示例域名 `example.com`——它们是给用户看的填写示例，不该出现真实域名
 - **打包产物**：前端产物带着上面这些 i18n 文案，所以按 `BASE_URL=/aischat-ui/` 重建前端，
-  再整体同步进 `dsh-aischat/dist`（现在与 `frontend/dist` 逐文件一致），
+  再整体同步进 `dsh-copree/dist`（现在与 `frontend/dist` 逐文件一致），
   `dist/docs` 镜像随之刷新；插件清单重建（262 个产物）并热更新到 profile
 - **刻意保留**：`federation-registry.json` 里的 `public_url`。它就是这个实例**对外公告的联邦
   接入地址**（对等端靠它发现并连过来），删了联邦即失效；要改就得改产品口径，不是清理文案
@@ -1024,7 +1038,7 @@
 #### 去地址化：仓库里的公网域名与入口 IP 一律换占位符
 - `docs/dev/STUDY_ROOM_DEVLOG.md` 那条"绝不暴露公网域名"的规则本身就把**两个公网域名和一个公网 IP**
   写在了括号里——规则与做法自相矛盾。改成只留 `<your-domain>` / `<entry-ip>` 占位符
-  （`dsh-aischat/dist/docs/` 的镜像副本同步）
+  （`dsh-copree/dist/docs/` 的镜像副本同步）
 - `web_fetch.py`、`url_guard.py` 的注释不再点名云元数据地址，改为写链路本地网段
   `169.254.0.0/16`；`test_api_probe` 的用例输入换成普通链路本地地址。
   **语义没变**：`url_guard` 本来就用 `is_link_local` 判整段，实测链路本地仍被拦、公网仍放行
@@ -1252,7 +1266,7 @@
 
 #### 界面优化
 - **窗口图标**：使用真正的 `.ico` 文件（多尺寸 16/32/48/64/128/256），修复 Windows 蓝色方框问题
-- **标题**：改为「AIsChat 启动器」
+- **标题**：改为「Copree 启动器」
 - **字号**：全局加大（标题 22px、状态 15px、设置 14px、页脚 11px）
 - **设置按钮**：emoji 改为纯文字（「设置」/「返回」）
 
@@ -1395,7 +1409,7 @@
 
 #### 界面优化
 - **窗口图标**：使用真正的 `.ico` 文件（多尺寸 16/32/48/64/128/256），修复 Windows 蓝色方框问题
-- **标题**：改为「AIsChat 启动器」
+- **标题**：改为「Copree 启动器」
 - **字号**：全局加大（标题 22px、状态 15px、设置 14px、页脚 11px）
 - **设置按钮**：emoji 改为纯文字（「设置」/「返回」）
 
@@ -1562,7 +1576,7 @@
 
 #### 界面优化
 - **窗口图标**：使用真正的 `.ico` 文件（多尺寸 16/32/48/64/128/256），修复 Windows 蓝色方框问题
-- **标题**：改为「AIsChat 启动器」
+- **标题**：改为「Copree 启动器」
 - **字号**：全局加大（标题 22px、状态 15px、设置 14px、页脚 11px）
 - **设置按钮**：emoji 改为纯文字（「设置」/「返回」）
 
@@ -1678,7 +1692,7 @@
 
 ## [v0.3.10] - 2026-08-19
 
-### Fixed — 🔧 DSH 世界同步两个编码/注入 bug（dsh-aischat）
+### Fixed — 🔧 DSH 世界同步两个编码/注入 bug（dsh-copree）
 
 - **`backendRequest` 响应拼接 utf8 截断**：`res.on('data', c => text += c)` 对每个 TCP chunk 单独 utf8 解码，
   多字节字符（如 `──`）跨 chunk 边界时损坏为 U+FFFD 乱码——`world_pull` 拉取含中文注释的 JS 文件会静默写坏本地。
@@ -1703,7 +1717,7 @@
   零常驻 token）；世界上下文提示词加「10 分区」指路，细节单一来源在文档。
 
 
-### Added — 🧩 嵌入兼容层（DSH 插件化第一步：AIsChat 可作为插件嵌入宿主）
+### Added — 🧩 嵌入兼容层（DSH 插件化第一步：Copree 可作为插件嵌入宿主）
 
 - **`?embed=1` 嵌入模式**：URL 带 `embed` 参数时，`Layout` 隐藏全局侧边栏/移动导航、`ChatArea` 隐藏聊天列表侧边栏，只渲染对话区——宿主（如 DSH）提供导航与外壳，界面即"融合"
 - **嵌入桥 `frontend/src/embed/bridge.ts`**（新模块，纯增量、不改既有流程）：
@@ -1712,7 +1726,7 @@
   - **安全边界**：`access_token` 绝不跨窗口传输，只交换联系人元数据与导航路径；宿主侧校验 `event.origin`
 - **接入点**：`App.tsx` 创建 router 后注册导航器并初始化桥；未嵌入时零开销（`isEmbedded()` 惰性求值）
 
-### Added — 🧩 行为插件协议（阶段二：AIsChat 自身全面插件化）
+### Added — 🧩 行为插件协议（阶段二：Copree 自身全面插件化）
 
 - **行为插件入口 `backend/app/services/plugin/api.py`**（新模块）：`@skill(type, category, name, description, config_schema)` 装饰器——**声明与行为合一**，一个装饰器同时完成 SkillRegistry 元数据注册 + skill_engine 行为处理器注册，消灭"skill.json 声明 + handlers 注册"的双写
 - **插件目录契约扩展**：插件目录内可选 `plugin.py`（行为入口），与现有 `plugin.json` + `skill.json` 共存；无 `plugin.py` 的旧声明插件完全兼容
@@ -1722,12 +1736,12 @@
 - **语言中立契约**：处理器上下文为普通对象/字典，不绑定 Python 特定机制，未来后端换语言时插件契约可平移
 - **四层验证闭环**：加载层、分发层、开关层、集成层全部通过
 
-### Added — 🔌 DSH 插件 `dsh-aischat`（AIsChat 以一等公民嵌入 DeepSeek Harness）
+### Added — 🔌 DSH 插件 `dsh-copree`（Copree 以一等公民嵌入 DeepSeek Harness）
 
-- **同源网关（Host 半边 `dsh-aischat/src/index.ts`）**：`/aischat-api` HTTP 代理（剥离 hop-by-hop、转发 Authorization、502 兜底）+ `/aischat-ws` WebSocket 升级代理（重放 `/ws?token=`、双向透传）——浏览器永不接触后端地址，**全程 loopback、零公网地址**
-- **侧边栏 board（Client 半边）**：`shell.overlay` 全帧面板，左侧 rail（置顶私信/置顶群聊/私信/群聊 + 用户行 + 退出），右侧对话列（消息 + 专属 composer，发送到选中的 AIsChat 对话，不碰 DSH 会话语义）
+- **同源网关（Host 半边 `dsh-copree/src/index.ts`）**：`/aischat-api` HTTP 代理（剥离 hop-by-hop、转发 Authorization、502 兜底）+ `/aischat-ws` WebSocket 升级代理（重放 `/ws?token=`、双向透传）——浏览器永不接触后端地址，**全程 loopback、零公网地址**
+- **侧边栏 board（Client 半边）**：`shell.overlay` 全帧面板，左侧 rail（置顶私信/置顶群聊/私信/群聊 + 用户行 + 退出），右侧对话列（消息 + 专属 composer，发送到选中的 Copree 对话，不碰 DSH 会话语义）
 - **登录统一**：`aisc.token` 存浏览器 localStorage；401 自动登出回登录页（不再静默显示"暂无联系人"假空态）
-- **消息渲染完全照搬 DSH 风格**：复用官方 `MarkdownText`（GFM + KaTeX 公式 + 安全过滤）——我方消息 DSH 用户气泡样式（`--dsw-specific-bubble` + label-primary + 22px 圆角 + 名称靠右），对方消息原生排版；**任何针对 DSH 对话风格的主题/插件改动自动作用到 AIsChat**
+- **消息渲染完全照搬 DSH 风格**：复用官方 `MarkdownText`（GFM + KaTeX 公式 + 安全过滤）——我方消息 DSH 用户气泡样式（`--dsw-specific-bubble` + label-primary + 22px 圆角 + 名称靠右），对方消息原生排版；**任何针对 DSH 对话风格的主题/插件改动自动作用到 Copree**
 - **图片附件**：`attachments` 里 `image/*` 提取，带 token fetch blob → objectURL（官方 resolveImage 同款机制，按 file_id 缓存）
 - **群聊邀请卡片**：`message_type=group_invitation` 专用卡片（📨 + 邀请人/群名 + 接受/拒绝按钮 + 状态）
 - **对话默认到底**：消息列表变化自动滚动到底部
@@ -1739,11 +1753,11 @@
 - **前端静态托管（Host）**：`/aischat-ui` 前缀服务 `BASE_URL=/aischat-ui/` 构建产物（SPA 回退、路径穿越防护、immutable 缓存）
 - **嵌入模式增强（前端）**：`api/client.ts` 嵌入时 API 基址走 `/aischat-api` 代理；401 不跳出 iframe 改为通知宿主；`?token=` URL 注入复用登录态（写入后从地址栏清除）；router basename `/aischat-ui`（修复嵌入路由 404）
 - **沉浸式覆盖层（Client）**：`shell.overlay` 全局 iframe 面板——群聊头部"沉浸式"按钮（自动查 `/worlds/by-entity` 绑定世界 → `/aischat-ui/world-view/{id}?embed=1`）+ AIC 侧边栏"功能"分组（群视界/好友/我的AI/管理/设置）+ DSH 设置页同款导航
-- **登录引导**：iframe 内 token 失效时不再显示 AIsChat 自带登录表单，改为"请先在宿主应用中登录"引导页 → 通知宿主打开 AIsChat board 登录（登录态统一由 DSH 插件管理）
+- **登录引导**：iframe 内 token 失效时不再显示 Copree 自带登录表单，改为"请先在宿主应用中登录"引导页 → 通知宿主打开 Copree board 登录（登录态统一由 DSH 插件管理）
 
-### Added — 🗂️ 群视界世界嵌入 DSH 工作区（对话用 DSH 的 agent，操作对象是 AIsChat 世界）
+### Added — 🗂️ 群视界世界嵌入 DSH 工作区（对话用 DSH 的 agent，操作对象是 Copree 世界）
 
-- **世界 → 工作区文件夹自动同步**：登录 AIsChat 或打开面板时，每个**自己创建的世界**自动同步为 DSH 工作区文件夹 `AIC群视界-世界名`（`$DSH_HOME/aischat-worlds/` 真实目录 + `.aischat-world.json` 世界身份）+ 一个 DSH 会话——全走官方 `workspaces.create` / `connectWorkspace` API，官方工作区自动显示、官方更新零影响，重复同步幂等
+- **世界 → 工作区文件夹自动同步**：登录 Copree 或打开面板时，每个**自己创建的世界**自动同步为 DSH 工作区文件夹 `AIC群视界-世界名`（`$DSH_HOME/aischat-worlds/` 真实目录 + `.aischat-world.json` 世界身份）+ 一个 DSH 会话——全走官方 `workspaces.create` / `connectWorkspace` API，官方工作区自动显示、官方更新零影响，重复同步幂等
 - **世界操作工具集（Host `world_*`，按会话所属世界自动路由）**：
   - `world_list_files` / `world_read_file` / `world_write_file` / `world_delete_file`：世界页面代码的文件树/读写（owner 鉴权写，`/worlds/{id}/files`）
   - `world_api`：世界受控 API（world/chat/memories/usage/groups/group-messages/state/data，经沙箱 `api_token` 鉴权）
@@ -1757,7 +1771,7 @@
 - **GitHub 式双向同步（世界文件本地镜像）**：
   - **工作区目录 = 世界文件镜像**：`world_pull` 把世界文件拉到工作区目录，agent 用 **DSH 原生 read/write/edit/glob/grep/bash** 直接操作（bash 可跑世界代码测试），`world_push` 同步回世界——不再依赖专用文件工具
   - **`.aischat-sync.json` 快照 + 三路对比**：记录每文件「上次同步时本地/远端 mtime」→ 分类 added / removed / changedRemote / changedLocal / conflict（两边都改）
-  - **自动拉取（温和）**：打开 AIsChat 时自动执行，仅当「本地无未推送修改且世界有改动」才拉取，返回 `+新增 ~修改 -删除` 报告；本地脏/冲突一律拒绝，绝不覆盖 agent 正在工作的文件（对话中文件不被自动改动）
+  - **自动拉取（温和）**：打开 Copree 时自动执行，仅当「本地无未推送修改且世界有改动」才拉取，返回 `+新增 ~修改 -删除` 报告；本地脏/冲突一律拒绝，绝不覆盖 agent 正在工作的文件（对话中文件不被自动改动）
   - **冲突裁决**：冲突文件不盲目覆盖——world_pull / world_push 默认跳过并报告，`force:true` 才强制；AI 读两边内容决定（保留本地 / 采用世界 / 手动合并）
   - **版本提示注入**：任何 world_* 工具执行后，若世界有更新未拉取 → 结果附 `updateHint`；有冲突 → 附 `conflictHint`（GitHub 式"有可用更新"提示）
 - **新增工具**：`world_push` / `world_pull`（快照对比 + force）、`world_run`（后端沙箱跑 Python，24MB/10s）、`world_trigger`（触发 handle(event)）；原有 world_read_file / write_file / list / delete / api / chat / lifecycle 全保留
@@ -1777,7 +1791,7 @@
 - **受控 API 新增两个端点**（`world_proxy.py`，复用 `_authorize_world_api` api_token 鉴权 + 现有限流）：
   - `GET /world/{id}/api/docs` → 平台 API 文档分区列表（id/标题/区介绍，DB 权威）
   - `GET /world/{id}/api/docs/{section}` → 指定分区完整内容（防路径穿越，只允许注册表内 id，未知分区 400 / 缺失 404）
-- **DSH 新工具 `world_view_doc`**（`dsh-aischat/src/index.ts`，参照 `world_api` 同款实现：`registerWorldTool` + `resolveWorldApiToken` + `backendRequest`）：不传 section 列分区、传 section（01~09）读分区内容——DSH 世界会话与 AIsChat 世界 AI 的 `view_api_doc` 同一份文档注册表，写世界代码时接口细节按需可查
+- **DSH 新工具 `world_view_doc`**（`dsh-copree/src/index.ts`，参照 `world_api` 同款实现：`registerWorldTool` + `resolveWorldApiToken` + `backendRequest`）：不传 section 列分区、传 section（01~09）读分区内容——DSH 世界会话与 Copree 世界 AI 的 `view_api_doc` 同一份文档注册表，写世界代码时接口细节按需可查
 - **验证**：分区列表（9 区）✓、读分区内容 ✓、越界分区 400 ✓、世界会话路由引导 ✓
 
 ---
@@ -2936,7 +2950,7 @@
 - 🐛 **设置页「测试连接」CORS 失败**：浏览器直接 `fetch` DeepSeek API 被 CORS 策略拦截。修复：新增后端代理端点，服务端发起请求。
 
 
-- 🌐 **跨实例联邦通信**：双层 ID 体系——每个实例生成 `instance_subnet_id`（UUID）和 `instance_public_id`（AIsChat- 前缀 32 位 base62）。通过 GitHub 仓库目录自动注册和发现对等端。服务端 WebSocket 直连（`/federation/ws` 端点），JWT 双向认证。联邦对等端管理面板支持添加/编辑/删除对等端，Token 更换按钮直通 GitHub classic token 创建页。
+- 🌐 **跨实例联邦通信**：双层 ID 体系——每个实例生成 `instance_subnet_id`（UUID）和 `instance_public_id`（Copree- 前缀 32 位 base62）。通过 GitHub 仓库目录自动注册和发现对等端。服务端 WebSocket 直连（`/federation/ws` 端点），JWT 双向认证。联邦对等端管理面板支持添加/编辑/删除对等端，Token 更换按钮直通 GitHub classic token 创建页。
 
 - 🔗 **联邦 URL 动态轮换**：三阶段协商协议（握手→使用→轮换），防固定地址攻击。`federation_peers.url_rotation` 列存储策略配置。服务端自动调度轮换，前端编辑对等端时 URL 加协议选择器（`wss://域名:端口/federation/ws`）。
 

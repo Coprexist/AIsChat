@@ -16,7 +16,7 @@
 
 我来帮你梳理这个仓库的结构。先从根目录开始探索。
 
-我看到这是一个相当大的项目（AIsChat）。让我先快速查看几个关键文件来理解架构。
+我看到这是一个相当大的项目（Copree）。让我先快速查看几个关键文件来理解架构。
 
 README 已经提供了很好的概览。现在让我看看后端入口、前端入口和项目全景报告来补充细节。
 
@@ -26,7 +26,7 @@ README 已经提供了很好的概览。现在让我看看后端入口、前端�
 
 ---
 
-# AIsChat 仓库框架梳理
+# Copree 仓库框架梳理
 
 ## 一、项目定位
 
@@ -41,7 +41,7 @@ README 已经提供了很好的概览。现在让我看看后端入口、前端�
 ## 二、顶层目录结构
 
 ```
-AIsChat/
+Copree/
 ├── backend/        # FastAPI 后端
 ├── frontend/       # React 19 前端
 ├── docs/           # 架构/产品文档（中文为主）
@@ -163,7 +163,7 @@ AIsChat/
 
 ---
 
-# AIsChat 应用入口代码流程
+# Copree 应用入口代码流程
 
 ## 阶段总览
 
@@ -1201,7 +1201,7 @@ async def _require_friendship(db, user_a_id, user_b_id):
 
 好问题——这是个架构判断题。让我先看下作者自己在 _debug 里的思考，并确认几个关键耦合点的代码事实。
 
-先纠正一个误解：`_debug/core-worker-migration-plan.md` 实际上**不是 AIsChat 自己的迁移计划**——它是另一个白板项目（BoardCore/MonitorCore/Worker 那一套）的笔记。文件里满篇都是 `board.js`、`AOM`、`OffscreenCanvas`、`Tauri IPC`，跟 AIsChat 的领域完全无关。所以这个文件不能作为作者对 AIsChat 拆分的现成思考。
+先纠正一个误解：`_debug/core-worker-migration-plan.md` 实际上**不是 Copree 自己的迁移计划**——它是另一个白板项目（BoardCore/MonitorCore/Worker 那一套）的笔记。文件里满篇都是 `board.js`、`AOM`、`OffscreenCanvas`、`Tauri IPC`，跟 Copree 的领域完全无关。所以这个文件不能作为作者对 Copree 拆分的现成思考。
 
 下面我基于代码事实来回答你的架构判断题。
 
@@ -1211,7 +1211,7 @@ async def _require_friendship(db, user_a_id, user_b_id):
 
 ## 一、先看当前真实的耦合点
 
-基于我们前面读过的代码，AIsChat 当前有 7 个真实耦合点：
+基于我们前面读过的代码，Copree 当前有 7 个真实耦合点：
 
 | 耦合点 | 性质 | 拆分难度 |
 |--------|------|---------|

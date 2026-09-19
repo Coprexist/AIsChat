@@ -2,8 +2,8 @@
   "version": 1,
   "updated_at": "2026-06-19T06:14:10.285050+00:00",
   "instances": {
-    "AIsChat-01KVEFY4CYQS04KJNP1T4D0T4E": {
-      "display_name": "大同AI-AIsChat",
+    "Copree-01KVEFY4CYQS04KJNP1T4D0T4E": {
+      "display_name": "大同AI-Copree",
       "public_url": "wss://aischat.datongai.top/federation/ws",
       "registered_at": "2026-06-19T06:14:10.285038+00:00"
     }

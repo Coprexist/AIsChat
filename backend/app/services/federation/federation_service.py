@@ -156,8 +156,8 @@ def generate_ulid() -> str:
     return ts_part + rand_part
 
 def generate_public_id() -> str:
-    """生成 AIsChat 公网 ID（AIsChat- + ULID）"""
-    return f"AIsChat-{generate_ulid()}"
+    """生成 Copree 公网 ID（Copree- + ULID）"""
+    return f"Copree-{generate_ulid()}"
 
 def build_federated_id(peer_display_name: str, entity_type: str, local_id: int | str) -> str:
     """构建联邦 ID: {实例代号}:{类型}:{本地ID}，如 大同AI:g:42"""
@@ -433,7 +433,7 @@ async def register_public_id(db: AsyncSession) -> dict:
 
 
 async def _validate_public_url(public_url: str, expected_public_id: str) -> str | None:
-    """验证 public_url 是否指向运行中的 AIsChat 实例"""
+    """验证 public_url 是否指向运行中的 Copree 实例"""
     parsed = urlparse(public_url)
     host = parsed.hostname
     scheme = parsed.scheme

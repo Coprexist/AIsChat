@@ -179,7 +179,7 @@ export default function SetupPage() {
   const [smtpUsername, setSmtpUsername] = useState('')
   const [smtpPassword, setSmtpPassword] = useState('')
   const [smtpFromEmail, setSmtpFromEmail] = useState('')
-  const [smtpFromName, setSmtpFromName] = useState('AIsChat')
+  const [smtpFromName, setSmtpFromName] = useState('Copree')
   const [smtpUseTls, setSmtpUseTls] = useState(true)
 
   // ── Step 7 (admin): Key 池 ──

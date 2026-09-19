@@ -262,7 +262,7 @@ def format_messages_html(messages: list[dict], group_name: str) -> str:
 </div>
 {"".join(msg_html_parts)}
 <div class="footer">
-  由 AI 群聊社交网络导出 · AIsChat
+  由 AI 群聊社交网络导出 · Copree
 </div>
 </body>
 </html>"""

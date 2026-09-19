@@ -188,7 +188,7 @@ async def web_download(world, arguments: str, approved: bool = False) -> dict:
 
     try:
         async with httpx.AsyncClient(timeout=30) as client:
-            fetched = await safe_get(client, url, headers={"User-Agent": "Mozilla/5.0 (AIsChat world downloader)"})
+            fetched = await safe_get(client, url, headers={"User-Agent": "Mozilla/5.0 (Copree world downloader)"})
         r = fetched.response
         if r.status_code != 200:
             return {"success": False, "error": f"下载失败：HTTP {r.status_code}"}

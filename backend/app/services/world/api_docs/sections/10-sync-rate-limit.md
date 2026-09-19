@@ -3,7 +3,7 @@
 
 ## 1. 这是什么
 
-世界文件有两份：**AIsChat 后端**（`data/worlds/{id}/`，页面实际加载的权威副本）和 **DSH 工作区镜像**（`~/.dsh/aischat-worlds/AIC群视界-<世界名>/`，你在 DSH 会话里直接读写的那份）。
+世界文件有两份：**Copree 后端**（`data/worlds/{id}/`，页面实际加载的权威副本）和 **DSH 工作区镜像**（`~/.dsh/aischat-worlds/AIC群视界-<世界名>/`，你在 DSH 会话里直接读写的那份）。
 两者靠 `.aischat-sync.json` 快照做 **GitHub 式三路对比同步**——不是自动实时同步，**改完必须主动 `world_push` 才会到远端**。
 
 ## 2. 快照与三路对比（判定依据，必读）

@@ -1,10 +1,10 @@
 @echo off
 chcp 65001 >nul
-title AIsChat 安装程序
+title Copree 安装程序
 
 echo.
 echo  ╔══════════════════════════════════════╗
-echo  ║       AIsChat 启动器 安装程序        ║
+echo  ║       Copree 启动器 安装程序        ║
 echo  ╚══════════════════════════════════════╝
 echo.
 
@@ -18,8 +18,8 @@ if %errorLevel% neq 0 (
 )
 
 :: 安装目录
-set "INSTALL_DIR=%LOCALAPPDATA%\AIsChat"
-set "EXE_NAME=AIsChat.exe"
+set "INSTALL_DIR=%LOCALAPPDATA%\Copree"
+set "EXE_NAME=Copree.exe"
 
 echo  安装目录: %INSTALL_DIR%
 echo.
@@ -32,17 +32,17 @@ if not exist "%INSTALL_DIR%" (
 
 :: 复制文件
 echo  [√] 正在复制文件...
-xcopy /E /I /Y "%~dp0dist\AIsChat\*" "%INSTALL_DIR%\" >nul 2>&1
+xcopy /E /I /Y "%~dp0dist\Copree\*" "%INSTALL_DIR%\" >nul 2>&1
 
 :: 创建开始菜单快捷方式
 set "SHORTCUT_DIR=%APPDATA%\Microsoft\Windows\Start Menu\Programs"
-if not exist "%SHORTCUT_DIR%\AIsChat" mkdir "%SHORTCUT_DIR%\AIsChat"
+if not exist "%SHORTCUT_DIR%\Copree" mkdir "%SHORTCUT_DIR%\Copree"
 
-powershell -Command "$ws = New-Object -ComObject WScript.Shell; $sc = $ws.CreateShortcut('%SHORTCUT_DIR%\AIsChat\AIsChat 启动器.lnk'); $sc.TargetPath = '%INSTALL_DIR%\%EXE_NAME%'; $sc.WorkingDirectory = '%INSTALL_DIR%'; $sc.Description = 'AIsChat 桌面启动器'; $sc.Save()"
+powershell -Command "$ws = New-Object -ComObject WScript.Shell; $sc = $ws.CreateShortcut('%SHORTCUT_DIR%\Copree\Copree 启动器.lnk'); $sc.TargetPath = '%INSTALL_DIR%\%EXE_NAME%'; $sc.WorkingDirectory = '%INSTALL_DIR%'; $sc.Description = 'Copree 桌面启动器'; $sc.Save()"
 echo  [√] 创建开始菜单快捷方式
 
 :: 创建桌面快捷方式
-powershell -Command "$ws = New-Object -ComObject WScript.Shell; $sc = $ws.CreateShortcut('%USERPROFILE%\Desktop\AIsChat 启动器.lnk'); $sc.TargetPath = '%INSTALL_DIR%\%EXE_NAME%'; $sc.WorkingDirectory = '%INSTALL_DIR%'; $sc.Description = 'AIsChat 桌面启动器'; $sc.Save()"
+powershell -Command "$ws = New-Object -ComObject WScript.Shell; $sc = $ws.CreateShortcut('%USERPROFILE%\Desktop\Copree 启动器.lnk'); $sc.TargetPath = '%INSTALL_DIR%\%EXE_NAME%'; $sc.WorkingDirectory = '%INSTALL_DIR%'; $sc.Description = 'Copree 桌面启动器'; $sc.Save()"
 echo  [√] 创建桌面快捷方式
 
 echo.

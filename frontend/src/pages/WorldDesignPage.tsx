@@ -110,7 +110,7 @@ export default function WorldDesignPage() {
   const MIN_EDITOR = 160
   const MIN_CHAT = 360
   const HANDLES = 8  // 两个拖拽手柄
-  // 上限必须按「设计区实际宽度」反推：外层还有 AIsChat 导航栏占位，用 window.innerWidth 会多算约 240px，
+  // 上限必须按「设计区实际宽度」反推：外层还有 Copree 导航栏占位，用 window.innerWidth 会多算约 240px，
   // 结果是文件树能拖到把对话栏挤出可视区。容器首帧未测量时退回 innerWidth。
   const [containerRef, containerWidth] = useElementWidth()
   const available = containerWidth || window.innerWidth
@@ -193,7 +193,7 @@ export default function WorldDesignPage() {
   }
   // 收集全部文档 md（合并）
   const getAllDocsMd = async () => {
-    const parts = ['# AIsChat 世界 API 接口文档\n']
+    const parts = ['# Copree 世界 API 接口文档\n']
     for (const sec of docsSections) {
       try {
         const r = await api.get<{ content: string }>(`/kb/${sec.id}`)

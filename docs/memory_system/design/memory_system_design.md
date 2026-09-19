@@ -88,7 +88,7 @@ flowchart LR
         N_Proc["程序记忆 Procedural"]
     end
 
-    subgraph AIsChat["⚡ AIsChat 实现"]
+    subgraph Copree["⚡ Copree 实现"]
         C_Sensory["消息附件<br/>多模态输入"]
         C_Sem["structured_records<br/>🗄️ 数据库结构记忆"]
         C_Epi["rough_memories + detail_memories<br/>🔍 向量记忆"]

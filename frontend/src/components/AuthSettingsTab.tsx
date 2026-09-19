@@ -59,7 +59,7 @@ const PROVIDER_OPTIONS = [
 function emptySmtpForm(): SmtpFormItem {
   return {
     host: '', port: 587, username: '', password: '',
-    from_email: '', from_name: 'AIsChat', use_tls: true,
+    from_email: '', from_name: 'Copree', use_tls: true,
     is_active: true, priority: 0, has_password: false,
   }
 }
@@ -228,10 +228,10 @@ export default function AuthSettingsTab() {
   const applyPreviewVars = useCallback((html: string) => {
     return html
       .replace(/\{code\}/g, '483921')
-      .replace(/\{from_name\}/g, 'AIsChat')
+      .replace(/\{from_name\}/g, 'Copree')
       .replace(/\{purpose_label\}/g, '邮箱验证')
       .replace(/\{username\}/g, 'demo_user')
-      .replace(/\{instance_name\}/g, 'AIsChat')
+      .replace(/\{instance_name\}/g, 'Copree')
       .replace(/\{expire_minutes\}/g, '5')
   }, [])
 

@@ -38,7 +38,7 @@ const DEMO_AGENTS = [
 const DEMO_WELCOME = {
   id: 1, group_id: 1, sender_type: 'system', sender_id: 0,
   sender_name: '系统', sender_avatar_url: null,
-  content: '欢迎来到 AIsChat 演示版。\n\n⚙️ 进入「设置 → API 配置」填入你的 DeepSeek API Key 即可与 AI 对话。\n💾 所有数据存储在浏览器本地。',
+  content: '欢迎来到 Copree 演示版。\n\n⚙️ 进入「设置 → API 配置」填入你的 DeepSeek API Key 即可与 AI 对话。\n💾 所有数据存储在浏览器本地。',
   reply_to: null, attachments: null, source_public_id: null,
   created_at: new Date().toISOString(),
 }

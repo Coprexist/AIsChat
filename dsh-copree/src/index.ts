@@ -1,11 +1,11 @@
 // SPDX-License-Identifier: MIT
 /**
- * dsh-aischat — host half.
+ * dsh-copree — host half.
  *
- * Same-origin gateway for the local AIsChat backend. The browser half never
+ * Same-origin gateway for the local Copree backend. The browser half never
  * touches the backend address: every HTTP call goes to `/aischat-api/*` and
  * every WebSocket to `/aischat-ws?token=...`, both answered here and proxied
- * to the AIsChat FastAPI service (default http://127.0.0.1:5228, backend WS at
+ * to the Copree FastAPI service (default http://127.0.0.1:5228, backend WS at
  * /ws). Authentication stays end-to-end: the browser's Authorization header
  * and WS token query are forwarded verbatim and never logged, stored, or
  * echoed back. No public address is ever referenced.
@@ -31,18 +31,18 @@ import os from 'node:os'
 import { PACKAGE_ROOT, registerPluginRoutes } from './plugin-update.js'
 
 /** Stable Cordis plugin name. */
-export const name = 'dsh-aischat'
+export const name = 'dsh-copree'
 
 /** 代理、世界工作区同步与世界操作工具都需要这些服务。 */
 export const inject = ['webServer', 'tools', 'systemPrompt']
 
 /** Plugin config: backend base URL and an optional plugin update source. */
 export type Config = {
-  /** AIsChat backend base URL, e.g. http://127.0.0.1:5228 (loopback only). */
+  /** Copree backend base URL, e.g. http://127.0.0.1:5228 (loopback only). */
   backendUrl: string
   /**
    * 插件自更新的源目录（内含 lib/manifest.json 的构建产物）。
-   * 留空则回溯安装来源：profile 的 package.json 里 dependencies['dsh-aischat']
+   * 留空则回溯安装来源：profile 的 package.json 里 dependencies['dsh-copree']
    * 的 file: 规格，通常无需配置。
    */
   pluginSourceDir: string
@@ -147,7 +147,7 @@ function stripHopByHop(headers: IncomingMessage['headers']): Record<string, stri
 }
 
 /**
- * Proxy one HTTP request to the AIsChat backend. The request body is piped
+ * Proxy one HTTP request to the Copree backend. The request body is piped
  * through untouched; the backend response is streamed back with its status
  * and headers. Errors produce a fixed 502 without echoing internals.
  */
@@ -212,7 +212,7 @@ function proxyHttp(
 }
 
 /**
- * Proxy one WebSocket upgrade to the AIsChat backend. The browser's upgrade
+ * Proxy one WebSocket upgrade to the Copree backend. The browser's upgrade
  * request (with its Sec-WebSocket-Key and token query) is replayed against
  * the backend; on the backend's 101 the response headers are written back to
  * the browser socket and both directions are piped until either side closes.
@@ -288,7 +288,7 @@ function proxyWs(
 // ════════════════════════════════════════════════════════════════════════
 // 世界工作区（AIC群视界 → DSH Workspace 文件夹 + 会话）
 //
-// 每个 AIsChat 世界对应 DSH 工作区里一个真实目录：
+// 每个 Copree 世界对应 DSH 工作区里一个真实目录：
 //   $DSH_HOME/aischat-worlds/AIC群视界-<世界名>/
 //     .aischat-world.json  { worldId, name }   ← 世界身份（工具据此路由）
 // client 同步流程：列世界 → 建目录 → workspaces.create({path}) →
@@ -300,7 +300,7 @@ const WORLD_DIR_BASE = join(process.env.DSH_HOME ?? join(os.homedir(), '.dsh'), 
 const WORLDS_PREFIX = '/aischat-worlds'
 
 /**
- * worldId -> AIsChat token（仅内存，供 owner 鉴权写操作；不落盘）。
+ * worldId -> Copree token（仅内存，供 owner 鉴权写操作；不落盘）。
  * 按世界而非会话路由：用户在工作区新建/切换会话不影响 token 归属
  * （会话可能由 DSH 新建流程创建，sessionId 不稳定；世界目录是稳定标识）。
  */
@@ -331,7 +331,7 @@ function readJsonBody(req: IncomingMessage): Promise<Record<string, unknown>> {
   })
 }
 
-/** 向 AIsChat 后端发一个请求，返回状态与文本。 */
+/** 向 Copree 后端发一个请求，返回状态与文本。 */
 function backendRequest(
   backendUrl: string,
   method: string,
@@ -772,7 +772,7 @@ export function apply(ctx: Context, config: Config): void {
           if (!Number.isInteger(worldId) || worldId <= 0) { send(400, { error: 'missing worldId' }); return }
           if (!token) { send(400, { error: 'missing token' }); return }
           worldTokenMap.set(worldId, token)
-          ctx.logger?.info?.(`dsh-aischat: token registered for world ${worldId}`)
+          ctx.logger?.info?.(`dsh-copree: token registered for world ${worldId}`)
           send(200, { ok: true })
         }).catch(() => send(400, { error: 'bad request' }))
         return
@@ -826,7 +826,7 @@ export function apply(ctx: Context, config: Config): void {
       execute: async (rawArgs, exec) => {
         const world = worldFromExec(exec as never)
         if (!world) {
-          return { error: '当前会话不属于任何 AIsChat 世界：请先在工作区打开一个「AIC群视界-世界名」会话（该会话目录需含 .aischat-world.json）。' }
+          return { error: '当前会话不属于任何 Copree 世界：请先在工作区打开一个「AIC群视界-世界名」会话（该会话目录需含 .aischat-world.json）。' }
         }
         try {
           const result = await execute((rawArgs ?? {}) as Record<string, unknown>, world)
@@ -861,10 +861,10 @@ export function apply(ctx: Context, config: Config): void {
 
   registerWorldTool(
     'world_list_files',
-    '列出当前 AIsChat 群视界世界的文件树（世界页面代码等）。返回文件列表（相对路径、大小、类型）。',
+    '列出当前 Copree 群视界世界的文件树（世界页面代码等）。返回文件列表（相对路径、大小、类型）。',
     { type: 'object', properties: { prefix: { type: 'string', description: '可选前缀过滤，如 css/ 或 blocks/' } }, additionalProperties: false },
     async (args, world) => {
-      if (!world.token) return { error: '该世界会话未连接登录态，无法列文件（需 owner 权限）。请重新打开 AIsChat 同步一次。' }
+      if (!world.token) return { error: '该世界会话未连接登录态，无法列文件（需 owner 权限）。请重新打开 Copree 同步一次。' }
       const prefix = encodeURIComponent(String(args.prefix ?? ''))
       const res = await backendRequest(backendUrl, 'GET', `/worlds/${world.worldId}/files?prefix=${prefix}`, { token: world.token })
       if (res.status !== 200) return { error: `列文件失败 (${res.status})`, detail: res.text.slice(0, 400) }
@@ -874,7 +874,7 @@ export function apply(ctx: Context, config: Config): void {
 
   registerWorldTool(
     'world_read_file',
-    '读取当前 AIsChat 群视界世界的一个文件内容（如 index.html、script.js、style.css）。',
+    '读取当前 Copree 群视界世界的一个文件内容（如 index.html、script.js、style.css）。',
     { type: 'object', properties: { path: { type: 'string', description: '相对路径，如 index.html 或 blocks/group-chat/chat-panel.js' } }, required: ['path'], additionalProperties: false },
     async (args, world) => {
       const path = String(args.path ?? '')
@@ -887,7 +887,7 @@ export function apply(ctx: Context, config: Config): void {
 
   registerWorldTool(
     'world_write_file',
-    '写入当前 AIsChat 群视界世界的一个文件（覆盖；自动建目录）。用于修改世界页面代码。',
+    '写入当前 Copree 群视界世界的一个文件（覆盖；自动建目录）。用于修改世界页面代码。',
     { type: 'object', properties: { path: { type: 'string', description: '相对路径，如 index.html' }, content: { type: 'string', description: '完整文件内容' } }, required: ['path', 'content'], additionalProperties: false },
     async (args, world) => {
       if (!world.token) return { error: '该世界会话未连接登录态，无法写文件（需 owner 权限）。' }
@@ -902,7 +902,7 @@ export function apply(ctx: Context, config: Config): void {
 
   registerWorldTool(
     'world_delete_file',
-    '删除当前 AIsChat 群视界世界的一个文件。',
+    '删除当前 Copree 群视界世界的一个文件。',
     { type: 'object', properties: { path: { type: 'string', description: '相对路径' } }, required: ['path'], additionalProperties: false },
     async (args, world) => {
       if (!world.token) return { error: '该世界会话未连接登录态，无法删文件。' }
@@ -915,7 +915,7 @@ export function apply(ctx: Context, config: Config): void {
 
   registerWorldTool(
     'world_api',
-    '调用当前 AIsChat 群视界世界的受控 API（GET/POST /world/{id}/api/{endpoint}）。常用：world（世界信息）、chat（对话历史）、memories（记忆）、usage（用量）、groups（绑定群列表）、group/messages（群消息）、state（状态）、data/{key}（世界数据）。',
+    '调用当前 Copree 群视界世界的受控 API（GET/POST /world/{id}/api/{endpoint}）。常用：world（世界信息）、chat（对话历史）、memories（记忆）、usage（用量）、groups（绑定群列表）、group/messages（群消息）、state（状态）、data/{key}（世界数据）。',
     { type: 'object', properties: { endpoint: { type: 'string', description: 'API 路径，如 world / chat / memories / usage / groups / group/messages / state / data/myk' }, method: { type: 'string', enum: ['GET', 'POST', 'PUT', 'DELETE'], default: 'GET' }, query: { type: 'object', description: '查询参数键值（字符串化）' }, body: { type: 'object', description: 'POST/PUT 请求体' } }, required: ['endpoint'], additionalProperties: false },
     async (args, world) => {
       const endpoint = String(args.endpoint ?? '').replace(/^\/+/, '')
@@ -955,7 +955,7 @@ export function apply(ctx: Context, config: Config): void {
 
   registerWorldTool(
     'world_chat',
-    '读写当前 AIsChat 群视界世界绑定群聊的消息。action=read 拉最近消息（groupId 省略时自动取世界绑定的第一个群）；action=send 以世界身份发消息。',
+    '读写当前 Copree 群视界世界绑定群聊的消息。action=read 拉最近消息（groupId 省略时自动取世界绑定的第一个群）；action=send 以世界身份发消息。',
     { type: 'object', properties: { action: { type: 'string', enum: ['read', 'send'] }, groupId: { type: 'number' }, content: { type: 'string', description: 'send 时的消息内容' }, limit: { type: 'number', default: 20 } }, required: ['action'], additionalProperties: false },
     async (args, world) => {
       const apiToken = await resolveWorldApiToken(backendUrl, world.worldId, world.token)
@@ -995,7 +995,7 @@ export function apply(ctx: Context, config: Config): void {
 
   registerWorldTool(
     'world_lifecycle',
-    '唤醒或休眠当前 AIsChat 群视界世界（wake 应用离线时间补偿并启动常驻；sleep 休眠）。',
+    '唤醒或休眠当前 Copree 群视界世界（wake 应用离线时间补偿并启动常驻；sleep 休眠）。',
     { type: 'object', properties: { action: { type: 'string', enum: ['wake', 'sleep'] } }, required: ['action'], additionalProperties: false },
     async (args, world) => {
       if (!world.token) return { error: '该世界会话未连接登录态，无法控制世界生命周期。' }
@@ -1009,7 +1009,7 @@ export function apply(ctx: Context, config: Config): void {
 
   registerWorldTool(
     'world_pull',
-    '把 AIsChat 世界的最新文件拉取到当前工作区目录（本地世界镜像）。' +
+    '把 Copree 世界的最新文件拉取到当前工作区目录（本地世界镜像）。' +
     '带冲突保护：本地有未推送的修改或冲突文件时会拒绝并报告，绝不覆盖你的改动；' +
     'force=true 时强制以世界为准覆盖。拉取后返回变化清单（新增/修改/删除）。' +
     '注意：返回里的 pulled N 是实际下载写盘的文件数（force 覆盖本地改动也计入）；' +
@@ -1027,10 +1027,10 @@ export function apply(ctx: Context, config: Config): void {
 
   registerWorldTool(
     'world_push',
-    '把当前工作区目录（本地世界镜像）的全部改动同步回 AIsChat 世界。' +
+    '把当前工作区目录（本地世界镜像）的全部改动同步回 Copree 世界。' +
     '只推送本地修改过的文件（带快照对比）；冲突文件（远端也改过）默认跳过并报告，' +
     'force=true 时以本地为准覆盖。排除本地元数据 .aischat-world.json 与 __pycache__。' +
-    '你（agent）用 DSH 原生 read/write/edit/bash 修改工作区文件后调用本工具让改动在 AIsChat 中生效。' +
+    '你（agent）用 DSH 原生 read/write/edit/bash 修改工作区文件后调用本工具让改动在 Copree 中生效。' +
     '注意：返回「已同步（无变化）」= 快照认为本地与远端已一致（改动很可能已在远端），用 world_read_file 复核内容，别当没生效。',
     { type: 'object', properties: { force: { type: 'boolean', description: 'true 时以本地为准强制覆盖冲突文件' } }, additionalProperties: false },
     async (args, world) => {
@@ -1045,7 +1045,7 @@ export function apply(ctx: Context, config: Config): void {
 
   registerWorldTool(
     'world_run',
-    '在 AIsChat 后端沙箱中运行一段 Python 代码（世界上下文：注入 WORLD_ID/WORLD_API_TOKEN 等环境；配额默认 24MB/10s）。' +
+    '在 Copree 后端沙箱中运行一段 Python 代码（世界上下文：注入 WORLD_ID/WORLD_API_TOKEN 等环境；配额默认 24MB/10s）。' +
     '适合测试世界逻辑；完整的页面/逻辑改动请用 DSH 原生工具改工作区文件 + world_push。',
     { type: 'object', properties: { code: { type: 'string', description: '要运行的 Python 代码' }, entry: { type: 'string', description: '可选入口，如 main.py' } }, required: ['code'], additionalProperties: false },
     async (args, world) => {
@@ -1061,7 +1061,7 @@ export function apply(ctx: Context, config: Config): void {
 
   registerWorldTool(
     'world_trigger',
-    '触发当前 AIsChat 世界入口的 handle(event)（世界沙箱），用于测试世界对事件的响应。',
+    '触发当前 Copree 世界入口的 handle(event)（世界沙箱），用于测试世界对事件的响应。',
     { type: 'object', properties: { event: { type: 'object', description: '事件载荷，如 {type: "message", ...}' }, entry: { type: 'string', description: '可选入口，如 main.py' } }, required: ['event'], additionalProperties: false },
     async (args, world) => {
       if (!world.token) return { error: '该世界会话未连接登录态，无法触发世界（需 owner 权限）。' }
@@ -1078,14 +1078,14 @@ export function apply(ctx: Context, config: Config): void {
   ctx.systemPrompt.section({
     name: 'aischat-world-context',
     order: 150,
-    text: '如果你的会话工作目录位于 aischat-worlds 目录下（目录名以「AIC群视界-」开头），你正在操作一个 AIsChat 群视界世界：' +
+    text: '如果你的会话工作目录位于 aischat-worlds 目录下（目录名以「AIC群视界-」开头），你正在操作一个 Copree 群视界世界：' +
       '该工作目录是世界的「本地镜像」——世界页面代码、数据文件都在里面，你可以直接用 DSH 原生的 read/write/edit/glob/grep/bash ' +
-      '工具读写它们（bash 可直接运行世界 Python 代码测试）。修改完成后调用 world_push 把改动同步回 AIsChat 世界；' +
+      '工具读写它们（bash 可直接运行世界 Python 代码测试）。修改完成后调用 world_push 把改动同步回 Copree 世界；' +
       '若世界在别处被改过、需要最新文件时用 world_pull 主动拉取。' +
       '精确操作（世界 API、绑定群聊消息、唤醒/休眠、沙箱运行）用 world_* 系列工具。' +
       '同步/限流机制（push「无变化」含义、429 处理、pulled 语义）用 world_view_doc 打开 10 分区查看。' +
-      '世界是用户嵌入 DSH 的「可操作对象」——你的推理与工具仍走 DSH 体系，只是操作目标属于 AIsChat。',
+      '世界是用户嵌入 DSH 的「可操作对象」——你的推理与工具仍走 DSH 体系，只是操作目标属于 Copree。',
   })
 
-  ctx.logger?.info?.(`dsh-aischat: proxying /aischat-api and /aischat-ws -> ${backendUrl}; serving /aischat-ui; world sync at ${WORLDS_PREFIX}`)
+  ctx.logger?.info?.(`dsh-copree: proxying /aischat-api and /aischat-ws -> ${backendUrl}; serving /aischat-ui; world sync at ${WORLDS_PREFIX}`)
 }

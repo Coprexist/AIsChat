@@ -157,7 +157,7 @@ export function setupDemo() {
   // ── Logo 修正 ──
   new MutationObserver(() => {
     document.querySelectorAll('img[src="/logo.png"]').forEach(el => {
-      if (el instanceof HTMLImageElement) el.src = '/AIsChat/logo.png'
+      if (el instanceof HTMLImageElement) el.src = '/Copree/logo.png'
     })
   }).observe(document.body || document.documentElement, { childList: true, subtree: true })
 }

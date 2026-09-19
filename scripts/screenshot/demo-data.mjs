@@ -156,7 +156,7 @@ export const DEMO_FRIENDS = DEMO_MEMBERS
 
 export const DEMO_MARKET_ITEMS = [
   {
-    id: 1, kind: 'world', title: '枕流镇', tags: ['小镇', '文字冒险'], author_id: 1, author_name: 'AIsChat 官方',
+    id: 1, kind: 'world', title: '枕流镇', tags: ['小镇', '文字冒险'], author_id: 1, author_name: 'Copree 官方',
     description: '一座靠在河湾上的小镇：雨天、旧书店，还有会说话的猫。天气会跟着群聊里的语气走。',
     source_world_id: 101, source: 'local', github_path: null, package_size: 268435, downloads: 128,
     github_downloads: null, updated_at: minutesAgo(60 * 24 * 2), github_updated_at: null,
@@ -174,7 +174,7 @@ export const DEMO_MARKET_ITEMS = [
 export const DEMO_GITHUB_ITEMS = [
   {
     id: 1, slug: 'night-boat', kind: 'world', title: '夜航船', tags: ['文字', '冒险'],
-    author_name: 'AIsChat 社区', author_github: 'aischat-demo', downloads: 43,
+    author_name: 'Copree 社区', author_github: 'aischat-demo', downloads: 43,
     updated_at: minutesAgo(60 * 24 * 5), is_local: false, is_mine: false,
     signature_valid: true, key_changed: false,
     description: '文字冒险：在无风的夜里，写下一句就能推动船向前。',

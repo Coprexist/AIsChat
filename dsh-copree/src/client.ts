@@ -1,31 +1,31 @@
 // SPDX-License-Identifier: MIT
 /**
- * dsh-aischat — browser half.
+ * dsh-copree — browser half.
  *
- * AIsChat as a first-class sidebar board, like the Workspace board:
+ * Copree as a first-class sidebar board, like the Workspace board:
  *
- * - `sidebar.footer.action` `aischat-entry`: toggles the AIsChat board.
+ * - `sidebar.footer.action` `aischat-entry`: toggles the Copree board.
  * - `shell.overlay` `aischat-board`: while the board is open it covers the
  *   whole frame and renders its own left rail (联系人板块: 置顶/私信/群聊,
  *   expanded like workspace folders) beside the conversation column (messages
  *   + composer). Opening the board hides the Workspace board; closing it
  *   restores DSH. No DSH session or composer semantics are touched — the
- *   composer inside the board sends to the selected AIsChat conversation.
+ *   composer inside the board sends to the selected Copree conversation.
  * - `settings.section` `aischat`: settings page (login / sign-out / note).
  *
  * All traffic is same-origin: HTTP `/aischat-api/*`, WS
- * `/aischat-ws?token=...`, both proxied by the host half to the local AIsChat
+ * `/aischat-ws?token=...`, both proxied by the host half to the local Copree
  * backend. The token lives in browser localStorage only.
  *
- * @module dsh-aischat/client
+ * @module dsh-copree/client
  */
 const React = require('react')
 const { useEffect, useState, useRef, useCallback, useMemo } = React
 // Reuse the shipped DSH Markdown renderer (GFM + KaTeX math + safe-HTML
-// filtering) so AIsChat messages render exactly like conversation text.
+// filtering) so Copree messages render exactly like conversation text.
 // 我方与对方消息都用 MarkdownText（完整 GFM/LaTeX，我方保留 DSH 用户
 // 气泡样式）——任何针对 DSH 对话渲染风格的主题/插件改动都会自动作用到
-// AIsChat。
+// Copree。
 const { MarkdownText, IconNewChatOutline16 } = require('@deepseek-ai/dsh-client-ui-primitives')
 
 /**
@@ -34,7 +34,7 @@ const { MarkdownText, IconNewChatOutline16 } = require('@deepseek-ai/dsh-client-
  * 外壳的 MarkdownText 强制要求这个 labels 包：渲染围栏代码块时会直接读
  * labels.code.copyLabel，整包缺失就在渲染期抛 TypeError。异常发生在
  * shell.overlay 槽内，会被外壳的错误边界整块摘掉——表现出来就是
- * 「点开某个含代码块的会话，AIsChat 界面直接消失」。
+ * 「点开某个含代码块的会话，Copree 界面直接消失」。
  * 外壳自己的对话页从 locale seat 生成同一份文案（markdownLabels(t)）；
  * 客户端插件没有这个 seat，这里给等价文案。
  */
@@ -44,13 +44,13 @@ const MARKDOWN_LABELS = {
 }
 
 /** Plugin identity. */
-const PLUGIN_ID = 'dsh-aischat'
+const PLUGIN_ID = 'dsh-copree'
 
 /** Same-origin API base answered by the host half. */
 const API = '/aischat-api'
 /** WebSocket endpoint answered by the host half (upgrade proxy). */
 const WS_BASE = '/aischat-ws'
-/** Plugin self-update endpoints answered by the host half (outside the AIsChat proxy prefix). */
+/** Plugin self-update endpoints answered by the host half (outside the Copree proxy prefix). */
 const PLUGIN_API = '/aischat-plugin'
 
 /** Browser-local storage keys (guarded read/write). */
@@ -132,7 +132,7 @@ async function api(path, options = {}) {
 }
 
 /**
- * Call a host-half plugin endpoint. These live outside the AIsChat proxy prefix,
+ * Call a host-half plugin endpoint. These live outside the Copree proxy prefix,
  * so they bypass api() and are not authenticated.
  */
 async function pluginApi(path, options = {}) {
@@ -255,8 +255,8 @@ function wsUrl(token) {
 }
 
 /**
- * Rewrite an AIsChat media URL for the DSH same-origin proxy.
- * AIsChat stores relative paths like `/api/fs/download-avatar/x.png` that its
+ * Rewrite an Copree media URL for the DSH same-origin proxy.
+ * Copree stores relative paths like `/api/fs/download-avatar/x.png` that its
  * own frontend serves through a vite proxy stripping the `/api` prefix. In
  * DSH the host half strips `/aischat-api`, so `/api/...` maps 1:1 to
  * `/aischat-api/...`. Absolute URLs (external avatars) pass through untouched.
@@ -322,7 +322,7 @@ function AttachmentImage({ fileId, name, style: imgStyle }) {
 
 /**
  * Prepare message text for the shipped Markdown renderer: it only displays
- * absolute HTTP(S) images and disables relative links, while AIsChat stores
+ * absolute HTTP(S) images and disables relative links, while Copree stores
  * media as relative `/api/...` paths. Rewrite markdown link/image targets to
  * absolute same-origin URLs (through the host proxy) so they render.
  */
@@ -525,7 +525,7 @@ const style = {
   memberRole: { flex: 'none', fontSize: 11, color: 'var(--dsw-alias-label-tertiary)' },
   smallBtn: { flex: 'none', padding: '4px 12px', borderRadius: 8, border: '1px solid var(--dsw-alias-border-l2)', background: 'transparent', color: 'var(--dsw-alias-label-primary)', cursor: 'pointer', fontSize: 12, fontWeight: 500 },
   smallBtnOn: { background: 'var(--dsw-alias-interactive-bg-hover)', borderColor: 'transparent' },
-  // 沉浸式覆盖层：zIndex 必须高于 board（30），否则在 AIsChat board 打开时
+  // 沉浸式覆盖层：zIndex 必须高于 board（30），否则在 Copree board 打开时
   // 会被 board 盖住（两者同在 shell.overlay 槽内，board fixed z30 > 本层 z5）。
   immersive: { position: 'fixed', inset: 0, zIndex: 40, display: 'flex', flexDirection: 'column', background: 'var(--dsw-alias-bg-base)' },
   immersiveBar: { flex: 'none', display: 'flex', alignItems: 'center', gap: 10, padding: '8px 14px', borderBottom: '1px solid var(--dsw-alias-border-l2)', fontSize: 13, fontWeight: 600, color: 'var(--dsw-alias-label-primary)' },
@@ -591,12 +591,12 @@ function LoginForm() {
   }
   return h('div', { style: style.login },
     h('div', { style: style.loginCard },
-      h('div', { style: style.loginTitle }, 'AIsChat 登录'),
+      h('div', { style: style.loginTitle }, 'Copree 登录'),
       h('input', { style: style.field, placeholder: '用户名 / 邮箱', value: id, onChange: (e) => setId(e.target.value), onKeyDown: (e) => { if (e.key === 'Enter') submit() } }),
       h('input', { style: style.field, placeholder: '密码', type: 'password', value: pw, onChange: (e) => setPw(e.target.value), onKeyDown: (e) => { if (e.key === 'Enter') submit() } }),
       h('button', { style: style.btn, onClick: submit, disabled: busy }, busy ? '登录中…' : '登录'),
       err ? h('div', { style: style.err }, err) : null,
-      h('div', { style: style.hint }, '凭据仅保存在本机浏览器，通过本地同源代理访问 AIsChat 服务。'),
+      h('div', { style: style.hint }, '凭据仅保存在本机浏览器，通过本地同源代理访问 Copree 服务。'),
     ),
   )
 }
@@ -794,7 +794,7 @@ function DmSettings({ active }) {
  * 单条消息的渲染兜底。
  *
  * 正文走外壳的 MarkdownText，它的渲染异常会一路冒到 shell.overlay 的错误边界，
- * 结果是整块 AIsChat 面板被摘掉（而不是只有这一条消息显示不出来）。
+ * 结果是整块 Copree 面板被摘掉（而不是只有这一条消息显示不出来）。
  * 这里按条兜住：失败就降级成纯文本，面板其余部分照常可用。
  */
 class MessageBoundary extends React.Component {
@@ -868,7 +868,7 @@ function MsgList({ messages, user }) {
   )
 }
 
-/** The conversation column: message list + composer (sends to AIsChat). */
+/** The conversation column: message list + composer (sends to Copree). */
 function ConversationColumn({ refresh, onImmersive }) {
   const [draft, setDraft] = useState('')
   const [sending, setSending] = useState(false)
@@ -910,7 +910,7 @@ function ConversationColumn({ refresh, onImmersive }) {
 
   if (!active) {
     return h('div', { style: style.main },
-      h('div', { style: style.mainHead }, 'AIsChat'),
+      h('div', { style: style.mainHead }, 'Copree'),
       h('div', { style: style.empty }, '从左侧选择一个对话'),
     )
   }
@@ -1003,7 +1003,7 @@ const FEATURES = [
   { id: 'settings', label: '设置', path: '/settings' },
 ]
 
-/** The AIsChat board: covers the whole frame like the Workspace board. */
+/** The Copree board: covers the whole frame like the Workspace board. */
 function AisChatBoard({ onClose }) {
   const [, force] = useState(0)
   const refresh = useCallback(() => force((n) => n + 1), [])
@@ -1044,7 +1044,7 @@ function AisChatBoard({ onClose }) {
     return h('div', { style: style.board },
       h('div', { style: style.rail },
         h('div', { style: style.railHead },
-          h('span', {}, 'AIsChat'),
+          h('span', {}, 'Copree'),
           h('button', { style: style.closeBtn, onClick: onClose }, '返回工作区'),
         ),
       ),
@@ -1067,7 +1067,7 @@ function AisChatBoard({ onClose }) {
   return h('div', { style: style.board },
     h('div', { style: style.rail },
       h('div', { style: style.railHead },
-        h('span', { style: style.railLabel }, 'AIsChat'),
+        h('span', { style: style.railLabel }, 'Copree'),
         h('button', { style: { ...style.closeBtn, marginLeft: 'auto', fontSize: 12 }, onClick: onClose }, '返回工作区'),
       ),
       h('div', { style: style.railUser },
@@ -1146,14 +1146,14 @@ function SettingsPage() {
 
   if (!user || !store.token) {
     return h('div', { style: { padding: 20, maxWidth: 420 } },
-      h('div', { style: { fontSize: 16, fontWeight: 600, marginBottom: 16, color: 'var(--dsw-alias-label-primary)' } }, 'AIsChat'),
-      h('div', { style: { ...style.hint, marginTop: 0 } }, '登录 AIsChat 后即可在侧边栏使用聊天。凭据仅保存在本机浏览器。'),
+      h('div', { style: { fontSize: 16, fontWeight: 600, marginBottom: 16, color: 'var(--dsw-alias-label-primary)' } }, 'Copree'),
+      h('div', { style: { ...style.hint, marginTop: 0 } }, '登录 Copree 后即可在侧边栏使用聊天。凭据仅保存在本机浏览器。'),
       h(LoginForm, null),
     )
   }
 
   return h('div', { style: { padding: 20, maxWidth: 480 } },
-    h('div', { style: { fontSize: 16, fontWeight: 600, marginBottom: 16, color: 'var(--dsw-alias-label-primary)' } }, 'AIsChat'),
+    h('div', { style: { fontSize: 16, fontWeight: 600, marginBottom: 16, color: 'var(--dsw-alias-label-primary)' } }, 'Copree'),
     h('div', { style: { ...style.row, padding: '8px 0' } },
       h('span', { style: style.avatar }, initials(user.name)),
       h('div', { style: style.rowText },
@@ -1174,8 +1174,8 @@ function SettingsPage() {
       h('div', { style: style.rowText },
         h('div', { style: style.rowTitle },
           plugin
-            ? `dsh-aischat ${(plugin.installed && plugin.installed.version) || '未知'} · ${shortId(plugin.installed && plugin.installed.id)}`
-            : 'dsh-aischat 版本检测中…'),
+            ? `dsh-copree ${(plugin.installed && plugin.installed.version) || '未知'} · ${shortId(plugin.installed && plugin.installed.id)}`
+            : 'dsh-copree 版本检测中…'),
         h('div', { style: style.rowSub }, pluginStateText(plugin)),
       ),
       pluginCanAct(plugin)
@@ -1224,14 +1224,14 @@ function FooterButton({ wide }) {
   return h('button', {
     style: { ...style.footTrigger, ...(rail ? style.footTriggerRail : {}), ...(open ? { background: 'var(--dsw-alias-interactive-bg-hover-solid, var(--dsw-alias-interactive-bg-hover))' } : {}) },
     onClick: toggle,
-    title: 'AIsChat 聊天',
-    'aria-label': rail ? 'AIsChat' : undefined,
+    title: 'Copree 聊天',
+    'aria-label': rail ? 'Copree' : undefined,
   },
     h(IconNewChatOutline16, { size: rail ? 18 : 16 }),
-    rail ? null : h('span', { style: { fontWeight: 500 } }, 'AIsChat'),
+    rail ? null : h('span', { style: { fontWeight: 500 } }, 'Copree'),
     needsUpdate
       ? h('span', {
-          title: 'AIsChat 插件有更新',
+          title: 'Copree 插件有更新',
           style: { flex: 'none', width: 7, height: 7, borderRadius: '50%', background: 'var(--dsw-alias-state-danger-primary, #e5484d)' },
         })
       : null,
@@ -1244,7 +1244,7 @@ const boardOpenRef = { current: false }
 // ── plugin entry ──────────────────────────────────────────────────────────
 
 module.exports = {
-  name: 'dsh-aischat',
+  name: 'dsh-copree',
   inject: ['slots', 'workspaces'],
   apply(ctx) {
     let boardOpen = false
@@ -1255,7 +1255,7 @@ module.exports = {
     }
 
     /**
-     * 把 AIsChat 世界同步为 DSH 工作区文件夹 + 会话：
+     * 把 Copree 世界同步为 DSH 工作区文件夹 + 会话：
      *   世界 → 目录（AIC群视界-世界名 + .aischat-world.json）→
      *   ctx.workspaces.create({path}) → connectWorkspace() 得会话 →
      *   上报 {sessionId, token}（host 仅内存保存，供 owner 鉴权写操作）。
@@ -1303,7 +1303,7 @@ module.exports = {
             body: JSON.stringify({ worldId: w.id }),
           }).catch(() => {})
         }
-      } catch { /* 同步失败静默：不影响 AIsChat 主功能 */ }
+      } catch { /* 同步失败静默：不影响 Copree 主功能 */ }
     }
 
     // 登录态变化时自动同步世界到工作区（节流 30s）。
@@ -1312,10 +1312,10 @@ module.exports = {
     })
 
     // 页面加载后若已恢复登录态（localStorage），立即静默上报一次——用户
-    // 直接点进「AIC群视界」工作区即可使用 world 工具，无需先点开 AIsChat 面板。
+    // 直接点进「AIC群视界」工作区即可使用 world 工具，无需先点开 Copree 面板。
     if (store.token && store.user) syncWorlds()
 
-    // 打开 AIsChat board 时也补一次同步（force 跳过节流，幂等安全）。
+    // 打开 Copree board 时也补一次同步（force 跳过节流，幂等安全）。
     window.addEventListener('aischat:board-toggle', (e) => {
       boardOpen = !!e.detail
       if (boardOpen && store.token) syncWorlds(true)
@@ -1339,11 +1339,11 @@ module.exports = {
     disposers.push(() => clearInterval(syncTimer))
 
     disposers.push(ctx.slots.inject('sidebar.footer.action', () => ctx.slots.register(
-      { name: 'sidebar.footer.action', id: 'aischat-entry', order: 10, label: 'AIsChat' },
+      { name: 'sidebar.footer.action', id: 'aischat-entry', order: 10, label: 'Copree' },
       FooterButton,
     )))
 
-    // The board: a frame-wide overlay rendered only while the AIsChat board is
+    // The board: a frame-wide overlay rendered only while the Copree board is
     // open. Registered once; the entry component reads the open flag from the
     // module store and renders null when closed.
     const BoardEntry = () => {
@@ -1377,7 +1377,7 @@ module.exports = {
     )))
 
     disposers.push(ctx.slots.inject('settings.section', () => ctx.slots.register(
-      { name: 'settings.section', id: 'aischat', order: 40, label: 'AIsChat' },
+      { name: 'settings.section', id: 'aischat', order: 40, label: 'Copree' },
       SettingsPage,
     )))
 
@@ -1386,7 +1386,7 @@ module.exports = {
       if (store.token && !store.ws) connectWs()
     })
 
-    // 前端 iframe（嵌入模式）登录态失效时通知宿主：打开 AIsChat board 让用户登录。
+    // 前端 iframe（嵌入模式）登录态失效时通知宿主：打开 Copree board 让用户登录。
     // 监听 aischat-embed 消息（source 校验 + 只响应 iframe 子窗口）。
     window.addEventListener('message', (event) => {
       const data = event.data

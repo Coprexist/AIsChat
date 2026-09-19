@@ -1,21 +1,21 @@
-# AIsChat 接入 DeepSeek Harness（DSH）指南
+# Copree 接入 DeepSeek Harness（DSH）指南
 
-> 面向：想用 DSH 直接操作 AIsChat 的开发者/用户
-> 适用范围：dsh-aischat 插件（v0.3.10+），AIsChat 作为插件嵌入 DSH Web
+> 面向：想用 DSH 直接操作 Copree 的开发者/用户
+> 适用范围：dsh-copree 插件（v0.3.10+），Copree 作为插件嵌入 DSH Web
 
 ---
 
 ## 1. 这是什么
 
-**dsh-aischat** 把 AIsChat 以「一等公民」嵌入 DeepSeek Harness Web。接入后你可以：
+**dsh-copree** 把 Copree 以「一等公民」嵌入 DeepSeek Harness Web。接入后你可以：
 
 | 能力 | 说明 |
 |---|---|
-| 💬 **聊天嵌入** | DSH 侧边栏点 AIsChat 直接聊（置顶私信 / 群聊 / 功能页），不必切换系统 |
+| 💬 **聊天嵌入** | DSH 侧边栏点 Copree 直接聊（置顶私信 / 群聊 / 功能页），不必切换系统 |
 | 🖼️ **沉浸式界面** | 群聊"沉浸式"按钮、AIC 功能页（群视界/好友/我的AI/管理/设置）以 iframe 全屏打开 |
-| 🗂️ **世界工作区** | 每个 AIsChat 世界 = DSH 工作区一个文件夹 `AIC群视界-世界名`，**用 DSH 原生的 agent 和工具直接操作世界**（改代码、跑逻辑、读写群聊） |
+| 🗂️ **世界工作区** | 每个 Copree 世界 = DSH 工作区一个文件夹 `AIC群视界-世界名`，**用 DSH 原生的 agent 和工具直接操作世界**（改代码、跑逻辑、读写群聊） |
 
-核心设计一句话：**对话/工具/沙箱用 DSH 的，操作对象是 AIsChat 的（世界文件、数据、群聊）**。
+核心设计一句话：**对话/工具/沙箱用 DSH 的，操作对象是 Copree 的（世界文件、数据、群聊）**。
 
 ---
 
@@ -25,7 +25,7 @@
 
 ```
 ┌─ DSH Web 进程（Host 半边）──────────────────────────────────────┐
-│  /aischat-api/*   HTTP 代理 → AIsChat 后端（默认 127.0.0.1:5228）│
+│  /aischat-api/*   HTTP 代理 → Copree 后端（默认 127.0.0.1:5228）│
 │  /aischat-ws       WebSocket 升级代理 → 后端 /ws                  │
 │  /aischat-ui/*     前端静态托管（SPA 回退 + 防穿越）               │
 │  /aischat-worlds/* 世界工作区：dir / token / status / pull 端点   │
@@ -34,7 +34,7 @@
 └──────────────────────────────────────────────────────────────────┘
         ▲ 同源（浏览器永不接触后端地址）
 ┌─ 浏览器（Client 半边）───────────────────────────────────────────┐
-│  侧边栏 AIsChat 入口 → 全屏 board（rail + 对话列 + composer）      │
+│  侧边栏 Copree 入口 → 全屏 board（rail + 对话列 + composer）      │
 │  沉浸式覆盖层（iframe /aischat-ui/...）                           │
 │  世界同步：登录/打开面板时建文件夹+会话+上报 token+温和拉取         │
 └──────────────────────────────────────────────────────────────────┘
@@ -49,17 +49,17 @@
 ### 3.1 前置
 
 - DSH Web 已运行（`dsh web`，如 `127.0.0.1:3080`）
-- AIsChat 后端在**同一台机器**运行（默认 `127.0.0.1:5228`），其前端已按 `/aischat-ui/` base 构建
+- Copree 后端在**同一台机器**运行（默认 `127.0.0.1:5228`），其前端已按 `/aischat-ui/` base 构建
 
 ### 3.2 构建插件
 
 ```bash
-cd dsh-aischat
+cd dsh-copree
 pnpm install        # 或复用 node_modules
 node scripts/build.mjs   # 产出 lib/index.js（Host）+ lib/client.js（Client）
 ```
 
-插件自包含 `dist/`（AIsChat 前端 `BASE_URL=/aischat-ui/` 构建产物），无需单独部署前端。
+插件自包含 `dist/`（Copree 前端 `BASE_URL=/aischat-ui/` 构建产物），无需单独部署前端。
 
 > `dist` **必须在 `package.json` 的 `files` 里**。打包管理器严格按该字段装包：
 > 漏了 `dist`，`dsh plugin add` / 插件市场一键装出来的副本就没有 UI，`/aischat-ui/`
@@ -68,7 +68,7 @@ node scripts/build.mjs   # 产出 lib/index.js（Host）+ lib/client.js（Client
 ### 3.3 装入 DSH
 
 ```bash
-dsh plugin --profile web add file:/path/to/dsh-aischat
+dsh plugin --profile web add file:/path/to/dsh-copree
 systemctl restart dsh-web   # 或重启 dsh web 进程
 ```
 
@@ -78,34 +78,34 @@ systemctl restart dsh-web   # 或重启 dsh web 进程
 
 ```yaml
 - insert:
-    - id: dsh-aischat
-      name: dsh-aischat
+    - id: dsh-copree
+      name: dsh-copree
       config:
         backendUrl: http://127.0.0.1:5228   # 仅回环/内网
 ```
 
 > 开发态改动同步：改 `src/*.ts` 后重跑 build，把 `lib/` 与 `dist/` 复制到
-> profile 的 `node_modules/dsh-aischat/`，Host 改动需重启 dsh-web，Client 改动刷新页面即可。
+> profile 的 `node_modules/dsh-copree/`，Host 改动需重启 dsh-web，Client 改动刷新页面即可。
 
 ### 3.5 插件自更新
 
-DSH 设置页的 **AIsChat** 分区底部新增一行插件版本信息，检测到不一致时出现 **更新** 按钮；
-侧边栏底部的 AIsChat 入口在有更新时显示角标。
+DSH 设置页的 **Copree** 分区底部新增一行插件版本信息，检测到不一致时出现 **更新** 按钮；
+侧边栏底部的 Copree 入口在有更新时显示角标。
 
 **身份用内容摘要，不用版本号。** `node scripts/build.mjs` 会产出 `lib/manifest.json`：
 清单里每个产物带 sha256，对清单取摘要即该次构建的身份（同镜像 digest 的用法）。
 因此不存在"忘了 bump 版本号导致检测不到"的情形——内容变了身份就变。
 
 **更新源零配置。** 插件回溯安装来源：profile 的 `package.json` 里
-`dependencies["dsh-aischat"]` 的 `file:` 规格（pnpm/npm 记录的就是它）。
+`dependencies["dsh-copree"]` 的 `file:` 规格（pnpm/npm 记录的就是它）。
 需要指向别处时再配 `pluginSourceDir`：
 
 ```yaml
 - insert:
-    - id: dsh-aischat
-      name: dsh-aischat
+    - id: dsh-copree
+      name: dsh-copree
       config:
-        pluginSourceDir: /path/to/dsh-aischat
+        pluginSourceDir: /path/to/dsh-copree
 ```
 
 **换入过程不会留半新半旧的状态**：先暂存并逐文件校验 sha256（源码改过但没重新构建会被
@@ -161,7 +161,7 @@ profile 的 `package.json` 判断自己是怎么装的，据此决定该由谁�
 离线验证（全程临时目录，不碰 profile 安装副本）：
 
 ```bash
-cd dsh-aischat
+cd dsh-copree
 node scripts/update-test.mjs   # 换入 / 幂等 / 篡改拒绝 / restart 判定 / 回滚
 node scripts/smoke.mjs         # Host 半挂到 mock webServer，验代理与插件端点
 ```
@@ -172,7 +172,7 @@ node scripts/smoke.mjs         # Host 半挂到 mock webServer，验代理与插
 
 ### 4.1 概念
 
-每个 AIsChat 世界对应 DSH 工作区一个**真实目录**：
+每个 Copree 世界对应 DSH 工作区一个**真实目录**：
 
 ```
 $DSH_HOME/aischat-worlds/AIC群视界-<世界名>/
@@ -181,7 +181,7 @@ $DSH_HOME/aischat-worlds/AIC群视界-<世界名>/
 ├── index.html / main.py / blocks/ ...   # 世界文件「本地镜像」
 ```
 
-**本地镜像 = 世界文件的本地副本**。agent 用 **DSH 原生的 read / write / edit / glob / grep / bash** 直接读写镜像（bash 可直接跑世界 Python 代码测试），改完 `world_push` 同步回 AIsChat 世界。
+**本地镜像 = 世界文件的本地副本**。agent 用 **DSH 原生的 read / write / edit / glob / grep / bash** 直接读写镜像（bash 可直接跑世界 Python 代码测试），改完 `world_push` 同步回 Copree 世界。
 
 ### 4.2 同步机制（GitHub 式）
 
@@ -195,7 +195,7 @@ $DSH_HOME/aischat-worlds/AIC群视界-<世界名>/
 | `conflict` | 两边都改 | **不自动**，交 AI/用户裁决 |
 | `removed` | 世界上删除 | 删除本地（本地未改时） |
 
-**自动拉取（温和）**：打开 AIsChat 时自动执行，**仅当「本地无未推送修改且世界有改动」**才拉取，返回 `+N 新增 ~N 修改 -N 删除` 报告。本地脏/冲突一律拒绝，**绝不覆盖 agent 正在工作的文件**（对话进行中文件不会被自动改动）。
+**自动拉取（温和）**：打开 Copree 时自动执行，**仅当「本地无未推送修改且世界有改动」**才拉取，返回 `+N 新增 ~N 修改 -N 删除` 报告。本地脏/冲突一律拒绝，**绝不覆盖 agent 正在工作的文件**（对话进行中文件不会被自动改动）。
 
 **实现要点（正确性保障）**：
 
@@ -208,7 +208,7 @@ $DSH_HOME/aischat-worlds/AIC群视界-<世界名>/
 ### 4.3 典型工作流
 
 ```
-① 打开 AIsChat（自动：建文件夹+会话+上报 token+温和拉取）
+① 打开 Copree（自动：建文件夹+会话+上报 token+温和拉取）
 ② 工作区点开 AIC群视界-世界名 会话
 ③ 对 DSH agent 说：
    "看看我的世界有什么文件"      → world_list_files
@@ -260,7 +260,7 @@ $DSH_HOME/aischat-worlds/AIC群视界-<世界名>/
 ## 7. 安全与隐私
 
 - **零公网地址**：插件代码、UI、代理目标全部 loopback；`backendUrl` 来自配置不接受客户端输入
-- **token 仅内存**：client 登录后把 token 按 worldId 上报 host（`worldTokenMap`），供 owner 鉴权写操作；**不落盘、不打日志**；dsh-web 重启后需重新打开 AIsChat 同步
+- **token 仅内存**：client 登录后把 token 按 worldId 上报 host（`worldTokenMap`），供 owner 鉴权写操作；**不落盘、不打日志**；dsh-web 重启后需重新打开 Copree 同步
 - **同源代理**：无 CORS 面；剥离 hop-by-hop 头防请求走私；错误响应固定文案不回显内部
 - **世界沙箱 token**（`api_token`）：仅内部调用用，绝不回传给模型
 
@@ -270,12 +270,12 @@ $DSH_HOME/aischat-worlds/AIC群视界-<世界名>/
 
 | 现象 | 处理 |
 |---|---|
-| 世界工具报"未连接登录态" | 打开一次 AIsChat（触发 token 上报）；查 `GET /aischat-worlds/status` 看 `tokenWorlds` 是否含该世界 |
-| 工作区没有世界文件夹 | 确认登录 AIsChat；只同步**自己创建**的世界（`/worlds` 只返回 owner） |
+| 世界工具报"未连接登录态" | 打开一次 Copree（触发 token 上报）；查 `GET /aischat-worlds/status` 看 `tokenWorlds` 是否含该世界 |
+| 工作区没有世界文件夹 | 确认登录 Copree；只同步**自己创建**的世界（`/worlds` 只返回 owner） |
 | `world_push` 跳过冲突 | 冲突裁决：读两边内容，`force:true` 或手动合并 |
 | 世界页打不开/显示宿主界面 | 世界无 index.html（提示"让群视界机器人生成"）；或路径未走 `/aischat-api` |
-| token 丢了（重启后） | 重新打开 AIsChat 面板触发同步 |
-| 工具报"不属于任何 AIsChat 世界" | 会话 cwd 需在 `aischat-worlds` 目录下（打开 AIC群视界-* 会话） |
+| token 丢了（重启后） | 重新打开 Copree 面板触发同步 |
+| 工具报"不属于任何 Copree 世界" | 会话 cwd 需在 `aischat-worlds` 目录下（打开 AIC群视界-* 会话） |
 | 装插件报 `ERR_PNPM_UNEXPECTED_STORE` | 见下方「DSH_HOME 是符号链接时的两个坑」第 1 条 |
 | 装插件报 `ENOENT ... /data_s001/tmp/...` 或 `.../relocated/dsh-session-recovery` | 见下方第 2 条 |
 
@@ -306,8 +306,8 @@ pnpm 写 lockfile 按**符号链接路径**计算 `file:` 依赖的相对路径�
 `relative(真实路径, 目标)`），工具已随插件提供：
 
 ```bash
-node dsh-aischat/scripts/fix-profile-links.mjs --dry-run   # 先看会改什么
-node dsh-aischat/scripts/fix-profile-links.mjs             # 修（自动备份 .bak-links）
+node dsh-copree/scripts/fix-profile-links.mjs --dry-run   # 先看会改什么
+node dsh-copree/scripts/fix-profile-links.mjs             # 修（自动备份 .bak-links）
 ```
 
 它是幂等的：路径已正确时报 0 处改动，连续运行不会叠加。
@@ -326,10 +326,10 @@ node dsh-aischat/scripts/fix-profile-links.mjs             # 修（自动备份 
 
 ---
 
-## 9. 与 AIsChat 独立部署的关系
+## 9. 与 Copree 独立部署的关系
 
-AIsChat 本体（docker-compose / 源码）保持独立可部署；插件是**加装层**，不改动 AIsChat 部署方式。后端世界文件仍在后端容器/数据目录，DSH 侧只是镜像 + 同步。
+Copree 本体（docker-compose / 源码）保持独立可部署；插件是**加装层**，不改动 Copree 部署方式。后端世界文件仍在后端容器/数据目录，DSH 侧只是镜像 + 同步。
 
 ---
 
-*相关：`docs/dev/TODO.md`（开发待办）、CHANGELOG v0.3.10（特性记录）、`dsh-aischat/README.md`（插件包内说明）*
+*相关：`docs/dev/TODO.md`（开发待办）、CHANGELOG v0.3.10（特性记录）、`dsh-copree/README.md`（插件包内说明）*

@@ -1,4 +1,4 @@
-# AIsChat 文档目录
+# Copree 文档目录
 
 > **版本**: v3.5.0 | **更新**: 2026-09-13
 
@@ -97,8 +97,8 @@
 
 | 文档 | 适用人群 | 说明 |
 |------|---------|------|
-| [AIsChat 基于 Agent 的项目探索与架构探讨.md](./exploration/AIsChat 基于 Agent 的项目探索与架构探讨.md) | 研究者/开发者 | 项目探索与架构讨论（原始对话） |
-| [AIsChat 重构设计文档.md](./exploration/AIsChat 重构设计文档.md) | 开发者 | 重构设计总览（精简版） |
+| [Copree 基于 Agent 的项目探索与架构探讨.md](./exploration/Copree 基于 Agent 的项目探索与架构探讨.md) | 研究者/开发者 | 项目探索与架构讨论（原始对话） |
+| [Copree 重构设计文档.md](./exploration/Copree 重构设计文档.md) | 开发者 | 重构设计总览（精简版） |
 
 ### 六、技术参考
 
@@ -106,7 +106,7 @@
 |------|---------|------|
 | [CODE_WIKI.md](./CODE_WIKI.md) | 开发者/维护者 | **代码 Wiki**：项目架构、模块职责、关键类与函数、全量路由表、i18n 体系、构建产物与插件包、API 端点、数据模型、配置部署、开发指南 |
 | [LEARNING_ROADMAP.md](./LEARNING_ROADMAP.md) | 新开发者 | **学习路线图**：5 阶段阶梯式学习，每阶段有目标、必读文件、Mermaid 图表、动手实践任务 |
-| [DSH 接入指南.md](./DSH接入指南.md) | 开发者 | 将 AIsChat 接入 DeepSeek Harness（DSH） |
+| [DSH 接入指南.md](./DSH接入指南.md) | 开发者 | 将 Copree 接入 DeepSeek Harness（DSH） |
 
 ### 七、项目参考
 

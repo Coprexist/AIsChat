@@ -1,7 +1,7 @@
 """
 PostgreSQL + pgvector 存储后端
 
-默认后端，保持 AIsChat 现有行为：
+默认后端，保持 Copree 现有行为：
   - 引擎：postgresql+asyncpg / postgresql
   - 向量：pgvector.sqlalchemy.Vector
   - 检索：<=> 余弦距离 + to_tsvector/ts_rank 全文

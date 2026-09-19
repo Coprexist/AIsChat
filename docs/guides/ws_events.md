@@ -1,4 +1,4 @@
-# AIsChat WebSocket 事件完整文档 / WebSocket Events Reference
+# Copree WebSocket 事件完整文档 / WebSocket Events Reference
 
 > **面向前端开发者和集成开发者。** 所有 WebSocket 事件的详细说明。
 > **For frontend and integration developers.** Detailed description of all WebSocket events.

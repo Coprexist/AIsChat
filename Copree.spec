@@ -76,7 +76,7 @@ exe = EXE(
     a.scripts,
     [],
     exclude_binaries=True,
-    name='AIsChat',
+    name='Copree',
     debug=False,
     bootloader_ignore_signals=False,
     strip=False,
@@ -98,5 +98,5 @@ coll = COLLECT(
     strip=False,
     upx=True,
     upx_exclude=[],
-    name='AIsChat',
+    name='Copree',
 )

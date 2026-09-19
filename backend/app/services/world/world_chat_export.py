@@ -77,7 +77,7 @@ def render_markdown(world, session: dict, messages: list) -> str:
         f"- 消息：{len(messages)} 条",
         f"- 导出时间：{now}",
         "",
-        "> 由 AIsChat 群视界导出；内容与对话面板所见一致（含思考与工具调用，不含系统提示词与配置）。",
+        "> 由 Copree 群视界导出；内容与对话面板所见一致（含思考与工具调用，不含系统提示词与配置）。",
     ]
     last_note = ""
     for m in messages:

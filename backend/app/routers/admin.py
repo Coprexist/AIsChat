@@ -1407,7 +1407,7 @@ async def get_auth_settings(
             "port": cfg.get("port", 587),
             "username": cfg.get("username", ""),
             "from_email": cfg.get("from_email", ""),
-            "from_name": cfg.get("from_name", "AIsChat"),
+            "from_name": cfg.get("from_name", "Copree"),
             "use_tls": cfg.get("use_tls", True),
             "has_password": bool(cfg.get("password_encrypted")),
             "is_active": cfg.get("is_active", True),
@@ -1582,7 +1582,7 @@ async def get_smtp_configs(
             "port": cfg.get("port", 587),
             "username": cfg.get("username", ""),
             "from_email": cfg.get("from_email", ""),
-            "from_name": cfg.get("from_name", "AIsChat"),
+            "from_name": cfg.get("from_name", "Copree"),
             "use_tls": cfg.get("use_tls", True),
             "is_active": cfg.get("is_active", True),
             "priority": cfg.get("priority", 0),
@@ -1678,7 +1678,7 @@ async def test_smtp_by_index(
         "username": cfg.get("username", ""),
         "password": password,
         "from_email": cfg.get("from_email", ""),
-        "from_name": cfg.get("from_name", "AIsChat"),
+        "from_name": cfg.get("from_name", "Copree"),
         "use_tls": cfg.get("use_tls", True),
     }
 
