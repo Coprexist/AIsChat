@@ -8,7 +8,7 @@ const SYS_MSG: Msg = {
   role: 'assistant',
   content: "你好！我是 Copree 演示版。输入你的 DeepSeek API Key 开始体验 AI 群聊。\n\n" +
     "💡 你的 Key 只保存在浏览器本地，不会上传到任何服务器。\n" +
-    "🌐 访问 GitHub 仓库获取完整版 → [Copree](https://github.com/Coprexist/AIsChat)",
+    "🌐 访问 GitHub 仓库获取完整版 → [Copree](https://github.com/Coprexist/Copree)",
 }
 
 export default function DemoChat() {
@@ -117,7 +117,7 @@ export default function DemoChat() {
           <span className="text-3xs px-1.5 py-0.5 rounded-full bg-accent-500/10 text-accent-500 border border-accent-500/20">DEMO</span>
         </div>
         <div className="flex items-center gap-2">
-          <a href="https://github.com/Coprexist/AIsChat" target="_blank" rel="noreferrer" className="flex items-center gap-1 text-xs text-textMuted hover:text-textSecondary">
+          <a href="https://github.com/Coprexist/Copree" target="_blank" rel="noreferrer" className="flex items-center gap-1 text-xs text-textMuted hover:text-textSecondary">
             <Github size={14} /> GitHub
           </a>
           <button onClick={() => setDark(!dark)} className="p-1.5 rounded-control hover:bg-canvas text-textMuted hover:text-textSecondary">

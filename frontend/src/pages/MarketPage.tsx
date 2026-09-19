@@ -628,7 +628,7 @@ export default function MarketPage() {
             <div className="text-center text-textMuted text-sm py-16 space-y-2">
               <Github size={32} className="mx-auto opacity-40" />
               <div>GitHub 快照为空。点击右上「刷新」从仓库拉取世界列表。</div>
-              <div className="text-3xs opacity-60">仓库: Coprexist/AIsChat-Community · 管理员可在后台配置仓库与自动获取</div>
+              <div className="text-3xs opacity-60">仓库: Coprexist/Copree-Community · 管理员可在后台配置仓库与自动获取</div>
             </div>
           ) : (
             <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-3">

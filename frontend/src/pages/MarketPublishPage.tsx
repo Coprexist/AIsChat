@@ -111,7 +111,7 @@ export default function MarketPublishPage() {
               className={`w-full flex items-center gap-2 px-3 py-2.5 rounded-control border text-sm transition-colors ${syncGithub ? 'bg-primary-500/10 border-primary-500/50 text-primary-300' : 'bg-elevated border-border text-textSecondary'}`}
             >
               <Github size={15} />
-              <span className="flex-1 text-left">发布后同步到 GitHub（AIsChat-Community）</span>
+              <span className="flex-1 text-left">发布后同步到 GitHub（Copree-Community）</span>
               <span className={`text-xs ${syncGithub ? 'text-primary-300' : 'text-textMuted'}`}>{syncGithub ? '已勾选' : '未勾选'}</span>
             </button>
             {syncGithub && !githubConfigured && (

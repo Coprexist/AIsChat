@@ -1357,7 +1357,7 @@ DB_PASSWORD=your-db-password
 # 其他
 DISPLAY_TIMEZONE=Asia/Shanghai
 GITHUB_TOKEN=
-REGISTRY_REPO=Coprexist/AIsChat
+REGISTRY_REPO=Coprexist/Copree
 ```
 
 ### 系统设置（管理员通过后台配置）
@@ -1382,7 +1382,7 @@ REGISTRY_REPO=Coprexist/AIsChat
 
 ```bash
 # 1. 克隆仓库
-git clone https://github.com/Coprexist/AIsChat.git
+git clone https://github.com/Coprexist/Copree.git
 cd Copree
 
 # 2. 配置环境变量

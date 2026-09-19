@@ -795,7 +795,7 @@ export default function MePage() {
         <Dialog onClose={() =>  setShowBindGithub(false)} className="flex items-center justify-center p-4">
           <div className="bg-surface border border-border rounded-dialog p-6 w-full max-w-sm shadow-2xl" onClick={e => e.stopPropagation()}>
             <h3 className="text-lg font-semibold text-textPrimary mb-1">绑定 GitHub 账户</h3>
-            <p className="text-xs text-textMuted mb-4">用于世界商城同步——以你的身份推送到 AIsChat-Community。Token 加密存储，仅本实例可见。</p>
+            <p className="text-xs text-textMuted mb-4">用于世界商城同步——以你的身份推送到 Copree-Community。Token 加密存储，仅本实例可见。</p>
             <div className="space-y-3">
               <div>
                 <div className="flex items-center justify-between mb-1">

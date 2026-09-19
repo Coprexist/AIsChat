@@ -157,7 +157,7 @@ class Settings(BaseSettings):
 
     # ── 联邦通信 — GitHub 注册表 ──
     github_token: str = ""
-    registry_repo: str = "Coprexist/AIsChat"
+    registry_repo: str = "Coprexist/Copree"
     registry_file: str = "federation-registry.json"
 
     # ── 联邦通信 — 出站 TLS ──

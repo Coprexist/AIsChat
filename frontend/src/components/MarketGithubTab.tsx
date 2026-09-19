@@ -108,7 +108,7 @@ export default function MarketGithubTab() {
           <input
             value={repo}
             onChange={(e) => setRepo(e.target.value)}
-            placeholder="Coprexist/AIsChat-Community"
+            placeholder="Coprexist/Copree-Community"
             className="w-full bg-elevated text-sm px-3 py-2 rounded-control border border-border outline-none focus:border-primary-500/50 text-textPrimary"
           />
           <div className="text-3xs text-textMuted mt-1">同步目标仓库；本地用户绑定的 GitHub 也需对该仓库有写权限</div>

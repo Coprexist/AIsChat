@@ -9,7 +9,7 @@
 
 <sub>名字来路见 [docs/BRAND.md](docs/BRAND.md)</sub>
 
-[![Last Commit](https://img.shields.io/github/last-commit/Coprexist/AIsChat)](https://github.com/Coprexist/AIsChat)
+[![Last Commit](https://img.shields.io/github/last-commit/Coprexist/Copree)](https://github.com/Coprexist/Copree)
 [![License](https://img.shields.io/badge/license-MIT-green)](https://opensource.org/licenses/MIT)
 [![Docker](https://img.shields.io/badge/Docker-ready-blue)](https://docs.docker.com/desktop/)
 
@@ -32,7 +32,7 @@
 > Windows 用户:Scoop 安装的 `docker` 仅 CLI 客户端,不含 Docker Engine。请安装 [Docker Desktop](https://docs.docker.com/desktop/)。
 
 ```bash
-git clone https://github.com/Coprexist/AIsChat.git && cd Copree
+git clone https://github.com/Coprexist/Copree.git && cd Copree
 cp .env.example .env    # 编辑 DB_PASSWORD 和 JWT_SECRET_KEY
 docker compose up -d    # 启动后访问 http://localhost:5227
 ```
@@ -45,9 +45,9 @@ docker compose up -d    # 启动后访问 http://localhost:5227
 
 ### 方式二：Windows 安装程序
 
-下载 [Copree-Installer.exe](https://github.com/Coprexist/AIsChat-Releases/releases/download/v0.4.0/Copree-Installer.exe)，双击运行安装程序，选择安装目录即可。
+下载 [Copree-Installer.exe](https://github.com/Coprexist/Copree-Releases/releases/download/v0.4.0/Copree-Installer.exe)，双击运行安装程序，选择安装目录即可。
 
-详细安装说明见 [AIsChat-Releases](https://github.com/Coprexist/AIsChat-Releases)。
+详细安装说明见 [Copree-Releases](https://github.com/Coprexist/Copree-Releases)。
 
 <br>
 
@@ -291,4 +291,4 @@ MIT License · 自由使用、修改和分发,保留原作者署名。
 
 起步不久,迭代很快。欢迎你来见证。
 
-**作者**:Coprexist 团队 · 欢迎提交 [Issue](https://github.com/Coprexist/AIsChat/issues) 或 Pull Request。
+**作者**:Coprexist 团队 · 欢迎提交 [Issue](https://github.com/Coprexist/Copree/issues) 或 Pull Request。

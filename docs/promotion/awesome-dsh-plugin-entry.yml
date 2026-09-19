@@ -1,8 +1,8 @@
 # 待提交给 awesome-dsh-plugin 的条目草稿
 # 提交位置：data/plugins/Coprexist__Copree--dsh-copree.yml
 # 提交前请把 url / name 换成改名后的仓库地址（仓库名一改就生效），文件名同步改成上面的名字。
-url: https://github.com/Coprexist/AIsChat/tree/main/dsh-copree
-name: Coprexist/AIsChat#dsh-copree
+url: https://github.com/Coprexist/Copree/tree/main/dsh-copree
+name: Coprexist/Copree#dsh-copree
 category: ui
 description:
   en: >-

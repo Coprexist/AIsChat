@@ -1,6 +1,6 @@
 # 开源 AI 群聊框架 Copree：从群聊到可编程世界引擎
 
-**摘要**：Copree 是一个开源的 AI 群聊社交框架，基于 FastAPI + React 19 构建，支持 AI 自主群聊、双重记忆、四状态机等核心功能。其 v0.3.1 版本重磅升级为“可编程世界引擎”，通过“群视界”能力让每个群聊都能绑定一个拥有独立时间、状态、记忆和代码的活世界。本文详细解析 Copree 的项目定位、快速部署、核心能力、架构设计，并与同类项目对比，帮助读者全面了解这个从“AI 社交”迈向“可编程世界”的创新框架。项目地址：<https://github.com/Coprexist/AIsChat>
+**摘要**：Copree 是一个开源的 AI 群聊社交框架，基于 FastAPI + React 19 构建，支持 AI 自主群聊、双重记忆、四状态机等核心功能。其 v0.3.1 版本重磅升级为“可编程世界引擎”，通过“群视界”能力让每个群聊都能绑定一个拥有独立时间、状态、记忆和代码的活世界。本文详细解析 Copree 的项目定位、快速部署、核心能力、架构设计，并与同类项目对比，帮助读者全面了解这个从“AI 社交”迈向“可编程世界”的创新框架。项目地址：<https://github.com/Coprexist/Copree>
 
 > 一个基于 FastAPI + React 19 的开源 AI 社交框架，支持 AI 自主群聊、双重记忆、四状态机与可编程世界引擎
 
@@ -26,7 +26,7 @@
 
 ```bash
 # 1. 克隆并配置
-git clone https://github.com/Coprexist/AIsChat.git && cd Copree
+git clone https://github.com/Coprexist/Copree.git && cd Copree
 cp .env.example .env
 # 编辑 .env：填写 DB_PASSWORD 和 JWT_SECRET_KEY
 
@@ -86,7 +86,7 @@ docker compose up -d
 **世界可以分享，而不仅是自娱自乐**：
 
 * **世界商城**：任何世界可发布到商城（标题/描述/标签），他人一键导入到自己的实例——造好的世界能被所有人看见和使用
-* **GitHub 社区仓库**（Coprexist/AIsChat-Community）：世界包可同步到社区仓库，任何 Copree 实例的商城都能拉取；仓库采用**双板块**设计（本地 / GitHub），管理员可配置自动获取与手动刷新
+* **GitHub 社区仓库**（Coprexist/Copree-Community）：世界包可同步到社区仓库，任何 Copree 实例的商城都能拉取；仓库采用**双板块**设计（本地 / GitHub），管理员可配置自动获取与手动刷新
 * **可信同步体系**：跨实例同步以 **GitHub 数字用户 ID 作为身份锚**（改名不影响归属），写入由**机器人统一校验**（目录所有权 + 查重），并叠加**作者签名 + 机器人背书签名**双重验签——防篡改、防冒名、防转载，社区生态的安全地基
 * **资源类型持续扩展**：除世界外，技能（Skills）、工具（Tools）、积木（Blocks）也将进入社区仓库
 
@@ -231,12 +231,12 @@ Copree 目前版本为 **v0.3.1**（2026-08-07），功能已完整可用，持�
 
 **相关链接**：
 
-* GitHub：<https://github.com/Coprexist/AIsChat>
-* 世界社区（商城数据源）：<https://github.com/Coprexist/AIsChat-Community>
-* 桌面客户端：<https://github.com/Coprexist/AIsChat-Client>
-* 产品介绍：[docs/ABOUT.md](https://github.com/Coprexist/AIsChat/blob/main/docs/ABOUT.md)
-* 用户手册：[docs/guides/用户手册.md](https://github.com/Coprexist/AIsChat/blob/main/docs/guides/%E7%94%A8%E6%88%B7%E6%89%8B%E5%86%8C.md)
-* 项目全景报告：[docs/reference/项目全景报告.md](https://github.com/Coprexist/AIsChat/blob/main/docs/reference/%E9%A1%B9%E7%9B%AE%E5%85%A8%E6%99%AF%E6%8A%A5%E5%91%8A.md)
-* 群视界设计文档：[docs/group\_world/design/group\_world\_design.md](https://github.com/Coprexist/AIsChat/blob/main/docs/group_world/design/group_world_design.md)
+* GitHub：<https://github.com/Coprexist/Copree>
+* 世界社区（商城数据源）：<https://github.com/Coprexist/Copree-Community>
+* 桌面客户端：<https://github.com/Coprexist/Copree-Client>
+* 产品介绍：[docs/ABOUT.md](https://github.com/Coprexist/Copree/blob/main/docs/ABOUT.md)
+* 用户手册：[docs/guides/用户手册.md](https://github.com/Coprexist/Copree/blob/main/docs/guides/%E7%94%A8%E6%88%B7%E6%89%8B%E5%86%8C.md)
+* 项目全景报告：[docs/reference/项目全景报告.md](https://github.com/Coprexist/Copree/blob/main/docs/reference/%E9%A1%B9%E7%9B%AE%E5%85%A8%E6%99%AF%E6%8A%A5%E5%91%8A.md)
+* 群视界设计文档：[docs/group\_world/design/group\_world\_design.md](https://github.com/Coprexist/Copree/blob/main/docs/group_world/design/group_world_design.md)
 
 > **Copree 不只是“能聊天的 AI”，而是“能生活的 AI 们”。现在，它们有了可以生活的世界。**
