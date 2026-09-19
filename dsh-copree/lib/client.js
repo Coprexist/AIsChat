@@ -1,4 +1,4 @@
-window.__ModuleLoader__.load({ id: "dsh-aischat", factory: (require) => {
+window.__ModuleLoader__.load({ id: "dsh-copree", factory: (require) => {
 var module = { exports: {} }; var exports = module.exports;
 
 // src/client.ts
@@ -397,7 +397,7 @@ var style = {
   memberRole: { flex: "none", fontSize: 11, color: "var(--dsw-alias-label-tertiary)" },
   smallBtn: { flex: "none", padding: "4px 12px", borderRadius: 8, border: "1px solid var(--dsw-alias-border-l2)", background: "transparent", color: "var(--dsw-alias-label-primary)", cursor: "pointer", fontSize: 12, fontWeight: 500 },
   smallBtnOn: { background: "var(--dsw-alias-interactive-bg-hover)", borderColor: "transparent" },
-  // 沉浸式覆盖层：zIndex 必须高于 board（30），否则在 AIsChat board 打开时
+  // 沉浸式覆盖层：zIndex 必须高于 board（30），否则在 Copree board 打开时
   // 会被 board 盖住（两者同在 shell.overlay 槽内，board fixed z30 > 本层 z5）。
   immersive: { position: "fixed", inset: 0, zIndex: 40, display: "flex", flexDirection: "column", background: "var(--dsw-alias-bg-base)" },
   immersiveBar: { flex: "none", display: "flex", alignItems: "center", gap: 10, padding: "8px 14px", borderBottom: "1px solid var(--dsw-alias-border-l2)", fontSize: 13, fontWeight: 600, color: "var(--dsw-alias-label-primary)" },
@@ -461,7 +461,7 @@ function LoginForm() {
     h(
       "div",
       { style: style.loginCard },
-      h("div", { style: style.loginTitle }, "AIsChat \u767B\u5F55"),
+      h("div", { style: style.loginTitle }, "Copree \u767B\u5F55"),
       h("input", { style: style.field, placeholder: "\u7528\u6237\u540D / \u90AE\u7BB1", value: id, onChange: (e) => setId(e.target.value), onKeyDown: (e) => {
         if (e.key === "Enter") submit();
       } }),
@@ -470,7 +470,7 @@ function LoginForm() {
       } }),
       h("button", { style: style.btn, onClick: submit, disabled: busy }, busy ? "\u767B\u5F55\u4E2D\u2026" : "\u767B\u5F55"),
       err ? h("div", { style: style.err }, err) : null,
-      h("div", { style: style.hint }, "\u51ED\u636E\u4EC5\u4FDD\u5B58\u5728\u672C\u673A\u6D4F\u89C8\u5668\uFF0C\u901A\u8FC7\u672C\u5730\u540C\u6E90\u4EE3\u7406\u8BBF\u95EE AIsChat \u670D\u52A1\u3002")
+      h("div", { style: style.hint }, "\u51ED\u636E\u4EC5\u4FDD\u5B58\u5728\u672C\u673A\u6D4F\u89C8\u5668\uFF0C\u901A\u8FC7\u672C\u5730\u540C\u6E90\u4EE3\u7406\u8BBF\u95EE Copree \u670D\u52A1\u3002")
     )
   );
 }
@@ -804,7 +804,7 @@ function ConversationColumn({ refresh, onImmersive }) {
     return h(
       "div",
       { style: style.main },
-      h("div", { style: style.mainHead }, "AIsChat"),
+      h("div", { style: style.mainHead }, "Copree"),
       h("div", { style: style.empty }, "\u4ECE\u5DE6\u4FA7\u9009\u62E9\u4E00\u4E2A\u5BF9\u8BDD")
     );
   }
@@ -934,7 +934,7 @@ function AisChatBoard({ onClose }) {
         h(
           "div",
           { style: style.railHead },
-          h("span", {}, "AIsChat"),
+          h("span", {}, "Copree"),
           h("button", { style: style.closeBtn, onClick: onClose }, "\u8FD4\u56DE\u5DE5\u4F5C\u533A")
         )
       ),
@@ -961,7 +961,7 @@ function AisChatBoard({ onClose }) {
       h(
         "div",
         { style: style.railHead },
-        h("span", { style: style.railLabel }, "AIsChat"),
+        h("span", { style: style.railLabel }, "Copree"),
         h("button", { style: { ...style.closeBtn, marginLeft: "auto", fontSize: 12 }, onClick: onClose }, "\u8FD4\u56DE\u5DE5\u4F5C\u533A")
       ),
       h(
@@ -1042,15 +1042,15 @@ function SettingsPage() {
     return h(
       "div",
       { style: { padding: 20, maxWidth: 420 } },
-      h("div", { style: { fontSize: 16, fontWeight: 600, marginBottom: 16, color: "var(--dsw-alias-label-primary)" } }, "AIsChat"),
-      h("div", { style: { ...style.hint, marginTop: 0 } }, "\u767B\u5F55 AIsChat \u540E\u5373\u53EF\u5728\u4FA7\u8FB9\u680F\u4F7F\u7528\u804A\u5929\u3002\u51ED\u636E\u4EC5\u4FDD\u5B58\u5728\u672C\u673A\u6D4F\u89C8\u5668\u3002"),
+      h("div", { style: { fontSize: 16, fontWeight: 600, marginBottom: 16, color: "var(--dsw-alias-label-primary)" } }, "Copree"),
+      h("div", { style: { ...style.hint, marginTop: 0 } }, "\u767B\u5F55 Copree \u540E\u5373\u53EF\u5728\u4FA7\u8FB9\u680F\u4F7F\u7528\u804A\u5929\u3002\u51ED\u636E\u4EC5\u4FDD\u5B58\u5728\u672C\u673A\u6D4F\u89C8\u5668\u3002"),
       h(LoginForm, null)
     );
   }
   return h(
     "div",
     { style: { padding: 20, maxWidth: 480 } },
-    h("div", { style: { fontSize: 16, fontWeight: 600, marginBottom: 16, color: "var(--dsw-alias-label-primary)" } }, "AIsChat"),
+    h("div", { style: { fontSize: 16, fontWeight: 600, marginBottom: 16, color: "var(--dsw-alias-label-primary)" } }, "Copree"),
     h(
       "div",
       { style: { ...style.row, padding: "8px 0" } },
@@ -1082,7 +1082,7 @@ function SettingsPage() {
         h(
           "div",
           { style: style.rowTitle },
-          plugin ? `dsh-aischat ${plugin.installed && plugin.installed.version || "\u672A\u77E5"} \xB7 ${shortId(plugin.installed && plugin.installed.id)}` : "dsh-aischat \u7248\u672C\u68C0\u6D4B\u4E2D\u2026"
+          plugin ? `dsh-copree ${plugin.installed && plugin.installed.version || "\u672A\u77E5"} \xB7 ${shortId(plugin.installed && plugin.installed.id)}` : "dsh-copree \u7248\u672C\u68C0\u6D4B\u4E2D\u2026"
         ),
         h("div", { style: style.rowSub }, pluginStateText(plugin))
       ),
@@ -1131,20 +1131,20 @@ function FooterButton({ wide }) {
     {
       style: { ...style.footTrigger, ...rail ? style.footTriggerRail : {}, ...open ? { background: "var(--dsw-alias-interactive-bg-hover-solid, var(--dsw-alias-interactive-bg-hover))" } : {} },
       onClick: toggle,
-      title: "AIsChat \u804A\u5929",
-      "aria-label": rail ? "AIsChat" : void 0
+      title: "Copree \u804A\u5929",
+      "aria-label": rail ? "Copree" : void 0
     },
     h(IconNewChatOutline16, { size: rail ? 18 : 16 }),
-    rail ? null : h("span", { style: { fontWeight: 500 } }, "AIsChat"),
+    rail ? null : h("span", { style: { fontWeight: 500 } }, "Copree"),
     needsUpdate ? h("span", {
-      title: "AIsChat \u63D2\u4EF6\u6709\u66F4\u65B0",
+      title: "Copree \u63D2\u4EF6\u6709\u66F4\u65B0",
       style: { flex: "none", width: 7, height: 7, borderRadius: "50%", background: "var(--dsw-alias-state-danger-primary, #e5484d)" }
     }) : null
   );
 }
 var boardOpenRef = { current: false };
 module.exports = {
-  name: "dsh-aischat",
+  name: "dsh-copree",
   inject: ["slots", "workspaces"],
   apply(ctx) {
     let boardOpen = false;
@@ -1214,7 +1214,7 @@ module.exports = {
     }, 6e4);
     disposers.push(() => clearInterval(syncTimer));
     disposers.push(ctx.slots.inject("sidebar.footer.action", () => ctx.slots.register(
-      { name: "sidebar.footer.action", id: "aischat-entry", order: 10, label: "AIsChat" },
+      { name: "sidebar.footer.action", id: "aischat-entry", order: 10, label: "Copree" },
       FooterButton
     )));
     const BoardEntry = () => {
@@ -1245,7 +1245,7 @@ module.exports = {
       ImmersiveOverlay
     )));
     disposers.push(ctx.slots.inject("settings.section", () => ctx.slots.register(
-      { name: "settings.section", id: "aischat", order: 40, label: "AIsChat" },
+      { name: "settings.section", id: "aischat", order: 40, label: "Copree" },
       SettingsPage
     )));
     window.addEventListener("focus", () => {

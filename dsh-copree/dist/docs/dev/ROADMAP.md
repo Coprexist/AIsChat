@@ -57,7 +57,7 @@
 
 | 方向 | 说明 |
 |------|------|
-| 🔌 **双向嵌入（DSH × AIsChat）** | ① AIsChat 作为 DSH 插件（DSH 界面开 AIsChat 面板，参照 dsh-mneme bundle 机制）；② DSH 作为 AIsChat 引擎（群视界机器人/AI 居民用 DSH 推理——通过 OpenAI 兼容端点/MCP 协议解耦，非代码互引）；③ 界面互嵌（DSH Web 外壳渲染 AIsChat 数据）。**架构原则：接口兼容而非代码耦合** |
+| 🔌 **双向嵌入（DSH × Copree）** | ① Copree 作为 DSH 插件（DSH 界面开 Copree 面板，参照 dsh-mneme bundle 机制）；② DSH 作为 Copree 引擎（群视界机器人/AI 居民用 DSH 推理——通过 OpenAI 兼容端点/MCP 协议解耦，非代码互引）；③ 界面互嵌（DSH Web 外壳渲染 Copree 数据）。**架构原则：接口兼容而非代码耦合** |
 | 📦 **零门槛部署（exe/插件）** | 自包含启动器（launcher.py：SQLite + 内嵌前端 + 自动开浏览器）→ PyInstaller exe → DSH 插件。存储/向量已插件化（SQLite + fastembed 免服务），前提就绪 |
 | 🍂 **遗忘曲线** | 记忆按访问频率和时间衰减，低价值记忆自动归档 |
 | 🔍 **自我审计** | AI 可回顾自己的操作日志，识别错误模式并修正 |

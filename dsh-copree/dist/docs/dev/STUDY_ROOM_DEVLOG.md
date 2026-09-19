@@ -5,7 +5,7 @@
 
 ## 一、总览
 
-自习室是一个嵌入 AIsChat 前端的番茄钟 + 白噪音应用，位于 `frontend/public/study-room/`（纯静态，iframe 加载），后端统计走 AIsChat 的 FastAPI `/study` 路由。
+自习室是一个嵌入 Copree 前端的番茄钟 + 白噪音应用，位于 `frontend/public/study-room/`（纯静态，iframe 加载），后端统计走 Copree 的 FastAPI `/study` 路由。
 
 **文件结构：**
 - `index.html` — 页面结构（计时器卡、声音条、设置弹窗、侧栏 3 卡）
@@ -78,7 +78,7 @@
 - 前端：vite dev 容器 ai_group_frontend（5227），public/ 改动一般自动提供，不刷新时 `docker restart ai_group_frontend`
 - 后端：ai_group_backend（5228），改代码必须 `docker restart ai_group_backend`（uvicorn 容器内不 reload）；迁移在 prestart.py MIGRATIONS 列表（study_records、study_settings 已加）
 - 测试：直连后端不带 /api 前缀（vite proxy 剥前缀）；测试 token /tmp/aisc_token3.txt（user_id=1）
-- 提交链：Coprexist/AIsChat.git main，最新 0d389d9
+- 提交链：Coprexist/Copree.git main，最新 0d389d9
 
 ## 七、隐私红线与偏好
 

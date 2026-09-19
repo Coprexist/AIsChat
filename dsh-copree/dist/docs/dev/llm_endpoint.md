@@ -114,7 +114,7 @@ docker exec ai_group_backend curl -s -o /dev/null -w '%{http_code}\n' \
 
 `url_guard.is_private_target()` 会**解析域名再判**，所以 `127.0.0.1.nip.io` 这类"域名指向回环"的绕过写法也拦得住。
 
-**注意方向**：dsh-aischat 插件访问 AIsChat 是 **DSH → AIsChat（入站）**，
+**注意方向**：dsh-copree 插件访问 Copree 是 **DSH → Copree（入站）**，
 `world_push` / `world_pull` 也是 DSH 侧工具调我们的 API——出站守卫碰不到它，别拿它当"必须放开内网"的理由。
 
 **测试**：`backend/tests/test_api_probe.py` 用 `httpx.MockTransport` 零网络覆盖全部分支

@@ -1,4 +1,4 @@
-# AIsChat 故障排查手册 / Troubleshooting Guide
+# Copree 故障排查手册 / Troubleshooting Guide
 
 > **面向管理员和开发者。** 常见问题的症状、原因和解决方案。
 > **For administrators and developers.** Symptoms, causes, and solutions for common issues.
@@ -600,9 +600,9 @@ for r in app.routes:
 
 ```bash
 #!/bin/bash
-# diagnose.sh - AIsChat 故障诊断脚本
+# diagnose.sh - Copree 故障诊断脚本
 
-echo "=== AIsChat 诊断 ==="
+echo "=== Copree 诊断 ==="
 
 echo "1. 检查容器状态"
 docker compose ps

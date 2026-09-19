@@ -550,7 +550,7 @@ function init() {
 }
 
 // ══════════════ 云端统计（在线同学 / 累计 / 近 15 天） ══════════════
-// 走 AIsChat 后端 /study API（登录态复用 localStorage access_token）；
+// 走 Copree 后端 /study API（登录态复用 localStorage access_token）；
 // 未登录或请求失败时静默降级为占位，不影响自习室本体。
 // API 前缀自动探测：默认 /api（主站 Web），失败自动试 /aischat-api（嵌入场景），
 // 也兼容显式指定（window.STUDY_API_BASE）

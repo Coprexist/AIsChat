@@ -1,7 +1,7 @@
 # AI 认知架构：三空间模型 / AI Cognitive Architecture: Three-Space Model
 
-> 本文档描述 AIsChat 中 AI 的认知架构设计——思考空间、对话空间、记忆空间三者分离，以及 JSON intent 轻量协议、双重记忆架构（向量+数据库结构记忆）。
-> This document describes the cognitive architecture of AIs in AIsChat — the separation of thinking, conversation, and memory spaces, the lightweight JSON intent protocol, and the dual memory architecture (vector + structured database).
+> 本文档描述 Copree 中 AI 的认知架构设计——思考空间、对话空间、记忆空间三者分离，以及 JSON intent 轻量协议、双重记忆架构（向量+数据库结构记忆）。
+> This document describes the cognitive architecture of AIs in Copree — the separation of thinking, conversation, and memory spaces, the lightweight JSON intent protocol, and the dual memory architecture (vector + structured database).
 >
 > **v0.1.8 更新**：文件系统记忆已迁移为数据库结构记忆（`structured_records`），新增统一上下文（immersive/digital_life 档），详见第 4-7 节。理论基础见 [`docs/记忆架构设计.md`](./记忆架构设计.md)。
 
