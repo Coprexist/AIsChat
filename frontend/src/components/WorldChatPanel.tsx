@@ -327,7 +327,7 @@ function ReasoningBubble({ text, running }: { text: string; running?: boolean })
     >
       <div className="flex items-center gap-1.5 px-2 py-1">
         <Brain size={12} className="shrink-0 text-textMuted" />
-        <span className="shrink-0 text-3xs text-textMuted font-medium">{t('tool:world.reasoning') || '思考'}</span>
+        <span className="shrink-0 text-3xs text-textMuted font-medium">{t('tool:world.reasoning')}</span>
         <span className="shrink-0 w-px h-2.5 bg-border/60 mx-0.5" aria-hidden />
         <span
           ref={summaryRef}
@@ -545,12 +545,12 @@ const WorldChatPanel = memo(forwardRef<WorldChatHandle, WorldChatPanelProps>(({ 
   const confirmAndSendSuggestion = useCallback(async (q: string) => {
     const ok = await confirmAsync({
       key: `world.suggest:${q}`,
-      title: t('tool:world.suggest.title') || '发送这条建议？',
-      confirmText: t('tool:world.suggest.confirm') || '发送',
+      title: t('tool:world.suggest.title'),
+      confirmText: t('tool:world.suggest.confirm'),
       message: (
         <>
           <div className="rounded-control bg-elevated border border-border px-3 py-2 text-xs text-textPrimary whitespace-pre-wrap break-words">{q}</div>
-          <div className="mt-2 text-3xs text-textMuted">{t('tool:world.suggest.modifyHint') || '如需修改：点右边的 ＋ 插入输入框再改'}</div>
+          <div className="mt-2 text-3xs text-textMuted">{t('tool:world.suggest.modifyHint')}</div>
         </>
       ),
     })

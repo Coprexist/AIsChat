@@ -583,7 +583,7 @@ export default function SettingsPage() {
         <div className="space-y-4">
           {providerPresets.length > 0 && (
             <div>
-              <label className="block text-xs font-medium mb-1.5 text-textSecondary">{t('settings.presetProvider') || '厂商预设'}</label>
+              <label className="block text-xs font-medium mb-1.5 text-textSecondary">{t('settings.presetProvider')}</label>
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2 mb-2">
                 {providerPresets.map(p => (
                   <button
@@ -1468,8 +1468,8 @@ export default function SettingsPage() {
                 <AlertTriangle size={20} className="text-rose-400" />
               </div>
               <div className="flex-1 min-w-0">
-                <h3 className="text-lg font-semibold text-textPrimary">{t('settings.removeEmailTitle') || '解绑邮箱'}</h3>
-                <p className="text-sm text-textSecondary mt-1">{t('settings.removeEmailDesc') || '解绑后你将无法使用邮箱登录和找回密码。确定要解绑吗？'}</p>
+                <h3 className="text-lg font-semibold text-textPrimary">{t('settings.removeEmailTitle')}</h3>
+                <p className="text-sm text-textSecondary mt-1">{t('settings.removeEmailDesc')}</p>
               </div>
             </div>
             <div className="flex gap-3 mt-5">

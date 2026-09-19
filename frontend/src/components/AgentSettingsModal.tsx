@@ -318,7 +318,7 @@ export default function AgentSettingsModal({
       }
       await api.put(`/agents/${agent.id}/config`, payload)
       setSaveOk(true)
-      setSaveMsg(t('modal.detailSettingsSaveAndClose') || 'Saved')
+      setSaveMsg(t('modal.detailSettingsSaveAndClose'))
       setTimeout(() => {
         onSaved()
         onClose()
@@ -351,7 +351,7 @@ export default function AgentSettingsModal({
             </button>
           )}
           <h2 className="text-base font-semibold text-textPrimary">
-            {view === 'main' ? t('modal.mainSettingsTitle') || '设置' : t('modal.detailSettingsTitle') || '详细设置'}
+            {view === 'main' ? t('modal.mainSettingsTitle') : t('modal.detailSettingsTitle')}
           </h2>
           <div className="w-6" />
         </div>
@@ -365,7 +365,7 @@ export default function AgentSettingsModal({
               </button>
             )}
             <h2 className="text-base font-semibold text-textPrimary">
-              {view === 'main' ? t('modal.mainSettingsTitle') || '设置' : t('modal.detailSettingsTitle') || '详细设置'}
+              {view === 'main' ? t('modal.mainSettingsTitle') : t('modal.detailSettingsTitle')}
             </h2>
           </div>
           <button onClick={onClose} className="text-textMuted hover:text-textSecondary transition-colors">
@@ -378,7 +378,7 @@ export default function AgentSettingsModal({
           {/* ═══════════════════════════════════════════ 主设置 ═══════════════════════════════════════════ */}
           {view === 'main' && (
             <>
-              <p className="text-3xs text-textMuted -mb-3">{t('modal.mainSettingsDesc') || '核心配置，快速调整 AI 行为。更多参数请点击底部「详细设置」。'}</p>
+              <p className="text-3xs text-textMuted -mb-3">{t('modal.mainSettingsDesc')}</p>
 
               {/* 基础信息 */}
               <Section title={t('modal.detailSettingsBasicInfo')} desc={t('modal.detailSettingsBasicInfoDesc')}>
@@ -388,7 +388,7 @@ export default function AgentSettingsModal({
                     className="w-full px-3 py-2 rounded-control border border-border bg-canvas text-sm text-textPrimary placeholder:text-textMuted focus:outline-none focus:ring-2 focus:ring-primary-500/50" />
                 </div>
                 <div>
-                  <label className="block text-xs font-medium mb-1 text-textSecondary">{t('modal.mainSettingsProfile') || '配置档位'}</label>
+                  <label className="block text-xs font-medium mb-1 text-textSecondary">{t('modal.mainSettingsProfile')}</label>
                   <div className="grid grid-cols-4 gap-2">
                     {PROFILE_OPTIONS.map((opt) => (
                       <button key={opt.value} type="button"
@@ -413,20 +413,20 @@ export default function AgentSettingsModal({
               </Section>
 
               {/* 个人资料 */}
-              <Section title={t('modal.detailSettingsProfileInfo') || '个人资料'} desc={t('modal.detailSettingsProfileInfoDesc') || 'AI 的对外展示信息'}>
+              <Section title={t('modal.detailSettingsProfileInfo')} desc={t('modal.detailSettingsProfileInfoDesc')}>
                 <div>
-                  <label className="block text-xs font-medium mb-1 text-textSecondary">{t('agentDetail.bioLabel') || '简介'}</label>
+                  <label className="block text-xs font-medium mb-1 text-textSecondary">{t('agentDetail.bioLabel')}</label>
                   <textarea value={bio} onChange={(e) => setBio(e.target.value)} rows={3} maxLength={500}
                     className="w-full px-3 py-2 rounded-control border border-border bg-canvas text-sm text-textPrimary placeholder:text-textMuted focus:outline-none focus:ring-2 focus:ring-primary-500/50 resize-none" />
                   <p className="text-3xs text-textMuted mt-0.5">{bio.length}/500</p>
                 </div>
                 <div>
-                  <label className="block text-xs font-medium mb-1 text-textSecondary">{t('agentDetail.statusTextLabel') || '个性状态'}</label>
+                  <label className="block text-xs font-medium mb-1 text-textSecondary">{t('agentDetail.statusTextLabel')}</label>
                   <input type="text" value={statusText} onChange={(e) => setStatusText(e.target.value)} maxLength={100}
                     className="w-full px-3 py-2 rounded-control border border-border bg-canvas text-sm text-textPrimary placeholder:text-textMuted focus:outline-none focus:ring-2 focus:ring-primary-500/50" />
                 </div>
                 <div>
-                  <label className="block text-xs font-medium mb-1 text-textSecondary">{t('me.statusColorLabel') || '状态颜色'}</label>
+                  <label className="block text-xs font-medium mb-1 text-textSecondary">{t('me.statusColorLabel')}</label>
                   <div className="flex items-center gap-2 flex-wrap">
                     {STATUS_COLORS.map(c => (
                       <button key={c.value} type="button" onClick={() => setStatusColor(c.value)}
@@ -444,7 +444,7 @@ export default function AgentSettingsModal({
                     <div className="relative">
                       <input type="color" value={statusColor || '#000000'} onChange={e => setStatusColor(e.target.value)}
                         className="w-6 h-6 rounded-full cursor-pointer border-2 border-border hover:border-primary-400 transition-colors"
-                        title={t('me.statusColorCustom') || '自定义'} />
+                        title={t('me.statusColorCustom')} />
                     </div>
                   </div>
                 </div>
@@ -473,7 +473,7 @@ export default function AgentSettingsModal({
               </Section>
 
               {/* 模型与行为 */}
-              <Section title={t('modal.mainSettingsModelBehavior') || '模型与行为'} desc={t('modal.mainSettingsModelBehaviorDesc') || ''}>
+              <Section title={t('modal.mainSettingsModelBehavior')} desc={t('modal.mainSettingsModelBehaviorDesc')}>
                 <div className="grid grid-cols-2 gap-3">
                   <div>
                     <label className="block text-xs font-medium mb-1 text-textSecondary">
@@ -516,14 +516,14 @@ export default function AgentSettingsModal({
               </Section>
 
               {/* 权限 */}
-              <Section title={t('modal.mainSettingsPermissions') || '权限'} desc={t('modal.mainSettingsPermissionsDesc') || ''}>
+              <Section title={t('modal.mainSettingsPermissions')} desc={t('modal.mainSettingsPermissionsDesc')}>
                 <ToggleField label={t('agents.allowOthersChat')} value={allowOthersChat} setValue={setAllowOthersChat} desc={t('agents.allowOthersChatDesc')} />
                 <ToggleField label={t('agents.discoverable')} value={discoverable} setValue={setDiscoverable} desc={t('agents.discoverableDesc')} />
                 <ToggleField label={t('modal.detailSettingsAllowFriendRequests')} value={allowFriendRequests} setValue={setAllowFriendRequests} desc={t('modal.detailSettingsAllowFriendRequestsDesc')} />
                 {allowFriendRequests && (
                   <ToggleField label={t('modal.detailSettingsAutoRespondFriendRequest')} value={autoRespondFriendRequest} setValue={setAutoRespondFriendRequest} desc={t('modal.detailSettingsAutoRespondFriendRequestDesc')} />
                 )}
-                <ToggleField label={t('modal.mainSettingsIsPaused') || '暂停 AI'} value={isPaused} setValue={setIsPaused} desc={t('modal.mainSettingsIsPausedDesc') || '暂停后 AI 不再响应任何消息'} />
+                <ToggleField label={t('modal.mainSettingsIsPaused')} value={isPaused} setValue={setIsPaused} desc={t('modal.mainSettingsIsPausedDesc')} />
               </Section>
             </>
           )}
@@ -531,10 +531,10 @@ export default function AgentSettingsModal({
           {/* ═══════════════════════════════════════════ 详细设置 ═══════════════════════════════════════════ */}
           {view === 'detailed' && (
             <>
-              <p className="text-3xs text-textMuted -mb-3">{t('modal.detailSettingsDesc') || '高级参数调整。不确定的保持默认即可。'}</p>
+              <p className="text-3xs text-textMuted -mb-3">{t('modal.detailSettingsDesc')}</p>
 
               {/* 高级模型参数 */}
-              <Section title={t('modal.detailSettingsAdvancedModel') || '高级模型参数'} desc={t('modal.detailSettingsAdvancedModelDesc') || '精细控制采样策略'} defaultCollapsed>
+              <Section title={t('modal.detailSettingsAdvancedModel')} desc={t('modal.detailSettingsAdvancedModelDesc')} defaultCollapsed>
                 <SliderField label="Top P" value={topP} setValue={setTopP} min={0} max={1} step={0.05} desc={t('modal.detailSettingsTopPDesc')} />
                 <SliderField label="Presence Penalty" value={presencePenalty} setValue={setPresencePenalty} min={-2} max={2} step={0.1} desc={t('modal.detailSettingsPresencePenaltyDesc')} />
                 <SliderField label="Frequency Penalty" value={frequencyPenalty} setValue={setFrequencyPenalty} min={-2} max={2} step={0.1} desc={t('modal.detailSettingsFrequencyPenaltyDesc')} />
@@ -554,9 +554,9 @@ export default function AgentSettingsModal({
               </Section>
 
               {/* 自动免打扰 (NEW) */}
-              <Section title={t('modal.detailSettingsAutoDnd') || '自动免打扰'} desc={t('modal.detailSettingsAutoDndDesc') || '意愿评分低于阈值时自动进入免打扰'}>
-                <SliderField label={t('modal.detailSettingsAutoDndThreshold') || '触发阈值'} value={autoDndThreshold} setValue={setAutoDndThreshold} min={0} max={100} step={5} desc={t('modal.detailSettingsAutoDndThresholdDesc') || '意愿评分低于此值时自动开启免打扰'} />
-                <NumberField label={t('modal.detailSettingsAutoDndDuration') || '持续时长（分钟）'} value={autoDndDuration} setValue={setAutoDndDuration} min={1} max={1440} desc={t('modal.detailSettingsAutoDndDurationDesc') || '自动免打扰的持续时长'} />
+              <Section title={t('modal.detailSettingsAutoDnd')} desc={t('modal.detailSettingsAutoDndDesc')}>
+                <SliderField label={t('modal.detailSettingsAutoDndThreshold')} value={autoDndThreshold} setValue={setAutoDndThreshold} min={0} max={100} step={5} desc={t('modal.detailSettingsAutoDndThresholdDesc')} />
+                <NumberField label={t('modal.detailSettingsAutoDndDuration')} value={autoDndDuration} setValue={setAutoDndDuration} min={1} max={1440} desc={t('modal.detailSettingsAutoDndDurationDesc')} />
               </Section>
 
               {/* 文件记忆 */}
@@ -585,17 +585,17 @@ export default function AgentSettingsModal({
               </Section>
 
               {/* 对话日志 (NEW) */}
-              <Section title={t('modal.detailSettingsConversationLogs') || '对话日志'} desc={t('modal.detailSettingsConversationLogsDesc') || '此 AI 的日志保留和用户查看权限'} defaultCollapsed>
+              <Section title={t('modal.detailSettingsConversationLogs')} desc={t('modal.detailSettingsConversationLogsDesc')} defaultCollapsed>
                 <div>
-                  <label className="block text-xs font-medium mb-1 text-textSecondary">{t('modal.detailSettingsConversationLogsLimit') || '日志保留上限'}</label>
+                  <label className="block text-xs font-medium mb-1 text-textSecondary">{t('modal.detailSettingsConversationLogsLimit')}</label>
                   <input type="number" min={1} max={10000} value={conversationLogsLimit ?? ''}
                     onChange={(e) => setConversationLogsLimit(e.target.value ? parseInt(e.target.value) : null)}
-                    placeholder={t('modal.detailSettingsConversationLogsLimitDesc') || '留空继承全局'}
+                    placeholder={t('modal.detailSettingsConversationLogsLimitDesc')}
                     className="w-full px-3 py-2 rounded-control border border-border bg-canvas text-sm text-textPrimary placeholder:text-textMuted focus:outline-none focus:ring-2 focus:ring-primary-500/50" />
-                  <p className="text-3xs text-textMuted mt-0.5">{t('modal.detailSettingsConversationLogsLimitDesc') || '留空继承全局设置'}</p>
+                  <p className="text-3xs text-textMuted mt-0.5">{t('modal.detailSettingsConversationLogsLimitDesc')}</p>
                 </div>
                 <div>
-                  <label className="block text-xs font-medium mb-1 text-textSecondary">{t('modal.detailSettingsUserCanViewLogs') || '允许用户查看日志'}</label>
+                  <label className="block text-xs font-medium mb-1 text-textSecondary">{t('modal.detailSettingsUserCanViewLogs')}</label>
                   <select
                     value={userCanViewLogs === null ? 'inherit' : userCanViewLogs ? 'on' : 'off'}
                     onChange={(e) => { const v = e.target.value; setUserCanViewLogs(v === 'inherit' ? null : v === 'on') }}
@@ -605,7 +605,7 @@ export default function AgentSettingsModal({
                     <option value="on">{t('common.enabled')}</option>
                     <option value="off">{t('common.disabled')}</option>
                   </select>
-                  <p className="text-3xs text-textMuted mt-0.5">{t('modal.detailSettingsUserCanViewLogsDesc') || '留空继承全局默认设置'}</p>
+                  <p className="text-3xs text-textMuted mt-0.5">{t('modal.detailSettingsUserCanViewLogsDesc')}</p>
                 </div>
               </Section>
 
@@ -625,7 +625,7 @@ export default function AgentSettingsModal({
               </Section>
 
               {/* ── 合并：对话与社交权限 ── */}
-              <Section title={t('modal.detailSettingsChatPermissionsDetail') || '对话与社交权限'} desc={t('modal.detailSettingsChatPermissionsDetailDesc') || '控制谁可以与此 AI 对话、加好友、消耗配额'} defaultCollapsed>
+              <Section title={t('modal.detailSettingsChatPermissionsDetail')} desc={t('modal.detailSettingsChatPermissionsDetailDesc')} defaultCollapsed>
                 {/* 社交发现 */}
                 <ToggleField label={t('agents.discoverable')} value={discoverable} setValue={setDiscoverable} desc={t('agents.discoverableDesc')} />
                 <ToggleField label={t('modal.detailSettingsAllowFriendRequests')} value={allowFriendRequests} setValue={setAllowFriendRequests} desc={t('modal.detailSettingsAllowFriendRequestsDesc')} />
@@ -662,11 +662,11 @@ export default function AgentSettingsModal({
                           </div>
                           <p className="text-3xs text-textMuted leading-relaxed">{t('agents.othersChatQuotaDesc')}</p>
                         </div>
-                        <ToggleField label={t('agents.autoResetQuota') || '自动重置配额'} value={autoResetQuota} setValue={setAutoResetQuota} desc={t('agents.autoResetQuotaDesc') || '用户每次 DM 后自动重置配额计数至上限'} />
+                        <ToggleField label={t('agents.autoResetQuota')} value={autoResetQuota} setValue={setAutoResetQuota} desc={t('agents.autoResetQuotaDesc')} />
                       </>
                     )}
                     {/* 群聊付费 */}
-                    <ToggleField label={t('agents.groupOwnerPays') || '群聊由群主付费'} value={groupOwnerPays} setValue={setGroupOwnerPays} desc={t('agents.groupOwnerPaysDesc') || '群聊中 AI 消息由群主付费，关闭后用户需使用自有 API Key'} />
+                    <ToggleField label={t('agents.groupOwnerPays')} value={groupOwnerPays} setValue={setGroupOwnerPays} desc={t('agents.groupOwnerPaysDesc')} />
                   </div>
                 ) : (
                   <div className="ml-4 pl-3 border-l-2 border-rose-400/30 space-y-2 mt-1">
@@ -689,20 +689,20 @@ export default function AgentSettingsModal({
 
                 {/* AI↔AI 私信限额（2026-08-09） */}
                 <div className="mt-4 pt-3 border-t border-border/40">
-                  <label className="block text-xs font-medium mb-1 text-textSecondary">{t('agents.dmQuotaTitle') || 'AI↔AI 私信限额'}</label>
-                  <p className="text-3xs text-textMuted leading-relaxed mb-2">{t('agents.dmQuotaDesc') || '控制与其他 AI 私信互通的条数（0 = 不启用该维度）。超出后消息照常送达，但不触发对方自动回复；创建者发消息后计数重置。'}</p>
+                  <label className="block text-xs font-medium mb-1 text-textSecondary">{t('agents.dmQuotaTitle')}</label>
+                  <p className="text-3xs text-textMuted leading-relaxed mb-2">{t('agents.dmQuotaDesc')}</p>
                   <div className="grid grid-cols-2 gap-3">
                     <div className="space-y-2">
-                      <span className="text-2xs font-medium text-textSecondary block">{t('agents.dmQuotaSend') || '发送'}</span>
-                      <NumberField label={t('agents.dmQuotaDaily') || '每天'} value={dmSendDaily} setValue={setDmSendDaily} min={0} max={9999} />
-                      <NumberField label={t('agents.dmQuotaWeekly') || '每周'} value={dmSendWeekly} setValue={setDmSendWeekly} min={0} max={9999} />
-                      <NumberField label={t('agents.dmQuotaCreatorChat') || '距创建者对话'} value={dmSendCreatorChat} setValue={setDmSendCreatorChat} min={0} max={9999} />
+                      <span className="text-2xs font-medium text-textSecondary block">{t('agents.dmQuotaSend')}</span>
+                      <NumberField label={t('agents.dmQuotaDaily')} value={dmSendDaily} setValue={setDmSendDaily} min={0} max={9999} />
+                      <NumberField label={t('agents.dmQuotaWeekly')} value={dmSendWeekly} setValue={setDmSendWeekly} min={0} max={9999} />
+                      <NumberField label={t('agents.dmQuotaCreatorChat')} value={dmSendCreatorChat} setValue={setDmSendCreatorChat} min={0} max={9999} />
                     </div>
                     <div className="space-y-2">
-                      <span className="text-2xs font-medium text-textSecondary block">{t('agents.dmQuotaReceive') || '接收'}</span>
-                      <NumberField label={t('agents.dmQuotaDaily') || '每天'} value={dmRecvDaily} setValue={setDmRecvDaily} min={0} max={9999} />
-                      <NumberField label={t('agents.dmQuotaWeekly') || '每周'} value={dmRecvWeekly} setValue={setDmRecvWeekly} min={0} max={9999} />
-                      <NumberField label={t('agents.dmQuotaCreatorChat') || '距创建者对话'} value={dmRecvCreatorChat} setValue={setDmRecvCreatorChat} min={0} max={9999} />
+                      <span className="text-2xs font-medium text-textSecondary block">{t('agents.dmQuotaReceive')}</span>
+                      <NumberField label={t('agents.dmQuotaDaily')} value={dmRecvDaily} setValue={setDmRecvDaily} min={0} max={9999} />
+                      <NumberField label={t('agents.dmQuotaWeekly')} value={dmRecvWeekly} setValue={setDmRecvWeekly} min={0} max={9999} />
+                      <NumberField label={t('agents.dmQuotaCreatorChat')} value={dmRecvCreatorChat} setValue={setDmRecvCreatorChat} min={0} max={9999} />
                     </div>
                   </div>
                 </div>
@@ -779,13 +779,13 @@ export default function AgentSettingsModal({
             <button onClick={() => setView('detailed')}
               className="flex-1 py-2.5 text-sm border border-primary-400/30 text-primary-500 rounded-card hover:bg-primary-500/10 font-medium transition-colors flex items-center justify-center gap-1"
             >
-              {t('modal.goToDetailedSettings') || '详细设置'} <ChevronRight size={14} />
+              {t('modal.goToDetailedSettings')} <ChevronRight size={14} />
             </button>
           ) : (
             <button onClick={() => setView('main')}
               className="flex-1 py-2.5 text-sm border border-border text-textSecondary rounded-card hover:bg-elevated font-medium transition-colors"
             >
-              {t('modal.backToMainSettings') || '返回简洁设置'}
+              {t('modal.backToMainSettings')}
             </button>
           )}
           <button onClick={onClose}

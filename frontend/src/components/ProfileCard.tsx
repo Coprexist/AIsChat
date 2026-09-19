@@ -225,7 +225,7 @@ export default function ProfileCard({ entityType, entityId, entityName, state, a
               }`}
             >
               <Star size={16} fill={isPriority ? 'currentColor' : 'none'} />
-              {isPriority ? t('profileCard.priorityOn') || '已特别关心' : t('profileCard.priorityOff') || '设为特别关心'}
+              {isPriority ? t('profileCard.priorityOn') : t('profileCard.priorityOff')}
             </button>
           )}
 
@@ -285,7 +285,7 @@ export default function ProfileCard({ entityType, entityId, entityName, state, a
           {/* 群聊信息 */}
           {isGroup && (
             <div className="text-2xs text-textMuted text-center pt-2">
-              {createdAt && <span>{t('profileCard.createdOn') || '创建于'} {new Date(createdAt).toLocaleDateString('zh-CN')}</span>}
+              {createdAt && <span>{t('profileCard.createdOn')} {new Date(createdAt).toLocaleDateString('zh-CN')}</span>}
             </div>
           )}
           </div>

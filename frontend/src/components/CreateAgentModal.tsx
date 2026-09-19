@@ -1064,23 +1064,23 @@ function DetailSettingsModal({
           </Section>
 
           {/* ── 自动免打扰 ── */}
-          <Section title={t('modal.detailSettingsAutoDnd') || '自动免打扰'} desc={t('modal.detailSettingsAutoDndDesc') || '意愿评分低于阈值时自动进入免打扰'}>
-            <SliderField label={t('modal.detailSettingsAutoDndThreshold') || '触发阈值'} value={autoDndThreshold} setValue={setAutoDndThreshold} min={0} max={100} step={5} desc={t('modal.detailSettingsAutoDndThresholdDesc') || '意愿评分低于此值时自动开启免打扰'} />
-            <NumberField label={t('modal.detailSettingsAutoDndDuration') || '持续时长（分钟）'} value={autoDndDuration} setValue={setAutoDndDuration} min={1} max={1440} desc={t('modal.detailSettingsAutoDndDurationDesc') || '自动免打扰的持续时长'} />
+          <Section title={t('modal.detailSettingsAutoDnd')} desc={t('modal.detailSettingsAutoDndDesc')}>
+            <SliderField label={t('modal.detailSettingsAutoDndThreshold')} value={autoDndThreshold} setValue={setAutoDndThreshold} min={0} max={100} step={5} desc={t('modal.detailSettingsAutoDndThresholdDesc')} />
+            <NumberField label={t('modal.detailSettingsAutoDndDuration')} value={autoDndDuration} setValue={setAutoDndDuration} min={1} max={1440} desc={t('modal.detailSettingsAutoDndDurationDesc')} />
           </Section>
 
           {/* ── 对话日志 ── */}
-          <Section title={t('modal.detailSettingsConversationLogs') || '对话日志'} desc={t('modal.detailSettingsConversationLogsDesc') || '此 AI 的日志保留和用户查看权限'}>
+          <Section title={t('modal.detailSettingsConversationLogs')} desc={t('modal.detailSettingsConversationLogsDesc')}>
             <div>
-              <label className="block text-xs font-medium mb-1 text-textSecondary">{t('modal.detailSettingsConversationLogsLimit') || '日志保留上限'}</label>
+              <label className="block text-xs font-medium mb-1 text-textSecondary">{t('modal.detailSettingsConversationLogsLimit')}</label>
               <input type="number" min={1} max={10000} value={conversationLogsLimit ?? ''}
                 onChange={(e) => setConversationLogsLimit(e.target.value ? parseInt(e.target.value) : null)}
-                placeholder={t('modal.detailSettingsConversationLogsLimitDesc') || '留空继承全局'}
+                placeholder={t('modal.detailSettingsConversationLogsLimitDesc')}
                 className="w-full px-3 py-2 rounded-control border border-border bg-canvas text-sm text-textPrimary placeholder:text-textMuted focus:outline-none focus:ring-2 focus:ring-primary-500/50" />
-              <p className="text-3xs text-textMuted mt-0.5">{t('modal.detailSettingsConversationLogsLimitDesc') || '留空继承全局设置'}</p>
+              <p className="text-3xs text-textMuted mt-0.5">{t('modal.detailSettingsConversationLogsLimitDesc')}</p>
             </div>
             <div>
-              <label className="block text-xs font-medium mb-1 text-textSecondary">{t('modal.detailSettingsUserCanViewLogs') || '允许用户查看日志'}</label>
+              <label className="block text-xs font-medium mb-1 text-textSecondary">{t('modal.detailSettingsUserCanViewLogs')}</label>
               <select
                 value={userCanViewLogs === null ? 'inherit' : userCanViewLogs ? 'on' : 'off'}
                 onChange={(e) => { const v = e.target.value; setUserCanViewLogs(v === 'inherit' ? null : v === 'on') }}
@@ -1090,7 +1090,7 @@ function DetailSettingsModal({
                 <option value="on">{t('common.enabled')}</option>
                 <option value="off">{t('common.disabled')}</option>
               </select>
-              <p className="text-3xs text-textMuted mt-0.5">{t('modal.detailSettingsUserCanViewLogsDesc') || '留空继承全局默认设置'}</p>
+              <p className="text-3xs text-textMuted mt-0.5">{t('modal.detailSettingsUserCanViewLogsDesc')}</p>
             </div>
           </Section>
 
@@ -1154,7 +1154,7 @@ function DetailSettingsModal({
           </Section>
 
           {/* ── 对话与社交权限 ── */}
-          <Section title={t('modal.detailSettingsChatPermissionsDetail') || '对话与社交权限'} desc={t('modal.detailSettingsChatPermissionsDetailDesc') || '控制谁可以与此 AI 对话、加好友、消耗配额'}>
+          <Section title={t('modal.detailSettingsChatPermissionsDetail')} desc={t('modal.detailSettingsChatPermissionsDetailDesc')}>
             <ToggleField label={t('agents.discoverable')} value={discoverable} setValue={setDiscoverable} desc={t('agents.discoverableDesc')} />
             <ToggleField label={t('modal.detailSettingsAllowFriendRequests')} value={allowFriendRequests} setValue={setAllowFriendRequests} desc={t('modal.detailSettingsAllowFriendRequestsDesc')} />
             {allowFriendRequests && (
@@ -1186,10 +1186,10 @@ function DetailSettingsModal({
                       </div>
                       <p className="text-3xs text-textMuted leading-relaxed">{t('agents.othersChatQuotaDesc')}</p>
                     </div>
-                    <ToggleField label={t('agents.autoResetQuota') || '自动重置配额'} value={autoResetQuota} setValue={setAutoResetQuota} desc={t('agents.autoResetQuotaDesc') || '用户每次 DM 后自动重置配额计数至上限'} />
+                    <ToggleField label={t('agents.autoResetQuota')} value={autoResetQuota} setValue={setAutoResetQuota} desc={t('agents.autoResetQuotaDesc')} />
                   </>
                 )}
-                <ToggleField label={t('agents.groupOwnerPays') || '群聊由群主付费'} value={groupOwnerPays} setValue={setGroupOwnerPays} desc={t('agents.groupOwnerPaysDesc') || '群聊中 AI 消息由群主付费，关闭后用户需使用自有 API Key'} />
+                <ToggleField label={t('agents.groupOwnerPays')} value={groupOwnerPays} setValue={setGroupOwnerPays} desc={t('agents.groupOwnerPaysDesc')} />
               </div>
             ) : (
               <div className="ml-4 pl-3 border-l-2 border-rose-400/30 space-y-2 mt-1">

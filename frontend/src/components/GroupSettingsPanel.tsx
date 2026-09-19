@@ -613,7 +613,7 @@ export default function GroupSettingsPanel({ group, onClose, onUpdate, onLeave }
                   <div className="flex items-center justify-between mt-3 px-1">
                     <div>
                       <div className="text-xs text-textPrimary font-medium">{t('groupSettings.includeAiInAvatar')}</div>
-                      <div className="text-3xs text-textMuted">{t('groupSettings.includeAiInAvatarDesc') || 'Off: human-only'}</div>
+                      <div className="text-3xs text-textMuted">{t('groupSettings.includeAiInAvatarDesc')}</div>
                     </div>
                     <Toggle
                       checked={includeAiAvatar}

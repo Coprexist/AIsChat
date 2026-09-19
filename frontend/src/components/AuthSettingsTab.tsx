@@ -490,9 +490,9 @@ export default function AuthSettingsTab() {
                       : 'border-border bg-canvas text-textMuted hover:text-textSecondary hover:border-borderHover'
                   }`}
                 >
-                  {p === 'gradient' ? t('admin.emailPresetGradient') || '渐变版' :
-                   p === 'simple' ? t('admin.emailPresetSimple') || '简版' :
-                   t('admin.emailPresetCustom') || '自定义版'}
+                  {p === 'gradient' ? t('admin.emailPresetGradient') :
+                   p === 'simple' ? t('admin.emailPresetSimple') :
+                   t('admin.emailPresetCustom')}
                 </button>
               ))}
             </div>
@@ -586,17 +586,17 @@ export default function AuthSettingsTab() {
                 </div>
                 <p className="text-sm font-medium text-textPrimary mb-1">
                   {templatePreset === 'gradient'
-                    ? (t('admin.emailPresetGradientActive') || '渐变版模板使用中')
-                    : (t('admin.emailPresetSimpleActive') || '简版模板使用中')}
+                    ? (t('admin.emailPresetGradientActive'))
+                    : (t('admin.emailPresetSimpleActive'))}
                 </p>
                 <p className="text-xs text-textMuted mb-3">
-                  {t('admin.emailPresetHint') || '点击「自定义版」按钮可编辑完整的邮件 HTML'}
+                  {t('admin.emailPresetHint')}
                 </p>
                 <button
                   onClick={() => setShowPreview(true)}
                   className="text-xs text-primary-400 hover:text-primary-500 dark:hover:text-primary-300 underline underline-offset-2"
                 >
-                  {t('admin.emailTemplateViewPreview') || '查看预览'}
+                  {t('admin.emailTemplateViewPreview')}
                 </button>
               </div>
             )}
@@ -613,7 +613,7 @@ export default function AuthSettingsTab() {
             {/* 头部 */}
             <div className="flex items-center justify-between px-5 py-3 border-b border-border shrink-0">
               <h3 className="text-sm font-semibold text-textPrimary">
-                {t('admin.emailTemplateViewPreview') || '邮件模板预览'}
+                {t('admin.emailTemplateViewPreview')}
               </h3>
               <button onClick={() => setShowPreview(false)} className="p-1 rounded-control text-textMuted hover:text-textPrimary hover:bg-elevated transition-colors">
                 <X size={16} />

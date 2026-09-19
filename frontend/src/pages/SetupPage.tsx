@@ -319,7 +319,7 @@ export default function SetupPage() {
     const file = e.target.files?.[0]
     if (!file) return
     if (!['image/jpeg', 'image/png', 'image/gif', 'image/webp'].includes(file.type)) {
-      setError(t('me.avatarTypeError') || '仅支持 JPEG/PNG/GIF/WebP')
+      setError(t('me.avatarTypeError'))
       return
     }
     setCropFile(file)
@@ -567,7 +567,7 @@ export default function SetupPage() {
                 <div
                   className="w-6 h-6 rounded-full border-2 border-primary-400 scale-110 shadow-md transition-all relative overflow-hidden"
                   style={{ backgroundColor: statusColor || '#6366f1' }}
-                  title={t('me.statusColorCustom') || '自定义'}
+                  title={t('me.statusColorCustom')}
                 >
                   {/* 居中笔图标表示可自定义 */}
                   <span className="absolute inset-0 flex items-center justify-center pointer-events-none">
@@ -651,7 +651,7 @@ export default function SetupPage() {
                   rel="noopener noreferrer"
                   className="inline-flex items-center gap-1 text-2xs text-primary-400 hover:text-primary-500 dark:hover:text-primary-300 underline underline-offset-2 mt-1.5"
                 >
-                  {t('setup.getApiKey') || '获取 API Key'}
+                  {t('setup.getApiKey')}
                   <ExternalLink size={11} />
                 </a>
               )}
@@ -680,8 +680,8 @@ export default function SetupPage() {
               <div className="w-12 h-12 rounded-full bg-mint-400/20 flex items-center justify-center mx-auto mb-3">
                 <Check size={24} className="text-mint-400" />
               </div>
-              <p className="text-sm font-medium text-textPrimary mb-1">{t('setup.aiCreated') || 'AI 已创建'}</p>
-              <p className="text-xs text-textMuted">{t('setup.aiCreatedDesc') || `「${aiName}」已准备就绪，后续可在 AI 管理页调整详细配置`}</p>
+              <p className="text-sm font-medium text-textPrimary mb-1">{t('setup.aiCreated')}</p>
+              <p className="text-xs text-textMuted">{t('setup.aiCreatedDesc')}</p>
             </div>
           ) : (
             /* 未创建 → 引导按钮 */
@@ -689,14 +689,14 @@ export default function SetupPage() {
               <div className="w-16 h-16 rounded-full bg-primary-500/10 flex items-center justify-center mx-auto mb-4">
                 <Bot size={28} className="text-primary-400" />
               </div>
-              <p className="text-sm text-textSecondary mb-1">{t('setup.aiCreateHint') || '创建一个 AI 小伙伴陪你聊天'}</p>
-              <p className="text-xs text-textMuted mb-5">{t('setup.aiCreateHintDesc') || '使用完整创建体验，预设档位、详细参数一应俱全'}</p>
+              <p className="text-sm text-textSecondary mb-1">{t('setup.aiCreateHint')}</p>
+              <p className="text-xs text-textMuted mb-5">{t('setup.aiCreateHintDesc')}</p>
               <button
                 onClick={() => setShowCreateModal(true)}
                 className="inline-flex items-center gap-2 px-5 py-2.5 rounded-card bg-primary-500 hover:bg-primary-600 text-white text-sm font-semibold transition-all shadow-lg shadow-primary-500/20"
               >
                 <Sparkles size={16} />
-                {t('setup.aiCreateButton') || '创建 AI'}
+                {t('setup.aiCreateButton')}
               </button>
               {!aiName.trim() && (
                 <p className="text-xs text-textMuted italic mt-4">{t('setup.skipAI')}</p>
@@ -923,7 +923,7 @@ export default function SetupPage() {
                   {saving ? (
                     <span className="inline-flex items-center gap-2">
                       <Loader2 size={14} className="animate-spin" />
-                      <span>{t('common.saving') || '保存中...'}</span>
+                      <span>{t('common.saving')}</span>
                     </span>
                   ) : (
                     <>
@@ -946,7 +946,7 @@ export default function SetupPage() {
               {saving ? (
                 <span className="inline-flex items-center gap-2">
                   <Loader2 size={16} className="animate-spin" />
-                  {t('common.saving') || '处理中...'}
+                  {t('common.saving')}
                 </span>
               ) : (
                 t('setup.complete')

@@ -839,7 +839,7 @@ export default function AgentDetailPage() {
                           }
                         }}
                         className="w-6 h-6 rounded-full cursor-pointer border-2 border-border hover:border-primary-400 transition-colors"
-                        title={t('me.statusColorCustom') || '自定义'} />
+                        title={t('me.statusColorCustom')} />
                     </div>
                   </div>
                 </div>

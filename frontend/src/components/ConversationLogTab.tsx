@@ -260,7 +260,7 @@ export default function ConversationLogTab() {
                       setAgentSearch(e.target.value)
                       loadAgents(e.target.value)
                     }}
-                    placeholder={t('admin.searchAiPlaceholder') || '搜索 AI 名称...'}
+                    placeholder={t('admin.searchAiPlaceholder')}
                     className="flex-1 px-3 py-2 rounded-control border border-border bg-canvas text-sm text-textPrimary focus:outline-none focus:ring-2 focus:ring-primary-500/50"
                   />
                   <select
@@ -351,7 +351,7 @@ export default function ConversationLogTab() {
                 setAgentSearch(e.target.value)
                 loadAgents(e.target.value)
               }}
-              placeholder={t('admin.searchAiPlaceholder') || '搜索 AI 名称...'}
+              placeholder={t('admin.searchAiPlaceholder')}
               className="flex-1 px-3 py-2 rounded-control border border-border bg-elevated text-sm text-textPrimary focus:outline-none focus:ring-2 focus:ring-primary-500/50"
             />
             <select
