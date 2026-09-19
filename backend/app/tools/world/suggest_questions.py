@@ -17,6 +17,8 @@ class SuggestQuestionsTool(WorldToolPlugin):
         '也可概括说明），不要只丢一个列表让用户猜。'
         '⚠️ 只要你在回复正文里写了「下面还有几个建议/选项」，就必须调用本工具把它们交给平台——'
         '界面显示的就是这几条；不调用就会显示平台预设，与你写的内容对不上（用户会来问）。'
+        '不需要建议时：⑧（纯技术问答、用户只是确认「对不对」等）要么**不调用**本工具（本次不显示任何建议），'
+        '要么显式传空数组 questions=[] 明确抑制本次建议——空数组不会回落成平台预设。'
     )
 
     parameters = {'questions': {'type': 'array',
@@ -31,7 +33,11 @@ class SuggestQuestionsTool(WorldToolPlugin):
             args = ctx.args
             questions = [str(q).strip()[:40] for q in (args.get("questions") or []) if str(q).strip()]
             if not questions:
-                return {"success": False, "error": "questions 不能为空"}
+                # 空数组 = 显式抑制：本次不展示任何建议（不回落平台预设）
+                if ctx.turn_state is not None:
+                    ctx.turn_state["suggestions"] = []
+                return {"success": True, "count": 0,
+                        "note": "本次不展示建议（已显式抑制，不会回落平台预设）"}
             if ctx.turn_state is not None:
                 ctx.turn_state["suggestions"] = questions[:5]
             return {"success": True, "count": len(questions), "note": "已生成建议问题，回复末尾会展示给用户"}

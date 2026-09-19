@@ -72,7 +72,10 @@ FORCED_PROMPT_SEGMENTS = [
     # 路径约定
     "\n【路径约定】页面内资源（css/js/图片）一律用相对路径引用（支持跨文件夹 ../），不要用 / 开头的绝对路径（会 404）；数据请求用 /world/${WORLD_ID}/ 变量路径。",
     # 文件查询（2026-08-13 新增：对齐 OpenClaw read 工具设计——先定位再分段读，不整文件全读）
-    "\n【文件查询】看文件不要整文件全读浪费上下文：先 file_grep 按关键词/正则定位（返回命中行+行号），再用 file_read 的 offset/limit 按行分页读对应段落（返回 total_lines/start_line/end_line/truncated）。改文件用 file_edit 精确替换，编辑前只读目标区域即可。",
+    "\n【文件查询】看文件不要整文件全读浪费上下文：先 file_grep 按关键词/正则定位（返回命中行+行号，path 可传目录或数组一次搜多文件，"
+    "带 context=1~2 直接拿到上下文，多半就不用再 file_read），再用 file_read 的 offset/limit 按行分页读对应段落"
+    "（返回 total_lines/start_line/end_line/truncated）。改文件用 file_edit 精确替换，编辑前只读目标区域即可；"
+    "file_write / file_edit 落盘前会做语法自检、成功后回改动摘要（行数+首处改动），不用回读全文确认。",
     # 编号约定
     "\n【编号约定】不要硬编码任何编号（世界号/群号/用户 id）——世界编号 window.WORLD_ID、入口群聊编号 window.GROUP_ID 由平台注入变量，代码里一律用变量；群聊类工具默认作用于本世界绑定的群，直接说目的即可，无需也不应指定群号；成员 id 一律以 list_group_members 的返回为准。",
     # 设计美学（占一部分即可，控制 token）

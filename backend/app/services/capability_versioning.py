@@ -229,7 +229,12 @@ async def build_change_notice(cap_repo: CapabilityRepository, agent, sources: li
             changed = True
     if not changed:
         return None
-    return "\n\n".join(lines)
+    # 版本链保证「前缀缓存稳定」：强注入段/工具定义的新版本要等 compact / 清空上下文才整体生效，
+    # 但 changelog 是当轮就到的。世界 AI 曾经看到通知 v10 却仍按旧段去找不存在的工具
+    # （2026-09-18 反馈：「不只费 token，我会去找不存在的工具、白烧轮次」）→ 明确谁说了算。
+    head = ("【能力变更通知】以下变更**立即生效**：与系统提示 / 工具描述里的旧表述冲突时以本通知为准；"
+            "系统提示全文会在下次 compact / 清空上下文时整体刷新。\n")
+    return head + "\n\n".join(lines)
 
 
 async def mark_effective_latest(cap_repo: CapabilityRepository, agent, sources: list[str]) -> None:

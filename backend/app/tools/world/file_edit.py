@@ -4,7 +4,7 @@
 """
 
 from app.tools.world.base import WorldToolPlugin, WorldToolContext
-from app.tools.world.shared import arg_error
+from app.tools.world.shared import arg_error, lint_error
 
 
 class FileEditTool(WorldToolPlugin):
@@ -12,7 +12,9 @@ class FileEditTool(WorldToolPlugin):
     label = '编辑文件'
     segment = 'file'
 
-    description = '增量编辑世界文件（查找替换/行后插入/删除行），比全量重写省 token。编辑前建议先 file_read 确认内容。多次插入时从最大行号开始往小插。'
+    description = ('增量编辑世界文件（查找替换/行后插入/删除行），比全量重写省 token。编辑前建议先 file_read 确认内容。'
+                   '落盘前对 .py/.js/.css 做语法自检（不通过会拒写并给行号；确认误报可加 skip_lint 强制写入）；'
+                   '成功返回行数增减与首处改动摘要，多数情况不用再回读确认。多次插入时从最大行号开始往小插。')
 
     parameters = {'path': {'type': 'string', 'description': '相对路径'},
      'operation': {'type': 'string',
@@ -23,7 +25,8 @@ class FileEditTool(WorldToolPlugin):
      'new_string': {'type': 'string', 'description': '替换后的新内容 / 要插入的内容'},
      'line': {'type': 'integer', 'description': 'insert 必填：在此行号之后插入（1 开头，0=文件开头）'},
      'start_line': {'type': 'integer', 'description': 'delete_lines 必填：起始行（1 开头）'},
-     'end_line': {'type': 'integer', 'description': 'delete_lines 必填：结束行（含）'}}
+     'end_line': {'type': 'integer', 'description': 'delete_lines 必填：结束行（含）'},
+     'skip_lint': {'type': 'boolean', 'description': '仅当语法校验误报时用：跳过落盘前语法自检（默认 false）'}}
 
     required = ['path', 'operation']
 
@@ -37,16 +40,25 @@ class FileEditTool(WorldToolPlugin):
             if operation not in ("str_replace", "insert", "delete_lines"):
                 return arg_error(
                     f"operation 非法（收到 {operation!r}，可选 str_replace / insert / delete_lines）", args)
+            from app.services.world.code_lint import lint_code
             from app.services.world.world_file_service import read_file, write_file
             from app.utils.pure.file_edit import apply_file_edit  # 与主站共用同一份编辑核心
+            from app.utils.pure.text_diff import summarize_change
             existing = read_file(ctx.world.id, path)
             if existing.get("binary"):
                 return {"success": False, "error": "二进制文件不可编辑"}
-            new_content, err = apply_file_edit(existing.get("content") or "", operation, args)
+            old_content = existing.get("content") or ""
+            new_content, err = apply_file_edit(old_content, operation, args)
             if err:
                 return {"success": False, "error": err}
+            if not args.get("skip_lint"):
+                problem = lint_code(path, new_content)
+                if problem:
+                    return lint_error(path, problem)
             write_file(ctx.world.id, path, new_content)
-            return {"success": True, "path": path, "operation": operation}
+            # 落盘即回改动摘要：省掉模型回读全文确认的那一次调用
+            return {"success": True, "path": path, "operation": operation,
+                    **summarize_change(old_content, new_content)}
         except (ValueError, FileNotFoundError) as e:
             return {"success": False, "error": str(e)}
 
@@ -54,5 +66,6 @@ class FileEditTool(WorldToolPlugin):
         ok = bool(result.get("success"))
         if ok:
             op = {"str_replace": "替换", "insert": "插入", "delete_lines": "删除行"}.get(result.get("operation", ""), "编辑")
-            return f"已{op} {result.get('path')}"
+            return (f"已{op} {result.get('path')}"
+                    f"（+{result.get('lines_added', 0)}/−{result.get('lines_removed', 0)} 行）")
         return f"编辑失败：{result.get('error', '未知错误')}"

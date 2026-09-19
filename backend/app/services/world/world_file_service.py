@@ -184,10 +184,27 @@ def read_file(world_id: int, rel_path: str, offset: int | None = None, limit: in
     return {"path": rel_path, "content": text, "binary": False, "size": len(data), "total_lines": len(text.split("\n"))}
 
 
-def grep_file(world_id: int, rel_path: str, pattern: str, max_hits: int = 30) -> dict:
+def _attach_context(lines: list[str], hits: list[dict], context: int) -> None:
+    """给命中原地补 ±context 行上下文（带行号）。
+
+    重叠区间合并去重：同一行只出现一次——命中行本身已在 content 里、其余命中行也不再进上下文，
+    所以整份结果不会重复吐同一行（省 token）；区间超出文件首尾自动截断。
+    """
+    matched = {h["line"] for h in hits}
+    emitted: set[int] = set()
+    for hit in hits:
+        start = max(1, hit["line"] - context)
+        end = min(len(lines), hit["line"] + context)
+        fresh = [n for n in range(start, end + 1) if n not in matched and n not in emitted]
+        hit["context"] = [{"line": n, "content": lines[n - 1][:300]} for n in fresh]
+        emitted.update(fresh)
+
+
+def grep_file(world_id: int, rel_path: str, pattern: str, max_hits: int = 30, context: int = 0) -> dict:
     """按关键词/正则搜文件内容，返回命中行 + 行号（轻量定位，2026-08-13 新增）。
 
     对齐 OpenClaw 的 grep 用法：先定位再按需读，不用整文件全读。
+    context>0 时每个命中附 ±context 行（带行号，命中行不重复）；context=0 的返回形状与旧版完全一致。
     """
     import re as _re
     target = _safe_path(world_id, rel_path)
@@ -202,12 +219,15 @@ def grep_file(world_id: int, rel_path: str, pattern: str, max_hits: int = 30) ->
     except _re.error:
         # 非正则 → 当普通子串（大小写不敏感）
         rx = _re.compile(_re.escape(pattern), _re.IGNORECASE)
+    lines = text.split("\n")
     hits = []
-    for i, line in enumerate(text.split("\n"), start=1):
+    for i, line in enumerate(lines, start=1):
         if rx.search(line):
             hits.append({"line": i, "content": line[:300]})
             if len(hits) >= max_hits:
                 break
+    if context > 0:
+        _attach_context(lines, hits, context)
     return {"path": rel_path, "hits": hits, "total_hits": len(hits), "max_hits": max_hits}
 
 
@@ -239,11 +259,12 @@ def _dir_scan_files(world_id: int, rel_path: str) -> tuple[list[str], int]:
     return files, skipped_large
 
 
-def grep_paths(world_id: int, paths: list[str], pattern: str, max_hits: int = 30) -> dict:
+def grep_paths(world_id: int, paths: list[str], pattern: str, max_hits: int = 30, context: int = 0) -> dict:
     """在文件/目录/多路径中搜索（file_grep 的目录与数组支持，2026-09-18 新增）。
 
     目录递归展开（跳过产物路径与超大文件），每条命中都带 path；
     命中累计到 max_hits、扫描累计到 GREP_SCAN_FILE_LIMIT 即停——多次调用与目录混传都不重复计。
+    context>0 时每个命中附 ±context 行上下文（各文件独立去重）；context=0 时返回形状与旧版完全一致。
     single_file=True 表示只搜了一个文件，调用方据此保留原有的「不带 path」返回形状。
     """
     hits: list[dict] = []
@@ -267,7 +288,7 @@ def grep_paths(world_id: int, paths: list[str], pattern: str, max_hits: int = 30
                 scan_truncated = True
                 break
             scanned += 1
-            one = grep_file(world_id, rel, pattern, max_hits=max_hits - len(hits))
+            one = grep_file(world_id, rel, pattern, max_hits=max_hits - len(hits), context=context)
             if one.get("binary"):
                 binary = binary or single_file        # 单文件：沿用旧的 binary 返回
                 continue

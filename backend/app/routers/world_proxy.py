@@ -9,6 +9,7 @@
 import asyncio
 import json
 import logging
+import math
 import secrets
 import time
 from collections import deque
@@ -138,7 +139,15 @@ def _consume(world_id: int, quota: int, what: str) -> None:
     while dq and now - dq[0] > RATE_LIMIT_WINDOW:
         dq.popleft()
     if len(dq) >= quota:
-        raise HTTPException(status_code=429, detail=f"请求过于频繁（{what}：{quota} 次/10 秒）")
+        # 真实剩余等待 = 窗口内最早那次请求滑出所需时间（dq 按时间递增，dq[0] 最早）。
+        # 它一滑出就腾出一个名额，此刻即下一次可成功的时间；向上取整且至少 1 秒，
+        # 上界天然是 RATE_LIMIT_WINDOW（更早的已在上面被剪掉）。不写死常量。
+        retry_after = max(1, math.ceil(RATE_LIMIT_WINDOW - (now - dq[0])))
+        raise HTTPException(
+            status_code=429,
+            detail=f"请求过于频繁（{what}：{quota} 次/10 秒），请 {retry_after} 秒后重试",
+            headers={"Retry-After": str(retry_after)},
+        )
     dq.append(now)
 
 
@@ -861,14 +870,26 @@ async def serve_world_file(
         # 世界代码据此拼 API/前端地址；独立部署无这些头，用默认值。
         api_prefix = request.headers.get("x-aischat-api-prefix", "/api")
         ui_prefix = request.headers.get("x-aischat-ui-prefix", "")
-        return HTMLResponse(_inject_world_vars(html, world_id, creator_name, group_id, world_name, entry=entry, api_prefix=api_prefix, ui_prefix=ui_prefix))
+        # 注入后的 HTML 是动态内容（世界变量/入口群/宿主前缀都随请求变化），且它承载
+        # 世界当前版本——与静态资源口径一致用 no-cache：允许落盘缓存，但每次调用前必须
+        # 回源校验，避免世界更新/换入口后仍打开旧页面。HTML 无 ETag，回源即重新生成
+        # （成本低），不做 no-store 是为了保留 bfcache/回退时的缓存可用性。
+        return HTMLResponse(
+            _inject_world_vars(html, world_id, creator_name, group_id, world_name, entry=entry, api_prefix=api_prefix, ui_prefix=ui_prefix),
+            headers={"Cache-Control": "no-cache"},
+        )
     # 世界代码频繁变化：ETag 条件缓存——更新后自动拿新版（免强刷），
     # 未更新时浏览器 304 走缓存（不重复下载）（2026-08-05 产品）
+    # 但只有 ETag/Last-Modified 时，浏览器会按启发式新鲜度（约文件年龄的 10%）长期
+    # 不回源验证，改了 CSS/JS 刷新仍是旧样式（世界 AI 和用户都遇到过）。
+    # 显式 no-cache：仍可缓存，但每次使用前必须回源校验——没变就 304（不重下），
+    # 变了立刻拿新版，同时保留上面的 ETag/304 逻辑不变。
     etag = f'"{target.stat().st_mtime_ns:x}-{target.stat().st_size:x}"'
-    headers = {"ETag": etag}
+    cache_headers = {"ETag": etag, "Cache-Control": "no-cache"}
     if request.headers.get("If-None-Match") == etag:
-        return Response(status_code=304)
-    return FileResponse(target, media_type=mime, headers=headers)
+        # 304 也带上 Cache-Control，缓存副本据此继续「每次回源校验」
+        return Response(status_code=304, headers={"Cache-Control": "no-cache"})
+    return FileResponse(target, media_type=mime, headers=cache_headers)
 
 
 @router.get("/{world_id}/preview")

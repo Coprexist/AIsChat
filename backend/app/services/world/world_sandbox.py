@@ -168,6 +168,59 @@ def _truncate(s: str) -> str:
     return s
 
 
+# ═══════════════════════════════════════════════════════════════
+# 跑完自检：脚本直接写文件会绕过 file_write/file_edit 的落盘校验
+# ═══════════════════════════════════════════════════════════════
+# 世界 AI 的批量替换脚本一次能改几百处，写坏了（少 }、吃掉 else、插值落进样式值）
+# 只能靠它自己事后回读发现——2026-09-18 它明确说这是"运气成分不小"。
+# 这里在脚本跑完后，把本次新增/改动的代码文件过一遍语法自检，当场把坏文件报回去。
+# 只报不拦（文件已经落盘），但足以让它当轮修掉。
+_LINT_SKIP_DIRS = {"__pycache__", "node_modules", "dist", "build", ".git", ".venv", ".mypy_cache"}
+_LINT_FILE_LIMIT = 3000     # 快照文件数上限（大世界不为了自检扫穿磁盘）
+_LINT_REPORT_LIMIT = 5      # 单次最多报几个坏文件
+
+
+def _code_snapshot(workdir: Path) -> dict[str, tuple[int, int]]:
+    """代码文件的 (mtime_ns, size) 快照，用于跑完后找出被脚本改动的文件"""
+    from app.services.world.code_lint import is_lintable
+    snap: dict[str, tuple[int, int]] = {}
+    for root, dirs, files in os.walk(workdir):
+        dirs[:] = [d for d in dirs if d not in _LINT_SKIP_DIRS and not d.startswith(".")]
+        for name in files:
+            if name.startswith(".sandbox"):
+                continue
+            rel = (Path(root) / name).relative_to(workdir).as_posix()
+            if not is_lintable(rel):
+                continue
+            try:
+                st = (Path(root) / name).stat()
+            except OSError:
+                continue
+            snap[rel] = (st.st_mtime_ns, st.st_size)
+            if len(snap) >= _LINT_FILE_LIMIT:
+                return snap
+    return snap
+
+
+def _lint_changed(workdir: Path, before: dict[str, tuple[int, int]]) -> list[dict]:
+    """对本次跑脚本动过的代码文件做语法自检（最多报 _LINT_REPORT_LIMIT 个）"""
+    from app.services.world.code_lint import lint_code
+    problems: list[dict] = []
+    for rel, sig in _code_snapshot(workdir).items():
+        if before.get(rel) == sig:
+            continue
+        try:
+            content = (workdir / rel).read_text(encoding="utf-8", errors="replace")
+        except OSError:
+            continue
+        problem = lint_code(rel, content)
+        if problem:
+            problems.append({"path": rel, **problem})
+            if len(problems) >= _LINT_REPORT_LIMIT:
+                break
+    return problems
+
+
 async def run_world_code(
     world,
     code: str | None = None,
@@ -189,9 +242,17 @@ async def run_world_code(
     （duration_ms = 执行耗时；queued_ms = 全局并发排队等待耗时，两者相加 = 请求总耗时）
     """
     _t0 = asyncio.get_event_loop().time()
+    workdir = _world_dir(world.id)
+    before = {} if readonly else _code_snapshot(workdir)      # 只读运行不会写盘，不必快照
     async with _get_semaphore():
         _result = await _run_world_code(world, code=code, entry=entry, background=background, readonly=readonly)
     _result["queued_ms"] = max(0, int((asyncio.get_event_loop().time() - _t0) * 1000) - int(_result.get("duration_ms") or 0))
+    if before:
+        problems = _lint_changed(workdir, before)
+        if problems:
+            _result["lint_problems"] = problems
+            _result["lint_note"] = ("⚠️ 本次脚本改动的代码文件有语法错误（已落盘，请立刻修）："
+                                    + "；".join(f"{p['path']} 第 {p['line']} 行 {p['error']}" for p in problems))
     return _result
 
 

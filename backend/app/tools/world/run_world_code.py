@@ -58,7 +58,12 @@ class RunWorldCodeTool(WorldToolPlugin):
         ok = bool(result.get("success"))
         if ok:
             if "result" in result:
-                return f"世界代码触发成功：{str(result.get('result'))[:120]}"
-            out = (result.get('stdout') or '').strip().splitlines()
-            return f"世界代码运行成功（{result.get('duration_ms', 0)}ms）：" + (out[-1][:120] if out else "无输出")
-        return f"世界代码执行失败：{result.get('error', '未知错误')}"
+                text = f"世界代码触发成功：{str(result.get('result'))[:120]}"
+            else:
+                out = (result.get('stdout') or '').strip().splitlines()
+                text = f"世界代码运行成功（{result.get('duration_ms', 0)}ms）：" + (out[-1][:120] if out else "无输出")
+        else:
+            text = f"世界代码执行失败：{result.get('error', '未知错误')}"
+        if result.get("lint_problems"):
+            text += f"｜⚠️ 语法自检：{len(result['lint_problems'])} 个被改动的代码文件有语法错误（见 lint_note）"
+        return text

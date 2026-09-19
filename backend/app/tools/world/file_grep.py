@@ -12,6 +12,10 @@ from app.tools.world.shared import arg_error
 DEFAULT_MAX_HITS = 30
 MAX_HITS_LIMIT = 100
 
+# 上下文行数：每条命中前后各附几行（0=只要命中行，与旧版返回形状完全一致）
+DEFAULT_CONTEXT = 0
+MAX_CONTEXT = 5
+
 
 def _path_list(value) -> list[str]:
     """path 归一：单个字符串（可含换行分隔）或字符串数组 → 去空白去重、保持顺序。"""
@@ -27,11 +31,19 @@ def _path_list(value) -> list[str]:
     return out
 
 
+def _single_hit(hit: dict) -> dict:
+    """单文件命中项：旧形状只有 line/content（不带文件路径）；带上下文时原样附上。"""
+    out = {"line": hit["line"], "content": hit["content"]}
+    if "context" in hit:
+        out["context"] = hit["context"]
+    return out
+
+
 def _single_result(path: str, pattern: str, result: dict) -> dict:
     """单文件：返回形状与旧版一致（命中只有 line/content，不带文件路径）"""
     if result.get("binary"):
         return {"success": True, "path": path, "binary": True, "note": "二进制文件，无法搜索"}
-    hits = [{"line": h["line"], "content": h["content"]} for h in result.get("hits") or []]
+    hits = [_single_hit(h) for h in result.get("hits") or []]
     if not hits:
         return {"success": True, "path": path, "pattern": pattern, "hits": [], "total_hits": 0,
                 "note": f"未找到匹配「{pattern}」"}
@@ -77,13 +89,17 @@ class FileGrepTool(WorldToolPlugin):
         'path 可传文件、目录（递归搜索，跳过 __pycache__/dist 等产物）或数组（多文件/多目录混合），'
         '传 "." 搜整个世界——找「哪些文件用了某段代码」就这样搜，别自己写沙箱脚本扫目录。'
         '命中带文件路径与行号，找到后配合 file_read(offset,limit) 读对应段落。'
+        f'只想看命中行就不用传 context；想顺手看上下文传 context（前后各 N 行，0-{MAX_CONTEXT}，默认 {DEFAULT_CONTEXT}），'
+        '能省一次 file_read。'
     )
 
     parameters = {'path': {'type': ['string', 'array'], 'items': {'type': 'string'},
                            'description': '相对路径：文件、目录（递归搜索）或 "."（整个世界）；多个用数组（也接受换行分隔的字符串）'},
                   'pattern': {'type': 'string', 'description': '关键词或正则表达式（正则非法时按普通子串匹配）'},
                   'max_hits': {'type': 'integer',
-                               'description': f'最多返回几条命中（默认 {DEFAULT_MAX_HITS}，上限 {MAX_HITS_LIMIT}）'}}
+                               'description': f'最多返回几条命中（默认 {DEFAULT_MAX_HITS}，上限 {MAX_HITS_LIMIT}）'},
+                  'context': {'type': 'integer',
+                              'description': f'命中行前后各附几行上下文（0-{MAX_CONTEXT}，默认 {DEFAULT_CONTEXT} 只给命中行）'}}
 
     required = ['path', 'pattern']
 
@@ -102,8 +118,18 @@ class FileGrepTool(WorldToolPlugin):
             except (TypeError, ValueError):
                 max_hits = DEFAULT_MAX_HITS
             max_hits = max(1, min(max_hits, MAX_HITS_LIMIT))
+            context = args.get("context")
+            if context is None:
+                context = DEFAULT_CONTEXT
+            else:
+                try:
+                    context = int(context)
+                except (TypeError, ValueError):
+                    return arg_error(f"context 必须是 0-{MAX_CONTEXT} 的整数", args)
+                if not 0 <= context <= MAX_CONTEXT:
+                    return arg_error(f"context 必须是 0-{MAX_CONTEXT} 的整数", args)
             from app.services.world.world_file_service import grep_paths
-            result = grep_paths(ctx.world.id, paths, pattern, max_hits=max_hits)
+            result = grep_paths(ctx.world.id, paths, pattern, max_hits=max_hits, context=context)
             if result.get("single_file"):
                 return _single_result(paths[0], pattern, result)
             return _multi_result(paths, pattern, max_hits, result)

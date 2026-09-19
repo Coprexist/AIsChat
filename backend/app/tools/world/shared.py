@@ -54,6 +54,23 @@ def arg_error(reason: str, args: dict) -> dict:
     return {"success": False, "error": f"{reason}；实际收到：{args_brief(args)}"}
 
 
+def lint_error(path: str, problem: dict) -> dict:
+    """落盘前语法自检失败的标准返回：点名文件/行号/该行原文，并说明文件未写入。
+
+    误报兜底：给一个明确的豁免口（skip_lint=true）——否则模型可能卡在一个
+    "写不进去的文件"上，比让它写坏更贵。
+    """
+    where = f"第 {problem['line']} 行" if problem.get("line") else "未知位置"
+    excerpt = f"：{(problem.get('excerpt') or '').strip()}" if problem.get("excerpt") else ""
+    return {
+        "success": False,
+        "path": path,
+        "syntax_error": True,
+        "error": (f"{path} {where} 语法校验未通过（文件未写入）：{problem.get('error', '未知错误')}"
+                  f"{excerpt}；修正后重试，确认是误报可加 skip_lint=true 强制写入"),
+    }
+
+
 def from_site_result(result: dict) -> dict:
     """主站工具结果 → 世界工具结果（**唯一适配点**）。
 
