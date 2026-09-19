@@ -160,9 +160,9 @@ async def _refresh_capabilities(world_repo, world) -> None:
     try:
         from app.repositories.capability_repo import SQLAlchemyCapabilityRepository
         from app.services.capability_versioning import apply_pending_changes
-        await apply_pending_changes(SQLAlchemyCapabilityRepository(world_repo.session), world.config, [
-            "ai-skills", f"world-prompt-{world.id}", "forced-prompt", f"world-name-{world.id}",
-        ])
+        from app.services.world.world_chat_service import prefix_capability_sources
+        await apply_pending_changes(SQLAlchemyCapabilityRepository(world_repo.session), world.config,
+                                    prefix_capability_sources(world.id))
     except Exception as e:
         # 压缩成功但能力变更没生效 → 用户以为已生效；必须留痕
         logger.warning(f"🌐 世界 #{world.id} compact 后应用能力变更失败: {e}")

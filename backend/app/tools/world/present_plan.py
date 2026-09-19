@@ -23,6 +23,9 @@ class PresentPlanTool(WorldToolPlugin):
 
     parameters = {
         'plan': {'type': 'string', 'description': '完整计划（markdown 文本，分条列出要做什么、动哪些文件）'},
+        'tool_rounds': {'type': 'integer',
+                        'description': '可选：本次计划预计需要几轮工具调用。超过本轮默认上限时，'
+                                       '用户批准计划即同时批准这次提额（硬上限 200）；计划被否则提额不生效'},
     }
 
     required = ['plan']
@@ -33,20 +36,38 @@ class PresentPlanTool(WorldToolPlugin):
         if not plan:
             return arg_error("缺少 plan 参数", args)
         from app.services.world.world_ai_mode import request_approval
+        from app.services.world.world_chat_service import ROUND_BUDGET_CEILING
         turn_id = (ctx.turn_state or {}).get("turn_id", "")
+        # 计划里可以带上"这次预计要几轮工具调用"：默认上限不够时，批准计划 = 同时批准提额
+        # （世界 AI 2026-09-18：「本轮末提示只剩 3 轮：大改容易卡在半途」）
+        budget: int | None = None
+        raw_rounds = args.get("tool_rounds")
+        if raw_rounds not in (None, ""):
+            try:
+                budget = max(1, min(int(raw_rounds), ROUND_BUDGET_CEILING))
+            except (TypeError, ValueError):
+                budget = None
+        detail = "通过后，本轮剩下的操作按自动模式直接执行"
+        if budget:
+            detail += f"（本次申请工具轮次上限：{budget} 轮）"
         # 计划必须真有人点头：无人应答一律不通过（on_timeout=False），
         # 否则"计划模式"会退化成"等 5 分钟自动开工"
         approval = await request_approval(
             ctx.world.id, turn_id, kind="plan", title="AI 提交了一份计划",
-            detail="通过后，本轮剩下的操作按自动模式直接执行",
+            detail=detail,
             body=plan, body_format="markdown",
             on_timeout=False,
         )
-        if approval.approved and ctx.turn_state is not None:
-            ctx.turn_state["plan_approved"] = True     # 本轮后续操作按自动模式放行
+        granted = bool(approval.approved)
+        if ctx.turn_state is not None:
+            if granted:
+                ctx.turn_state["plan_approved"] = True     # 本轮后续操作按自动模式放行
+                if budget:
+                    ctx.turn_state["round_budget"] = budget
         return {
-            "success": True, "approved": approval.approved,
+            "success": True, "approved": granted,
             # 用户可能只通过一部分、或写下修改意见——原样交给 AI，让它调整后重新提交
+            **({"round_budget": budget, "round_note": f"本轮工具轮次上限已提到 {budget} 轮"} if granted and budget else {}),
             USER_NOTE_KEY: approval.note, "summary": approval.reason,
         }
 

@@ -325,6 +325,50 @@ WORLD_CHAT_KEEP_LAST = 10          # 压缩后保留的最近真实消息数
 # 否则会出现"提示 AI 去压缩、压了却无可压缩"（旧值 6 < 10，正好落在这个空区间里）
 WORLD_CONTEXT_MIN_MESSAGES = WORLD_CHAT_KEEP_LAST + 1
 DEFAULT_MAX_TOOL_ROUNDS = 50       # 工具循环默认上限（可在设计页配置 max_tool_rounds 覆盖）
+ROUND_BUDGET_CEILING = 200         # 单轮工具调用硬上限（含计划模式申请的提额）
+
+
+def resolve_round_budget(ai_cfg: dict) -> int:
+    """单轮工具调用上限的**唯一口径**：世界配置 max_tool_rounds（默认 50，硬顶 200）"""
+    raw = (ai_cfg or {}).get("max_tool_rounds")
+    if raw in (None, ""):
+        return DEFAULT_MAX_TOOL_ROUNDS
+    try:
+        return max(1, min(int(raw), ROUND_BUDGET_CEILING))
+    except (TypeError, ValueError):
+        return DEFAULT_MAX_TOOL_ROUNDS
+
+
+def prefix_capability_sources(world_id: int) -> list[str]:
+    """进前缀的能力源：compact / 清空上下文 / 会话起点解锁共用同一份口径（要改只改这里）"""
+    return ["ai-skills", f"world-prompt-{world_id}", "forced-prompt", f"world-name-{world_id}"]
+
+
+def build_budget_prompt(max_rounds: int) -> str:
+    """本轮预算段（进前缀；按世界配置稳定 → 缓存友好）。
+
+    世界 AI 2026-09-18 反馈：「本轮末提示只剩 3 轮：大改容易卡在半途」——它到快用完才知道上限。
+    开局就给数，它才能规划"先落盘再验证"，而不是撞墙。
+    """
+    return (
+        f"\n【本轮预算】本轮最多 {max_rounds} 轮工具调用（世界配置 max_tool_rounds）。"
+        "开局就按这个数规划：多轮的活先把已完成的部分落盘再验证，别把大改留到最后一轮；"
+        "剩 5 轮会提醒你收尾，剩 2 轮禁止开启新工作。"
+        f"任务明显超过上限时，计划模式下可在 present_plan 里带 tool_rounds 申请提额"
+        f"（上限 {ROUND_BUDGET_CEILING} 轮，用户批准计划即同时批准提额）。"
+    )
+
+
+async def session_is_fresh(world_repo, world) -> bool:
+    """本会话还没有任何真实消息（新会话 / 刚清空）——前缀反正要重建，可以安全解锁能力变更"""
+    try:
+        rows = await get_chat_history(
+            world_repo, world.id, 1, session_id=session_id_for_db(world), roles=REAL_ROLES,
+        )
+        return not rows
+    except Exception as e:
+        logger.warning(f"🌐 世界 #{world.id} 会话起点判定失败（按非起点处理）: {e}")
+        return False
 
 
 CHAT_HISTORY_LIMIT = 30  # 没有摘要时携带的最近真实消息数
@@ -1139,9 +1183,23 @@ async def _prepare_world_chat(
     # 变更 → 写新版本 + 尾部 changelog 告知，不碰前缀；compact / clear 解锁后生效
     from app.repositories.capability_repo import SQLAlchemyCapabilityRepository
     from app.services.capability_versioning import (
-        ensure_text_source_version, get_effective_text,
+        apply_pending_changes, ensure_text_source_version, get_effective_text, mark_known_latest,
     )
     _cap_repo = SQLAlchemyCapabilityRepository(world_repo.session)
+    # ── 会话起点解锁（2026-09-19）───────────────────────────────────────────────
+    # 前缀内容的版本链只在 compact / 清空上下文时对齐，而天天在用的世界永远等不到那次 idle compact
+    # （compact_idle_hours 默认 18h）——实测 4 个真正聊过天的世界里 3 个停在旧版强注入段（v3/v6/v7），
+    # world 45 因此在 v7 上按旧文案去找本环境不存在的 world_push，白烧轮次。
+    # 新会话第一轮没有"前缀要保"的包袱（历史为空，缓存本来就要重建），在这里对齐一次。
+    # 代价：版本确实变过时，这一轮前缀全额 miss 一次（约 76k × ¥0.2/M ≈ 1.5 分）。
+    if await session_is_fresh(world_repo, world):
+        _prefix_cfg = dict(world.config or {})
+        _sources = prefix_capability_sources(world_id)
+        await apply_pending_changes(_cap_repo, _prefix_cfg, _sources)
+        await mark_known_latest(_cap_repo, _prefix_cfg, _sources)   # 已在生效前缀里，无需再发变更通知
+        world.config = _prefix_cfg
+        await world_repo.commit()
+        logger.info(f"🌐 世界 #{world_id} 会话起点：前缀能力快照已对齐最新")
     user_prompt = cfg.get("system_prompt") or CREATOR_DEFAULT_CONFIG["system_prompt"]
     forced_prompt = build_forced_prompt()
     creator_name = cfg.get("name") or "群视界机器人"
@@ -1156,6 +1214,7 @@ async def _prepare_world_chat(
     system_prompt = world_context_block(world) + "\n\n" + eff_user_prompt
     system_prompt += eff_forced_prompt  # 强注入段：平台强约束，用户不可改
     system_prompt += build_mode_prompt(get_mode(world))  # 运行模式（自动/审阅/计划）
+    system_prompt += build_budget_prompt(resolve_round_budget(cfg))  # 轮次预算前置（前缀稳定，可缓存）
     # 昵称也在前缀里（版本化保证缓存命中）：改名当轮只有尾部「世界AI昵称」变更通知，
     # 全文要等 compact / 清空上下文才刷新——所以这里给一条常驻的冲突裁决规则。
     system_prompt += (f"\n【名字】你的名字是「{eff_name}」，对外标识 world-{world_id}。"
@@ -1269,12 +1328,10 @@ async def _prepare_world_chat(
     try:
         from app.repositories.capability_repo import SQLAlchemyCapabilityRepository
         from app.services.capability_versioning import build_change_notice
-        notice = await build_change_notice(SQLAlchemyCapabilityRepository(world_repo.session), world.config, [
-            "ai-skills",
-            f"world-prompt-{world_id}",
-            "forced-prompt",
-            f"world-name-{world_id}",
-        ])
+        notice = await build_change_notice(
+            SQLAlchemyCapabilityRepository(world_repo.session), world.config,
+            prefix_capability_sources(world_id),
+        )
         if notice:
             messages.append({"role": "system", "content": notice})
             await world_repo.commit()
@@ -1540,9 +1597,9 @@ async def _run_tool_loop(
             ],
             **({"reasoning_content": full_reasoning} if full_reasoning else {}),
         })
-        # 工具循环上限：creator_config.max_tool_rounds（默认 50，设计页可改）
-        max_rounds = int(cfg.get("max_tool_rounds") or DEFAULT_MAX_TOOL_ROUNDS)
-        max_rounds = max(1, min(max_rounds, 200))
+        # 工具循环上限：世界配置 max_tool_rounds；计划模式获批提额时以 turn_state 里的预算为准
+        max_rounds = min(int(turn_state.get("round_budget") or 0) or resolve_round_budget(cfg),
+                         ROUND_BUDGET_CEILING)
         async def _exec_pending_tools():
             """执行「当前待执行的那一批工具」+ 注入插入消息。
 

@@ -35,12 +35,9 @@ class ClearContextTool(WorldToolPlugin):
             try:
                 from app.repositories.capability_repo import SQLAlchemyCapabilityRepository
                 from app.services.capability_versioning import apply_pending_changes
-                await apply_pending_changes(SQLAlchemyCapabilityRepository(ctx.world_repo.session), ctx.world.config, [
-                    "ai-skills",
-                    f"world-prompt-{ctx.world.id}",
-                    "forced-prompt",
-                    f"world-name-{ctx.world.id}",
-                ])
+                from app.services.world.world_chat_service import prefix_capability_sources
+                await apply_pending_changes(SQLAlchemyCapabilityRepository(ctx.world_repo.session), ctx.world.config,
+                                            prefix_capability_sources(ctx.world.id))
             except Exception as e:
                 # 同上：清空成功但能力变更没生效
                 logger.warning(f"🌐 世界 #{ctx.world.id} clear 后应用能力变更失败: {e}")

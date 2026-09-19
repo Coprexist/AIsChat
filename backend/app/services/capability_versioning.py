@@ -272,6 +272,27 @@ async def mark_effective_latest(cap_repo: CapabilityRepository, agent, sources: 
             _set_holder_map(agent, "cap_effective_versions", e)
 
 
+async def mark_known_latest(cap_repo: CapabilityRepository, agent, sources: list[str]) -> None:
+    """把「已知版本」也对齐最新：内容已经进了生效前缀时，不必再发一次变更通知。
+
+    与 mark_effective_latest 配对（会话起点解锁：既生效、也已"告知"，避免下一轮多一条
+    描述"已经生效的内容"的通知）。
+    """
+    from app.models.agent import CapabilityVersion
+
+    for source in sources:
+        latest = (await cap_repo.execute(
+            select(CapabilityVersion)
+            .where(CapabilityVersion.source == source)
+            .order_by(CapabilityVersion.version.desc())
+            .limit(1)
+        )).scalar_one_or_none()
+        if latest is not None:
+            k = _holder_map(agent, "cap_known_versions")
+            k[source] = latest.version
+            _set_holder_map(agent, "cap_known_versions", k)
+
+
 # ═══════════════════════════════════════════════════════════════
 # 前缀文本源版本化（2026-08-12 产品定：所有进前缀的内容必须保证缓存命中）
 # ═══════════════════════════════════════════════════════════════
