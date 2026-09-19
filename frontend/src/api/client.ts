@@ -16,7 +16,7 @@ function isEmbeddedMode(): boolean {
 }
 
 /** 嵌入模式下的 API 前缀（宿主 DSH 通过同源代理提供） */
-const EMBED_API_PREFIX = '/aischat-api'
+const EMBED_API_PREFIX = '/copree-api'
 
 function getApiBaseUrl(): string {
   // 嵌入模式（DSH iframe）：走宿主同源代理前缀
@@ -38,7 +38,7 @@ function handleUnauthorized(path: string) {
   localStorage.removeItem('access_token')
   if (isEmbeddedMode()) {
     try {
-      window.parent?.postMessage({ source: 'aischat-embed', type: 'unauthorized' }, '*')
+      window.parent?.postMessage({ source: 'copree-embed', type: 'unauthorized' }, '*')
     } catch {
       /* 宿主不可达时静默 */
     }
@@ -204,7 +204,7 @@ function filenameFromDisposition(header: string | null): string {
 
 /** 带鉴权下载文件（**全站"另存为"唯一入口**：会话/群聊/私信导出、备份、世界包、docx 转换…）
  *
- *  复用同一套 base + token（嵌入模式走宿主代理 /aischat-base，桌面端走实例地址——
+ *  复用同一套 base + token（嵌入模式走宿主代理 /copree-base，桌面端走实例地址——
  *  以前各处自己写 `/api/...`，嵌进 DSH 面板就 404）；
  *  文件名以服务端 Content-Disposition 为准（RFC 5987，中文名也正确），拿不到才用兜底名；
  *  init 支持 POST（如 docx：先 POST 拿二进制）。落盘交给 utils/download.saveBlob。 */

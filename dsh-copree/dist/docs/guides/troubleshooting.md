@@ -536,7 +536,7 @@ db: AsyncSession = Depends(get_db)
 
 ```bash
 # 打印运行中路由的完整依赖树，直接看 call 和 query_params
-cd /aischat && docker compose exec backend python -c "
+cd /copree && docker compose exec backend python -c "
 from app.main import app
 for r in app.routes:
     if getattr(r, 'path', '') == '/kb/status':

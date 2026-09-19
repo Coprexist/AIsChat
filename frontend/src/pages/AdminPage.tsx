@@ -995,7 +995,7 @@ function BackupTab() {
     try {
       // 文件名（含 .sql/.db 扩展名）由后端 Content-Disposition 决定，前端不再猜
       await api.download('/admin/backup/download',
-                         `aischat_backup_${new Date().toISOString().slice(0, 10)}${dbExt}`)
+                         `copree_backup_${new Date().toISOString().slice(0, 10)}${dbExt}`)
       setMessage(t('admin.dbBackupSuccess'))
     } catch (e: any) {
       setError(e.message)
@@ -1011,7 +1011,7 @@ function BackupTab() {
     setMessage('')
     try {
       await api.download('/admin/backup/full/download',
-                         `aischat_full_${new Date().toISOString().slice(0, 10)}.tar.gz`)
+                         `copree_full_${new Date().toISOString().slice(0, 10)}.tar.gz`)
       setMessage(t('admin.fullBackupSuccess'))
     } catch (e: any) {
       setError(e.message)

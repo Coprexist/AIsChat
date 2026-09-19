@@ -778,8 +778,8 @@ def _inject_world_vars(
       USER_ID      当前用户编号（无登录态 = null，客户端可补）
       WORLD_ENTRY  入口分流：{kind: 'group'|'dm'|'main', group_id, group_type_slug}
                    世界代码据此渲染不同界面（群类型→对应场景、私聊→对话地点、直进→主页）
-      WORLD_API    API 前缀（独立部署 /api；宿主嵌入时由宿主代理注入 /aischat-api）
-      WORLD_UI     主应用前端前缀（独立部署空串；宿主嵌入时 /aischat-ui）
+      WORLD_API    API 前缀（独立部署 /api；宿主嵌入时由宿主代理注入 /copree-api）
+      WORLD_UI     主应用前端前缀（独立部署空串；宿主嵌入时 /copree-ui）
     """
     script = (
         "<script>\n"
@@ -866,10 +866,10 @@ async def serve_world_file(
         elif entry_from in ("dm", "main"):
             entry["kind"] = entry_from
         html = target.read_text(encoding="utf-8", errors="replace")
-        # 宿主嵌入（DSH）时由宿主代理注入 x-aischat-api-prefix / x-aischat-ui-prefix，
+        # 宿主嵌入（DSH）时由宿主代理注入 x-copree-api-prefix / x-copree-ui-prefix，
         # 世界代码据此拼 API/前端地址；独立部署无这些头，用默认值。
-        api_prefix = request.headers.get("x-aischat-api-prefix", "/api")
-        ui_prefix = request.headers.get("x-aischat-ui-prefix", "")
+        api_prefix = request.headers.get("x-copree-api-prefix", "/api")
+        ui_prefix = request.headers.get("x-copree-ui-prefix", "")
         # 注入后的 HTML 是动态内容（世界变量/入口群/宿主前缀都随请求变化），且它承载
         # 世界当前版本——与静态资源口径一致用 no-cache：允许落盘缓存，但每次调用前必须
         # 回源校验，避免世界更新/换入口后仍打开旧页面。HTML 无 ETag，回源即重新生成

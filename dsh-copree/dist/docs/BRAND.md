@@ -1,6 +1,6 @@
 # 品牌与命名 / Brand & Naming
 
-> 本文只讲名字：它是什么、为什么这么取、以及哪些地方**刻意没有跟着改**。
+> 本文只讲名字：它是什么、为什么这么取、改名改了哪些、哪些**刻意留着**。
 
 ## 名字
 
@@ -21,8 +21,7 @@
 连起来是：**我们早在从前，思维便已连接在一起。**
 
 还有第二层：与组织名 **Coprexist** 约分（消去共同的 `Copre`）——Coprexist 余 `xist`，
-Copree 的尾巴 `e` 接上去，恰好拼回 **exist**。
-所以它不是缩写，而是**把字藏进了名字里**：
+Copree 的尾巴 `e` 接上去，恰好拼回 **exist**。它不是缩写，而是**把字藏进了名字里**：
 
 > Co-exist, reduced to exist.
 > 一同存在，早在从前；约分之后，剩下存在。
@@ -32,26 +31,34 @@ Copree 的尾巴 `e` 接上去，恰好拼回 **exist**。
 名字不再字面写 "AI Chat"，但那是它的**起点**，所以简介与 DSH 插件介绍都保留这层表述：
 「前身 AIsChat —— 让 AI 拥有自己的状态、记忆与生命节奏，不只是工具，是陪伴」。
 
-## 刻意没改的东西（内部标识，改了会断）
+## 改名范围
 
-| 位置 | 为什么保留 |
-|------|-----------|
-| DB 名 `ai_group_chat` / 容器 `ai_group_*` / DB 用户 `ai_chat` | 用户看不见，迁移风险全在自己这边 |
-| 备份文件前缀 `aischat_*.db.gz` / `aischat_*.sql.gz` | 备份列表按前缀扫描，改了历史备份等于"消失" |
-| 同源代理与前端的路径 `/aischat-api`、`/aischat-ws`、`/aischat-ui/`、宿主世界同步路由 `/aischat-worlds/*` | 前后端与 DSH 宿主的**协议路径**，必须两侧同版本一起换（前端 `BASE_URL=/aischat-ui/` 也是它） |
-| 前端存储键 `aischat-theme`、通知 tag `aischat_msg`、postMessage 源 `aischat-embed` | 存储键改了会重置用户偏好；后两者是宿主协议 |
-| DSH 工作区目录 `AIC群视界-<世界名>`、`.aischat-world.json` | 用户本地磁盘上已经存在的目录/文件，改了就是"找不到" |
-| 历史 CHANGELOG 条目、`docs/promotion/aischat-v0.3.1-article.md` | 历史就该是历史，不追改旧文 |
+**代码里已全量替换**（2026-09-19）：`AIsChat`/`aischat` → `Copree`/`copree` —— 显示文案、
+协议路径（`/copree-api`、`/copree-ws`、`/copree-ui/`、`/copree-worlds/*`、`x-copree-*-prefix`）、
+前端存储键（`copree-theme`）、通知 tag、postMessage 源（`copree-embed`）、插件包名与目录、
+打包产物名（`Copree.spec` / `Copree.exe`）、备份前缀（`copree_*`）、联邦公网 ID（`Copree-<ULID>`）、文档。
 
-联邦公网 ID：新实例生成 `Copree-<ULID>`，老实例保留原值——**没有任何代码解析这个前缀**，所以不需要兼容读。
+### 刻意留着 / 新名为主 + 旧名兼容
 
-## 待办（改名是分步做的）
+| 位置 | 处理 |
+|------|------|
+| 真实域名（含 aischat 的那个） | **没动**——改它要动 DNS/证书，属部署侧 |
+| 真实容器名（compose 项目名） | **没动**——重建容器会换掉数据卷名，是迁移活 |
+| DB 名 `ai_group_chat` / 容器 `ai_group_*` / DB 用户 `ai_chat` | **没动**——本就不含品牌词，改要 dump/restore |
+| 历史文件名 `docs/promotion/aischat-v0.3.1-article.md` | **没动**——历史就该是历史 |
+| 老世界镜像 `aischat-worlds/AIC群视界-*`、`.aischat-world.json`、`.aischat-sync.json` | **旧名兼容读**：老工作区与指向它们的 DSH 会话原样可用；新世界才用 `copree-worlds/Copree群视界-*` |
+| 老备份 `aischat_*.gz` | **仍能列出/清理/回档**；新备份写 `copree_*` |
+| 老存储键 `aischat-theme` | 读一次即迁到 `copree-theme`，主题偏好不丢 |
 
-1. GitHub 组织下的 5 个仓库改名（`AIsChat*` → `Copree*`），旧 URL 自动 301
-2. 改名之后：代码里的仓库 URL、`registry_repo` 默认值、`.gitignore` 里的兄弟仓目录名
-3. DSH 插件构建产物重建：`cd dsh-copree && node scripts/build.mjs`（+ `sync-dist.mjs` 同步前端产物 / 重新生成 manifest 哈希）
-4. awesome-dsh-plugin 列表条目：新 YAML 见 [`docs/promotion/awesome-dsh-plugin-entry.yml`](promotion/awesome-dsh-plugin-entry.yml)
-5. 部署侧：演示站子路径（`frontend/.env.demo` 的 `BASE_URL`）、镜像站（手动）、镜像/搜索缓存
+联邦公网 ID：老实例保留原值——**没有任何代码解析这个前缀**，所以不需要兼容读。
+
+## 待办（只剩部署侧）
+
+1. ~~5 个仓库改名（旧 URL 自动 301）~~ ✅ 2026-09-19
+2. ~~代码里的仓库 URL / `registry_repo` / `.gitignore`~~ ✅
+3. ~~插件产物重建（`build.mjs` + `sync-dist.mjs`）~~ ✅
+4. ~~awesome-dsh-plugin 列表条目~~ ✅ PR [#5417](https://github.com/awesome-dsh-plugin/awesome-dsh-plugin/pull/5417)
+5. 部署侧：演示站子路径（`frontend/.env.demo`）、域名 DNS/证书、镜像站、DB 与容器名迁移（要做单独排窗口）
 
 ---
 
@@ -61,9 +68,9 @@ Copree 的尾巴 `e` 接上去，恰好拼回 **exist**。
 Formerly **AIsChat**, a name that pinned the product to "AI chat" while it had already become a
 framework for **AI group chat + programmable worlds**.
 
-**Origin.** `Copree` = **co + pre + e** (together · before · exist) — *"we were already connected
-in thought, long before."* Cancel the shared `Copre` against the org name **Coprexist**: what is left
-is `xist`, and Copree's trailing `e` completes it into **exist**.
+**Origin.** `Copree` = **co + pre + e** (together · before · exist) — *"we were already connected in
+thought, long before."* Cancel the shared `Copre` against the org name **Coprexist**: what is left is
+`xist`, and the trailing `e` completes it into **exist**.
 
 > Co-exist, reduced to exist.
 
@@ -71,8 +78,15 @@ is `xist`, and Copree's trailing `e` completes it into **exist**.
 so intros and the DSH plugin description keep the line: "formerly AIsChat — AIs that have state,
 memory and a life rhythm: not just tools, but companions."
 
-**Deliberately unchanged** (internal identifiers that would break if renamed): database/container
-names, backup file prefix `aischat_*`, same-origin proxy paths and storage keys (`/aischat-api`,
-`/aischat-ws`, `aischat-embed`, `aischat-theme`), the DSH workspace folder `AIC群视界-<world>` and
-`.aischat-world.json`, historical CHANGELOG entries and the old v0.3.1 article.
-Federation public IDs: new instances get `Copree-<ULID>`; nothing parses the prefix, so old ids need no migration.
+**Scope.** Every brand-shaped string is now `copree`: display copy, protocol paths (`/copree-api`,
+`/copree-ws`, `/copree-ui/`, `/copree-worlds/*`, `x-copree-*-prefix`), the storage key `copree-theme`,
+the notification tag, the postMessage source `copree-embed`, the plugin package/directory, build
+artifacts (`Copree.spec` / `Copree.exe`), the backup prefix `copree_*`, federation public IDs
+(`Copree-<ULID>`) and the docs.
+
+**Deliberately kept or read-both-ways.** Deployment-side names stay: the real domain, the real
+compose/container name, the historical database/container names (`ai_group_*`), and the old article
+filename. On-disk artifacts that already exist in users homes are read under both names: old world
+mirrors (`aischat-worlds/AIC群视界-*`, `.aischat-world.json`, `.aischat-sync.json`) keep working while
+new worlds use `copree-worlds/Copree群视界-*`, old backups `aischat_*.gz` are still listed and
+restored, and the old `aischat-theme` key migrates to `copree-theme`.

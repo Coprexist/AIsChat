@@ -37,7 +37,7 @@ class BaseProvider(ABC):
         """返回 SQLAlchemy 异步引擎 URL。
 
         Postgres: postgresql+asyncpg://user:pass@host:5432/db
-        SQLite:   sqlite+aiosqlite:///./data/aischat.db
+        SQLite:   sqlite+aiosqlite:///./data/copree.db
         """
         raise NotImplementedError
 

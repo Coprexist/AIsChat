@@ -3,8 +3,8 @@
  * dsh-copree — host half.
  *
  * Same-origin gateway for the local Copree backend. The browser half never
- * touches the backend address: every HTTP call goes to `/aischat-api/*` and
- * every WebSocket to `/aischat-ws?token=...`, both answered here and proxied
+ * touches the backend address: every HTTP call goes to `/copree-api/*` and
+ * every WebSocket to `/copree-ws?token=...`, both answered here and proxied
  * to the Copree FastAPI service (default http://127.0.0.1:5228, backend WS at
  * /ws). Authentication stays end-to-end: the browser's Authorization header
  * and WS token query are forwarded verbatim and never logged, stored, or
@@ -57,12 +57,12 @@ export const Config: z<Config> = z.object({
 export { applyUpdate, computeStatus, manifestId, readManifest, resolveSourceRoot, rollback } from './plugin-update.js'
 
 /** Routes owned by this plugin. */
-const HTTP_PREFIX = '/aischat-api'
-const WS_PATH = '/aischat-ws'
+const HTTP_PREFIX = '/copree-api'
+const WS_PATH = '/copree-ws'
 /** 前端静态资源挂载前缀（iframe 嵌入沉浸式界面等页面）。 */
-const UI_PREFIX = '/aischat-ui'
+const UI_PREFIX = '/copree-ui'
 
-/** 静态资源根目录：插件包内 dist/（前端 BASE_URL=/aischat-ui/ 构建产物）。 */
+/** 静态资源根目录：插件包内 dist/（前端 BASE_URL=/copree-ui/ 构建产物）。 */
 const UI_ROOT = join(PACKAGE_ROOT, 'dist')
 
 /** 静态文件 content-type 表（前端产物常用子集；缺省 application/octet-stream）。 */
@@ -88,7 +88,7 @@ const MIME: Record<string, string> = {
 }
 
 /**
- * 服务前端静态产物（`/aischat-ui/*`）。路径解析锚定在 dist 根内，杜绝
+ * 服务前端静态产物（`/copree-ui/*`）。路径解析锚定在 dist 根内，杜绝
  * `..` 穿越；SPA 路由（无扩展名的路径）回退到 index.html。
  */
 function serveStatic(req: IncomingMessage, res: ServerResponse): void {
@@ -178,20 +178,20 @@ function proxyHttp(
         host: target.host,
         // 告知后端当前部署形态：世界代码注入 window.WORLD_API / WORLD_UI 用
         // （群聊面板、平台菜单等组件据此拼同源代理前缀，避免落到宿主 SPA fallback）。
-        'x-aischat-api-prefix': '/aischat-api',
-        'x-aischat-ui-prefix': '/aischat-ui',
+        'x-copree-api-prefix': '/copree-api',
+        'x-copree-ui-prefix': '/copree-ui',
       },
     },
     (upRes) => {
       const headers = stripHopByHop(upRes.headers)
       // 重定向重写：后端 3xx 的 Location 是站内绝对路径（如 /world/1/files/...），
-      // 浏览器按原样跟随会打到宿主自身的 SPA fallback。统一补上 /aischat-api
+      // 浏览器按原样跟随会打到宿主自身的 SPA fallback。统一补上 /copree-api
       // 前缀，让重定向继续走本代理。
       const status = upRes.statusCode ?? 502
       if (status >= 300 && status < 400 && headers.location !== undefined) {
         const loc = Array.isArray(headers.location) ? String(headers.location[0]) : String(headers.location)
-        if (loc.startsWith('/') && !loc.startsWith('/aischat-api')) {
-          headers.location = `/aischat-api${loc}`
+        if (loc.startsWith('/') && !loc.startsWith('/copree-api')) {
+          headers.location = `/copree-api${loc}`
         }
       }
       res.writeHead(status, upRes.statusMessage ?? '', headers)
@@ -286,18 +286,38 @@ function proxyWs(
 }
 
 // ════════════════════════════════════════════════════════════════════════
-// 世界工作区（AIC群视界 → DSH Workspace 文件夹 + 会话）
+// 世界工作区（Copree群视界 → DSH Workspace 文件夹 + 会话）
 //
 // 每个 Copree 世界对应 DSH 工作区里一个真实目录：
-//   $DSH_HOME/aischat-worlds/AIC群视界-<世界名>/
-//     .aischat-world.json  { worldId, name }   ← 世界身份（工具据此路由）
+//   $DSH_HOME/copree-worlds/Copree群视界-<世界名>/
+//     .copree-world.json  { worldId, name }   ← 世界身份（工具据此路由）
 // client 同步流程：列世界 → 建目录 → workspaces.create({path}) →
 // connectWorkspace() 得会话 → 上报 {sessionId, token}（token 仅存内存，
 // 用于需要 owner 鉴权的写操作，不落盘、不打日志）。
 // ════════════════════════════════════════════════════════════════════════
 
-const WORLD_DIR_BASE = join(process.env.DSH_HOME ?? join(os.homedir(), '.dsh'), 'aischat-worlds')
-const WORLDS_PREFIX = '/aischat-worlds'
+const WORLD_DIR_BASE = join(process.env.DSH_HOME ?? join(os.homedir(), '.dsh'), 'copree-worlds')
+const WORLDS_PREFIX = '/copree-worlds'
+
+/**
+ * 改名前的老目录（aischat-worlds）与老身份文件（.aischat-world.json）继续认：
+ * 用户磁盘上已经存在的世界工作区、以及指向它们的 DSH 会话不能因为改名失效。
+ * 新世界一律用新名字；老世界原目录原样复用（worldDirFor 先查新目录、再查老目录）。
+ */
+const LEGACY_WORLD_DIR_BASE = join(process.env.DSH_HOME ?? join(os.homedir(), '.dsh'), 'aischat-worlds')
+const WORLD_DIR_BASES = [WORLD_DIR_BASE, LEGACY_WORLD_DIR_BASE]
+const META_FILES = ['.copree-world.json', '.aischat-world.json']
+
+/** 读世界身份：新名优先，老名兜底（两者都缺 = 不是世界目录） */
+function readWorldMeta(dir: string): { worldId?: unknown; name?: unknown } | null {
+  for (const file of META_FILES) {
+    const p = join(dir, file)
+    try {
+      if (existsSync(p)) return JSON.parse(readFileSync(p, 'utf8'))
+    } catch { /* 损坏就试下一个名字 */ }
+  }
+  return null
+}
 
 /**
  * worldId -> Copree token（仅内存，供 owner 鉴权写操作；不落盘）。
@@ -385,16 +405,15 @@ async function resolveWorldApiToken(backendUrl: string, worldId: number, ownerTo
   }
 }
 
-/** 从工具执行上下文解析所属世界：会话 cwd 必须在 WORLD_DIR_BASE 内。 */
+/** 从工具执行上下文解析所属世界：会话 cwd 必须在任一世界目录（新旧）内。 */
 function resolveWorldFromCwd(cwd: string | undefined): { worldId: number; name: string } | null {
   if (!cwd) return null
   try {
     const real = realpathSync(cwd)
-    const base = realpathSync(WORLD_DIR_BASE)
-    if (real !== base && !real.startsWith(base + sep)) return null
-    const metaPath = join(real, '.aischat-world.json')
-    if (!existsSync(metaPath)) return null
-    const meta = JSON.parse(readFileSync(metaPath, 'utf8')) as { worldId?: unknown; name?: unknown }
+    const bases = WORLD_DIR_BASES.filter((b) => existsSync(b)).map((b) => realpathSync(b))
+    if (!bases.some((base) => real === base || real.startsWith(base + sep))) return null
+    const meta = readWorldMeta(real)
+    if (!meta) return null
     const worldId = Number(meta.worldId)
     if (!Number.isInteger(worldId) || worldId <= 0) return null
     return { worldId, name: String(meta.name ?? `世界${worldId}`) }
@@ -409,56 +428,56 @@ function textOutput(value: unknown): Array<{ type: 'text'; text: string }> {
   return [{ type: 'text', text }]
 }
 
-/** 列出 WORLD_DIR_BASE 下的世界目录（含 worldId，诊断用）。 */
+/** 列出世界目录（新旧两个 base，含 worldId，诊断用）。 */
 function listWorldDirs(): Array<{ dir: string; worldId: number | null; name: string }> {
   const out: Array<{ dir: string; worldId: number | null; name: string }> = []
-  try {
-    if (!existsSync(WORLD_DIR_BASE)) return out
-    for (const entry of readdirSync(WORLD_DIR_BASE, { withFileTypes: true })) {
-      if (!entry.isDirectory()) continue
-      const metaPath = join(WORLD_DIR_BASE, entry.name, '.aischat-world.json')
-      let worldId: number | null = null
-      let name = ''
-      try {
-        const meta = JSON.parse(readFileSync(metaPath, 'utf8')) as { worldId?: unknown; name?: unknown }
-        worldId = Number(meta.worldId) || null
-        name = String(meta.name ?? '')
-      } catch { /* no meta */ }
-      out.push({ dir: entry.name, worldId, name })
-    }
-  } catch { /* ignore */ }
+  const seen = new Set<string>()
+  for (const root of WORLD_DIR_BASES) {
+    try {
+      if (!existsSync(root)) continue
+      for (const entry of readdirSync(root, { withFileTypes: true })) {
+        if (!entry.isDirectory() || seen.has(entry.name)) continue
+        seen.add(entry.name)
+        const meta = readWorldMeta(join(root, entry.name)) ?? {}
+        out.push({
+          dir: entry.name,
+          worldId: Number(meta.worldId) || null,
+          name: String(meta.name ?? ''),
+        })
+      }
+    } catch { /* ignore */ }
+  }
   return out
 }
 
 /** 世界镜像中应排除的文件（本地元数据 + 运行时产物）。 */
 function isMirrorExcluded(relPath: string): boolean {
   const base = relPath.split('/').pop() ?? relPath
-  if (relPath === '.aischat-world.json') return true
-  if (relPath === SNAPSHOT_FILE) return true // 快照文件自身不计入对比（否则永远被当本地新增）
+  if (META_FILES.includes(relPath)) return true          // 新老身份文件都不参与同步
+  if (relPath === SNAPSHOT_FILE || relPath === LEGACY_SNAPSHOT_FILE) return true // 快照自身不计入对比
   if (base === '__pycache__' || relPath.includes('/__pycache__/')) return true
   if (base.endsWith('.pyc')) return true
   if (base === '.DS_Store') return true
   return false
 }
 
-/** 按 worldId 找工作区世界目录（在 WORLD_DIR_BASE 下匹配 .aischat-world.json）。 */
+/** 按 worldId 找工作区世界目录：先新 base、再老 base（老镜像原样复用，不重复建目录）。 */
 function worldDirFor(worldId: number): string | null {
-  try {
-    if (!existsSync(WORLD_DIR_BASE)) return null
-    for (const entry of readdirSync(WORLD_DIR_BASE, { withFileTypes: true })) {
-      if (!entry.isDirectory()) continue
-      const metaPath = join(WORLD_DIR_BASE, entry.name, '.aischat-world.json')
-      try {
-        const meta = JSON.parse(readFileSync(metaPath, 'utf8')) as { worldId?: unknown }
-        if (Number(meta.worldId) === worldId) return join(WORLD_DIR_BASE, entry.name)
-      } catch { /* skip */ }
-    }
-  } catch { /* ignore */ }
+  for (const root of WORLD_DIR_BASES) {
+    try {
+      if (!existsSync(root)) continue
+      for (const entry of readdirSync(root, { withFileTypes: true })) {
+        if (!entry.isDirectory()) continue
+        const meta = readWorldMeta(join(root, entry.name))
+        if (meta && Number(meta.worldId) === worldId) return join(root, entry.name)
+      }
+    } catch { /* ignore */ }
+  }
   return null
 }
 
 // ════════════════════════════════════════════════════════════════════
-// GitHub 式双向同步（.aischat-sync.json 快照 + 三路对比）
+// GitHub 式双向同步（.copree-sync.json 快照 + 三路对比）
 //
 // 快照记录每个文件「上次同步时的本地 mtime / 远端 mtime」：
 //   本地 mtime 变了  = 本地有未推送修改（changedLocal）
@@ -475,13 +494,16 @@ interface SyncCompare {
   conflict: string[]       // 两边都改（需裁决）
 }
 
-const SNAPSHOT_FILE = '.aischat-sync.json'
+const SNAPSHOT_FILE = '.copree-sync.json'
+const LEGACY_SNAPSHOT_FILE = '.aischat-sync.json'
 
 function readSnapshot(dir: string): SyncSnapshot {
-  try {
-    const parsed = JSON.parse(readFileSync(join(dir, SNAPSHOT_FILE), 'utf8')) as SyncSnapshot
-    if (parsed && parsed.v === 1 && parsed.files && typeof parsed.files === 'object') return parsed
-  } catch { /* 无快照或损坏 */ }
+  for (const file of [SNAPSHOT_FILE, LEGACY_SNAPSHOT_FILE]) {
+    try {
+      const parsed = JSON.parse(readFileSync(join(dir, file), 'utf8')) as SyncSnapshot
+      if (parsed && parsed.v === 1 && parsed.files && typeof parsed.files === 'object') return parsed
+    } catch { /* 无快照或损坏就试下一个名字 */ }
+  }
   return { v: 1, files: {} }
 }
 
@@ -746,11 +768,13 @@ export function apply(ctx: Context, config: Config): void {
           const worldId = Number(body.worldId)
           const name = String(body.name ?? '')
           if (!Number.isInteger(worldId) || worldId <= 0) { send(400, { error: 'invalid worldId' }); return }
-          const dirName = sanitizeDirName(`AIC群视界-${name || `世界${worldId}`}`)
+          const existing = worldDirFor(worldId)   // 改名前的世界镜像（aischat-worlds/AIC群视界-*）原样复用
+          if (existing) { send(200, { path: existing }); return }
+          const dirName = sanitizeDirName(`Copree群视界-${name || `世界${worldId}`}`)
           const dir = join(WORLD_DIR_BASE, dirName)
           try {
             mkdirSync(dir, { recursive: true })
-            const metaPath = join(dir, '.aischat-world.json')
+            const metaPath = join(dir, '.copree-world.json')
             if (!existsSync(metaPath)) {
               writeFileSync(metaPath, JSON.stringify({ worldId, name }, null, 2), 'utf8')
             } else {
@@ -826,7 +850,7 @@ export function apply(ctx: Context, config: Config): void {
       execute: async (rawArgs, exec) => {
         const world = worldFromExec(exec as never)
         if (!world) {
-          return { error: '当前会话不属于任何 Copree 世界：请先在工作区打开一个「AIC群视界-世界名」会话（该会话目录需含 .aischat-world.json）。' }
+          return { error: '当前会话不属于任何 Copree 世界：请先在工作区打开一个「Copree群视界-世界名」会话（该会话目录需含 .copree-world.json）。' }
         }
         try {
           const result = await execute((rawArgs ?? {}) as Record<string, unknown>, world)
@@ -1029,7 +1053,7 @@ export function apply(ctx: Context, config: Config): void {
     'world_push',
     '把当前工作区目录（本地世界镜像）的全部改动同步回 Copree 世界。' +
     '只推送本地修改过的文件（带快照对比）；冲突文件（远端也改过）默认跳过并报告，' +
-    'force=true 时以本地为准覆盖。排除本地元数据 .aischat-world.json 与 __pycache__。' +
+    'force=true 时以本地为准覆盖。排除本地元数据 .copree-world.json 与 __pycache__。' +
     '你（agent）用 DSH 原生 read/write/edit/bash 修改工作区文件后调用本工具让改动在 Copree 中生效。' +
     '注意：返回「已同步（无变化）」= 快照认为本地与远端已一致（改动很可能已在远端），用 world_read_file 复核内容，别当没生效。',
     { type: 'object', properties: { force: { type: 'boolean', description: 'true 时以本地为准强制覆盖冲突文件' } }, additionalProperties: false },
@@ -1076,9 +1100,9 @@ export function apply(ctx: Context, config: Config): void {
 
   // ── 世界会话提示词（泛化引导，不依赖具体会话） ─────────────────────
   ctx.systemPrompt.section({
-    name: 'aischat-world-context',
+    name: 'copree-world-context',
     order: 150,
-    text: '如果你的会话工作目录位于 aischat-worlds 目录下（目录名以「AIC群视界-」开头），你正在操作一个 Copree 群视界世界：' +
+    text: '如果你的会话工作目录位于 copree-worlds 目录下（目录名以「Copree群视界-」开头），你正在操作一个 Copree 群视界世界：' +
       '该工作目录是世界的「本地镜像」——世界页面代码、数据文件都在里面，你可以直接用 DSH 原生的 read/write/edit/glob/grep/bash ' +
       '工具读写它们（bash 可直接运行世界 Python 代码测试）。修改完成后调用 world_push 把改动同步回 Copree 世界；' +
       '若世界在别处被改过、需要最新文件时用 world_pull 主动拉取。' +
@@ -1087,5 +1111,5 @@ export function apply(ctx: Context, config: Config): void {
       '世界是用户嵌入 DSH 的「可操作对象」——你的推理与工具仍走 DSH 体系，只是操作目标属于 Copree。',
   })
 
-  ctx.logger?.info?.(`dsh-copree: proxying /aischat-api and /aischat-ws -> ${backendUrl}; serving /aischat-ui; world sync at ${WORLDS_PREFIX}`)
+  ctx.logger?.info?.(`dsh-copree: proxying /copree-api and /copree-ws -> ${backendUrl}; serving /copree-ui; world sync at ${WORLDS_PREFIX}`)
 }

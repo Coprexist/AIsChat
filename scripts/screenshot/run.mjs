@@ -59,7 +59,7 @@ async function main() {
 
   const avatarB64 = readFileSync(AVATAR).toString('base64')
   const token = mintToken(jwtSecret())
-  const profileDir = mkdtempSync(path.join(tmpdir(), 'aischat-shot-'))
+  const profileDir = mkdtempSync(path.join(tmpdir(), 'copree-shot-'))
   const port = 9300 + Math.floor(Math.random() * 200)
   const { proc: chrome, wsUrl, bin } = await launchChrome({ port, profileDir })
   const session = await Session.connect(wsUrl)

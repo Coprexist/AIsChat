@@ -191,7 +191,7 @@ export function useWebSocket(
           // 桌面通知
           if ('Notification' in window && Notification.permission === 'granted') {
             try {
-              new Notification('💬 Copree', { body: '收到新消息', tag: 'aischat_msg' })
+              new Notification('💬 Copree', { body: '收到新消息', tag: 'copree_msg' })
             } catch {}
           } else if ('Notification' in window && Notification.permission !== 'denied') {
             Notification.requestPermission()

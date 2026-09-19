@@ -52,7 +52,7 @@ export default function LoginPage() {
           <button
             onClick={() => {
               try {
-                window.parent?.postMessage({ source: 'aischat-embed', type: 'request-login' }, '*')
+                window.parent?.postMessage({ source: 'copree-embed', type: 'request-login' }, '*')
               } catch { /* 静默 */ }
             }}
             className="px-5 py-2 rounded-control bg-primary-600 text-white text-sm font-medium hover:bg-primary-500"

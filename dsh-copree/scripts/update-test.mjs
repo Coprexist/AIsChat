@@ -46,7 +46,7 @@ function assert(cond, message) {
 const base = readManifest(REPO)
 assert(base && Object.keys(base.files).length > 0, `源码构建清单存在（${base ? Object.keys(base.files).length : 0} 个产物）`)
 
-const work = mkdtempSync(join(tmpdir(), 'aischat-plugin-update-'))
+const work = mkdtempSync(join(tmpdir(), 'copree-plugin-update-'))
 try {
   // 按 pnpm 的真实布局摆放，让来源分类读到 <profile>/package.json
   const profile = join(work, 'profile')
@@ -98,7 +98,7 @@ try {
 
   // 8. 安装副本缺产物 -> 必须报不完整，而不是拿清单比对说“已是最新”。
   //    真实事故：pnpm 按 package.json 的 files 字段装包，dist 不在其中被裁掉，
-  //    而 /aischat-plugin/status 当时仍报 up-to-date，界面 404 无人知晓。
+  //    而 /copree-plugin/status 当时仍报 up-to-date，界面 404 无人知晓。
   rmSync(join(install, 'dist/index.html'), { force: true })
   status = await computeStatus(install, BACKEND, source)
   assert(

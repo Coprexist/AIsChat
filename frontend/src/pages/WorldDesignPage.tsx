@@ -214,7 +214,7 @@ export default function WorldDesignPage() {
   const doDownload = async (format: 'md' | 'docx') => {
     if (!downloadTarget) return
     const { scope, title } = downloadTarget
-    const filename = scope === 'section' ? `api-doc-${docsActive || 'doc'}` : 'aischat-world-api-docs'
+    const filename = scope === 'section' ? `api-doc-${docsActive || 'doc'}` : 'copree-world-api-docs'
     if (format === 'md') {
       const md = scope === 'section' ? docsContent : await getAllDocsMd()
       downloadDoc(md, filename + '.md')

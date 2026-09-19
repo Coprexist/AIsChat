@@ -22,7 +22,7 @@ class Settings(BaseSettings):
 
     # ── 数据库 ──
     db_backend: str = "postgres"
-    sqlite_db_path: str = "./data/aischat.db"
+    sqlite_db_path: str = "./data/copree.db"
     database_url: str = "postgresql+asyncpg://ai_chat:change_me@localhost:5432/ai_group_chat"
     database_url_sync: str = "postgresql://ai_chat:change_me@localhost:5432/ai_group_chat"
 

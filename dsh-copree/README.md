@@ -16,16 +16,16 @@ Copree 原生集成插件：把 Copree 聊天（置顶 / 私信 / 群聊）、�
 双面插件：
 
 - **Host 半**（`lib/index.js`）：在 DSH Web 服务上注册同源网关 + 世界工作区
-  - `GET/POST /aischat-api/*` → 代理到本机 Copree 后端（默认 `http://127.0.0.1:5228`，可配置）
-  - `/aischat-ws?token=...` → WebSocket 升级代理到后端 `/ws`
-  - `/aischat-ui/*` → Copree 前端静态托管（SPA 回退 + 路径穿越防护）
-  - `/aischat-worlds/*` → 世界工作区端点（dir 建目录 / token 上报 / status 诊断 / pull 拉取）
+  - `GET/POST /copree-api/*` → 代理到本机 Copree 后端（默认 `http://127.0.0.1:5228`，可配置）
+  - `/copree-ws?token=...` → WebSocket 升级代理到后端 `/ws`
+  - `/copree-ui/*` → Copree 前端静态托管（SPA 回退 + 路径穿越防护）
+  - `/copree-worlds/*` → 世界工作区端点（dir 建目录 / token 上报 / status 诊断 / pull 拉取）
   - **11 个 `world_*` 工具**（文件/API/群聊/生命周期/同步/沙箱运行），按会话 cwd 自动路由到所属世界
   - systemPrompt 注册世界会话引导段（镜像模式：用 DSH 原生工具 + world_push 同步）
 - **Client 半**（`lib/client.js`）：原生界面 + 世界同步
   - 侧边栏底部入口（`sidebar.footer.action`）+ 全屏 board（联系人 + 对话 + composer）
   - 沉浸式覆盖层（`shell.overlay`）：群聊"沉浸式"、AIC 功能页（群视界/好友/我的AI/管理/设置）
-  - 世界同步：登录/打开面板时建 `AIC群视界-*` 工作区文件夹 + 会话 + 上报 token（按 worldId）+
+  - 世界同步：登录/打开面板时建 `Copree群视界-*` 工作区文件夹 + 会话 + 上报 token（按 worldId）+
     温和自动拉取（仅本地干净且世界有改动才拉，绝不覆盖本地修改）
   - 设置页（`settings.section`）：登录 / 退出 / 状态说明
 
@@ -52,7 +52,7 @@ dsh plugin --profile web add file:/path/to/dsh-copree
 且**只走一个入口**——它会排除只属于仓库的素材（`docs/assets` 的 README/推广图）：
 
 ```bash
-docker exec -w /app ai_group_frontend sh -c "BASE_URL=/aischat-ui/ node_modules/.bin/vite build"
+docker exec -w /app ai_group_frontend sh -c "BASE_URL=/copree-ui/ node_modules/.bin/vite build"
 node scripts/sync-dist.mjs
 node scripts/build.mjs   # 重建清单里的产物哈希
 ```
@@ -73,11 +73,11 @@ node scripts/build.mjs   # 重建清单里的产物哈希
 
 ## 世界工作区（GitHub 式双向同步）
 
-每个 Copree 世界 = DSH 工作区文件夹 `AIC群视界-世界名`，目录即世界文件的
-**本地镜像**（`$DSH_HOME/aischat-worlds/`）。agent 用 **DSH 原生工具**
+每个 Copree 世界 = DSH 工作区文件夹 `Copree群视界-世界名`，目录即世界文件的
+**本地镜像**（`$DSH_HOME/copree-worlds/`）。agent 用 **DSH 原生工具**
 （read/write/edit/bash）操作镜像，`world_push` 同步回世界，`world_pull` 拉最新。
 
-- `.aischat-sync.json` 快照 + 三路对比（added/changedRemote/changedLocal/conflict）
+- `.copree-sync.json` 快照 + 三路对比（added/changedRemote/changedLocal/conflict）
 - 自动拉取仅当「本地无未推送修改且世界有改动」（温和，不覆盖 agent 工作文件）
 - 冲突文件不盲目覆盖：push/pull 默认跳过并报告，`force:true` 强制；AI 读两边内容裁决
 - 版本提示：world_* 工具结果附 `updateHint` / `conflictHint`

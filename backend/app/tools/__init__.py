@@ -49,7 +49,7 @@ def _discover_external_tools():
     for pyfile in sorted(dirpath.rglob("*.py")):
         if pyfile.name.startswith("_"):
             continue
-        module = f"aischat_ext_tool_{pyfile.stem}"
+        module = f"copree_ext_tool_{pyfile.stem}"
         try:
             spec = importlib.util.spec_from_file_location(module, pyfile)
             mod = importlib.util.module_from_spec(spec)

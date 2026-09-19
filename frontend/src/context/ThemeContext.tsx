@@ -14,11 +14,12 @@ const ThemeContext = createContext<ThemeContextType>({
   setTheme: () => {},
 })
 
-const STORAGE_KEY = 'aischat-theme'
+const STORAGE_KEY = 'copree-theme'
+const LEGACY_STORAGE_KEY = 'aischat-theme'   // 改名前的键：读一次就迁到新键，用户主题偏好不丢
 
 function getInitialTheme(): Theme {
   try {
-    const stored = localStorage.getItem(STORAGE_KEY)
+    const stored = localStorage.getItem(STORAGE_KEY) ?? localStorage.getItem(LEGACY_STORAGE_KEY)
     if (stored === 'light' || stored === 'dark') return stored
   } catch {}
   // 跟随系统偏好

@@ -1,6 +1,6 @@
 # dsh-copree bundle patch: mounts the dual-face Copree integration plugin.
 # The host half proxies the local Copree backend (default 127.0.0.1:5228)
-# through /aischat-api (HTTP) and /aischat-ws (WebSocket upgrade); the client
+# through /copree-api (HTTP) and /copree-ws (WebSocket upgrade); the client
 # half renders the native sidebar entry, chat view, and settings page.
 - insert:
     - id: dsh-copree

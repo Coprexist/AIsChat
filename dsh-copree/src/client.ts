@@ -4,17 +4,17 @@
  *
  * Copree as a first-class sidebar board, like the Workspace board:
  *
- * - `sidebar.footer.action` `aischat-entry`: toggles the Copree board.
- * - `shell.overlay` `aischat-board`: while the board is open it covers the
+ * - `sidebar.footer.action` `copree-entry`: toggles the Copree board.
+ * - `shell.overlay` `copree-board`: while the board is open it covers the
  *   whole frame and renders its own left rail (联系人板块: 置顶/私信/群聊,
  *   expanded like workspace folders) beside the conversation column (messages
  *   + composer). Opening the board hides the Workspace board; closing it
  *   restores DSH. No DSH session or composer semantics are touched — the
  *   composer inside the board sends to the selected Copree conversation.
- * - `settings.section` `aischat`: settings page (login / sign-out / note).
+ * - `settings.section` `copree`: settings page (login / sign-out / note).
  *
- * All traffic is same-origin: HTTP `/aischat-api/*`, WS
- * `/aischat-ws?token=...`, both proxied by the host half to the local Copree
+ * All traffic is same-origin: HTTP `/copree-api/*`, WS
+ * `/copree-ws?token=...`, both proxied by the host half to the local Copree
  * backend. The token lives in browser localStorage only.
  *
  * @module dsh-copree/client
@@ -47,11 +47,11 @@ const MARKDOWN_LABELS = {
 const PLUGIN_ID = 'dsh-copree'
 
 /** Same-origin API base answered by the host half. */
-const API = '/aischat-api'
+const API = '/copree-api'
 /** WebSocket endpoint answered by the host half (upgrade proxy). */
-const WS_BASE = '/aischat-ws'
+const WS_BASE = '/copree-ws'
 /** Plugin self-update endpoints answered by the host half (outside the Copree proxy prefix). */
-const PLUGIN_API = '/aischat-plugin'
+const PLUGIN_API = '/copree-plugin'
 
 /** Browser-local storage keys (guarded read/write). */
 const K_TOKEN = 'aisc.token'
@@ -93,7 +93,7 @@ function parseUser(raw) {
 
 /** Notify every mounted surface (settings page, board) to re-read state. */
 function broadcast(what) {
-  window.dispatchEvent(new CustomEvent('aischat:' + what))
+  window.dispatchEvent(new CustomEvent('copree:' + what))
 }
 
 /**
@@ -258,8 +258,8 @@ function wsUrl(token) {
  * Rewrite an Copree media URL for the DSH same-origin proxy.
  * Copree stores relative paths like `/api/fs/download-avatar/x.png` that its
  * own frontend serves through a vite proxy stripping the `/api` prefix. In
- * DSH the host half strips `/aischat-api`, so `/api/...` maps 1:1 to
- * `/aischat-api/...`. Absolute URLs (external avatars) pass through untouched.
+ * DSH the host half strips `/copree-api`, so `/api/...` maps 1:1 to
+ * `/copree-api/...`. Absolute URLs (external avatars) pass through untouched.
  */
 function mediaUrl(url) {
   if (!url || typeof url !== 'string') return url
@@ -654,7 +654,7 @@ async function respondInvitation(inv, accept) {
     await api(`/group-invitations/${encodeURIComponent(inv.invitation_id)}/${accept ? 'accept' : 'reject'}`, { method: 'POST' })
     broadcast('message')
   } catch (e) {
-    window.dispatchEvent(new CustomEvent('aischat:error:' + (e.message || '操作失败')))
+    window.dispatchEvent(new CustomEvent('copree:error:' + (e.message || '操作失败')))
   }
 }
 
@@ -703,7 +703,7 @@ function GroupSettings({ active }) {
       loadContacts(true).catch(() => {})
       const g = await api(`/groups/${encodeURIComponent(active.id)}`)
       setInfo(g)
-    } catch (e) { window.dispatchEvent(new CustomEvent('aischat:error:' + (e.message || '操作失败'))) }
+    } catch (e) { window.dispatchEvent(new CustomEvent('copree:error:' + (e.message || '操作失败'))) }
   }
   const toggleDnd = async () => {
     try {
@@ -714,7 +714,7 @@ function GroupSettings({ active }) {
       }
       const g = await api(`/groups/${encodeURIComponent(active.id)}`)
       setInfo(g)
-    } catch (e) { window.dispatchEvent(new CustomEvent('aischat:error:' + (e.message || '操作失败'))) }
+    } catch (e) { window.dispatchEvent(new CustomEvent('copree:error:' + (e.message || '操作失败'))) }
   }
 
   const pinned = !!(info && info.is_pinned)
@@ -763,7 +763,7 @@ function DmSettings({ active }) {
       loadContacts(true).catch(() => {})
       const d = await api(`/dm/${encodeURIComponent(active.id)}?summary=true`)
       setInfo(d)
-    } catch (e) { window.dispatchEvent(new CustomEvent('aischat:error:' + (e.message || '操作失败'))) }
+    } catch (e) { window.dispatchEvent(new CustomEvent('copree:error:' + (e.message || '操作失败'))) }
   }
   const toggleDnd = async () => {
     try {
@@ -771,7 +771,7 @@ function DmSettings({ active }) {
       await api(`/dm/${encodeURIComponent(active.id)}/dnd`, { method: 'POST', json: { duration_minutes: inDnd ? 0 : null } })
       const d = await api(`/dm/${encodeURIComponent(active.id)}?summary=true`)
       setInfo(d)
-    } catch (e) { window.dispatchEvent(new CustomEvent('aischat:error:' + (e.message || '操作失败'))) }
+    } catch (e) { window.dispatchEvent(new CustomEvent('copree:error:' + (e.message || '操作失败'))) }
   }
 
   const pinned = !!(info && info.is_pinned)
@@ -800,7 +800,7 @@ function DmSettings({ active }) {
 class MessageBoundary extends React.Component {
   constructor(props) { super(props); this.state = { failed: false } }
   static getDerivedStateFromError() { return { failed: true } }
-  componentDidCatch(error) { console.warn('[aischat] 消息渲染失败，已降级为纯文本', error) }
+  componentDidCatch(error) { console.warn('[copree] 消息渲染失败，已降级为纯文本', error) }
   render() {
     if (this.state.failed) {
       return h('div', { style: { ...style.msgOtherBubble, whiteSpace: 'pre-wrap' } }, String(this.props.text || ''))
@@ -902,7 +902,7 @@ function ConversationColumn({ refresh, onImmersive }) {
         refresh()
       }
     } catch (e) {
-      window.dispatchEvent(new CustomEvent('aischat:error:' + (e.message || 'send failed')))
+      window.dispatchEvent(new CustomEvent('copree:error:' + (e.message || 'send failed')))
     } finally {
       setSending(false)
     }
@@ -952,7 +952,7 @@ function ConversationColumn({ refresh, onImmersive }) {
 }
 
 /**
- * 沉浸式界面：iframe 内嵌前端页面（同源托管 /aischat-ui/...）。
+ * 沉浸式界面：iframe 内嵌前端页面（同源托管 /copree-ui/...）。
  * path 为完整 iframe src（含 ?embed=1）；设置页功能导航与群聊沉浸式共用。
  */
 function ImmersivePanel({ path, title, onClose }) {
@@ -973,13 +973,13 @@ function openImmersive(path, title) {
   const sep = path.includes('?') ? '&' : '?'
   immersiveState.path = path + sep + 'token=' + encodeURIComponent(store.token || '')
   immersiveState.title = title || ''
-  window.dispatchEvent(new CustomEvent('aischat:immersive'))
+  window.dispatchEvent(new CustomEvent('copree:immersive'))
 }
 
 function closeImmersive() {
   immersiveState.path = null
   immersiveState.title = ''
-  window.dispatchEvent(new CustomEvent('aischat:immersive'))
+  window.dispatchEvent(new CustomEvent('copree:immersive'))
 }
 
 /** 全局沉浸式覆盖层入口：监听 immersive 广播，有路径时渲染面板。 */
@@ -987,8 +987,8 @@ function ImmersiveOverlay() {
   const [, force] = useState(0)
   useEffect(() => {
     const on = () => force((n) => n + 1)
-    window.addEventListener('aischat:immersive', on)
-    return () => window.removeEventListener('aischat:immersive', on)
+    window.addEventListener('copree:immersive', on)
+    return () => window.removeEventListener('copree:immersive', on)
   }, [])
   if (!immersiveState.path) return null
   return h(ImmersivePanel, { path: immersiveState.path, title: immersiveState.title, onClose: closeImmersive })
@@ -1011,12 +1011,12 @@ function AisChatBoard({ onClose }) {
 
   useEffect(() => {
     const onMsg = () => refresh()
-    window.addEventListener('aischat:message', onMsg)
-    window.addEventListener('aischat:auth', onMsg)
-    window.addEventListener('aischat:error', (e) => { console.warn('[aischat]', e.detail) })
+    window.addEventListener('copree:message', onMsg)
+    window.addEventListener('copree:auth', onMsg)
+    window.addEventListener('copree:error', (e) => { console.warn('[copree]', e.detail) })
     return () => {
-      window.removeEventListener('aischat:message', onMsg)
-      window.removeEventListener('aischat:auth', onMsg)
+      window.removeEventListener('copree:message', onMsg)
+      window.removeEventListener('copree:auth', onMsg)
     }
   }, [refresh])
 
@@ -1088,14 +1088,14 @@ function AisChatBoard({ onClose }) {
           FEATURES.map((f) => h('button', {
             key: f.id,
             style: { ...style.row, fontSize: 13 },
-            onClick: () => openImmersive(`/aischat-ui${f.path}?embed=1`, f.label),
+            onClick: () => openImmersive(`/copree-ui${f.path}?embed=1`, f.label),
           }, f.label)),
         ),
       ),
     ),
     h(ConversationColumn, {
       refresh,
-      onImmersive: (wid) => openImmersive(`/aischat-ui/world-view/${encodeURIComponent(wid)}?embed=1`, '沉浸式界面'),
+      onImmersive: (wid) => openImmersive(`/copree-ui/world-view/${encodeURIComponent(wid)}?embed=1`, '沉浸式界面'),
     }),
   )
 }
@@ -1109,12 +1109,12 @@ function SettingsPage() {
   const [pluginBusy, setPluginBusy] = useState(false)
 
   useEffect(() => {
-    window.addEventListener('aischat:auth', refresh)
+    window.addEventListener('copree:auth', refresh)
     let alive = true
     pluginApi('/status').then((s) => { if (alive) setPlugin(s) }).catch(() => {})
     return () => {
       alive = false
-      window.removeEventListener('aischat:auth', refresh)
+      window.removeEventListener('copree:auth', refresh)
     }
   }, [refresh])
 
@@ -1166,7 +1166,7 @@ function SettingsPage() {
       FEATURES.map((f) => h('button', {
         key: f.id,
         style: { ...style.footBtn, padding: '9px 10px', fontSize: 14 },
-        onClick: () => openImmersive(`/aischat-ui${f.path}?embed=1`, f.label),
+        onClick: () => openImmersive(`/copree-ui${f.path}?embed=1`, f.label),
       }, f.label)),
     ),
     h('div', { style: { fontSize: 13, fontWeight: 600, margin: '18px 0 8px', color: 'var(--dsw-alias-label-primary)' } }, '插件'),
@@ -1211,13 +1211,13 @@ function FooterButton({ wide }) {
   }, [])
   useEffect(() => {
     const onRefresh = () => setOpen(boardOpenRef.current)
-    window.addEventListener('aischat:board-refresh', onRefresh)
-    return () => window.removeEventListener('aischat:board-refresh', onRefresh)
+    window.addEventListener('copree:board-refresh', onRefresh)
+    return () => window.removeEventListener('copree:board-refresh', onRefresh)
   }, [])
   const toggle = () => {
     const next = !open
     setOpen(next)
-    window.dispatchEvent(new CustomEvent('aischat:board-toggle', { detail: next }))
+    window.dispatchEvent(new CustomEvent('copree:board-toggle', { detail: next }))
   }
   const rail = wide === false
   // 官方 trigger 风格：wide 全宽行（图标+文字），rail 时 36px 圆形仅图标。
@@ -1251,12 +1251,12 @@ module.exports = {
 
     const bump = () => {
       boardOpenRef.current = boardOpen
-      window.dispatchEvent(new CustomEvent('aischat:board-refresh'))
+      window.dispatchEvent(new CustomEvent('copree:board-refresh'))
     }
 
     /**
      * 把 Copree 世界同步为 DSH 工作区文件夹 + 会话：
-     *   世界 → 目录（AIC群视界-世界名 + .aischat-world.json）→
+     *   世界 → 目录（Copree群视界-世界名 + .copree-world.json）→
      *   ctx.workspaces.create({path}) → connectWorkspace() 得会话 →
      *   上报 {sessionId, token}（host 仅内存保存，供 owner 鉴权写操作）。
      * 全部走官方 API，幂等（重复同步复用同一 workspace/空白会话）。
@@ -1273,7 +1273,7 @@ module.exports = {
         if (!Array.isArray(worlds)) return
         for (const w of worlds) {
           if (!w || !w.id) continue
-          const dirRes = await fetch('/aischat-worlds/dir', {
+          const dirRes = await fetch('/copree-worlds/dir', {
             method: 'POST',
             headers: { 'content-type': 'application/json' },
             body: JSON.stringify({ worldId: w.id, name: w.name || `世界${w.id}` }),
@@ -1289,7 +1289,7 @@ module.exports = {
           await ctx.workspaces.connectWorkspace(workspaceId).catch(() => null)
           // token 按 worldId 上报（稳定标识）：host 按世界路由，不依赖
           // sessionId（DSH 新建会话流程会创建新会话，sessionId 不稳定）。
-          await fetch('/aischat-worlds/token', {
+          await fetch('/copree-worlds/token', {
             method: 'POST',
             headers: { 'content-type': 'application/json' },
             body: JSON.stringify({ worldId: w.id, token: store.token }),
@@ -1297,7 +1297,7 @@ module.exports = {
           // 温和自动拉取：host 端带快照/冲突保护——仅当「本地无未推送修改且
           // 世界有改动」时才拉取并报告变化；本地有修改或冲突一律拒绝，绝不覆盖
           // agent 正在工作的文件。对话进行中文件不会被自动改动。
-          await fetch('/aischat-worlds/pull', {
+          await fetch('/copree-worlds/pull', {
             method: 'POST',
             headers: { 'content-type': 'application/json' },
             body: JSON.stringify({ worldId: w.id }),
@@ -1307,23 +1307,23 @@ module.exports = {
     }
 
     // 登录态变化时自动同步世界到工作区（节流 30s）。
-    window.addEventListener('aischat:auth', () => {
+    window.addEventListener('copree:auth', () => {
       if (store.token) syncWorlds()
     })
 
     // 页面加载后若已恢复登录态（localStorage），立即静默上报一次——用户
-    // 直接点进「AIC群视界」工作区即可使用 world 工具，无需先点开 Copree 面板。
+    // 直接点进「Copree群视界」工作区即可使用 world 工具，无需先点开 Copree 面板。
     if (store.token && store.user) syncWorlds()
 
     // 打开 Copree board 时也补一次同步（force 跳过节流，幂等安全）。
-    window.addEventListener('aischat:board-toggle', (e) => {
+    window.addEventListener('copree:board-toggle', (e) => {
       boardOpen = !!e.detail
       if (boardOpen && store.token) syncWorlds(true)
       bump()
     })
 
-    window.addEventListener('aischat:error', (e) => {
-      console.warn('[aischat]', e.detail)
+    window.addEventListener('copree:error', (e) => {
+      console.warn('[copree]', e.detail)
     })
 
     const disposers = []
@@ -1339,7 +1339,7 @@ module.exports = {
     disposers.push(() => clearInterval(syncTimer))
 
     disposers.push(ctx.slots.inject('sidebar.footer.action', () => ctx.slots.register(
-      { name: 'sidebar.footer.action', id: 'aischat-entry', order: 10, label: 'Copree' },
+      { name: 'sidebar.footer.action', id: 'copree-entry', order: 10, label: 'Copree' },
       FooterButton,
     )))
 
@@ -1354,8 +1354,8 @@ module.exports = {
           setOpenState(boardOpen)
           force((n) => n + 1)
         }
-        window.addEventListener('aischat:board-refresh', onRefresh)
-        return () => window.removeEventListener('aischat:board-refresh', onRefresh)
+        window.addEventListener('copree:board-refresh', onRefresh)
+        return () => window.removeEventListener('copree:board-refresh', onRefresh)
       }, [])
       if (!openState) return null
       return h(AisChatBoard, {
@@ -1366,18 +1366,18 @@ module.exports = {
       })
     }
     disposers.push(ctx.slots.inject('shell.overlay', () => ctx.slots.register(
-      { name: 'shell.overlay', id: 'aischat-board', order: 30 },
+      { name: 'shell.overlay', id: 'copree-board', order: 30 },
       BoardEntry,
     )))
 
     // 全局沉浸式覆盖层：群聊"沉浸式"按钮与设置页功能导航共用（iframe 打开后盖住整个 frame）。
     disposers.push(ctx.slots.inject('shell.overlay', () => ctx.slots.register(
-      { name: 'shell.overlay', id: 'aischat-immersive', order: 40 },
+      { name: 'shell.overlay', id: 'copree-immersive', order: 40 },
       ImmersiveOverlay,
     )))
 
     disposers.push(ctx.slots.inject('settings.section', () => ctx.slots.register(
-      { name: 'settings.section', id: 'aischat', order: 40, label: 'Copree' },
+      { name: 'settings.section', id: 'copree', order: 40, label: 'Copree' },
       SettingsPage,
     )))
 
@@ -1387,10 +1387,10 @@ module.exports = {
     })
 
     // 前端 iframe（嵌入模式）登录态失效时通知宿主：打开 Copree board 让用户登录。
-    // 监听 aischat-embed 消息（source 校验 + 只响应 iframe 子窗口）。
+    // 监听 copree-embed 消息（source 校验 + 只响应 iframe 子窗口）。
     window.addEventListener('message', (event) => {
       const data = event.data
-      if (!data || typeof data !== 'object' || data.source !== 'aischat-embed') return
+      if (!data || typeof data !== 'object' || data.source !== 'copree-embed') return
       if (data.type === 'request-login' || data.type === 'unauthorized') {
         if (!boardOpen) {
           boardOpen = true

@@ -7,7 +7,7 @@ from app.tools.base import ToolPlugin, ToolRegistry
 
 logger = logging.getLogger(__name__)
 
-MANUAL_PATH = Path("/aischat/docs/guides/用户手册.md")
+MANUAL_PATH = Path("/copree/docs/guides/用户手册.md")
 
 
 class ReadManual(ToolPlugin):

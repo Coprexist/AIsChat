@@ -9,9 +9,9 @@ var MARKDOWN_LABELS = {
   code: { copyLabel: "\u590D\u5236", copiedLabel: "\u5DF2\u590D\u5236" },
   footnotes: "\u811A\u6CE8"
 };
-var API = "/aischat-api";
-var WS_BASE = "/aischat-ws";
-var PLUGIN_API = "/aischat-plugin";
+var API = "/copree-api";
+var WS_BASE = "/copree-ws";
+var PLUGIN_API = "/copree-plugin";
 var K_TOKEN = "aisc.token";
 var K_USER = "aisc.user";
 var store = {
@@ -47,7 +47,7 @@ function parseUser(raw) {
   }
 }
 function broadcast(what) {
-  window.dispatchEvent(new CustomEvent("aischat:" + what));
+  window.dispatchEvent(new CustomEvent("copree:" + what));
 }
 async function api(path, options = {}) {
   const headers = { ...options.headers || {} };
@@ -520,7 +520,7 @@ async function respondInvitation(inv, accept) {
     await api(`/group-invitations/${encodeURIComponent(inv.invitation_id)}/${accept ? "accept" : "reject"}`, { method: "POST" });
     broadcast("message");
   } catch (e) {
-    window.dispatchEvent(new CustomEvent("aischat:error:" + (e.message || "\u64CD\u4F5C\u5931\u8D25")));
+    window.dispatchEvent(new CustomEvent("copree:error:" + (e.message || "\u64CD\u4F5C\u5931\u8D25")));
   }
 }
 var INVITE_STATUS_LABEL = { pending: "\u5F85\u5904\u7406", accepted: "\u5DF2\u63A5\u53D7", rejected: "\u5DF2\u62D2\u7EDD" };
@@ -578,7 +578,7 @@ function GroupSettings({ active }) {
       const g = await api(`/groups/${encodeURIComponent(active.id)}`);
       setInfo(g);
     } catch (e) {
-      window.dispatchEvent(new CustomEvent("aischat:error:" + (e.message || "\u64CD\u4F5C\u5931\u8D25")));
+      window.dispatchEvent(new CustomEvent("copree:error:" + (e.message || "\u64CD\u4F5C\u5931\u8D25")));
     }
   };
   const toggleDnd = async () => {
@@ -591,7 +591,7 @@ function GroupSettings({ active }) {
       const g = await api(`/groups/${encodeURIComponent(active.id)}`);
       setInfo(g);
     } catch (e) {
-      window.dispatchEvent(new CustomEvent("aischat:error:" + (e.message || "\u64CD\u4F5C\u5931\u8D25")));
+      window.dispatchEvent(new CustomEvent("copree:error:" + (e.message || "\u64CD\u4F5C\u5931\u8D25")));
     }
   };
   const pinned = !!(info && info.is_pinned);
@@ -651,7 +651,7 @@ function DmSettings({ active }) {
       const d = await api(`/dm/${encodeURIComponent(active.id)}?summary=true`);
       setInfo(d);
     } catch (e) {
-      window.dispatchEvent(new CustomEvent("aischat:error:" + (e.message || "\u64CD\u4F5C\u5931\u8D25")));
+      window.dispatchEvent(new CustomEvent("copree:error:" + (e.message || "\u64CD\u4F5C\u5931\u8D25")));
     }
   };
   const toggleDnd = async () => {
@@ -661,7 +661,7 @@ function DmSettings({ active }) {
       const d = await api(`/dm/${encodeURIComponent(active.id)}?summary=true`);
       setInfo(d);
     } catch (e) {
-      window.dispatchEvent(new CustomEvent("aischat:error:" + (e.message || "\u64CD\u4F5C\u5931\u8D25")));
+      window.dispatchEvent(new CustomEvent("copree:error:" + (e.message || "\u64CD\u4F5C\u5931\u8D25")));
     }
   };
   const pinned = !!(info && info.is_pinned);
@@ -693,7 +693,7 @@ var MessageBoundary = class extends React.Component {
     return { failed: true };
   }
   componentDidCatch(error) {
-    console.warn("[aischat] \u6D88\u606F\u6E32\u67D3\u5931\u8D25\uFF0C\u5DF2\u964D\u7EA7\u4E3A\u7EAF\u6587\u672C", error);
+    console.warn("[copree] \u6D88\u606F\u6E32\u67D3\u5931\u8D25\uFF0C\u5DF2\u964D\u7EA7\u4E3A\u7EAF\u6587\u672C", error);
   }
   render() {
     if (this.state.failed) {
@@ -795,7 +795,7 @@ function ConversationColumn({ refresh, onImmersive }) {
         refresh();
       }
     } catch (e) {
-      window.dispatchEvent(new CustomEvent("aischat:error:" + (e.message || "send failed")));
+      window.dispatchEvent(new CustomEvent("copree:error:" + (e.message || "send failed")));
     } finally {
       setSending(false);
     }
@@ -863,19 +863,19 @@ function openImmersive(path, title) {
   const sep = path.includes("?") ? "&" : "?";
   immersiveState.path = path + sep + "token=" + encodeURIComponent(store.token || "");
   immersiveState.title = title || "";
-  window.dispatchEvent(new CustomEvent("aischat:immersive"));
+  window.dispatchEvent(new CustomEvent("copree:immersive"));
 }
 function closeImmersive() {
   immersiveState.path = null;
   immersiveState.title = "";
-  window.dispatchEvent(new CustomEvent("aischat:immersive"));
+  window.dispatchEvent(new CustomEvent("copree:immersive"));
 }
 function ImmersiveOverlay() {
   const [, force] = useState(0);
   useEffect(() => {
     const on = () => force((n) => n + 1);
-    window.addEventListener("aischat:immersive", on);
-    return () => window.removeEventListener("aischat:immersive", on);
+    window.addEventListener("copree:immersive", on);
+    return () => window.removeEventListener("copree:immersive", on);
   }, []);
   if (!immersiveState.path) return null;
   return h(ImmersivePanel, { path: immersiveState.path, title: immersiveState.title, onClose: closeImmersive });
@@ -893,14 +893,14 @@ function AisChatBoard({ onClose }) {
   const user = store.user;
   useEffect(() => {
     const onMsg = () => refresh();
-    window.addEventListener("aischat:message", onMsg);
-    window.addEventListener("aischat:auth", onMsg);
-    window.addEventListener("aischat:error", (e) => {
-      console.warn("[aischat]", e.detail);
+    window.addEventListener("copree:message", onMsg);
+    window.addEventListener("copree:auth", onMsg);
+    window.addEventListener("copree:error", (e) => {
+      console.warn("[copree]", e.detail);
     });
     return () => {
-      window.removeEventListener("aischat:message", onMsg);
-      window.removeEventListener("aischat:auth", onMsg);
+      window.removeEventListener("copree:message", onMsg);
+      window.removeEventListener("copree:auth", onMsg);
     };
   }, [refresh]);
   useEffect(() => {
@@ -986,14 +986,14 @@ function AisChatBoard({ onClose }) {
           FEATURES.map((f) => h("button", {
             key: f.id,
             style: { ...style.row, fontSize: 13 },
-            onClick: () => openImmersive(`/aischat-ui${f.path}?embed=1`, f.label)
+            onClick: () => openImmersive(`/copree-ui${f.path}?embed=1`, f.label)
           }, f.label))
         )
       )
     ),
     h(ConversationColumn, {
       refresh,
-      onImmersive: (wid) => openImmersive(`/aischat-ui/world-view/${encodeURIComponent(wid)}?embed=1`, "\u6C89\u6D78\u5F0F\u754C\u9762")
+      onImmersive: (wid) => openImmersive(`/copree-ui/world-view/${encodeURIComponent(wid)}?embed=1`, "\u6C89\u6D78\u5F0F\u754C\u9762")
     })
   );
 }
@@ -1005,7 +1005,7 @@ function SettingsPage() {
   const [pluginMsg, setPluginMsg] = useState("");
   const [pluginBusy, setPluginBusy] = useState(false);
   useEffect(() => {
-    window.addEventListener("aischat:auth", refresh);
+    window.addEventListener("copree:auth", refresh);
     let alive = true;
     pluginApi("/status").then((s) => {
       if (alive) setPlugin(s);
@@ -1013,7 +1013,7 @@ function SettingsPage() {
     });
     return () => {
       alive = false;
-      window.removeEventListener("aischat:auth", refresh);
+      window.removeEventListener("copree:auth", refresh);
     };
   }, [refresh]);
   const applyPluginUpdate = async () => {
@@ -1069,7 +1069,7 @@ function SettingsPage() {
       FEATURES.map((f) => h("button", {
         key: f.id,
         style: { ...style.footBtn, padding: "9px 10px", fontSize: 14 },
-        onClick: () => openImmersive(`/aischat-ui${f.path}?embed=1`, f.label)
+        onClick: () => openImmersive(`/copree-ui${f.path}?embed=1`, f.label)
       }, f.label))
     ),
     h("div", { style: { fontSize: 13, fontWeight: 600, margin: "18px 0 8px", color: "var(--dsw-alias-label-primary)" } }, "\u63D2\u4EF6"),
@@ -1117,13 +1117,13 @@ function FooterButton({ wide }) {
   }, []);
   useEffect(() => {
     const onRefresh = () => setOpen(boardOpenRef.current);
-    window.addEventListener("aischat:board-refresh", onRefresh);
-    return () => window.removeEventListener("aischat:board-refresh", onRefresh);
+    window.addEventListener("copree:board-refresh", onRefresh);
+    return () => window.removeEventListener("copree:board-refresh", onRefresh);
   }, []);
   const toggle = () => {
     const next = !open;
     setOpen(next);
-    window.dispatchEvent(new CustomEvent("aischat:board-toggle", { detail: next }));
+    window.dispatchEvent(new CustomEvent("copree:board-toggle", { detail: next }));
   };
   const rail = wide === false;
   return h(
@@ -1150,7 +1150,7 @@ module.exports = {
     let boardOpen = false;
     const bump = () => {
       boardOpenRef.current = boardOpen;
-      window.dispatchEvent(new CustomEvent("aischat:board-refresh"));
+      window.dispatchEvent(new CustomEvent("copree:board-refresh"));
     };
     let lastWorldsSync = 0;
     const syncWorlds = async (force = false) => {
@@ -1163,7 +1163,7 @@ module.exports = {
         if (!Array.isArray(worlds)) return;
         for (const w of worlds) {
           if (!w || !w.id) continue;
-          const dirRes = await fetch("/aischat-worlds/dir", {
+          const dirRes = await fetch("/copree-worlds/dir", {
             method: "POST",
             headers: { "content-type": "application/json" },
             body: JSON.stringify({ worldId: w.id, name: w.name || `\u4E16\u754C${w.id}` })
@@ -1176,13 +1176,13 @@ module.exports = {
           const workspaceId = ws.workspaceId || ws.id;
           if (!workspaceId) continue;
           await ctx.workspaces.connectWorkspace(workspaceId).catch(() => null);
-          await fetch("/aischat-worlds/token", {
+          await fetch("/copree-worlds/token", {
             method: "POST",
             headers: { "content-type": "application/json" },
             body: JSON.stringify({ worldId: w.id, token: store.token })
           }).catch(() => {
           });
-          await fetch("/aischat-worlds/pull", {
+          await fetch("/copree-worlds/pull", {
             method: "POST",
             headers: { "content-type": "application/json" },
             body: JSON.stringify({ worldId: w.id })
@@ -1192,17 +1192,17 @@ module.exports = {
       } catch {
       }
     };
-    window.addEventListener("aischat:auth", () => {
+    window.addEventListener("copree:auth", () => {
       if (store.token) syncWorlds();
     });
     if (store.token && store.user) syncWorlds();
-    window.addEventListener("aischat:board-toggle", (e) => {
+    window.addEventListener("copree:board-toggle", (e) => {
       boardOpen = !!e.detail;
       if (boardOpen && store.token) syncWorlds(true);
       bump();
     });
-    window.addEventListener("aischat:error", (e) => {
-      console.warn("[aischat]", e.detail);
+    window.addEventListener("copree:error", (e) => {
+      console.warn("[copree]", e.detail);
     });
     const disposers = [];
     const onConnectionReset = () => {
@@ -1214,7 +1214,7 @@ module.exports = {
     }, 6e4);
     disposers.push(() => clearInterval(syncTimer));
     disposers.push(ctx.slots.inject("sidebar.footer.action", () => ctx.slots.register(
-      { name: "sidebar.footer.action", id: "aischat-entry", order: 10, label: "Copree" },
+      { name: "sidebar.footer.action", id: "copree-entry", order: 10, label: "Copree" },
       FooterButton
     )));
     const BoardEntry = () => {
@@ -1225,8 +1225,8 @@ module.exports = {
           setOpenState(boardOpen);
           force((n) => n + 1);
         };
-        window.addEventListener("aischat:board-refresh", onRefresh);
-        return () => window.removeEventListener("aischat:board-refresh", onRefresh);
+        window.addEventListener("copree:board-refresh", onRefresh);
+        return () => window.removeEventListener("copree:board-refresh", onRefresh);
       }, []);
       if (!openState) return null;
       return h(AisChatBoard, {
@@ -1237,15 +1237,15 @@ module.exports = {
       });
     };
     disposers.push(ctx.slots.inject("shell.overlay", () => ctx.slots.register(
-      { name: "shell.overlay", id: "aischat-board", order: 30 },
+      { name: "shell.overlay", id: "copree-board", order: 30 },
       BoardEntry
     )));
     disposers.push(ctx.slots.inject("shell.overlay", () => ctx.slots.register(
-      { name: "shell.overlay", id: "aischat-immersive", order: 40 },
+      { name: "shell.overlay", id: "copree-immersive", order: 40 },
       ImmersiveOverlay
     )));
     disposers.push(ctx.slots.inject("settings.section", () => ctx.slots.register(
-      { name: "settings.section", id: "aischat", order: 40, label: "Copree" },
+      { name: "settings.section", id: "copree", order: 40, label: "Copree" },
       SettingsPage
     )));
     window.addEventListener("focus", () => {
@@ -1253,7 +1253,7 @@ module.exports = {
     });
     window.addEventListener("message", (event) => {
       const data = event.data;
-      if (!data || typeof data !== "object" || data.source !== "aischat-embed") return;
+      if (!data || typeof data !== "object" || data.source !== "copree-embed") return;
       if (data.type === "request-login" || data.type === "unauthorized") {
         if (!boardOpen) {
           boardOpen = true;

@@ -72,8 +72,8 @@ backend/core.*
 frontend/public/docs/
 Copree-Client
 
-# dsh-aischat 构建符号链接
-/dsh-aischat/node_modules
+# dsh-copree 构建符号链接
+/dsh-copree/node_modules
 /study-room/
 
 # Python/venv

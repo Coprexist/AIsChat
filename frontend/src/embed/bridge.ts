@@ -4,10 +4,10 @@
  * 当 Copree 以 `?embed=1` 被宿主（如 DeepSeek Harness / DSH）嵌入时，
  * 通过 postMessage 与宿主页面通信：
  *
- *   Copree → 宿主（source: 'aischat-embed'）
+ *   Copree → 宿主（source: 'copree-embed'）
  *     - { type: 'ready',   loggedIn }      页面加载完成（含登录态）
  *     - { type: 'contacts', loggedIn, groups, dmSessions }  联系人列表（复用现有 API）
- *   Copree ← 宿主（source: 'ds-aischat'）
+ *   Copree ← 宿主（source: 'ds-copree'）
  *     - { type: 'navigate', path }         导航到站内路径（如 /chat/gm/3）
  *     - { type: 'refresh' }                重新上报联系人列表
  *
@@ -17,9 +17,9 @@
 import { api } from '../api/client'
 
 /** Copree 发出的消息标识 */
-export const EMBED_SOURCE = 'aischat-embed'
+export const EMBED_SOURCE = 'copree-embed'
 /** 宿主（DSH）发来的消息标识 */
-export const HOST_SOURCE = 'ds-aischat'
+export const HOST_SOURCE = 'ds-copree'
 
 /** 与 ChatSidebar 的 Group / DMSession 结构保持一致（接口字段可增减，序列化取原始 JSON） */
 export interface EmbedGroup {

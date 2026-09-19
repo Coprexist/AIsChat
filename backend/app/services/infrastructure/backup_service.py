@@ -190,7 +190,7 @@ class PostgresBackupBackend(DatabaseBackupBackend):
         tmp_path = None
         try:
             with tempfile.NamedTemporaryFile(
-                mode="wb", suffix=".sql", delete=False, prefix="aischat_restore_"
+                mode="wb", suffix=".sql", delete=False, prefix="copree_restore_"
             ) as f:
                 f.write(sql_content)
                 tmp_path = f.name
@@ -570,20 +570,28 @@ def _ensure_backup_dir() -> Path:
     return BACKUP_DIR
 
 
+# 改名前的备份前缀（aischat_*）：历史备份继续能被列出、清理、回档
+BACKUP_PREFIXES = ("copree_", "aischat_")
+
+
 def _backup_glob_pattern() -> str:
-    """根据当前后端返回匹配的文件 glob 模式"""
+    """根据当前后端返回匹配的文件 glob 模式（两种品牌前缀都匹配）"""
     backend = get_backup_backend()
     ext = backend.backup_extension  # ".sql" or ".db"
-    return f"aischat_*{ext}.gz"
+    return f"*{ext}.gz"
+
+
+def _is_backup_name(name: str, ext: str) -> bool:
+    return name.startswith(BACKUP_PREFIXES) and name.endswith(f"{ext}.gz")
 
 
 def list_backup_files() -> list[Path]:
     """列出本机备份文件（按时间倒序，兼容两种后端的文件名）"""
     if not BACKUP_DIR.exists():
         return []
-    # 合并两种后端的备份文件
-    sql_files = sorted(BACKUP_DIR.glob("aischat_*.sql.gz"), reverse=True)
-    db_files = sorted(BACKUP_DIR.glob("aischat_*.db.gz"), reverse=True)
+    # 合并两种后端、两种品牌前缀的备份文件
+    sql_files = sorted((p for p in BACKUP_DIR.glob("*.sql.gz") if _is_backup_name(p.name, ".sql")), reverse=True)
+    db_files = sorted((p for p in BACKUP_DIR.glob("*.db.gz") if _is_backup_name(p.name, ".db")), reverse=True)
     # 按修改时间混合排序
     all_files = sql_files + db_files
     all_files.sort(key=lambda p: p.stat().st_mtime, reverse=True)
@@ -595,7 +603,7 @@ async def save_backup(db_bytes: bytes) -> str:
     _ensure_backup_dir()
     backend = get_backup_backend()
     ext = backend.backup_extension  # ".sql" or ".db"
-    filename = f"aischat_{datetime.now().strftime('%Y%m%d_%H%M%S_%f')}{ext}.gz"
+    filename = f"copree_{datetime.now().strftime('%Y%m%d_%H%M%S_%f')}{ext}.gz"
     path = BACKUP_DIR / filename
     # 流式压缩写入
     with gzip.open(path, "wb") as f:

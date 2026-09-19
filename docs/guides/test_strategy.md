@@ -351,7 +351,7 @@ async def test_models_404_falls_back_to_tiny_chat():
 cd backend && python -m pytest tests/test_api_probe.py -v
 
 # 容器里没装 pytest（完整命令见 1.1）
-cd /tmp/zfsv3/sata11/15228874271/data/aischat && \
+cd /tmp/zfsv3/sata11/15228874271/data/copree && \
   docker exec -w /app ai_group_backend python tests/run_without_pytest.py
 ```
 

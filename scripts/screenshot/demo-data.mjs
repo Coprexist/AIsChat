@@ -174,14 +174,14 @@ export const DEMO_MARKET_ITEMS = [
 export const DEMO_GITHUB_ITEMS = [
   {
     id: 1, slug: 'night-boat', kind: 'world', title: '夜航船', tags: ['文字', '冒险'],
-    author_name: 'Copree 社区', author_github: 'aischat-demo', downloads: 43,
+    author_name: 'Copree 社区', author_github: 'copree-demo', downloads: 43,
     updated_at: minutesAgo(60 * 24 * 5), is_local: false, is_mine: false,
     signature_valid: true, key_changed: false,
     description: '文字冒险：在无风的夜里，写下一句就能推动船向前。',
   },
 ]
 
-export const DEMO_GITHUB_BIND = { bound: true, username: 'aischat-demo' }
+export const DEMO_GITHUB_BIND = { bound: true, username: 'copree-demo' }
 
 const worldMsg = (id, role, content, minutes, extra = {}) => ({
   id, role, content, reasoning: null, is_error: null,

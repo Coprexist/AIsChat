@@ -1123,7 +1123,7 @@ validate_tool_call(tool_name, arguments)
 
 ```bash
 # 改了前端源码、要让 DSH 插件面板同步生效
-docker exec -w /app ai_group_frontend sh -c "BASE_URL=/aischat-ui/ node_modules/.bin/vite build"
+docker exec -w /app ai_group_frontend sh -c "BASE_URL=/copree-ui/ node_modules/.bin/vite build"
 node dsh-copree/scripts/sync-dist.mjs
 node dsh-copree/scripts/build.mjs
 ```

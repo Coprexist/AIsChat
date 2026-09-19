@@ -13,7 +13,7 @@
 |---|---|
 | 💬 **聊天嵌入** | DSH 侧边栏点 Copree 直接聊（置顶私信 / 群聊 / 功能页），不必切换系统 |
 | 🖼️ **沉浸式界面** | 群聊"沉浸式"按钮、AIC 功能页（群视界/好友/我的AI/管理/设置）以 iframe 全屏打开 |
-| 🗂️ **世界工作区** | 每个 Copree 世界 = DSH 工作区一个文件夹 `AIC群视界-世界名`，**用 DSH 原生的 agent 和工具直接操作世界**（改代码、跑逻辑、读写群聊） |
+| 🗂️ **世界工作区** | 每个 Copree 世界 = DSH 工作区一个文件夹 `Copree群视界-世界名`，**用 DSH 原生的 agent 和工具直接操作世界**（改代码、跑逻辑、读写群聊） |
 
 核心设计一句话：**对话/工具/沙箱用 DSH 的，操作对象是 Copree 的（世界文件、数据、群聊）**。
 
@@ -25,22 +25,22 @@
 
 ```
 ┌─ DSH Web 进程（Host 半边）──────────────────────────────────────┐
-│  /aischat-api/*   HTTP 代理 → Copree 后端（默认 127.0.0.1:5228）│
-│  /aischat-ws       WebSocket 升级代理 → 后端 /ws                  │
-│  /aischat-ui/*     前端静态托管（SPA 回退 + 防穿越）               │
-│  /aischat-worlds/* 世界工作区：dir / token / status / pull 端点   │
+│  /copree-api/*   HTTP 代理 → Copree 后端（默认 127.0.0.1:5228）│
+│  /copree-ws       WebSocket 升级代理 → 后端 /ws                  │
+│  /copree-ui/*     前端静态托管（SPA 回退 + 防穿越）               │
+│  /copree-worlds/* 世界工作区：dir / token / status / pull 端点   │
 │  world_* 工具（11 个） 按会话所在世界目录自动路由                 │
 │  systemPrompt 段    世界会话提示词（泛化引导）                    │
 └──────────────────────────────────────────────────────────────────┘
         ▲ 同源（浏览器永不接触后端地址）
 ┌─ 浏览器（Client 半边）───────────────────────────────────────────┐
 │  侧边栏 Copree 入口 → 全屏 board（rail + 对话列 + composer）      │
-│  沉浸式覆盖层（iframe /aischat-ui/...）                           │
+│  沉浸式覆盖层（iframe /copree-ui/...）                           │
 │  世界同步：登录/打开面板时建文件夹+会话+上报 token+温和拉取         │
 └──────────────────────────────────────────────────────────────────┘
 ```
 
-**安全边界**：所有流量同源（`/aischat-api` 等前缀由 DSH Web 服务），浏览器不持有后端地址；`backendUrl` 仅限本机回环，来自插件配置而非客户端输入。
+**安全边界**：所有流量同源（`/copree-api` 等前缀由 DSH Web 服务），浏览器不持有后端地址；`backendUrl` 仅限本机回环，来自插件配置而非客户端输入。
 
 ---
 
@@ -49,7 +49,7 @@
 ### 3.1 前置
 
 - DSH Web 已运行（`dsh web`，如 `127.0.0.1:3080`）
-- Copree 后端在**同一台机器**运行（默认 `127.0.0.1:5228`），其前端已按 `/aischat-ui/` base 构建
+- Copree 后端在**同一台机器**运行（默认 `127.0.0.1:5228`），其前端已按 `/copree-ui/` base 构建
 
 ### 3.2 构建插件
 
@@ -59,10 +59,10 @@ pnpm install        # 或复用 node_modules
 node scripts/build.mjs   # 产出 lib/index.js（Host）+ lib/client.js（Client）
 ```
 
-插件自包含 `dist/`（Copree 前端 `BASE_URL=/aischat-ui/` 构建产物），无需单独部署前端。
+插件自包含 `dist/`（Copree 前端 `BASE_URL=/copree-ui/` 构建产物），无需单独部署前端。
 
 > `dist` **必须在 `package.json` 的 `files` 里**。打包管理器严格按该字段装包：
-> 漏了 `dist`，`dsh plugin add` / 插件市场一键装出来的副本就没有 UI，`/aischat-ui/`
+> 漏了 `dist`，`dsh plugin add` / 插件市场一键装出来的副本就没有 UI，`/copree-ui/`
 > 直接 404。开发态手工拷 `lib/` + `dist/` 会掩盖这个问题。
 
 ### 3.3 装入 DSH
@@ -110,7 +110,7 @@ DSH 设置页的 **Copree** 分区底部新增一行插件版本信息，检测�
 
 **换入过程不会留半新半旧的状态**：先暂存并逐文件校验 sha256（源码改过但没重新构建会被
 拒绝），通过后备份旧文件、逐文件原子改名，构建清单最后落盘作为提交点。上一次的状态保留在
-`.aischat-plugin-previous/`，可回滚。
+`.copree-plugin-previous/`，可回滚。
 
 **安装完整性单独检一次**：清单只记录"装了什么"，文件被包管理器裁掉后清单仍会声称一切正常
 ——所以 `status` 会逐个确认产物是否真的在（只做存在性检查，开销可忽略），缺失即报
@@ -149,10 +149,10 @@ profile 的 `package.json` 判断自己是怎么装的，据此决定该由谁�
 
 | 方法 | 路径 | 说明 |
 |------|------|------|
-| GET | `/aischat-plugin/status` | 已装/可用的身份、更新源解析依据、applyMode、后端版本漂移 |
-| POST | `/aischat-plugin/apply` | 用本地构建执行换入（`self` 通道） |
-| POST | `/aischat-plugin/update` | 调 `dsh plugin update` 从原来源更新（`package-manager` 通道） |
-| POST | `/aischat-plugin/rollback` | 回滚到上一次换入前 |
+| GET | `/copree-plugin/status` | 已装/可用的身份、更新源解析依据、applyMode、后端版本漂移 |
+| POST | `/copree-plugin/apply` | 用本地构建执行换入（`self` 通道） |
+| POST | `/copree-plugin/update` | 调 `dsh plugin update` 从原来源更新（`package-manager` 通道） |
+| POST | `/copree-plugin/rollback` | 回滚到上一次换入前 |
 
 **后端版本漂移检测**：构建时把后端 `/health` 的 `version` 写进清单，运行时再比一次。
 后端 API 变了而插件内置的 `dist/` 还是旧的，会在设置页直接提示——这正是"插件 UI 调用了
@@ -175,9 +175,9 @@ node scripts/smoke.mjs         # Host 半挂到 mock webServer，验代理与插
 每个 Copree 世界对应 DSH 工作区一个**真实目录**：
 
 ```
-$DSH_HOME/aischat-worlds/AIC群视界-<世界名>/
-├── .aischat-world.json   # 世界身份（worldId/name，工具据此路由）
-├── .aischat-sync.json    # 同步快照（本地/远端 mtime）
+$DSH_HOME/copree-worlds/Copree群视界-<世界名>/
+├── .copree-world.json   # 世界身份（worldId/name，工具据此路由）
+├── .copree-sync.json    # 同步快照（本地/远端 mtime）
 ├── index.html / main.py / blocks/ ...   # 世界文件「本地镜像」
 ```
 
@@ -185,7 +185,7 @@ $DSH_HOME/aischat-worlds/AIC群视界-<世界名>/
 
 ### 4.2 同步机制（GitHub 式）
 
-`.aischat-sync.json` 记录每个文件「上次同步时的本地 mtime / 远端 mtime」，每次同步做**三路对比**：
+`.copree-sync.json` 记录每个文件「上次同步时的本地 mtime / 远端 mtime」，每次同步做**三路对比**：
 
 | 分类 | 含义 | 处理 |
 |---|---|---|
@@ -199,7 +199,7 @@ $DSH_HOME/aischat-worlds/AIC群视界-<世界名>/
 
 **实现要点（正确性保障）**：
 
-- **快照只记录"实际同步成功"的文件**：`.aischat-sync.json` 更新时只写入本次真正拉取/推送成功的文件，其余保留旧记录——未同步的本地修改、被跳过的冲突、远端新改动**绝不会被"洗白"成已同步**，下次对比仍能识别
+- **快照只记录"实际同步成功"的文件**：`.copree-sync.json` 更新时只写入本次真正拉取/推送成功的文件，其余保留旧记录——未同步的本地修改、被跳过的冲突、远端新改动**绝不会被"洗白"成已同步**，下次对比仍能识别
 - **`force:true` 语义**：拉取 = 完全以远端为准（覆盖冲突 + 本地修改），推送 = 完全以本地为准（覆盖冲突）；温和模式 = 任何一边有未同步改动都拒绝
 - 快照文件自身、`__pycache__`、`.pyc` 等运行产物不计入对比（不误报"本地新增"）
 
@@ -209,7 +209,7 @@ $DSH_HOME/aischat-worlds/AIC群视界-<世界名>/
 
 ```
 ① 打开 Copree（自动：建文件夹+会话+上报 token+温和拉取）
-② 工作区点开 AIC群视界-世界名 会话
+② 工作区点开 Copree群视界-世界名 会话
 ③ 对 DSH agent 说：
    "看看我的世界有什么文件"      → world_list_files
    "读一下 main.py"             → 原生 read
@@ -250,10 +250,10 @@ $DSH_HOME/aischat-worlds/AIC群视界-<世界名>/
 
 ## 6. 沉浸式界面与功能导航
 
-- **群聊头部「沉浸式」按钮**：自动查 `/worlds/by-entity` 绑定世界 → 打开 `/aischat-ui/world-view/{id}?embed=1`
+- **群聊头部「沉浸式」按钮**：自动查 `/worlds/by-entity` 绑定世界 → 打开 `/copree-ui/world-view/{id}?embed=1`
 - **AIC 侧边栏「功能」分组**：群视界 / 好友 / 我的AI / 管理 / 设置，点击在覆盖层打开对应前端页面
-- **嵌入模式**（`?embed=1`）：前端隐藏自身侧边栏，API 基址走 `/aischat-api`；401 通知宿主；`?token=` 注入复用登录态；router basename `/aischat-ui`
-- **世界页内嵌群聊**：后端注入 `window.WORLD_API` / `WORLD_UI`（DSH 嵌入 = `/aischat-api` / `/aischat-ui`，独立部署默认不变），世界代码的群聊面板/平台菜单/SSE 正确走代理
+- **嵌入模式**（`?embed=1`）：前端隐藏自身侧边栏，API 基址走 `/copree-api`；401 通知宿主；`?token=` 注入复用登录态；router basename `/copree-ui`
+- **世界页内嵌群聊**：后端注入 `window.WORLD_API` / `WORLD_UI`（DSH 嵌入 = `/copree-api` / `/copree-ui`，独立部署默认不变），世界代码的群聊面板/平台菜单/SSE 正确走代理
 
 ---
 
@@ -270,12 +270,12 @@ $DSH_HOME/aischat-worlds/AIC群视界-<世界名>/
 
 | 现象 | 处理 |
 |---|---|
-| 世界工具报"未连接登录态" | 打开一次 Copree（触发 token 上报）；查 `GET /aischat-worlds/status` 看 `tokenWorlds` 是否含该世界 |
+| 世界工具报"未连接登录态" | 打开一次 Copree（触发 token 上报）；查 `GET /copree-worlds/status` 看 `tokenWorlds` 是否含该世界 |
 | 工作区没有世界文件夹 | 确认登录 Copree；只同步**自己创建**的世界（`/worlds` 只返回 owner） |
 | `world_push` 跳过冲突 | 冲突裁决：读两边内容，`force:true` 或手动合并 |
-| 世界页打不开/显示宿主界面 | 世界无 index.html（提示"让群视界机器人生成"）；或路径未走 `/aischat-api` |
+| 世界页打不开/显示宿主界面 | 世界无 index.html（提示"让群视界机器人生成"）；或路径未走 `/copree-api` |
 | token 丢了（重启后） | 重新打开 Copree 面板触发同步 |
-| 工具报"不属于任何 Copree 世界" | 会话 cwd 需在 `aischat-worlds` 目录下（打开 AIC群视界-* 会话） |
+| 工具报"不属于任何 Copree 世界" | 会话 cwd 需在 `copree-worlds` 目录下（打开 Copree群视界-* 会话） |
 | 装插件报 `ERR_PNPM_UNEXPECTED_STORE` | 见下方「DSH_HOME 是符号链接时的两个坑」第 1 条 |
 | 装插件报 `ENOENT ... /data_s001/tmp/...` 或 `.../relocated/dsh-session-recovery` | 见下方第 2 条 |
 

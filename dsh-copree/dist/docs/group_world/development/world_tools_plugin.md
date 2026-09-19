@@ -85,7 +85,7 @@ app.tools 导入
 把插件目录（一个 `.py` 一个工具）放到任意路径，配环境变量即可：
 
 ```bash
-WORLD_TOOLS_DIR=/opt/aischat-tools docker compose up -d backend
+WORLD_TOOLS_DIR=/opt/copree-tools docker compose up -d backend
 ```
 
 启动时会扫描该目录并注册；文件导入失败只记日志。
@@ -150,7 +150,7 @@ Point `WORLD_TOOLS_DIR` at a directory of `.py` files and they are discovered at
 so community tools do not need to fork this repository:
 
 ```bash
-WORLD_TOOLS_DIR=/opt/aischat-tools docker compose up -d backend
+WORLD_TOOLS_DIR=/opt/copree-tools docker compose up -d backend
 ```
 
 Plugins run with the same privileges as the backend — only load code you trust.

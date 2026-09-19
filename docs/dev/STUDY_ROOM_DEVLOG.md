@@ -47,7 +47,7 @@
   - `GET /study/summary` — 今日/累计/近 15 天/在线数
   - `GET|PUT /study/settings` — 时长设置（focus 1~120、short/long 1~60、interval 1~12）
   - `PUT /study/cycle` — 今日周期进度（跨天自动清零）
-- **前端**：studyLoadRemote 启动拉取（服务器优先）、saveSettings→syncSettings、handleComplete→syncCycle；API 双前缀自动重试（/api → /aischat-api）
+- **前端**：studyLoadRemote 启动拉取（服务器优先）、saveSettings→syncSettings、handleComplete→syncCycle；API 双前缀自动重试（/api → /copree-api）
 
 ## 四、布局（css/style.css）
 

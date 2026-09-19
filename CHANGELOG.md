@@ -15,11 +15,11 @@
   与组织名 Coprexist 约分（消去共同的 Copre），剩下的 `e` + `xist` 恰好拼回 **exist**
 - 全仓显示层替换：前端 i18n 三语 / 文档 / README / 邮件 / 接口文档 / 插件文案——
   含世界 AI 的【平台信息】段（它因此知道平台叫什么，也能回答"为什么叫 Copree"）
-- 插件改名 `dsh-aischat` → `dsh-copree`（目录 / 包名 / cordis patch / 文档引用；源码已改，
+- 插件改名 `dsh-copree` → `dsh-copree`（目录 / 包名 / cordis patch / 文档引用；源码已改，
   **构建产物待本地 `node scripts/build.mjs` 重建**——`lib`/`dist`/`manifest.json` 带内容哈希，不能手改）
 - 打包：`AIsChat.spec` → `Copree.spec`（产物 `Copree.exe`）、`scripts/install.bat` 的安装目录与快捷方式
-- **刻意没改**（内部标识，改了会断）：DB/容器名、备份文件前缀 `aischat_*`、同源代理前缀 `/aischat-api`、
-  存储键 `aischat-theme`、DSH 工作区目录 `AIC群视界-*`、`.aischat-world.json`、历史 CHANGELOG 与旧宣传文。
+- **刻意没改**（内部标识，改了会断）：DB/容器名、备份文件前缀 `copree_*`、同源代理前缀 `/copree-api`、
+  存储键 `copree-theme`、DSH 工作区目录 `Copree群视界-*`、`.copree-world.json`、历史 CHANGELOG 与旧宣传文。
   联邦公网 ID：新实例生成 `Copree-`（没有任何代码解析此前缀，老实例保留原值即可）。
   完整清单与理由见 `docs/BRAND.md`
 
@@ -280,7 +280,7 @@
 - `package-manager` 通道**不重复实现版本比对**——semver 与 git ref 解析都归 pnpm，
   插件只负责调用并如实回传输出。这与插件市场自身的同一条原则一致：它在
   `updates.js` 里专门防过「用 npm 包名去比对私有 git 源、把 git 安装覆盖掉」
-- 新增 `POST /aischat-plugin/update`；`update-test.mjs` 补 4 条来源分类断言（共 20 条）
+- 新增 `POST /copree-plugin/update`；`update-test.mjs` 补 4 条来源分类断言（共 20 条）
 - 对分发用户的实际意义：装在 npm 上的用户由市场按版本号提示更新；用
   `github:owner/repo#path:/dsh-copree` 装的用户由市场按 **HEAD commit** 比对提示
   ——主仓库一变就能提示，天然适配「源码在仓库、产物随仓库走」的分发方式
@@ -304,7 +304,7 @@
 - **打包 bug**：`package.json` 的 `files` 只有 `["lib","cordis.patch.yml","README.md"]`，
   漏了 `dist`。文档教的"手动拷 lib 与 dist 到 profile"一直掩盖着它；这次走正规
   `dsh plugin add`（pnpm 严格按 `files` 装包），安装副本的 `dist` 被裁掉，
-  `/aischat-ui/` 直接 **404**，DSH 面板里的沉浸式界面全废
+  `/copree-ui/` 直接 **404**，DSH 面板里的沉浸式界面全废
 - 由此暴露自更新的一个真实缺陷：**`status` 只比对清单，不看文件是否真的在**——
   `dist` 已经没了，它仍报 `up-to-date`。现在 `status` 会逐个确认产物存在
   （只做存在性检查，开销可忽略），缺失即报 `reason: incomplete` 并给出缺失数；
@@ -327,14 +327,14 @@
   真机实测解析成功；需要指向别处时用新的 `pluginSourceDir` 配置覆盖
 - **换入不留半新半旧**：先暂存并逐文件校验 sha256（源码改过但没重新构建会被拒绝，
   实测确认拒绝后安装副本未被改动），通过后备份旧文件、逐文件原子改名，
-  构建清单最后落盘作为提交点；上一次状态留在 `.aischat-plugin-previous/` 可回滚
+  构建清单最后落盘作为提交点；上一次状态留在 `.copree-plugin-previous/` 可回滚
 - **如实区分两种生效方式**：只动 client/UI 为 `hot`（自动刷新页面），
   动了 host 半为 `restart`（必须重启 dsh-web——它正被进程加载，覆盖文件不会热替换）。
   插件不自行重启宿主进程，那会掐断当前会话
 - **后端版本漂移检测**：构建时把后端 `/health` 的 `version` 写进清单，运行时再比一次。
   "插件内置 UI 调用了已不存在的后端接口"这类事故——本次 `/groups/{id}/messages` 改成
   `/gm/{id}/messages` 正是一例——现在会在设置页直接提示
-- 新增 `/aischat-plugin/status|apply|rollback` 三个同源端点；新增
+- 新增 `/copree-plugin/status|apply|rollback` 三个同源端点；新增
   `scripts/update-test.mjs`（15 条断言，覆盖换入/幂等/篡改拒绝/restart 判定/回滚）
 - 顺带修好 `scripts/smoke.mjs`：它只留得住最后一个 prefix 路由，且 `ctx.tools` 未 mock
   导致 `apply()` 直接抛错——世界工具加进来之后它就没再跑通过。现在按最长前缀匹配派发，
@@ -1025,7 +1025,7 @@
 - **文档 / 历史**（`CHANGELOG`、项目全景报告、联邦 URL 轮换协议）：换成 `<your-domain>` 占位符
 - **示例文案**（`translations.ts` 三语的实例地址 placeholder、`FederationTab.tsx` 的输入框
   placeholder）：换成通用示例域名 `example.com`——它们是给用户看的填写示例，不该出现真实域名
-- **打包产物**：前端产物带着上面这些 i18n 文案，所以按 `BASE_URL=/aischat-ui/` 重建前端，
+- **打包产物**：前端产物带着上面这些 i18n 文案，所以按 `BASE_URL=/copree-ui/` 重建前端，
   再整体同步进 `dsh-copree/dist`（现在与 `frontend/dist` 逐文件一致），
   `dist/docs` 镜像随之刷新；插件清单重建（262 个产物）并热更新到 profile
 - **刻意保留**：`federation-registry.json` 里的 `public_url`。它就是这个实例**对外公告的联邦
@@ -1699,7 +1699,7 @@
   修复：Buffer 数组收集 + 最后统一 `Buffer.concat().toString('utf8')`。
 - **`world_pull` 拉 HTML 拉到注入版**：走 `/world/{id}/files/{path}` 静态路由会对 HTML 注入世界变量（WORLD_ID 等），
   拉回本地的是注入后文件而非原始代码。修复：`.html/.htm` 改走带 token 的 `/worlds/{id}/files/content` 原始读取接口。
-- **同步快照单位**：`.aischat-sync.json` 的 `lm` 必须用毫秒（对齐 DSH `statMtime` 的 mtimeMs）；
+- **同步快照单位**：`.copree-sync.json` 的 `lm` 必须用毫秒（对齐 DSH `statMtime` 的 mtimeMs）；
   单位不一致会导致全文件误判 changedLocal，force 拉取覆盖本地。
 - **`world_pull` force 模式误报「无变化」**：`pulled: N` 但 message 报「无变化」——force 拉取的
   conflict/changedLocal 覆盖未计入统计。修复：pulled > 0 时如实上报 `↓N 覆盖`。
@@ -1738,7 +1738,7 @@
 
 ### Added — 🔌 DSH 插件 `dsh-copree`（Copree 以一等公民嵌入 DeepSeek Harness）
 
-- **同源网关（Host 半边 `dsh-copree/src/index.ts`）**：`/aischat-api` HTTP 代理（剥离 hop-by-hop、转发 Authorization、502 兜底）+ `/aischat-ws` WebSocket 升级代理（重放 `/ws?token=`、双向透传）——浏览器永不接触后端地址，**全程 loopback、零公网地址**
+- **同源网关（Host 半边 `dsh-copree/src/index.ts`）**：`/copree-api` HTTP 代理（剥离 hop-by-hop、转发 Authorization、502 兜底）+ `/copree-ws` WebSocket 升级代理（重放 `/ws?token=`、双向透传）——浏览器永不接触后端地址，**全程 loopback、零公网地址**
 - **侧边栏 board（Client 半边）**：`shell.overlay` 全帧面板，左侧 rail（置顶私信/置顶群聊/私信/群聊 + 用户行 + 退出），右侧对话列（消息 + 专属 composer，发送到选中的 Copree 对话，不碰 DSH 会话语义）
 - **登录统一**：`aisc.token` 存浏览器 localStorage；401 自动登出回登录页（不再静默显示"暂无联系人"假空态）
 - **消息渲染完全照搬 DSH 风格**：复用官方 `MarkdownText`（GFM + KaTeX 公式 + 安全过滤）——我方消息 DSH 用户气泡样式（`--dsw-specific-bubble` + label-primary + 22px 圆角 + 名称靠右），对方消息原生排版；**任何针对 DSH 对话风格的主题/插件改动自动作用到 Copree**
@@ -1750,38 +1750,38 @@
 
 ### Added — 🖼️ 沉浸式界面与功能导航（长线优雅：前端静态托管 + 同源 iframe）
 
-- **前端静态托管（Host）**：`/aischat-ui` 前缀服务 `BASE_URL=/aischat-ui/` 构建产物（SPA 回退、路径穿越防护、immutable 缓存）
-- **嵌入模式增强（前端）**：`api/client.ts` 嵌入时 API 基址走 `/aischat-api` 代理；401 不跳出 iframe 改为通知宿主；`?token=` URL 注入复用登录态（写入后从地址栏清除）；router basename `/aischat-ui`（修复嵌入路由 404）
-- **沉浸式覆盖层（Client）**：`shell.overlay` 全局 iframe 面板——群聊头部"沉浸式"按钮（自动查 `/worlds/by-entity` 绑定世界 → `/aischat-ui/world-view/{id}?embed=1`）+ AIC 侧边栏"功能"分组（群视界/好友/我的AI/管理/设置）+ DSH 设置页同款导航
+- **前端静态托管（Host）**：`/copree-ui` 前缀服务 `BASE_URL=/copree-ui/` 构建产物（SPA 回退、路径穿越防护、immutable 缓存）
+- **嵌入模式增强（前端）**：`api/client.ts` 嵌入时 API 基址走 `/copree-api` 代理；401 不跳出 iframe 改为通知宿主；`?token=` URL 注入复用登录态（写入后从地址栏清除）；router basename `/copree-ui`（修复嵌入路由 404）
+- **沉浸式覆盖层（Client）**：`shell.overlay` 全局 iframe 面板——群聊头部"沉浸式"按钮（自动查 `/worlds/by-entity` 绑定世界 → `/copree-ui/world-view/{id}?embed=1`）+ AIC 侧边栏"功能"分组（群视界/好友/我的AI/管理/设置）+ DSH 设置页同款导航
 - **登录引导**：iframe 内 token 失效时不再显示 Copree 自带登录表单，改为"请先在宿主应用中登录"引导页 → 通知宿主打开 Copree board 登录（登录态统一由 DSH 插件管理）
 
 ### Added — 🗂️ 群视界世界嵌入 DSH 工作区（对话用 DSH 的 agent，操作对象是 Copree 世界）
 
-- **世界 → 工作区文件夹自动同步**：登录 Copree 或打开面板时，每个**自己创建的世界**自动同步为 DSH 工作区文件夹 `AIC群视界-世界名`（`$DSH_HOME/aischat-worlds/` 真实目录 + `.aischat-world.json` 世界身份）+ 一个 DSH 会话——全走官方 `workspaces.create` / `connectWorkspace` API，官方工作区自动显示、官方更新零影响，重复同步幂等
+- **世界 → 工作区文件夹自动同步**：登录 Copree 或打开面板时，每个**自己创建的世界**自动同步为 DSH 工作区文件夹 `Copree群视界-世界名`（`$DSH_HOME/copree-worlds/` 真实目录 + `.copree-world.json` 世界身份）+ 一个 DSH 会话——全走官方 `workspaces.create` / `connectWorkspace` API，官方工作区自动显示、官方更新零影响，重复同步幂等
 - **世界操作工具集（Host `world_*`，按会话所属世界自动路由）**：
   - `world_list_files` / `world_read_file` / `world_write_file` / `world_delete_file`：世界页面代码的文件树/读写（owner 鉴权写，`/worlds/{id}/files`）
   - `world_api`：世界受控 API（world/chat/memories/usage/groups/group-messages/state/data，经沙箱 `api_token` 鉴权）
   - `world_chat`：读写世界绑定群聊消息（以世界身份发送）
   - `world_lifecycle`：唤醒/休眠世界
-- **按会话路由**：工具从会话 cwd 解析 `.aischat-world.json` 定位世界——`AIC群视界-*` 会话里直接可用，普通会话自动拒绝并提示
+- **按会话路由**：工具从会话 cwd 解析 `.copree-world.json` 定位世界——`Copree群视界-*` 会话里直接可用，普通会话自动拒绝并提示
 - **token 仅内存**：client 同步时上报 `{sessionId, token}`，host 存内存供 owner 鉴权写操作（不落盘、不打日志）
 - **同步 bug 修复**：`workspaces.create` 返回值主键是 `workspaceId`（非 `id`）——误用 `ws.id` 会跳过会话创建与 token 上报（浏览器实测暴露），已改 `workspaceId || id`
 - **token 按世界路由**：改为 `{worldId, token}` 上报（DSH 新建会话流程会换 sessionId，按会话路由不稳）——工具按 cwd 解析世界后取 token，会话新建/切换不影响
-- **诊断端点**：`GET /aischat-worlds/status` → `{tokenWorlds, worldDirs}`（不含 token 明文），排障用
+- **诊断端点**：`GET /copree-worlds/status` → `{tokenWorlds, worldDirs}`（不含 token 明文），排障用
 - **GitHub 式双向同步（世界文件本地镜像）**：
   - **工作区目录 = 世界文件镜像**：`world_pull` 把世界文件拉到工作区目录，agent 用 **DSH 原生 read/write/edit/glob/grep/bash** 直接操作（bash 可跑世界代码测试），`world_push` 同步回世界——不再依赖专用文件工具
-  - **`.aischat-sync.json` 快照 + 三路对比**：记录每文件「上次同步时本地/远端 mtime」→ 分类 added / removed / changedRemote / changedLocal / conflict（两边都改）
+  - **`.copree-sync.json` 快照 + 三路对比**：记录每文件「上次同步时本地/远端 mtime」→ 分类 added / removed / changedRemote / changedLocal / conflict（两边都改）
   - **自动拉取（温和）**：打开 Copree 时自动执行，仅当「本地无未推送修改且世界有改动」才拉取，返回 `+新增 ~修改 -删除` 报告；本地脏/冲突一律拒绝，绝不覆盖 agent 正在工作的文件（对话中文件不被自动改动）
   - **冲突裁决**：冲突文件不盲目覆盖——world_pull / world_push 默认跳过并报告，`force:true` 才强制；AI 读两边内容决定（保留本地 / 采用世界 / 手动合并）
   - **版本提示注入**：任何 world_* 工具执行后，若世界有更新未拉取 → 结果附 `updateHint`；有冲突 → 附 `conflictHint`（GitHub 式"有可用更新"提示）
 - **新增工具**：`world_push` / `world_pull`（快照对比 + force）、`world_run`（后端沙箱跑 Python，24MB/10s）、`world_trigger`（触发 handle(event)）；原有 world_read_file / write_file / list / delete / api / chat / lifecycle 全保留
 - **提示词注入**：systemPrompt 注册泛化世界操作引导段（工作区目录 = 世界镜像，用 DSH 原生工具 + world_push 同步；world_pull 拉最新）
-- **世界页内嵌群聊修复**：`chat-panel.js` / `sidebar.js` / `adventure.js` / `identity.js` 读取注入的 `window.WORLD_API` / `WORLD_UI`（DSH 嵌入 = `/aischat-api` / `/aischat-ui`，独立部署保持 `/api` / 空）——世界页内群聊、平台菜单、SSE 不再落到宿主 SPA fallback
-- **代理 Location 重写**：Host 代理对后端 3xx 重定向补 `/aischat-api` 前缀（`/world/{id}/preview` → `/aischat-api/world/{id}/files/...`），沉浸式 iframe 内世界页可完整加载
+- **世界页内嵌群聊修复**：`chat-panel.js` / `sidebar.js` / `adventure.js` / `identity.js` 读取注入的 `window.WORLD_API` / `WORLD_UI`（DSH 嵌入 = `/copree-api` / `/copree-ui`，独立部署保持 `/api` / 空）——世界页内群聊、平台菜单、SSE 不再落到宿主 SPA fallback
+- **代理 Location 重写**：Host 代理对后端 3xx 重定向补 `/copree-api` 前缀（`/world/{id}/preview` → `/copree-api/world/{id}/files/...`），沉浸式 iframe 内世界页可完整加载
 
 ### Fixed — 🔧 同步正确性三连修（GitHub 式同步实测暴露）
 
-- **快照文件自身误判**：`.aischat-sync.json` 未被 `isMirrorExcluded` 排除，被 `walkDir` 计为本地文件且快照无其记录 → 永远判为「本地新增」→ 温和自动拉取**永远拒绝**（浏览器实测：token 正常上报、目录已建、文件却拉不下来）。已把快照文件加入排除列表
+- **快照文件自身误判**：`.copree-sync.json` 未被 `isMirrorExcluded` 排除，被 `walkDir` 计为本地文件且快照无其记录 → 永远判为「本地新增」→ 温和自动拉取**永远拒绝**（浏览器实测：token 正常上报、目录已建、文件却拉不下来）。已把快照文件加入排除列表
 - **force 覆盖不全**：`world_pull force:true` 之前只放行检查，`pullTargets` 不含冲突文件与本地修改文件 → 返回 `ok:true` 却 `pulled:0`，**冲突/本地修改实际未被覆盖**。已补齐：force 拉取时 `conflict + changedLocal` 一并入队，以远端为准覆盖
 - **快照无条件「洗白」（最严重）**：pull/push 成功后用**全量本地文件**重建快照并写入当前 mtime——未同步的本地修改、被跳过的冲突、远端新改动全部被标成「已同步」，**温和自动拉取从此检测不到世界新版本**（实测：制造真实冲突后 force 拉取返回「无变化」）。已改为：**只更新实际成功同步的文件**，其余保留旧记录；push 后用重新拉取的远端树写 rm（PUT 会更新远端 mtime）
 - **验证**：温和拒绝（本地脏/冲突不覆盖）✓、force 覆盖冲突与本地修改 ✓、脏快照重建（force 全量以远端为准）✓、远端改动自动拉取 ✓、无变化识别 ✓
@@ -2286,7 +2286,7 @@
 - 🔒 **手动链接 SPA 跳转**：`DocLink` 组件拦截 Markdown 内部链接，匹配路由后 SPA 导航，外部链接新窗口打开。
 - 🖼️ **AI 头像上传统一**：AI 头像也走 WebP/GIF 魔数检测跳过裁剪，统一使用 `api.upload()` 获得友好 413 错误提示。
 - 📉 **Mermaid 渲染失败友好降级**：显示具体错误信息 + 语法高亮原始代码回退，不再只报「渲染失败」。
-- ✅ **Nginx 413 修复**：`aischat.<your-domain>.conf` 补上 `client_max_body_size 20m`。
+- ✅ **Nginx 413 修复**：`copree.<your-domain>.conf` 补上 `client_max_body_size 20m`。
 - 🔤 **Svg 中文不乱码**：Mermaid iframe base64 解码改用 `TextDecoder('utf-8')` 替代 `atob`。
 
 ### Changed

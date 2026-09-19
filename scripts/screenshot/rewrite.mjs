@@ -24,7 +24,7 @@ const DEMO_TEXT = new Set([
   ...DEMO_FRIENDS.map((f) => f.friend_name),
   ...DEMO_MARKET_ITEMS.map((i) => i.title),
   ...DEMO_GITHUB_ITEMS.map((i) => i.title),
-  'Copree 官方', 'Copree 社区', 'aischat-demo',
+  'Copree 官方', 'Copree 社区', 'copree-demo',
 ])
 
 const NAME_KEY = /^(username|sender_name|friend_name|author_name|author_github|nickname|display_name|creator_name|owner_name|name)$/

@@ -1,12 +1,12 @@
 // 把前端产物镜像进插件包 dist/。
 //
-// 为什么需要它：dist/ 是插件包的一部分（宿主半从 dist/ 服务 /aischat-ui/*），
+// 为什么需要它：dist/ 是插件包的一部分（宿主半从 dist/ 服务 /copree-ui/*），
 // 但前端产物里混着**只属于仓库**的东西——docs/assets（README/推广图）不该随包分发。
 // 手抄 cp -a 很容易把它们一起带上（35M 里有 3.8M 是文档，其中大头就是这些图），
 // 所以同步只走这一个入口，排除清单也写在这里一处。
 //
 // 用法（前端在容器里构建，产物落在 frontend/dist）：
-//   docker exec -w /app ai_group_frontend sh -c "BASE_URL=/aischat-ui/ node_modules/.bin/vite build"
+//   docker exec -w /app ai_group_frontend sh -c "BASE_URL=/copree-ui/ node_modules/.bin/vite build"
 //   node scripts/sync-dist.mjs
 import { cpSync, existsSync, mkdirSync, readdirSync, rmSync, statSync } from 'node:fs'
 import { dirname, join, relative } from 'node:path'

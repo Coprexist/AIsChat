@@ -33,11 +33,11 @@ export type ApplyMode = 'hot' | 'restart'
 
 export const PLUGIN_NAME = 'dsh-copree'
 export const MANIFEST_REL = 'lib/manifest.json'
-export const PLUGIN_PREFIX = '/aischat-plugin'
+export const PLUGIN_PREFIX = '/copree-plugin'
 
 const HOST_ENTRY = 'lib/index.js'
-const STAGING_DIR = '.aischat-plugin-staging'
-const BACKUP_DIR = '.aischat-plugin-previous'
+const STAGING_DIR = '.copree-plugin-staging'
+const BACKUP_DIR = '.copree-plugin-previous'
 
 /** 包根目录：本文件被打进 lib/index.js，故其所在目录的上一级即包根。 */
 export const PACKAGE_ROOT = join(fileURLToPath(new URL('.', import.meta.url)), '..')
@@ -416,7 +416,7 @@ export function rollback(installRoot: string): ApplyResult {
 
 type JsonSender = (status: number, payload: unknown) => void
 
-/** 注册 /aischat-plugin 路由。handler 保持薄，逻辑都在上面的纯函数里。 */
+/** 注册 /copree-plugin 路由。handler 保持薄，逻辑都在上面的纯函数里。 */
 export function registerPluginRoutes(
   register: (route: { kind: 'prefix'; path: string; handler: (req: any, res: any) => void }) => void,
   opts: { installRoot: string; backendUrl: string; sourceDir?: string; log?: (message: string) => void },

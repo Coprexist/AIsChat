@@ -552,12 +552,12 @@ function init() {
 // ══════════════ 云端统计（在线同学 / 累计 / 近 15 天） ══════════════
 // 走 Copree 后端 /study API（登录态复用 localStorage access_token）；
 // 未登录或请求失败时静默降级为占位，不影响自习室本体。
-// API 前缀自动探测：默认 /api（主站 Web），失败自动试 /aischat-api（嵌入场景），
+// API 前缀自动探测：默认 /api（主站 Web），失败自动试 /copree-api（嵌入场景），
 // 也兼容显式指定（window.STUDY_API_BASE）
 let studyApiBase = window.STUDY_API_BASE || null;
 function studyBase() {
     if (studyApiBase) return studyApiBase;
-    try { if (new URLSearchParams(location.search).has('embed')) studyApiBase = '/aischat-api'; } catch (e) {}
+    try { if (new URLSearchParams(location.search).has('embed')) studyApiBase = '/copree-api'; } catch (e) {}
     return studyApiBase || '/api';
 }
 
@@ -571,10 +571,10 @@ async function studyFetch(path, opts) {
     try {
         return await doFetch(studyBase());
     } catch (e) {
-        // 非 401 且当前是 /api：自动换 /aischat-api 重试一次（覆盖嵌入场景）
+        // 非 401 且当前是 /api：自动换 /copree-api 重试一次（覆盖嵌入场景）
         if (!/401/.test(e.message) && studyBase() === '/api') {
-            studyApiBase = '/aischat-api';
-            return doFetch('/aischat-api');
+            studyApiBase = '/copree-api';
+            return doFetch('/copree-api');
         }
         throw e;
     }

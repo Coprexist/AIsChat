@@ -1079,7 +1079,7 @@ async def download_backup(
         content=db_bytes,
         media_type=media_type,
         headers={
-            "Content-Disposition": f'attachment; filename="aischat_backup_{timestamp}{ext}"',
+            "Content-Disposition": f'attachment; filename="copree_backup_{timestamp}{ext}"',
         },
     )
 
@@ -1151,17 +1151,17 @@ async def restore_local_backup(
     import gzip
     from app.services.infrastructure.backup_service import restore_backup, BACKUP_DIR
 
-    # 防路径穿越：只允许备份目录内的 aischat_*.sql.gz 或 aischat_*.db.gz
+    # 防路径穿越：只允许备份目录内的 copree_*.sql.gz / copree_*.db.gz（改名前的 aischat_* 一并放行）
     name = req.filename
     if (
         not name
         or "/" in name or "\\" in name or ".." in name
-        or not name.startswith("aischat_")
+        or not name.startswith(("copree_", "aischat_"))
         or not (name.endswith(".sql.gz") or name.endswith(".db.gz"))
     ):
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail="非法备份文件名（仅允许 aischat_*.sql.gz 或 aischat_*.db.gz）",
+            detail="非法备份文件名（仅允许 copree_*.sql.gz 或 copree_*.db.gz）",
         )
 
     path = BACKUP_DIR / name
@@ -1206,7 +1206,7 @@ async def download_full_backup(
         content=tar_bytes,
         media_type="application/gzip",
         headers={
-            "Content-Disposition": f'attachment; filename="aischat_full_{timestamp}.tar.gz"',
+            "Content-Disposition": f'attachment; filename="copree_full_{timestamp}.tar.gz"',
         },
     )
 

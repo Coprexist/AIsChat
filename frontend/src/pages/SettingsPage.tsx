@@ -1046,7 +1046,7 @@ export default function SettingsPage() {
               </div>
               <p className="text-xs text-textMuted">{t('settings.dataLocationDesc')}</p>
               <p className="text-xs text-primary-400 font-mono mt-1.5">
-                ~/.aischat/data/
+                ~/.copree/data/
               </p>
             </div>
 

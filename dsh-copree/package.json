@@ -45,7 +45,7 @@
     "dsh",
     "deepseek-harness",
     "dsh-plugin",
-    "aischat",
+    "copree",
     "chat"
   ],
   "license": "MIT"

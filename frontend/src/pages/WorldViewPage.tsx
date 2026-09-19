@@ -19,9 +19,9 @@ export default function WorldViewPage() {
 
   const wid = Number(worldId)
 
-  // 嵌入模式（DSH iframe）：世界文件走宿主同源代理前缀 /aischat-api，
+  // 嵌入模式（DSH iframe）：世界文件走宿主同源代理前缀 /copree-api，
   // 否则 /world/... 会被宿主 SPA fallback 接住（显示宿主界面而非群视界）。
-  const worldBase = isEmbedded() ? '/aischat-api' : ''
+  const worldBase = isEmbedded() ? '/copree-api' : ''
 
   // 返回：Tauri 关窗口；其他一律切回「标准界面」（群聊优先，其次世界列表），不依赖关窗
   const handleBack = () => {

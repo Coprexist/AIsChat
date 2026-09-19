@@ -21,10 +21,10 @@ import { basename, dirname, isAbsolute, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 var PLUGIN_NAME = "dsh-copree";
 var MANIFEST_REL = "lib/manifest.json";
-var PLUGIN_PREFIX = "/aischat-plugin";
+var PLUGIN_PREFIX = "/copree-plugin";
 var HOST_ENTRY = "lib/index.js";
-var STAGING_DIR = ".aischat-plugin-staging";
-var BACKUP_DIR = ".aischat-plugin-previous";
+var STAGING_DIR = ".copree-plugin-staging";
+var BACKUP_DIR = ".copree-plugin-previous";
 var PACKAGE_ROOT = join(fileURLToPath(new URL(".", import.meta.url)), "..");
 function sha256File(path) {
   return createHash("sha256").update(readFileSync(path)).digest("hex");
@@ -325,9 +325,9 @@ var Config = z.object({
   backendUrl: z.string().default("http://127.0.0.1:5228"),
   pluginSourceDir: z.string().default("")
 });
-var HTTP_PREFIX = "/aischat-api";
-var WS_PATH = "/aischat-ws";
-var UI_PREFIX = "/aischat-ui";
+var HTTP_PREFIX = "/copree-api";
+var WS_PATH = "/copree-ws";
+var UI_PREFIX = "/copree-ui";
 var UI_ROOT = join2(PACKAGE_ROOT, "dist");
 var MIME = {
   ".html": "text/html; charset=utf-8",
@@ -413,8 +413,8 @@ function proxyHttp(backendUrl, req, res, targetPath) {
         host: target.host,
         // 告知后端当前部署形态：世界代码注入 window.WORLD_API / WORLD_UI 用
         // （群聊面板、平台菜单等组件据此拼同源代理前缀，避免落到宿主 SPA fallback）。
-        "x-aischat-api-prefix": "/aischat-api",
-        "x-aischat-ui-prefix": "/aischat-ui"
+        "x-copree-api-prefix": "/copree-api",
+        "x-copree-ui-prefix": "/copree-ui"
       }
     },
     (upRes) => {
@@ -422,8 +422,8 @@ function proxyHttp(backendUrl, req, res, targetPath) {
       const status = upRes.statusCode ?? 502;
       if (status >= 300 && status < 400 && headers.location !== void 0) {
         const loc = Array.isArray(headers.location) ? String(headers.location[0]) : String(headers.location);
-        if (loc.startsWith("/") && !loc.startsWith("/aischat-api")) {
-          headers.location = `/aischat-api${loc}`;
+        if (loc.startsWith("/") && !loc.startsWith("/copree-api")) {
+          headers.location = `/copree-api${loc}`;
         }
       }
       res.writeHead(status, upRes.statusMessage ?? "", headers);
@@ -494,8 +494,21 @@ function proxyWs(backendUrl, req, socket, head) {
   if (head.length > 0) upstream.write(head);
   upstream.end();
 }
-var WORLD_DIR_BASE = join2(process.env.DSH_HOME ?? join2(os.homedir(), ".dsh"), "aischat-worlds");
-var WORLDS_PREFIX = "/aischat-worlds";
+var WORLD_DIR_BASE = join2(process.env.DSH_HOME ?? join2(os.homedir(), ".dsh"), "copree-worlds");
+var WORLDS_PREFIX = "/copree-worlds";
+var LEGACY_WORLD_DIR_BASE = join2(process.env.DSH_HOME ?? join2(os.homedir(), ".dsh"), "aischat-worlds");
+var WORLD_DIR_BASES = [WORLD_DIR_BASE, LEGACY_WORLD_DIR_BASE];
+var META_FILES = [".copree-world.json", ".aischat-world.json"];
+function readWorldMeta(dir) {
+  for (const file of META_FILES) {
+    const p = join2(dir, file);
+    try {
+      if (existsSync2(p)) return JSON.parse(readFileSync2(p, "utf8"));
+    } catch {
+    }
+  }
+  return null;
+}
 var worldTokenMap = /* @__PURE__ */ new Map();
 var sessionTokenMap = /* @__PURE__ */ new Map();
 function sanitizeDirName(name2) {
@@ -574,11 +587,10 @@ function resolveWorldFromCwd(cwd) {
   if (!cwd) return null;
   try {
     const real = realpathSync(cwd);
-    const base = realpathSync(WORLD_DIR_BASE);
-    if (real !== base && !real.startsWith(base + sep)) return null;
-    const metaPath = join2(real, ".aischat-world.json");
-    if (!existsSync2(metaPath)) return null;
-    const meta = JSON.parse(readFileSync2(metaPath, "utf8"));
+    const bases = WORLD_DIR_BASES.filter((b) => existsSync2(b)).map((b) => realpathSync(b));
+    if (!bases.some((base) => real === base || real.startsWith(base + sep))) return null;
+    const meta = readWorldMeta(real);
+    if (!meta) return null;
     const worldId = Number(meta.worldId);
     if (!Number.isInteger(worldId) || worldId <= 0) return null;
     return { worldId, name: String(meta.name ?? `\u4E16\u754C${worldId}`) };
@@ -592,56 +604,57 @@ function textOutput(value) {
 }
 function listWorldDirs() {
   const out = [];
-  try {
-    if (!existsSync2(WORLD_DIR_BASE)) return out;
-    for (const entry of readdirSync(WORLD_DIR_BASE, { withFileTypes: true })) {
-      if (!entry.isDirectory()) continue;
-      const metaPath = join2(WORLD_DIR_BASE, entry.name, ".aischat-world.json");
-      let worldId = null;
-      let name2 = "";
-      try {
-        const meta = JSON.parse(readFileSync2(metaPath, "utf8"));
-        worldId = Number(meta.worldId) || null;
-        name2 = String(meta.name ?? "");
-      } catch {
+  const seen = /* @__PURE__ */ new Set();
+  for (const root of WORLD_DIR_BASES) {
+    try {
+      if (!existsSync2(root)) continue;
+      for (const entry of readdirSync(root, { withFileTypes: true })) {
+        if (!entry.isDirectory() || seen.has(entry.name)) continue;
+        seen.add(entry.name);
+        const meta = readWorldMeta(join2(root, entry.name)) ?? {};
+        out.push({
+          dir: entry.name,
+          worldId: Number(meta.worldId) || null,
+          name: String(meta.name ?? "")
+        });
       }
-      out.push({ dir: entry.name, worldId, name: name2 });
+    } catch {
     }
-  } catch {
   }
   return out;
 }
 function isMirrorExcluded(relPath) {
   const base = relPath.split("/").pop() ?? relPath;
-  if (relPath === ".aischat-world.json") return true;
-  if (relPath === SNAPSHOT_FILE) return true;
+  if (META_FILES.includes(relPath)) return true;
+  if (relPath === SNAPSHOT_FILE || relPath === LEGACY_SNAPSHOT_FILE) return true;
   if (base === "__pycache__" || relPath.includes("/__pycache__/")) return true;
   if (base.endsWith(".pyc")) return true;
   if (base === ".DS_Store") return true;
   return false;
 }
 function worldDirFor(worldId) {
-  try {
-    if (!existsSync2(WORLD_DIR_BASE)) return null;
-    for (const entry of readdirSync(WORLD_DIR_BASE, { withFileTypes: true })) {
-      if (!entry.isDirectory()) continue;
-      const metaPath = join2(WORLD_DIR_BASE, entry.name, ".aischat-world.json");
-      try {
-        const meta = JSON.parse(readFileSync2(metaPath, "utf8"));
-        if (Number(meta.worldId) === worldId) return join2(WORLD_DIR_BASE, entry.name);
-      } catch {
+  for (const root of WORLD_DIR_BASES) {
+    try {
+      if (!existsSync2(root)) continue;
+      for (const entry of readdirSync(root, { withFileTypes: true })) {
+        if (!entry.isDirectory()) continue;
+        const meta = readWorldMeta(join2(root, entry.name));
+        if (meta && Number(meta.worldId) === worldId) return join2(root, entry.name);
       }
+    } catch {
     }
-  } catch {
   }
   return null;
 }
-var SNAPSHOT_FILE = ".aischat-sync.json";
+var SNAPSHOT_FILE = ".copree-sync.json";
+var LEGACY_SNAPSHOT_FILE = ".aischat-sync.json";
 function readSnapshot(dir) {
-  try {
-    const parsed = JSON.parse(readFileSync2(join2(dir, SNAPSHOT_FILE), "utf8"));
-    if (parsed && parsed.v === 1 && parsed.files && typeof parsed.files === "object") return parsed;
-  } catch {
+  for (const file of [SNAPSHOT_FILE, LEGACY_SNAPSHOT_FILE]) {
+    try {
+      const parsed = JSON.parse(readFileSync2(join2(dir, file), "utf8"));
+      if (parsed && parsed.v === 1 && parsed.files && typeof parsed.files === "object") return parsed;
+    } catch {
+    }
   }
   return { v: 1, files: {} };
 }
@@ -916,11 +929,16 @@ function apply(ctx, config) {
             send(400, { error: "invalid worldId" });
             return;
           }
-          const dirName = sanitizeDirName(`AIC\u7FA4\u89C6\u754C-${name2 || `\u4E16\u754C${worldId}`}`);
+          const existing = worldDirFor(worldId);
+          if (existing) {
+            send(200, { path: existing });
+            return;
+          }
+          const dirName = sanitizeDirName(`Copree\u7FA4\u89C6\u754C-${name2 || `\u4E16\u754C${worldId}`}`);
           const dir = join2(WORLD_DIR_BASE, dirName);
           try {
             mkdirSync2(dir, { recursive: true });
-            const metaPath = join2(dir, ".aischat-world.json");
+            const metaPath = join2(dir, ".copree-world.json");
             if (!existsSync2(metaPath)) {
               writeFileSync2(metaPath, JSON.stringify({ worldId, name: name2 }, null, 2), "utf8");
             } else {
@@ -998,7 +1016,7 @@ function apply(ctx, config) {
       execute: async (rawArgs, exec) => {
         const world = worldFromExec(exec);
         if (!world) {
-          return { error: "\u5F53\u524D\u4F1A\u8BDD\u4E0D\u5C5E\u4E8E\u4EFB\u4F55 Copree \u4E16\u754C\uFF1A\u8BF7\u5148\u5728\u5DE5\u4F5C\u533A\u6253\u5F00\u4E00\u4E2A\u300CAIC\u7FA4\u89C6\u754C-\u4E16\u754C\u540D\u300D\u4F1A\u8BDD\uFF08\u8BE5\u4F1A\u8BDD\u76EE\u5F55\u9700\u542B .aischat-world.json\uFF09\u3002" };
+          return { error: "\u5F53\u524D\u4F1A\u8BDD\u4E0D\u5C5E\u4E8E\u4EFB\u4F55 Copree \u4E16\u754C\uFF1A\u8BF7\u5148\u5728\u5DE5\u4F5C\u533A\u6253\u5F00\u4E00\u4E2A\u300CCopree\u7FA4\u89C6\u754C-\u4E16\u754C\u540D\u300D\u4F1A\u8BDD\uFF08\u8BE5\u4F1A\u8BDD\u76EE\u5F55\u9700\u542B .copree-world.json\uFF09\u3002" };
         }
         try {
           const result = await execute(rawArgs ?? {}, world);
@@ -1206,7 +1224,7 @@ function apply(ctx, config) {
   );
   registerWorldTool(
     "world_push",
-    "\u628A\u5F53\u524D\u5DE5\u4F5C\u533A\u76EE\u5F55\uFF08\u672C\u5730\u4E16\u754C\u955C\u50CF\uFF09\u7684\u5168\u90E8\u6539\u52A8\u540C\u6B65\u56DE Copree \u4E16\u754C\u3002\u53EA\u63A8\u9001\u672C\u5730\u4FEE\u6539\u8FC7\u7684\u6587\u4EF6\uFF08\u5E26\u5FEB\u7167\u5BF9\u6BD4\uFF09\uFF1B\u51B2\u7A81\u6587\u4EF6\uFF08\u8FDC\u7AEF\u4E5F\u6539\u8FC7\uFF09\u9ED8\u8BA4\u8DF3\u8FC7\u5E76\u62A5\u544A\uFF0Cforce=true \u65F6\u4EE5\u672C\u5730\u4E3A\u51C6\u8986\u76D6\u3002\u6392\u9664\u672C\u5730\u5143\u6570\u636E .aischat-world.json \u4E0E __pycache__\u3002\u4F60\uFF08agent\uFF09\u7528 DSH \u539F\u751F read/write/edit/bash \u4FEE\u6539\u5DE5\u4F5C\u533A\u6587\u4EF6\u540E\u8C03\u7528\u672C\u5DE5\u5177\u8BA9\u6539\u52A8\u5728 Copree \u4E2D\u751F\u6548\u3002\u6CE8\u610F\uFF1A\u8FD4\u56DE\u300C\u5DF2\u540C\u6B65\uFF08\u65E0\u53D8\u5316\uFF09\u300D= \u5FEB\u7167\u8BA4\u4E3A\u672C\u5730\u4E0E\u8FDC\u7AEF\u5DF2\u4E00\u81F4\uFF08\u6539\u52A8\u5F88\u53EF\u80FD\u5DF2\u5728\u8FDC\u7AEF\uFF09\uFF0C\u7528 world_read_file \u590D\u6838\u5185\u5BB9\uFF0C\u522B\u5F53\u6CA1\u751F\u6548\u3002",
+    "\u628A\u5F53\u524D\u5DE5\u4F5C\u533A\u76EE\u5F55\uFF08\u672C\u5730\u4E16\u754C\u955C\u50CF\uFF09\u7684\u5168\u90E8\u6539\u52A8\u540C\u6B65\u56DE Copree \u4E16\u754C\u3002\u53EA\u63A8\u9001\u672C\u5730\u4FEE\u6539\u8FC7\u7684\u6587\u4EF6\uFF08\u5E26\u5FEB\u7167\u5BF9\u6BD4\uFF09\uFF1B\u51B2\u7A81\u6587\u4EF6\uFF08\u8FDC\u7AEF\u4E5F\u6539\u8FC7\uFF09\u9ED8\u8BA4\u8DF3\u8FC7\u5E76\u62A5\u544A\uFF0Cforce=true \u65F6\u4EE5\u672C\u5730\u4E3A\u51C6\u8986\u76D6\u3002\u6392\u9664\u672C\u5730\u5143\u6570\u636E .copree-world.json \u4E0E __pycache__\u3002\u4F60\uFF08agent\uFF09\u7528 DSH \u539F\u751F read/write/edit/bash \u4FEE\u6539\u5DE5\u4F5C\u533A\u6587\u4EF6\u540E\u8C03\u7528\u672C\u5DE5\u5177\u8BA9\u6539\u52A8\u5728 Copree \u4E2D\u751F\u6548\u3002\u6CE8\u610F\uFF1A\u8FD4\u56DE\u300C\u5DF2\u540C\u6B65\uFF08\u65E0\u53D8\u5316\uFF09\u300D= \u5FEB\u7167\u8BA4\u4E3A\u672C\u5730\u4E0E\u8FDC\u7AEF\u5DF2\u4E00\u81F4\uFF08\u6539\u52A8\u5F88\u53EF\u80FD\u5DF2\u5728\u8FDC\u7AEF\uFF09\uFF0C\u7528 world_read_file \u590D\u6838\u5185\u5BB9\uFF0C\u522B\u5F53\u6CA1\u751F\u6548\u3002",
     { type: "object", properties: { force: { type: "boolean", description: "true \u65F6\u4EE5\u672C\u5730\u4E3A\u51C6\u5F3A\u5236\u8986\u76D6\u51B2\u7A81\u6587\u4EF6" } }, additionalProperties: false },
     async (args, world) => {
       const dir = worldDirFor(world.worldId);
@@ -1252,11 +1270,11 @@ function apply(ctx, config) {
     }
   );
   ctx.systemPrompt.section({
-    name: "aischat-world-context",
+    name: "copree-world-context",
     order: 150,
-    text: "\u5982\u679C\u4F60\u7684\u4F1A\u8BDD\u5DE5\u4F5C\u76EE\u5F55\u4F4D\u4E8E aischat-worlds \u76EE\u5F55\u4E0B\uFF08\u76EE\u5F55\u540D\u4EE5\u300CAIC\u7FA4\u89C6\u754C-\u300D\u5F00\u5934\uFF09\uFF0C\u4F60\u6B63\u5728\u64CD\u4F5C\u4E00\u4E2A Copree \u7FA4\u89C6\u754C\u4E16\u754C\uFF1A\u8BE5\u5DE5\u4F5C\u76EE\u5F55\u662F\u4E16\u754C\u7684\u300C\u672C\u5730\u955C\u50CF\u300D\u2014\u2014\u4E16\u754C\u9875\u9762\u4EE3\u7801\u3001\u6570\u636E\u6587\u4EF6\u90FD\u5728\u91CC\u9762\uFF0C\u4F60\u53EF\u4EE5\u76F4\u63A5\u7528 DSH \u539F\u751F\u7684 read/write/edit/glob/grep/bash \u5DE5\u5177\u8BFB\u5199\u5B83\u4EEC\uFF08bash \u53EF\u76F4\u63A5\u8FD0\u884C\u4E16\u754C Python \u4EE3\u7801\u6D4B\u8BD5\uFF09\u3002\u4FEE\u6539\u5B8C\u6210\u540E\u8C03\u7528 world_push \u628A\u6539\u52A8\u540C\u6B65\u56DE Copree \u4E16\u754C\uFF1B\u82E5\u4E16\u754C\u5728\u522B\u5904\u88AB\u6539\u8FC7\u3001\u9700\u8981\u6700\u65B0\u6587\u4EF6\u65F6\u7528 world_pull \u4E3B\u52A8\u62C9\u53D6\u3002\u7CBE\u786E\u64CD\u4F5C\uFF08\u4E16\u754C API\u3001\u7ED1\u5B9A\u7FA4\u804A\u6D88\u606F\u3001\u5524\u9192/\u4F11\u7720\u3001\u6C99\u7BB1\u8FD0\u884C\uFF09\u7528 world_* \u7CFB\u5217\u5DE5\u5177\u3002\u540C\u6B65/\u9650\u6D41\u673A\u5236\uFF08push\u300C\u65E0\u53D8\u5316\u300D\u542B\u4E49\u3001429 \u5904\u7406\u3001pulled \u8BED\u4E49\uFF09\u7528 world_view_doc \u6253\u5F00 10 \u5206\u533A\u67E5\u770B\u3002\u4E16\u754C\u662F\u7528\u6237\u5D4C\u5165 DSH \u7684\u300C\u53EF\u64CD\u4F5C\u5BF9\u8C61\u300D\u2014\u2014\u4F60\u7684\u63A8\u7406\u4E0E\u5DE5\u5177\u4ECD\u8D70 DSH \u4F53\u7CFB\uFF0C\u53EA\u662F\u64CD\u4F5C\u76EE\u6807\u5C5E\u4E8E Copree\u3002"
+    text: "\u5982\u679C\u4F60\u7684\u4F1A\u8BDD\u5DE5\u4F5C\u76EE\u5F55\u4F4D\u4E8E copree-worlds \u76EE\u5F55\u4E0B\uFF08\u76EE\u5F55\u540D\u4EE5\u300CCopree\u7FA4\u89C6\u754C-\u300D\u5F00\u5934\uFF09\uFF0C\u4F60\u6B63\u5728\u64CD\u4F5C\u4E00\u4E2A Copree \u7FA4\u89C6\u754C\u4E16\u754C\uFF1A\u8BE5\u5DE5\u4F5C\u76EE\u5F55\u662F\u4E16\u754C\u7684\u300C\u672C\u5730\u955C\u50CF\u300D\u2014\u2014\u4E16\u754C\u9875\u9762\u4EE3\u7801\u3001\u6570\u636E\u6587\u4EF6\u90FD\u5728\u91CC\u9762\uFF0C\u4F60\u53EF\u4EE5\u76F4\u63A5\u7528 DSH \u539F\u751F\u7684 read/write/edit/glob/grep/bash \u5DE5\u5177\u8BFB\u5199\u5B83\u4EEC\uFF08bash \u53EF\u76F4\u63A5\u8FD0\u884C\u4E16\u754C Python \u4EE3\u7801\u6D4B\u8BD5\uFF09\u3002\u4FEE\u6539\u5B8C\u6210\u540E\u8C03\u7528 world_push \u628A\u6539\u52A8\u540C\u6B65\u56DE Copree \u4E16\u754C\uFF1B\u82E5\u4E16\u754C\u5728\u522B\u5904\u88AB\u6539\u8FC7\u3001\u9700\u8981\u6700\u65B0\u6587\u4EF6\u65F6\u7528 world_pull \u4E3B\u52A8\u62C9\u53D6\u3002\u7CBE\u786E\u64CD\u4F5C\uFF08\u4E16\u754C API\u3001\u7ED1\u5B9A\u7FA4\u804A\u6D88\u606F\u3001\u5524\u9192/\u4F11\u7720\u3001\u6C99\u7BB1\u8FD0\u884C\uFF09\u7528 world_* \u7CFB\u5217\u5DE5\u5177\u3002\u540C\u6B65/\u9650\u6D41\u673A\u5236\uFF08push\u300C\u65E0\u53D8\u5316\u300D\u542B\u4E49\u3001429 \u5904\u7406\u3001pulled \u8BED\u4E49\uFF09\u7528 world_view_doc \u6253\u5F00 10 \u5206\u533A\u67E5\u770B\u3002\u4E16\u754C\u662F\u7528\u6237\u5D4C\u5165 DSH \u7684\u300C\u53EF\u64CD\u4F5C\u5BF9\u8C61\u300D\u2014\u2014\u4F60\u7684\u63A8\u7406\u4E0E\u5DE5\u5177\u4ECD\u8D70 DSH \u4F53\u7CFB\uFF0C\u53EA\u662F\u64CD\u4F5C\u76EE\u6807\u5C5E\u4E8E Copree\u3002"
   });
-  ctx.logger?.info?.(`dsh-copree: proxying /aischat-api and /aischat-ws -> ${backendUrl}; serving /aischat-ui; world sync at ${WORLDS_PREFIX}`);
+  ctx.logger?.info?.(`dsh-copree: proxying /copree-api and /copree-ws -> ${backendUrl}; serving /copree-ui; world sync at ${WORLDS_PREFIX}`);
 }
 export {
   Config,

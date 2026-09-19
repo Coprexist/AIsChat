@@ -81,19 +81,19 @@ gateway.on('upgrade', (req, socket, head) => {
 await new Promise((r) => gateway.listen(GATEWAY_PORT, '127.0.0.1', r))
 
 // 1. HTTP proxy
-const res = await fetch(`http://127.0.0.1:${GATEWAY_PORT}/aischat-api/health`)
+const res = await fetch(`http://127.0.0.1:${GATEWAY_PORT}/copree-api/health`)
 const body = await res.json()
-console.log('HTTP proxy /aischat-api/health ->', res.status, JSON.stringify(body))
+console.log('HTTP proxy /copree-api/health ->', res.status, JSON.stringify(body))
 if (res.status !== 200 || body.status !== 'ok') throw new Error('HTTP proxy failed')
 
 // 2. Plugin self-update status endpoint
-const pluginStatus = await fetch(`http://127.0.0.1:${GATEWAY_PORT}/aischat-plugin/status`)
+const pluginStatus = await fetch(`http://127.0.0.1:${GATEWAY_PORT}/copree-plugin/status`)
 const pluginBody = await pluginStatus.json()
 console.log('plugin /status ->', pluginStatus.status, JSON.stringify(pluginBody))
 if (pluginStatus.status !== 200 || !pluginBody.state) throw new Error('plugin status failed')
 
 // 3. WS upgrade proxy
-const ws = new WebSocket(`ws://127.0.0.1:${GATEWAY_PORT}/aischat-ws?token=test`)
+const ws = new WebSocket(`ws://127.0.0.1:${GATEWAY_PORT}/copree-ws?token=test`)
 await new Promise((resolve, reject) => {
   ws.onopen = () => resolve()
   ws.onerror = () => reject(new Error('ws open failed'))

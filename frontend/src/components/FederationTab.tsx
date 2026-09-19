@@ -912,7 +912,7 @@ export default function FederationTab() {
                             setEditPeerForm({ ...editPeerForm, remote_url: host ? `${proto}://${host}/federation/ws` : '' })
                           }}
                           className="flex-1 px-2 py-1 text-xs bg-surface border border-border border-x-0 text-textPrimary font-mono"
-                          placeholder="aischat.example.com:5228"
+                          placeholder="copree.example.com:5228"
                         />
                         <span className="inline-flex items-center px-1.5 text-3xs text-textMuted bg-surface border border-border rounded-r shrink-0 font-mono">
                           /federation/ws
