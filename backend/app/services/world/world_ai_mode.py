@@ -285,8 +285,9 @@ async def gate_tool_call(world, world_id: int, tool_name: str, args: dict, turn_
         return True, True, ""
 
     if mode == "plan" and not turn_state.get("plan_approved"):
-        # run_world_code 在计划模式下由平台强制只读（不写文件/世界数据/群消息），
-        # 读代码、跑统计、探索现状正是出计划所需——放行
+        # run_world_code 在计划通过前由平台强制只读（不写文件/世界数据/群消息），
+        # 读代码、跑统计、探索现状正是出计划所需——放行；
+        # 计划通过后本分支不再进入，写入类工具正常放行，沙箱 readonly 也随之解除（见 run_world_code.py）
         if tool_name == "run_world_code":
             return True, False, ""
         return False, False, (
@@ -400,8 +401,9 @@ def build_mode_prompt(mode: str) -> str:
         "\n【运行模式：计划】本世界处于计划模式：**先探索、先规划**。\n"
         "- 收到任务先读相关文件/资料摸清现状，然后用 present_plan 提交计划（要改哪些文件、下载什么、删什么、"
         "分几步），用户在弹窗里通过后，本轮剩下的操作按自动模式执行——此时直接干，不要再逐步请示；\n"
-        "- run_world_code 在计划模式下仍可用，但平台强制只读：能读文件、跑统计与探索，"
-        "不能写文件、写世界数据或发群消息（写操作会被平台拒绝，别反复试）；\n"
+        "- run_world_code 在计划模式下仍可用：**计划通过前**平台强制只读（能读文件、跑统计、探索现状，"
+        "不能写文件/世界数据/发群消息）；**计划通过后**本轮按自动模式执行，沙箱恢复可写——"
+        "跑打包脚本、批量替换脚本都行，不用手工对齐产物；\n"
         "- 计划未通过前，任何写入/下载/删除工具都会被平台挡下，这是正常的，不要反复试；\n"
         "- 任务明显超过本轮默认工具轮次上限（例如要连改十几个文件）时，在 present_plan 里带 "
         "tool_rounds=N 一并申请提额：用户批准计划即批准提额，别硬着头皮开工、卡在最后一轮半途而废；\n"

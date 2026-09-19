@@ -19,7 +19,7 @@ class RunWorldCodeTool(WorldToolPlugin):
     parameters = {'code': {'type': 'string', 'description': '可选：直接执行的 Python 脚本'},
      'entry': {'type': 'string', 'description': '可选：世界文件夹内入口文件（默认 main.py，触发模式用）'},
      'event': {'type': 'object', 'description': '可选：触发事件 dict；给了就执行入口的 handle(event) 并返回结果'},
-     'readonly': {'type': 'boolean', 'description': '可选：声明本次只读（只能加严——计划模式本就强制只读，传 false 也关不掉）'}}
+     'readonly': {'type': 'boolean', 'description': '可选：声明本次只读（只能加严）。计划模式下计划通过前平台强制只读，通过后本轮恢复可写'}}
 
     required = []
 
@@ -27,10 +27,13 @@ class RunWorldCodeTool(WorldToolPlugin):
         # 2.1/2.2：沙箱执行世界代码（code 脚本）或触发入口 handle(event)
         try:
             args = ctx.args
-            # 只读由平台决定：计划模式强制只读（世界目录只读 + 受控 API token 带只读前缀），
-            # readonly 参数只用于加严，不能借它关闭平台强制的只读
+            # 只读由平台决定：**计划通过前**强制只读（世界目录只读 + 受控 API token 带只读前缀）；
+            # 计划通过后本轮按自动模式执行，沙箱也就该能写——否则 AI 改完源码跑不了打包脚本，
+            # 只能手工把差异打进产物（世界 AI 2026-09-19 反馈的"手工对齐税"）。
+            # readonly 参数只用于加严，不能借它关闭平台强制的只读。
             from app.services.world.world_ai_mode import get_mode
-            readonly = get_mode(ctx.world) == "plan" or bool(args.get("readonly"))
+            plan_approved = bool((ctx.turn_state or {}).get("plan_approved"))
+            readonly = (get_mode(ctx.world) == "plan" and not plan_approved) or bool(args.get("readonly"))
             # 确保沙箱 env 注入 WORLD_API_TOKEN / WORLD_API_BASE（懒生成，worlds.config.api_token）
             from app.routers.world_proxy import ensure_world_api_token
             await ensure_world_api_token(ctx.world_repo.session, ctx.world)

@@ -9,18 +9,34 @@
 
 ### ✨ 新增功能
 
+#### 计划通过后解除沙箱只读：AI 改完源码能自己跑打包脚本
+- 世界 AI 反馈（2026-09-19）：世界页面加载的是 `dist/*.js`，而计划模式下沙箱被平台强制只读，
+  跑不了 `tools/build.py` → 每次改玩法都得「沙箱算期望文本 → 手工把差异打进 dist」，
+  这轮新增约 300 行直接导致 dist 补不完（它管这叫"手工对齐税"）
+- 修法：只读判定改成「计划模式 **且计划未通过**」——用户批准计划后本轮按自动模式执行，沙箱随之恢复可写；
+  批准前仍强制只读（原来的安全性质一点没放宽）
+
+#### 参数校验报错不再回显长文本正文
+- 世界 AI 反馈：`file_edit` 忘传 `operation` 时，报错把 `old_string`/`new_string` **全文**倒出来
+  （它两次都踩到，白烧上下文）
+- 修法：`args_brief` 对 `content / new_string / old_string / code / plan / body` 只报「已收到，N 字符」，
+  其余字段仍按 120 字截断
+
 #### 项目更名：AIsChat → Copree（不音译，前身 AIsChat）
 - 缘由：`AIsChat` 是品类描述词，等于把产品钉在"AI 聊天"这一层，而它已经是 **AI 群聊 + 可编程世界**的框架。
   **Copree** = co + pre + e（共同 · 从前 · 存在）→「我们早在从前，思维便已连接在一起」；
   与组织名 Coprexist 约分（消去共同的 Copre），剩下的 `e` + `xist` 恰好拼回 **exist**
 - 全仓显示层替换：前端 i18n 三语 / 文档 / README / 邮件 / 接口文档 / 插件文案——
   含世界 AI 的【平台信息】段（它因此知道平台叫什么，也能回答"为什么叫 Copree"）
-- 插件改名 `dsh-copree` → `dsh-copree`（目录 / 包名 / cordis patch / 文档引用；源码已改，
-  **构建产物待本地 `node scripts/build.mjs` 重建**——`lib`/`dist`/`manifest.json` 带内容哈希，不能手改）
+- 插件改名 `dsh-aischat` → `dsh-copree`（目录 / 包名 / cordis patch / 文档引用；`lib`/`dist`/`manifest.json`
+  已用 `node scripts/build.mjs` 重建，内容哈希同步刷新）
 - 打包：`AIsChat.spec` → `Copree.spec`（产物 `Copree.exe`）、`scripts/install.bat` 的安装目录与快捷方式
-- **刻意没改**（内部标识，改了会断）：DB/容器名、备份文件前缀 `copree_*`、同源代理前缀 `/copree-api`、
-  存储键 `copree-theme`、DSH 工作区目录 `Copree群视界-*`、`.copree-world.json`、历史 CHANGELOG 与旧宣传文。
-  联邦公网 ID：新实例生成 `Copree-`（没有任何代码解析此前缀，老实例保留原值即可）。
+- 协议路径、存储键、标记文件、备份前缀也一并换名（`/copree-api`、`/copree-ws`、`/copree-ui/`、
+  `/copree-worlds/*`、`copree-theme`、`.copree-world.json`、`copree_*`），**旧名一律兼容读**：
+  老世界镜像 `aischat-worlds/AIC群视界-*` 仍可用（新世界才用 `copree-worlds/Copree群视界-*`）、
+  老备份仍能列出/回档、老存储键读一次即迁移
+- **刻意没改**（部署侧）：真实域名、真实 compose/容器名、DB 名 `ai_group_*`、历史文章文件名。
+  联邦公网 ID：新实例生成 `Copree-<ULID>`（没有任何代码解析此前缀，老实例保留原值即可）。
   完整清单与理由见 `docs/BRAND.md`
 
 #### 会话起点解锁：前缀能力快照不再"等到 compact 才更新"

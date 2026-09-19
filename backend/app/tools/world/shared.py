@@ -29,14 +29,21 @@ def parse_args(arguments: str) -> dict:
 
 # 参数校验报错里回显的值上限：报错只是为了让模型看着自己发来的参数改，不是复述内容
 _ARGS_ECHO_VALUE_LIMIT = 120
+# 这几个字段本身就是几千 token 的大块内容（file_edit 的 old/new_string、file_write 的 content…）：
+# 报错里只报长度不回显内容——模型知道自己发了什么，回显纯属烧上下文（世界 AI 2026-09-19 反馈）
+_ARGS_LONG_FIELDS = {"content", "new_string", "old_string", "code", "plan", "body"}
 
 
 def args_brief(args: dict) -> str:
-    """实际收到参数的摘要（`键=值`，值截断），给参数校验报错用。"""
+    """实际收到参数的摘要（`键=值`，值截断；长文本字段只报长度），给参数校验报错用。"""
     if not args:
         return "无"
     parts = []
     for key, value in args.items():
+        if key in _ARGS_LONG_FIELDS:
+            size = len(value) if isinstance(value, str) else len(json.dumps(value, ensure_ascii=False))
+            parts.append(f"{key}=（已收到，{size} 字符）")
+            continue
         text = value if isinstance(value, str) else json.dumps(value, ensure_ascii=False)
         text = " ".join(str(text).split())
         if len(text) > _ARGS_ECHO_VALUE_LIMIT:
