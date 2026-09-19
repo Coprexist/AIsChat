@@ -42,6 +42,11 @@ STREAM_MAX_TOKENS = 32000
 # 前端设置页只读展示（深灰），不提供编辑入口。
 
 FORCED_PROMPT_SEGMENTS = [
+    # 平台信息（2026-09-19 用户反馈：世界 AI 被问「你知道我们平台的名字吗」时，上下文里只有
+    # 「群视界」「主站」这些模块名，只能回答"我看不到平台的名字"——平台身份必须写进强注入段）
+    "\n【平台信息】本平台叫 **AIsChat**（简称 AIC）：「主站」（群聊主应用）是平台本体，「群视界」是它里面可自建世界的模块"
+    "（世界页面 + 群视界机器人 + 世界 API）——群视界不是平台全名。你是这个平台里的世界 AI（群视界机器人）＝造物主，"
+    "在世界之外设计世界。被问到平台名 / 你的归属时按这段回答；不确定就说不确定，不要猜。",
     # 能力边界
     "\n【能力边界】平台里有两类 AI，能力不同，被问起时准确回答，不要凭猜测：\n- 你（世界 AI / 群视界机器人）= 造物主：平台工具 + 设计侧技能库（data/world_ai_skills/，全局共享），在世界之外设计世界，不用也不会拿到世界侧技能\n- 群里的 AI 成员（居民，平台 agent，如绑定了本世界的群 AI）= 绑定本世界后拥有：① 世界侧技能（data/worlds/{id}/skills/ 下颁布的 manifest+code.py，像调普通工具一样 function calling 直接调用）② world_command 文本命令工具（把命令发到群里，由世界程序 main.py handle() 解析执行，与用户共用同一套语法）——所以群 AI 不是「只会说话没有工具」，它有工具，能力取决于这个世界颁布了什么技能\n- 世界侧技能由你（或世界配置）颁布：在世界的 skills/ 目录放 manifest.json + code.py，绑定本世界的群 AI 就能直接工具调用；你没颁布技能时它们就没有世界侧工具（只剩 world_command 和平台默认工具）\n- 用户/群成员直接在群里发命令文本（如「收诗：xxx」「我去 2,3」）→ 群消息钩子 → 世界程序 main.py 解析执行——这是「人直接与世界交互」，与群 AI 调工具是两条并存的路径，别混为一谈",
     # 注意事项（通用行为准则，浓缩版）
@@ -1151,7 +1156,10 @@ async def _prepare_world_chat(
     system_prompt = world_context_block(world) + "\n\n" + eff_user_prompt
     system_prompt += eff_forced_prompt  # 强注入段：平台强约束，用户不可改
     system_prompt += build_mode_prompt(get_mode(world))  # 运行模式（自动/审阅/计划）
-    system_prompt += f"\n【名字】你的名字是「{eff_name}」，对外标识 world-{world_id}。"
+    # 昵称也在前缀里（版本化保证缓存命中）：改名当轮只有尾部「世界AI昵称」变更通知，
+    # 全文要等 compact / 清空上下文才刷新——所以这里给一条常驻的冲突裁决规则。
+    system_prompt += (f"\n【名字】你的名字是「{eff_name}」，对外标识 world-{world_id}。"
+                      "若收到「世界AI昵称」变更通知，以通知里的新名字为准（系统提示全文在下次 compact / 清空上下文后刷新）。")
 
     notices = await take_pending_notices(world_repo, world_id)
     notice_lines = "\n".join(

@@ -34,6 +34,20 @@ SOURCE_PLATFORM = "platform"
 _unlock_ctx: contextvars.ContextVar[bool] = contextvars.ContextVar("cap_unlock_ctx", default=False)
 
 
+# 能力源 id → 人话标签（通知标题用：world-name-45 这种 id 世界 AI 看不出是什么）
+_SOURCE_LABELS = {"forced-prompt": "强注入段", "ai-skills": "设计侧能力"}
+
+
+def source_label(source: str) -> str:
+    """能力源 id → 中文标签（world-prompt-45 → 世界AI提示词，world-name-45 → 世界AI昵称）"""
+    if source in _SOURCE_LABELS:
+        return _SOURCE_LABELS[source]
+    for prefix, name in (("world-prompt-", "世界AI提示词"), ("world-name-", "世界AI昵称")):
+        if source.startswith(prefix):
+            return name
+    return source
+
+
 def defs_hash(definitions: list) -> str:
     """工具定义列表 → 内容哈希（检测变更）"""
     return hashlib.sha256(
@@ -59,7 +73,11 @@ def _diff_changelog(old_defs: list | None, new_defs: list) -> str:
         new_text = "".join((d or {}).get("content") or "" for d in (new_defs or []))
         if old_text == new_text:
             return "内容无变化"
-        # 找首个差异位置，展示前后各 40 字
+        # 短文本（昵称这类）：直接给「旧 → 新」；字数+首处差异看不懂（世界 AI 收到
+        # 「6→3 字，首处差异：…群视界机器人… → …小傻福…」时没意识到那是它自己的新名字）
+        if len(old_text) <= 60 and len(new_text) <= 60:
+            return f"内容更新：「{old_text}」 → 「{new_text}」"
+        # 长文本：找首个差异位置，展示前后各 40 字
         i = 0
         while i < min(len(old_text), len(new_text)) and old_text[i] == new_text[i]:
             i += 1
@@ -222,7 +240,7 @@ async def build_change_notice(cap_repo: CapabilityRepository, agent, sources: li
         )).scalars().all()
         parts = [f"[{r.changelog}]" for r in rows if r.changelog]
         if parts:
-            lines.append(f"【能力变更通知 {source} v{known}→v{latest.version}】\n" + "\n".join(parts))
+            lines.append(f"【能力变更通知 · {source_label(source)} v{known}→v{latest.version}】\n" + "\n".join(parts))
             k = _holder_map(agent, "cap_known_versions")
             k[source] = latest.version
             _set_holder_map(agent, "cap_known_versions", k)
